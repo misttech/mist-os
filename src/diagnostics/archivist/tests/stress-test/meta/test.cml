@@ -16,7 +16,6 @@
 {
     include: [
         "//src/sys/test_runners/stress_test/default.shard.cml",
-        "inspect/offer.shard.cml",
         "syslog/use.shard.cml",
     ],
     program: {
@@ -30,7 +29,15 @@
             url: "fuchsia-pkg://fuchsia.com/archivist-stress-test#meta/archivist-for-embedding.cm",
         },
     ],
+    capabilities: [
+        { dictionary: "test-diagnostics" },
+    ],
     offer: [
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#archivist",
+        },
         {
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
@@ -42,12 +49,30 @@
             to: "#archivist",
         },
         {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "#archivist/diagnostics-accessors",
+            to: "#actors",
+        },
+        {
             protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
+            to: "#actors",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "self/test-diagnostics",
+        },
+        {
+            dictionary: "test-diagnostics",
+            from: "self",
+            as: "diagnostics",
             to: "#actors",
         },
     ],

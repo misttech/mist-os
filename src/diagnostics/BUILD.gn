@@ -18,6 +18,10 @@ group("diagnostics") {
     "validator",
     "//src/lib/diagnostics",
 
+    # Ensure we build the stress tests in this utility group. But don't include this in tests as we
+    # don't want to generally run them.
+    "//src/diagnostics/archivist/tests/stress-test",
+
     # Disabled due to lack of support in Clang and Rust toolchain;
     # see https://fxbug.dev/325488864.
     # "wasm",
