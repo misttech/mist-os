@@ -37,7 +37,16 @@ def metrics_processor(
 
 
 class InputLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
-    """Computes input latency metrics."""
+    """Measures the time it takes for an input event to result in user-visible change on-screen.
+
+    Calculates the time needed for an input event to progress through the through input pipeline to
+    and result in a change on the screen at vsync. Flow events in the trace enable this class to
+    reliably corellate input events to the first user-visible-output that results.
+
+    By default, this module reports aggregate latency measurements -- such as min, max, average, and
+    percentiles -- calculated across all input events generated during the test. It can be
+    configured to instead report a time series of latency measurements, one for each input event.
+    """
 
     def __init__(self, aggregates_only: bool = True):
         """Constructor.

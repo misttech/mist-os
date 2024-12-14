@@ -17,7 +17,16 @@ _DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
 
 
 class FpsMetricsProcessor(trace_metrics.MetricsProcessor):
-    """Computes FPS (Frames-per-Second) metrics."""
+    """Computes FPS (Frames-per-Second) metrics.
+
+    Calculates Scenic's frames-per-second by measuring the window between consecutive vsyncs that
+    are triggered by Scenic's frame-rendering code. Flow events in the trace enable this class to
+    reliably correlate the correct events to calculate this duration.
+
+    By default, this module reports aggregate latency measurements -- such as min, max, average, and
+    percentiles -- calculated across all frames rendered during the test. It can be
+    configured to instead report a time series of measurements, one for each event.
+    """
 
     def __init__(self, aggregates_only: bool = True):
         """Constructor.

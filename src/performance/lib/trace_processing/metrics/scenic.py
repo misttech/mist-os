@@ -18,7 +18,17 @@ _DISPLAY_VSYNC_READY_EVENT_NAME: str = "Display::Fence::OnReady"
 
 
 class ScenicMetricsProcessor(trace_metrics.MetricsProcessor):
-    """Computes scenic metrics."""
+    """Computes CPU and GPU time spent rendering frames in Scenic.
+
+    Calculates total time-to-render-frame by measuring from the moment that Scenic reports it has
+    begun computing frame contents to the moment that is ready for vsync. Also tracks time spent on
+    CPU-bound operations for each frame. Flow events in the trace enable this class to reliably
+    correlate the correct events to calculate this duration.
+
+    By default, this module reports aggregate latency measurements -- such as min, max, average, and
+    percentiles -- calculated across all frames rendered during the test. It can be
+    configured to instead report a time series of measurements, one for each event.
+    """
 
     def __init__(self, aggregates_only: bool = True):
         """Constructor.
