@@ -70,12 +70,14 @@ impl ConnectionSelectionRequester {
     }
     pub async fn do_roam_selection(
         &mut self,
+        scan_type: fidl_common::ScanType,
         network_id: types::NetworkIdentifier,
         credential: network_config::Credential,
     ) -> Result<Option<types::ScannedCandidate>, anyhow::Error> {
         let (sender, receiver) = oneshot::channel();
         self.sender
             .try_send(ConnectionSelectionRequest::RoamSelection {
+                scan_type,
                 network_id,
                 credential,
                 responder: sender,
@@ -93,6 +95,7 @@ pub enum ConnectionSelectionRequest {
         responder: oneshot::Sender<Option<types::ScannedCandidate>>,
     },
     RoamSelection {
+        scan_type: fidl_common::ScanType,
         network_id: types::NetworkIdentifier,
         credential: network_config::Credential,
         responder: oneshot::Sender<Option<types::ScannedCandidate>>,
@@ -111,6 +114,7 @@ pub trait ConnectionSelectorApi {
     // Find best roam candidate.
     async fn find_and_select_roam_candidate(
         &self,
+        scan_type: fidl_common::ScanType,
         network: types::NetworkIdentifier,
         credential: &network_config::Credential,
     ) -> Option<types::ScannedCandidate>;
@@ -131,8 +135,8 @@ pub async fn serve_connection_selection_request_loop(
                         // sender from responding.
                         let _ = responder.send(selected);
                     }
-                    ConnectionSelectionRequest::RoamSelection { network_id, credential, responder } => {
-                        let selected = connection_selector.find_and_select_roam_candidate(network_id, &credential).await;
+                    ConnectionSelectionRequest::RoamSelection { scan_type, network_id, credential, responder } => {
+                        let selected = connection_selector.find_and_select_roam_candidate(scan_type, network_id, &credential).await;
                         // It's acceptable for the receiver to close the channel, preventing this
                         // sender from responding.
                         let _ = responder.send(selected);
@@ -330,6 +334,33 @@ impl ConnectionSelector {
             Err(()) => scanned_candidate,
         }
     }
+
+    // Find scan results in provided network
+    async fn roam_scan(
+        &self,
+        scan_type: fidl_common::ScanType,
+        network: types::NetworkIdentifier,
+    ) -> Vec<types::ScanResult> {
+        let ssids = match scan_type {
+            fidl_common::ScanType::Passive => vec![],
+            fidl_common::ScanType::Active => vec![network.ssid.clone()],
+        };
+        self.scan_requester
+            .perform_scan(ScanReason::RoamSearch, ssids, vec![])
+            .await
+            .unwrap_or_else(|e| {
+                error!("{}", format_err!("Error scanning: {:?}", e));
+                vec![]
+            })
+            .into_iter()
+            .filter(|s| {
+                s.ssid == network.ssid
+                    && network
+                        .security_type
+                        .is_compatible_with_scanned_type(&s.security_type_detailed)
+            })
+            .collect::<Vec<_>>()
+    }
 }
 
 #[async_trait(?Send)]
@@ -405,57 +436,22 @@ impl ConnectionSelectorApi for ConnectionSelector {
     /// to ensure the network config matches.
     async fn find_and_select_roam_candidate(
         &self,
+        scan_type: fidl_common::ScanType,
         network: types::NetworkIdentifier,
         credential: &network_config::Credential,
     ) -> Option<types::ScannedCandidate> {
-        // Scan for APs in this network
-        // TODO(https://fxbug.dev/42082248) Use an active scan in cases where a faster scan is justified.
-        let mut matching_scans = self
-            .scan_requester
-            .perform_scan(ScanReason::RoamSearch, vec![], vec![])
-            .await
-            .unwrap_or_else(|e| {
-                error!("{}", format_err!("Error scanning: {:?}", e));
-                vec![]
-            })
-            .into_iter()
-            .filter(|s| {
-                s.ssid == network.ssid
-                    && network
-                        .security_type
-                        .is_compatible_with_scanned_type(&s.security_type_detailed)
-            })
-            .collect::<Vec<_>>();
-
-        // If no APs were found, do an active scan. If the network is not hidden, at least 1 scan
-        // result should be seen since the AP is close enough to be connected to.
-        if matching_scans.is_empty() {
-            match self
-                .scan_requester
-                .perform_scan(ScanReason::RoamSearch, vec![network.ssid.clone()], vec![])
-                .await
-            {
-                Ok(scan_results) => {
-                    matching_scans = scan_results
-                        .into_iter()
-                        .filter(|s| {
-                            network
-                                .security_type
-                                .is_compatible_with_scanned_type(&s.security_type_detailed)
-                        })
-                        .collect()
-                }
-                Err(e) => {
-                    info!("Active scan to find hidden APs to roam to failed: {:?}", e);
-                    return None;
-                }
-            }
+        // Scan for APs in the provided network.
+        let mut matching_scan_results = self.roam_scan(scan_type, network.clone()).await;
+        if matching_scan_results.is_empty() && scan_type == fidl_common::ScanType::Passive {
+            info!("No scan results seen in passive roam scan. Active scanning.");
+            matching_scan_results =
+                self.roam_scan(fidl_common::ScanType::Active, network.clone()).await;
         }
 
         let mut candidates = Vec::new();
         // All APs should be grouped in the same scan result based on SSID and security,
         // but combine all if there are multiple scan results.
-        for mut s in matching_scans {
+        for mut s in matching_scan_results {
             if let Some(config) = self
                 .saved_network_manager
                 .lookup(&network)
@@ -470,7 +466,6 @@ impl ConnectionSelectorApi for ConnectionSelector {
                 warn!("Failed to find config for network to roam from");
             }
         }
-
         // Choose the best AP
         bss_selection::select_bss(
             candidates,
@@ -740,8 +735,8 @@ mod tests {
     use crate::util::testing::fakes::{FakeSavedNetworksManager, FakeScanRequester};
     use crate::util::testing::{
         create_inspect_persistence_channel, generate_channel, generate_random_bss,
-        generate_random_connect_reason, generate_random_scan_result,
-        generate_random_scanned_candidate,
+        generate_random_connect_reason, generate_random_network_identifier,
+        generate_random_password, generate_random_scan_result, generate_random_scanned_candidate,
     };
     use diagnostics_assertions::{assert_data_tree, AnyNumericProperty};
     use futures::task::Poll;
@@ -1710,6 +1705,87 @@ mod tests {
         );
     }
 
+    #[test_case(fidl_common::ScanType::Active)]
+    #[test_case(fidl_common::ScanType::Passive)]
+    #[fuchsia::test(add_test_attr = false)]
+    fn find_and_select_roam_candidate_requests_typed_scan(scan_type: fidl_common::ScanType) {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = exec.run_singlethreaded(test_setup(true));
+        let connection_selector = test_values.connection_selector;
+
+        let test_id = types::NetworkIdentifier {
+            ssid: types::Ssid::try_from("foo").unwrap(),
+            security_type: types::SecurityType::Wpa3,
+        };
+        let credential = generate_random_password();
+
+        // Set a scan result to be returned
+        exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![
+            types::ScanResult {
+                ssid: test_id.ssid.clone(),
+                security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
+                compatibility: types::Compatibility::Supported,
+                entries: vec![],
+            },
+        ])));
+
+        // Kick off roam selection
+        let roam_selection_fut = connection_selector.find_and_select_roam_candidate(
+            scan_type,
+            test_id.clone(),
+            &credential,
+        );
+        let mut roam_selection_fut = pin!(roam_selection_fut);
+        let _ = exec.run_singlethreaded(&mut roam_selection_fut);
+
+        // Check that the right scan request was sent
+        if scan_type == fidl_common::ScanType::Active {
+            assert_eq!(
+                *exec.run_singlethreaded(test_values.scan_requester.scan_requests.lock()),
+                vec![(ScanReason::RoamSearch, vec![test_id.ssid.clone()], vec![])]
+            );
+        } else {
+            assert_eq!(
+                *exec.run_singlethreaded(test_values.scan_requester.scan_requests.lock()),
+                vec![(ScanReason::RoamSearch, vec![], vec![])]
+            );
+        }
+    }
+
+    #[fuchsia::test]
+    fn find_and_select_roam_candidate_active_scans_if_no_results_found() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = exec.run_singlethreaded(test_setup(true));
+        let connection_selector = test_values.connection_selector;
+
+        let test_id = generate_random_network_identifier();
+        let credential = generate_random_password();
+
+        // Set empty scan results to be returned.
+        exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![])));
+        exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![])));
+
+        // Kick off roam selection with a passive scan.
+        let roam_selection_fut = connection_selector.find_and_select_roam_candidate(
+            fidl_common::ScanType::Passive,
+            test_id.clone(),
+            &credential,
+        );
+
+        let mut roam_selection_fut = pin!(roam_selection_fut);
+        let _ = exec.run_singlethreaded(&mut roam_selection_fut);
+
+        // Check that two scan requests were issued, one passive scan and one active scan when the
+        // passive scan yielded no results.
+        assert_eq!(
+            *exec.run_singlethreaded(test_values.scan_requester.scan_requests.lock()),
+            vec![
+                (ScanReason::RoamSearch, vec![], vec![]),
+                (ScanReason::RoamSearch, vec![test_id.ssid.clone()], vec![])
+            ]
+        );
+    }
+
     #[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
     #[fuchsia::test]
     async fn recorded_metrics_on_scan() {
@@ -1813,6 +1889,7 @@ mod tests {
         }
         async fn find_and_select_roam_candidate(
             &self,
+            _scan_type: fidl_common::ScanType,
             _network: types::NetworkIdentifier,
             _credential: &network_config::Credential,
         ) -> Option<types::ScannedCandidate> {
@@ -1875,9 +1952,11 @@ mod tests {
         let mut requester = ConnectionSelectionRequester { sender: request_sender };
 
         // Call request method
-        let mut roam_selection_fut =
-            pin!(requester
-                .do_roam_selection(candidate.network.clone(), candidate.credential.clone()));
+        let mut roam_selection_fut = pin!(requester.do_roam_selection(
+            fidl_common::ScanType::Passive,
+            candidate.network.clone(),
+            candidate.credential.clone()
+        ));
         assert_variant!(exec.run_until_stalled(&mut roam_selection_fut), Poll::Pending);
 
         // Run the service loop forward

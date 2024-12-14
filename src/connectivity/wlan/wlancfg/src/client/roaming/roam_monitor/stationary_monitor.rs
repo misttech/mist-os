@@ -13,7 +13,10 @@ use async_trait::async_trait;
 use futures::lock::Mutex;
 use std::sync::Arc;
 use tracing::{error, info};
-use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
+    fuchsia_async as fasync,
+};
 
 /// Minimum wait time between roam scans if there are no new roam reasons. The time between roam
 /// scans increases with a backoff, since subsequent scans are unlikely to have a different result.
@@ -165,10 +168,13 @@ impl StationaryMonitor {
                 roam_reasons.clone();
             self.connection_data.previous_roam_scan_data.rssi_prev_roam_scan = rssi;
             info!("Initiating roam search for roam reasons: {:?}", roam_reasons);
-            return RoamTriggerDataOutcome::RoamSearch(
-                self.connection_data.network_identifier.clone(),
-                self.connection_data.credential.clone(),
-            );
+            // Stationary monitor uses active roam scans to prioritize shorter scan times over power
+            // consumption.
+            return RoamTriggerDataOutcome::RoamSearch {
+                scan_type: fidl_common::ScanType::Active,
+                network_identifier: self.connection_data.network_identifier.clone(),
+                credential: self.connection_data.credential.clone(),
+            };
         }
         RoamTriggerDataOutcome::Noop
     }
@@ -391,6 +397,41 @@ mod test {
             }
             _ => assert_variant!(result, RoamTriggerDataOutcome::RoamSearch { .. }),
         }
+    }
+
+    #[fuchsia::test]
+    fn test_stationary_monitor_uses_active_scans() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::now());
+
+        // Setup monitor with connection data that would trigger a roam scan due to SNR below
+        // threshold. Set the EWMA weights to 1 so the values can be easily changed later in tests.
+        let rssi = LOCAL_ROAM_THRESHOLD_RSSI_2G + 1.0;
+        let snr = LOCAL_ROAM_THRESHOLD_SNR_5G - 1.0;
+        let connection_data = RoamingConnectionData {
+            signal_data: EwmaSignalData::new(rssi, snr, 1),
+            ..generate_random_roaming_connection_data()
+        };
+        let mut test_values = setup_test_with_data(connection_data);
+
+        // Generate trigger data with same signal values as initial, which would trigger a roam
+        // search due to the below threshold SNR.
+        let trigger_data =
+            RoamTriggerData::SignalReportInd(fidl_internal::SignalReportIndication {
+                rssi_dbm: rssi as i8,
+                snr_db: snr as i8,
+            });
+
+        // Advance the time so that we allow roam scanning
+        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::MonotonicDuration::from_hours(
+            1,
+        )));
+
+        // Send trigger data, and verify that the roam scan type is Active.
+        assert_variant!(
+            run_handle_roam_trigger_data(&mut exec, &mut test_values.monitor, trigger_data.clone()),
+            RoamTriggerDataOutcome::RoamSearch { scan_type: fidl_common::ScanType::Active, .. }
+        );
     }
 
     #[fuchsia::test]
