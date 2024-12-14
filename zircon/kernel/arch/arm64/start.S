@@ -64,12 +64,10 @@ handoff_paddr           .req x25
 .endm
 
 // This code is purely position-independent and generates no relocations
-// that need boot-time fixup; gen-kaslr-fixup.sh ensures this (and would
-// ignore it if this code were in .text.boot, so don't put it there).
+// that need boot-time fixup.
 .text
 FUNCTION(_start)
-.globl PhysbootHandoff
-PhysbootHandoff = _start
+.label PhysbootHandoff, global
 
     // As early as possible collect the time stamp.
     sample_ticks
@@ -126,19 +124,6 @@ PhysbootHandoff = _start
     // the trampoline page tables. If we're a secondary we can jump straight to
     // enabling paging.
     cbnz    cpuid, .Lmmu_enable
-
-    // When using zbi-start.S, it needs the kernel_vaddr in x0.
-    // Use a direct jump there and back so it doesn't need to spill
-    // x30 someplace to make its call.
-    mov     x0, kernel_vaddr
-    b       ImageFixup
-.globl AfterImageFixup
-AfterImageFixup:
-
-    // When not using zbi-start.S, physboot has taken care of both
-    // relocation and zeroing .bss already.
-.weak ImageFixup
-ImageFixup = AfterImageFixup
 
     /* set up a functional stack pointer */
     adr_global tmp, boot_cpu_kstack_end
@@ -377,10 +362,6 @@ END_DATA(boot_cpu_shadow_call_kstack)
 DATA(tt_trampoline)
     .skip 8 * MMU_IDENT_PAGE_TABLE_ENTRIES_TOP
 END_DATA(tt_trampoline)
-
-// This symbol is used by image.S
-.global IMAGE_ELF_ENTRY
-IMAGE_ELF_ENTRY = _start
 
 // This symbol is used by gdb python to know the base of the kernel module
 .global KERNEL_BASE_ADDRESS

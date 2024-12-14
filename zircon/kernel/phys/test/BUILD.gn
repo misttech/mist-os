@@ -531,13 +531,6 @@ if (current_toolchain != default_toolchain) {
     ]
   }
 
-  zbi_test("physboot-zbi-kernel-core-tests") {
-    deps = [
-      ":physboot-zbi-kernel-test-zircon",
-      "//zircon/system/utest/core:core-tests-standalone($default_toolchain)",
-    ]
-  }
-
   kernel_elf_binary("physboot-elf-kernel-hello-world-test") {
     testonly = true
     output_name = "physzircon"
@@ -629,10 +622,6 @@ if (current_toolchain != default_toolchain) {
         ":efi-memory-test",
         ":efi-shell-smoke-test",
       ]
-    }
-
-    if (!use_elf_kernel) {
-      deps += [ ":physboot-zbi-kernel-core-tests" ]
     }
 
     if (have_devicetree) {

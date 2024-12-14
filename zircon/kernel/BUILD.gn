@@ -528,10 +528,7 @@ if (is_kernel) {
     inputs = [ "kernel.ld" ]
     configs += [ ":kernel_defsym" ]
 
-    deps = [
-      ":zircon-main",
-      "arch/$zircon_cpu:zbi-kernel-image",
-    ]
+    deps = [ ":zircon-main" ]
   }
 
   kernel_elf_binary("physzircon") {
@@ -714,7 +711,9 @@ if (is_kernel) {
       deps += [ ":validate-kernel-symbols" ]
     }
 
-    sources = [ "arch/$zircon_cpu/image.S" ]
+    if (!use_elf_kernel) {
+      sources = [ "arch/$zircon_cpu/image.S" ]
+    }
 
     include_dirs = [ "." ]  # For kernel-image.inc.
 
