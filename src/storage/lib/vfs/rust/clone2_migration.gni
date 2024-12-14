@@ -1,9 +1,0 @@
-# Copyright 2024 The Fuchsia Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
-# found in the LICENSE file.
-
-# TODO(https://fxbug.dev/324080864): Remove this file when Clone2 has migrated to Clone.
-declare_args() {
-  # Temporary variable used to transition out-of-tree fuchsia.unknown/Cloneable servers.
-  use_clone2_signature = false
-}
