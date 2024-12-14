@@ -103,6 +103,9 @@
         "zx/Off": {
           "kind": "alias"
         },
+        "zx/Signals": {
+          "kind": "alias"
+        },
         "zx/Status": {
           "kind": "alias"
         },

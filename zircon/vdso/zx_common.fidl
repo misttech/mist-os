@@ -47,6 +47,10 @@ alias Koid = uint64;
 // zx_off_t: offset.
 alias Off = uint64;
 
+// TODO(https://fxbug.dev/42061412): This should be modeled as a `bits`, but more thought
+// needs to be given to the public/private split of the current C definition.
+alias Signals = uint32;
+
 // TODO(https://fxbug.dev/42128146): These are currently duplicated with zircon/types.h.
 // Eventually the definitions in zircon/types.h will be generated from this
 // source.

@@ -3,10 +3,6 @@
 // found in the LICENSE file.
 library zx;
 
-// TODO(https://fxbug.dev/42061412): This should be modeled as a `bits`, but more thought
-// needs to be given to the public/private split of the current C definition.
-alias Signals = uint32;
-
 const WAIT_MANY_MAX_ITEMS usize64 = 64;
 
 // TODO(scottmg): Apply rights spec from WaitMany on |items| to |handle| here,
