@@ -66,7 +66,7 @@ impl From<LogCommand> for LogFilterCriteria {
             exclude_tags: cmd.exclude_tags,
             pid: cmd.pid,
             tid: cmd.tid,
-            interest_selectors: cmd.select.into_iter().chain(cmd.set_severity).collect(),
+            interest_selectors: cmd.set_severity,
         }
     }
 }

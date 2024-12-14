@@ -403,7 +403,7 @@ impl LogCommand {
     async fn map_interest_selectors<'a>(
         realm_query: &impl InstanceGetter,
         interest_selectors: impl Iterator<Item = &'a LogInterestSelector>,
-    ) -> Result<Vec<Cow<'a, LogInterestSelector>>, LogError> {
+    ) -> Result<impl Iterator<Item = Cow<'a, LogInterestSelector>>, LogError> {
         let selectors = Self::get_selectors_and_monikers(interest_selectors);
         let mut translated_selectors = vec![];
         for (moniker, selector) in selectors {
@@ -454,7 +454,7 @@ impl LogCommand {
 
             ffx_bail!("{}", String::from_utf8(err_output)?);
         }
-        Ok(translated_selectors.into_iter().map(|(selector, _)| selector).collect())
+        Ok(translated_selectors.into_iter().map(|(selector, _)| selector))
     }
 
     /// Sets interest based on configured selectors.
@@ -474,24 +474,21 @@ impl LogCommand {
                 new_flag: "--force-set-severity",
             });
         }
-        let all_selectors = self
-            .select
-            .iter()
-            .cloned()
-            .chain(self.set_severity.iter().cloned())
-            .collect::<Vec<_>>();
-        let mut selectors: Cow<'_, Vec<_>> = Cow::Borrowed(&all_selectors);
-        if !(selectors.is_empty() || self.force_select || self.force_set_severity) {
-            let new_selectors = Self::map_interest_selectors(realm_query, selectors.iter()).await?;
-            if !new_selectors.is_empty() {
-                selectors = Cow::Owned(
-                    new_selectors.into_iter().map(|selector| selector.into_owned()).collect(),
-                );
-            }
+        if !self.set_severity.is_empty() {
+            let selectors = if self.force_set_severity {
+                Cow::Borrowed(&self.set_severity)
+            } else {
+                Cow::Owned(
+                    Self::map_interest_selectors(realm_query, self.set_severity.iter())
+                        .await?
+                        .map(|s| s.into_owned())
+                        .collect::<Vec<_>>(),
+                )
+            };
+
+            log_settings_client.set_interest(&selectors).await?;
         }
-        if !all_selectors.is_empty() {
-            log_settings_client.set_interest(selectors.as_ref()).await?;
-        }
+
         Ok(())
     }
 
