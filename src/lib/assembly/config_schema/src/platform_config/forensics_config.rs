@@ -2,15 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use camino::Utf8PathBuf;
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Configuration options for the forensics area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(default, deny_unknown_fields)]
 pub struct ForensicsConfig {
     pub feedback: FeedbackConfig,
+    #[file_relative_paths]
     pub cobalt: CobaltConfig,
 }
 
@@ -26,9 +29,12 @@ pub struct FeedbackConfig {
 }
 
 /// Configuration options for the cobalt configuration area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(default, deny_unknown_fields)]
 pub struct CobaltConfig {
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub api_key: Option<Utf8PathBuf>,
+    #[file_relative_paths]
+    pub api_key: Option<FileRelativePathBuf>,
 }

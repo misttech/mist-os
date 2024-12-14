@@ -284,7 +284,7 @@ Resulting product is not supported and may misbehave!
 
     // Add product-specified memory buckets.
     if let Some(buckets) = platform.diagnostics.memory_monitor.buckets {
-        builder.add_memory_buckets(&vec![buckets])?;
+        builder.add_memory_buckets(&vec![buckets.into()])?;
     }
 
     // Add any packages compiled by the assembly process itself

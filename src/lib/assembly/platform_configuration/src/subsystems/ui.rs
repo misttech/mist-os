@@ -186,7 +186,7 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             .directory("sensor-config");
         if let Some(sensor_config_path) = &ui_config.sensor_config {
             config_dir.entry(FileEntry {
-                source: sensor_config_path.clone(),
+                source: sensor_config_path.clone().into(),
                 destination: "config.json".into(),
             })?;
         }

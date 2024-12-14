@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use camino::Utf8PathBuf;
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use input_device_constants::InputDeviceType as PlatformInputDeviceType;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the UI area.
-#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformUiConfig {
     /// Whether UI should be enabled on the product.
@@ -16,7 +16,8 @@ pub struct PlatformUiConfig {
 
     /// The sensor config to provide to the input pipeline.
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub sensor_config: Option<Utf8PathBuf>,
+    #[file_relative_paths]
+    pub sensor_config: Option<FileRelativePathBuf>,
 
     /// The minimum frame duration for frame scheduler.
     pub frame_scheduler_min_predicted_frame_duration_in_us: u64,

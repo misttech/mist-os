@@ -30,21 +30,21 @@ impl DefineSubsystemConfiguration<SetUiConfig> for SetUiSubsystem {
 
             if let Some(display) = &config.display {
                 builder.package("setui_service").config_data(FileEntry {
-                    source: display.clone(),
+                    source: display.clone().into(),
                     destination: "display_configuration.json".into(),
                 })?;
             }
 
             if let Some(interface) = &config.interface {
                 builder.package("setui_service").config_data(FileEntry {
-                    source: interface.clone(),
+                    source: interface.clone().into(),
                     destination: "interface_configuration.json".into(),
                 })?;
             }
 
             if let Some(agent) = &config.agent {
                 builder.package("setui_service").config_data(FileEntry {
-                    source: agent.clone(),
+                    source: agent.clone().into(),
                     destination: "agent_configuration.json".into(),
                 })?;
             }
