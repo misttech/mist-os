@@ -31,7 +31,10 @@ use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ENODATA};
 use starnix_uapi::file_mode::FileMode;
-use starnix_uapi::{errno, error};
+use starnix_uapi::{
+    errno, error, FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION,
+    FS_IOC_SETFLAGS, FS_IOC_SETVERSION,
+};
 use std::collections::HashSet;
 use std::sync::{Arc, OnceLock};
 
@@ -917,18 +920,30 @@ pub(super) fn check_file_ioctl_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     file: &FileObject,
+    request: u32,
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
     let mode = file.node().info().mode;
     let file_class = file_class_from_file_mode(mode)?;
     let subject_sid = current_task.security_state.lock().current_sid;
-    has_file_permissions(&permission_check, subject_sid, file, &[])?;
+    has_file_permissions(&permission_check,subject_sid, file, &[])?;
+    let permissions: &[Permission] = match request {
+        // The NSA report also has `FIBMAP` follow this branch.
+        FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => {
+            &[CommonFilePermission::GetAttr.for_class(file_class)]
+        }
+        FS_IOC_SETFLAGS | FS_IOC_SETVERSION => {
+            &[CommonFilePermission::SetAttr.for_class(file_class)]
+        }
+        FIONBIO | FIOASYNC => &[],
+        _ => &[CommonFilePermission::Ioctl.for_class(file_class)],
+    };
     todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/364569179", "ioctl"),
         &permission_check,
         subject_sid,
         &file.name.entry.node,
-        &[CommonFilePermission::Ioctl.for_class(file_class)],
+        permissions,
     )
 }
 

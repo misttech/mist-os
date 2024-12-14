@@ -387,10 +387,14 @@ pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
 
 /// Returns whether `current_task` can issue an ioctl to `file`.
 /// Corresponds to the `file_ioctl()` LSM hook.
-pub fn check_file_ioctl_access(current_task: &CurrentTask, file: &FileObject) -> Result<(), Errno> {
+pub fn check_file_ioctl_access(
+    current_task: &CurrentTask,
+    file: &FileObject,
+    request: u32,
+) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_file_ioctl_access");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::check_file_ioctl_access(security_server, current_task, file)
+        selinux_hooks::check_file_ioctl_access(security_server, current_task, file, request)
     })
 }
 
