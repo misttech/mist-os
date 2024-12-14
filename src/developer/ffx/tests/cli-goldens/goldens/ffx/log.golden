@@ -34,7 +34,19 @@
       "optionality": "repeating",
       "long": "--moniker",
       "short": null,
-      "description": "filter for a component moniker. May be repeated.",
+      "description": "DEPRECATED: use --component",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "component"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--component",
+      "short": null,
+      "description": "fuzzy search for a component by moniker or url. May be repeated.",
       "hidden": false
     },
     {
@@ -90,7 +102,7 @@
       "optionality": "optional",
       "long": "--kernel",
       "short": null,
-      "description": "outputs only kernel logs. Overrides any other moniker specified.",
+      "description": "outputs only kernel logs, unless combined with --component.",
       "hidden": false
     },
     {

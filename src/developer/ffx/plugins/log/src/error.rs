@@ -49,9 +49,12 @@ impl From<log_command::LogError> for LogError {
         use log_command::LogError::*;
         let err: fho::Error = match value {
             UnknownError(err) => err.into(),
-            DumpWithSinceNow | NoBootTimestamp | NoSymbolizerConfig | DeprecatedFlag { .. } => {
-                fho::Error::User(value.into())
-            }
+            FuzzyMatchTooManyMatches(_)
+            | SearchParameterNotFound(_)
+            | DumpWithSinceNow
+            | NoBootTimestamp
+            | NoSymbolizerConfig
+            | DeprecatedFlag { .. } => fho::Error::User(value.into()),
             IOError(err) => fho::Error::Unexpected(err.into()),
             FfxError(err) => err.into(),
             Utf8Error(err) => fho::Error::Unexpected(err.into()),

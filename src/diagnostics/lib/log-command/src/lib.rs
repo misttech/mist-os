@@ -181,10 +181,14 @@ pub struct LogCommand {
     #[argh(option)]
     pub filter: Vec<String>,
 
-    /// filter for a component moniker.
-    /// May be repeated.
+    /// DEPRECATED: use --component
     #[argh(option)]
     pub moniker: Vec<String>,
+
+    /// fuzzy search for a component by moniker or url.
+    /// May be repeated.
+    #[argh(option)]
+    pub component: Vec<String>,
 
     /// exclude a string in either the message, component or url.
     /// May be repeated.
@@ -204,7 +208,7 @@ pub struct LogCommand {
     #[argh(option, default = "Severity::Info")]
     pub severity: Severity,
 
-    /// outputs only kernel logs. Overrides any other moniker specified.
+    /// outputs only kernel logs, unless combined with --component.
     #[argh(switch)]
     pub kernel: bool,
 
@@ -305,6 +309,7 @@ impl Default for LogCommand {
         LogCommand {
             filter: vec![],
             moniker: vec![],
+            component: vec![],
             exclude: vec![],
             tag: vec![],
             exclude_tags: vec![],
@@ -380,6 +385,24 @@ pub enum LogError {
     FormatterError(#[from] FormatterError),
     #[error("Deprecated flag: `{flag}`, use: `{new_flag}`")]
     DeprecatedFlag { flag: &'static str, new_flag: &'static str },
+    #[error(
+        "Fuzzy matching failed due to too many matches, please re-try with one of these:\n{0}"
+    )]
+    FuzzyMatchTooManyMatches(String),
+    #[error("No running components were found matching {0}")]
+    SearchParameterNotFound(String),
+}
+
+impl LogError {
+    fn too_many_fuzzy_matches(matches: impl Iterator<Item = String>) -> Self {
+        let mut result = String::new();
+        for component in matches {
+            result.push_str(&component);
+            result.push('\n');
+        }
+
+        Self::FuzzyMatchTooManyMatches(result)
+    }
 }
 
 /// Trait used to get available instances given a moniker query.
@@ -457,14 +480,7 @@ impl LogCommand {
         Ok(translated_selectors.into_iter().map(|(selector, _)| selector))
     }
 
-    /// Sets interest based on configured selectors.
-    /// If a single ambiguous match is found, the monikers in the selectors
-    /// are automatically re-written.
-    pub async fn maybe_set_interest(
-        &self,
-        log_settings_client: &LogSettingsProxy,
-        realm_query: &impl InstanceGetter,
-    ) -> Result<(), LogError> {
+    pub fn validate_cmd_flags_with_warnings(&mut self) -> Result<Vec<&'static str>, LogError> {
         if !self.select.is_empty() {
             return Err(LogError::DeprecatedFlag { flag: "--select", new_flag: "--set-severity" });
         }
@@ -474,6 +490,29 @@ impl LogCommand {
                 new_flag: "--force-set-severity",
             });
         }
+
+        let mut warnings = vec![];
+
+        if !self.moniker.is_empty() {
+            warnings.push("WARNING: --moniker is deprecated, use --component instead");
+            if self.component.is_empty() {
+                self.component = std::mem::take(&mut self.moniker);
+            } else {
+                warnings.push("WARNING: ignoring --moniker arguments in favor of --component");
+            }
+        }
+
+        Ok(warnings)
+    }
+
+    /// Sets interest based on configured selectors.
+    /// If a single ambiguous match is found, the monikers in the selectors
+    /// are automatically re-written.
+    pub async fn maybe_set_interest(
+        &self,
+        log_settings_client: &LogSettingsProxy,
+        realm_query: &impl InstanceGetter,
+    ) -> Result<(), LogError> {
         if !self.set_severity.is_empty() {
             let selectors = if self.force_set_severity {
                 Cow::Borrowed(&self.set_severity)
