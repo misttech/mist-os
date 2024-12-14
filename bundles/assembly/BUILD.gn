@@ -119,7 +119,6 @@ assembly_input_bundle("embeddable") {
   bootfs_files_labels = [
     "//build/info/bootfs",
     "//src/bringup:bootfs",
-    "//src/sys/component_manager:bootfs",
   ]
   bootfs_packages = [
     "//src/bringup/bin/critical-services:package",
@@ -157,6 +156,29 @@ assembly_input_bundle("embeddable") {
     {
       package_target = "//src/devices/bus/drivers/platform:package"
       driver_components = [ "meta/platform-bus.cm" ]
+    },
+  ]
+}
+
+# This AIB contains Component Manager without tracing enabled.
+assembly_input_bundle("component_manager") {
+  bootfs_files_labels = [ "//src/sys/component_manager:bootfs" ]
+}
+
+# This AIB contains Component Manager with tracing, which should not
+# be used in memory-constrained builds.
+assembly_input_bundle("component_manager_with_tracing") {
+  bootfs_files_labels = [ "//src/sys/component_manager:bootfs_with_tracing" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = [ "//src/sys/component_manager/meta/component_manager_root_trace.root_shard.cml" ]
+        },
+      ]
     },
   ]
 }

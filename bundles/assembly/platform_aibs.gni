@@ -16,6 +16,10 @@ bootstrap_user_platform_aib_names = [
   # The embeddable feature-set-level
   "embeddable",
 
+  # component_manager is separate from embeddable so that
+  # component_manager_with_tracing can be used instead.
+  "component_manager",
+
   # The bootstrap feature-set-level
   "bootstrap",
 
@@ -361,6 +365,10 @@ eng_only_platform_aib_names =
       # SSH Config for eng only
       "core_realm_development_access_eng",
 
+      # This isn't in all eng builds, but is in some,
+      #and not in any non-eng builds.
+      "component_manager_with_tracing",
+
       # The minimal additions for eng build-type assemblies
       "standard_eng",
 
@@ -412,6 +420,7 @@ eng_platform_aib_names =
 
 required_user_aib_names = [
   "embeddable",
+  "component_manager",
   "bootstrap",
   "core_realm",
   "core_realm_user_and_userdebug",

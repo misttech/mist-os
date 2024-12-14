@@ -1,5 +1,6 @@
 {
     debug: false,
+    trace_provider: "root_exposed",
     maintain_utc_clock: true,
     use_builtin_process_launcher: true,
     num_threads: 2,
