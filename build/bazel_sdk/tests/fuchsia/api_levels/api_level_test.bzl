@@ -29,6 +29,16 @@ level_setting_test = analysistest.make(
     },
 )
 
+level_setting_test_no_checks_test = analysistest.make(
+    _level_setting_test_impl,
+    attrs = {
+        "expected_level": attr.string(),
+    },
+    config_settings = {
+        "@fuchsia_sdk//fuchsia:fuchsia_targets_enabled": False,
+    },
+)
+
 def _make_test_fuchsia_api_level(name, level):
     fuchsia_api_level(
         name = name,
@@ -96,6 +106,13 @@ def _test_level_setting():
         target_under_test = ":unset",
         expected_failure_message = '`@//fuchsia/api_levels:unset` has not been set to an API level. Has an API level been specified for this target? Valid API levels are ["',
         tags = ["manual"],
+    )
+
+    # test that we can skip the validation
+    level_setting_test_no_checks_test(
+        name = "test_no_validation_empty_string",
+        target_under_test = "unset",
+        expected_level = "",
     )
 
 # Failure tests
@@ -175,6 +192,7 @@ def fuchsia_api_level_test_suite(name, **kwargs):
             ":test_setting_head",
             ":test_setting_platform",
             ":test_unset",
+            ":test_no_validation_empty_string",
 
             # _test_level_setting_failures tests
             ":test_setting_unknown_string",

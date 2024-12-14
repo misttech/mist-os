@@ -7,6 +7,7 @@
 # NOTE: INTERNAL_ONLY_VALID_TARGET_APIS is part of the generated content of @fuchsia_sdk
 # and does not exist in @rules_fuchsia.
 load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
 # We define the provider in this file because it is a private implementation
 # detail in this file. It is only made public so that it can be used in tests.
@@ -128,21 +129,25 @@ def u32_for_fuchsia_api_level_or_none(api_level):
 def _fuchsia_api_level_impl(ctx):
     raw_level = ctx.build_setting_value
 
-    if raw_level == "":
-        # All we know is that this rule is being analyzed with the level set to the empty string,
-        # which is the default, and the label of the rule. We do not know why the rule is being
-        # analyzed, though most likely it is FUCHSIA_API_LEVEL_TARGET_NAME being analyzed for a
-        # target after `fuchsia_transition`, meaning none of the API level mechanisms were set.
-        fail("ERROR: `{}` has not been set to an API level. Has an API level been specified for this target? Valid API levels are {}".format(
-            ctx.label,
-            _valid_api_level_names(),
-        ))
+    # Only validate targets if fuchsia_targets_enabled is true. The fuchsia_targets_enabled flag
+    # defaults to true and is only enabled in repositories which have infrastructure settings that
+    # require it.
+    if ctx.attr._fuchsia_targets_enabled_flag[BuildSettingInfo].value:
+        if raw_level == "":
+            # All we know is that this rule is being analyzed with the level set to the empty string,
+            # which is the default, and the label of the rule. We do not know why the rule is being
+            # analyzed, though most likely it is FUCHSIA_API_LEVEL_TARGET_NAME being analyzed for a
+            # target after `fuchsia_transition`, meaning none of the API level mechanisms were set.
+            fail("ERROR: `{}` has not been set to an API level. Has an API level been specified for this target? Valid API levels are {}".format(
+                ctx.label,
+                _valid_api_level_names(),
+            ))
 
-    if raw_level not in _valid_api_level_names():
-        fail('ERROR: "{}" is not an API level supported by this SDK. API level should be one of {}'.format(
-            raw_level,
-            _valid_api_level_names(),
-        ))
+        if raw_level not in _valid_api_level_names():
+            fail('ERROR: "{}" is not an API level supported by this SDK. API level should be one of {}'.format(
+                raw_level,
+                _valid_api_level_names(),
+            ))
 
     return FuchsiaAPILevelInfo(
         level = raw_level,
@@ -157,6 +162,14 @@ fuchsia_api_level = rule(
     """,
     implementation = _fuchsia_api_level_impl,
     build_setting = config.string(flag = True),
+    attrs = {
+        "_fuchsia_targets_enabled_flag": attr.label(doc = """
+        A flag that signals that we are not building fuchsia. This is needed
+        so that we can skip checking the API level during analysis for builds
+        like bazel build //... which might analyze fuchsia targets that depend
+        on the api level flag but depend on the fuchsia_transition to set it.
+        """, default = "@fuchsia_sdk//fuchsia:fuchsia_targets_enabled"),
+    },
 )
 
 def _verify_cc_head_api_level_impl(ctx):
