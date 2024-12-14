@@ -113,9 +113,6 @@ if (toolchain_environment == "userboot") {
     ]
     defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
 
-    # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
-    defines += [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
-
     ldflags = [
       "-Wl,-e,_start",
       "-nostartfiles",

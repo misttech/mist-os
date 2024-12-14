@@ -316,9 +316,6 @@ static_library("standalone") {
 
   complete_static_lib = true
 
-  # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
-  defines = [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
-
   sources = [ "standalone-assert.cc" ]
   deps = [
     "//zircon/system/public",

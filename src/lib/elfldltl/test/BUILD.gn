@@ -119,9 +119,6 @@ if (current_os == "linux") {
     test("linux-static-pie-test") {
       disable_syslog_backend = true
 
-      # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
-      defines = [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
-
       sources = [ "linux-static-pie-test.cc" ]
       configs -= [
         "//build/config/linux:default-pie",
@@ -183,9 +180,6 @@ if (is_fuchsia) {
 
       # Avoid libc references from assert() in libc++ header code.
       defines = [ "NDEBUG=1" ]
-
-      # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
-      defines += [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
 
       ldflags = [
         # A standalone binary should indicate its stack requirements.
