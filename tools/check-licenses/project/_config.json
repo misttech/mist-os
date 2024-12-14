@@ -57,7 +57,10 @@
                     "third_party/grpc/third_party/upb/third_party",
                     "third_party/dart-pkg/pub/csslib/third_party",
                     "third_party/dart-pkg/pub/characters/third_party",
-                    "third_party/gperftools/src/third_party"
+                    "third_party/gperftools/src/third_party",
+                    "third_party/shaderc/src/third_party",
+                    "third_party/shaderc/third_party",
+                    "third_party/shaderc-temp/third_party"
                 ],
                 "notes": [
                     "The GN build system will likely not be able to accurately\n",
