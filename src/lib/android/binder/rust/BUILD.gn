@@ -44,6 +44,7 @@ rustc_library("binder") {
     "//third_party/android/platform/frameworks/native/libs/binder/rust/src/proxy.rs",
     "//third_party/android/platform/frameworks/native/libs/binder/rust/src/service.rs",
     "//third_party/android/platform/frameworks/native/libs/binder/rust/src/state.rs",
+    "//third_party/android/platform/frameworks/native/libs/binder/rust/src/system_only.rs",
   ]
 
   configs += [ "//src/lib/android:android_rust_config" ]
@@ -54,6 +55,7 @@ rustc_library("binder") {
     "//src/lib/android/binder",
     "//third_party/rust_crates:downcast-rs",
     "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:log",
   ]
 
   with_unit_tests = true
