@@ -629,7 +629,7 @@ where
 ///
 /// [RFC 3810 section 5.1.3]:
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.3
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Default)]
 pub struct Mldv2ResponseDelay(u16);
 
 impl LinExpConversion<Duration> for Mldv2ResponseDelay {

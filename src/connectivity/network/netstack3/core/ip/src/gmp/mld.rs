@@ -14,7 +14,10 @@ use core::time::Duration;
 use log::{debug, error};
 use net_declare::net_ip_v6;
 use net_types::ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr};
-use net_types::{LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness};
+use net_types::{
+    LinkLocalAddress as _, LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr,
+    Witness,
+};
 use netstack3_base::{
     AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, WeakDeviceIdentifier,
 };
@@ -119,44 +122,86 @@ pub trait MldPacketHandler<BC, DeviceId> {
     );
 }
 
+fn receive_mld_packet<B: SplitByteSlice, CC: MldContext<BC>, BC: MldBindingsContext>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    src_ip: Ipv6SourceAddr,
+    packet: MldPacket<B>,
+) -> Result<(), MldError> {
+    match packet {
+        MldPacket::MulticastListenerQuery(msg) => {
+            // From RFC 2710 section 5:
+            //
+            //  - To be valid, the Query message MUST come from a link-
+            //  local IPv6 Source Address [...]
+            if !src_ip.is_link_local() {
+                return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
+            }
+            gmp::v1::handle_query_message(core_ctx, bindings_ctx, device, msg.body())
+                .map_err(Into::into)
+        }
+        MldPacket::MulticastListenerQueryV2(msg) => {
+            // From RFC 3810 section 5.1.14:
+            //
+            // If a node (router or host) receives a Query message with
+            // the IPv6 Source Address set to the unspecified address (::), or any
+            // other address that is not a valid IPv6 link-local address, it MUST
+            // silently discard the message.
+            if !src_ip.is_link_local() {
+                return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
+            }
+            gmp::v2::handle_query_message(core_ctx, bindings_ctx, device, msg.body())
+                .map_err(Into::into)
+        }
+        MldPacket::MulticastListenerReport(msg) => {
+            // From RFC 2710 section 5:
+            //
+            //  - To be valid, the Report message MUST come from a link-
+            //   local IPv6 Source Address [...]
+            //
+            // However, RFC 3810 allows MLD reports to be sent from
+            // unspecified addresses and we in fact send those, so we relax
+            // to allow accepting from unspecified addresses as well.
+            match src_ip {
+                Ipv6SourceAddr::Unspecified => {}
+                Ipv6SourceAddr::Unicast(src_ip) => {
+                    if !src_ip.is_link_local() {
+                        return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
+                    }
+                }
+            }
+            let addr = msg.body().group_addr;
+            MulticastAddr::new(msg.body().group_addr).map_or(
+                Err(MldError::NotAMember { addr }),
+                |group_addr| {
+                    gmp::v1::handle_report_message(core_ctx, bindings_ctx, device, group_addr)
+                        .map_err(Into::into)
+                },
+            )
+        }
+        MldPacket::MulticastListenerReportV2(_) => {
+            debug!("Hosts are not interested in MLDv2 report messages");
+            Ok(())
+        }
+        MldPacket::MulticastListenerDone(_) => {
+            debug!("Hosts are not interested in Done messages");
+            Ok(())
+        }
+    }
+}
+
 impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::DeviceId> for CC {
     fn receive_mld_packet<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
-        _src_ip: Ipv6SourceAddr,
+        src_ip: Ipv6SourceAddr,
         _dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
     ) {
-        let result = match packet {
-            MldPacket::MulticastListenerQuery(msg) => {
-                gmp::v1::handle_query_message(self, bindings_ctx, device, msg.body())
-                    .map_err(Into::into)
-            }
-            MldPacket::MulticastListenerQueryV2(msg) => {
-                gmp::v2::handle_query_message(self, bindings_ctx, device, msg.body())
-                    .map_err(Into::into)
-            }
-            MldPacket::MulticastListenerReport(msg) => {
-                let addr = msg.body().group_addr;
-                MulticastAddr::new(msg.body().group_addr).map_or(
-                    Err(MldError::NotAMember { addr }),
-                    |group_addr| {
-                        gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
-                            .map_err(Into::into)
-                    },
-                )
-            }
-            MldPacket::MulticastListenerReportV2(_) => {
-                debug!("Hosts are not interested in MLDv2 report messages");
-                return;
-            }
-            MldPacket::MulticastListenerDone(_) => {
-                debug!("Hosts are not interested in Done messages");
-                return;
-            }
-        };
-        result.unwrap_or_else(|e| debug!("Error occurred when handling MLD message: {}", e));
+        receive_mld_packet(self, bindings_ctx, device, src_ip, packet)
+            .unwrap_or_else(|e| debug!("Error occurred when handling MLD message: {}", e));
     }
 }
 
@@ -338,7 +383,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
     fn handle_disabled(&mut self) {}
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Eq, PartialEq)]
 pub(crate) enum MldError {
     /// The host is trying to operate on an group address of which the host is
     /// not a member.
@@ -347,6 +392,9 @@ pub(crate) enum MldError {
     /// Failed to send an IGMP packet.
     #[error("failed to send out an MLD packet to address: {}", addr)]
     SendFailure { addr: Ipv6Addr },
+    /// Message ignored because of bad source address.
+    #[error("bad source address: {}", addr)]
+    BadSourceAddress { addr: Ipv6Addr },
     /// MLD is disabled
     #[error("MLD is disabled on interface")]
     Disabled,
@@ -564,9 +612,11 @@ mod tests {
         FakeWeakDeviceId, TestIpExt,
     };
     use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext};
-    use packet::{BufferMut, ParseBuffer};
+    use packet::{Buf, BufferMut, ParseBuffer};
     use packet_formats::gmp::GroupRecordType;
-    use packet_formats::icmp::mld::MulticastListenerQuery;
+    use packet_formats::icmp::mld::{
+        Mldv2QueryMessageBuilder, MulticastListenerQuery, MulticastListenerQueryV2,
+    };
     use packet_formats::icmp::{IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet};
     use packet_formats::ip::IpPacket;
     use packet_formats::ipv6::ext_hdrs::Ipv6ExtensionHeaderData;
@@ -774,14 +824,9 @@ mod tests {
         _marker: IpVersionMarker::new(),
     });
 
-    fn receive_mld_query(
-        core_ctx: &mut FakeCoreCtxImpl,
-        bindings_ctx: &mut FakeBindingsCtxImpl,
-        resp_time: Duration,
-        group_addr: MulticastAddr<Ipv6Addr>,
-    ) {
+    fn new_v1_query(resp_time: Duration, group_addr: MulticastAddr<Ipv6Addr>) -> Buf<Vec<u8>> {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
-        let mut buffer = Mldv1MessageBuilder::<MulticastListenerQuery>::new_with_max_resp_delay(
+        Mldv1MessageBuilder::<MulticastListenerQuery>::new_with_max_resp_delay(
             group_addr.get(),
             resp_time.try_into().unwrap(),
         )
@@ -793,29 +838,13 @@ mod tests {
             MulticastListenerQuery,
         ))
         .serialize_vec_outer()
-        .unwrap();
-        match buffer
-            .parse_with::<_, Icmpv6Packet<_>>(IcmpParseArgs::new(router_addr, MY_IP))
-            .unwrap()
-        {
-            Icmpv6Packet::Mld(packet) => core_ctx.receive_mld_packet(
-                bindings_ctx,
-                &FakeDeviceId,
-                router_addr.try_into().unwrap(),
-                MY_IP,
-                packet,
-            ),
-            _ => panic!("serialized icmpv6 message is not an mld message"),
-        }
+        .unwrap()
+        .unwrap_b()
     }
 
-    fn receive_mld_report(
-        core_ctx: &mut FakeCoreCtxImpl,
-        bindings_ctx: &mut FakeBindingsCtxImpl,
-        group_addr: MulticastAddr<Ipv6Addr>,
-    ) {
+    fn new_v1_report(group_addr: MulticastAddr<Ipv6Addr>) -> Buf<Vec<u8>> {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
-        let mut buffer = Mldv1MessageBuilder::<MulticastListenerReport>::new(group_addr)
+        Mldv1MessageBuilder::<MulticastListenerReport>::new(group_addr)
             .into_serializer()
             .encapsulate(IcmpPacketBuilder::<_, _>::new(
                 router_addr,
@@ -825,20 +854,75 @@ mod tests {
             ))
             .serialize_vec_outer()
             .unwrap()
-            .unwrap_b();
+            .unwrap_b()
+    }
+
+    fn new_v2_general_query() -> Buf<Vec<u8>> {
+        let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
+        Mldv2QueryMessageBuilder::new(
+            Default::default(),
+            None,
+            false,
+            Default::default(),
+            Default::default(),
+            core::iter::empty::<Ipv6Addr>(),
+        )
+        .into_serializer()
+        .encapsulate(IcmpPacketBuilder::<_, _>::new(
+            router_addr,
+            MY_IP,
+            IcmpSenderZeroCode,
+            MulticastListenerQueryV2,
+        ))
+        .serialize_vec_outer()
+        .unwrap()
+        .unwrap_b()
+    }
+
+    fn parse_mld_packet<B: ParseBuffer>(buffer: &mut B) -> MldPacket<&[u8]> {
+        let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
         match buffer
             .parse_with::<_, Icmpv6Packet<_>>(IcmpParseArgs::new(router_addr, MY_IP))
             .unwrap()
         {
-            Icmpv6Packet::Mld(packet) => core_ctx.receive_mld_packet(
-                bindings_ctx,
-                &FakeDeviceId,
-                router_addr.try_into().unwrap(),
-                MY_IP,
-                packet,
-            ),
+            Icmpv6Packet::Mld(packet) => packet,
             _ => panic!("serialized icmpv6 message is not an mld message"),
         }
+    }
+
+    fn receive_mld_query(
+        core_ctx: &mut FakeCoreCtxImpl,
+        bindings_ctx: &mut FakeBindingsCtxImpl,
+        resp_time: Duration,
+        group_addr: MulticastAddr<Ipv6Addr>,
+    ) {
+        let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
+        let mut buffer = new_v1_query(resp_time, group_addr);
+        let packet = parse_mld_packet(&mut buffer);
+        core_ctx.receive_mld_packet(
+            bindings_ctx,
+            &FakeDeviceId,
+            router_addr.try_into().unwrap(),
+            MY_IP,
+            packet,
+        )
+    }
+
+    fn receive_mld_report(
+        core_ctx: &mut FakeCoreCtxImpl,
+        bindings_ctx: &mut FakeBindingsCtxImpl,
+        group_addr: MulticastAddr<Ipv6Addr>,
+    ) {
+        let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
+        let mut buffer = new_v1_report(group_addr);
+        let packet = parse_mld_packet(&mut buffer);
+        core_ctx.receive_mld_packet(
+            bindings_ctx,
+            &FakeDeviceId,
+            router_addr.try_into().unwrap(),
+            MY_IP,
+            packet,
+        )
     }
 
     // Ensure the ttl is 1.
@@ -1468,5 +1552,66 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(report, vec![(sent_report_addr.get(), sent_report_mode, sent_report_sources)]);
+    }
+
+    #[test]
+    fn v1_query_reject_bad_ipv6_source_addr() {
+        let mut ctx = new_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+
+        let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
+        for addr in
+            [Ipv6SourceAddr::Unspecified, Ipv6SourceAddr::new(net_ip_v6!("2001::1")).unwrap()]
+        {
+            let mut buffer = &buffer[..];
+            let packet = parse_mld_packet(&mut buffer);
+            assert_eq!(
+                receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+                Err(MldError::BadSourceAddress { addr: addr.into_addr() })
+            );
+        }
+    }
+
+    #[test]
+    fn v2_query_reject_bad_ipv6_source_addr() {
+        let mut ctx = new_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+
+        let buffer = new_v2_general_query().into_inner();
+        for addr in
+            [Ipv6SourceAddr::Unspecified, Ipv6SourceAddr::new(net_ip_v6!("2001::1")).unwrap()]
+        {
+            let mut buffer = &buffer[..];
+            let packet = parse_mld_packet(&mut buffer);
+            assert_eq!(
+                receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+                Err(MldError::BadSourceAddress { addr: addr.into_addr() })
+            );
+        }
+    }
+
+    #[test]
+    fn v1_report_reject_bad_ipv6_source_addr() {
+        let mut ctx = new_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+
+        let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
+        let addr = Ipv6SourceAddr::new(net_ip_v6!("2001::1")).unwrap();
+        let mut buffer = &buffer[..];
+        let packet = parse_mld_packet(&mut buffer);
+        assert_eq!(
+            receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+            Err(MldError::BadSourceAddress { addr: addr.into_addr() })
+        );
+
+        // Unspecified is okay however.
+        let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
+        let addr = Ipv6SourceAddr::Unspecified;
+        let mut buffer = &buffer[..];
+        let packet = parse_mld_packet(&mut buffer);
+        assert_eq!(
+            receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+            Err(MldError::BadSourceAddress { addr: addr.into_addr() })
+        );
     }
 }
