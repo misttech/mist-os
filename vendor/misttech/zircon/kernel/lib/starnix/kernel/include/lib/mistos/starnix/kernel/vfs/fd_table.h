@@ -203,9 +203,9 @@ class FdTable {
 
   fit::result<Errno, FdFlags> get_fd_flags_allowing_opath(FdNumber fd) const;
 
-  fit::result<Errno, FdFlags> get_fd_flags(FdNumber fd) const;
-
   fit::result<Errno> set_fd_flags(FdNumber fd, FdFlags flags) const;
+
+  fit::result<Errno> set_fd_flags_allowing_opath(FdNumber fd, FdFlags flags) const;
 
   void retain(std::function<bool(FdNumber, FdFlags&)> func) const;
 

@@ -16,15 +16,19 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/string_view.h>
 
-using namespace starnix::testing;
-using namespace starnix_uapi;
-
 namespace testing {
+namespace {
+
+using starnix::FdFlags;
+using starnix::FdFlagsEnum;
+using starnix::FdNumber;
+
 
 bool test_sys_creat() {
   BEGIN_TEST;
-  auto [kernel, current_task] = create_kernel_and_task();
-  auto path_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
+  auto path_addr =
+      starnix::testing::map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
   ktl::string_view path("newfile.txt");
   auto result = (*current_task).write_memory(path_addr, {(uint8_t*)path.data(), path.size()});
   ASSERT_TRUE(result.is_ok());
@@ -33,12 +37,14 @@ bool test_sys_creat() {
   ASSERT_TRUE(fd_or_error.is_ok());
   auto file_handle = current_task->open_file(path, OpenFlags(OpenFlagsEnum::RDONLY));
 
-  auto flag_or_error = (*current_task)->files_.get_fd_flags(fd_or_error.value());
+  auto flag_or_error = (*current_task)->files_.get_fd_flags_allowing_opath(fd_or_error.value());
   ASSERT_TRUE(flag_or_error.is_ok());
+  ASSERT_FALSE(flag_or_error->contains(FdFlagsEnum::CLOEXEC));
 
   END_TEST;
 }
 
+}  // namespace
 }  // namespace testing
 
 UNITTEST_START_TESTCASE(starnix_arch_syscalls)
