@@ -86,8 +86,12 @@ closed protocol Linux {
     // STUB 7
     strict A0007Poll() -> () error int64;
 
-    // STUB 8
-    strict A0008Lseek() -> () error int64;
+    // #8, SYSCALL_DEFINE3(lseek, unsigned int, fd, off_t, offset, unsigned int, whence)
+    strict A0008Lseek(resource struct {
+        fd uint32;
+        offset uint64;
+        whence uint32;
+    }) -> () error int64;
 
     // #9, SYSCALL_DEFINE6(mmap, unsigned long, addr, unsigned long, len, unsigned long, prot, unsigned long, flags, unsigned long, fd, unsigned long, off)
     strict A0009Mmap(resource struct {
