@@ -8,8 +8,10 @@
 #include <asm.h>
 #include <lib/arch/asm.h>
 #include <lib/arch/zbi.h>
-#include <arch/x86/asm.h>
 
+#define PHYS_LOAD_ADDRESS (KERNEL_LOAD_OFFSET)
+#define PHYS_ADDR_DELTA (KERNEL_BASE - PHYS_LOAD_ADDRESS)
+#define PHYS(x) ((x) - PHYS_ADDR_DELTA)
 
 // This file lays out the final kernel image seen by the boot loader.
 // It concatenates:
