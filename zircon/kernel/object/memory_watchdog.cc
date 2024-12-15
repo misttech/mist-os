@@ -327,15 +327,20 @@ void MemoryWatchdog::WorkerThread() {
 
 void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
   const PressureLevel prev = mem_event_idx_;
+  // Coming into this method we must not be in the kOutOfMemory state, as if this were possible
+  // allocations would be stalled and we would be waiting for a memory state change *before*
+  // triggering the evictor, which would cause a deadlock.
+  DEBUG_ASSERT(prev != PressureLevel::kOutOfMemory);
   zx_status_t status = ZX_OK;
   // This loop can iterate many times as it is woken up by both pmm state changes and, if continuous
   // eviction is enabled, page queues state changes.
   do {
+    // We cannot enter this method in the kOutOfMemory state and since we would exit this loop if
+    // the state were to change we can never be configuring the free memory signal in this state.
+    DEBUG_ASSERT(mem_event_idx_ != PressureLevel::kOutOfMemory);
     auto [lower, upper] = FreeMemBoundsForLevel(mem_event_idx_);
     const uint64_t delay_alloc_level =
-        mem_event_idx_ == PressureLevel::kOutOfMemory
-            ? UINT64_MAX
-            : (mem_watermarks_[PressureLevel::kOutOfMemory] - watermark_debounce_) / PAGE_SIZE;
+        (mem_watermarks_[PressureLevel::kOutOfMemory] - watermark_debounce_) / PAGE_SIZE;
     if (pmm_set_free_memory_signal(lower / PAGE_SIZE, upper / PAGE_SIZE, delay_alloc_level,
                                    &mem_state_signal_)) {
       // After having successfully set the event check again for any allocation failures. This is to
