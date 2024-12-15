@@ -127,21 +127,6 @@ static inline bool PollVmoPopulatedBytes(const zx::vmo& vmo, size_t expected_pop
   });
 }
 
-// TODO(https://fxbug.dev/338300808): While in the transition phase of RFC-0254 tests need to be
-// able to check either kind of attribution. This helper exists to simplify this logic in tests and
-// can be removed once fully transitioned and testing of the old model can be removed.
-static inline bool UsingLegacyAttribution() {
-  zx_info_task_stats_t stats;
-  zx_status_t result =
-      zx::process::self()->get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), nullptr, nullptr);
-  ZX_ASSERT(result == ZX_OK);
-  return stats.mem_fractional_scaled_shared_bytes == UINT64_MAX;
-}
-
-static inline uint64_t ValueIfLegacyAttribution(uint64_t legacy_value, uint64_t new_value) {
-  return UsingLegacyAttribution() ? legacy_value : new_value;
-}
-
 // Create a fit::defer which will check a BTI to make certain that it has no
 // pinned or quarantined pages when it goes out of scope, and fail the test if
 // it does.

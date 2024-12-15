@@ -18,8 +18,6 @@
 
 namespace pager_tests {
 
-using vmo_test::ValueIfLegacyAttribution;
-
 // Helper struct that can be used to re run a similar test on different levels of a VMO hierarchy
 enum class PageDepth { root, clone, snapshot };
 
@@ -59,8 +57,7 @@ TEST(Snapshot, Smoke) {
 
   // Both `clone` and `snapshot` should see the same previous modification.
   // Modified page is shared between `clone` and `snapshot`, so evenly attributed.
-  EXPECT_TRUE(
-      snapshot->PollPopulatedBytes(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2ul)));
+  EXPECT_TRUE(snapshot->PollPopulatedBytes(zx_system_get_page_size() / 2ul));
   EXPECT_EQ(*reinterpret_cast<uint64_t*>(clone->base_addr()), 0xdead1eaf);
   EXPECT_EQ(*reinterpret_cast<uint64_t*>(snapshot->base_addr()), 0xdead1eaf);
 
@@ -182,10 +179,8 @@ TEST(Snapshot, DropVmos) {
   *reinterpret_cast<uint64_t*>(full_snapshot->base_addr() + zx_system_get_page_size()) = 0xdead1eaf;
   auto partial_snapshot = full_snapshot->Clone(0, 1, ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
   ASSERT_NOT_NULL(partial_snapshot);
-  EXPECT_TRUE(full_snapshot->PollPopulatedBytes(ValueIfLegacyAttribution(
-      2ul * zx_system_get_page_size(), 3ul * zx_system_get_page_size() / 2ul)));
-  EXPECT_TRUE(partial_snapshot->PollPopulatedBytes(
-      ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2ul)));
+  EXPECT_TRUE(full_snapshot->PollPopulatedBytes(3ul * zx_system_get_page_size() / 2ul));
+  EXPECT_TRUE(partial_snapshot->PollPopulatedBytes(zx_system_get_page_size() / 2ul));
   ASSERT_TRUE(full_snapshot->PollNumChildren(1));
   ASSERT_TRUE(partial_snapshot->PollNumChildren(0));
 
@@ -231,26 +226,21 @@ TEST(Snapshot, ResizeShrinkSnapshot) {
   // `vmo` owns the original page-supplied pages.
   // `snapshot` and `clone` share modified pages equally.
   EXPECT_TRUE(vmo->PollPopulatedBytes(2ul * zx_system_get_page_size()));
-  EXPECT_TRUE(clone->PollPopulatedBytes(
-      ValueIfLegacyAttribution(2 * zx_system_get_page_size(), zx_system_get_page_size())));
-  EXPECT_TRUE(snapshot->PollPopulatedBytes(ValueIfLegacyAttribution(0, zx_system_get_page_size())));
+  EXPECT_TRUE(clone->PollPopulatedBytes(zx_system_get_page_size()));
+  EXPECT_TRUE(snapshot->PollPopulatedBytes(zx_system_get_page_size()));
 
   // Shrink `clone`, which should move `clone`s second page to `snapshot`.
   // They will still share the first page.
   clone->Resize(1);
   EXPECT_TRUE(vmo->PollPopulatedBytes(2ul * zx_system_get_page_size()));
-  EXPECT_TRUE(clone->PollPopulatedBytes(
-      ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 2ul)));
-  EXPECT_TRUE(snapshot->PollPopulatedBytes(
-      ValueIfLegacyAttribution(zx_system_get_page_size(), 3ul * zx_system_get_page_size() / 2ul)));
+  EXPECT_TRUE(clone->PollPopulatedBytes(zx_system_get_page_size() / 2ul));
+  EXPECT_TRUE(snapshot->PollPopulatedBytes(3ul * zx_system_get_page_size() / 2ul));
 
   // Then shrink `snapshot`, which will drop the page just moved from `clone`.
   snapshot->Resize(1);
   EXPECT_TRUE(vmo->PollPopulatedBytes(2ul * zx_system_get_page_size()));
-  EXPECT_TRUE(clone->PollPopulatedBytes(
-      ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 2ul)));
-  EXPECT_TRUE(
-      snapshot->PollPopulatedBytes(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2ul)));
+  EXPECT_TRUE(clone->PollPopulatedBytes(zx_system_get_page_size() / 2ul));
+  EXPECT_TRUE(snapshot->PollPopulatedBytes(zx_system_get_page_size() / 2ul));
 }
 
 // Shrinking a snapshot will allow unseen pages in the parent to drop.
@@ -1050,8 +1040,7 @@ TEST(Snapshot, CommitRangeInSnapshot) {
   ASSERT_NOT_NULL(clone);
   *reinterpret_cast<uint64_t*>(clone->base_addr()) = 0xc0ffee;
   auto snapshot = clone->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
-  EXPECT_TRUE(
-      snapshot->PollPopulatedBytes(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2ul)));
+  EXPECT_TRUE(snapshot->PollPopulatedBytes(zx_system_get_page_size() / 2ul));
 
   // Commit the first page in the snapshot, which should force it to fork the page.
   auto status =
@@ -1262,19 +1251,15 @@ TEST(Snapshot, ObjMemAccounting) {
   auto snapshot = clone->Clone(ZX_VMO_CHILD_SNAPSHOT_MODIFIED);
   ASSERT_NOT_NULL(snapshot);
   EXPECT_TRUE(vmo->PollPopulatedBytes(2ul * zx_system_get_page_size()));
-  EXPECT_TRUE(clone->PollPopulatedBytes(
-      ValueIfLegacyAttribution(zx_system_get_page_size(), zx_system_get_page_size() / 2ul)));
-  EXPECT_TRUE(
-      snapshot->PollPopulatedBytes(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2ul)));
+  EXPECT_TRUE(clone->PollPopulatedBytes(zx_system_get_page_size() / 2ul));
+  EXPECT_TRUE(snapshot->PollPopulatedBytes(zx_system_get_page_size() / 2ul));
 
   // Write to the second page of `clone` and check that it forks that page.
   // The first page is still shared between `clone` and `snapshot`.
   *reinterpret_cast<uint64_t*>(clone->base_addr() + zx_system_get_page_size()) = 0xc0ffee;
   EXPECT_TRUE(vmo->PollPopulatedBytes(2ul * zx_system_get_page_size()));
-  EXPECT_TRUE(clone->PollPopulatedBytes(ValueIfLegacyAttribution(
-      2ul * zx_system_get_page_size(), 3ul * zx_system_get_page_size() / 2ul)));
-  EXPECT_TRUE(
-      snapshot->PollPopulatedBytes(ValueIfLegacyAttribution(0, zx_system_get_page_size() / 2ul)));
+  EXPECT_TRUE(clone->PollPopulatedBytes(3ul * zx_system_get_page_size() / 2ul));
+  EXPECT_TRUE(snapshot->PollPopulatedBytes(zx_system_get_page_size() / 2ul));
 
   // Write to the first page of `snapshot` and check that it forks a page.
   // Both pages are now independent between `clone` and `snapshot`.

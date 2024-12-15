@@ -165,19 +165,6 @@ TEST(TaskGetInfoTest, InfoTaskRuntimeInvalidHandle) {
 }
 
 TEST(TaskGetInfoTest, SharedMemAccounting) {
-  // TODO(https://fxbug.dev/338300808): While in the transition phase of RFC-0254 we may still be
-  // using legacy attribution. This test is only intended to work post RFC-0254, so we first check
-  // if in this transition phase and skip this test if so.
-  {
-    zx_info_task_stats_t stats;
-    zx_status_t result =
-        zx::process::self()->get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), nullptr, nullptr);
-    ZX_ASSERT(result == ZX_OK);
-    if (stats.mem_fractional_scaled_shared_bytes == UINT64_MAX) {
-      ZXTEST_SKIP("System using legacy attribution, skipping\n");
-    }
-  }
-
   // First, verify we have access to the system resource to run this test.
   zx::unowned_resource system_resource = maybe_standalone::GetSystemResource();
   if (!system_resource->is_valid()) {
