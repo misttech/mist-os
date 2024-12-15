@@ -32,15 +32,6 @@
 
 #include <ktl/enforce.h>
 
-// This flag enables usage of split bits instead of share counts when tracking COW pages.
-// We couple this flag to the usge of legacy vs new attribution code as the legacy code only works
-// with split bits and the new code only works with share counts.
-//
-// TODO(https://fxbug.dev/issues/338300808): Remove this flag when the new attribution code (and
-// thus share counts) are the default.
-#define ENABLE_COW_SPLIT_BITS false
-static_assert(ENABLE_LEGACY_ATTRIBUTION == ENABLE_COW_SPLIT_BITS);
-
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
 // add expensive code to do a full validation of the VMO at various points.
@@ -94,47 +85,6 @@ uint32_t GetShareCount(T p) {
   return share_count;
 }
 
-template <>
-uint32_t GetShareCount(vm_page_t* p) {
-  return p->object.share_count;
-}
-
-template <typename T>
-void SetShareCount(T p, uint32_t count) {
-  DEBUG_ASSERT(p->IsPageOrRef());
-
-  if (p->IsPage()) {
-    p->Page()->object.share_count = count;
-  } else if (p->IsReference()) {
-    Pmm::Node().GetPageCompression()->SetMetadata(p->Reference(), count);
-  }
-}
-
-template <>
-void SetShareCount(vm_page_t* p, uint32_t count) {
-  p->object.share_count = count;
-}
-
-enum class SplitDir : uint8_t {
-  Left = 1,
-  Right = 2,
-};
-
-template <typename T>
-bool IsSplit(SplitDir dir, T p) {
-  return (GetShareCount(p) & static_cast<uint32_t>(dir)) != 0;
-}
-
-template <typename T>
-void SetSplit(SplitDir dir, T p) {
-  SetShareCount(p, GetShareCount(p) | static_cast<uint32_t>(dir));
-}
-
-template <typename T>
-void ClearSplits(T p) {
-  SetShareCount(p, 0);
-}
-
 void ZeroPage(paddr_t pa) {
   void* ptr = paddr_to_physmap(pa);
   DEBUG_ASSERT(ptr);
@@ -162,8 +112,6 @@ void InitializeVmPage(vm_page_t* p) {
   // Page should be in the ALLOC state so we can transition it to the OBJECT state.
   DEBUG_ASSERT(p->state() == vm_page_state::ALLOC);
   p->set_state(vm_page_state::OBJECT);
-  // When split bits are in use, the share_count will actually encode the split bits according to
-  // |IsSplit| and |SetSplit| above.
   p->object.share_count = 0;
   p->object.pin_count = 0;
   p->object.always_need = 0;
@@ -526,39 +474,11 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
   // If we're not a hidden vmo then we need to remove ourselves from our parent and free any pages
   // that we own.
   if (!is_hidden_locked()) {
-    // When using split bits we must remove ourselves from the hidden parent before clearing our
-    // page list to ensure the MergeContentWithChildLocked logic works correctly. When not using
-    // split bits this requirement is inverted.
-    if (!ENABLE_COW_SPLIT_BITS) {
-      // Clear out all content that we can see. This means dropping references to any pages in our
-      // parents, as well as removing any pages in our own page list.
-      ReleaseOwnedPagesLocked(0);
-    }
+    // Clear out all content that we can see. This means dropping references to any pages in our
+    // parents, as well as removing any pages in our own page list.
+    ReleaseOwnedPagesLocked(0);
     if (parent_) {
       parent_locked().RemoveChildLocked(this);
-    }
-
-    // Before potentially dropping the lock to perform any long running deletions over our parents
-    // clear out our page list. Any page (or reference) that links back to us is linking back to a
-    // VMO that is partially dead (our parent_ pointer still exists, but our parent does not link
-    // back to us, etc).
-    // If not using split bits we already performed this clean out previously and can skip it.
-    if (ENABLE_COW_SPLIT_BITS) {
-      // We stack-own loaned pages between removing the page from PageQueues and freeing the page
-      // via call to FreePagesLocked().
-      __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
-      // Cleanup page lists and page sources.
-      list_node_t list;
-      list_initialize(&list);
-
-      __UNINITIALIZED BatchPQRemove page_remover(&list);
-      // free all of the pages attached to us
-      page_list_.RemoveAllContent(
-          [&page_remover](VmPageOrMarker&& p) { page_remover.PushContent(&p); });
-      page_remover.Flush();
-
-      FreePagesLocked(&list, /*freeing_owned_pages=*/true);
     }
 
     if (parent_) {
@@ -877,43 +797,6 @@ zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOp
   return ZX_OK;
 }
 
-VmCowPages& VmCowPages::left_child_locked() {
-  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
-  DEBUG_ASSERT(is_hidden_locked());
-  DEBUG_ASSERT(children_list_len_ == 2);
-
-  auto& ret = children_list_.front();
-  AssertHeld(ret.lock_ref());
-  return ret;
-}
-
-VmCowPages& VmCowPages::right_child_locked() {
-  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
-  DEBUG_ASSERT(is_hidden_locked());
-  DEBUG_ASSERT(children_list_len_ == 2);
-  auto& ret = children_list_.back();
-  AssertHeld(ret.lock_ref());
-  return ret;
-}
-
-const VmCowPages& VmCowPages::left_child_locked() const {
-  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
-  DEBUG_ASSERT(is_hidden_locked());
-  DEBUG_ASSERT(children_list_len_ == 2);
-  const auto& ret = children_list_.front();
-  AssertHeld(ret.lock_ref());
-  return ret;
-}
-
-const VmCowPages& VmCowPages::right_child_locked() const {
-  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
-  DEBUG_ASSERT(is_hidden_locked());
-  DEBUG_ASSERT(children_list_len_ == 2);
-  const auto& ret = children_list_.back();
-  AssertHeld(ret.lock_ref());
-  return ret;
-}
-
 void VmCowPages::ReplaceChildLocked(VmCowPages* old, VmCowPages* new_child) {
   canary_.Assert();
 
@@ -947,10 +830,6 @@ void VmCowPages::AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t par
   child->root_parent_offset_ = root_parent_offset;
   child->parent_offset_ = offset;
   child->parent_limit_ = parent_limit;
-
-  // This child should be in an initial state and these members should be clear.
-  DEBUG_ASSERT(!child->partial_cow_release_);
-  DEBUG_ASSERT(child->parent_start_limit_ == 0);
 
   // The child's page list should skew by the child's offset relative to the parent. This allows
   // fast copies of page list entries when merging the lists later (entire blocks of entries can be
@@ -1085,7 +964,6 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages> child) {
   child->children_list_len_ = children_list_len_;
   children_list_len_ = 0;
   child->reclamation_event_count_ = reclamation_event_count_;
-  child->page_attribution_user_id_ = page_attribution_user_id_;
   child->high_priority_count_ = high_priority_count_;
   high_priority_count_ = 0;
   AddChildLocked(child.get(), 0, size_);
@@ -1110,10 +988,6 @@ void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages> child) {
 zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
                                                  fbl::RefPtr<VmCowPages>* cow_child) {
   canary_.Assert();
-
-  if constexpr (ENABLE_COW_SPLIT_BITS) {
-    return CloneBidirectionalUsingSplitsLocked(offset, size, cow_child);
-  }
 
   ParentAndRange child_range = FindParentAndRangeForCloneLocked(this, offset, size, true);
   VmCowPages* parent = child_range.parent;
@@ -1171,77 +1045,6 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
       },
       child_range.parent_offset, child_range.parent_limit);
   DEBUG_ASSERT(status == ZX_OK);
-
-  // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check either child's page sharing however, so check those independently.
-  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(parent->DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSharingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(cow_clone->DebugValidateVmoPageBorrowingLocked());
-  if (parent_clone) {
-    AssertHeld(parent_clone->lock_ref());
-    VMO_VALIDATION_ASSERT(parent_clone->DebugValidatePageSharingLocked());
-    VMO_FRUGAL_VALIDATION_ASSERT(parent_clone->DebugValidateVmoPageBorrowingLocked());
-  }
-
-  *cow_child = ktl::move(cow_clone);
-
-  return ZX_OK;
-}
-
-zx_status_t VmCowPages::CloneBidirectionalUsingSplitsLocked(uint64_t offset, uint64_t size,
-                                                            fbl::RefPtr<VmCowPages>* cow_child) {
-  canary_.Assert();
-
-  // The parent must be `this` node.
-  // TODO(b/42058561): After switching to share counts, allow walking the hierarchy to select a
-  // parent further up.
-  // The clone's parent limit starts out equal to its size, but it can't exceed the parent's size.
-  // This ensures that any clone pages beyond the parent's range get initialized from zeroes.
-  const uint64_t child_parent_limit = ClampedLimit(offset, size, size_);
-  ParentAndRange child_range = {this, offset, child_parent_limit, size};
-  VmCowPages* parent = child_range.parent;
-  AssertHeld(parent->lock_ref());
-
-  fbl::AllocChecker ac;
-  auto cow_clone = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_,
-                           child_range.size, nullptr, nullptr));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-  AssertHeld(cow_clone->lock_ref());
-
-  // The parent must be `this` node, so it must always be visible.
-  // TODO(b/42058561): After switching to share counts, allow walking the hierarchy to select a
-  // parent further up. At that point the `if` below might be skipped allowing hidden nodes to have
-  // >2 children.
-  DEBUG_ASSERT(!parent->is_hidden_locked());
-
-  // If `parent` is to be the new child's parent then it must become hidden first.
-  // That requires cloning it into a new visible child of the (now) hidden parent.
-  fbl::RefPtr<VmCowPages> parent_clone;
-  if (!parent->is_hidden_locked()) {
-    DEBUG_ASSERT(parent == this);  // `parent` must either be hidden already, or be `this` node.
-    DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
-
-    parent_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-        hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size_, nullptr, nullptr));
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
-    }
-
-    // The child becomes a full clone of the parent: inheriting its children, paged backref, etc.
-    CloneParentIntoChildLocked(parent_clone);
-    DEBUG_ASSERT(children_list_len_ == 1);
-
-    // Transition into being the hidden node.
-    options_ |= VmCowPagesOptions::kHidden;
-  }
-
-  // The COW clone's parent must be hidden because the clone must not see any future parent writes.
-  DEBUG_ASSERT(parent->is_hidden_locked());
-  parent->AddChildLocked(cow_clone.get(), child_range.parent_offset, child_range.parent_limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
   // It will not check either child's page sharing however, so check those independently.
@@ -1419,14 +1222,8 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   // Hidden vmos have 0, 2 or more children. If we had more we would have already returned, and we
   // cannot be here with 0 children, therefore we must have 2, including the one we are removing.
   DEBUG_ASSERT(children_list_len_ == 2);
-  if constexpr (ENABLE_COW_SPLIT_BITS) {
-    const bool removed_left = &left_child_locked() == removed;
-    DropChildLocked(removed);
-    MergeContentWithChildUsingSplitsLocked(removed, removed_left);
-  } else {
-    DropChildLocked(removed);
-    MergeContentWithChildLocked(removed);
-  }
+  DropChildLocked(removed);
+  MergeContentWithChildLocked(removed);
 
   VmCowPages* child = &children_list_.front();
   DEBUG_ASSERT(child);
@@ -1436,56 +1233,6 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   DEBUG_ASSERT(ref_count_debug() >= 2);
 
   AssertHeld(child->lock_ref());
-
-  if (ENABLE_COW_SPLIT_BITS && child->page_attribution_user_id_ != page_attribution_user_id_) {
-    // If the attribution user id of this vmo doesn't match that of its remaining child,
-    // then the vmo with the matching attribution user id was just closed. In that case, we
-    // need to reattribute the pages of any ancestor hidden vmos to vmos that still exist.
-    //
-    // The syscall API doesn't specify how pages are to be attributed among a group of COW
-    // clones. One option is to pick a remaining vmo 'arbitrarily' and attribute everything to
-    // that vmo. However, it seems fairer to reattribute each remaining hidden vmo with
-    // its child whose user id doesn't match the vmo that was just closed. So walk up the
-    // clone chain and attribute each hidden vmo to the vmo we didn't just walk through.
-    auto cur = this;
-    AssertHeld(cur->lock_ref());
-    uint64_t user_id_to_skip = page_attribution_user_id_;
-    while (cur->parent_ != nullptr) {
-      auto parent = cur->parent_.get();
-      AssertHeld(parent->lock_ref());
-
-      // Snapshot-modified case: hidden node with non-hidden parent.
-      // Pages will be attributed to the visible root.
-      if (!parent->is_hidden_locked()) {
-        // Parent must be root & pager-backed.
-        DEBUG_ASSERT(!parent->parent_);
-        DEBUG_ASSERT(parent->is_source_preserving_page_content());
-        break;
-      }
-
-      if (parent->page_attribution_user_id_ == page_attribution_user_id_) {
-        uint64_t new_user_id = parent->left_child_locked().page_attribution_user_id_;
-        if (new_user_id == user_id_to_skip) {
-          new_user_id = parent->right_child_locked().page_attribution_user_id_;
-        }
-        // Although user IDs can be unset for VMOs that do not have a dispatcher, copy-on-write
-        // VMOs always have user level dispatchers, and should have a valid user-id set, hence we
-        // should never end up re-attributing a hidden parent with an unset id.
-        DEBUG_ASSERT(new_user_id != 0);
-        // The 'if' above should mean that the new_user_id isn't the ID we are trying to remove
-        // and isn't one we just used. For this to fail we either need a corrupt VMO hierarchy, or
-        // to have labeled two leaf nodes with the same user_id, which would also be incorrect as
-        // leaf nodes have unique dispatchers and hence unique ids.
-        DEBUG_ASSERT(new_user_id != page_attribution_user_id_ && new_user_id != user_id_to_skip);
-        parent->page_attribution_user_id_ = new_user_id;
-        user_id_to_skip = new_user_id;
-
-        cur = parent;
-      } else {
-        break;
-      }
-    }
-  }
 
   // We can have a priority count of at most 1, and only if the remaining child is the one
   // contributing to it.
@@ -1515,7 +1262,7 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   // invariant that parent_limit_ being non-zero implies we have a parent. Although this generally
   // should not matter, we have not transitioned to being dead yet, so we should maintain the
   // correct invariants.
-  parent_offset_ = parent_limit_ = parent_start_limit_ = 0;
+  parent_offset_ = parent_limit_ = 0;
 
   // Things should be consistent after dropping one child and merging with the other.
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
@@ -1525,7 +1272,6 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
 }
 
 void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed) {
-  DEBUG_ASSERT(!ENABLE_COW_SPLIT_BITS);
   canary_.Assert();
 
   DEBUG_ASSERT(is_hidden_locked());
@@ -1541,7 +1287,6 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed) {
   // It will be made consistent by the caller and checked then.
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(child.DebugValidateVmoPageBorrowingLocked());
-  DEBUG_ASSERT(child.parent_start_limit_ == 0);  // Cannot be >0 with share counts.
 
   const uint64_t merge_start_offset = child.parent_offset_;
   const uint64_t merge_end_offset = child.parent_offset_ + child.parent_limit_;
@@ -1593,258 +1338,6 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed) {
   VMO_FRUGAL_VALIDATION_ASSERT(child.DebugValidateVmoPageBorrowingLocked());
 }
 
-void VmCowPages::MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, bool removed_left) {
-  canary_.Assert();
-
-  DEBUG_ASSERT(children_list_len_ == 1);
-  VmCowPages& child = children_list_.front();
-  AssertHeld(child.lock_ref());
-  AssertHeld(removed->lock_ref());
-  // We don't check the hierarchy because it is inconsistent at this point.
-  // It will be made consistent by the caller and checked then.
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(child.DebugValidateVmoPageBorrowingLocked());
-
-  list_node freed_pages;
-  list_initialize(&freed_pages);
-  __UNINITIALIZED BatchPQRemove page_remover(&freed_pages);
-
-  const uint64_t visibility_start_offset = child.parent_offset_ + child.parent_start_limit_;
-  const uint64_t merge_start_offset = child.parent_offset_;
-  const uint64_t merge_end_offset = child.parent_offset_ + child.parent_limit_;
-
-  // There's no technical reason why this merging code cannot be run if there is a page source,
-  // however a bi-directional clone will never have a page source and so in case there are any
-  // consequence that have no been considered, ensure we are not in this case.
-  DEBUG_ASSERT(!is_source_preserving_page_content());
-
-  page_list_.RemovePages(page_remover.RemovePagesCallback(), 0, visibility_start_offset);
-  page_list_.RemovePages(page_remover.RemovePagesCallback(), merge_end_offset,
-                         VmPageList::MAX_SIZE);
-
-  if (child.parent_offset_ + child.parent_limit_ > parent_limit_) {
-    // Update the child's parent limit to ensure that it won't be able to see more of its new parent
-    // than this hidden node was able to see.
-    //
-    // The start limit must never exceed the parent limit, so check this invariant and maintain it
-    // after updating the parent limit.
-    DEBUG_ASSERT(parent_start_limit_ <= parent_limit_);
-    child.parent_limit_ = ClampedLimit(child.parent_offset_, child.parent_limit_, parent_limit_);
-    child.parent_start_limit_ = ktl::min(child.parent_start_limit_, child.parent_limit_);
-  } else {
-    // The child will be able to see less of its new parent than this hidden vmo was
-    // able to see, so release any parent pages in that range.
-    ReleaseCowParentPagesLocked(merge_end_offset, parent_limit_, &page_remover);
-  }
-
-  if (removed->parent_offset_ + removed->parent_start_limit_ < visibility_start_offset) {
-    // If the removed former child has a smaller offset, then there are retained
-    // ancestor pages that will no longer be visible and thus should be freed.
-    ReleaseCowParentPagesLocked(removed->parent_offset_ + removed->parent_start_limit_,
-                                visibility_start_offset, &page_remover);
-  }
-
-  // Adjust the child's offset so it will still see the correct range.
-  bool overflow = add_overflow(parent_offset_, child.parent_offset_, &child.parent_offset_);
-  // Overflow here means that something went wrong when setting up parent limits.
-  DEBUG_ASSERT(!overflow);
-
-  if (child.is_hidden_locked()) {
-    // After the merge, either |child| can't see anything in parent (in which case
-    // the parent limits could be anything), or |child|'s first visible offset will be
-    // at least as large as |this|'s first visible offset.
-    DEBUG_ASSERT(child.parent_start_limit_ == child.parent_limit_ ||
-                 parent_offset_ + parent_start_limit_ <=
-                     child.parent_offset_ + child.parent_start_limit_);
-  } else {
-    // non-hidden vmos should always have zero parent_start_limit_
-    DEBUG_ASSERT(child.parent_start_limit_ == 0);
-  }
-
-  // At this point, we need to merge |this|'s page list and |child|'s page list.
-  //
-  // In general, COW clones are expected to share most of their pages (i.e. to fork a relatively
-  // small number of pages). Because of this, it is preferable to do work proportional to the
-  // number of pages which were forked into |removed|. However, there are a few things that can
-  // prevent this:
-  //   - If |child|'s offset is non-zero then the offsets of all of |this|'s pages will
-  //     need to be updated when they are merged into |child|.
-  //   - If there has been a call to ReleaseCowParentPagesLocked which was not able to
-  //     update the parent limits, then there can exist pages in this vmo's page list
-  //     which are not visible to |child| but can't be easily freed based on its parent
-  //     limits. Finding these pages requires examining the split bits of all pages.
-  //   - If |child| is hidden, then there can exist pages in this vmo which were split into
-  //     |child|'s subtree and then migrated out of |child|. Those pages need to be freed, and
-  //     the simplest way to find those pages is to examine the split bits.
-  bool fast_merge = merge_start_offset == 0 && !partial_cow_release_ && !child.is_hidden_locked();
-
-  if (fast_merge) {
-    // Only leaf vmos can be directly removed, so this must always be true. This guarantees
-    // that there are no pages that were split into |removed| that have since been migrated
-    // to its children.
-    DEBUG_ASSERT(!removed->is_hidden_locked());
-
-    // Before merging, find any pages that are present in both |removed| and |this|. Those
-    // pages are visibile to |child| but haven't been written to through |child|, so
-    // their split bits need to be cleared. Note that ::ReleaseCowParentPagesLocked ensures
-    // that pages outside of the parent limit range won't have their split bits set.
-    removed->page_list_.ForEveryPageInRange(
-        [removed_offset = removed->parent_offset_, this](auto* page, uint64_t offset) {
-          // Hidden VMO hierarchies do not support intervals.
-          ASSERT(!page->IsInterval());
-          AssertHeld(lock_ref());
-          // Whether this is a true page, or a marker, we must check |this| for a page as either
-          // represents a potential fork, even if we subsequently changed it to a marker.
-          VmPageOrMarkerRef page_or_mark = page_list_.LookupMutable(offset + removed_offset);
-          if (page_or_mark && page_or_mark->IsPageOrRef()) {
-            // The page was definitely forked into |removed|, but
-            // shouldn't be forked twice.
-            DEBUG_ASSERT(IsSplit(SplitDir::Left, page_or_mark) ^
-                         IsSplit(SplitDir::Right, page_or_mark));
-            ClearSplits(page_or_mark);
-          }
-          return ZX_ERR_NEXT;
-        },
-        removed->parent_start_limit_, removed->parent_limit_);
-
-    // These will be freed, but accumulate them separately for use in asserts before adding these to
-    // freed_pages.
-    list_node covered_pages;
-    list_initialize(&covered_pages);
-    __UNINITIALIZED BatchPQRemove covered_remover(&covered_pages);
-
-    // Although not all pages in page_list_ will end up existing in child, we don't know which ones
-    // will get replaced, so we must update all of the backlinks.
-    {
-      __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&child);
-      struct {
-        BatchPQUpdateBacklink* page_backlink_updater;
-        VmCompression* compression;
-      } state = {&page_backlink_updater, Pmm::Node().GetPageCompression()};
-      page_list_.ForEveryPageMutable([this, &state](VmPageOrMarkerRef p, uint64_t off) {
-        // Hidden VMO hierarchies do not support intervals.
-        ASSERT(!p->IsInterval());
-
-        if (p->IsReference()) {
-          // A regular reference we can move, a temporary reference we need to turn back into
-          // its page so we can move it. To determine if we have a temporary reference we can
-          // just attempt to move it, and if it was a temporary reference we will get a page
-          // returned.
-          if (auto maybe_page = MaybeDecompressReference(state.compression, p->Reference())) {
-            // For simplicity, since this is a very uncommon edge case, just update the page in
-            // place in this page list, then move it as a regular page.
-            AssertHeld(lock_ref());
-            SetNotPinnedLocked(*maybe_page, off);
-            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
-            ASSERT(state.compression->IsTempReference(ref));
-          }
-        }
-        // Not an else-if to intentionally perform this if the previous block turned a reference
-        // into a page.
-        if (p->IsPage()) {
-          state.page_backlink_updater->Push(p->Page(), off);
-        }
-
-        return ZX_ERR_NEXT;
-      });
-      // Update backlinks for any last partial batch of pages.
-      page_backlink_updater.Flush();
-    }
-
-    // Now merge |child|'s pages into |this|, overwriting any pages present in |this|, and
-    // then move that list to |child|.
-    // We are going to perform a delayed free on pages removed here by concatenating |covered_pages|
-    // to |freed_pages|. As a result |freed_pages| will end up with mixed ownership of pages, so
-    // FreePagesLocked() will simply free the pages to the PMM. Make sure that the |child| did not
-    // have a source that was handling frees, which would require more work that simply freeing
-    // pages to the PMM.
-    DEBUG_ASSERT(!child.is_source_handling_free_locked());
-    child.page_list_.MergeOnto(page_list_, [&covered_remover](VmPageOrMarker&& p, uint64_t offset) {
-      covered_remover.PushContent(&p);
-    });
-    child.page_list_ = ktl::move(page_list_);
-
-    vm_page_t* p;
-    covered_remover.Flush();
-    list_for_every_entry (&covered_pages, p, vm_page_t, queue_node) {
-      // The page was already present in |child|, so it should be split at least
-      // once. And being split twice is obviously bad.
-      ASSERT(IsSplit(SplitDir::Left, p) ^ IsSplit(SplitDir::Right, p));
-      ASSERT(p->object.pin_count == 0);
-    }
-    list_splice_after(&covered_pages, &freed_pages);
-  } else {
-    // Merge our page list into the child page list and update all the necessary metadata.
-    __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&child);
-    struct {
-      bool removed_left;
-      uint64_t merge_start_offset;
-      BatchPQRemove* page_remover;
-      BatchPQUpdateBacklink* page_backlink_updater;
-      VmCompression* compression;
-    } state = {removed_left, merge_start_offset, &page_remover, &page_backlink_updater,
-               Pmm::Node().GetPageCompression()};
-    child.page_list_.MergeFrom(
-        page_list_, merge_start_offset, merge_end_offset,
-        [&page_remover](VmPageOrMarker&& p, uint64_t offset) { page_remover.PushContent(&p); },
-        [this, &state](VmPageOrMarker* page_or_marker, uint64_t offset) {
-          DEBUG_ASSERT(page_or_marker->IsPageOrRef());
-          DEBUG_ASSERT(page_or_marker->IsReference() ||
-                       page_or_marker->Page()->object.pin_count == 0);
-
-          if (state.removed_left ? IsSplit(SplitDir::Right, page_or_marker)
-                                 : IsSplit(SplitDir::Left, page_or_marker)) {
-            // This happens when the pages was already migrated into child but then
-            // was migrated further into child's descendants. The page can be freed.
-            state.page_remover->PushContent(page_or_marker);
-          } else {
-            // Since we recursively fork on write, if the child doesn't have the
-            // page, then neither of its children do.
-            ClearSplits(page_or_marker);
-            if (page_or_marker->IsReference()) {
-              // A regular reference we can move, a temporary reference we need to turn back into
-              // its page so we can move it. To determine if we have a temporary reference we can
-              // just attempt to move it, and if it was a temporary reference we will get a page
-              // returned.
-              if (auto maybe_page =
-                      MaybeDecompressReference(state.compression, page_or_marker->Reference())) {
-                // For simplicity, since this is a very uncommon edge case, just update the page in
-                // place in this page list, then move it as a regular page.
-                AssertHeld(lock_ref());
-                SetNotPinnedLocked(*maybe_page, offset);
-                VmPageOrMarker::ReferenceValue ref =
-                    page_or_marker->SwapReferenceForPage(*maybe_page);
-                ASSERT(state.compression->IsTempReference(ref));
-              }
-            }
-            // Not an else-if to intentionally perform this if the previous block turned a reference
-            // into a page.
-            if (page_or_marker->IsPage()) {
-              state.page_backlink_updater->Push(page_or_marker->Page(),
-                                                offset - state.merge_start_offset);
-            }
-          }
-        });
-    // Update backlinks for any last partial batch of pages.
-    page_backlink_updater.Flush();
-  }
-  DEBUG_ASSERT(page_list_.IsEmpty());
-
-  page_remover.Flush();
-  if (!list_is_empty(&freed_pages)) {
-    // |freed_pages| might also contain pages removed from a child or an ancestor, so we do not own
-    // all the pages. Make sure we did not have a page source that was handling frees which would
-    // require additional work on the owned pages on top of a simple free to the PMM.
-    DEBUG_ASSERT(!is_source_handling_free_locked());
-    FreePagesLocked(&freed_pages, /*freeing_owned_pages=*/false);
-  }
-
-  // We don't check the hierarchy because it is inconsistent at this point.
-  // It will be made consistent by the caller and checked then.
-  VMO_FRUGAL_VALIDATION_ASSERT(child.DebugValidateVmoPageBorrowingLocked());
-  VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-}
-
 void VmCowPages::DumpLocked(uint depth, bool verbose) const {
   canary_.Assert();
 
@@ -1869,10 +1362,10 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
   for (uint i = 0; i < depth; ++i) {
     printf("  ");
   }
-  printf("cow_pages %p %ssize %#" PRIx64 " offset %#" PRIx64 " start limit %#" PRIx64
-         " limit %#" PRIx64 " content pages %zu compressed pages %zu ref %d parent %p\n",
-         this, node_type, size_, parent_offset_, parent_start_limit_, parent_limit_, page_count,
-         compressed_count, ref_count_debug(), parent_.get());
+  printf("cow_pages %p %ssize %#" PRIx64 " offset %#" PRIx64 " limit %#" PRIx64
+         " content pages %zu compressed pages %zu ref %d parent %p\n",
+         this, node_type, size_, parent_offset_, parent_limit_, page_count, compressed_count,
+         ref_count_debug(), parent_.get());
 
   if (page_source_) {
     for (uint i = 0; i < depth + 1; ++i) {
@@ -1889,15 +1382,6 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
       }
       if (p->IsMarker()) {
         printf("offset %#" PRIx64 " zero page marker\n", offset);
-      } else if (p->IsPage() && ENABLE_COW_SPLIT_BITS) {
-        vm_page_t* page = p->Page();
-        printf("offset %#" PRIx64 " page %p paddr %#" PRIxPTR "(%c%c%c)\n", offset, page,
-               page->paddr(), IsSplit(SplitDir::Left, page) ? 'L' : '.',
-               IsSplit(SplitDir::Right, page) ? 'R' : '.', page->object.always_need ? 'A' : '.');
-      } else if (p->IsReference() && ENABLE_COW_SPLIT_BITS) {
-        const uint64_t cookie = p->Reference().value();
-        printf("offset %#" PRIx64 " reference %#" PRIx64 "(%c%c)\n", offset, cookie,
-               IsSplit(SplitDir::Left, p) ? 'L' : '.', IsSplit(SplitDir::Right, p) ? 'R' : '.');
       } else if (p->IsPage()) {
         vm_page_t* page = p->Page();
         printf("offset %#" PRIx64 " page %p paddr %#" PRIxPTR " share %" PRIu32 "(%c)\n", offset,
@@ -1940,10 +1424,6 @@ VmCowPages::AttributionCounts VmCowPages::GetAttributedMemoryInRangeLocked(
 
   // Due to the need to manipulate fields in AttributionCounts that only exist based on the #define
   // we cannot use the normal if constexpr guard and instead need a preprocessor guard.
-#if ENABLE_COW_SPLIT_BITS
-  return GetAttributedMemoryInRangeUsingSplitsLocked(offset_bytes, len_bytes);
-#else
-
   DEBUG_ASSERT(!is_hidden_locked());
 
   VmCompression* compression = Pmm::Node().GetPageCompression();
@@ -1987,237 +1467,6 @@ VmCowPages::AttributionCounts VmCowPages::GetAttributedMemoryInRangeLocked(
   DEBUG_ASSERT(status == ZX_OK);
 
   return counts;
-#endif
-}
-
-VmCowPages::AttributionCounts VmCowPages::GetAttributedMemoryInRangeUsingSplitsLocked(
-    uint64_t offset_bytes, uint64_t len_bytes) const {
-  canary_.Assert();
-
-  if (is_hidden_locked()) {
-    return AttributionCounts{};
-  }
-
-  AttributionCounts counts;
-  // TODO(https://g-issues.fuchsia.dev/issues/338300808): Formalize attribution model.
-  page_list_.ForEveryPageAndGapInRange(
-      [&counts](const auto* p, uint64_t off) {
-        if (p->IsPage()) {
-          counts.uncompressed_bytes += PAGE_SIZE;
-        } else if (p->IsReference()) {
-          counts.compressed_bytes += PAGE_SIZE;
-        }
-        return ZX_ERR_NEXT;
-      },
-      [this, &counts](uint64_t gap_start, uint64_t gap_end) {
-        AssertHeld(lock_ref());
-
-        // If there's no parent, there's no pages to care about. If there is a non-hidden
-        // parent, then that owns any pages in the gap, not us.
-        if (!parent_) {
-          return ZX_ERR_NEXT;
-        }
-        if (!parent_locked().is_hidden_locked()) {
-          return ZX_ERR_NEXT;
-        }
-
-        // Count any ancestor pages that should be attributed to us in the range. Ideally the whole
-        // range gets processed in one attempt, but in order to prevent unbounded stack growth with
-        // recursion we instead process partial ranges and recalculate the intermediate results.
-        // As a result instead of being O(n) in the number of committed pages it could
-        // pathologically become O(nd) where d is our depth in the vmo hierarchy.
-        uint64_t off = gap_start;
-        while (off < parent_limit_ && off < gap_end) {
-          AttributionCounts local_count;
-          uint64_t attributed =
-              CountAttributedAncestorBytesLocked(off, gap_end - off, &local_count);
-          // |CountAttributedAncestorPagesLocked| guarantees that it will make progress.
-          DEBUG_ASSERT(attributed > 0);
-          off += attributed;
-          counts += local_count;
-        }
-
-        return ZX_ERR_NEXT;
-      },
-      offset_bytes, offset_bytes + len_bytes);
-
-  return counts;
-}
-
-uint64_t VmCowPages::CountAttributedAncestorBytesLocked(uint64_t offset, uint64_t size,
-                                                        AttributionCounts* count) const
-    TA_REQ(lock()) {
-  // We need to walk up the ancestor chain to see if there are any pages that should be attributed
-  // to this vmo. We attempt operate on the entire range given to us but should we need to query
-  // the next parent for a range we trim our operating range. Trimming the range is necessary as
-  // we cannot recurse and otherwise have no way to remember where we were up to after processing
-  // the range in the parent. The solution then is to return all the way back up to the caller with
-  // a partial range and then effectively recompute the meta data at the point we were up to.
-
-  // Note that we cannot stop just because the page_attribution_user_id_ changes. This is because
-  // there might still be a forked page at the offset in question which should be attributed to
-  // this vmo. Whenever the attribution user id changes while walking up the ancestors, we need
-  // to determine if there is a 'closer' vmo in the sibling subtree to which the offset in
-  // question can be attributed, or if it should still be attributed to the current vmo.
-
-  DEBUG_ASSERT(offset < parent_limit_);
-  const VmCowPages* cur = this;
-  AssertHeld(cur->lock_ref());
-  uint64_t cur_offset = offset;
-  uint64_t cur_size = size;
-  // Count of how many bytes we attributed as being owned by this vmo.
-  AttributionCounts attributed_ours;
-  // Count how much we've processed. This is needed to remember when we iterate up the parent list
-  // at an offset.
-  uint64_t attributed = 0;
-  while (cur_offset < cur->parent_limit_) {
-    // For cur->parent_limit_ to be non-zero, it must have a parent.
-    DEBUG_ASSERT(cur->parent_);
-
-    const auto parent = cur->parent_.get();
-    AssertHeld(parent->lock_ref());
-    uint64_t parent_offset;
-    bool overflowed = add_overflow(cur->parent_offset_, cur_offset, &parent_offset);
-    DEBUG_ASSERT(!overflowed);                     // vmo creation should have failed
-    DEBUG_ASSERT(parent_offset <= parent->size_);  // parent_limit_ prevents this
-
-    // Child of snapshot-modified root, pages will be attributed to parent
-    if (!parent->is_hidden_locked()) {
-      // Parent must be root & pager-backed.
-      DEBUG_ASSERT(!parent->parent_);
-      DEBUG_ASSERT(parent->is_source_preserving_page_content());
-      break;
-    }
-
-    const bool left = cur == &parent->left_child_locked();
-    const auto& sib = left ? parent->right_child_locked() : parent->left_child_locked();
-
-    // Work out how much of the desired size is actually visible to us in the parent, we just use
-    // this to walk the correct amount of the page_list_
-    const uint64_t parent_size = ktl::min(cur_size, cur->parent_limit_ - cur_offset);
-
-    // By default we expect to process the entire range, hence our next_size is 0. Should we need to
-    // iterate up the stack then these will be set by one of the callbacks.
-    uint64_t next_parent_offset = parent_offset + cur_size;
-    uint64_t next_size = 0;
-    parent->page_list_.ForEveryPageAndGapInRange(
-        [&parent, &cur, &attributed_ours, &sib](const auto* p, uint64_t off) {
-          AssertHeld(cur->lock_ref());
-          AssertHeld(sib.lock_ref());
-          AssertHeld(parent->lock_ref());
-          // Hidden VMO hierarchies don't support page intervals.
-          ASSERT(!p->IsInterval());
-          if (p->IsMarker()) {
-            return ZX_ERR_NEXT;
-          }
-          if (
-              // Page is explicitly owned by us
-              (parent->page_attribution_user_id_ == cur->page_attribution_user_id_) ||
-              // If page has already been split and we can see it, then we know
-              // the sibling subtree can't see the page and thus it should be
-              // attributed to this vmo.
-              (IsSplit(SplitDir::Left, p) || IsSplit(SplitDir::Right, p)) ||
-              // If the sibling cannot access this page then its ours, otherwise we know there's
-              // a vmo in the sibling subtree which is 'closer' to this offset, and to which we will
-              // attribute the page to.
-              !(sib.parent_offset_ + sib.parent_start_limit_ <= off &&
-                off < sib.parent_offset_ + sib.parent_limit_)) {
-            if (p->IsPage()) {
-              attributed_ours.uncompressed_bytes += PAGE_SIZE;
-            } else if (p->IsReference()) {
-              attributed_ours.compressed_bytes += PAGE_SIZE;
-            }
-          }
-          return ZX_ERR_NEXT;
-        },
-        [&parent, &cur, &next_parent_offset, &next_size, &sib](uint64_t gap_start,
-                                                               uint64_t gap_end) {
-          // Process a gap in the parent VMO.
-          //
-          // A gap in the parent VMO doesn't necessarily mean there are no pages
-          // in this range: our parent's ancestors may have pages, so we need to
-          // walk up the tree to find out.
-          //
-          // We don't always need to walk the tree though: in this this gap, both this VMO
-          // and our sibling VMO will share the same set of ancestor pages. However, the
-          // pages will only be accounted to one of the two VMOs.
-          //
-          // If the parent page_attribution_user_id is the same as us, we need to
-          // keep walking up the tree to perform a more accurate count.
-          //
-          // If the parent page_attribution_user_id is our sibling, however, we
-          // can just ignore the overlapping range: pages may or may not exist in
-          // the range --- but either way, they would be accounted to our sibling.
-          // Instead, we need only walk up ranges not visible to our sibling.
-          AssertHeld(cur->lock_ref());
-          AssertHeld(sib.lock_ref());
-          AssertHeld(parent->lock_ref());
-          uint64_t gap_size = gap_end - gap_start;
-          if (parent->page_attribution_user_id_ == cur->page_attribution_user_id_) {
-            // don't need to consider siblings as we own this range, but we do need to
-            // keep looking up the stack to find any actual pages.
-            next_parent_offset = gap_start;
-            next_size = gap_size;
-            return ZX_ERR_STOP;
-          }
-          // For this entire range we know that the offset is visible to the current vmo, and there
-          // are no committed or migrated pages. We need to check though for what portion of this
-          // range we should attribute to the sibling. Any range that we can attribute to the
-          // sibling we can skip, otherwise we have to keep looking up the stack to see if there are
-          // any pages that could be attributed to us.
-          uint64_t sib_offset, sib_len;
-          if (!GetIntersect(gap_start, gap_size, sib.parent_offset_ + sib.parent_start_limit_,
-                            sib.parent_limit_ - sib.parent_start_limit_, &sib_offset, &sib_len)) {
-            // No sibling ownership, so need to look at the whole range in the parent to find any
-            // pages.
-            next_parent_offset = gap_start;
-            next_size = gap_size;
-            return ZX_ERR_STOP;
-          }
-          // If the whole range is owned by the sibling, any pages that might be in
-          // it won't be accounted to us anyway. Skip the segment.
-          if (sib_len == gap_size) {
-            DEBUG_ASSERT(sib_offset == gap_start);
-            return ZX_ERR_NEXT;
-          }
-
-          // Otherwise, inspect the range not visible to our sibling.
-          if (sib_offset == gap_start) {
-            next_parent_offset = sib_offset + sib_len;
-            next_size = gap_end - next_parent_offset;
-          } else {
-            next_parent_offset = gap_start;
-            next_size = sib_offset - gap_start;
-          }
-          return ZX_ERR_STOP;
-        },
-        parent_offset, parent_offset + parent_size);
-    if (next_size == 0) {
-      // If next_size wasn't set then we don't need to keep looking up the chain as we successfully
-      // looked at the entire range.
-      break;
-    }
-    // Count anything up to the next starting point as being processed.
-    attributed += next_parent_offset - parent_offset;
-    // Size should have been reduced by at least the amount we just attributed
-    DEBUG_ASSERT(next_size <= cur_size &&
-                 cur_size - next_size >= next_parent_offset - parent_offset);
-
-    cur = parent;
-    cur_offset = next_parent_offset;
-    cur_size = next_size;
-  }
-  // Exiting the loop means we either ceased finding a relevant parent for the range, or we were
-  // able to process the entire range without needing to look up to a parent, in either case we
-  // can consider the entire range as attributed.
-  //
-  // The cur_size can be larger than the value of parent_size from the last loop iteration. This is
-  // fine as that range we trivially know has zero pages in it, and therefore has zero pages to
-  // determine attributions off.
-  attributed += cur_size;
-
-  *count = attributed_ours;
-  return attributed;
 }
 
 VmPageOrMarker VmCowPages::AddPageTransaction::Complete(VmPageOrMarker p) {
@@ -2487,36 +1736,11 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
   return ZX_OK;
 }
 
-bool VmCowPages::IsUniAccessibleLocked(vm_page_t* page, uint64_t offset) const {
-  DEBUG_ASSERT(page_list_.Lookup(offset)->Page() == page);
-
-  if (IsSplit(SplitDir::Left, page) || IsSplit(SplitDir::Right, page)) {
-    return true;
-  }
-
-  if (offset < left_child_locked().parent_offset_ + left_child_locked().parent_start_limit_ ||
-      offset >= left_child_locked().parent_offset_ + left_child_locked().parent_limit_) {
-    return true;
-  }
-
-  if (offset < right_child_locked().parent_offset_ + right_child_locked().parent_start_limit_ ||
-      offset >= right_child_locked().parent_offset_ + right_child_locked().parent_limit_) {
-    return true;
-  }
-
-  return false;
-}
-
 zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_list,
                                            VmCowPages* page_owner, vm_page_t* page,
                                            uint64_t owner_offset,
                                            AnonymousPageRequest* page_request,
                                            vm_page_t** out_page) {
-  if constexpr (ENABLE_COW_SPLIT_BITS) {
-    return CloneCowPageUsingSplitsLocked(offset, alloc_list, page_owner, page, owner_offset,
-                                         page_request, out_page);
-  }
-
   AssertHeld(page_owner->lock_ref());
   DEBUG_ASSERT(page != vm_get_zero_page());
   DEBUG_ASSERT(parent_);
@@ -2588,187 +1812,10 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::CloneCowPageUsingSplitsLocked(uint64_t offset, list_node_t* alloc_list,
-                                                      VmCowPages* page_owner, vm_page_t* page,
-                                                      uint64_t owner_offset,
-                                                      AnonymousPageRequest* page_request,
-                                                      vm_page_t** out_page) {
-  DEBUG_ASSERT(page != vm_get_zero_page());
-  DEBUG_ASSERT(parent_);
-  DEBUG_ASSERT(page_request);
-
-  // Stash the paddr of the page that is going to be copied across loop iterations.
-  const paddr_t page_paddr = page->paddr();
-
-  // To avoid the need for rollback logic on allocation failure, we start the forking
-  // process from the root-most vmo and work our way towards the leaf vmo. This allows
-  // us to maintain the hidden vmo invariants through the whole operation, so that we
-  // can stop at any point.
-  //
-  // To set this up, walk from the leaf to |page_owner|, and keep track of the
-  // path via |stack_.dir_flag|.
-  VmCowPages* cur = this;
-  do {
-    AssertHeld(cur->lock_ref());
-    VmCowPages* next = cur->parent_.get();
-    // We should always be able to find |page_owner| in the ancestor chain.
-    DEBUG_ASSERT(next);
-    AssertHeld(next->lock_ref());
-
-    next->stack_.dir_flag = &next->left_child_locked() == cur ? StackDir::Left : StackDir::Right;
-    if (next->stack_.dir_flag == StackDir::Right) {
-      DEBUG_ASSERT(&next->right_child_locked() == cur);
-    }
-    cur = next;
-  } while (cur != page_owner);
-  uint64_t cur_offset = owner_offset;
-
-  // |target_page| is the page we're considering for migration. Cache it
-  // across loop iterations.
-  vm_page_t* target_page = page;
-
-  zx_status_t alloc_status = ZX_OK;
-
-  // As long as we're simply migrating |page|, there's no need to update any vmo mappings, since
-  // that means the other side of the clone tree has already covered |page| and the current side
-  // of the clone tree will still see |page|. As soon as we insert a new page, we'll need to
-  // update all mappings at or below that level.
-  bool skip_range_update = true;
-  // While inserting pages down the tree we attempt to avoid redundant range updates as much as
-  // possible by deferring range updates for the subtree we are going to modify again. We do
-  // eventually need to perform an update though, and this deferred method ensures that wherever we
-  // process to, be it to success or if we abort early due to an error, the subtree we had been
-  // deferring is updated.
-  auto complete_range_update = fit::defer([&]() {
-    DEBUG_ASSERT(cur);
-    if (!skip_range_update) {
-      AssertHeld(cur->lock_ref());
-      // We either successfully migrated/cloned the page all the way to our target, or we had an
-      // error part way along. Either way the subtree we reached needs an unmap done against it.
-      cur->RangeChangeUpdateLocked(cur_offset, PAGE_SIZE, RangeChangeOp::Unmap);
-    }
-  });
-  do {
-    // |target_page| is always located in |cur| at |cur_offset| at the start of the loop.
-    VmCowPages* target_page_owner = cur;
-    AssertHeld(target_page_owner->lock_ref());
-    uint64_t target_page_offset = cur_offset;
-
-    cur = cur->stack_.dir_flag == StackDir::Left ? &cur->left_child_locked()
-                                                 : &cur->right_child_locked();
-    DEBUG_ASSERT(cur_offset >= cur->parent_offset_);
-    cur_offset -= cur->parent_offset_;
-
-    // We're either going to migrate the page or copy the page from |target_page_owner| to |cur|.
-    // Lookup the page list slot in |cur| that we're going to manipulate so that when we add the
-    // page later it does not encounter an allocation failure in the page list. We need to do this
-    // *before* we've made any changes to the |target_page_owner| page list so that we do not need
-    // to roll back in case of a failed migration.
-    __UNINITIALIZED auto page_transaction =
-        cur->BeginAddPageLocked(cur_offset, CanOverwriteContent::Zero);
-    if (page_transaction.is_error()) {
-      *out_page = nullptr;
-      return page_transaction.status_value();
-    }
-
-    // From this point on, we should ensure that the transaction either gets completed or canceled.
-    auto cancel_transaction = fit::defer([cur, &page_transaction] {
-      AssertHeld(cur->lock_ref());
-      cur->CancelAddPageLocked(*page_transaction);
-    });
-
-    const SplitDir target_dir =
-        (target_page_owner->stack_.dir_flag == StackDir::Left) ? SplitDir::Left : SplitDir::Right;
-    if (target_page_owner->IsUniAccessibleLocked(target_page, target_page_offset)) {
-      // If the page we're covering in the parent is uni-accessible, then we
-      // can directly move the page.
-
-      // For now, we won't see a loaned page here.
-      DEBUG_ASSERT(!target_page->is_loaned());
-
-      // Assert that we're not trying to split the page the same direction two times. Either
-      // some tracking state got corrupted or a page in the subtree we're trying to
-      // migrate to got improperly migrated/freed. If we did this migration, then the
-      // opposite subtree would lose access to this page.
-      DEBUG_ASSERT(!IsSplit(target_dir, target_page));
-      ClearSplits(target_page);
-
-      VmPageOrMarker removed = target_page_owner->page_list_.RemoveContent(target_page_offset);
-      // We know this is a true page since it is just our |target_page|, which is a true page.
-      vm_page* removed_page = removed.ReleasePage();
-      // Cannot have loaned pages in hidden node.
-      DEBUG_ASSERT(!removed_page->is_loaned());
-      pmm_page_queues()->Remove(removed_page);
-      DEBUG_ASSERT(removed_page == target_page);
-    } else {
-      // Otherwise we need to fork the page.  The page has no writable mappings so we don't need to
-      // remove write or unmap before copying the contents.
-      vm_page_t* cover_page;
-      alloc_status = AllocateCopyPage(page_paddr, alloc_list, page_request, &cover_page);
-      if (alloc_status != ZX_OK) {
-        break;
-      }
-
-      // We're going to cover target_page with cover_page, so set appropriate split bit.
-      const SplitDir sibling_dir =
-          (target_dir == SplitDir::Left) ? SplitDir::Right : SplitDir::Left;
-      DEBUG_ASSERT(!IsSplit(sibling_dir, target_page));
-      SetSplit(target_dir, target_page);
-
-      target_page = cover_page;
-
-      skip_range_update = false;
-    }
-
-    // Skip the automatic range update so we can do it ourselves more efficiently. This gets handled
-    // either in the next code block below for the subtree we do not walk, or by the
-    // complete_range_update deferred method for our target subtree.
-    [[maybe_unused]] VmPageOrMarker prev_content = cur->CompleteAddPageLocked(
-        *page_transaction, VmPageOrMarker::Page(target_page), /*do_range_update=*/false);
-    cancel_transaction.cancel();
-    // We should not have been trying to fork at this offset if something already existed.
-    DEBUG_ASSERT(prev_content.IsEmpty());
-
-    if (!skip_range_update) {
-      if (cur != this) {
-        // In this case, cur is a hidden vmo and has no direct mappings. Also, its
-        // descendents along the page stack will be dealt with by subsequent iterations
-        // of this loop. That means that any mappings that need to be touched now are
-        // owned by the children on the opposite side of stack_.dir_flag.
-        VmCowPages& other = cur->stack_.dir_flag == StackDir::Left ? cur->right_child_locked()
-                                                                   : cur->left_child_locked();
-        AssertHeld(other.lock_ref());
-        RangeChangeList list;
-        other.RangeChangeUpdateFromParentLocked(cur_offset, PAGE_SIZE, &list);
-        RangeChangeUpdateListLocked(&list, RangeChangeOp::Unmap);
-      } else {
-        // This is the last iteration of the loop and we need to unmap from this. As
-        // complete_range_update already handles this case we let it perform the update to avoid
-        // needing to reason about cancelling the deferred method.
-        DEBUG_ASSERT(offset == cur_offset);
-      }
-    }
-  } while (cur != this);
-  DEBUG_ASSERT(alloc_status != ZX_OK || cur_offset == offset);
-
-  if (unlikely(alloc_status != ZX_OK)) {
-    *out_page = nullptr;
-    return alloc_status;
-  } else {
-    *out_page = target_page;
-    return ZX_OK;
-  }
-}
-
 zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
                                                  VmCowPages* page_owner, vm_page_t* page,
                                                  uint64_t owner_offset,
                                                  AnonymousPageRequest* page_request) {
-  if constexpr (ENABLE_COW_SPLIT_BITS) {
-    return CloneCowPageAsZeroUsingSplitsLocked(offset, freed_list, page_owner, page, owner_offset,
-                                               page_request);
-  }
-
   AssertHeld(page_owner->lock_ref());
   DEBUG_ASSERT(page != vm_get_zero_page());
   DEBUG_ASSERT(parent_);
@@ -2808,109 +1855,7 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::CloneCowPageAsZeroUsingSplitsLocked(uint64_t offset,
-                                                            list_node_t* freed_list,
-                                                            VmCowPages* page_owner, vm_page_t* page,
-                                                            uint64_t owner_offset,
-                                                            AnonymousPageRequest* page_request) {
-  DEBUG_ASSERT(parent_);
-
-  DEBUG_ASSERT(!page_source_ || page_source_->DebugIsPageOk(page, offset));
-
-  // Need to make sure the page is duplicated as far as our parent. Then we can pretend
-  // that we have forked it into us by setting the marker.
-  if (page_owner != parent_.get()) {
-    // Do not pass our freed_list here as this wants an alloc_list to allocate from.
-    zx_status_t result = parent_locked().CloneCowPageLocked(
-        offset + parent_offset_, nullptr, page_owner, page, owner_offset, page_request, &page);
-    if (result != ZX_OK) {
-      return result;
-    }
-  }
-
-  // Before forking/moving the page, ensure a slot is available so that we know AddPageLocked cannot
-  // fail below. In the scenario where |slot| is empty, we do not need to worry about calling
-  // ReturnEmptySlot, since there are no failure paths from here and we are guaranteed to fill the
-  // slot.
-  __UNINITIALIZED auto page_transaction = BeginAddPageLocked(offset, CanOverwriteContent::Zero);
-  if (page_transaction.is_error()) {
-    return page_transaction.status_value();
-  }
-
-  const SplitDir this_dir =
-      (this == &(parent_locked().left_child_locked())) ? SplitDir::Left : SplitDir::Right;
-  // Page is in our parent. Check if its uni accessible, if so we can free it.
-  if (parent_locked().IsUniAccessibleLocked(page, offset + parent_offset_)) {
-    // Make sure we didn't already merge the page in this direction.
-    DEBUG_ASSERT(!IsSplit(this_dir, page));
-    // We are going to be inserting removed pages into a shared free list. So make sure the parent
-    // did not have a page source that was handling frees which would require additional work on the
-    // owned pages on top of a simple free to the PMM.
-    DEBUG_ASSERT(!parent_locked().is_source_handling_free_locked());
-    // We know this is a true page since it is just our target |page|.
-    vm_page* removed =
-        parent_locked().page_list_.RemoveContent(offset + parent_offset_).ReleasePage();
-    DEBUG_ASSERT(removed == page);
-    // Cannot have loaned pages in hidden nodes.
-    DEBUG_ASSERT(!removed->is_loaned());
-    pmm_page_queues()->Remove(removed);
-    DEBUG_ASSERT(!list_in_list(&removed->queue_node));
-    list_add_tail(freed_list, &removed->queue_node);
-  } else {
-    SetSplit(this_dir, page);
-  }
-  // Insert the zero marker.
-  // We know that the slot is empty, so we know we won't be overwriting an actual page.
-  // We expect the caller to update any mappings.
-  [[maybe_unused]] VmPageOrMarker old =
-      CompleteAddPageLocked(*page_transaction, VmPageOrMarker::Marker(), /*do_range_update=*/false);
-  // We cannot be forking a page to here if there's already something.
-  DEBUG_ASSERT(old.IsEmpty());
-  return ZX_OK;
-}
-
-void VmCowPages::ReleaseOwnedPagesUsingSplitsLocked(uint64_t start) {
-  DEBUG_ASSERT(!is_hidden_locked());
-  DEBUG_ASSERT(start <= size_);
-
-  // We stack-own loaned pages between removing the page from PageQueues and freeing the page
-  // via call to |FreePagesLocked|.
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
-  list_node_t freed_list;
-  list_initialize(&freed_list);
-  __UNINITIALIZED BatchPQRemove page_remover(&freed_list);
-
-  // Release any split pages if we have a hidden parent.
-  if (is_parent_hidden_locked() && start < parent_limit_) {
-    ReleaseCowParentPagesLocked(start, parent_limit_, &page_remover);
-    // Flush the page remover and free the pages, so that we don't mix ownership of ancestor
-    // pages with pages removed from this object below.
-    page_remover.Flush();
-    FreePagesLocked(&freed_list, /*freeing_owned_pages=*/false);
-  }
-
-  // Remove any pages from our page list.
-  if (start == 0) {
-    page_list_.RemoveAllContent(
-        [&page_remover](VmPageOrMarker&& p) { page_remover.PushContent(&p); });
-  } else {
-    page_list_.RemovePages(page_remover.RemovePagesCallback(), start, size_);
-  }
-  page_remover.Flush();
-  FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
-  if (!is_parent_hidden_locked()) {
-    // Potentially trim the parent limit to reflect the range that has been freed. For a hidden
-    // parent this will have already been done by ReleaseCowParentPagesLocked.
-    parent_limit_ = ktl::min(parent_limit_, start);
-  }
-}
-
 void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start) {
-  if constexpr (ENABLE_COW_SPLIT_BITS) {
-    ReleaseOwnedPagesUsingSplitsLocked(start);
-    return;
-  }
   DEBUG_ASSERT(!is_hidden_locked());
   DEBUG_ASSERT(start <= size_);
 
@@ -5028,40 +3973,6 @@ zx_status_t VmCowPages::DecompressInRangeLocked(uint64_t offset, uint64_t len,
   uint64_t cur_offset = ROUNDDOWN(offset, PAGE_SIZE);
   uint64_t end_offset = ROUNDUP(offset + len, PAGE_SIZE);
 
-  if constexpr (ENABLE_COW_SPLIT_BITS) {
-    while (cur_offset < end_offset) {
-      VmPageOrMarkerRef ref;
-      uint64_t ref_offset = 0;
-      page_list_.ForEveryPageInRangeMutable(
-          [&](VmPageOrMarkerRef page_or_marker, uint64_t offset) {
-            if (page_or_marker->IsReference()) {
-              ref = page_or_marker;
-              ref_offset = offset;
-              return ZX_ERR_STOP;
-            }
-            return ZX_ERR_NEXT;
-          },
-          cur_offset, end_offset);
-      if (!ref) {
-        return ZX_OK;
-      }
-      __UNINITIALIZED AnonymousPageRequest page_request;
-      zx_status_t status = ReplaceReferenceWithPageLocked(ref, ref_offset, &page_request);
-      if (status == ZX_OK) {
-        cur_offset = ref_offset + PAGE_SIZE;
-      } else if (status == ZX_ERR_SHOULD_WAIT) {
-        guard->CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
-        // With the lock dropped it's possible that our cur/end_offset are no longer within the
-        // range of the VMO, but if this is the case we will immediately find no pages in the
-        // page_list_ for this range and return.
-      }
-      if (status != ZX_OK) {
-        return status;
-      }
-    }
-    return ZX_OK;
-  }
-
   zx_status_t status;
   do {
     __UNINITIALIZED AnonymousPageRequest page_request;
@@ -5259,222 +4170,6 @@ bool VmCowPages::AnyPagesPinnedLocked(uint64_t offset, size_t len) {
   return found_pinned;
 }
 
-// Helper function which processes the region visible by both children.
-void VmCowPages::ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end,
-                                                   bool sibling_visible,
-                                                   BatchPQRemove* page_remover) {
-  // Compute the range in the parent that cur no longer will be able to see.
-  const uint64_t parent_range_start = CheckedAdd(start, parent_offset_);
-  const uint64_t parent_range_end = CheckedAdd(end, parent_offset_);
-
-  bool skip_split_bits = true;
-  if (parent_limit_ <= end) {
-    parent_limit_ = ktl::min(start, parent_limit_);
-    if (parent_limit_ <= parent_start_limit_) {
-      // Setting both to zero is cleaner and makes some asserts easier.
-      parent_start_limit_ = 0;
-      parent_limit_ = 0;
-    }
-  } else if (start == parent_start_limit_) {
-    parent_start_limit_ = end;
-  } else if (sibling_visible) {
-    // Split bits and partial cow release are only an issue if this range is also visible to our
-    // sibling. If it's not visible then we will always be freeing all pages anyway, no need to
-    // worry about split bits. Otherwise if the vmo limits can't be updated, this function will need
-    // to use the split bits to release pages in the parent. It also means that ancestor pages in
-    // the specified range might end up being released based on their current split bits, instead of
-    // through subsequent calls to this function. Therefore parent and all ancestors need to have
-    // the partial_cow_release_ flag set to prevent fast merge issues in ::RemoveChildLocked.
-    auto cur = this;
-    AssertHeld(cur->lock_ref());
-    uint64_t cur_start = start;
-    uint64_t cur_end = end;
-    while (cur->parent_ && cur_start < cur_end) {
-      auto parent = cur->parent_.get();
-      AssertHeld(parent->lock_ref());
-      parent->partial_cow_release_ = true;
-      cur_start = ktl::max(CheckedAdd(cur_start, cur->parent_offset_), parent->parent_start_limit_);
-      cur_end = ktl::min(CheckedAdd(cur_end, cur->parent_offset_), parent->parent_limit_);
-      cur = parent;
-    }
-    skip_split_bits = false;
-  }
-
-  // The start limit must never exceed the parent limit, even after updating the limits.
-  DEBUG_ASSERT(parent_start_limit_ <= parent_limit_);
-
-  // Free any pages that either aren't visible, or were already split into the other child. For
-  // pages that haven't been split into the other child, we need to ensure they're univisible.
-  // We are going to be inserting removed pages into a shared free list. So make sure the parent did
-  // not have a page source that was handling frees which would require additional work on the owned
-  // pages on top of a simple free to the PMM.
-  DEBUG_ASSERT(!parent_locked().is_source_handling_free_locked());
-  const SplitDir this_dir =
-      (this == &parent_locked().left_child_locked()) ? SplitDir::Left : SplitDir::Right;
-  const SplitDir sibling_dir = (this_dir == SplitDir::Left) ? SplitDir::Right : SplitDir::Left;
-  parent_locked().page_list_.RemovePages(
-      [skip_split_bits, sibling_visible, sibling_dir, this_dir, page_remover](
-          VmPageOrMarker* page_or_mark, uint64_t offset) {
-        // Hidden VMO hierarchies do not support intervals.
-        ASSERT(!page_or_mark->IsInterval());
-
-        if (page_or_mark->IsMarker()) {
-          // If this marker is in a range still visible to the sibling then we just leave it, no
-          // split bits or anything to be updated. If the sibling cannot see it, then we can clear
-          // it.
-          if (!sibling_visible) {
-            *page_or_mark = VmPageOrMarker::Empty();
-          }
-          return ZX_ERR_NEXT;
-        }
-        // If the sibling can still see this page then we need to keep it around, otherwise we can
-        // free it. The sibling can see the page if this range is |sibling_visible| and if the
-        // sibling hasn't already forked the page, which is recorded in the split bits.
-        if (!sibling_visible || IsSplit(sibling_dir, page_or_mark)) {
-          page_remover->PushContent(page_or_mark);
-          return ZX_ERR_NEXT;
-        }
-        if (skip_split_bits) {
-          // If we were able to update this vmo's parent limit, that made the pages
-          // uniaccessible. We clear the split bits to allow ::RemoveChildLocked to efficiently
-          // merge vmos without having to worry about pages above parent_limit_.
-          ClearSplits(page_or_mark);
-        } else {
-          // Otherwise set the appropriate split bit to make the page uniaccessible.
-          SetSplit(this_dir, page_or_mark);
-        }
-        return ZX_ERR_NEXT;
-      },
-      parent_range_start, parent_range_end);
-}
-
-void VmCowPages::ReleaseCowParentPagesLocked(uint64_t start, uint64_t end,
-                                             BatchPQRemove* page_remover) {
-  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
-  // This function releases |this| references to any ancestor vmo's COW pages.
-  //
-  // To do so, we divide |this| parent into three (possibly 0-length) regions: the region
-  // which |this| sees but before what the sibling can see, the region where both |this|
-  // and its sibling can see, and the region |this| can see but after what the sibling can
-  // see. Processing the 2nd region only requires touching the direct parent, since the sibling
-  // can see ancestor pages in the region. However, processing the 1st and 3rd regions requires
-  // recursively releasing |this| parent's ancestor pages, since those pages are no longer
-  // visible through |this| parent.
-  //
-  // This function processes region 3 (incl. recursively processing the parent), then region 2,
-  // then region 1 (incl. recursively processing the parent). Processing is done in reverse order
-  // to ensure parent_limit_ is reduced correctly. When processing either regions of type 1 or 3 we
-  //  1. walk up the parent and find the largest common slice that all nodes in the hierarchy see
-  //     as being of the same type.
-  //  2. walk back down (using stack_ direction flags) applying the range update using that final
-  //     calculated size
-  //  3. reduce the range we are operating on to not include the section we just processed
-  //  4. repeat steps 1-3 until range is empty
-  // In the worst case it is possible for this algorithm then to be O(N^2) in the depth of the tree.
-  // More optimal algorithms probably exist, but this algorithm is sufficient for at the moment as
-  // these suboptimal scenarios do not occur in practice.
-
-  // At the top level we continuously attempt to process the range until it is empty.
-  while (end > start) {
-    // cur_start / cur_end get adjusted as cur moves up/down the parent chain.
-    uint64_t cur_start = start;
-    uint64_t cur_end = end;
-    VmCowPages* cur = this;
-
-    AssertHeld(cur->lock_ref());
-    // First walk up the parent chain as long as there is a visible parent that does not overlap
-    // with its sibling.
-    while (cur->parent_ && cur->parent_start_limit_ < cur_end && cur_start < cur->parent_limit_) {
-      if (cur_end > cur->parent_limit_) {
-        // Part of the range sees the parent, and part of it doesn't. As we only process ranges of
-        // a single type we first trim the range down to the portion that doesn't see the parent,
-        // then next time around the top level loop we will process the portion that does see
-        cur_start = cur->parent_limit_;
-        DEBUG_ASSERT(cur_start < cur_end);
-        break;
-      }
-      // Trim the start to the portion of the parent it can see.
-      cur_start = ktl::max(cur_start, cur->parent_start_limit_);
-      DEBUG_ASSERT(cur_start < cur_end);
-
-      // Work out what the overlap with our sibling is
-      auto parent = cur->parent_.get();
-      AssertHeld(parent->lock_ref());
-      // Stop processing if we are the child of a snapshot-modified root, as any pages in the parent
-      // are owned by the root and should remain accessible to the pager.
-      if (!parent->is_hidden_locked()) {
-        // Parent must be root & pager-backed.
-        DEBUG_ASSERT(!parent->parent_);
-        DEBUG_ASSERT(parent->is_source_preserving_page_content());
-        break;
-      }
-      bool left = cur == &parent->left_child_locked();
-      auto& other = left ? parent->right_child_locked() : parent->left_child_locked();
-      AssertHeld(other.lock_ref());
-
-      // Project our operating range into our parent.
-      const uint64_t our_parent_start = CheckedAdd(cur_start, cur->parent_offset_);
-      const uint64_t our_parent_end = CheckedAdd(cur_end, cur->parent_offset_);
-      // Project our siblings full range into our parent.
-      const uint64_t other_parent_start =
-          CheckedAdd(other.parent_offset_, other.parent_start_limit_);
-      const uint64_t other_parent_end = CheckedAdd(other.parent_offset_, other.parent_limit_);
-
-      if (other_parent_end >= our_parent_end && other_parent_start < our_parent_end) {
-        // At least some of the end of our range overlaps with the sibling. First move up our start
-        // to ensure our range is 100% overlapping.
-        if (other_parent_start > our_parent_start) {
-          cur_start = CheckedAdd(cur_start, other_parent_start - our_parent_start);
-          DEBUG_ASSERT(cur_start < cur_end);
-        }
-        // Free the range that overlaps with the sibling, then we are done walking up as this is the
-        // type 2 kind of region. It is safe to process this right now since we are in a terminal
-        // state and are leaving the loop, thus we know that this is the final size of the region.
-        cur->ReleaseCowParentPagesLockedHelper(cur_start, cur_end, true, page_remover);
-        break;
-      }
-      // End of our range does not see the sibling. First move up our start to ensure we are dealing
-      // with a range that is 100% no sibling, and then keep on walking up.
-      if (other_parent_end > our_parent_start && other_parent_end < our_parent_end) {
-        cur_start = CheckedAdd(cur_start, other_parent_end - our_parent_start);
-        DEBUG_ASSERT(cur_start < cur_end);
-      }
-
-      // Record the direction so we can walk about down later.
-      parent->stack_.dir_flag = left ? StackDir::Left : StackDir::Right;
-      // Don't use our_parent_start as we may have updated cur_start
-      cur_start = CheckedAdd(cur_start, cur->parent_offset_);
-      cur_end = our_parent_end;
-      DEBUG_ASSERT(cur_start < cur_end);
-      cur = parent;
-    }
-
-    // Every parent that we walked up had no overlap with its siblings. Now that we know the size
-    // of the range that we can process we just walk back down processing.
-    while (cur != this) {
-      // Although we free pages in the parent we operate on the *child*, as that is whose limits
-      // we will actually adjust. The ReleaseCowParentPagesLockedHelper will then reach backup to
-      // the parent to actually free any pages.
-      cur = cur->stack_.dir_flag == StackDir::Left ? &cur->left_child_locked()
-                                                   : &cur->right_child_locked();
-      AssertHeld(cur->lock_ref());
-      DEBUG_ASSERT(cur_start >= cur->parent_offset_);
-      DEBUG_ASSERT(cur_end >= cur->parent_offset_);
-      cur_start -= cur->parent_offset_;
-      cur_end -= cur->parent_offset_;
-
-      cur->ReleaseCowParentPagesLockedHelper(cur_start, cur_end, false, page_remover);
-    }
-
-    // Update the end with the portion we managed to do. Ensuring some basic sanity of the range,
-    // most importantly that we processed a non-zero portion to ensure progress.
-    DEBUG_ASSERT(cur_start >= start);
-    DEBUG_ASSERT(cur_start < end);
-    DEBUG_ASSERT(cur_end == end);
-    end = cur_start;
-  }
-}
-
 void VmCowPages::InvalidateReadRequestsLocked(uint64_t offset, uint64_t len) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
@@ -5651,11 +4346,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
     for (auto& child : children_list_) {
       AssertHeld(child.lock_ref());
 
-      // The start limit must never exceed the parent limit, so check this invariant and maintain it
-      // after updating the parent limit.
-      DEBUG_ASSERT(child.parent_start_limit_ <= child.parent_limit_);
       child.parent_limit_ = ClampedLimit(child.parent_offset_, child.parent_limit_, start);
-      child.parent_start_limit_ = ktl::min(child.parent_start_limit_, child.parent_limit_);
     }
 
   } else if (s > size_) {
@@ -7245,9 +5936,6 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
     // Start compression of the page by swapping the page list to contain the temporary reference.
     // Ensure the compression system is aware of the page's current share_count so it can track any
     // changes we make to that value while compression is running.
-    //
-    // When split bits are in use, the share_count will actually encode the split bits according to
-    // |IsSplit| and |SetSplit| above.
     VmPageOrMarker::ReferenceValue temp_ref = compressor->Start(
         VmCompressor::PageAndMetadata{.page = page, .metadata = page->object.share_count});
     [[maybe_unused]] vm_page_t* compress_page = page_or_marker.SwapPageForReference(temp_ref);
@@ -7293,9 +5981,6 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
       // The |compressor| doesn't know how to update the |page| with any changes we made to its
       // metadata while compression was running, so we need to manually copy the metadata over to
       // the page's share_count here.
-      //
-      // When split bits are in use, the share_count will actually encode the split bits according
-      // to |IsSplit| and |SetSplit| above.
       DEBUG_ASSERT(page == fail->src_page.page);
       page->object.share_count = fail->src_page.metadata;
       old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
@@ -7607,10 +6292,6 @@ bool VmCowPages::DebugValidateHierarchyLocked() const TA_REQ(lock()) {
 bool VmCowPages::DebugValidatePageSharingLocked() const {
   canary_.Assert();
 
-  if constexpr (ENABLE_COW_SPLIT_BITS) {
-    return DebugValidatePageSplitsLocked();
-  }
-
   // Visible nodes should never contain shared pages.
   if (!is_hidden_locked()) {
     zx_status_t status =
@@ -7672,7 +6353,6 @@ bool VmCowPages::DebugValidatePageSharingLocked() const {
       // |offset_in_parent < cur->parent_offset_| allowing us to safely perform that subtraction
       // from then on.
       if (offset_in_parent < cur->parent_offset_ ||
-          offset_in_parent - cur->parent_offset_ < cur->parent_start_limit_ ||
           offset_in_parent - cur->parent_offset_ >= cur->parent_limit_) {
         // This blank case is used to capture the scenario where current does not see the target
         // offset in the parent, in which case there is no point traversing into the children.
@@ -7749,205 +6429,6 @@ bool VmCowPages::DebugValidatePageSharingLocked() const {
   });
 
   return status == ZX_OK;
-}
-
-bool VmCowPages::DebugValidatePageSplitsLocked() const {
-  canary_.Assert();
-
-  // Assume this is valid until we prove otherwise.
-  bool valid = true;
-  page_list_.ForEveryPage([this, &valid](const VmPageOrMarker* page, uint64_t offset) {
-    if (!page->IsPageOrRef()) {
-      return ZX_ERR_NEXT;
-    }
-    AssertHeld(this->lock_ref());
-
-    // All pages in non-hidden VMOs should not be split, as this is a meaningless thing to talk
-    // about and indicates a book keeping error somewhere else.
-    if (!this->is_hidden_locked()) {
-      if (IsSplit(SplitDir::Left, page) || IsSplit(SplitDir::Right, page)) {
-        if (page->IsPage()) {
-          printf("Found split page %p (off %p) in non-hidden node %p\n", page->Page(),
-                 (void*)offset, this);
-        } else {
-          printf("Found split reference off %p in non-hidden node%p\n", (void*)offset, this);
-        }
-        this->DumpLocked(1, true);
-        valid = false;
-        return ZX_ERR_STOP;
-      }
-      // Nothing else to test for non-hidden VMOs.
-      return ZX_ERR_NEXT;
-    }
-
-    // We found a page in the hidden VMO, if it has been forked in either direction then we
-    // expect that if we search down that path we will find that the forked page and that no
-    // descendant can 'see' back to this page.
-    const VmCowPages* expected = nullptr;
-    if (IsSplit(SplitDir::Left, page)) {
-      expected = &left_child_locked();
-    } else if (IsSplit(SplitDir::Right, page)) {
-      expected = &right_child_locked();
-    } else {
-      return ZX_ERR_NEXT;
-    }
-
-    // We know this must be true as this is a hidden vmo and so left_child_locked and
-    // right_child_locked will never have returned null.
-    DEBUG_ASSERT(expected);
-
-    // No leaf VMO in expected should be able to 'see' this page and potentially re-fork it. To
-    // validate this we need to walk the entire sub tree.
-    const VmCowPages* cur = expected;
-    uint64_t off = offset;
-    // We start with cur being an immediate child of 'this', so we can preform subtree traversal
-    // until we end up back in 'this'.
-    while (cur != this) {
-      AssertHeld(cur->lock_ref());
-      // Check that we can see this page in the parent. Importantly this first checks if
-      // |off < cur->parent_offset_| allowing us to safely perform that subtraction from then on.
-      if (off < cur->parent_offset_ || off - cur->parent_offset_ < cur->parent_start_limit_ ||
-          off - cur->parent_offset_ >= cur->parent_limit_) {
-        // This blank case is used to capture the scenario where current does not see the target
-        // offset in the parent, in which case there is no point traversing into the children.
-      } else if (cur->is_hidden_locked()) {
-        // A hidden VMO *may* have the page, but not necessarily if both children forked it out.
-        const VmPageOrMarker* l = cur->page_list_.Lookup(off - cur->parent_offset_);
-        if (!l || l->IsEmpty()) {
-          // Page not found, we need to recurse down into our children.
-          off -= cur->parent_offset_;
-          cur = &cur->left_child_locked();
-          continue;
-        }
-      } else {
-        // We already checked in the first 'if' branch that this offset was visible, and so this
-        // leaf VMO *must* have a page or marker to prevent it 'seeing' the already forked original.
-        const VmPageOrMarker* l = cur->page_list_.Lookup(off - cur->parent_offset_);
-        if (!l || l->IsEmpty()) {
-          if (page->IsPage()) {
-            printf("Failed to find fork of page %p (off %p) from %p in leaf node %p (off %p)\n",
-                   page->Page(), (void*)offset, this, cur, (void*)(off - cur->parent_offset_));
-          } else {
-            printf("Failed to find fork of reference (off %p) from %p in leaf node %p (off %p)\n",
-                   (void*)offset, this, cur, (void*)(off - cur->parent_offset_));
-          }
-          cur->DumpLocked(1, true);
-          this->DumpLocked(1, true);
-          valid = false;
-          return ZX_ERR_STOP;
-        }
-      }
-
-      // Find our next node by walking up until we see we have come from a left path, then go right.
-      do {
-        VmCowPages* next = cur->parent_.get();
-        AssertHeld(next->lock_ref());
-        off += next->parent_offset_;
-        if (next == this) {
-          cur = next;
-          break;
-        }
-
-        // If we came from the left, go back down on the right, otherwise just keep going up.
-        if (cur == &next->left_child_locked()) {
-          off -= next->parent_offset_;
-          cur = &next->right_child_locked();
-          break;
-        }
-        cur = next;
-      } while (1);
-    }
-
-    // The inverse case must also exist where the side that hasn't forked it must still be able to
-    // see it. It can either be seen by a leaf vmo that does not have a page, or a hidden vmo that
-    // has partial_cow_release_ set.
-    // No leaf VMO in expected should be able to 'see' this page and potentially re-fork it. To
-    // validate this we need to walk the entire sub tree.
-    if (IsSplit(SplitDir::Left, page)) {
-      cur = &right_child_locked();
-    } else if (IsSplit(SplitDir::Right, page)) {
-      cur = &left_child_locked();
-    } else {
-      return ZX_ERR_NEXT;
-    }
-    off = offset;
-    // Initially we haven't seen the page, unless this VMO itself has done a partial cow release, in
-    // which case we ourselves can see it. Logic is structured this way to avoid indenting this
-    // whole code block in an if, whilst preserving the ability to add future checks below.
-    bool seen = partial_cow_release_;
-    // We start with cur being an immediate child of 'this', so we can preform subtree traversal
-    // until we end up back in 'this'.
-    while (cur != this && !seen) {
-      AssertHeld(cur->lock_ref());
-      // Check that we can see this page in the parent. Importantly this first checks if
-      // |off < cur->parent_offset_| allowing us to safely perform that subtraction from then on.
-      if (off < cur->parent_offset_ || off - cur->parent_offset_ < cur->parent_start_limit_ ||
-          off - cur->parent_offset_ >= cur->parent_limit_) {
-        // This blank case is used to capture the scenario where current does not see the target
-        // offset in the parent, in which case there is no point traversing into the children.
-      } else if (cur->is_hidden_locked()) {
-        // A hidden VMO can see the page if it performed a partial cow release.
-        if (cur->partial_cow_release_) {
-          seen = true;
-          break;
-        }
-        // Otherwise recurse into the children.
-        off -= cur->parent_offset_;
-        cur = &cur->left_child_locked();
-        continue;
-      } else {
-        // We already checked in the first 'if' branch that this offset was visible, and so if this
-        // leaf has no committed page then it is able to see it.
-        const VmPageOrMarker* l = cur->page_list_.Lookup(off - cur->parent_offset_);
-        if (!l || l->IsEmpty()) {
-          seen = true;
-          break;
-        }
-      }
-      // Find our next node by walking up until we see we have come from a left path, then go right.
-      do {
-        VmCowPages* next = cur->parent_.get();
-        AssertHeld(next->lock_ref());
-        off += next->parent_offset_;
-        if (next == this) {
-          cur = next;
-          break;
-        }
-
-        // If we came from the left, go back down on the right, otherwise just keep going up.
-        if (cur == &next->left_child_locked()) {
-          off -= next->parent_offset_;
-          cur = &next->right_child_locked();
-          break;
-        }
-        cur = next;
-      } while (1);
-    }
-    if (!seen) {
-      if (page->IsPage()) {
-        printf(
-            "Failed to find any child who could fork the remaining split page %p (off %p) in node "
-            "%p\n",
-            page->Page(), (void*)offset, this);
-      } else {
-        printf(
-            "Failed to find any child who could fork the remaining split reference (off %p) in "
-            "node "
-            "%p\n",
-            (void*)offset, this);
-      }
-      this->DumpLocked(1, true);
-      printf("Left:\n");
-      left_child_locked().DumpLocked(1, true);
-      printf("Right:\n");
-      right_child_locked().DumpLocked(1, true);
-      valid = false;
-      return ZX_ERR_STOP;
-    }
-    return ZX_ERR_NEXT;
-  });
-
-  return valid;
 }
 
 bool VmCowPages::DebugValidateBacklinksLocked() const {
@@ -8349,8 +6830,6 @@ void VmCowPages::CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* sr
       arch_clean_invalidate_cache_range((vaddr_t)dst, PAGE_SIZE);
     }
   }
-  // When split bits are in use, the share_count will actually encode the split bits according to
-  // |IsSplit| and |SetSplit| above.
   dst_page->object.share_count = src_page->object.share_count;
   dst_page->object.always_need = src_page->object.always_need;
   DEBUG_ASSERT(!dst_page->object.always_need || (!dst_page->is_loaned() && !src_page->is_loaned()));

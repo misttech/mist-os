@@ -114,11 +114,6 @@ class VmObjectPaged final : public VmObject {
     }
     return 0;
   }
-  void set_user_id(uint64_t user_id) override {
-    VmObject::set_user_id(user_id);
-    Guard<CriticalMutex> guard{lock()};
-    cow_pages_locked()->set_page_attribution_user_id_locked(user_id);
-  }
 
   uint64_t HeapAllocationBytes() const override {
     Guard<CriticalMutex> guard{lock()};

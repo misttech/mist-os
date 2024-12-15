@@ -577,9 +577,7 @@ class VmObject : public VmHierarchyBase,
   virtual uint64_t parent_user_id() const = 0;
 
   // Sets the value returned by |user_id()|. May only be called once.
-  //
-  // Derived types overriding this method are expected to call it from their override.
-  virtual void set_user_id(uint64_t user_id);
+  void set_user_id(uint64_t user_id);
 
   // Returns the maximum possible size of a VMO.
   static size_t max_size() { return MAX_SIZE; }
