@@ -153,8 +153,7 @@ fit::result<Errno, size_t> FileObject::write(const CurrentTask& current_task,
     size_t bytes_written;
     if (flags().contains(OpenFlagsEnum::APPEND)) {
       // let _guard = self.node().append_lock.write(current_task)?;
-      auto seek = ops().seek(*this, current_task, *offset,
-                             SeekTarget{.type = SeekTargetType::End, .offset = 0}) _EP(seek);
+      auto seek = ops().seek(*this, current_task, *offset, SeekTarget::End(0)) _EP(seek);
 
       *offset = *seek;
       auto result = write_common(current_task, static_cast<size_t>(*offset), data) _EP(result);

@@ -22,6 +22,60 @@ using starnix::FdFlags;
 using starnix::FdFlagsEnum;
 using starnix::FdNumber;
 
+bool test_sys_lseek() {
+  BEGIN_TEST;
+
+  auto [kernel, current_task] =
+      starnix::testing::create_kernel_task_and_unlocked_with_bootfs_current_zbi();
+  auto fd = FdNumber::from_raw(10);
+  auto file_handle = current_task->open_file("data/testfile.txt", OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(file_handle.is_ok());
+  auto file_size = file_handle.value()->node()->stat(*current_task).value().st_size;
+  auto insert_result = (*current_task)->files_.insert(**current_task, fd, file_handle.value());
+  ASSERT_TRUE(insert_result.is_ok());
+
+  auto seek_cur_0 = sys_lseek(*current_task, fd, 0, SEEK_CUR);
+  ASSERT_TRUE(seek_cur_0.is_ok());
+  ASSERT_EQ(0, seek_cur_0.value());
+
+  auto seek_cur_1 = sys_lseek(*current_task, fd, 1, SEEK_CUR);
+  ASSERT_TRUE(seek_cur_1.is_ok());
+  ASSERT_EQ(1, seek_cur_1.value());
+
+  auto seek_set_3 = sys_lseek(*current_task, fd, 3, SEEK_SET);
+  ASSERT_TRUE(seek_set_3.is_ok());
+  ASSERT_EQ(3, seek_set_3.value());
+
+  auto seek_cur_neg3 = sys_lseek(*current_task, fd, -3, SEEK_CUR);
+  ASSERT_TRUE(seek_cur_neg3.is_ok());
+  ASSERT_EQ(0, seek_cur_neg3.value());
+
+  auto seek_end_0 = sys_lseek(*current_task, fd, 0, SEEK_END);
+  ASSERT_TRUE(seek_end_0.is_ok());
+  ASSERT_EQ(file_size, seek_end_0.value());
+
+  auto seek_set_neg5 = sys_lseek(*current_task, fd, -5, SEEK_SET);
+  ASSERT_TRUE(seek_set_neg5.is_error());
+  ASSERT_EQ(seek_set_neg5.error_value().error_code(), errno(EINVAL).error_code());
+
+  // Make sure failed call didn't change offset
+  auto seek_cur_check = sys_lseek(*current_task, fd, 0, SEEK_CUR);
+  ASSERT_TRUE(seek_cur_check.is_ok());
+  ASSERT_EQ(seek_cur_check.value(), file_size);
+
+  // Prepare for overflow
+  auto seek_set_3_again = sys_lseek(*current_task, fd, 3, SEEK_SET);
+  ASSERT_TRUE(seek_set_3_again.is_ok());
+  ASSERT_EQ(seek_set_3_again.value(), 3);
+
+  // Check for overflow
+  auto seek_cur_max = sys_lseek(*current_task, fd, INT64_MAX, SEEK_CUR);
+  ASSERT_TRUE(seek_cur_max.is_error());
+  ASSERT_EQ(seek_cur_max.error_value().error_code(), errno(EINVAL).error_code());
+
+  END_TEST;
+}
+
 bool test_sys_dup() {
   BEGIN_TEST;
 
@@ -141,6 +195,7 @@ bool test_sys_open_cloexec() {
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_vfs_syscalls)
+UNITTEST("test sys lseek", unit_testing::test_sys_lseek)
 UNITTEST("test sys dup", unit_testing::test_sys_dup)
 UNITTEST("test sys dup3", unit_testing::test_sys_dup3)
 UNITTEST("test sys open cloexec", unit_testing::test_sys_open_cloexec)

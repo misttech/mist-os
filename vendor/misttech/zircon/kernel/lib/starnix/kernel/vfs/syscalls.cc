@@ -223,6 +223,13 @@ fit::result<Errno> sys_close(const CurrentTask& current_task, FdNumber fd) {
   return fit::ok();
 }
 
+fit::result<Errno, off_t> sys_lseek(const CurrentTask& current_task, FdNumber fd, off_t offset,
+                                    uint32_t whence) {
+  auto file = current_task->files_.get(fd) _EP(file);
+  auto target = SeekTarget::from_raw(whence, offset) _EP(target);
+  return file->seek(current_task, target.value());
+}
+
 fit::result<Errno, size_t> sys_pread64(const CurrentTask& current_task, FdNumber fd,
                                        starnix_uapi::UserAddress address, size_t length,
                                        off_t offset) {
