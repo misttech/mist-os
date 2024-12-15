@@ -32,13 +32,13 @@
 
 #include <ktl/enforce.h>
 
+#include <asm/ioctls.h>
 #include <asm/stat.h>
 #include <linux/fcntl.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
-
 namespace {
 
 /// A convenient wrapper for Task::open_file_at.
@@ -424,6 +424,27 @@ fit::result<Errno, size_t> sys_getcwd(const CurrentTask& current_task,
                                     user_cwd.size())));
 
   return fit::ok(user_cwd.size());
+}
+
+fit::result<Errno, starnix_syscalls::SyscallResult> sys_ioctl(const CurrentTask& current_task,
+                                                              FdNumber fd, uint32_t request,
+                                                              starnix_syscalls::SyscallArg arg) {
+  // TODO: https://fxbug.dev/364569179 - Figure out what to do about the security
+  // check for FIONREAD, FIBMAP, FIGETBSZ, FIONBIO, and FIOASYNC. These ioctls check
+  // a different set of permissions than other arbitrary ioctls.
+  switch (request) {
+    case FIOCLEX:
+      _EP(current_task->files_.set_fd_flags(fd, FdFlags(FdFlagsEnum::CLOEXEC)));
+      return fit::ok(starnix_syscalls::SUCCESS);
+    case FIONCLEX:
+      _EP(current_task->files_.set_fd_flags(fd, FdFlags::empty()));
+      return fit::ok(starnix_syscalls::SUCCESS);
+    default: {
+      auto file = current_task->files_.get(fd) _EP(file);
+      //_EP(security::check_file_ioctl_access(current_task, file));
+      return file->ioctl(current_task, request, arg);
+    }
+  }
 }
 
 fit::result<Errno, FdNumber> sys_dup(const CurrentTask& current_task, FdNumber oldfd) {

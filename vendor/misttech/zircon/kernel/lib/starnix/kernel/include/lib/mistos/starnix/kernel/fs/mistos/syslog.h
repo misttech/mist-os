@@ -35,7 +35,7 @@ class SyslogFile : public FileOps {
   fit::result<Errno, starnix_syscalls::SyscallResult> ioctl(const FileObject& file,
                                                             const CurrentTask& current_task,
                                                             uint32_t request,
-                                                            long arg) const final {
+                                                            SyscallArg arg) const final {
     return default_ioctl(file, current_task, request, arg);
   }
 };

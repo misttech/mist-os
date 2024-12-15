@@ -9,6 +9,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
+#include <lib/mistos/starnix_syscalls/syscall_arg.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
@@ -123,6 +124,10 @@ fit::result<Errno> sys_fchmodat(const CurrentTask& current_task, FdNumber dir_fd
 
 fit::result<Errno, size_t> sys_getcwd(const CurrentTask& current_task,
                                       starnix_uapi::UserAddress buf, size_t size);
+
+fit::result<Errno, starnix_syscalls::SyscallResult> sys_ioctl(const CurrentTask& current_task,
+                                                              FdNumber fd, uint32_t request,
+                                                              starnix_syscalls::SyscallArg arg);
 
 fit::result<Errno, FdNumber> sys_dup(const CurrentTask& current_task, FdNumber oldfd);
 

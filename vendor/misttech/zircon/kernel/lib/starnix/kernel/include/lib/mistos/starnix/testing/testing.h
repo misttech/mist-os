@@ -67,7 +67,7 @@ class PanickingFile : public FileOps {
   }
 
   fit::result<Errno, SyscallResult> ioctl(const FileObject& file, const CurrentTask& current_task,
-                                          uint32_t request, long arg) const final {
+                                          uint32_t request, SyscallArg arg) const final {
     panic("ioctl called on PanickingFile");
   }
 };

@@ -14,6 +14,8 @@
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
+#include <lib/mistos/starnix_syscalls/syscall_arg.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/starnix_sync/locks.h>
 
@@ -281,11 +283,14 @@ class FileObject : public fbl::RefCounted<FileObject> {
                                        ProtectionFlags prot_flags, MappingOptionsFlags options,
                                        NamespaceNode filename) const;
 
+  fit::result<Errno, starnix_syscalls::SyscallResult> ioctl(const CurrentTask& current_task,
+                                                            uint32_t request,
+                                                            starnix_syscalls::SyscallArg arg) const;
   ~FileObject();
 
  private:
-  FileObject(WeakFileHandle weak_handle, FileObjectId id, ActiveNamespaceNode name, FileSystemHandle fs,
-             ktl::unique_ptr<FileOps> ops, OpenFlags flags);
+  FileObject(WeakFileHandle weak_handle, FileObjectId id, ActiveNamespaceNode name,
+             FileSystemHandle fs, ktl::unique_ptr<FileOps> ops, OpenFlags flags);
 
  public:
   mtl::WeakPtrFactory<FileObject> weak_factory_;

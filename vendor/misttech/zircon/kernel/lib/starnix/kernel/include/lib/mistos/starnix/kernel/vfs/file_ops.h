@@ -31,12 +31,14 @@ class InputBuffer;
 class DirectSink;
 
 using WeakFileHandle = mtl::WeakPtr<FileObject>;
+using starnix_syscalls::SyscallArg;
 using starnix_syscalls::SyscallResult;
 using starnix_uapi::UserAddress;
 
 fit::result<Errno, SyscallResult> default_fcntl(uint32_t cmd);
-fit::result<Errno, SyscallResult> default_ioctl(const FileObject&, const CurrentTask&,
-                                                uint32_t request, long arg);
+fit::result<Errno, SyscallResult> default_ioctl(const FileObject& file,
+                                                const CurrentTask& current_task, uint32_t request,
+                                                SyscallArg arg);
 
 /// Corresponds to struct file_operations in Linux, plus any filesystem-specific data.
 class FileOps {
@@ -153,7 +155,7 @@ class FileOps {
 
   virtual fit::result<Errno, SyscallResult> ioctl(const FileObject& file,
                                                   const CurrentTask& current_task, uint32_t request,
-                                                  long arg) const {
+                                                  SyscallArg arg) const {
     return default_ioctl(file, current_task, request, arg);
   }
 
@@ -389,7 +391,7 @@ struct OPathOps : FileOps {
   }
 
   fit::result<Errno, SyscallResult> ioctl(const FileObject& file, const CurrentTask& current_task,
-                                          uint32_t request, long arg) const final {
+                                          uint32_t request, SyscallArg arg) const final {
     return fit::error(errno(EBADF));
   }
 };
