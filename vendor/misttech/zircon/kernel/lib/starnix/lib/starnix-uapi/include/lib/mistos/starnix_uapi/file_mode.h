@@ -107,6 +107,10 @@ class FileMode {
     return *this;
   }
   FileMode operator|(const FileMode& other) const { return mode_ | other.mode_; }
+  FileMode& operator|=(const FileMode& other) {
+    mode_ |= other.mode_;
+    return *this;
+  }
   FileMode operator~() const { return ~mode_; }
 
  private:
