@@ -109,6 +109,14 @@ struct LookupFlags {
                     .symlink_mode = follow_symlinks ? SymlinkMode::Follow : SymlinkMode::NoFollow,
                     .automount = automount});
   }
+
+  /// impl From<StatxFlags> for LookupFlags
+  static LookupFlags from(StatxFlags flags) {
+    auto lookup_flags = StatxFlags(StatxFlagsEnum::_AT_SYMLINK_NOFOLLOW) |
+                        StatxFlags(StatxFlagsEnum::_AT_EMPTY_PATH) |
+                        StatxFlags(StatxFlagsEnum::_AT_NO_AUTOMOUNT);
+    return from_bits(flags.bits() & lookup_flags.bits(), lookup_flags.bits()).value();
+  }
 };
 
 fit::result<Errno, NamespaceNode> lookup_at(const CurrentTask& current_task, FdNumber dir_fd,
@@ -278,6 +286,28 @@ fit::result<Errno> sys_newfstatat(const CurrentTask& current_task, FdNumber dir_
       _EP(lflags);
   auto name = lookup_at(current_task, dir_fd, user_path, lflags.value()) _EP(name);
   auto result = name->entry_->node_->stat(current_task) _EP(result);
+  return fit::ok();
+}
+
+fit::result<Errno> sys_statx(const CurrentTask& current_task, FdNumber dir_fd,
+                             starnix_uapi::UserCString user_path, uint32_t flags, uint32_t mask,
+                             starnix_uapi::UserRef<struct ::statx> statxbuf) {
+  auto statx_flags = StatxFlags::from_bits(flags);
+  if (!statx_flags) {
+    return fit::error(errno(EINVAL));
+  }
+
+  if ((statx_flags.value() & (StatxFlags(StatxFlagsEnum::_AT_STATX_FORCE_SYNC) |
+                              StatxFlags(StatxFlagsEnum::_AT_STATX_DONT_SYNC))) ==
+      (StatxFlags(StatxFlagsEnum::_AT_STATX_FORCE_SYNC) |
+       StatxFlags(StatxFlagsEnum::_AT_STATX_DONT_SYNC))) {
+    return fit::error(errno(EINVAL));
+  }
+
+  auto name =
+      lookup_at(current_task, dir_fd, user_path, LookupFlags::from(statx_flags.value())) _EP(name);
+  auto result = name->entry_->node_->statx(current_task, statx_flags.value(), mask) _EP(result);
+  _EP(current_task.write_object(statxbuf, *result));
   return fit::ok();
 }
 

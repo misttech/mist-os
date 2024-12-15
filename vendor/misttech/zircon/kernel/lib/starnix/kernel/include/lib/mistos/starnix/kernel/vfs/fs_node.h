@@ -39,6 +39,25 @@ class CurrentTask;
 using PipeHandle = fbl::RefPtr<Pipe>;
 using starnix_uapi::Credentials;
 
+// The inner class is required because bitflags cannot pass the attribute through to the single
+// variant, and attributes cannot be applied to macro invocations.
+namespace inner_flags {
+enum class StatxFlagsEnum : uint32_t {
+  _AT_SYMLINK_NOFOLLOW = AT_SYMLINK_NOFOLLOW,
+  _AT_EMPTY_PATH = AT_EMPTY_PATH,
+  _AT_NO_AUTOMOUNT = AT_NO_AUTOMOUNT,
+  _AT_STATX_SYNC_AS_STAT = AT_STATX_SYNC_AS_STAT,
+  _AT_STATX_FORCE_SYNC = AT_STATX_FORCE_SYNC,
+  _AT_STATX_DONT_SYNC = AT_STATX_DONT_SYNC,
+  _STATX_ATTR_VERITY = STATX_ATTR_VERITY,
+};
+
+using StatxFlags = Flags<StatxFlagsEnum>;
+}  // namespace inner_flags
+
+using StatxFlags = inner_flags::StatxFlags;
+using StatxFlagsEnum = inner_flags::StatxFlagsEnum;
+
 class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
                      public fbl::RefCountedUpgradeable<FsNode> {
  public:
@@ -254,11 +273,15 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
 
   fit::result<Errno, struct ::stat> stat(const CurrentTask& current_task) const;
 
+  fit::result<Errno, struct ::statx> statx(const CurrentTask& current_task, StatxFlags flags,
+                                           uint32_t mask) const;
+
   // Returns current `FsNodeInfo`.
-  starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info() const { return info_.Read(); }
+  starnix_sync::RwLock<FsNodeInfo>::RwLockReadGuard info() const { return info_.Read(); }
 
   /// Refreshes the `FsNodeInfo` if necessary and returns a read lock.
-  fit::result<Errno, FsNodeInfo> fetch_and_refresh_info(const CurrentTask& current_task) const;
+  fit::result<Errno, starnix_sync::RwLock<FsNodeInfo>::RwLockReadGuard> fetch_and_refresh_info(
+      const CurrentTask& current_task) const;
 
   template <typename T, typename F>
   T update_info(F&& mutator) const {
@@ -290,5 +313,17 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
 };
 
 }  // namespace starnix
+
+template <>
+constexpr Flag<starnix::inner_flags::StatxFlagsEnum>
+    Flags<starnix::inner_flags::StatxFlagsEnum>::FLAGS[] = {
+        {starnix::inner_flags::StatxFlagsEnum::_AT_SYMLINK_NOFOLLOW},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_EMPTY_PATH},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_NO_AUTOMOUNT},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_STATX_SYNC_AS_STAT},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_STATX_FORCE_SYNC},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_STATX_DONT_SYNC},
+        {starnix::inner_flags::StatxFlagsEnum::_STATX_ATTR_VERITY},
+};
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_H_

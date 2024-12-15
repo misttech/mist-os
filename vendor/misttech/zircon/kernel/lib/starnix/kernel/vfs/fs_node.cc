@@ -38,6 +38,7 @@ using std::destroy_at;
 #include <ktl/enforce.h>
 
 #include <linux/errno.h>
+#include <linux/stat.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
@@ -251,7 +252,7 @@ fit::result<Errno> FsNode::chmod(const CurrentTask& current_task, const MountInf
 
 fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) const {
   auto result = fetch_and_refresh_info(current_task) _EP(result);
-  auto info = result.value();
+  auto info = ktl::move(result.value());
 
   /*
     let time_to_kernel_timespec_pair = |t| {
@@ -268,20 +269,74 @@ fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) co
 
   return fit::ok<struct stat>({
       //.st_dev =
-      .st_ino = info.ino_,
-      .st_nlink = static_cast<__kernel_ulong_t>(info.link_count_),
-      .st_mode = info.mode_.bits(),
-      .st_uid = info.uid_,
-      .st_gid = info.gid_,
-      .st_rdev = info.rdev_.bits(),
-      .st_size = static_cast<__kernel_long_t>(info.size_),
-      .st_blksize = static_cast<__kernel_long_t>(info.blksize_),
-      .st_blocks = static_cast<__kernel_long_t>(info.blocks_),
+      .st_ino = info->ino_,
+      .st_nlink = static_cast<__kernel_ulong_t>(info->link_count_),
+      .st_mode = info->mode_.bits(),
+      .st_uid = info->uid_,
+      .st_gid = info->gid_,
+      .st_rdev = info->rdev_.bits(),
+      .st_size = static_cast<__kernel_long_t>(info->size_),
+      .st_blksize = static_cast<__kernel_long_t>(info->blksize_),
+      .st_blocks = static_cast<__kernel_long_t>(info->blocks_),
   });
 }
 
-fit::result<Errno, FsNodeInfo> FsNode::fetch_and_refresh_info(
-    const CurrentTask& current_task) const {
+fit::result<Errno, struct ::statx> FsNode::statx(const CurrentTask& current_task, StatxFlags flags,
+                                                 uint32_t mask) const {
+  // Ignore mask for now and fill in all of the fields
+  auto result = [&]() -> fit::result<Errno, starnix_sync::RwLock<FsNodeInfo>::RwLockReadGuard> {
+    if (flags.contains(StatxFlags(StatxFlagsEnum::_AT_STATX_DONT_SYNC))) {
+      return fit::ok(ktl::move(info()));
+    }
+    auto r = fetch_and_refresh_info(current_task) _EP(r);
+    return fit::ok(ktl::move(r.value()));
+  }() _EP(result);
+
+  starnix_sync::RwLock<FsNodeInfo>::RwLockReadGuard info = ktl::move(result.value());
+
+  if ((mask & STATX__RESERVED) == STATX__RESERVED) {
+    return fit::error(errno(EINVAL));
+  }
+
+  // TODO(https://fxbug.dev/302594110): statx attributes
+  uint32_t stx_mnt_id = 0;
+  uint64_t stx_attributes = 0;
+  uint64_t stx_attributes_mask = STATX_ATTR_VERITY;
+
+  // TODO: Port fsverity check once implemented
+  /*if (matches!(*self.fsverity.lock(), FsVerityState::FsVerity)) {
+    stx_attributes |= STATX_ATTR_VERITY;
+  }*/
+
+  return fit::ok<struct ::statx>(
+      {.stx_mask = STATX_NLINK | STATX_UID |
+                   STATX_GID /*| STATX_ATIME | STATX_MTIME | STATX_CTIME*/ | STATX_INO |
+                   STATX_SIZE | STATX_BLOCKS | STATX_BASIC_STATS,
+       .stx_blksize = static_cast<__u32>(info->blksize_),
+       .stx_attributes = stx_attributes,
+       .stx_nlink = static_cast<__u32>(info->link_count_),
+       .stx_uid = info->uid_,
+       .stx_gid = info->gid_,
+       .stx_mode = static_cast<__u16>(info->mode_.bits()),
+       .stx_ino = info->ino_,
+       .stx_size = static_cast<__u64>(info->size_),
+       .stx_blocks = static_cast<__u64>(info->blocks_),
+       .stx_attributes_mask = stx_attributes_mask,
+       // TODO: Port timestamp conversion
+       //.stx_atime = statx_timestamp_from_time(info.time_access_),
+       //.stx_mtime = statx_timestamp_from_time(info.time_modify_),
+       //.stx_ctime = statx_timestamp_from_time(info.time_status_change_),
+
+       .stx_rdev_major = info->rdev_.major(),
+       .stx_rdev_minor = info->rdev_.minor(),
+
+       //.stx_dev_major = fs_->dev_id().major(),
+       //.stx_dev_minor = fs_->dev_id().minor(),
+       .stx_mnt_id = stx_mnt_id});
+}
+
+fit::result<Errno, starnix_sync::RwLock<FsNodeInfo>::RwLockReadGuard>
+FsNode::fetch_and_refresh_info(const CurrentTask& current_task) const {
   return ops().fetch_and_refresh_info(*this, current_task, info_);
 }
 

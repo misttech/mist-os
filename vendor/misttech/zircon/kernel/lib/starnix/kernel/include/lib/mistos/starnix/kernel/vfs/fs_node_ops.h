@@ -208,10 +208,10 @@ class FsNodeOps {
   /// override this function.
   ///
   /// Return a reader lock on the updated information.
-  virtual fit::result<Errno, FsNodeInfo> fetch_and_refresh_info(
-      const FsNode& node, const CurrentTask& current_task,
-      starnix_sync::RwLock<FsNodeInfo>& info) const {
-    return fit::ok(*info.Read());
+  virtual fit::result<Errno, starnix_sync::RwLock<FsNodeInfo>::RwLockReadGuard>
+  fetch_and_refresh_info(const FsNode& node, const CurrentTask& current_task,
+                         starnix_sync::RwLock<FsNodeInfo>& info) const {
+    return fit::ok(info.Read());
   }
 
   /// Indicates if the filesystem can manage the timestamps (i.e. atime, ctime, and mtime).
