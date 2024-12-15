@@ -4,11 +4,10 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-// This file provides real-mode entry points for
-// 1) secondary CPU initialization
-// 2) suspend-to-RAM wakeup
+// This file provides real-mode entry points for secondary CPU initialization.
 
 #include <asm.h>
+#include <lib/arch/asm.h>
 #include <arch/x86/bootstrap16.h>
 #include <arch/x86/descriptor.h>
 #include <arch/x86/registers.h>
@@ -20,10 +19,10 @@
 .section .text.bootstrap16,"ax",%progbits
 .balign PAGE_SIZE
 
-DATA(x86_bootstrap16_start)
+.label x86_bootstrap16_start, global
 
 .code16
-FUNCTION_LABEL(x86_bootstrap16_entry)
+.label x86_bootstrap16_entry, global
     // Enter no-fill cache mode (allegedly this is the initial state
     // according to Intel 3A, but on at least one Broadwell the APs can
     // come up with caching enabled)
@@ -87,7 +86,7 @@ FUNCTION_LABEL(x86_bootstrap16_entry)
 
 // Get the secondary cpu into 64-bit mode with interrupts disabled and no TSS
 .code64
-FUNCTION_LABEL(_x86_secondary_cpu_long_mode_entry)
+.label _x86_secondary_cpu_long_mode_entry, global
     // When we get here, %rsi should contain the absolute address of our data
     // page.
     mov $1, %rdi
@@ -113,9 +112,9 @@ FUNCTION_LABEL(_x86_secondary_cpu_long_mode_entry)
 
     // Switch out of the copied code page and into the kernel's
     // version of it
-    movabs $.Lhighaddr, %rbx
-    jmp  *%rbx
-.Lhighaddr:
+    jmp *BCD_VIRT_LM_HIGH_ENTRY_OFFSET(%rsi)
+
+.function _x86_secondary_cpu_long_mode_high_entry, global
     // Switch to the kernel's PML4
     mov %rcx, %cr3
     // As of this point, %esi is invalid
@@ -131,19 +130,19 @@ FUNCTION_LABEL(_x86_secondary_cpu_long_mode_entry)
     mov %eax, %gs
     mov %eax, %ss
 
-    // Load the IDT
+    // Load the IDT. Note that this preserves both %rdx and %rdi (see below).
     call load_startup_idt
 
+    // %rdi (`aps_still_booting`) and %rdx (`thread`) were set above and have
+    // been preserved since then.
     mov %rdx, %rsi
-    // Do an indirect call to keep this position independent
-    // x86_secondary_entry(CPU ready counter, thread)
-    movabs $x86_secondary_entry, %rbx
-    call *%rbx
+    call x86_secondary_entry
 
 // If x86_secondary_entry returns, hang.
 0:
     hlt
     jmp 0b
+.end_function
 
-DATA(x86_bootstrap16_end)
+.label x86_bootstrap16_end, global
     nop
