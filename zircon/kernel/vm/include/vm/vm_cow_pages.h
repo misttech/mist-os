@@ -392,8 +392,10 @@ class VmCowPages final : public VmHierarchyBase,
   // After successful completion the range of pages will all read as zeros. The mechanism used to
   // achieve this is not guaranteed to decommit, but it will try to.
   // |page_start_base| and |page_end_base| must be page aligned offsets within the range of the
-  // object. |zeroed_len_out| will contain the length (in bytes) starting at |page_start_base| that
-  // was successfully zeroed.
+  // object. |dirty_track| specifies whether the range being zeroed subscribes to dirty tracking, if
+  // |true| the range will start out as dirty. |dirty_track| only has meaning if the VMO supports
+  // dirty tracking, otherwise it is ignored. |zeroed_len_out| will contain the length (in bytes)
+  // starting at |page_start_base| that was successfully zeroed.
   //
   // Returns one of the following:
   //  ZX_OK => The whole range was successfully zeroed.
@@ -401,7 +403,7 @@ class VmCowPages final : public VmHierarchyBase,
   //  operation. |zeroed_len_out| will contain the range that was partially zeroed, so the caller
   //  can advance the start offset before retrying.
   //  Any other error code indicates a failure to zero a part of the range or the whole range.
-  zx_status_t ZeroPagesLocked(uint64_t page_start_base, uint64_t page_end_base,
+  zx_status_t ZeroPagesLocked(uint64_t page_start_base, uint64_t page_end_base, bool dirty_track,
                               MultiPageRequest* page_request, uint64_t* zeroed_len_out)
       TA_REQ(lock());
 
@@ -1391,8 +1393,11 @@ class VmCowPages final : public VmHierarchyBase,
   // indicate that existing pages do not need to be zeroed, in which case no pages requests will be
   // generated and no pages freed, allowing those respective parameters to be passed as nullptr.
   // Otherwise the parameters, operation and return values are same as ZeroPagesLocked.
+  // |dirty_track| can be set to |true| if any zeroes inserted are to be treated as Dirty, otherwise
+  // they are not dirty tracked.
   zx_status_t ZeroPagesPreservingContentLocked(uint64_t page_start_base, uint64_t page_end_base,
-                                               bool only_zero_gaps, list_node_t* freed_list,
+                                               bool only_zero_gaps, bool dirty_track,
+                                               list_node_t* freed_list,
                                                MultiPageRequest* page_request,
                                                uint64_t* processed_len_out) TA_REQ(lock());
 

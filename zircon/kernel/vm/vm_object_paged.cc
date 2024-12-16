@@ -1273,7 +1273,7 @@ zx_status_t VmObjectPaged::ZeroPartialPageLocked(uint64_t page_base_offset,
       guard);
 }
 
-zx_status_t VmObjectPaged::ZeroRange(uint64_t offset, uint64_t len) {
+zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool dirty_track) {
   canary_.Assert();
   if (can_block_on_page_requests()) {
     lockdep::AssertNoLocksHeld();
@@ -1311,6 +1311,8 @@ zx_status_t VmObjectPaged::ZeroRange(uint64_t offset, uint64_t len) {
   uint64_t end_page_base = ROUNDDOWN(end, PAGE_SIZE);
 
   if (unlikely(start_page_base != start)) {
+    // We're doing partial page writes, so we should be dirty tracking.
+    DEBUG_ASSERT(dirty_track);
     // Need to handle the case were end is unaligned and on the same page as start
     if (unlikely(start_page_base == end_page_base)) {
       return ZeroPartialPageLocked(start_page_base, start - start_page_base, end - start_page_base,
@@ -1328,6 +1330,8 @@ zx_status_t VmObjectPaged::ZeroRange(uint64_t offset, uint64_t len) {
   }
 
   if (unlikely(end_page_base != end)) {
+    // We're doing partial page writes, so we should be dirty tracking.
+    DEBUG_ASSERT(dirty_track);
     zx_status_t status = ZeroPartialPageLocked(end_page_base, 0, end - end_page_base, &guard);
     if (status == ZX_OK) {
       status = establish_invariants();
@@ -1359,8 +1363,11 @@ zx_status_t VmObjectPaged::ZeroRange(uint64_t offset, uint64_t len) {
   while (start < end) {
     uint64_t zeroed_len = 0;
     zx_status_t status =
-        cow_pages_locked()->ZeroPagesLocked(start, end, &page_request, &zeroed_len);
+        cow_pages_locked()->ZeroPagesLocked(start, end, dirty_track, &page_request, &zeroed_len);
     if (status == ZX_ERR_SHOULD_WAIT) {
+      // If we're not asked to dirty track, we won't be creating any new dirty pages so we shouldn't
+      // need to wait on a page request.
+      DEBUG_ASSERT(dirty_track);
       guard.CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
       if (status != ZX_OK) {
         if (status == ZX_ERR_TIMED_OUT) {

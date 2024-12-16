@@ -372,6 +372,13 @@ class VmObject : public VmHierarchyBase,
   // May block on user pager requests and must be called without locks held.
   virtual zx_status_t ZeroRange(uint64_t offset, uint64_t len) { return ZX_ERR_NOT_SUPPORTED; }
 
+  // Zero a range of the VMO and also untrack it from any kind of dirty tracking. For committed
+  // pages, this means that they are released. And any kind of zero markers or intervals that are
+  // inserted will not subscribe to dirty tracking.
+  virtual zx_status_t ZeroRangeUntracked(uint64_t offset, uint64_t len) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   // Unpin the given range of the vmo.  This asserts if it tries to unpin a
   // page that is already not pinned (do not expose this function to
   // usermode).

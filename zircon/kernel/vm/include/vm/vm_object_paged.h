@@ -146,7 +146,17 @@ class VmObjectPaged final : public VmObject {
   }
   zx_status_t PrefetchRange(uint64_t offset, uint64_t len) override;
   zx_status_t DecommitRange(uint64_t offset, uint64_t len) override;
-  zx_status_t ZeroRange(uint64_t offset, uint64_t len) override;
+  zx_status_t ZeroRange(uint64_t offset, uint64_t len) override {
+    return ZeroRangeInternal(offset, len, /*dirty_track=*/true);
+  }
+  zx_status_t ZeroRangeUntracked(uint64_t offset, uint64_t len) override {
+    // We don't expect any committed pages to remain at the end of this call, so we should be
+    // operating on whole pages.
+    if (!IS_PAGE_ALIGNED(offset) || !IS_PAGE_ALIGNED(len)) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    return ZeroRangeInternal(offset, len, /*dirty_track=*/false);
+  }
 
   void Unpin(uint64_t offset, uint64_t len) override {
     Guard<CriticalMutex> guard{lock()};
@@ -384,6 +394,9 @@ class VmObjectPaged final : public VmObject {
   zx_status_t ZeroPartialPageLocked(uint64_t page_base_offset, uint64_t zero_start_offset,
                                     uint64_t zero_end_offset, Guard<CriticalMutex>* guard)
       TA_REQ(lock());
+
+  // Internal helper for ZeroRange*.
+  zx_status_t ZeroRangeInternal(uint64_t offset, uint64_t len, bool dirty_track);
 
   // Internal implementations that assume lock is already held.
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock());
