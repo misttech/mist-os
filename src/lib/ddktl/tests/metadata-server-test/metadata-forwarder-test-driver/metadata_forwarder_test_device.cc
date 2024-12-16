@@ -42,7 +42,7 @@ zx_status_t MetadataForwarderTestDevice::Bind(void* ctx, zx_device_t* dev) {
     return outgoing.status_value();
   }
 
-  std::array offers = {MetadataServer::kFidlServiceName};
+  std::array offers = {MetadataServer<fuchsia_hardware_test::Metadata>::kFidlServiceName};
   const std::vector<zx_device_str_prop_t> kStrProps = {
       ddk::MakeStrProperty(bind_metadata_server_test::PURPOSE,
                            bind_metadata_server_test::PURPOSE_RETRIEVE_METADATA),

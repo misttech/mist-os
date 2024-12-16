@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.examples.metadata/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 
 #include <bind/fuchsia_examples_metadata_bind_library/cpp/bind.h>
-
-#include "examples/drivers/metadata/fuchsia.examples.metadata/metadata.h"
 
 namespace examples::drivers::metadata {
 
@@ -85,7 +85,7 @@ class SenderDriver final : public fdf::DriverBase,
   }
 
   // Responsible for serving metadata.
-  MetadataServer metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_examples_metadata::Metadata> metadata_server_;
 
   // Used by tests in order to communicate with the driver via devfs.
   driver_devfs::Connector<fuchsia_examples_metadata::Sender> devfs_connector_{

@@ -12,10 +12,6 @@ type Metadata = table {
     1: test_property string:MAX;
 };
 
-// The name of the FIDL service that serves `Metadata`. Must be unique when
-// compared to other FIDL services.
-const METADATA_SERVICE string = "fuchsia.examples.metadata.Metadata";
-
 // Implemented by the driver that will be sending metadata using the
 // //sdk/lib/driver/metadata library. Used only for testing.
 closed protocol Sender {

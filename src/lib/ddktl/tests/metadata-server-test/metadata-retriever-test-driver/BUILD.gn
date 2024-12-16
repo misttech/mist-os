@@ -19,10 +19,7 @@ source_set("driver_source") {
     "metadata_retriever_test_device.cc",
     "metadata_retriever_test_device.h",
   ]
-  deps = [
-    "//src/lib/ddktl/tests/metadata-server-test:metadata_server_test_bind_library_cpp",
-    "//src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test:metadata",
-  ]
+  deps = [ "//src/lib/ddktl/tests/metadata-server-test:metadata_server_test_bind_library_cpp" ]
   public_deps = [
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/lib/driver/component/cpp",

@@ -21,7 +21,6 @@ fuchsia_cc_driver("driver") {
   deps = [
     "//examples/drivers/metadata:fuchsia_examples_metadata_bind_library_cpp",
     "//examples/drivers/metadata/fuchsia.examples.metadata:fuchsia.examples.metadata_cpp",
-    "//examples/drivers/metadata/fuchsia.examples.metadata:metadata",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",

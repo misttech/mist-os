@@ -75,7 +75,6 @@ test("metadata_server_mock_ddk_test") {
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddktl",
-    "//src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test:metadata",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
   ]

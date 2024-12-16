@@ -4,12 +4,12 @@
 
 #include "sdk/lib/driver/metadata/cpp/tests/test_root/test_root.h"
 
+#include <fidl/fuchsia.driver.framework/cpp/natural_types.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
 #include <bind/fuchsia_driver_metadata_test_bind_library/cpp/bind.h>
-
-#include "fidl/fuchsia.driver.framework/cpp/natural_types.h"
 
 namespace fdf_metadata::test {
 

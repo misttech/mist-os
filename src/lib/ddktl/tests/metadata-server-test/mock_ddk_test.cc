@@ -2,15 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.test/cpp/fidl.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
+#include <ddktl/metadata_server.h>
 #include <gtest/gtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test/metadata.h"
 #include "src/lib/ddktl/tests/metadata-server-test/metadata-retriever-test-driver/metadata_retriever_test_device.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -28,7 +29,7 @@ class IncomingNamespace {
   }
 
  private:
-  MetadataServer metadata_server_;
+  ddk::MetadataServer<fuchsia_hardware_test::wire::Metadata> metadata_server_;
   component::OutgoingDirectory outgoing_{async_get_default_dispatcher()};
 };
 
@@ -40,7 +41,7 @@ class MetadataServerMockDdkTest : public ::testing::Test {
     auto incoming_namespace_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     incoming_namespace_.SyncCall(&IncomingNamespace::Init,
                                  std::move(incoming_namespace_endpoints.server));
-    parent_->AddFidlService(fuchsia_hardware_test::kMetadataTypeName,
+    parent_->AddFidlService(MetadataServer<fuchsia_hardware_test::Metadata>::kFidlServiceName,
                             std::move(incoming_namespace_endpoints.client), "default");
 
     // Start driver.

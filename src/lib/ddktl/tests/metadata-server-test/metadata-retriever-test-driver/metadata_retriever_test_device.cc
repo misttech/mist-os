@@ -7,7 +7,8 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 
-#include "src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test/metadata.h"
+#include <bind/metadata_server_test_bind_library/cpp/bind.h>
+#include <ddktl/metadata_server.h>
 
 namespace ddk::test {
 

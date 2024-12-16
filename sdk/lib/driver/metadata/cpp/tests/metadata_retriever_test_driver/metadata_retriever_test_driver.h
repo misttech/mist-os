@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.test/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/driver/metadata/cpp/tests/fuchsia.hardware.test/metadata.h>
 #include <lib/driver/node/cpp/add_child.h>
 
 namespace fdf_metadata::test {
