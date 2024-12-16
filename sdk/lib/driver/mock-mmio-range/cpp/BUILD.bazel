@@ -5,7 +5,7 @@
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "mock-mmio-range",
+    name = "cpp",
     srcs = [
         "mock-mmio-range.cc",
     ],
