@@ -180,7 +180,7 @@ closed protocol Coordinator {
     /// It is illegal to pass a display mode which was not part of the display's Info.
     strict SetDisplayMode(struct {
         display_id fuchsia.hardware.display.types.DisplayId;
-        mode Mode;
+        mode fuchsia.hardware.display.types.Mode;
     });
 
     /// Set the color conversion applied to the display. The conversion is applied to

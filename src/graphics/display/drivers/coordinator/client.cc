@@ -1330,7 +1330,7 @@ void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_displ
   coded_configs.reserve(added_display_ids.size());
 
   // Hang on to modes values until we send the message.
-  std::vector<std::vector<fhd::wire::Mode>> modes_vector;
+  std::vector<std::vector<fuchsia_hardware_display_types::wire::Mode>> modes_vector;
 
   fidl::Arena arena;
   for (display::DisplayId added_display_id : added_display_ids) {
@@ -1349,11 +1349,11 @@ void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_displ
     cpp20::span<const display::DisplayTiming> display_timings = display_timings_result.value();
     ZX_DEBUG_ASSERT(!display_timings.empty());
 
-    std::vector<fhd::wire::Mode> modes;
+    std::vector<fuchsia_hardware_display_types::wire::Mode> modes;
 
     modes.reserve(display_timings.size());
     for (const display::DisplayTiming& timing : display_timings) {
-      modes.emplace_back(fhd::wire::Mode{
+      modes.emplace_back(fuchsia_hardware_display_types::wire::Mode{
           .active_area =
               {
                   .width = static_cast<uint32_t>(timing.horizontal_active_px),
@@ -1364,7 +1364,8 @@ void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_displ
       });
     }
     modes_vector.emplace_back(std::move(modes));
-    info.modes = fidl::VectorView<fhd::wire::Mode>::FromExternal(modes_vector.back());
+    info.modes = fidl::VectorView<fuchsia_hardware_display_types::wire::Mode>::FromExternal(
+        modes_vector.back());
 
     info.pixel_format =
         fidl::VectorView<fuchsia_images2::wire::PixelFormat>(arena, config->pixel_formats_.size());

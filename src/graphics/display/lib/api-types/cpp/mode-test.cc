@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 
 #include <gtest/gtest.h>
@@ -85,7 +85,7 @@ TEST(ModeTest, FromDesignatedInitializer) {
 }
 
 TEST(ModeTest, FromFidlMode) {
-  static constexpr fuchsia_hardware_display::wire::Mode fidl_mode = {
+  static constexpr fuchsia_hardware_display_types::wire::Mode fidl_mode = {
       .active_area = {.width = 640, .height = 480},
       .refresh_rate_millihertz = 60'000,
   };
@@ -125,11 +125,11 @@ TEST(ModeTest, ToFidlMode) {
       .refresh_rate_millihertz = 60'000,
   });
 
-  static constexpr fuchsia_hardware_display::wire::Mode fidl_mode = mode.ToFidl();
+  static constexpr fuchsia_hardware_display_types::wire::Mode fidl_mode = mode.ToFidl();
   EXPECT_EQ(640u, fidl_mode.active_area.width);
   EXPECT_EQ(480u, fidl_mode.active_area.height);
   EXPECT_EQ(60'000u, fidl_mode.refresh_rate_millihertz);
-  EXPECT_EQ(fuchsia_hardware_display::wire::ModeFlags(), fidl_mode.flags);
+  EXPECT_EQ(fuchsia_hardware_display_types::wire::ModeFlags(), fidl_mode.flags);
 }
 
 TEST(ModeTest, ToBanjoMode) {
@@ -153,42 +153,42 @@ TEST(ModeTest, ToBanjoMode) {
 }
 
 TEST(ModeTest, IsValidFidlVga60Fps) {
-  EXPECT_TRUE(Mode::IsValid(fuchsia_hardware_display::wire::Mode{
+  EXPECT_TRUE(Mode::IsValid(fuchsia_hardware_display_types::wire::Mode{
       .active_area = {.width = 640, .height = 480},
       .refresh_rate_millihertz = 60'000,
-      .flags = fuchsia_hardware_display::wire::ModeFlags(),
+      .flags = fuchsia_hardware_display_types::wire::ModeFlags(),
   }));
 }
 
 TEST(ModeTest, IsValidFidlLargeWidth) {
-  EXPECT_FALSE(Mode::IsValid(fuchsia_hardware_display::wire::Mode{
+  EXPECT_FALSE(Mode::IsValid(fuchsia_hardware_display_types::wire::Mode{
       .active_area = {.width = 1'000'000, .height = 480},
       .refresh_rate_millihertz = 60'000,
-      .flags = fuchsia_hardware_display::wire::ModeFlags(),
+      .flags = fuchsia_hardware_display_types::wire::ModeFlags(),
   }));
 }
 
 TEST(ModeTest, IsValidFidlLargeHeight) {
-  EXPECT_FALSE(Mode::IsValid(fuchsia_hardware_display::wire::Mode{
+  EXPECT_FALSE(Mode::IsValid(fuchsia_hardware_display_types::wire::Mode{
       .active_area = {.width = 640, .height = 1'000'000},
       .refresh_rate_millihertz = 60'000,
-      .flags = fuchsia_hardware_display::wire::ModeFlags(),
+      .flags = fuchsia_hardware_display_types::wire::ModeFlags(),
   }));
 }
 
 TEST(ModeTest, IsValidFidlLargeRefreshRate) {
-  EXPECT_FALSE(Mode::IsValid(fuchsia_hardware_display::wire::Mode{
+  EXPECT_FALSE(Mode::IsValid(fuchsia_hardware_display_types::wire::Mode{
       .active_area = {.width = 640, .height = 480},
       .refresh_rate_millihertz = 10'000'000,
-      .flags = fuchsia_hardware_display::wire::ModeFlags(),
+      .flags = fuchsia_hardware_display_types::wire::ModeFlags(),
   }));
 }
 
 TEST(ModeTest, IsValidFidlNonZeroFlags) {
-  EXPECT_FALSE(Mode::IsValid(fuchsia_hardware_display::wire::Mode{
+  EXPECT_FALSE(Mode::IsValid(fuchsia_hardware_display_types::wire::Mode{
       .active_area = {.width = 640, .height = 480},
       .refresh_rate_millihertz = 10'000'000,
-      .flags = static_cast<fuchsia_hardware_display::wire::ModeFlags>(1),
+      .flags = static_cast<fuchsia_hardware_display_types::wire::ModeFlags>(1),
   }));
 }
 

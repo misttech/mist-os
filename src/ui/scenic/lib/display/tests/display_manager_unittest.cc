@@ -127,7 +127,7 @@ TEST_F(DisplayManagerMockTest, OnDisplayAdded) {
       .id = kDisplayId,
       .modes =
           {
-              fuchsia_hardware_display::Mode{{
+              fuchsia_hardware_display_types::Mode{{
                   .active_area =
                       fuchsia_math::SizeU({.width = kDisplayWidth, .height = kDisplayHeight}),
                   .refresh_rate_millihertz = kDisplayRefreshRateHz * 1'000,
@@ -158,11 +158,11 @@ TEST_F(DisplayManagerMockTest, OnDisplayAdded) {
 
 TEST_F(DisplayManagerMockTest, SelectPreferredMode) {
   static const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
-  static const fuchsia_hardware_display::Mode kPreferredMode = {{
+  static const fuchsia_hardware_display_types::Mode kPreferredMode = {{
       .active_area = fuchsia_math::SizeU({.width = 1024, .height = 768}),
       .refresh_rate_millihertz = 60'000,
   }};
-  static const fuchsia_hardware_display::Mode kNonPreferredMode = {{
+  static const fuchsia_hardware_display_types::Mode kNonPreferredMode = {{
       .active_area = fuchsia_math::SizeU({.width = 800, .height = 600}),
       .refresh_rate_millihertz = 30'000,
   }};
@@ -210,11 +210,11 @@ TEST_F(DisplayManagerMockTest, SelectPreferredMode) {
 
 TEST(DisplayManager, ICanHazDisplayMode) {
   static const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
-  static const fuchsia_hardware_display::Mode kPreferredMode = {{
+  static const fuchsia_hardware_display_types::Mode kPreferredMode = {{
       .active_area = fuchsia_math::SizeU({.width = 1024, .height = 768}),
       .refresh_rate_millihertz = 60'000,
   }};
-  static const fuchsia_hardware_display::Mode kNonPreferredButSelectedMode = {{
+  static const fuchsia_hardware_display_types::Mode kNonPreferredButSelectedMode = {{
       .active_area = fuchsia_math::SizeU({.width = 800, .height = 600}),
       .refresh_rate_millihertz = 30'000,
   }};
@@ -274,11 +274,11 @@ TEST(DisplayManager, DisplayModeConstraintsHorizontalResolution) {
   };
 
   static const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
-  static const fuchsia_hardware_display::Mode kModeNotSatisfyingConstraints = {{
+  static const fuchsia_hardware_display_types::Mode kModeNotSatisfyingConstraints = {{
       .active_area = fuchsia_math::SizeU({.width = 1024, .height = 768}),
       .refresh_rate_millihertz = 60'000,
   }};
-  static const fuchsia_hardware_display::Mode kModeSatisfyingConstraints = {{
+  static const fuchsia_hardware_display_types::Mode kModeSatisfyingConstraints = {{
       .active_area = fuchsia_math::SizeU({.width = 800, .height = 600}),
       .refresh_rate_millihertz = 30'000,
   }};
@@ -339,11 +339,11 @@ TEST(DisplayManager, DisplayModeConstraintsVerticalResolution) {
   };
 
   static const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
-  static const fuchsia_hardware_display::Mode kModeNotSatisfyingConstraints = {{
+  static const fuchsia_hardware_display_types::Mode kModeNotSatisfyingConstraints = {{
       .active_area = fuchsia_math::SizeU({.width = 1024, .height = 768}),
       .refresh_rate_millihertz = 60'000,
   }};
-  static const fuchsia_hardware_display::Mode kModeSatisfyingConstraints = {{
+  static const fuchsia_hardware_display_types::Mode kModeSatisfyingConstraints = {{
       .active_area = fuchsia_math::SizeU({.width = 800, .height = 600}),
       .refresh_rate_millihertz = 30'000,
   }};
@@ -404,11 +404,11 @@ TEST(DisplayManager, DisplayModeConstraintsRefreshRateLimit) {
   };
 
   static const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
-  static const fuchsia_hardware_display::Mode kModeNotSatisfyingConstraints = {{
+  static const fuchsia_hardware_display_types::Mode kModeNotSatisfyingConstraints = {{
       .active_area = fuchsia_math::SizeU({.width = 1024, .height = 768}),
       .refresh_rate_millihertz = 60'000,
   }};
-  static const fuchsia_hardware_display::Mode kModeSatisfyingConstraints = {{
+  static const fuchsia_hardware_display_types::Mode kModeSatisfyingConstraints = {{
       .active_area = fuchsia_math::SizeU({.width = 800, .height = 600}),
       .refresh_rate_millihertz = 30'000,
   }};
@@ -469,15 +469,15 @@ TEST(DisplayManager, DisplayModeConstraintsOverriddenByModeIndex) {
   };
 
   static const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
-  static const fuchsia_hardware_display::Mode kModeNotSatisfyingConstraints = {{
+  static const fuchsia_hardware_display_types::Mode kModeNotSatisfyingConstraints = {{
       .active_area = fuchsia_math::SizeU({.width = 1024, .height = 768}),
       .refresh_rate_millihertz = 60'000,
   }};
-  static const fuchsia_hardware_display::Mode kModeSatisfyingConstraints = {{
+  static const fuchsia_hardware_display_types::Mode kModeSatisfyingConstraints = {{
       .active_area = fuchsia_math::SizeU({.width = 800, .height = 600}),
       .refresh_rate_millihertz = 30'000,
   }};
-  static const fuchsia_hardware_display::Mode kModeOverridden = {{
+  static const fuchsia_hardware_display_types::Mode kModeOverridden = {{
       .active_area = fuchsia_math::SizeU({.width = 1280, .height = 960}),
       .refresh_rate_millihertz = 30'000,
   }};

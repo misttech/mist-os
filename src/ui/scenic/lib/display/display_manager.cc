@@ -19,7 +19,7 @@ namespace display {
 namespace {
 
 std::optional<size_t> PickFirstDisplayModeSatisfyingConstraints(
-    cpp20::span<const fuchsia_hardware_display::Mode> modes,
+    cpp20::span<const fuchsia_hardware_display_types::Mode> modes,
     const DisplayModeConstraints& constraints) {
   for (size_t i = 0; i < modes.size(); ++i) {
     if (constraints.ModeSatisfiesConstraints(modes[i])) {
@@ -32,7 +32,7 @@ std::optional<size_t> PickFirstDisplayModeSatisfyingConstraints(
 }  // namespace
 
 bool DisplayModeConstraints::ModeSatisfiesConstraints(
-    const fuchsia_hardware_display::Mode& mode) const {
+    const fuchsia_hardware_display_types::Mode& mode) const {
   if (!width_px_range.Contains(static_cast<int>(mode.active_area().width()))) {
     return false;
   }
@@ -124,7 +124,7 @@ void DisplayManager::OnDisplaysChanged(
             (*default_display_coordinator_)->ApplyConfig();
       }
 
-      const fuchsia_hardware_display::Mode& mode = display.modes()[mode_index];
+      const fuchsia_hardware_display_types::Mode& mode = display.modes()[mode_index];
       default_display_ = std::make_unique<Display>(
           display.id(), mode.active_area().width(), mode.active_area().height(),
           display.horizontal_size_mm(), display.vertical_size_mm(), display.pixel_format(),

@@ -5,7 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_MODE_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_MODE_H_
 
-#include <fidl/fuchsia.hardware.display/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <zircon/assert.h>
 
@@ -31,7 +31,7 @@ class Mode {
 
   // True iff `fidl_mode` is convertible to a valid Mode.
   [[nodiscard]] static constexpr bool IsValid(
-      const fuchsia_hardware_display::wire::Mode& fidl_mode);
+      const fuchsia_hardware_display_types::wire::Mode& fidl_mode);
   [[nodiscard]] static constexpr bool IsValid(const display_mode_t& banjo_mode);
 
   // `banjo_mode` must be convertible to a valid Mode.
@@ -48,7 +48,8 @@ class Mode {
   // this a constructor would introduce ambiguity when designated initializer
   // syntax is used, because `fuchsia.hardware.display.types/Mode` has the same
   // field names as our supported designated initializer syntax.
-  [[nodiscard]] static constexpr Mode From(const fuchsia_hardware_display::wire::Mode& fidl_mode);
+  [[nodiscard]] static constexpr Mode From(
+      const fuchsia_hardware_display_types::wire::Mode& fidl_mode);
 
   // Constructor that enables the designated initializer syntax with containers.
   //
@@ -62,7 +63,7 @@ class Mode {
   friend constexpr bool operator==(const Mode& lhs, const Mode& rhs);
   friend constexpr bool operator!=(const Mode& lhs, const Mode& rhs);
 
-  constexpr fuchsia_hardware_display::wire::Mode ToFidl() const;
+  constexpr fuchsia_hardware_display_types::wire::Mode ToFidl() const;
   constexpr display_mode_t ToBanjo() const;
 
   // Guaranteed to meet the requirements in the FIDL documentation.
@@ -82,7 +83,8 @@ class Mode {
   //
   // IsValid() variant with developer-friendly debug assertions.
   static constexpr void DebugAssertIsValid(const Mode::ConstructorArgs& args);
-  static constexpr void DebugAssertIsValid(const fuchsia_hardware_display::wire::Mode& fidl_mode);
+  static constexpr void DebugAssertIsValid(
+      const fuchsia_hardware_display_types::wire::Mode& fidl_mode);
   static constexpr void DebugAssertIsValid(const display_mode_t& banjo_mode);
 
   Dimensions active_area_;
@@ -90,7 +92,7 @@ class Mode {
 };
 
 // static
-constexpr bool Mode::IsValid(const fuchsia_hardware_display::wire::Mode& fidl_mode) {
+constexpr bool Mode::IsValid(const fuchsia_hardware_display_types::wire::Mode& fidl_mode) {
   if (!Dimensions::IsValid((fidl_mode.active_area))) {
     return false;
   }
@@ -107,7 +109,7 @@ constexpr bool Mode::IsValid(const fuchsia_hardware_display::wire::Mode& fidl_mo
     return false;
   }
 
-  if (fidl_mode.flags != fuchsia_hardware_display::wire::ModeFlags()) {
+  if (fidl_mode.flags != fuchsia_hardware_display_types::wire::ModeFlags()) {
     return false;
   }
 
@@ -179,7 +181,7 @@ constexpr Mode::Mode(const Mode::ConstructorArgs& args)
 }
 
 // static
-constexpr Mode Mode::From(const fuchsia_hardware_display::wire::Mode& fidl_mode) {
+constexpr Mode Mode::From(const fuchsia_hardware_display_types::wire::Mode& fidl_mode) {
   DebugAssertIsValid(fidl_mode);
   const Dimensions active_area = Dimensions::From(fidl_mode.active_area);
 
@@ -227,8 +229,8 @@ constexpr bool operator==(const Mode& lhs, const Mode& rhs) {
 
 constexpr bool operator!=(const Mode& lhs, const Mode& rhs) { return !(lhs == rhs); }
 
-constexpr fuchsia_hardware_display::wire::Mode Mode::ToFidl() const {
-  return fuchsia_hardware_display::wire::Mode{
+constexpr fuchsia_hardware_display_types::wire::Mode Mode::ToFidl() const {
+  return fuchsia_hardware_display_types::wire::Mode{
       .active_area = active_area_.ToFidl(),
 
       // This cast does not cause UB because the refresh rate must be
@@ -275,7 +277,8 @@ constexpr void Mode::DebugAssertIsValid(const Mode::ConstructorArgs& args) {
 }
 
 // static
-constexpr void Mode::DebugAssertIsValid(const fuchsia_hardware_display::wire::Mode& fidl_mode) {
+constexpr void Mode::DebugAssertIsValid(
+    const fuchsia_hardware_display_types::wire::Mode& fidl_mode) {
   ZX_DEBUG_ASSERT(Dimensions::IsValid(fidl_mode.active_area));
   const Dimensions active_area = Dimensions::From(fidl_mode.active_area);
   ZX_DEBUG_ASSERT(!active_area.IsEmpty());
@@ -283,7 +286,7 @@ constexpr void Mode::DebugAssertIsValid(const fuchsia_hardware_display::wire::Mo
   ZX_DEBUG_ASSERT(fidl_mode.refresh_rate_millihertz > 0);
   ZX_DEBUG_ASSERT(fidl_mode.refresh_rate_millihertz <= kMaxRefreshRateMillihertz);
 
-  ZX_DEBUG_ASSERT(fidl_mode.flags == fuchsia_hardware_display::wire::ModeFlags());
+  ZX_DEBUG_ASSERT(fidl_mode.flags == fuchsia_hardware_display_types::wire::ModeFlags());
 }
 
 // static

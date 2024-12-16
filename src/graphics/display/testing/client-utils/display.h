@@ -33,7 +33,7 @@ class Display {
             ColorCorrectionArgs color_correction_args = ColorCorrectionArgs());
 
   fuchsia_images2::wire::PixelFormat format() const { return pixel_formats_[format_idx_]; }
-  fuchsia_hardware_display::wire::Mode mode() const { return modes_[mode_idx_]; }
+  fuchsia_hardware_display_types::wire::Mode mode() const { return modes_[mode_idx_]; }
   display::DisplayId id() const { return id_; }
 
   bool set_format_idx(uint32_t idx) {
@@ -59,7 +59,7 @@ class Display {
 
   display::DisplayId id_;
   std::vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
-  std::vector<fuchsia_hardware_display::wire::Mode> modes_;
+  std::vector<fuchsia_hardware_display_types::wire::Mode> modes_;
 
   std::string manufacturer_name_;
   std::string monitor_name_;
