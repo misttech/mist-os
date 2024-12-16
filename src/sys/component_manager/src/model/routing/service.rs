@@ -11,16 +11,13 @@ use cm_rust::{CapabilityTypeName, ChildRef, ComponentDecl, ExposeDecl, ExposeDec
 use cm_types::{IterablePath, Name, RelativePath};
 use cm_util::TaskGroup;
 use errors::{CapabilityProviderError, ModelError, OpenError};
-use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use flyweights::FlyStr;
 use fuchsia_async::{DurationExt, TimeoutExt};
-use fuchsia_fs::directory::WatcherStreamError;
 use futures::channel::oneshot;
 use futures::future::{join_all, BoxFuture};
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt;
-use futures::StreamExt;
 use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::Explain;
@@ -34,13 +31,12 @@ use routing::collection::{
 use routing::component_instance::ComponentInstanceInterface;
 use routing::error::RoutingError;
 use routing::legacy_router::NoopVisitor;
-use sandbox::{Dict, DirEntry};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Weak};
 use tracing::{error, warn};
 use vfs::directory::entry::{
-    DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest, SubNode,
+    DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
 };
 use vfs::directory::immutable::simple::{
     simple as simple_immutable_dir, Simple as SimpleImmutableDir,
@@ -50,176 +46,7 @@ use vfs::path::Path;
 use vfs::ToObjectRequest;
 
 /// Timeout for opening a service capability when aggregating.
-pub const OPEN_SERVICE_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
-
-/// Returns a task which will keep the given `service_dictionary` up-to-date with service instances
-/// published at `services_capability_path` in `outgoing_directory`.
-///
-/// Once this task has successfully reached an idle state, where it has successfully walked to
-/// `service_capability_path` and processed its contents, it will send a message over
-/// `send_on_idle`.
-///
-/// If this task is dropped then all entries will be removed from `service_dictionary`.
-pub async fn update_dictionary_for_service(
-    moniker: Moniker,
-    service_name: Name,
-    outgoing_directory: DirEntry,
-    scope: ExecutionScope,
-    service_capability_path: cm_types::Path,
-    service_dictionary: Dict,
-    send_on_idle: oneshot::Sender<Result<(), OpenError>>,
-) {
-    match create_watcher(outgoing_directory, service_capability_path, scope).await {
-        Ok((mut watcher, dir_proxy)) => {
-            // When we get dropped, then its safe to assume that the component has been stopped. We
-            // want to delete all of the service instances from the service instance dictionary
-            // when this happens, because those instances can no longer be connected to.
-            let service_dictionary_clone = service_dictionary.clone();
-            let _guard = scopeguard::guard((), move |_| {
-                // All items are deleted regardless of if we drain the iterator
-                let _ = service_dictionary_clone.drain();
-            });
-            let mut send_on_idle = Some(send_on_idle);
-            loop {
-                match watcher.next().await {
-                    None | Some(Err(_)) => {
-                        return;
-                    }
-                    Some(Ok(message)) => {
-                        process_watcher_message(&message, &dir_proxy, &service_dictionary);
-                        match message.event {
-                            fuchsia_fs::directory::WatchEvent::DELETED => return,
-                            fuchsia_fs::directory::WatchEvent::IDLE => {
-                                if let Some(send_on_idle) = send_on_idle.take() {
-                                    let _ = send_on_idle.send(Ok(()));
-                                }
-                            }
-                            _ => (),
-                        }
-                    }
-                }
-            }
-        }
-        Err(err) => {
-            error!(
-                component=%moniker,
-                service_name=%service_name,
-                error=%err,
-                "Failed to create service instance directory watcher.",
-            );
-            let _ = send_on_idle.send(Err(err));
-        }
-    }
-}
-
-/// Creates filesystem watchers to wait for the creation of and then walk to the subdirectory
-/// `service_capability_path` in `outgoing_directory`. Returns the filesystem watcher for and a
-/// proxy to the specified sub-directory.
-async fn create_watcher(
-    outgoing_directory: DirEntry,
-    service_capability_path: cm_types::Path,
-    scope: ExecutionScope,
-) -> Result<(fuchsia_fs::directory::Watcher, fio::DirectoryProxy), OpenError> {
-    let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
-    let (mut current_dir_proxy, server_end) = create_proxy::<fio::DirectoryMarker>();
-    outgoing_directory.open(scope, flags, ".", server_end.into());
-    let mut current_watcher = fuchsia_fs::directory::Watcher::new(&current_dir_proxy).await?;
-
-    for name in service_capability_path.split().into_iter() {
-        watcher_wait_for_path(&mut current_watcher, &name).await?;
-        let new_dir_proxy = fuchsia_fs::directory::open_directory_async(
-            &current_dir_proxy,
-            name.as_str(),
-            fio::PERM_READABLE,
-        )?;
-        current_dir_proxy = new_dir_proxy;
-        current_watcher = fuchsia_fs::directory::Watcher::new(&current_dir_proxy).await?;
-    }
-    Ok((current_watcher, current_dir_proxy))
-}
-
-/// Blocks until `path` is discovered in `watcher`.
-async fn watcher_wait_for_path(
-    watcher: &mut fuchsia_fs::directory::Watcher,
-    path: &Name,
-) -> Result<(), OpenError> {
-    loop {
-        match watcher.next().await {
-            None => {
-                return Err(CapabilityProviderError::VfsOpenError(zx::Status::PEER_CLOSED).into());
-            }
-            Some(Err(WatcherStreamError::ChannelRead(status))) => {
-                return Err(CapabilityProviderError::VfsOpenError(status).into());
-            }
-            Some(Ok(message)) => {
-                if message.filename.to_str() == Some(path.as_str()) {
-                    match message.event {
-                        fuchsia_fs::directory::WatchEvent::ADD_FILE
-                        | fuchsia_fs::directory::WatchEvent::EXISTING => return Ok(()),
-                        fuchsia_fs::directory::WatchEvent::DELETED => {
-                            return Err(OpenError::DirectoryDeleted)
-                        }
-                        fuchsia_fs::directory::WatchEvent::REMOVE_FILE
-                        | fuchsia_fs::directory::WatchEvent::IDLE => (),
-                    }
-                }
-            }
-        }
-    }
-}
-
-/// Updates `dictionary` appropriately to match the event described by `message`. If a file has
-/// been added (or is pre-existing) according to the watcher, then a new `DirEntry` is added to
-/// `dictionary` for that file. If the file is removed, then the related entry in `dictionary` is
-/// removed. Deletes all entries in `dictionary` if the watcher declares the directory as deleted.
-fn process_watcher_message(
-    message: &fuchsia_fs::directory::WatchMessage,
-    parent_directory: &fio::DirectoryProxy,
-    dictionary: &Dict,
-) {
-    match message.event {
-        fuchsia_fs::directory::WatchEvent::DELETED => {
-            // If the directory doesn't exist anymore, then neither do any of our dictionary
-            // entries. Note that the elements are deleted from the dictionary even if we don't
-            // exhaust the returned iterator.
-            let _ = dictionary.drain();
-        }
-        fuchsia_fs::directory::WatchEvent::ADD_FILE
-        | fuchsia_fs::directory::WatchEvent::EXISTING => {
-            let filename = &message.filename;
-            if filename.to_str() == Some(".") {
-                // Ignore the "." file
-                return;
-            }
-            let Ok(path) = Path::validate_and_split(format!("{}", filename.display())) else {
-                warn!("path received from fuchsia.io is rejected by the vfs crate: {:?}", filename);
-                return;
-            };
-            let sub_node_dir_entry = DirEntry::new(Arc::new(SubNode::new(
-                vfs::remote::remote_dir(Clone::clone(parent_directory)),
-                path,
-                fio::DirentType::Directory,
-            )));
-            let Ok(name) = Name::new(format!("{}", filename.display())) else {
-                warn!("path received from fuchsia.io is invalid dictionary key: {:?}", filename);
-                return;
-            };
-            let Ok(()) = dictionary.insert(name, sub_node_dir_entry.into()) else {
-                warn!("non-unique directory entry found: {:?}", filename);
-                return;
-            };
-        }
-        fuchsia_fs::directory::WatchEvent::REMOVE_FILE => {
-            let filename = &message.filename;
-            let Ok(name) = Name::new(format!("{}", filename.display())) else {
-                warn!("path received from fuchsia.io is invalid dictionary key: {:?}", filename);
-                return;
-            };
-            let _ = dictionary.remove(&name);
-        }
-        fuchsia_fs::directory::WatchEvent::IDLE => (),
-    }
-}
+const OPEN_SERVICE_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 
 /// Serves a Service directory that allows clients to list instances resulting from an aggregation of service offers
 /// and to open instances.

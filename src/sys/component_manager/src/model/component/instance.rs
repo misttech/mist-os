@@ -14,9 +14,7 @@ use crate::model::environment::Environment;
 use crate::model::escrow::{self, EscrowedState};
 use crate::model::namespace::create_namespace;
 use crate::model::routing::legacy::RouteRequestExt;
-use crate::model::routing::service::{
-    AnonymizedAggregateServiceDir, AnonymizedServiceRoute, OPEN_SERVICE_TIMEOUT,
-};
+use crate::model::routing::service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute};
 use crate::model::routing::{self, RoutingFailureErrorReporter};
 use crate::model::start::Start;
 use crate::model::storage::build_storage_admin_dictionary;
@@ -55,10 +53,7 @@ use errors::{
     ResolveActionError, StopError,
 };
 use fidl::endpoints::{create_proxy, ServerEnd};
-use fuchsia_async::Task;
-use futures::channel::oneshot;
-use futures::future::{BoxFuture, Shared};
-use futures::{select, FutureExt};
+use futures::future::BoxFuture;
 use hooks::{CapabilityReceiver, EventPayload};
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::RouterError;
@@ -68,7 +63,6 @@ use sandbox::{
 };
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::pin::pin;
 use std::sync::Arc;
 use tracing::warn;
 use vfs::directory::entry::{DirectoryEntry, OpenRequest, SubNode};
@@ -359,20 +353,6 @@ pub struct ResolvedInstanceState {
     /// its outgoing directory server endpoint. Present if and only if the component
     /// has a program.
     program_escrow: Option<escrow::Actor>,
-
-    /// Dictionaries which are kept up to date to reflect the service instances published by this
-    /// component. If the component is not running, each dictionary will be empty. Each dictionary
-    /// has a future associated with it, which can be used to wait on component startup
-    /// initialization. In other words: whenever this component is started then these futures will
-    /// be reset to values that block until the component publishes the directory for the service
-    /// and the entries in that directory have been processed.
-    ///
-    /// Note that these dictionaries live on the resolved instance state, and thus will live across
-    /// multiple component start/stop cycles. If an updater is registered on this dictionary and
-    /// the component restarts, the updater can be relied on to notify when the component's
-    /// services instances become unavailable and when ones from the new run are published.
-    pub service_instance_dictionaries:
-        HashMap<Name, (Dict, Shared<oneshot::Receiver<Result<(), OpenError>>>)>,
 }
 
 /// Extracts a mutable reference to the `target` field of an `OfferDecl`, or
@@ -432,18 +412,6 @@ impl ResolvedInstanceState {
             None
         };
 
-        let service_instance_dictionaries = decl
-            .capabilities
-            .iter()
-            .filter_map(|capability_decl| match capability_decl {
-                CapabilityDecl::Service(service) => {
-                    let (_sender, receiver) = oneshot::channel();
-                    Some((service.name.clone(), (Dict::new(), receiver.shared())))
-                }
-                _ => None,
-            })
-            .collect();
-
         let mut state = Self {
             weak_component,
             execution_scope: component.execution_scope.clone(),
@@ -460,7 +428,6 @@ impl ResolvedInstanceState {
             anonymized_services: HashMap::new(),
             sandbox: Default::default(),
             program_escrow,
-            service_instance_dictionaries,
         };
         state.add_static_children(component).await?;
 
@@ -493,17 +460,6 @@ impl ResolvedInstanceState {
                 capability: &cm_rust::CapabilityDecl,
             ) -> Router<DirEntry> {
                 ResolvedInstanceState::make_program_outgoing_dir_entry_router(
-                    component, decl, capability,
-                )
-            }
-
-            fn new_outgoing_dir_dictionary_router(
-                &self,
-                component: &Arc<ComponentInstance>,
-                decl: &cm_rust::ComponentDecl,
-                capability: &cm_rust::CapabilityDecl,
-            ) -> Router<Dict> {
-                ResolvedInstanceState::make_program_outgoing_dictionary_router(
                     component, decl, capability,
                 )
             }
@@ -548,7 +504,7 @@ impl ResolvedInstanceState {
         let name = capability_decl.name();
         let path = capability_decl.path().expect("must have path").to_string();
         let path = fuchsia_fs::canonicalize_path(&path);
-        let entry_type = CapabilityTypeName::from(capability_decl).into();
+        let entry_type = ComponentCapability::from(capability_decl.clone()).type_name().into();
         let relative_path = vfs::path::Path::validate_and_split(path).unwrap();
         let outgoing_dir_entry = component
             .get_outgoing()
@@ -591,30 +547,6 @@ impl ResolvedInstanceState {
             },
             _ => Router::<Connector>::new(hook),
         }
-    }
-
-    /// Creates a `Router<Dict>` that requests the specified capability from the
-    /// program's outgoing directory.
-    pub fn make_program_outgoing_dictionary_router(
-        component: &Arc<ComponentInstance>,
-        component_decl: &ComponentDecl,
-        capability_decl: &cm_rust::CapabilityDecl,
-    ) -> Router<Dict> {
-        if component_decl.get_runner().is_none() {
-            return Router::<Dict>::new_error(OpenOutgoingDirError::InstanceNonExecutable);
-        }
-        match capability_decl {
-            cm_rust::CapabilityDecl::Service(_) => (),
-            other_decl => panic!(
-                "can't make outgoing dictionary router for non-service capability: {:?}",
-                other_decl
-            ),
-        }
-        // Dictionary-based capabilities don't need to support CapabilityRequested.
-        Router::<Dict>::new(DictionaryOutgoingRouter {
-            source: component.as_weak(),
-            capability_decl: capability_decl.clone(),
-        })
     }
 
     /// Creates a `Router<DirEntry>` that requests the specified capability from the
@@ -1303,10 +1235,6 @@ pub struct StartedInstanceState {
     ///
     /// Only set if the component uses the `fuchsia.logger.LogSink` protocol.
     pub logger: Option<Arc<ScopedLogger>>,
-
-    /// Tasks which keep the service instances dictionaries up to date with published instances
-    /// from the component.
-    _service_instance_dictionaries_updaters: Option<Task<()>>,
 }
 
 impl StartedInstanceState {
@@ -1320,7 +1248,6 @@ impl StartedInstanceState {
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
-        service_instance_dictionaries_updaters: Option<Task<()>>,
     ) -> Self {
         let timestamp = zx::BootInstant::get();
         let timestamp_monotonic = zx::MonotonicInstant::get();
@@ -1332,7 +1259,6 @@ impl StartedInstanceState {
             start_reason,
             execution_controller_task,
             logger: logger.map(Arc::new),
-            _service_instance_dictionaries_updaters: service_instance_dictionaries_updaters,
         }
     }
 
@@ -1493,93 +1419,6 @@ impl Routable<DirEntry> for DirEntryOutgoingRouter {
             RouterResponse::<DirEntry>::Capability(self.dir_entry.clone())
         };
         Ok(resp)
-    }
-}
-
-#[derive(Debug)]
-struct DictionaryOutgoingRouter {
-    source: WeakComponentInstance,
-    capability_decl: cm_rust::CapabilityDecl,
-}
-
-#[async_trait]
-impl Routable<Dict> for DictionaryOutgoingRouter {
-    async fn route(
-        &self,
-        request: Option<Request>,
-        debug: bool,
-    ) -> Result<RouterResponse<Dict>, RouterError> {
-        fn cm_unexpected() -> RouterError {
-            RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
-        }
-
-        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
-        let ExtendedMoniker::ComponentInstance(target_moniker) =
-            <WeakInstanceToken as WeakInstanceTokenExt<ComponentInstance>>::moniker(
-                &request.target,
-            )
-        else {
-            return Err(cm_unexpected());
-        };
-        self.source
-            .ensure_started(&StartReason::AccessCapability {
-                target: target_moniker,
-                name: self.capability_decl.name().clone(),
-            })
-            .await?;
-        let ExtendedInstance::Component(_) =
-            request.target.upgrade().map_err(RoutingError::from)?
-        else {
-            return Err(cm_unexpected());
-        };
-        if debug {
-            return Ok(RouterResponse::<Dict>::Debug(
-                CapabilitySource::Component(ComponentSource {
-                    capability: self.capability_decl.clone().into(),
-                    moniker: self.source.moniker.clone(),
-                })
-                .try_into()
-                .expect("failed to convert capability source to Data"),
-            ));
-        }
-        let source = self.source.upgrade().map_err(RoutingError::from)?;
-        let (service_dictionary, initialization_waiter) = source
-            .lock_state()
-            .await
-            .get_resolved_state()
-            .ok_or(RoutingError::RouteSourceShutdown { moniker: self.source.moniker.clone() })?
-            .service_instance_dictionaries
-            .get(self.capability_decl.name())
-            .expect("missing dictionary for declared service")
-            .clone();
-
-        // We have the service dictionary that we'd like to return now, but we don't want to return
-        // it and allow the route to finish until the component has published service instances.
-        // Block on the initialization waiter with a timeout, so that we don't accidentally return
-        // the dictionary before the component has finished its initialization.
-        let mut initialization_waiter = pin!(initialization_waiter.clone().fuse());
-        let mut timer = pin!(fasync::Timer::new(OPEN_SERVICE_TIMEOUT).fuse());
-        select! {
-            res = initialization_waiter => {
-                match res {
-                    Err(_e) => {
-                        // The component must have stopped while we were routing, because the sender
-                        // was dropped.
-                        Err(RoutingError::RouteSourceStopped { moniker: source.moniker.clone() }.into())
-                    }
-                    Ok(Err(open_error)) => {
-                        // Initialization failed for some reason, which means that this route
-                        // fails.
-                        Err(open_error.into())
-                    }
-                    Ok(Ok(())) => {
-                        // Initialization succeeded, return the dictionary.
-                        Ok(service_dictionary.into())
-                    }
-                }
-            }
-            _ = timer => Err(OpenError::Timeout.into()),
-        }
     }
 }
 
