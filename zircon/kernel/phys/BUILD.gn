@@ -145,6 +145,9 @@ if (toolchain_environment == "kernel.phys" ||
   static_library("symbolize") {
     public = [ "include/phys/symbolize.h" ]
 
+    # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
+    defines = [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
+
     sources = [
       "main-symbolize.cc",
       "panic.cc",
