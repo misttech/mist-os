@@ -22,9 +22,10 @@ constexpr FilesystemOptions DefaultFilesystemOptions() {
 
 // Provides the base Blobfs setup without providing a message loop. See the variants below.
 //
-// Blobfs shutdown is tricky. The message loop must process any pending messages (so the vmo
-// free notifications can be delivered and the Blobs can unregister themselves first), then the
-// Blobfs instance must be deleted, then the Vfs instance must be deleted. This must happen in the
+// Blobfs shutdown is tricky. The message loop must process any pending messages (so the vmo free
+// notifications can be delivered and the Blobs can unregister themselves first). Then, the VFS
+// instance must be shut down to make sure the pager threads are terminated and that there are no
+// outstanding references to blobs. Then the Blobfs instance can be deleted. This must happen in the
 // derived class' destructors so the loop gets destroyed last.
 class BlobfsTestSetupBase {
  public:

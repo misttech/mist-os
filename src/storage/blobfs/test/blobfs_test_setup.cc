@@ -74,10 +74,10 @@ zx_status_t BlobfsTestSetupBase::Remount(const MountOptions& options) {
 
 BlobfsTestSetup::~BlobfsTestSetup() {
   loop_.RunUntilIdle();
-  if (blobfs_)
-    Blobfs::Destroy(std::move(blobfs_));
   if (vfs())
     ShutdownVfs();
+  if (blobfs_)
+    Blobfs::Destroy(std::move(blobfs_));
 }
 
 void BlobfsTestSetup::ShutdownVfs() {
@@ -89,10 +89,10 @@ void BlobfsTestSetup::ShutdownVfs() {
 BlobfsTestSetupWithThread::BlobfsTestSetupWithThread() { loop_.StartThread("blobfs-async-loop"); }
 
 BlobfsTestSetupWithThread::~BlobfsTestSetupWithThread() {
-  if (blobfs_)
-    Blobfs::Destroy(std::move(blobfs_));
   if (vfs())
     ShutdownVfs();
+  if (blobfs_)
+    Blobfs::Destroy(std::move(blobfs_));
 }
 
 void BlobfsTestSetupWithThread::ShutdownVfs() {
