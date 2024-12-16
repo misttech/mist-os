@@ -10,13 +10,6 @@ const PROXY_NAME_LEN uint32 = 1024;
 
 @discoverable
 open protocol Manager {
-    /// Suspends all the running Starnix kernels.
-    /// Returns after all processes have been suspended.
-    flexible Suspend(table {}) -> ();
-
-    /// Resumes all suspended Starnix kernels.
-    flexible Resume(table {});
-
     /// Suspends the container running in `job`.
     ///
     /// The call will return successfully when `wake_event` has been signaled. Returns
