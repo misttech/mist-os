@@ -674,7 +674,7 @@ class PageQueues {
 
   void LruThread();
   void MaybeTriggerLruProcessing() TA_EXCL(lock_);
-  bool NeedsLruProcessing() const;
+  bool NeedsLruProcessingLocked() const TA_REQ(lock_);
 
   // MarkAccessed is split into a small inlinable portion that attempts to short circuit, and this
   // main implementation that does the actual accessed marking if needed.
@@ -793,6 +793,8 @@ class PageQueues {
   // think they are in a queue that is invalid, only valid linked lists in the page_queues_ will
   // ever have pages in them. This invariant is easy to enforce as the page_queues_ are updated
   // under a lock.
+  // These are atomic so they can be safely read without the lock held, however they are always
+  // modified with the lock hold.
   ktl::atomic<uint64_t> lru_gen_ = 0;
   ktl::atomic<uint64_t> mru_gen_ = kNumReclaim - 1;
 
