@@ -120,15 +120,15 @@ pub async fn pb_create_with_sdk_version(
     if let Some(size_report) = cmd.gerrit_size_report {
         let mut mapper = PartitionImageMapper::new(partitions.clone());
         if let Some(system) = &system_a {
-            mapper.map_images_to_slot(&system.images, PartitionSlot::A);
+            mapper.map_images_to_slot(&system.images, PartitionSlot::A)?;
             ensure_system_board(system)?;
         }
         if let Some(system) = &system_b {
-            mapper.map_images_to_slot(&system.images, PartitionSlot::B);
+            mapper.map_images_to_slot(&system.images, PartitionSlot::B)?;
             ensure_system_board(system)?;
         }
         if let Some(system) = &system_r {
-            mapper.map_images_to_slot(&system.images, PartitionSlot::R);
+            mapper.map_images_to_slot(&system.images, PartitionSlot::R)?;
             ensure_system_board(system)?;
         }
         mapper
@@ -368,6 +368,7 @@ fn load_assembly_manifest(
         };
         let mut has_zbi = false;
         let mut has_vbmeta = false;
+        let mut has_dtbo = false;
         for image in manifest.images.into_iter() {
             match image {
                 Image::BasePackage(..) => {}
@@ -393,6 +394,14 @@ fn load_assembly_manifest(
                     images.push(image);
                     has_vbmeta = true;
                 }
+                Image::Dtbo(_) => {
+                    if has_dtbo {
+                        anyhow::bail!("Found more than one Dtbo");
+                    }
+                    images.push(image);
+                    has_dtbo = true;
+                }
+
                 // We don't need to extract packages from `FxfsSparse`, since it exists only if
                 // `Fxfs` also exists (and always contains the same set of packages).
                 Image::FxfsSparse { .. }

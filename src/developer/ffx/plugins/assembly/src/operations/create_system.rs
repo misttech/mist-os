@@ -47,6 +47,9 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         images: Default::default(),
         board_name: image_assembly_config.board_name.clone(),
     };
+    if let Some(devicetree_overlay) = &image_assembly_config.devicetree_overlay {
+        assembly_manifest.images.push(assembly_manifest::Image::Dtbo(devicetree_overlay.clone()));
+    }
     assembly_manifest
         .images
         .push(assembly_manifest::Image::QemuKernel(image_assembly_config.qemu_kernel.clone()));

@@ -304,6 +304,11 @@ Resulting product is not supported and may misbehave!
             .add_devicetree(devicetree_path.as_utf8_pathbuf())
             .context("Adding devicetree binary")?;
     }
+    if let Some(devicetree_overlay_path) = &board_info.devicetree_overlay {
+        builder
+            .add_devicetree_overlay(devicetree_overlay_path.as_utf8_pathbuf())
+            .context("Adding devicetree binary overlay")?;
+    }
 
     // Construct and set the images config
     builder

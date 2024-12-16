@@ -97,6 +97,10 @@ pub struct ImageAssemblyConfigBuilder {
     /// Devicetree binary to be added to zbi
     devicetree: Option<Utf8PathBuf>,
 
+    /// Devicetree binary overlay to be added to the update package and flashed to a specific
+    /// partition.
+    devicetree_overlay: Option<Utf8PathBuf>,
+
     /// Developer override options
     developer_only_options: Option<DeveloperOnlyOptions>,
 
@@ -127,6 +131,7 @@ impl ImageAssemblyConfigBuilder {
             board_driver_arguments: None,
             configuration_capabilities: None,
             devicetree: None,
+            devicetree_overlay: None,
             developer_only_options: None,
             images_config: None,
         }
@@ -740,6 +745,14 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
+    pub fn add_devicetree_overlay(&mut self, devicetree_overlay_path: &Utf8Path) -> Result<()> {
+        if self.devicetree_overlay.is_some() {
+            bail!("duplicate devicetree binary overlay");
+        }
+        self.devicetree_overlay = Some(devicetree_overlay_path.into());
+        Ok(())
+    }
+
     pub fn set_images_config(&mut self, images_config: ImagesConfig) -> Result<()> {
         if self.images_config.is_some() {
             bail!("image_config has already been set.");
@@ -804,6 +817,7 @@ impl ImageAssemblyConfigBuilder {
             board_driver_arguments,
             configuration_capabilities,
             devicetree,
+            devicetree_overlay,
             developer_only_options: _,
             images_config,
         } = self;
@@ -1039,6 +1053,7 @@ impl ImageAssemblyConfigBuilder {
             board_name,
             board_driver_arguments,
             devicetree,
+            devicetree_overlay,
             image_mode,
         };
 

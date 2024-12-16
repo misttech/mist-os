@@ -58,6 +58,8 @@ def main():
     # Copy the devicetree
     if "devicetree" in config:
         copy_artifacts(config, "devicetree", "devicetree")
+    if "devicetree_overlay" in config:
+        copy_artifacts(config, "devicetree_overlay", "devicetree")
 
     # Copy the vbmeta
     if "filesystems" in config and "vbmeta" in config["filesystems"]:

@@ -105,6 +105,10 @@ def _fuchsia_board_configuration_impl(ctx):
         board_files.append(ctx.file.devicetree)
         board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
 
+    if ctx.attr.devicetree_overlay:
+        board_files.append(ctx.file.devicetree_overlay)
+        board_config["devicetree_overlay"] = board_config_relative_to_root + ctx.file.devicetree_overlay.path
+
     args = []
     if ctx.attr.post_processing_script:
         script = ctx.attr.post_processing_script[FuchsiaPostProcessingScriptInfo]
@@ -196,6 +200,10 @@ _fuchsia_board_configuration = rule(
         ),
         "devicetree": attr.label(
             doc = "Devicetree binary (.dtb) file",
+            allow_single_file = True,
+        ),
+        "devicetree_overlay": attr.label(
+            doc = "Devicetree binary overlay (.dtbo) file",
             allow_single_file = True,
         ),
         "post_processing_script": attr.label(
