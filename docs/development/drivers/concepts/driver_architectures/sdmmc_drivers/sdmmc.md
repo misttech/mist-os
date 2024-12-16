@@ -15,7 +15,7 @@ used on all platforms.
 Bringing up an SoC with a new SDMMC controller requires writing a new platform
 driver. If the controller implements the SDHCI specification then this driver
 should implement
-[fuchsia.hardware.sdhci](/sdk/banjo/fuchsia.hardware.sdhci/sdhci.fidl), otherwise it
+[fuchsia.hardware.sdhci](/sdk/fidl/fuchsia.hardware.sdhci/sdhci.fidl), otherwise it
 should implement
 [fuchsia.hardware.sdmmc](/sdk/banjo/fuchsia.hardware.sdmmc/sdmmc.fidl). It may be
 helpful to disable DMA and higher speed modes through `SdmmcHostInfo` and
