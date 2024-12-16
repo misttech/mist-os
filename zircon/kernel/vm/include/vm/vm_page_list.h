@@ -232,8 +232,8 @@ class VmPageOrMarker {
                                      kDirtyStateShift);
     }
     void SetDirtyState(DirtyState state) {
-      // Only allow dirty zero ranges for now.
-      DEBUG_ASSERT(state == DirtyState::Dirty);
+      // Only allow dirty and untracked zero ranges for now.
+      DEBUG_ASSERT(state == DirtyState::Dirty || state == DirtyState::Untracked);
       // Clear the old state.
       value_ &= ~(BIT_MASK(kDirtyStateBits) << kDirtyStateShift);
       // Set the new state.
@@ -284,6 +284,11 @@ class VmPageOrMarker {
     DEBUG_ASSERT(IsIntervalZero());
     return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
            ZeroRange::DirtyState::Dirty;
+  }
+  bool IsZeroIntervalUntracked() const {
+    DEBUG_ASSERT(IsIntervalZero());
+    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+           ZeroRange::DirtyState::Untracked;
   }
   ZeroRange::DirtyState GetZeroIntervalDirtyState() const {
     DEBUG_ASSERT(IsIntervalZero());

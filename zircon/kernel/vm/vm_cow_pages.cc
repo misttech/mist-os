@@ -5337,9 +5337,9 @@ zx_status_t VmCowPages::EnumerateDirtyRangesLocked(uint64_t offset, uint64_t len
         }
         // Enumerate any dirty zero intervals.
         if (p->IsIntervalZero()) {
-          // For now we only support dirty intervals.
+          // For now we do not support clean intervals.
           DEBUG_ASSERT(!p->IsZeroIntervalClean());
-          return !p->IsZeroIntervalClean();
+          return p->IsZeroIntervalDirty();
         }
         // Pager-backed VMOs cannot have compressed references, so the only other type is a marker.
         DEBUG_ASSERT(p->IsMarker());
@@ -5353,7 +5353,7 @@ zx_status_t VmCowPages::EnumerateDirtyRangesLocked(uint64_t offset, uint64_t len
           DEBUG_ASSERT(!page->is_loaned());
           DEBUG_ASSERT(page->object.get_page_offset() == off);
         } else if (p->IsIntervalZero()) {
-          DEBUG_ASSERT(!p->IsZeroIntervalClean());
+          DEBUG_ASSERT(p->IsZeroIntervalDirty());
         }
         return ZX_ERR_NEXT;
       },
@@ -5436,9 +5436,13 @@ zx_status_t VmCowPages::WritebackBeginLocked(uint64_t offset, uint64_t len, bool
           UpdateDirtyStateLocked(p->Page(), off, DirtyState::AwaitingClean);
           return ZX_ERR_NEXT;
         }
+        // Transition dirty zero intervals to AwaitingClean.
         if (p->IsIntervalZero()) {
-          // Transition zero intervals to AwaitingClean.
-          DEBUG_ASSERT(p->IsZeroIntervalDirty());
+          if (!p->IsZeroIntervalDirty()) {
+            // The only other state we support is Untracked.
+            DEBUG_ASSERT(p->IsZeroIntervalUntracked());
+            return ZX_ERR_NEXT;
+          }
           if (p->IsIntervalStart() || p->IsIntervalSlot()) {
             // Start tracking a dirty interval. It will only transition once the end is encountered.
             DEBUG_ASSERT(!interval_start);
@@ -5542,9 +5546,13 @@ zx_status_t VmCowPages::WritebackEndLocked(uint64_t offset, uint64_t len) {
           UpdateDirtyStateLocked(p->Page(), off, DirtyState::Clean);
           return ZX_ERR_NEXT;
         }
+        // Handle zero intervals.
         if (p->IsIntervalZero()) {
-          // Handle zero intervals.
-          DEBUG_ASSERT(p->IsZeroIntervalDirty());
+          if (!p->IsZeroIntervalDirty()) {
+            // The only other state we support is Untracked.
+            DEBUG_ASSERT(p->IsZeroIntervalUntracked());
+            return ZX_ERR_NEXT;
+          }
           if (p->IsIntervalStart() || p->IsIntervalSlot()) {
             DEBUG_ASSERT(!interval_start);
             // Start tracking an interval.
@@ -5680,7 +5688,7 @@ void VmCowPages::DetachSourceLocked() {
         // Zero intervals are dirty so they cannot be removed.
         if (p->IsIntervalZero()) {
           // TODO: Remove clean intervals once they are supported.
-          DEBUG_ASSERT(p->IsZeroIntervalDirty());
+          DEBUG_ASSERT(!p->IsZeroIntervalClean());
           return ZX_ERR_NEXT;
         }
 
@@ -6535,7 +6543,7 @@ bool VmCowPages::DebugValidateZeroIntervalsLocked() const {
 
         if (p->IsInterval()) {
           DEBUG_ASSERT(p->IsIntervalZero());
-          DEBUG_ASSERT(p->IsZeroIntervalDirty());
+          DEBUG_ASSERT(p->IsZeroIntervalDirty() || p->IsZeroIntervalUntracked());
           if (p->IsIntervalStart()) {
             if (in_interval) {
               dprintf(INFO, "interval start at 0x%" PRIx64 " while already in interval\n", off);
