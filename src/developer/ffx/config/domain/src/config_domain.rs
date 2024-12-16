@@ -9,17 +9,17 @@ use std::process::Command;
 
 use camino::{Utf8Path, Utf8PathBuf};
 
-use crate::fuchsia_env::{ConfigMap, FuchsiaEnv, ParseError};
-use crate::{ConfigPath, FileStates};
+use crate::file_states::FileStates;
+use crate::fuchsia_env::{ConfigMap, ConfigPath, FuchsiaEnv, ParseError};
 
-pub const FILE_STEM: &str = "fuchsia_env";
-pub const TOML_FILE_EXTENSION: &str = "toml";
-pub const JSON5_FILE_EXTENSION: &str = "json5";
-pub const FILE_EXTENSIONS: &[&str] = &[TOML_FILE_EXTENSION, JSON5_FILE_EXTENSION];
+const FILE_STEM: &str = "fuchsia_env";
+const TOML_FILE_EXTENSION: &str = "toml";
+const JSON5_FILE_EXTENSION: &str = "json5";
+const FILE_EXTENSIONS: &[&str] = &[TOML_FILE_EXTENSION, JSON5_FILE_EXTENSION];
 
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
-pub enum LoadError {
+enum LoadError {
     #[error("Multiple candidate files were present (also found `{0}`), remove one of them to resolve the ambiguity")]
     MultipleFiles(Utf8PathBuf),
     #[error(transparent)]
@@ -267,7 +267,7 @@ impl ConfigDomain {
 
     /// The path relative to the project root where the version check manifest
     /// file is stored
-    pub fn sdk_check_manifest_path(&self) -> Utf8PathBuf {
+    fn sdk_check_manifest_path(&self) -> Utf8PathBuf {
         self.root.join(Self::FUCHSIA_PROJECT_DATA).join(Self::VERSION_CHECK_MANIFEST)
     }
 
