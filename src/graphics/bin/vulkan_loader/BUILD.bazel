@@ -9,4 +9,7 @@ package(default_visibility = ["//visibility:public"])
 fuchsia_prebuilt_package(
     name = "vulkan_loader",
     archive = "@gn_targets//src/graphics/bin/vulkan_loader:vulkan_loader",
+    drivers = [
+        "meta/vulkan_loader.cm",
+    ],
 )
