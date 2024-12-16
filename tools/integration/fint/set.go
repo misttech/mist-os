@@ -183,43 +183,33 @@ func runGen(
 		return "", fmt.Errorf("failed to write args.gn: %w", err)
 	}
 
-	genCmd := []string{
-		gn,
-		"gen",
+	regenCmd := []string{
+		filepath.Join(contextSpec.CheckoutDir, "build", "regenerator"),
+		"--fuchsia-dir",
+		contextSpec.CheckoutDir,
+		"--fuchsia-build-dir",
 		contextSpec.BuildDir,
-		fmt.Sprintf("--root=%s", contextSpec.CheckoutDir),
-		"--check=system",
-		"--fail-on-unused-args",
-		// If --ninja-executable is set, GN runs `ninja -t restat build.ninja`
-		// after generating the ninja files, updating the cached modified
-		// timestamps of files. This avoids extra regens when running ninja
-		// repeatedly under some circumstances.
-		fmt.Sprintf("--ninja-executable=%s", thirdPartyPrebuilt(contextSpec.CheckoutDir, platform, "ninja")),
 	}
-
 	if isatty.IsTerminal() {
-		genCmd = append(genCmd, "--color")
+		regenCmd = append(regenCmd, "--color")
 	}
 	if gnTracePath != "" {
-		genCmd = append(genCmd, fmt.Sprintf("--tracelog=%s", gnTracePath))
+		regenCmd = append(regenCmd, fmt.Sprintf("--gn-tracelog=%s", gnTracePath))
 	}
 	if staticSpec.ExportRustProject {
-		genCmd = append(genCmd, "--export-rust-project")
+		regenCmd = append(regenCmd, "--export-rust-project")
 	}
 	for _, f := range staticSpec.IdeFiles {
-		genCmd = append(genCmd, fmt.Sprintf("--ide=%s", f))
+		regenCmd = append(regenCmd, fmt.Sprintf("--gn-ide=%s", f))
 	}
 	for _, s := range staticSpec.JsonIdeScripts {
-		genCmd = append(genCmd, fmt.Sprintf("--json-ide-script=%s", s))
+		regenCmd = append(regenCmd, fmt.Sprintf("--gn-json-ide-script=%s", s))
 	}
-
-	// Always generate the ninja_outputs.json file used by //build/api/client
-	genCmd = append(genCmd, "--ninja-outputs-file=ninja_outputs.json")
 
 	// When `gn gen` fails, it outputs a brief helpful error message to stdout.
 	var stdoutBuf bytes.Buffer
-	if err := runner.Run(ctx, genCmd, subprocess.RunOptions{Stdout: io.MultiWriter(&stdoutBuf, os.Stdout)}); err != nil {
-		return stdoutBuf.String(), fmt.Errorf("error running gn gen: %w", err)
+	if err := runner.Run(ctx, regenCmd, subprocess.RunOptions{Stdout: io.MultiWriter(&stdoutBuf, os.Stdout)}); err != nil {
+		return stdoutBuf.String(), fmt.Errorf("error running %q: %w", regenCmd[0], err)
 	}
 	return stdoutBuf.String(), nil
 }

@@ -50,6 +50,24 @@ def main() -> int:
         help="Only create convenience symlinks, do not regenerate build plan.",
     )
     parser.add_argument(
+        "--color", action="store_true", help="Force colored output."
+    )
+    parser.add_argument(
+        "--gn-tracelog", type=Path, help="Path to GN --tracelog output file."
+    )
+    parser.add_argument(
+        "--gn-ide",
+        action="append",
+        default=[],
+        help="Pass value to GN --ide option.",
+    )
+    parser.add_argument(
+        "--gn-json-ide-script",
+        action="append",
+        default=[],
+        help="Pass value to GN --json-ide-script option.",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="count",
@@ -72,7 +90,7 @@ def main() -> int:
         args: T.Sequence[str], **kwd: T.Any
     ) -> "subprocess.CompletedProcess[str]":
         if verbose >= 2:
-            log("CMD: %s" % " ".join(shlex.quote(a) for a in args))
+            log("CMD: %s" % " ".join(shlex.quote(str(a)) for a in args))
         return subprocess.run(args, text=True, **kwd)
 
     if not args.fuchsia_build_dir:
@@ -102,13 +120,24 @@ def main() -> int:
         gn_cmd_args = [
             prebuilt_gn_subpath,
             "args" if args.update_args else "gen",
+            os.path.relpath(build_dir, fuchsia_dir),
             "--fail-on-unused-args",
             "--check=system",
             "--export-rust-project",
             f"--ninja-executable={fuchsia_dir}/{prebuilt_ninja_subpath}",
             "--ninja-outputs-file=ninja_outputs.json",
-            os.path.relpath(build_dir, fuchsia_dir),
         ]
+        if args.color:
+            gn_cmd_args += ["--color"]
+
+        if args.gn_tracelog:
+            gn_cmd_args += [f"--tracelog={args.gn_tracelog}"]
+
+        for gn_ide in args.gn_ide:
+            gn_cmd_args += [f"--ide={gn_ide}"]
+
+        for gn_json_ide_script in args.gn_json_ide_script:
+            gn_cmd_args += [f"--json-ide-script={gn_json_ide_script}"]
 
         log("Running gn gen to rebuild Ninja manifest...")
         ret = run_cmd(gn_cmd_args, cwd=args.fuchsia_dir)
@@ -142,7 +171,7 @@ def main() -> int:
             f"--host-tag={args.host_tag}",
         ]
         regenerator_command = " ".join(
-            shlex.quote(a) for a in regenerator_command_args
+            shlex.quote(str(a)) for a in regenerator_command_args
         )
 
         pos2 = build_ninja.find("\n", pos + 16)
