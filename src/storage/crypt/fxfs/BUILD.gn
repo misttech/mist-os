@@ -60,6 +60,10 @@ fuchsia_package("package") {
   deps = [ ":fxfs-crypt" ]
 }
 
+group("fxfs") {
+  public_deps = [ ":fxfs-crypt" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":fxfs-crypt-tests" ]

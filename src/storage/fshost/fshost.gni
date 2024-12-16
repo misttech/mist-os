@@ -103,8 +103,8 @@ template("fshost_cml") {
 
       if (options.data_filesystem_format == "fxfs") {
         deps += [
+          "//src/storage/crypt/fxfs",
           "//src/storage/fxfs:fxfs_component",
-          "//src/storage/fxfs-crypt",
         ]
       } else if (options.data_filesystem_format == "f2fs") {
         deps += [ "//src/storage/f2fs/bin:f2fs-component" ]

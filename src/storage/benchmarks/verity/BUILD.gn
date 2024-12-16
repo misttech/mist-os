@@ -89,8 +89,8 @@ fuchsia_test_package("verity-benchmarks") {
     ":setup_verity",
     ":test_fxfs",
     "//src/starnix/containers/debian:container_resources",
+    "//src/storage/crypt/fxfs",
     "//src/storage/fxfs:fxfs_component",
-    "//src/storage/fxfs-crypt",
   ]
   subpackages = [
     "//src/starnix/kernel:starnix_kernel_package",

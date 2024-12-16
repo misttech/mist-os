@@ -2939,7 +2939,7 @@ assembly_input_bundle("fshost_storage_host_fxfs") {
   bootfs_packages = [
     "//src/storage/gpt/component:package",
     "//src/storage/fxfs:package",
-    "//src/storage/fxfs-crypt:package",
+    "//src/storage/crypt/fxfs:package",
   ]
 }
 
@@ -3036,7 +3036,7 @@ assembly_input_bundle("fshost_fxfs") {
   memory_buckets = [ "//src/developer/memory/buckets/fxfs_buckets.json5" ]
   bootfs_packages = [
     "//src/storage/fxfs:package",
-    "//src/storage/fxfs-crypt:package",
+    "//src/storage/crypt/fxfs:package",
   ]
 }
 
@@ -3092,7 +3092,7 @@ assembly_input_bundle("fshost_fvm_fxfs") {
   memory_buckets = [ "//src/developer/memory/buckets/fxfs_buckets.json5" ]
   bootfs_packages = [
     "//src/storage/fxfs:package",
-    "//src/storage/fxfs-crypt:package",
+    "//src/storage/crypt/fxfs:package",
   ]
 }
 
@@ -3158,7 +3158,7 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
   ]
   bootfs_packages = [
     "//src/storage/fxfs:package",
-    "//src/storage/fxfs-crypt:package",
+    "//src/storage/crypt/fxfs:package",
     "//src/storage/minfs/bin:package",
   ]
 }

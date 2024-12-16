@@ -34,6 +34,6 @@ fuchsia_package("test-fxfs-package") {
   package_name = "test-fxfs"
   deps = [
     ":test-fxfs",
-    "//src/storage/fxfs-crypt",
+    "//src/storage/crypt/fxfs",
   ]
 }

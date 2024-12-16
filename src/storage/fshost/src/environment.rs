@@ -8,7 +8,6 @@ mod fxfs_container;
 use crate::copier::recursive_copy;
 use crate::crypt::fxfs::{self, CryptService};
 use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
-use crate::crypt::{get_policy, Policy};
 use crate::device::constants::{
     BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, DATA_PARTITION_LABEL, DATA_TYPE_GUID,
     DATA_VOLUME_LABEL, DEFAULT_F2FS_MIN_BYTES, FVM_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL,
@@ -19,6 +18,7 @@ use crate::inspect::register_migration_status;
 use crate::watcher::{DirSource, Watcher};
 use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
+use crypt_policy::{get_policy, Policy};
 use device_watcher::{recursive_wait, recursive_wait_and_open};
 use fidl::endpoints::{create_proxy, ServerEnd, ServiceMarker as _};
 use fidl_fuchsia_fs_startup::MountOptions;

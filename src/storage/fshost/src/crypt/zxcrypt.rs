@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{format_sources, get_policy, unseal_sources, KeyConsumer};
 use crate::device::Device;
 use anyhow::{anyhow, Context, Error};
 use async_trait::async_trait;
+use crypt_policy::{format_sources, get_policy, unseal_sources, KeyConsumer};
 use device_watcher::recursive_wait_and_open;
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_device::ControllerProxy;

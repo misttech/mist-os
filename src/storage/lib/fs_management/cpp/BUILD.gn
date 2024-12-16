@@ -140,8 +140,8 @@ fuchsia_component("fs-management-test-component") {
   manifest = "meta/fs_management_tests.cml"
   deps = [
     ":fs-management-test",
+    "//src/storage/crypt/fxfs",
     "//src/storage/fs_test:test_crypt_service",
-    "//src/storage/fxfs-crypt",
   ]
 }
 

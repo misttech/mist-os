@@ -55,11 +55,11 @@ impl Key {
         ensure!(zxcrypt_header.magic == ZXCRYPT_MAGIC, zx::Status::WRONG_TYPE);
         ensure!(zxcrypt_header.version == ZXCRYPT_VERSION, zx::Status::NOT_SUPPORTED);
 
-        // This is tightly coupled with the crypt server that runs in fshost.  It expects to receive
-        // the zxcrypt header (which includes the magic, guid and version) followed by the wrapped
-        // key.  The unwrapped key consists of 64 bytes for the XTS key which is made up of two 32
-        // bytes Aes256 keys, one for the data and one for the IV/tweak, followed by 16 bytes which
-        // make up the IV.
+        // This is tightly coupled with the implementation of Crypt in //src/storage/crypt/zxcrypt.
+        // It expects to receive the zxcrypt header (which includes the magic, guid and version)
+        // followed by the wrapped key.  The unwrapped key consists of 64 bytes for the XTS key
+        // which is made up of two 32 bytes Aes256 keys, one for the data and one for the IV/tweak,
+        // followed by 16 bytes which make up the IV.
         let wrapping_key_id_0 = [0; 16];
         let unwrapped_key = crypt
             .unwrap_key(&wrapping_key_id_0, 0, &data[..std::mem::size_of::<ZxcryptHeaderAndKey>()])
