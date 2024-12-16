@@ -162,7 +162,7 @@ component_manager.
 [glossary.driver host]: /docs/glossary#README.md#driver-host
 [glossary.fvm]: /docs/glossary#README.md#fuchsia-volume-manager
 [glossary.realm]: /docs/glossary#README.md#realm
-[glossary.session]: /docs/glossary#README.md#session
+[glossary.session]: /docs/glossary#README.md#session-component
 [glossary.outgoing-directory]: /docs/glossary/README.md#outgoing-directory
 [blobfs]: /docs/concepts/filesystems/blobfs.md
 [bootloader-and-kernel]: /docs/concepts/process/userboot.md#boot_loader_and_kernel_startup

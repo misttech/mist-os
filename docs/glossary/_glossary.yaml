@@ -1054,12 +1054,12 @@
   full_description: "A  <a href=\"/docs/glossary#fidl\">FIDL</a> protocol that organizes and
   presents graphical views. The presented views can be annotated with
   <a href=\"/docs/glossary#element-annotation\">element annotations</a> to communicate
-  presentation properties to the <code>GraphicalPresenter</code>. This protocol is used, for example,
-  when a <a href=\"/docs/glossary#session\">session component</a>
-  written in Rust wants to delegate presentation logic to a child
-  <a href=\"/docs/glossary#component\">component</a> written in Flutter, or when a session
-  component that manages the lifecycle of elements delegates the presentation of element views to a
-  child component that implements <code>GraphicalPresenter</code>."
+  presentation properties to the <code>GraphicalPresenter</code>. This protocol is used, for
+  example, when a <a href=\"/docs/glossary#window-manager\">window manager</a> accompanying a
+  <a href=\"/docs/glossary#session-component\">session component</a>  written in Rust wants to
+  delegate presentation logic to a child <a href=\"/docs/glossary#component\">component</a>
+  written in Flutter, or when a window manager delegates the presentation of element views launched
+  by the session component to a child component that implements <code>GraphicalPresenter</code>."
   see_also: ["<a href=\"https://fuchsia.dev/reference/fidl/fuchsia.element#GraphicalPresenter\"><code>fuchsia.element.GraphicalPresenter</code></a>"]
   related_guides: [""]
   area: ["General", "UI", "FIDL", "Component Framework", "Session", "Flutter"]
@@ -1974,9 +1974,11 @@
   hardware buttons, or those with only network I/O.
 
   Simple products may specify a session component with no children, while complex
-  products have many children of the session component."
+  products have many children of the session component, such as delegating graphical presentation
+  responsibility to an accompanying <a href=\"/docs/glossary#window-manager\">window manager</a>."
   see_also: ["<a href=\"/docs/glossary#component\">Component</a>"]
-  related_guides: [""]
+  related_guides: ["<a href=\"/docs/development/sessions/writing-a-hello-world-session.md\">Writing a \"Hello World\" session
+</a>"]
   area: ["Session", "Component Framework"]
 
 - term: "Session launcher"
@@ -2324,6 +2326,24 @@
   see_also: ["<a href=\"/docs/reference/kernel_objects/vm_object.md\">VMO overview</a>"]
   related_guides: [""]
   area: ["Zircon"]
+
+- term: "Window Manager"
+  short_description: "A component (or multiple components) that controls the placement and
+  appearance of windows supplied by applications."
+  full_description: "A component (or multiple components) that controls the placement and
+  appearance of windows supplied by applications. On some systems, this system is also responsible
+  for rendering UI (e.g. title bars). Because the Fuchsia platform may be used to implement a
+  variety of products with very different graphical and input capabilities, the distribution of
+  window manager responsibilities on Fuchsia may look very different than other operating systems
+  where the platform is more closely tied to a single user experience. A window manager typically
+  accompanies a <a href=\"/docs/glossary#session-component\">Session component</a> to present any
+  graphical interfaces presented by elements launched as a part of the session. A window manager
+  and a session together create a product experience."
+  see_also: [
+    "<a href=\"/docs/contribute/governance/rfcs/0189_window_management\">RFC-0189 - Window Management</a>"
+  ]
+  related_guides: [""]
+  area: ["Session", "UI"]
 
 - term: "Zircon"
   short_description: "Zircon is the
