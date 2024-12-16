@@ -1051,6 +1051,185 @@ vm_page_t* VmPageList::ReplacePageWithZeroInterval(uint64_t offset,
   return page;
 }
 
+zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_t old_end_offset,
+                                              uint64_t new_start_offset, uint64_t new_end_offset,
+                                              VmPageOrMarker::IntervalDirtyState new_dirty_state) {
+  DEBUG_ASSERT(old_start_offset == UINT64_MAX || IS_PAGE_ALIGNED(old_start_offset));
+  DEBUG_ASSERT(old_end_offset == UINT64_MAX || IS_PAGE_ALIGNED(old_end_offset));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(new_start_offset));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(new_end_offset));
+  // We only support dirty or untracked zero intervals.
+  DEBUG_ASSERT(new_dirty_state == VmPageOrMarker::IntervalDirtyState::Dirty ||
+               new_dirty_state == VmPageOrMarker::IntervalDirtyState::Untracked);
+
+  // Helper to look up a slot at an offset and return a mutable VmPageOrMarker*. Only finds an
+  // existing slot and does not perform any allocations.
+  auto lookup_slot = [this](uint64_t offset) -> VmPageOrMarker* {
+    const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
+    const size_t index = offset_to_node_index(offset, list_skew_);
+    auto pln = list_.find(node_offset);
+    if (!pln.IsValid()) {
+      return nullptr;
+    }
+    return &pln->Lookup(index);
+  };
+
+  VmPageOrMarker* old_start =
+      old_start_offset != UINT64_MAX ? lookup_slot(old_start_offset) : nullptr;
+  VmPageOrMarker* old_end = old_end_offset != UINT64_MAX ? lookup_slot(old_end_offset) : nullptr;
+  // We should have been able to find either the old start or end sentinel (or both).
+  DEBUG_ASSERT(old_start || old_end);
+  // If found, the old start and end sentinels are as expected.
+  DEBUG_ASSERT(!old_start || (old_start->IsIntervalZero() &&
+                              (old_start->IsIntervalStart() || old_start->IsIntervalSlot())));
+  DEBUG_ASSERT(!old_end || (old_end->IsIntervalZero() &&
+                            (old_end->IsIntervalEnd() || old_start->IsIntervalSlot())));
+
+  VmPageOrMarker* new_start = nullptr;
+  VmPageOrMarker* new_end = nullptr;
+  bool try_merge_left = false, try_merge_right = false;
+
+  // Now that we've performed the initial checks, do the actual changes. The rest of this function
+  // is structured such that any allocations for node slots are done before making any changes to
+  // the page list, so that we don't leave the list in an inconsistent state. Any unused empty slots
+  // should be returned so that they can be freed up.
+  if (old_start && old_end) {
+    // Overwriting existing slots.
+    DEBUG_ASSERT(old_start_offset == new_start_offset);
+    DEBUG_ASSERT(old_end_offset == new_end_offset);
+    // The new interval has a different dirty state.
+    DEBUG_ASSERT(new_dirty_state != old_start->GetZeroIntervalDirtyState());
+    DEBUG_ASSERT(old_start->GetZeroIntervalDirtyState() == old_end->GetZeroIntervalDirtyState());
+    new_start = old_start;
+    new_end = old_end;
+    // We have a new dirty state, so we can try merging the new interval both to the left and the
+    // right.
+    try_merge_left = true;
+    try_merge_right = true;
+  } else if (old_start) {
+    // We need to clip at the start.
+    DEBUG_ASSERT(old_start_offset == new_start_offset);
+    // The new interval has a different dirty state.
+    DEBUG_ASSERT(new_dirty_state != old_start->GetZeroIntervalDirtyState());
+    new_end = LookupOrAllocateInternal(new_end_offset);
+    if (!new_end) {
+      return ZX_ERR_NO_MEMORY;
+    }
+    DEBUG_ASSERT(new_start_offset == new_end_offset || new_end->IsEmpty());
+
+    VmPageOrMarker* clipped_start = LookupOrAllocateInternal(new_end_offset + PAGE_SIZE);
+    if (!clipped_start) {
+      if (new_start_offset != new_end_offset) {
+        ReturnEmptySlot(new_end_offset);
+      }
+      return ZX_ERR_NO_MEMORY;
+    }
+    if (clipped_start->IsIntervalEnd()) {
+      clipped_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    } else {
+      DEBUG_ASSERT(clipped_start->IsEmpty());
+      *clipped_start = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start,
+                                                    old_start->GetZeroIntervalDirtyState());
+    }
+
+    // Now that the clipped start has been created, carry over any remaining AwaitingCleanLength
+    // from the old start.
+    uint64_t old_len = old_start->GetZeroIntervalAwaitingCleanLength();
+    uint64_t len = new_end_offset + PAGE_SIZE - old_start_offset;
+    if (old_len > len) {
+      clipped_start->SetZeroIntervalAwaitingCleanLength(old_len - len);
+    }
+
+    new_start = old_start;
+    // We can try merging the new interval to the left since it has a different dirty state from the
+    // old interval.
+    try_merge_left = true;
+  } else {
+    // We need to clip at the end.
+    DEBUG_ASSERT(old_end_offset == new_end_offset);
+    // The new interval has a different dirty state.
+    DEBUG_ASSERT(new_dirty_state != old_end->GetZeroIntervalDirtyState());
+    new_start = LookupOrAllocateInternal(new_start_offset);
+    if (!new_start) {
+      return ZX_ERR_NO_MEMORY;
+    }
+    DEBUG_ASSERT(new_start_offset == new_end_offset || new_start->IsEmpty());
+
+    VmPageOrMarker* clipped_end = LookupOrAllocateInternal(new_start_offset - PAGE_SIZE);
+    if (!clipped_end) {
+      if (new_start_offset != new_end_offset) {
+        ReturnEmptySlot(new_start_offset);
+      }
+      return ZX_ERR_NO_MEMORY;
+    }
+    if (clipped_end->IsIntervalStart()) {
+      clipped_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+    } else {
+      DEBUG_ASSERT(clipped_end->IsEmpty());
+      *clipped_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End,
+                                                  old_end->GetZeroIntervalDirtyState());
+    }
+
+    new_end = old_end;
+    // We can try merging the new interval to the right since it has a different dirty state from
+    // the old interval.
+    try_merge_right = true;
+  }
+
+  if (new_start == new_end) {
+    *new_start =
+        VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Slot, new_dirty_state);
+  } else {
+    *new_start =
+        VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start, new_dirty_state);
+    *new_end = VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End, new_dirty_state);
+  }
+
+  if (try_merge_left) {
+    // See if we can merge left.
+    VmPageOrMarker* left = lookup_slot(new_start_offset - PAGE_SIZE);
+    if (left && left->IsIntervalZero() && left->GetZeroIntervalDirtyState() == new_dirty_state) {
+      if (left->IsIntervalSlot()) {
+        left->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Start);
+      } else {
+        DEBUG_ASSERT(left->IsIntervalEnd());
+        *left = VmPageOrMarker::Empty();
+        ReturnEmptySlot(new_start_offset - PAGE_SIZE);
+      }
+      if (new_start->IsIntervalSlot()) {
+        new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
+      } else {
+        DEBUG_ASSERT(new_start->IsIntervalStart());
+        *new_start = VmPageOrMarker::Empty();
+        ReturnEmptySlot(new_start_offset);
+      }
+    }
+  }
+
+  if (try_merge_right) {
+    // See if we can merge right.
+    VmPageOrMarker* right = lookup_slot(new_end_offset + PAGE_SIZE);
+    if (right && right->IsIntervalZero() && right->GetZeroIntervalDirtyState() == new_dirty_state) {
+      if (right->IsIntervalSlot()) {
+        right->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::End);
+      } else {
+        DEBUG_ASSERT(right->IsIntervalStart());
+        *right = VmPageOrMarker::Empty();
+        ReturnEmptySlot(new_end_offset + PAGE_SIZE);
+      }
+      if (new_end->IsIntervalSlot()) {
+        new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Start);
+      } else {
+        DEBUG_ASSERT(new_end->IsIntervalEnd());
+        *new_end = VmPageOrMarker::Empty();
+        ReturnEmptySlot(new_end_offset);
+      }
+    }
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t VmPageList::ClipIntervalStart(uint64_t interval_start, uint64_t len) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(interval_start));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len));

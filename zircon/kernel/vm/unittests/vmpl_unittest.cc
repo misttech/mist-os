@@ -2665,6 +2665,157 @@ static bool vmpl_interval_populate_slot_test() {
   END_TEST;
 }
 
+static bool vmpl_interval_overwrite_full_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t expected_start = 1, expected_end = 2 * VmPageListNode::kPageFanOut;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut;
+  ASSERT_GT(size, expected_end);
+  ASSERT_OK(list.AddZeroInterval(expected_start * PAGE_SIZE, (expected_end + 1) * PAGE_SIZE,
+                                 VmPageOrMarker::IntervalDirtyState::Dirty));
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size * PAGE_SIZE));
+
+  // Untracked interval overwrites old dirty interval.
+  ASSERT_OK(list.OverwriteZeroInterval(expected_start * PAGE_SIZE, expected_end * PAGE_SIZE,
+                                       expected_start * PAGE_SIZE, expected_end * PAGE_SIZE,
+                                       VmPageOrMarker::IntervalDirtyState::Untracked));
+
+  // Start and end remain the same but the dirty state changes.
+  zx_status_t status = list.ForEveryPageAndGapInRange(
+      [&](const VmPageOrMarker* p, uint64_t off) {
+        if (p->IsIntervalStart() && off == expected_start * PAGE_SIZE) {
+          if (!p->IsZeroIntervalUntracked()) {
+            return ZX_ERR_BAD_STATE;
+          }
+          return ZX_ERR_NEXT;
+        }
+        if (p->IsIntervalEnd() && off == expected_end * PAGE_SIZE) {
+          if (!p->IsZeroIntervalUntracked()) {
+            return ZX_ERR_BAD_STATE;
+          }
+          return ZX_ERR_NEXT;
+        }
+        return ZX_ERR_BAD_STATE;
+      },
+      [](uint64_t start, uint64_t end) { return ZX_ERR_BAD_STATE; }, expected_start * PAGE_SIZE,
+      (expected_end + 1) * PAGE_SIZE);
+  EXPECT_OK(status);
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
+static bool vmpl_interval_overwrite_start_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t old_start = 1, old_end = 2 * VmPageListNode::kPageFanOut;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut;
+  ASSERT_GT(size, old_end);
+  ASSERT_OK(list.AddZeroInterval(old_start * PAGE_SIZE, (old_end + 1) * PAGE_SIZE,
+                                 VmPageOrMarker::IntervalDirtyState::Untracked));
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size * PAGE_SIZE));
+
+  // Break off the start of the untracked interval into a new dirty interval.
+  constexpr uint64_t new_end = old_end - 5;
+  ASSERT_OK(list.OverwriteZeroInterval(old_start * PAGE_SIZE, UINT64_MAX, old_start * PAGE_SIZE,
+                                       new_end * PAGE_SIZE,
+                                       VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  constexpr uint64_t expected_intervals[4] = {old_start, new_end, new_end + 1, old_end};
+  constexpr VmPageOrMarker::IntervalDirtyState expected_state[4] = {
+      VmPageOrMarker::IntervalDirtyState::Dirty, VmPageOrMarker::IntervalDirtyState::Dirty,
+      VmPageOrMarker::IntervalDirtyState::Untracked, VmPageOrMarker::IntervalDirtyState::Untracked};
+  uint64_t intervals[4];
+  VmPageOrMarker::IntervalDirtyState interval_state[4];
+  size_t interval_index = 0;
+  zx_status_t status = list.ForEveryPageAndGapInRange(
+      [&](const VmPageOrMarker* p, uint64_t off) {
+        if (p->IsInterval()) {
+          if ((p->IsIntervalStart() && interval_index % 2 == 0) ||
+              (p->IsIntervalEnd() && interval_index % 2 == 1)) {
+            intervals[interval_index] = off / PAGE_SIZE;
+            interval_state[interval_index++] = p->GetZeroIntervalDirtyState();
+            return ZX_ERR_NEXT;
+          }
+        }
+        return ZX_ERR_BAD_STATE;
+      },
+      [](uint64_t start, uint64_t end) { return ZX_ERR_BAD_STATE; }, old_start * PAGE_SIZE,
+      (old_end + 1) * PAGE_SIZE);
+  EXPECT_OK(status);
+  EXPECT_EQ(4u, interval_index);
+  for (size_t i = 0; i < interval_index; i++) {
+    EXPECT_EQ(expected_intervals[i], intervals[i]);
+    EXPECT_EQ(expected_state[i], interval_state[i]);
+  }
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
+static bool vmpl_interval_overwrite_end_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Interval spanning across 3 nodes, with the middle one unpopulated.
+  constexpr uint64_t old_start = 1, old_end = 2 * VmPageListNode::kPageFanOut;
+  constexpr uint64_t size = 3 * VmPageListNode::kPageFanOut;
+  ASSERT_GT(size, old_end);
+  ASSERT_OK(list.AddZeroInterval(old_start * PAGE_SIZE, (old_end + 1) * PAGE_SIZE,
+                                 VmPageOrMarker::IntervalDirtyState::Untracked));
+  EXPECT_TRUE(list.AnyPagesOrIntervalsInRange(0, size * PAGE_SIZE));
+
+  // Break off the end of the untracked interval into a new dirty interval.
+  constexpr uint64_t new_start = old_start + 5;
+  ASSERT_OK(list.OverwriteZeroInterval(UINT64_MAX, old_end * PAGE_SIZE, new_start * PAGE_SIZE,
+                                       old_end * PAGE_SIZE,
+                                       VmPageOrMarker::IntervalDirtyState::Dirty));
+
+  constexpr uint64_t expected_intervals[4] = {old_start, new_start - 1, new_start, old_end};
+  constexpr VmPageOrMarker::IntervalDirtyState expected_state[4] = {
+      VmPageOrMarker::IntervalDirtyState::Untracked, VmPageOrMarker::IntervalDirtyState::Untracked,
+      VmPageOrMarker::IntervalDirtyState::Dirty, VmPageOrMarker::IntervalDirtyState::Dirty};
+  uint64_t intervals[4];
+  VmPageOrMarker::IntervalDirtyState interval_state[4];
+  size_t interval_index = 0;
+  zx_status_t status = list.ForEveryPageAndGapInRange(
+      [&](const VmPageOrMarker* p, uint64_t off) {
+        if (p->IsInterval()) {
+          if ((p->IsIntervalStart() && interval_index % 2 == 0) ||
+              (p->IsIntervalEnd() && interval_index % 2 == 1)) {
+            intervals[interval_index] = off / PAGE_SIZE;
+            interval_state[interval_index++] = p->GetZeroIntervalDirtyState();
+            return ZX_ERR_NEXT;
+          }
+        }
+        return ZX_ERR_BAD_STATE;
+      },
+      [](uint64_t start, uint64_t end) { return ZX_ERR_BAD_STATE; }, old_start * PAGE_SIZE,
+      (old_end + 1) * PAGE_SIZE);
+  EXPECT_OK(status);
+  EXPECT_EQ(4u, interval_index);
+  for (size_t i = 0; i < interval_index; i++) {
+    EXPECT_EQ(expected_intervals[i], intervals[i]);
+    EXPECT_EQ(expected_state[i], interval_state[i]);
+  }
+
+  list.RemoveAllContent([](VmPageOrMarker&&) {});
+
+  END_TEST;
+}
+
 static bool vmpl_interval_clip_start_test() {
   BEGIN_TEST;
 
@@ -3370,6 +3521,9 @@ VM_UNITTEST(vmpl_interval_populate_partial_test)
 VM_UNITTEST(vmpl_interval_populate_start_test)
 VM_UNITTEST(vmpl_interval_populate_end_test)
 VM_UNITTEST(vmpl_interval_populate_slot_test)
+VM_UNITTEST(vmpl_interval_overwrite_full_test)
+VM_UNITTEST(vmpl_interval_overwrite_start_test)
+VM_UNITTEST(vmpl_interval_overwrite_end_test)
 VM_UNITTEST(vmpl_interval_clip_start_test)
 VM_UNITTEST(vmpl_interval_clip_end_test)
 VM_UNITTEST(vmpl_awaiting_clean_split_test)

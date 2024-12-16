@@ -1153,6 +1153,29 @@ class VmPageList final {
   vm_page_t* ReplacePageWithZeroInterval(uint64_t offset,
                                          VmPageOrMarker::IntervalDirtyState dirty_state);
 
+  // Overwrite a zero interval either fully or partially with a new zero interval, breaking off the
+  // old interval into two if required. old_start_offset and old_end_offset specify the start and
+  // end sentinels of the old interval that is being overwritten; either one of these or both can be
+  // specified, with the other set to UINT64_MAX. The new zero interval that overwrites the old
+  // spans [new_start_offset, new_end_offset] with its state set to new_dirty_state.
+  //  - For full overwrites, both old_start_offset and old_end_offset must be provided, and should
+  //  be equal to new_start_offset and new_end_offset respectively. At the end of the call, the old
+  //  interval will have been completely replaced by the new one.
+  //  - For partial overwrites from the start, old_start_offset must be provided and be equal to
+  //  new_start_offset, and old_end_offset must be UINT64_MAX. At the end of this call, the start of
+  //  the old interval will have been overwritten by the new interval, with the remainder of the old
+  //  interval now starting at |new_end_offset + PAGE_SIZE|.
+  //  - For partial overwrites from the end, old_end_offset must be provided and be equal to
+  //  new_end_offset, and old_start_offset must be UINT64_MAX. At the end of this call, the end of
+  //  the old interval will have been overwritten by the new interval, with the remainder of the old
+  //  interval now ending at |new_start_offset - PAGE_SIZE|.
+  //  - Partial overwrites in the middle are not allowed. In other words, either old_start_offset
+  //  must be the same as new_start_offset, or old_end_offset must be the same as new_end_offset, or
+  //  both.
+  zx_status_t OverwriteZeroInterval(uint64_t old_start_offset, uint64_t old_end_offset,
+                                    uint64_t new_start_offset, uint64_t new_end_offset,
+                                    VmPageOrMarker::IntervalDirtyState new_dirty_state);
+
  private:
   // Returns true if the specified offset falls in a sparse page interval.
   bool IsOffsetInInterval(uint64_t offset) const;
