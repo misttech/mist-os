@@ -78,6 +78,11 @@ class TransformGraph {
   // previously a child of the parent transform. This function does not remove priority children.
   bool RemoveChild(TransformHandle parent, TransformHandle child);
 
+  // Removes all child edges from the parent transform, replacing them with transforms from
+  // new_children. The parent transform should be an unreleased transform created by calling
+  // CreateTransform() on this object, but this is only enforced by DCHECK.
+  bool ReplaceChildren(TransformHandle parent, const std::vector<TransformHandle>& new_children);
+
   // Removes all child edges from the parent transform. This function does not remove priority
   // children.
   void ClearChildren(TransformHandle parent);

@@ -450,5 +450,42 @@ TEST(TransformGraphTest, PriorityChildTrackedSeparately) {
   EXPECT_EQ(data.sorted_transforms[1].handle, priority_child);
 }
 
+TEST(TransformGraphTest, ReplaceChildren) {
+  TransformGraph graph;
+
+  static constexpr uint64_t kNumTransforms = 9;
+  auto transforms = CreateTransforms<kNumTransforms>(graph);
+
+  graph.AddChild(transforms[0], transforms[1]);
+  graph.AddChild(transforms[0], transforms[2]);
+
+  graph.AddChild(transforms[3], transforms[4]);
+  graph.AddChild(transforms[3], transforms[5]);
+
+  std::vector<TransformHandle> new_children = {transforms[6], transforms[7], transforms[8]};
+  EXPECT_TRUE(graph.ReplaceChildren(transforms[0], new_children));
+
+  // Calling ReplaceChildren() with non-unique children should return false and transform graph
+  // should remain unchanged.
+  std::vector<TransformHandle> duplicate_children = {transforms[1], transforms[1]};
+  EXPECT_FALSE(graph.ReplaceChildren(transforms[0], duplicate_children));
+
+  // AddChild operations expected to return false when child transform already present in parent.
+  EXPECT_FALSE(graph.AddChild(transforms[0], transforms[6]));
+  EXPECT_FALSE(graph.AddChild(transforms[0], transforms[7]));
+  EXPECT_FALSE(graph.AddChild(transforms[0], transforms[8]));
+
+  // AddChild operations expected to return true when successful and child transform was not
+  // already present in parent. We expect true because transforms[1] and transforms[2] should have
+  // been removed with the first `ReplaceChildren` operation.
+  EXPECT_TRUE(graph.AddChild(transforms[0], transforms[1]));
+  EXPECT_TRUE(graph.AddChild(transforms[0], transforms[2]));
+
+  // Expect no change on transforms[3] graph.
+  // AddChild operations expected to return false when child transform already present in parent.
+  EXPECT_FALSE(graph.AddChild(transforms[3], transforms[4]));
+  EXPECT_FALSE(graph.AddChild(transforms[3], transforms[5]));
+}
+
 }  // namespace test
 }  // namespace flatland
