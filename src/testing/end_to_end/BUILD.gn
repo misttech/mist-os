@@ -63,7 +63,8 @@ group_with_no_dir_target_deps("core_x64_stable_tests") {
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    # TODO(https://fxbug.dev/384233293): This test caused buildbot infra errors. Fix the flaky test.
+    # "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
