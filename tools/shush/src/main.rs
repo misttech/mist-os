@@ -27,6 +27,8 @@ use std::process::Command;
 use crate::api::Api;
 
 const DEFAULT_ROLLOUT_PATH: &str = "./rollout.json";
+const DEFAULT_MAX_CC_USERS: usize = 3;
+const DEFAULT_HOLDING_COMPONENT: &str = "LanguagePlatforms>Rust";
 
 #[derive(Debug, FromArgs)]
 /// Silence rustc and clippy lints with allow attributes and autofixes
@@ -150,6 +152,9 @@ fn filter_from_str(s: &str) -> Result<Filter, String> {
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "allow")]
 struct Allow {
+    /// a reason to provide for allows as an alternative to filing issues
+    #[argh(option)]
+    reason: Option<String>,
     /// the ref to link to on codesearch
     #[argh(option)]
     codesearch_ref: Option<String>,
@@ -160,8 +165,8 @@ struct Allow {
     #[argh(option)]
     blocking_issue: Option<String>,
     /// the maximum number of additional users to CC on created issues
-    #[argh(option, default = "3")]
-    max_cc_users: usize,
+    #[argh(option)]
+    max_cc_users: Option<usize>,
     /// the holding component to place newly-created bugs into (default "LanguagePlatforms>Rust")
     #[argh(option)]
     holding_component: Option<String>,
@@ -227,35 +232,70 @@ fn main() -> Result<()> {
                     lint_args.dryrun,
                 ),
                 LintAction::Allow(ref allow_args) => {
-                    let mut api = args.api()?;
-                    let mut issue_template = issues::IssueTemplate::new(
-                        &lint_args.lint,
-                        allow_args.codesearch_ref.as_deref(),
-                        allow_args.load_template()?,
-                        allow_args.blocking_issue.as_deref(),
-                        allow_args.max_cc_users,
-                    );
+                    let followup = if let Some(reason) = &allow_args.reason {
+                        anyhow::ensure!(
+                            allow_args.codesearch_ref.is_none(),
+                            "can't specify an allow reason and a codesearch ref"
+                        );
+                        anyhow::ensure!(
+                            allow_args.template.is_none(),
+                            "can't specify an allow reason and a template"
+                        );
+                        anyhow::ensure!(
+                            allow_args.blocking_issue.is_none(),
+                            "can't specify an allow reason and a blocking issue"
+                        );
+                        anyhow::ensure!(
+                            allow_args.blocking_issue.is_none(),
+                            "can't specify an allow reason and a blocking issue"
+                        );
+                        anyhow::ensure!(
+                            allow_args.max_cc_users.is_none(),
+                            "can't specify an allow reason and max cc users"
+                        );
+                        anyhow::ensure!(
+                            allow_args.holding_component.is_none(),
+                            "can't specify an allow reason and a holding component"
+                        );
+                        anyhow::ensure!(
+                            allow_args.rollout.is_none(),
+                            "can't specify an allow reason and a rollout path"
+                        );
+                        allow::AllowFollowup::Reason(reason.clone())
+                    } else {
+                        let issue_template = issues::IssueTemplate::new(
+                            &lint_args.lint,
+                            allow_args.codesearch_ref.as_deref(),
+                            allow_args.load_template()?,
+                            allow_args.blocking_issue.as_deref(),
+                            allow_args.max_cc_users.unwrap_or(DEFAULT_MAX_CC_USERS),
+                        );
 
-                    let rollout_path = allow_args.rollout_path();
-                    if rollout_path.exists() {
-                        return Err(anyhow!(
-                            "The rollout path {} already exists, delete it or specify an alternate path.",
-                            rollout_path.to_str().unwrap_or("<non-utf8 path>"),
-                        ));
-                    }
+                        let rollout_path = allow_args.rollout_path();
+                        if rollout_path.exists() {
+                            return Err(anyhow!(
+                                "The rollout path {} already exists, delete it or specify an alternate path.",
+                                rollout_path.to_str().unwrap_or("<non-utf8 path>"),
+                            ));
+                        }
+
+                        allow::AllowFollowup::FileIssues {
+                            api: args.api()?,
+                            issue_template,
+                            rollout_path,
+                            holding_component_name: allow_args
+                                .holding_component
+                                .as_ref()
+                                .map(String::as_str)
+                                .unwrap_or(DEFAULT_HOLDING_COMPONENT),
+                        }
+                    };
 
                     allow::allow(
                         &mut lint_args.read_lints(),
                         lint_args.try_get_filter()?,
                         &lint_args.change_to_fuchsia_root()?,
-                        &mut *api,
-                        &mut issue_template,
-                        rollout_path,
-                        allow_args
-                            .holding_component
-                            .as_ref()
-                            .map(String::as_str)
-                            .unwrap_or("LanguagePlatforms>Rust"),
+                        followup,
                         lint_args.dryrun,
                         args.verbose,
                     )

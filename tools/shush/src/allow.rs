@@ -18,14 +18,21 @@ use crate::lint::{filter_lints, Lint, LintFile};
 use crate::owners::FileOwnership;
 use crate::span::Span;
 
+pub enum AllowFollowup<'a> {
+    Reason(String),
+    FileIssues {
+        api: Box<dyn Api>,
+        issue_template: IssueTemplate<'a>,
+        rollout_path: &'a Path,
+        holding_component_name: &'a str,
+    },
+}
+
 pub fn allow(
     lints: &mut impl BufRead,
     filter: &[String],
     fuchsia_dir: &Path,
-    api: &mut (impl Api + ?Sized),
-    issue_template: &mut IssueTemplate<'_>,
-    rollout_path: &Path,
-    holding_component_name: &str,
+    mut followup: AllowFollowup<'_>,
     dryrun: bool,
     verbose: bool,
 ) -> Result<()> {
@@ -47,19 +54,27 @@ pub fn allow(
         }
 
         if !public_files.is_empty() {
-            let issue = issue_template.create(
-                api,
-                ownership,
-                &public_files,
-                holding_component_name,
-                verbose,
-            )?;
-            let bug_link = format!("https://fxbug.dev/{}", issue.id);
-            created_issues.push(issue);
+            let metadata = match &mut followup {
+                AllowFollowup::Reason(r) => InsertionMetadata::Reason(r.clone()),
+                AllowFollowup::FileIssues {
+                    api, issue_template, holding_component_name, ..
+                } => {
+                    let issue = issue_template.create(
+                        &mut **api,
+                        ownership,
+                        &public_files,
+                        holding_component_name,
+                        verbose,
+                    )?;
+                    let bug_link = format!("https://fxbug.dev/{}", issue.id);
+                    created_issues.push(issue);
+                    InsertionMetadata::BugUrl(bug_link)
+                }
+            };
 
             if !dryrun {
                 for public_file in public_files.iter() {
-                    match insert_allows(&public_file.path, &public_file.lints, &bug_link) {
+                    match insert_allows(&public_file.path, &public_file.lints, &metadata) {
                         Ok(ins) => ins,
                         Err(e) => {
                             eprintln!("Failed to annotate {}: {:?}", public_file.path, e);
@@ -88,7 +103,9 @@ pub fn allow(
         }
     }
 
-    fs::write(rollout_path, serde_json::to_string(&created_issues)?)?;
+    if let AllowFollowup::FileIssues { rollout_path, .. } = followup {
+        fs::write(rollout_path, serde_json::to_string(&created_issues)?)?;
+    }
 
     Ok(())
 }
@@ -166,10 +183,10 @@ impl<'ast> Visit<'ast> for Finder {
     }
 }
 
-fn insert_allows(filename: &str, lints: &[Lint], bug_link: &str) -> Result<()> {
+fn insert_allows(filename: &str, lints: &[Lint], metadata: &InsertionMetadata) -> Result<()> {
     let src = fs::read_to_string(filename)?;
     let insertions = calculate_insertions(&src, lints)?;
-    fs::write(filename, apply_insertions(&src, insertions, bug_link))?;
+    fs::write(filename, apply_insertions(&src, insertions, metadata))?;
     Ok(())
 }
 
@@ -186,10 +203,15 @@ fn calculate_insertions(src: &str, lints: &[Lint]) -> Result<BTreeMap<usize, Has
     Ok(inserts)
 }
 
+enum InsertionMetadata {
+    Reason(String),
+    BugUrl(String),
+}
+
 fn apply_insertions(
     src: &str,
     insertions: BTreeMap<usize, HashSet<String>>,
-    bug_link: &str,
+    metadata: &InsertionMetadata,
 ) -> String {
     let ends_with_newline = src.ends_with('\n');
     let mut lines: Vec<Cow<'_, str>> = src.lines().map(Cow::from).collect();
@@ -204,11 +226,12 @@ fn apply_insertions(
             [0..to_annotate.find(|c: char| !c.is_whitespace()).unwrap_or(to_annotate.len())];
         let mut lints_for_line: Vec<String> = lints.into_iter().collect();
         lints_for_line.sort();
-        lines.insert(
-            line - 1,
-            format!("{}#[allow({})] // TODO({})", indent, lints_for_line.join(", "), bug_link)
-                .into(),
-        );
+        let lints_joined = lints_for_line.join(", ");
+        let text = match &metadata {
+            InsertionMetadata::Reason(r) => format!("#[allow({lints_joined}, reason = \"{r}\")]"),
+            InsertionMetadata::BugUrl(u) => format!("#[allow({lints_joined})] // TODO({u})"),
+        };
+        lines.insert(line - 1, format!("{indent}{text}").into());
     }
     lines.join("\n") + if ends_with_newline { "\n" } else { "" }
 }
@@ -255,10 +278,27 @@ trait Foo {
         let insertions =
             calculate_insertions(BASIC, &[lint(name.clone(), (3, 5), (3, 6))]).unwrap();
         assert_eq!(
-            apply_insertions(BASIC, insertions, "INSERT_LINT_BUG"),
+            apply_insertions(
+                BASIC,
+                insertions.clone(),
+                &InsertionMetadata::BugUrl("INSERT_LINT_BUG".to_string())
+            ),
             "
 fn main() {
     #[allow(LINTNAME)] // TODO(INSERT_LINT_BUG)
+    let x = 1;
+    let y = 2;
+}"
+        );
+        assert_eq!(
+            apply_insertions(
+                BASIC,
+                insertions,
+                &InsertionMetadata::Reason("INSERT_REASON".to_string())
+            ),
+            "
+fn main() {
+    #[allow(LINTNAME, reason = \"INSERT_REASON\")]
     let x = 1;
     let y = 2;
 }"
@@ -276,10 +316,27 @@ fn main() {
         )
         .unwrap();
         assert_eq!(
-            apply_insertions(BASIC, insertions, "INSERT_LINT_BUG"),
+            apply_insertions(
+                BASIC,
+                insertions.clone(),
+                &InsertionMetadata::BugUrl("INSERT_LINT_BUG".to_string())
+            ),
             "
 fn main() {
     #[allow(LINTNAME, OTHERNAME)] // TODO(INSERT_LINT_BUG)
+    let x = 1;
+    let y = 2;
+}"
+        );
+        assert_eq!(
+            apply_insertions(
+                BASIC,
+                insertions,
+                &InsertionMetadata::Reason("INSERT_REASON".to_string())
+            ),
+            "
+fn main() {
+    #[allow(LINTNAME, OTHERNAME, reason = \"INSERT_REASON\")]
     let x = 1;
     let y = 2;
 }"
@@ -292,9 +349,26 @@ fn main() {
         let insertions =
             calculate_insertions(BASIC, &[lint(name.clone(), (2, 4), (3, 6))]).unwrap();
         assert_eq!(
-            apply_insertions(BASIC, insertions, "INSERT_LINT_BUG"),
+            apply_insertions(
+                BASIC,
+                insertions.clone(),
+                &InsertionMetadata::BugUrl("INSERT_LINT_BUG".to_string())
+            ),
             "
 #[allow(LINTNAME)] // TODO(INSERT_LINT_BUG)
+fn main() {
+    let x = 1;
+    let y = 2;
+}"
+        );
+        assert_eq!(
+            apply_insertions(
+                BASIC,
+                insertions,
+                &InsertionMetadata::Reason("INSERT_REASON".to_string())
+            ),
+            "
+#[allow(LINTNAME, reason = \"INSERT_REASON\")]
 fn main() {
     let x = 1;
     let y = 2;
@@ -308,8 +382,26 @@ fn main() {
         let insertions =
             calculate_insertions(NESTED, &[lint(name.clone(), (10, 21), (10, 30))]).unwrap();
         assert_eq!(
-            apply_insertions(NESTED, insertions, "INSERT_LINT_BUG").lines().nth(9).unwrap(),
+            apply_insertions(
+                NESTED,
+                insertions.clone(),
+                &InsertionMetadata::BugUrl("INSERT_LINT_BUG".to_string())
+            )
+            .lines()
+            .nth(9)
+            .unwrap(),
             "                    #[allow(LINTNAME)] // TODO(INSERT_LINT_BUG)"
+        );
+        assert_eq!(
+            apply_insertions(
+                NESTED,
+                insertions,
+                &InsertionMetadata::Reason("INSERT_REASON".to_string())
+            )
+            .lines()
+            .nth(9)
+            .unwrap(),
+            "                    #[allow(LINTNAME, reason = \"INSERT_REASON\")]"
         );
     }
 
@@ -319,8 +411,26 @@ fn main() {
         let insertions =
             calculate_insertions(NESTED, &[lint(name.clone(), (12, 17), (12, 18))]).unwrap();
         assert_eq!(
-            apply_insertions(NESTED, insertions, "INSERT_LINT_BUG").lines().nth(8).unwrap(),
+            apply_insertions(
+                NESTED,
+                insertions.clone(),
+                &InsertionMetadata::BugUrl("INSERT_LINT_BUG".to_string())
+            )
+            .lines()
+            .nth(8)
+            .unwrap(),
             "                #[allow(LINTNAME)] // TODO(INSERT_LINT_BUG)"
+        );
+        assert_eq!(
+            apply_insertions(
+                NESTED,
+                insertions,
+                &InsertionMetadata::Reason("INSERT_REASON".to_string())
+            )
+            .lines()
+            .nth(8)
+            .unwrap(),
+            "                #[allow(LINTNAME, reason = \"INSERT_REASON\")]"
         );
     }
 
@@ -330,8 +440,26 @@ fn main() {
         let insertions =
             calculate_insertions(NESTED, &[lint(name.clone(), (6, 13), (7, 30))]).unwrap();
         assert_eq!(
-            apply_insertions(NESTED, insertions, "INSERT_LINT_BUG").lines().nth(4).unwrap(),
+            apply_insertions(
+                NESTED,
+                insertions.clone(),
+                &InsertionMetadata::BugUrl("INSERT_LINT_BUG".to_string())
+            )
+            .lines()
+            .nth(4)
+            .unwrap(),
             "        #[allow(LINTNAME)] // TODO(INSERT_LINT_BUG)"
+        );
+        assert_eq!(
+            apply_insertions(
+                NESTED,
+                insertions,
+                &InsertionMetadata::Reason("INSERT_REASON".to_string())
+            )
+            .lines()
+            .nth(4)
+            .unwrap(),
+            "        #[allow(LINTNAME, reason = \"INSERT_REASON\")]"
         );
     }
 
@@ -341,8 +469,15 @@ fn main() {
         let insertions =
             calculate_insertions(TRAIT, &[lint(name.clone(), (3, 5), (3, 6))]).unwrap();
         assert_eq!(
-            apply_insertions(TRAIT, insertions, "INSERT_LINT_BUG").lines().nth(2).unwrap(),
-            "    #[allow(LINTNAME)] // TODO(INSERT_LINT_BUG)"
+            apply_insertions(
+                TRAIT,
+                insertions,
+                &InsertionMetadata::Reason("INSERT_REASON".to_string())
+            )
+            .lines()
+            .nth(2)
+            .unwrap(),
+            "    #[allow(LINTNAME, reason = \"INSERT_REASON\")]"
         );
     }
 }

@@ -13,6 +13,20 @@ pub trait Api {
     fn list_components(&mut self) -> Result<Vec<Component>>;
 }
 
+impl<'a> Api for &'a mut dyn Api {
+    fn create_issue(&mut self, request: CreateIssue) -> Result<IssueId> {
+        (*self).create_issue(request)
+    }
+
+    fn update_issue(&mut self, request: UpdateIssue) -> Result<()> {
+        (*self).update_issue(request)
+    }
+
+    fn list_components(&mut self) -> Result<Vec<Component>> {
+        (*self).list_components()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 pub struct IssueId(usize);
 

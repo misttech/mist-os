@@ -129,7 +129,7 @@ impl<'a> IssueTemplate<'a> {
 
     pub fn create(
         &self,
-        api: &mut (impl Api + ?Sized),
+        api: &mut dyn Api,
         ownership: &FileOwnership,
         files: &[&LintFile],
         holding_component_name: &str,
