@@ -346,6 +346,127 @@ pub mod admin {
     }
 }
 
+/// Provides testutils for testing implementations of clients and servers for routes rules FIDL.
+pub mod rules {
+    use fidl_fuchsia_net_routes as fnet_routes;
+    use futures::{Stream, StreamExt as _, TryStreamExt as _};
+    use net_types::ip::{GenericOverIp, Ip};
+
+    use crate::rules::{FidlRuleAdminIpExt, FidlRuleIpExt, RuleSetRequest, RuleTableRequest};
+    use crate::Responder;
+
+    // Responds to the given `Watch` request with the given batch of events.
+    fn handle_watch<I: FidlRuleIpExt>(
+        request: <<I::RuleWatcherMarker as fidl::endpoints::ProtocolMarker>::RequestStream as Stream>::Item,
+        event_batch: Vec<I::RuleEvent>,
+    ) {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct HandleInputs<I: FidlRuleIpExt> {
+            request:
+                <<I::RuleWatcherMarker as fidl::endpoints::ProtocolMarker>::RequestStream as Stream>::Item,
+            event_batch: Vec<I::RuleEvent>,
+        }
+        I::map_ip_in(
+            HandleInputs { request, event_batch },
+            |HandleInputs { request, event_batch }| match request
+                .expect("failed to receive `Watch` request")
+            {
+                fnet_routes::RuleWatcherV4Request::Watch { responder } => {
+                    responder.send(&event_batch).expect("failed to respond to `Watch`")
+                }
+            },
+            |HandleInputs { request, event_batch }| match request
+                .expect("failed to receive `Watch` request")
+            {
+                fnet_routes::RuleWatcherV6Request::Watch { responder } => {
+                    responder.send(&event_batch).expect("failed to respond to `Watch`")
+                }
+            },
+        );
+    }
+
+    /// A fake implementation of the `WatcherV4` and `WatcherV6` protocols.
+    ///
+    /// Feeds events received in `events` as responses to `Watch()`.
+    pub async fn fake_rules_watcher_impl<I: FidlRuleIpExt>(
+        events: impl Stream<Item = Vec<I::RuleEvent>>,
+        server_end: fidl::endpoints::ServerEnd<I::RuleWatcherMarker>,
+    ) {
+        let (request_stream, _control_handle) = server_end.into_stream_and_control_handle();
+        request_stream
+            .zip(events)
+            .for_each(|(request, event_batch)| {
+                handle_watch::<I>(request, event_batch);
+                futures::future::ready(())
+            })
+            .await
+    }
+
+    /// Provides a stream of watcher events such that the stack appears to contain
+    /// no routes and never installs any.
+    pub fn empty_watch_event_stream<'a, I: FidlRuleIpExt>(
+    ) -> impl Stream<Item = Vec<I::RuleEvent>> + 'a {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrap<I: FidlRuleIpExt>(I::RuleEvent);
+
+        let Wrap(event) = I::map_ip(
+            (),
+            |()| Wrap(fnet_routes::RuleEventV4::Idle(fnet_routes::Empty)),
+            |()| Wrap(fnet_routes::RuleEventV6::Idle(fnet_routes::Empty)),
+        );
+        futures::stream::once(futures::future::ready(vec![event])).chain(futures::stream::pending())
+    }
+
+    /// Provides a RuleTable implementation that serves no-op RuleSets.
+    pub async fn serve_noop_rule_sets<I: FidlRuleAdminIpExt>(
+        server_end: fidl::endpoints::ServerEnd<I::RuleTableMarker>,
+    ) {
+        let stream = server_end.into_stream();
+        stream
+            .and_then(|item| async move {
+                let RuleTableRequest::NewRuleSet { priority: _, rule_set, control_handle: _ } =
+                    I::into_rule_table_request(item);
+                serve_noop_rule_set::<I>(rule_set).await;
+                Ok(())
+            })
+            .for_each_concurrent(None, |item| {
+                item.expect("should not get error");
+                futures::future::ready(())
+            })
+            .await;
+    }
+
+    /// Serves a RuleSet that returns OK for everything and does nothing.
+    pub async fn serve_noop_rule_set<I: FidlRuleAdminIpExt>(
+        server_end: fidl::endpoints::ServerEnd<I::RuleSetMarker>,
+    ) {
+        let stream = server_end.into_stream();
+        stream
+            .try_for_each(|item| async move {
+                let request = I::into_rule_set_request(item);
+                match request {
+                    RuleSetRequest::AddRule { index: _, matcher, action: _, responder } => {
+                        let _: crate::rules::RuleMatcher<_> =
+                            matcher.expect("AddRule called with invalid matcher");
+                        responder.send(Ok(())).expect("respond to AddRule");
+                    }
+                    RuleSetRequest::RemoveRule { index: _, responder } => {
+                        responder.send(Ok(())).expect("respond to RemoveRule");
+                    }
+                    RuleSetRequest::AuthenticateForRouteTable { table: _, token: _, responder } => {
+                        responder.send(Ok(())).expect("respond to AuthenticateForRouteTable")
+                    }
+                    RuleSetRequest::Close { control_handle: _ } => {}
+                };
+                Ok(())
+            })
+            .await
+            .expect("should not get error");
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod internal {
     use super::*;

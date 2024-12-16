@@ -27,12 +27,14 @@ pub(crate) mod util;
 
 use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures::channel::oneshot;
 use futures::future::Future;
 use futures::{FutureExt as _, StreamExt as _};
 use net_types::ip::{Ipv4, Ipv6};
 use netlink_packet_route::RouteNetlinkMessage;
 use {
     fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_root as fnet_root,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext, fuchsia_async as fasync,
 };
 
@@ -69,13 +71,39 @@ impl<P: SenderReceiverProvider> Netlink<P> {
     pub fn new<H: interfaces::InterfacesHandler>(
         interfaces_handler: H,
     ) -> (Self, impl Future<Output = ()> + Send) {
+        Self::new_inner(
+            interfaces_handler,
+            NetlinkWorkerDiscoverableProtocols::from_environment,
+            None,
+        )
+    }
+
+    /// Returns a newly instantiated [`Netlink`] and its asynchronous worker.
+    ///
+    /// Callers are responsible for polling the worker [`Future`], which drives
+    /// the Netlink implementation's asynchronous work. The worker will never
+    /// complete.
+    pub fn new_from_protocol_connections<H: interfaces::InterfacesHandler>(
+        interfaces_handler: H,
+        protocols: NetlinkWorkerDiscoverableProtocols,
+        on_initialized: oneshot::Sender<()>,
+    ) -> (Self, impl Future<Output = ()> + Send) {
+        Self::new_inner(interfaces_handler, || protocols, Some(on_initialized))
+    }
+
+    fn new_inner<H: interfaces::InterfacesHandler>(
+        interfaces_handler: H,
+        protocols: impl FnOnce() -> NetlinkWorkerDiscoverableProtocols + Send + 'static,
+        on_initialized: Option<oneshot::Sender<()>>,
+    ) -> (Self, impl Future<Output = ()> + Send) {
         let (route_client_sender, route_client_receiver) = mpsc::unbounded();
         (
             Netlink { id_generator: ClientIdGenerator::default(), route_client_sender },
-            run_netlink_worker(NetlinkWorkerParams::<_, P> {
-                interfaces_handler,
-                route_client_receiver,
-            }),
+            run_netlink_worker(
+                NetlinkWorkerParams::<_, P> { interfaces_handler, route_client_receiver },
+                protocols,
+                on_initialized,
+            ),
         )
     }
 
@@ -115,6 +143,7 @@ struct ClientWithReceiver<
 }
 
 /// The possible error types when instantiating a new client.
+#[derive(Debug)]
 pub enum NewClientError {
     /// The [`Netlink`] is disconnected from its associated worker, perhaps as a
     /// result of dropping the worker.
@@ -134,11 +163,83 @@ struct NetlinkWorkerParams<H, P: SenderReceiverProvider> {
     >,
 }
 
+/// All of the protocols that the netlink worker connects to.
+#[allow(missing_docs)]
+pub struct NetlinkWorkerDiscoverableProtocols {
+    pub root_interfaces: fnet_root::InterfacesProxy,
+    pub interfaces_state: fnet_interfaces::StateProxy,
+    pub v4_routes_state: fnet_routes::StateV4Proxy,
+    pub v6_routes_state: fnet_routes::StateV6Proxy,
+    pub v4_main_route_table: fnet_routes_admin::RouteTableV4Proxy,
+    pub v6_main_route_table: fnet_routes_admin::RouteTableV6Proxy,
+    pub v4_route_table_provider: fnet_routes_admin::RouteTableProviderV4Proxy,
+    pub v6_route_table_provider: fnet_routes_admin::RouteTableProviderV6Proxy,
+    pub v4_rule_table: fnet_routes_admin::RuleTableV4Proxy,
+    pub v6_rule_table: fnet_routes_admin::RuleTableV6Proxy,
+}
+
+impl NetlinkWorkerDiscoverableProtocols {
+    fn from_environment() -> Self {
+        let root_interfaces = connect_to_protocol::<fnet_root::InterfacesMarker>()
+            .expect("connect to fuchsia.net.root.Interfaces");
+        let interfaces_state = connect_to_protocol::<fnet_interfaces::StateMarker>()
+            .expect("connect to fuchsia.net.interfaces.State");
+        let v4_routes_state =
+            connect_to_protocol::<<Ipv4 as fnet_routes_ext::FidlRouteIpExt>::StateMarker>()
+                .expect("connect to fuchsia.net.routes.StateV4");
+        let v6_routes_state =
+            connect_to_protocol::<<Ipv6 as fnet_routes_ext::FidlRouteIpExt>::StateMarker>()
+                .expect("connect to fuchsia.net.routes.StateV6");
+        let v4_main_route_table = connect_to_protocol::<
+            <Ipv4 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableMarker,
+        >()
+        .expect("connect to fuchsia.net.routes.admin.RouteTableV4");
+        let v6_main_route_table = connect_to_protocol::<
+            <Ipv6 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableMarker,
+        >()
+        .expect("connect to fuchsia.net.routes.admin.RouteTableV6");
+        let v4_route_table_provider = connect_to_protocol::<
+            <Ipv4 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableProviderMarker,
+        >()
+        .expect("connect to fuchsia.net.routes.admin.RouteTableProviderV4");
+        let v6_route_table_provider = connect_to_protocol::<
+            <Ipv6 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableProviderMarker,
+        >()
+        .expect("connect to fuchsia.net.routes.admin.RouteTableProviderV6");
+        let v4_rule_table = connect_to_protocol::<
+            <Ipv4 as fnet_routes_ext::rules::FidlRuleAdminIpExt>::RuleTableMarker,
+        >()
+        .expect("connect to fuchsia.net.routes.admin.RuleTableV4");
+        let v6_rule_table = connect_to_protocol::<
+            <Ipv6 as fnet_routes_ext::rules::FidlRuleAdminIpExt>::RuleTableMarker,
+        >()
+        .expect("connect to fuchsia.net.routes.admin.RuleTableV6");
+        Self {
+            root_interfaces,
+            interfaces_state,
+            v4_routes_state,
+            v6_routes_state,
+            v4_main_route_table,
+            v6_main_route_table,
+            v4_route_table_provider,
+            v6_route_table_provider,
+            v4_rule_table,
+            v6_rule_table,
+        }
+    }
+}
+
 /// The worker encompassing all asynchronous Netlink work.
 ///
 /// The worker is never expected to complete.
+///
+/// `protocols` is taken as a closure because we need to avoid creating asynchronous FIDL proxies
+/// until an executor is running, so it's helpful to defer creation until the event loop starts
+/// running.
 async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverProvider>(
     params: NetlinkWorkerParams<H, P>,
+    protocols: impl FnOnce() -> NetlinkWorkerDiscoverableProtocols + Send + 'static,
+    on_initialized: Option<oneshot::Sender<()>>,
 ) {
     let NetlinkWorkerParams { interfaces_handler, route_client_receiver } = params;
 
@@ -148,48 +249,35 @@ async fn run_netlink_worker<H: interfaces::InterfacesHandler, P: SenderReceiverP
     let unified_event_loop = fasync::Task::spawn({
         let route_clients = route_clients.clone();
         async move {
-            let interfaces_proxy = connect_to_protocol::<fnet_root::InterfacesMarker>()
-                .expect("connect to fuchsia.net.root.Interfaces");
-            let interfaces_state_proxy = connect_to_protocol::<fnet_interfaces::StateMarker>()
-                .expect("connect to fuchsia.net.interfaces");
-            let v4_routes_state =
-                connect_to_protocol::<<Ipv4 as fnet_routes_ext::FidlRouteIpExt>::StateMarker>()
-                    .expect("connect to fuchsia.net.routes");
-            let v6_routes_state =
-                connect_to_protocol::<<Ipv6 as fnet_routes_ext::FidlRouteIpExt>::StateMarker>()
-                    .expect("connect to fuchsia.net.routes");
-            let v4_main_route_table = connect_to_protocol::<
-                <Ipv4 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableMarker,
-            >()
-            .expect("connect to fuchsia.net.routes.admin");
-            let v6_main_route_table = connect_to_protocol::<
-                <Ipv6 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableMarker,
-            >()
-            .expect("connect to fuchsia.net.routes.admin");
-            let v4_route_table_provider = connect_to_protocol::<
-                <Ipv4 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableProviderMarker,
-            >()
-            .expect("connect to fuchsia.net.routes.admin");
-            let v6_route_table_provider = connect_to_protocol::<
-                <Ipv6 as fnet_routes_ext::admin::FidlRouteAdminIpExt>::RouteTableProviderMarker,
-            >()
-            .expect("connect to fuchsia.net.routes.admin");
-
-            let event_loop: EventLoop<H, P::Sender<_>> = EventLoop {
-                interfaces_proxy,
-                interfaces_state_proxy,
+            let NetlinkWorkerDiscoverableProtocols {
+                root_interfaces,
+                interfaces_state,
                 v4_routes_state,
                 v6_routes_state,
                 v4_main_route_table,
                 v6_main_route_table,
                 v4_route_table_provider,
                 v6_route_table_provider,
+                v4_rule_table,
+                v6_rule_table,
+            } = protocols();
+            let event_loop: EventLoop<H, P::Sender<_>> = EventLoop {
+                interfaces_proxy: root_interfaces,
+                interfaces_state_proxy: interfaces_state,
+                v4_routes_state,
+                v6_routes_state,
+                v4_main_route_table,
+                v6_main_route_table,
+                v4_route_table_provider,
+                v6_route_table_provider,
+                v4_rule_table,
+                v6_rule_table,
                 route_clients,
                 unified_request_stream,
                 interfaces_handler,
             };
 
-            match event_loop.run().await {
+            match event_loop.run(on_initialized).await {
                 Err(e) => panic!("error running event loop: {e:?}"),
             }
         }

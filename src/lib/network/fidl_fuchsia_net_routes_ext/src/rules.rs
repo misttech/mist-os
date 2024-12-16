@@ -383,6 +383,13 @@ pub enum RuleFidlConversionError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RuleSetPriority(u32);
 
+impl RuleSetPriority {
+    /// Create a new [`RuleSetPriority`].
+    pub const fn new(x: u32) -> Self {
+        Self(x)
+    }
+}
+
 /// The priority for the default rule set, where the default rule that points
 /// to the main table lives.
 pub const DEFAULT_RULE_SET_PRIORITY: RuleSetPriority =
