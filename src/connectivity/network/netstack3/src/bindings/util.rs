@@ -21,7 +21,8 @@ use net_types::{AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_core::device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId};
 use netstack3_core::error::{ExistsError, NotFoundError};
 use netstack3_core::ip::{
-    Lifetime, PreferredLifetime, SlaacConfiguration, SlaacConfigurationUpdate,
+    IgmpConfigMode, Lifetime, MldConfigMode, PreferredLifetime, SlaacConfiguration,
+    SlaacConfigurationUpdate,
 };
 use netstack3_core::neighbor::{NudUserConfig, NudUserConfigUpdate};
 use netstack3_core::routes::{
@@ -1434,6 +1435,25 @@ impl TryFromFidl<fnet_interfaces_ext::PreferredLifetimeInfo>
                 Self::Preferred(Lifetime::from_zx_time(i.into()))
             }
         })
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::MldVersion> for MldConfigMode {
+    fn into_fidl(self) -> fnet_interfaces_admin::MldVersion {
+        match self {
+            Self::V1 => fnet_interfaces_admin::MldVersion::V1,
+            Self::V2 => fnet_interfaces_admin::MldVersion::V2,
+        }
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::IgmpVersion> for IgmpConfigMode {
+    fn into_fidl(self) -> fnet_interfaces_admin::IgmpVersion {
+        match self {
+            Self::V1 => fnet_interfaces_admin::IgmpVersion::V1,
+            Self::V2 => fnet_interfaces_admin::IgmpVersion::V2,
+            Self::V3 => fnet_interfaces_admin::IgmpVersion::V3,
+        }
     }
 }
 

@@ -46,6 +46,7 @@ use core::num::NonZeroU64;
 use core::time::Duration;
 
 use assert_matches::assert_matches;
+use log::info;
 use net_types::ip::{Ip, IpAddress, IpVersionMarker};
 use net_types::MulticastAddr;
 use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult};
@@ -202,7 +203,7 @@ pub trait GmpQueryHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
 /// An implementation of a Group Management Protocol (GMP) such as the Internet
 /// Group Management Protocol, Version 2 (IGMPv2) for IPv4 or the Multicast
 /// Listener Discovery (MLD) protocol for IPv6.
-pub trait GmpHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
+pub trait GmpHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Handles GMP potentially being enabled.
     ///
     /// Attempts to transition memberships in the non-member state to a member
@@ -238,6 +239,20 @@ pub trait GmpHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupLeaveResult;
+
+    /// Returns the current protocol mode.
+    fn gmp_get_mode(&mut self, device: &Self::DeviceId) -> I::GmpProtoConfigMode;
+
+    /// Sets the new user-configured protocol mode.
+    ///
+    /// Returns the previous mode. No packets are sent in response to switching
+    /// modes.
+    fn gmp_set_mode(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &Self::DeviceId,
+        new_mode: I::GmpProtoConfigMode,
+    ) -> I::GmpProtoConfigMode;
 }
 
 impl<I: IpExt, BT: GmpBindingsTypes, CC: GmpStateContext<I, BT>> GmpQueryHandler<I, BT> for CC {
@@ -342,6 +357,41 @@ impl<I: IpExt, BC: GmpBindingsContext, CC: GmpContext<I, BC>> GmpHandler<I, BC> 
             GmpMode::V2 => v2::leave_group(bindings_ctx, group_addr, state),
         })
     }
+
+    fn gmp_get_mode(&mut self, device: &CC::DeviceId) -> I::GmpProtoConfigMode {
+        self.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| {
+            core_ctx.get_config_mode(state.gmp.mode)
+        })
+    }
+
+    fn gmp_set_mode(
+        &mut self,
+        bindings_ctx: &mut BC,
+        device: &CC::DeviceId,
+        new_mode: I::GmpProtoConfigMode,
+    ) -> I::GmpProtoConfigMode {
+        self.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| {
+            let old_mode = core_ctx.get_config_mode(state.gmp.mode);
+            info!("GMP({}) mode change by user from {:?} to {:?}", I::NAME, old_mode, new_mode);
+            let request = core_ctx.set_config_mode(new_mode);
+            let new_gmp_mode = match (request, state.gmp.mode) {
+                (GmpConfigModeRequest::ForcedV1, GmpMode::V1 { .. } | GmpMode::V2) => {
+                    GmpMode::V1 { compat: false }
+                }
+                (GmpConfigModeRequest::V2, GmpMode::V2 | GmpMode::V1 { compat: false }) => {
+                    GmpMode::V2
+                }
+                (GmpConfigModeRequest::V2, GmpMode::V1 { compat: true }) => {
+                    // Don't exit compatibility mode due to user request,
+                    // because we might still have knowledge of an old router in
+                    // the network.
+                    GmpMode::V1 { compat: true }
+                }
+            };
+            enter_mode(&mut core_ctx, bindings_ctx, state, new_gmp_mode);
+            old_mode
+        })
+    }
 }
 
 /// Randomly generates a timeout in (0, period].
@@ -389,6 +439,9 @@ impl<BC> GmpBindingsContext for BC where BC: RngContext + TimerContext + GmpBind
 
 /// An extension trait to [`Ip`].
 pub trait IpExt: Ip {
+    /// The user-controllable mode configuration.
+    type GmpProtoConfigMode: Debug + Copy + Clone + Eq + PartialEq;
+
     /// Returns true iff GMP should be performed for the multicast group.
     fn should_perform_gmp(addr: MulticastAddr<Self::Addr>) -> bool;
 }
@@ -662,6 +715,15 @@ impl Default for GmpMode {
     }
 }
 
+/// The type returned by [`GmpContextInner::set_config_mode`] to request a GMP
+/// config mode.
+enum GmpConfigModeRequest {
+    /// Request a change to forced V1 mode.
+    ForcedV1,
+    /// Request a change to V2 mode.
+    V2,
+}
+
 #[cfg_attr(test, derive(derivative::Derivative))]
 #[cfg_attr(test, derivative(Debug(bound = "")))]
 enum GmpGroupStateByVersion<I: Ip, BT: GmpBindingsTypes> {
@@ -759,6 +821,18 @@ trait GmpContextInner<I: IpExt, BC: GmpBindingsContext>: GmpTypeLayout<I, BC> {
     /// This is called to notify protocols of the protocol entering disabled
     /// mode. Protocols should clear any network-learned parameters.
     fn handle_disabled(&mut self);
+
+    /// Returns the current operating mode as the user configuration value from
+    /// the current generic GMP mode + protocol state.
+    fn get_config_mode(&mut self, gmp_mode: GmpMode) -> I::GmpProtoConfigMode;
+
+    /// Sets the current operating mode from a user config request.
+    ///
+    /// `mode` is the requested configuration mode.
+    ///
+    /// Returns a [`GmpConfigModeRequest`] that is applied to the current
+    /// `GmpMode`.
+    fn set_config_mode(&mut self, mode: I::GmpProtoConfigMode) -> GmpConfigModeRequest;
 }
 
 fn handle_timer<I, BC, CC>(
@@ -828,6 +902,7 @@ fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
                     gmp.timers.cancel(bindings_ctx, &TimerIdInner::V1Compat),
                     Some((_, ()))
                 );
+                info!("GMP({}) enter mode {:?}", I::NAME, &gmp.mode);
             }
             return;
         }
@@ -859,6 +934,7 @@ fn enter_mode<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
             gmp.v2_proto.on_enter_v1();
         }
     };
+    info!("GMP({}) enter mode {:?}", I::NAME, new_mode);
     gmp.timers.clear(bindings_ctx);
     gmp.mode = new_mode;
     core_ctx.handle_mode_change(new_mode);

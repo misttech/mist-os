@@ -41,9 +41,9 @@ use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpDeviceMtuContext, IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpEnabledGroup,
-    GmpGroupState, GmpState, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt,
-    MulticastGroupSet, NotAMemberErr,
+    self, GmpBindingsContext, GmpBindingsTypes, GmpConfigModeRequest, GmpContext, GmpContextInner,
+    GmpEnabledGroup, GmpGroupState, GmpMode, GmpState, GmpStateContext, GmpStateRef, GmpTimerId,
+    GmpTypeLayout, IpExt, MulticastGroupSet, NotAMemberErr,
 };
 
 /// The destination address for all MLDv2 reports.
@@ -241,7 +241,17 @@ impl<B: SplitByteSlice> gmp::v2::QueryMessage<Ipv6> for Mldv2QueryBody<B> {
     }
 }
 
+/// The MLD mode controllable by the user.
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[allow(missing_docs)]
+pub enum MldConfigMode {
+    V1,
+    V2,
+}
+
 impl IpExt for Ipv6 {
+    type GmpProtoConfigMode = MldConfigMode;
+
     fn should_perform_gmp(group_addr: MulticastAddr<Ipv6Addr>) -> bool {
         // Per [RFC 3810 Section 6]:
         //
@@ -381,6 +391,20 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
     fn handle_mode_change(&mut self, _new_mode: gmp::GmpMode) {}
 
     fn handle_disabled(&mut self) {}
+
+    fn get_config_mode(&mut self, gmp_mode: GmpMode) -> MldConfigMode {
+        match gmp_mode {
+            GmpMode::V2 | GmpMode::V1 { compat: true } => MldConfigMode::V2,
+            GmpMode::V1 { compat: false } => MldConfigMode::V1,
+        }
+    }
+
+    fn set_config_mode(&mut self, mode: MldConfigMode) -> GmpConfigModeRequest {
+        match mode {
+            MldConfigMode::V1 => GmpConfigModeRequest::ForcedV1,
+            MldConfigMode::V2 => GmpConfigModeRequest::V2,
+        }
+    }
 }
 
 #[derive(Debug, Error, Eq, PartialEq)]
@@ -890,7 +914,7 @@ mod tests {
         }
     }
 
-    fn receive_mld_query(
+    fn receive_mldv1_query(
         core_ctx: &mut FakeCoreCtxImpl,
         bindings_ctx: &mut FakeBindingsCtxImpl,
         resp_time: Duration,
@@ -977,7 +1001,7 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
 
-            receive_mld_query(
+            receive_mldv1_query(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 Duration::from_secs(10),
@@ -1014,7 +1038,12 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
+            receive_mldv1_query(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                Duration::from_secs(0),
+                GROUP_ADDR,
+            );
             // The query says that it wants to hear from us immediately.
             assert_eq!(core_ctx.frames().len(), 2);
             // There should be no timers set.
@@ -1047,7 +1076,7 @@ mod tests {
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
-            receive_mld_query(
+            receive_mldv1_query(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 Duration::from_secs(10),
@@ -1097,7 +1126,12 @@ mod tests {
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
-            receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
+            receive_mldv1_query(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                Duration::from_secs(0),
+                GROUP_ADDR,
+            );
 
             // Since it is an immediate query, we will send a report immediately
             // and turn into Idle state again.
@@ -1138,7 +1172,7 @@ mod tests {
         let start = bindings_ctx.now();
         let duration = instant1 - start;
 
-        receive_mld_query(&mut core_ctx, &mut bindings_ctx, duration, GROUP_ADDR);
+        receive_mldv1_query(&mut core_ctx, &mut bindings_ctx, duration, GROUP_ADDR);
         assert_eq!(core_ctx.frames().len(), 1);
         core_ctx.state.gmp_state().timers.assert_timers([(
             gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
@@ -1290,7 +1324,12 @@ mod tests {
                 assert_gmp_state!(core_ctx, &group, NonMember);
                 assert_no_effect(&core_ctx, &bindings_ctx);
 
-                receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10), group);
+                receive_mldv1_query(
+                    &mut core_ctx,
+                    &mut bindings_ctx,
+                    Duration::from_secs(10),
+                    group,
+                );
                 // We should have done no state transitions/work.
                 assert_gmp_state!(core_ctx, &group, NonMember);
                 assert_no_effect(&core_ctx, &bindings_ctx);
@@ -1613,5 +1652,50 @@ mod tests {
             receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
             Err(MldError::BadSourceAddress { addr: addr.into_addr() })
         );
+    }
+
+    #[test]
+    fn user_mode_change() {
+        let mut ctx = new_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+        assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), MldConfigMode::V1);
+        assert_eq!(
+            core_ctx.gmp_join_group(bindings_ctx, &FakeDeviceId, GROUP_ADDR),
+            GroupJoinResult::Joined(())
+        );
+        // Ignore first reports.
+        let _ = core_ctx.take_frames();
+        assert_eq!(
+            core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, MldConfigMode::V2),
+            MldConfigMode::V1
+        );
+        assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), MldConfigMode::V2);
+        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V2);
+        // No side-effects.
+        assert_eq!(core_ctx.take_frames(), Vec::new());
+
+        // If we receive a v1 query, we'll go into compat mode but still report
+        // v2 to the user.
+        receive_mldv1_query(core_ctx, bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
+        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
+        // Acknowledge query response.
+        assert_eq!(core_ctx.take_frames().len(), 1);
+        assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), MldConfigMode::V2);
+
+        // Even if user attempts to set V2 again we'll keep it in compat.
+        assert_eq!(
+            core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, MldConfigMode::V2),
+            MldConfigMode::V2
+        );
+        assert_eq!(core_ctx.take_frames(), Vec::new());
+        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
+
+        // Forcing V1 mode, however, exits compat.
+        assert_eq!(
+            core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, MldConfigMode::V1),
+            MldConfigMode::V2
+        );
+        assert_eq!(core_ctx.take_frames(), Vec::new());
+        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: false });
     }
 }

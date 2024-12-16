@@ -22,8 +22,8 @@ use netstack3_base::{
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::gmp::{
-    self, GmpContext, GmpContextInner, GmpEnabledGroup, GmpGroupState, GmpMode, GmpState,
-    GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
+    self, GmpConfigModeRequest, GmpContext, GmpContextInner, GmpEnabledGroup, GmpGroupState,
+    GmpMode, GmpState, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
 };
 
 pub(super) struct FakeGmpContext<I: IpExt> {
@@ -138,6 +138,14 @@ impl<I: IpExt> GmpContextInner<I, FakeGmpBindingsContext<I>> for &'_ mut FakeGmp
     fn handle_mode_change(&mut self, _new_mode: GmpMode) {}
 
     fn handle_disabled(&mut self) {}
+
+    fn get_config_mode(&mut self, _gmp_mode: GmpMode) -> I::GmpProtoConfigMode {
+        unimplemented!()
+    }
+
+    fn set_config_mode(&mut self, _mode: I::GmpProtoConfigMode) -> GmpConfigModeRequest {
+        unimplemented!()
+    }
 }
 
 #[derive(Debug, Default)]

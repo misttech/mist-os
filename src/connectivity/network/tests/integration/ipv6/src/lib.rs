@@ -1158,7 +1158,14 @@ async fn sends_mld_reports<N: Netstack>(
         };
         let control = iface.control();
         let new_config = gen_config(mld_version);
-        let old_config = gen_config(fnet_interfaces_admin::MldVersion::V2);
+        // TODO(https://fxbug.dev/42071006): Remove when netstack3 defaults to
+        // MLDv2.
+        let default_version = match N::VERSION {
+            NetstackVersion::Netstack3 => fnet_interfaces_admin::MldVersion::V1,
+            NetstackVersion::Netstack2 { .. } => fnet_interfaces_admin::MldVersion::V2,
+            other => panic!("unexpected version {other:?}"),
+        };
+        let old_config = gen_config(default_version);
         assert_eq!(
             control
                 .set_configuration(&new_config)

@@ -32,6 +32,7 @@ use crate::internal::device::{
     self, AddressRemovedReason, DelIpAddr, IpDeviceAddressContext as _, IpDeviceBindingsContext,
     IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceStateContext as _,
 };
+use crate::internal::gmp::GmpHandler as _;
 use crate::internal::routing::IpRoutingDeviceContext;
 use crate::internal::types::RawMetric;
 
@@ -192,6 +193,7 @@ where
             IpDeviceConfigurationAndFlags {
                 config: config.clone(),
                 flags: core_ctx.with_ip_device_flags(device_id, |flags| flags.clone()),
+                gmp_mode: core_ctx.gmp_get_mode(device_id),
             }
         })
     }

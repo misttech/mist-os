@@ -601,13 +601,17 @@ impl DeviceHandler {
                             ),
                         },
                         ip_config,
+                        mld_mode: None,
                     },
                 )
                 .unwrap();
             let _: Ipv4DeviceConfigurationUpdate = ctx
                 .api()
                 .device_ip::<Ipv4>()
-                .update_configuration(&core_id, Ipv4DeviceConfigurationUpdate { ip_config })
+                .update_configuration(
+                    &core_id,
+                    Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode: None },
+                )
                 .unwrap();
 
             info!("created interface {:?}", core_id);

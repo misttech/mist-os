@@ -128,11 +128,12 @@ pub mod ip {
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
         CommonAddressProperties, IidSecret, IpAddressState, IpDeviceConfiguration,
         IpDeviceConfigurationAndFlags, IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4AddrConfig,
-        Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
-        Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime, SetIpAddressPropertiesError,
-        SlaacConfiguration, SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
-        UpdateIpConfigurationError,
+        Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig,
+        Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime,
+        SetIpAddressPropertiesError, SlaacConfiguration, SlaacConfigurationUpdate,
+        TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
+    pub use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode};
     pub use netstack3_ip::multicast_forwarding::{
         ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastForwardingEvent,
         MulticastRoute, MulticastRouteKey, MulticastRouteStats, MulticastRouteTarget,

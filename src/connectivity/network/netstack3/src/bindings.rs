@@ -1107,7 +1107,10 @@ impl Netstack {
             .ctx
             .api()
             .device_ip::<Ipv4>()
-            .update_configuration(&loopback, Ipv4DeviceConfigurationUpdate { ip_config })
+            .update_configuration(
+                &loopback,
+                Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode: None },
+            )
             .unwrap();
         let _: Ipv6DeviceConfigurationUpdate = self
             .ctx
@@ -1123,6 +1126,7 @@ impl Netstack {
                         temporary_address_configuration: None,
                     },
                     ip_config,
+                    mld_mode: None,
                 },
             )
             .unwrap();

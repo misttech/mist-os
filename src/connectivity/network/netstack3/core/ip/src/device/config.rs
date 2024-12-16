@@ -18,6 +18,8 @@ use crate::internal::device::{
     Ipv6DeviceConfigurationContext, WithIpDeviceConfigurationMutInner as _,
     WithIpv6DeviceConfigurationMutInner as _,
 };
+use crate::internal::gmp::igmp::IgmpConfigMode;
+use crate::internal::gmp::mld::MldConfigMode;
 use crate::internal::gmp::GmpHandler;
 
 /// A trait abstracting configuration between IPv4 and IPv6.
@@ -54,6 +56,8 @@ pub struct IpDeviceConfigurationUpdate {
 pub struct Ipv4DeviceConfigurationUpdate {
     /// A change in the IP device configuration.
     pub ip_config: IpDeviceConfigurationUpdate,
+    /// A change in the IGMP mode.
+    pub igmp_mode: Option<IgmpConfigMode>,
 }
 
 impl From<IpDeviceConfigurationUpdate> for Ipv4DeviceConfigurationUpdate {
@@ -125,7 +129,7 @@ where
         config: PendingIpDeviceConfigurationUpdate<'_, Ipv4, Self::DeviceId>,
     ) -> Ipv4DeviceConfigurationUpdate {
         let PendingIpDeviceConfigurationUpdate(
-            Ipv4DeviceConfigurationUpdate { ip_config },
+            Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode },
             device_id,
         ) = config;
         let device_id: &CC::DeviceId = device_id;
@@ -185,6 +189,12 @@ where
                     ip_enabled: next,
                 })
             });
+
+            // NB: change GMP mode before enabling in case those are changed
+            // atomically.
+            let igmp_mode = igmp_mode
+                .map(|igmp_mode| core_ctx.gmp_set_mode(bindings_ctx, device_id, igmp_mode));
+
             let gmp_enabled = handle_change_and_get_prev(gmp_enabled_updates, |next| {
                 if next {
                     GmpHandler::gmp_handle_maybe_enabled(core_ctx, bindings_ctx, device_id)
@@ -202,7 +212,7 @@ where
                 unicast_forwarding_enabled,
                 multicast_forwarding_enabled,
             };
-            Ipv4DeviceConfigurationUpdate { ip_config }
+            Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode }
         })
     }
 }
@@ -218,6 +228,8 @@ pub struct Ipv6DeviceConfigurationUpdate {
     pub slaac_config: SlaacConfigurationUpdate,
     /// A change in the IP device configuration.
     pub ip_config: IpDeviceConfigurationUpdate,
+    /// A change in the MLD mode.
+    pub mld_mode: Option<MldConfigMode>,
 }
 
 impl From<IpDeviceConfigurationUpdate> for Ipv6DeviceConfigurationUpdate {
@@ -248,6 +260,7 @@ where
                 max_router_solicitations,
                 slaac_config,
                 ip_config,
+                mld_mode,
             },
             device_id,
         ) = config;
@@ -293,6 +306,11 @@ where
             let dad_transmits = dont_handle_change_and_get_prev(dad_transmits_updates);
             let max_router_solicitations =
                 dont_handle_change_and_get_prev(max_router_solicitations_updates);
+
+            // NB: change GMP mode before enabling in case those are changed
+            // atomically.
+            let mld_mode =
+                mld_mode.map(|mld_mode| core_ctx.gmp_set_mode(bindings_ctx, device_id, mld_mode));
 
             let ip_config = IpDeviceConfigurationUpdate {
                 ip_enabled: handle_change_and_get_prev(ip_enabled_updates, |next| {
@@ -355,6 +373,7 @@ where
                 max_router_solicitations,
                 slaac_config: slaac_config_updates,
                 ip_config,
+                mld_mode,
             }
         })
     }
@@ -392,6 +411,8 @@ pub struct IpDeviceConfigurationAndFlags<I: IpDeviceIpExt> {
     pub config: I::Configuration,
     /// The device flags.
     pub flags: IpDeviceFlags,
+    /// The GMP mode.
+    pub gmp_mode: I::GmpProtoConfigMode,
 }
 
 impl<I: IpDeviceIpExt> AsRef<IpDeviceConfiguration> for IpDeviceConfigurationAndFlags<I> {

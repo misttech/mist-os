@@ -66,7 +66,7 @@ use crate::internal::device::state::{
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
-use crate::internal::gmp::{GmpHandler, GroupJoinResult, GroupLeaveResult};
+use crate::internal::gmp::{self, GmpHandler, GroupJoinResult, GroupLeaveResult};
 
 /// An IP device timer.
 ///
@@ -264,7 +264,7 @@ impl<
 }
 
 /// An extension trait adding IP device properties.
-pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt {
+pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt {
     /// IP layer state kept by the device.
     type State<BT: IpDeviceStateBindingsTypes>: AsRef<IpDeviceState<Self, BT>>
         + AsMut<IpDeviceState<Self, BT>>;
