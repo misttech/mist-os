@@ -4,8 +4,6 @@
 
 #include "pci-sdhci.h"
 
-#include <fuchsia/hardware/sdhci/cpp/banjo.h>
-#include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -13,7 +11,6 @@
 #include <lib/device-protocol/pci.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/param.h>
 #include <threads.h>
 #include <unistd.h>
@@ -28,93 +25,79 @@ namespace sdhci {
 
 PciSdhci::PciSdhci(zx_device_t* parent) : DeviceType(parent) {}
 
-zx_status_t PciSdhci::SdhciGetInterrupt(zx::interrupt* interrupt_out) {
+void PciSdhci::GetInterrupt(fdf::Arena& arena, GetInterruptCompleter::Sync& completer) {
   // select irq mode
   fuchsia_hardware_pci::InterruptMode mode = fuchsia_hardware_pci::InterruptMode::kDisabled;
   zx_status_t status = pci_.ConfigureInterruptMode(1, &mode);
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: error setting irq mode: %s", kTag, zx_status_get_string(status));
-    return status;
-  }
-
-  // get irq handle
-  status = pci_.MapInterrupt(0, interrupt_out);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: error getting irq handle: %s", kTag, zx_status_get_string(status));
-  }
-  return status;
-}
-
-void PciSdhci::GetInterrupt(fdf::Arena& arena, GetInterruptCompleter::Sync& completer) {
-  zx::interrupt irq;
-  if (zx_status_t status = SdhciGetInterrupt(&irq); status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
   }
-  completer.buffer(arena).ReplySuccess(std::move(irq));
+
+  // get irq handle
+  zx::interrupt interrupt;
+  status = pci_.MapInterrupt(0, &interrupt);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: error getting irq handle: %s", kTag, zx_status_get_string(status));
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+
+  completer.buffer(arena).ReplySuccess(std::move(interrupt));
 }
 
-zx_status_t PciSdhci::SdhciGetMmio(zx::vmo* out, zx_off_t* out_offset) {
+void PciSdhci::GetMmio(fdf::Arena& arena, GetMmioCompleter::Sync& completer) {
   if (!mmio_.has_value()) {
     zx_status_t status = pci_.MapMmio(0u, ZX_CACHE_POLICY_UNCACHED_DEVICE, &mmio_);
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: error mapping register window: %s", kTag, zx_status_get_string(status));
-      return status;
+      completer.buffer(arena).ReplyError(status);
+      return;
     }
   }
-  *out_offset = mmio_->get_offset();
-  return mmio_->get_vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, out);
-}
-
-void PciSdhci::GetMmio(fdf::Arena& arena, GetMmioCompleter::Sync& completer) {
+  auto offset = mmio_->get_offset();
   zx::vmo vmo;
-  zx_off_t offset;
-  if (zx_status_t status = SdhciGetMmio(&vmo, &offset); status != ZX_OK) {
+  zx_status_t status = mmio_->get_vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+  if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
   }
-  completer.buffer(arena).ReplySuccess(std::move(vmo), offset);
-}
 
-zx_status_t PciSdhci::SdhciGetBti(uint32_t index, zx::bti* out_bti) {
-  if (!bti_.is_valid()) {
-    zx_status_t st = pci_.GetBti(index, &bti_);
-    if (st != ZX_OK) {
-      return st;
-    }
-  }
-  return bti_.duplicate(ZX_RIGHT_SAME_RIGHTS, out_bti);
+  completer.buffer(arena).ReplySuccess(std::move(vmo), offset);
 }
 
 void PciSdhci::GetBti(GetBtiRequestView request, fdf::Arena& arena,
                       GetBtiCompleter::Sync& completer) {
+  if (!bti_.is_valid()) {
+    zx_status_t status = pci_.GetBti(request->index, &bti_);
+    if (status != ZX_OK) {
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+  }
+
   zx::bti bti;
-  if (zx_status_t status = SdhciGetBti(request->index, &bti); status != ZX_OK) {
+  zx_status_t status = bti_.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti);
+  if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
     return;
   }
+
   completer.buffer(arena).ReplySuccess(std::move(bti));
 }
 
-uint32_t PciSdhci::SdhciGetBaseClock() { return 0; }
-
 void PciSdhci::GetBaseClock(fdf::Arena& arena, GetBaseClockCompleter::Sync& completer) {
-  completer.buffer(arena).Reply(SdhciGetBaseClock());
-}
-
-uint64_t PciSdhci::SdhciGetQuirks(uint64_t* out_dma_boundary_alignment) {
-  *out_dma_boundary_alignment = 0;
-  return SDHCI_QUIRK_STRIP_RESPONSE_CRC_PRESERVE_ORDER;
+  completer.buffer(arena).Reply(0);
 }
 
 void PciSdhci::GetQuirks(fdf::Arena& arena, GetQuirksCompleter::Sync& completer) {
-  uint64_t dma_boundary_alignment;
-  fuchsia_hardware_sdhci::Quirk quirks{SdhciGetQuirks(&dma_boundary_alignment)};
-  completer.buffer(arena).Reply(quirks, dma_boundary_alignment);
+  completer.buffer(arena).Reply(fuchsia_hardware_sdhci::Quirk::kStripResponseCrcPreserveOrder, 0);
 }
 
-void PciSdhci::SdhciHwReset() {
+void PciSdhci::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
   if (!mmio_.has_value()) {
+    completer.buffer(arena).Reply();
     return;
   }
   uint32_t val = mmio_->Read32(HOST_CONTROL1_OFFSET);
@@ -126,22 +109,12 @@ void PciSdhci::SdhciHwReset() {
   mmio_->Write32(val, HOST_CONTROL1_OFFSET);
   // minimum is 200us but wait 300us for good measure
   zx_nanosleep(zx_deadline_after(ZX_USEC(300)));
-}
-
-void PciSdhci::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
-  SdhciHwReset();
   completer.buffer(arena).Reply();
 }
 
-zx_status_t PciSdhci::SdhciVendorSetBusClock(uint32_t frequency_hz) { return ZX_ERR_STOP; }
-
 void PciSdhci::VendorSetBusClock(VendorSetBusClockRequestView request, fdf::Arena& arena,
                                  VendorSetBusClockCompleter::Sync& completer) {
-  if (zx_status_t status = SdhciVendorSetBusClock(request->frequency_hz)) {
-    completer.buffer(arena).ReplyError(status);
-    return;
-  }
-  completer.buffer(arena).ReplySuccess();
+  completer.buffer(arena).ReplyError(ZX_ERR_STOP);
 }
 
 void PciSdhci::DdkUnbind(ddk::UnbindTxn txn) { device_unbind_reply(zxdev()); }
@@ -209,7 +182,6 @@ zx_status_t PciSdhci::Init() {
   };
 
   status = DdkAdd(ddk::DeviceAddArgs("pci-sdhci")
-                      .set_proto_id(ZX_PROTOCOL_SDHCI)
                       .set_runtime_service_offers(offers)
                       .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {

@@ -23,7 +23,6 @@ fuchsia_cc_driver("pci-sdhci-driver") {
   ]
   sources = [ "pci-sdhci.cc" ]
   deps = [
-    "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_cpp",
     "//sdk/lib/driver/outgoing/cpp",
