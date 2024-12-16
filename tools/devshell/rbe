@@ -209,6 +209,7 @@ EOF
   until test_bazel_rbe
   do
     echo "If the previous build attempt failed due to authentication, follow the prompts to authenticate."
+    suggest_gcert
     ensure_auth_for_bazel "$@" || {
       echo "Failed to authenticate for bazel."
       return 1
@@ -349,6 +350,14 @@ function ensure_auth_for_bazel() {
     unrestricted) ensure_loas ;;
     restricted) ensure_oauth ;;
   esac
+}
+
+function suggest_gcert() {
+  [[ "$FX_BUILD_AUTO_AUTH" == 1 ]] || cat <<EOF
+If you continue to see authentication failures, try opting in to
+go/fuchsia-rbe-gcert, by running 'export FX_BUILD_AUTO_AUTH=1' in
+your shell or adding it to your ~/.bashrc file.
+EOF
 }
 
 # For builds that use remote services like RBE, ResultStore,
