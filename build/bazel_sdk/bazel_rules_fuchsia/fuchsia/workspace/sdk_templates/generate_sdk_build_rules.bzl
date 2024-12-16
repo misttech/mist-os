@@ -1752,6 +1752,9 @@ alias(
 )
 """,
         )
+
+        # Needed by the SDK test suite.
+        ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "tools"), "fuchsia/tools")
     else:
         # Simply symlink the content of @rules_fuchsia into the current
         # repository instead.

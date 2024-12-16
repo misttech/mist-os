@@ -5,7 +5,7 @@
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
-load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/packaging:common_utils.bzl", "failure_test", "no_repo_default_api_level_failure_test", "unknown_override_api_level_failure_test", "unknown_repo_default_api_level_failure_test")
 load("//test_utils:make_file.bzl", "make_fake_component_manifest", "make_file")
 

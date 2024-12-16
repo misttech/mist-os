@@ -5,7 +5,7 @@
 """Fuchsia API level support."""
 
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@fuchsia_sdk//fuchsia/private:fuchsia_api_level.bzl", "FuchsiaAPILevelInfo", "fuchsia_api_level")
+load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaAPILevelInfo", "fuchsia_api_level")
 load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
 
 def _level_setting_test_impl(ctx):

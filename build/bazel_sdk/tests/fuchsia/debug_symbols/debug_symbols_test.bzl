@@ -6,12 +6,12 @@
 
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load(
-    "@fuchsia_sdk//fuchsia/private:fuchsia_debug_symbols.bzl",
+    "@fuchsia_sdk//fuchsia:private_defs.bzl",
+    "FuchsiaDebugSymbolInfo",
     "fuchsia_collect_all_debug_symbols_infos_aspect",
     "fuchsia_debug_symbols",
     "transform_collected_debug_symbols_infos",
 )
-load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaDebugSymbolInfo")
 load("//test_utils:make_file.bzl", "make_file")
 
 def _top_level_target_impl(ctx):
