@@ -48,6 +48,7 @@ cc_test_executable("virtual-keyboard-test-bin") {
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/lib/timekeeper",
     "//src/ui/input/testing/fake_input_report_device",
     "//src/ui/testing/ui_test_manager",
     "//third_party/googletest:gtest",

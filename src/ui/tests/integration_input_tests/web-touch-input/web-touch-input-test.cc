@@ -47,6 +47,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <src/lib/timekeeper/clock.h>
 #include <src/ui/testing/util/portable_ui_test.h>
 
 // This test exercises the touch input dispatch path from Input Pipeline to a Chromium. It is a
@@ -120,9 +121,7 @@ using ChildName = std::string;
 // Set this as low as you can that still works across all test platforms.
 constexpr zx::duration kTimeout = zx::min(5);
 
-// The type used to measure UTC time. The integer value here does not matter so
-// long as it differs from the ZX_CLOCK_MONOTONIC=0 defined by Zircon.
-using time_utc = zx::basic_time<1>;
+using time_utc = timekeeper::time_utc;
 
 // Maximum distance between two physical pixel coordinates so that they are considered equal.
 constexpr double kEpsilon = 0.5f;
