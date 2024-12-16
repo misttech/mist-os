@@ -101,7 +101,7 @@ impl EnvContext {
             )
             .map_err(fxe)?,
         };
-        let _ = ffx_config::init(&context).await;
+        let _ = ffx_config::init(&context);
         let cache_path = context.get_cache_path()?;
         std::fs::create_dir_all(&cache_path)?;
         let target_spec = ffx_target::get_target_specifier(&context).await?;

@@ -147,7 +147,7 @@ pub async fn test_init() -> Result<TestEnv> {
     let env = TestEnv::new(TEST_LOCK.lock_arc().await).await?;
 
     // force an overwrite of the configuration setup
-    crate::init(&env.context).await?;
+    crate::init(&env.context)?;
 
     Ok(env)
 }
@@ -160,7 +160,7 @@ pub async fn test_init_in_tree(build_dir: &Path) -> Result<TestEnv> {
     let env = TestEnv::new_intree(build_dir, TEST_LOCK.lock_arc().await).await?;
 
     // force an overwrite of the configuration setup
-    crate::init(&env.context).await?;
+    crate::init(&env.context)?;
 
     Ok(env)
 }

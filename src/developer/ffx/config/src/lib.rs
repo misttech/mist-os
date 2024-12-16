@@ -137,7 +137,7 @@ pub fn global_env() -> Result<Environment> {
 
 /// Initialize the configuration. Only the first call in a process runtime takes effect, so users must
 /// call this early with the required values, such as in main() in the ffx binary.
-pub async fn init(context: &EnvironmentContext) -> Result<()> {
+pub fn init(context: &EnvironmentContext) -> Result<()> {
     let mut env_lock = ENV.lock().unwrap();
     if env_lock.is_some() {
         anyhow::bail!("Attempted to set the global environment more than once in a process invocation, outside of a test");

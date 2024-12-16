@@ -89,7 +89,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
 
     let context = app.load_context(exe_kind)?;
 
-    ffx_config::init(&context).await?;
+    ffx_config::init(&context)?;
 
     // Everything that needs to use the config must be after loading the config.
     if !context.has_no_environment() {
