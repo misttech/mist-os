@@ -694,17 +694,22 @@ mod tests {
         config: MldConfig,
     }
 
-    fn new_context() -> FakeCtxImpl {
+    /// Creates a new test context in MLDv1.
+    ///
+    /// A historical note: a number of tests were originally written when only
+    /// MLDv1 was supported.
+    fn new_mldv1_context() -> FakeCtxImpl {
         FakeCtxImpl::with_default_bindings_ctx(|bindings_ctx| {
             // We start with enabled true to make tests easier to write.
             let mld_enabled = true;
             FakeCoreCtxImpl::with_state(FakeMldCtx {
                 shared: Rc::new(RefCell::new(Shared {
                     groups: MulticastGroupSet::default(),
-                    gmp_state: GmpState::new_with_enabled::<_, IntoCoreTimerCtx>(
+                    gmp_state: GmpState::new_with_enabled_and_mode::<_, IntoCoreTimerCtx>(
                         bindings_ctx,
                         FakeWeakDeviceId(FakeDeviceId),
                         mld_enabled,
+                        GmpMode::V1 { compat: false },
                     ),
                     config: Default::default(),
                 })),
@@ -932,7 +937,7 @@ mod tests {
         )
     }
 
-    fn receive_mld_report(
+    fn receive_mldv1_report(
         core_ctx: &mut FakeCoreCtxImpl,
         bindings_ctx: &mut FakeBindingsCtxImpl,
         group_addr: MulticastAddr<Ipv6Addr>,
@@ -993,7 +998,7 @@ mod tests {
     #[test]
     fn test_mld_simple_integration() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1029,7 +1034,7 @@ mod tests {
     #[test]
     fn test_mld_immediate_query() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1059,7 +1064,7 @@ mod tests {
     #[test]
     fn test_mld_integration_fallback_from_idle() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1109,7 +1114,7 @@ mod tests {
     #[test]
     fn test_mld_integration_immediate_query_wont_fallback() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1154,7 +1159,7 @@ mod tests {
 
     #[test]
     fn test_mld_integration_delay_reset_timer() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
         // This seed was carefully chosen to produce a substantial duration
         // value below.
         bindings_ctx.seed_rng(123456);
@@ -1195,7 +1200,7 @@ mod tests {
     #[test]
     fn test_mld_integration_last_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1239,7 +1244,7 @@ mod tests {
     #[test]
     fn test_mld_integration_not_last_does_not_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1252,7 +1257,7 @@ mod tests {
                 now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
             assert_eq!(core_ctx.frames().len(), 1);
-            receive_mld_report(&mut core_ctx, &mut bindings_ctx, GROUP_ADDR);
+            receive_mldv1_report(&mut core_ctx, &mut bindings_ctx, GROUP_ADDR);
             bindings_ctx.timers.assert_no_timers_installed();
             // The report should be discarded because we have received from someone
             // else.
@@ -1274,7 +1279,7 @@ mod tests {
     #[test]
     fn test_mld_with_link_local() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             core_ctx.state.ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
@@ -1319,7 +1324,7 @@ mod tests {
                 assert_gmp_state!(core_ctx, &group, NonMember);
                 assert_no_effect(&core_ctx, &bindings_ctx);
 
-                receive_mld_report(&mut core_ctx, &mut bindings_ctx, group);
+                receive_mldv1_report(&mut core_ctx, &mut bindings_ctx, group);
                 // We should have done no state transitions/work.
                 assert_gmp_state!(core_ctx, &group, NonMember);
                 assert_no_effect(&core_ctx, &bindings_ctx);
@@ -1344,7 +1349,7 @@ mod tests {
             };
 
             let new_ctx = || {
-                let mut ctx = new_context();
+                let mut ctx = new_mldv1_context();
                 ctx.bindings_ctx.seed_rng(seed);
                 ctx
             };
@@ -1376,7 +1381,7 @@ mod tests {
         run_with_many_seeds(|seed| {
             // Simple MLD integration test to check that when we call top-level
             // multicast join and leave functions, MLD is performed.
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1434,7 +1439,7 @@ mod tests {
     #[test]
     fn test_mld_enable_disable() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
             assert_eq!(core_ctx.take_frames(), []);
 
@@ -1526,7 +1531,7 @@ mod tests {
     /// Test the basics of MLDv2 report sending.
     #[test]
     fn send_gmpv2_report() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
         let sent_report_addr = Ipv6::get_multicast_addr(130);
         let sent_report_mode = GroupRecordType::ModeIsExclude;
         let sent_report_sources = Vec::<Ipv6Addr>::new();
@@ -1595,7 +1600,7 @@ mod tests {
 
     #[test]
     fn v1_query_reject_bad_ipv6_source_addr() {
-        let mut ctx = new_context();
+        let mut ctx = new_mldv1_context();
         let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
 
         let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
@@ -1613,7 +1618,7 @@ mod tests {
 
     #[test]
     fn v2_query_reject_bad_ipv6_source_addr() {
-        let mut ctx = new_context();
+        let mut ctx = new_mldv1_context();
         let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
 
         let buffer = new_v2_general_query().into_inner();
@@ -1631,7 +1636,7 @@ mod tests {
 
     #[test]
     fn v1_report_reject_bad_ipv6_source_addr() {
-        let mut ctx = new_context();
+        let mut ctx = new_mldv1_context();
         let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
 
         let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
@@ -1656,7 +1661,7 @@ mod tests {
 
     #[test]
     fn user_mode_change() {
-        let mut ctx = new_context();
+        let mut ctx = new_mldv1_context();
         let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), MldConfigMode::V1);
         assert_eq!(

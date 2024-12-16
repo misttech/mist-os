@@ -31,8 +31,8 @@ use netstack3_ip::device::{
     Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId, SlaacConfigurationUpdate,
 };
 use netstack3_ip::gmp::{
-    IgmpTimerId, MldTimerId, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
-    MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+    IgmpConfigMode, IgmpTimerId, MldConfigMode, MldTimerId,
+    IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL, MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
 };
 
 const V4_HOST_ADDR: SpecifiedAddr<Ipv4Addr> =
@@ -40,7 +40,7 @@ const V4_HOST_ADDR: SpecifiedAddr<Ipv4Addr> =
 const V4_GROUP_ADDR: MulticastAddr<Ipv4Addr> = Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS;
 
 #[test]
-fn test_igmp_enable_disable_integration() {
+fn test_igmpv2_enable_disable_integration() {
     let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
         Ipv4::TEST_ADDRS;
 
@@ -87,6 +87,7 @@ fn test_igmp_enable_disable_integration() {
                         gmp_enabled: Some(gmp_enabled),
                         ..Default::default()
                     },
+                    igmp_mode: Some(IgmpConfigMode::V2),
                     ..Default::default()
                 },
             )
@@ -181,7 +182,7 @@ fn test_igmp_enable_disable_integration() {
 }
 
 #[test]
-fn test_mld_enable_disable_integration() {
+fn test_mldv1_enable_disable_integration() {
     let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
         Ipv6::TEST_ADDRS;
 
@@ -234,6 +235,7 @@ fn test_mld_enable_disable_integration() {
                         gmp_enabled: Some(gmp_enabled),
                         ..Default::default()
                     },
+                    mld_mode: Some(MldConfigMode::V1),
                     ..Default::default()
                 },
             )

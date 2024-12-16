@@ -195,19 +195,18 @@ pub(super) fn new_context_with_mode<I: IpExt>(mode: GmpMode) -> FakeCtx<I> {
         // We start with enabled true to make tests easier to write.
         let enabled = true;
         bindings_ctx.rng = netstack3_base::testutil::FakeCryptoRng::from_entropy();
-        let mut core_ctx = FakeGmpContext {
+        FakeGmpContext {
             inner: FakeGmpContextInner::default(),
             enabled,
             groups: Default::default(),
-            gmp: GmpState::new_with_enabled::<_, IntoCoreTimerCtx>(
+            gmp: GmpState::new_with_enabled_and_mode::<_, IntoCoreTimerCtx>(
                 bindings_ctx,
                 FakeWeakDeviceId(FakeDeviceId),
                 enabled,
+                mode,
             ),
             config: Default::default(),
-        };
-        core_ctx.gmp.mode = mode;
-        core_ctx
+        }
     })
 }
 

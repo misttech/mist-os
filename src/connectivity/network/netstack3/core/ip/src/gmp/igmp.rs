@@ -996,14 +996,14 @@ mod tests {
         core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
     }
 
-    fn receive_igmp_general_query(
+    fn receive_igmp_v2_general_query(
         core_ctx: &mut FakeCoreCtx,
         bindings_ctx: &mut FakeBindingsCtx,
-        resp_time: Duration,
+        resp_time: NonZeroDuration,
     ) {
         let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipQueryV2>::new_with_resp_time(
             Ipv4Addr::new([0, 0, 0, 0]),
-            resp_time.try_into().unwrap(),
+            resp_time.get().try_into().unwrap(),
         );
         let buff = ser.into_serializer().serialize_vec_outer().unwrap();
         core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
@@ -1015,7 +1015,7 @@ mod tests {
         core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, OTHER_HOST_ADDR, MY_ADDR, buff);
     }
 
-    fn setup_simple_test_environment_with_addr_subnet(
+    fn setup_igmpv2_test_environment_with_addr_subnet(
         seed: u128,
         a: Option<AddrSubnet<Ipv4Addr, Ipv4DeviceAddr>>,
     ) -> FakeCtx {
@@ -1025,10 +1025,11 @@ mod tests {
             FakeCoreCtx::with_state(FakeIgmpCtx {
                 shared: Rc::new(RefCell::new(Shared {
                     groups: MulticastGroupSet::default(),
-                    gmp_state: GmpState::new_with_enabled::<_, IntoCoreTimerCtx>(
+                    gmp_state: GmpState::new_with_enabled_and_mode::<_, IntoCoreTimerCtx>(
                         bindings_ctx,
                         FakeWeakDeviceId(FakeDeviceId),
                         igmp_enabled,
+                        GmpMode::V1 { compat: false },
                     ),
                     igmp_state: Default::default(),
                     config: Default::default(),
@@ -1042,8 +1043,8 @@ mod tests {
         ctx
     }
 
-    fn setup_simple_test_environment(seed: u128) -> FakeCtx {
-        setup_simple_test_environment_with_addr_subnet(
+    fn setup_igmpv2_test_environment(seed: u128) -> FakeCtx {
+        setup_igmpv2_test_environment_with_addr_subnet(
             seed,
             Some(AddrSubnet::new(MY_ADDR.get(), 24).unwrap()),
         )
@@ -1084,7 +1085,7 @@ mod tests {
         let addr_subnet = src_ip.map(|a| AddrSubnet::new(a.get(), 16).unwrap());
         run_with_many_seeds(|seed| {
             let FakeCtx { mut core_ctx, mut bindings_ctx } =
-                setup_simple_test_environment_with_addr_subnet(seed, addr_subnet);
+                setup_igmpv2_test_environment_with_addr_subnet(seed, addr_subnet);
 
             // Joining a group should send a report.
             assert_eq!(
@@ -1112,7 +1113,7 @@ mod tests {
     #[test]
     fn test_igmp_integration_fallback_from_idle() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
             assert_eq!(
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
@@ -1155,7 +1156,7 @@ mod tests {
     #[test]
     fn test_igmpv2_integration_igmpv1_router_present() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
 
             assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
             assert_eq!(
@@ -1234,7 +1235,7 @@ mod tests {
     #[test]
     fn test_igmp_integration_delay_reset_timer() {
         // This seed value was chosen to later produce a timer duration > 100ms.
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(123456);
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(123456);
         assert_eq!(
             core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
             GroupJoinResult::Joined(())
@@ -1278,7 +1279,7 @@ mod tests {
     #[test]
     fn test_igmp_integration_last_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
             assert_eq!(
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
@@ -1321,7 +1322,7 @@ mod tests {
     #[test]
     fn test_igmp_integration_always_idle_member() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
             assert_eq!(
                 core_ctx.gmp_join_group(
                     &mut bindings_ctx,
@@ -1338,7 +1339,7 @@ mod tests {
     #[test]
     fn test_igmp_integration_not_last_does_not_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
             assert_eq!(
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
@@ -1367,7 +1368,7 @@ mod tests {
     #[test]
     fn test_receive_general_query() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
             assert_eq!(
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
@@ -1387,11 +1388,11 @@ mod tests {
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 4);
-            const RESP_TIME: Duration = Duration::from_secs(10);
-            receive_igmp_general_query(&mut core_ctx, &mut bindings_ctx, RESP_TIME);
+            const RESP_TIME: NonZeroDuration = NonZeroDuration::from_secs(10).unwrap();
+            receive_igmp_v2_general_query(&mut core_ctx, &mut bindings_ctx, RESP_TIME);
             // Two new timers should be there.
             let now = bindings_ctx.now();
-            let range = now..=(now + RESP_TIME);
+            let range = now..=(now + RESP_TIME.get());
             core_ctx.state.gmp_state().timers.assert_range([
                 (&gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(), range.clone()),
                 (&gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR_2).into(), range),
@@ -1409,7 +1410,7 @@ mod tests {
         run_with_many_seeds(|seed| {
             // Test that we do not perform IGMP when IGMP is disabled.
 
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
             bindings_ctx.seed_rng(seed);
             // Test environment is created in enabled state.
             core_ctx.state.igmp_enabled = false;
@@ -1460,7 +1461,7 @@ mod tests {
             // Simple IGMP integration test to check that when we call top-level
             // multicast join and leave functions, IGMP is performed.
 
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
 
             assert_eq!(
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1511,7 +1512,7 @@ mod tests {
     #[test]
     fn test_igmp_enable_disable() {
         run_with_many_seeds(|seed| {
-            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(seed);
+            let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
             assert_eq!(core_ctx.take_frames(), []);
 
             assert_eq!(
@@ -1599,7 +1600,7 @@ mod tests {
     /// Test the basics of IGMPv3 report sending.
     #[test]
     fn send_igmpv3_report() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(0);
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(0);
         let sent_report_addr = Ipv4::get_multicast_addr(130);
         let sent_report_mode = GroupRecordType::ModeIsExclude;
         let sent_report_sources = Vec::<Ipv4Addr>::new();
@@ -1656,7 +1657,7 @@ mod tests {
     /// Tests IGMPv3 entering compatibility modes.
     #[test]
     fn igmpv3_version_compat() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(0);
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(0);
         core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, state| {
             gmp::enter_mode(&mut core_ctx, &mut bindings_ctx, state, GmpMode::V2);
         });
@@ -1727,7 +1728,7 @@ mod tests {
 
     #[test]
     fn version_compat_clears_on_disable() {
-        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_simple_test_environment(0);
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(0);
         assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
         assert_eq!(
             gmp::v1::handle_query_message(
@@ -1749,7 +1750,7 @@ mod tests {
 
     #[test]
     fn user_mode_change() {
-        let mut ctx = setup_simple_test_environment(0);
+        let mut ctx = setup_igmpv2_test_environment(0);
         let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
         assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), IgmpConfigMode::V2);
         assert_eq!(

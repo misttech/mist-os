@@ -516,27 +516,37 @@ impl<I: Ip, BC: GmpBindingsTypes + TimerContext> GmpState<I, BC> {
         bindings_ctx: &mut BC,
         device: D,
     ) -> Self {
-        Self::new_with_enabled::<D, CC>(bindings_ctx, device, false)
+        Self::new_with_enabled_and_mode::<D, CC>(
+            bindings_ctx,
+            device,
+            false,
+            // TODO(https://fxbug.dev/42071006): Default to V2 once ready.
+            GmpMode::V1 { compat: false },
+        )
     }
 
     /// Constructs a new `GmpState` for `device` assuming initial enabled state
-    /// `enabled`.
+    /// `enabled` and `mode`.
     ///
     /// This is meant to be called directly only in test scenarios (besides
     /// helping implement [`GmpState::new`] that is) where to decrease test
     /// verbosity `GmpState` can be created in a state that assumes
     /// [`GmpHandler::gmp_handle_maybe_enabled`] was called.
-    fn new_with_enabled<D: WeakDeviceIdentifier, CC: CoreTimerContext<GmpTimerId<I, D>, BC>>(
+    fn new_with_enabled_and_mode<
+        D: WeakDeviceIdentifier,
+        CC: CoreTimerContext<GmpTimerId<I, D>, BC>,
+    >(
         bindings_ctx: &mut BC,
         device: D,
         enabled: bool,
+        mode: GmpMode,
     ) -> Self {
         Self {
             timers: LocalTimerHeap::new_with_context::<_, CC>(
                 bindings_ctx,
                 GmpTimerId::new(device),
             ),
-            mode: Default::default(),
+            mode,
             v2_proto: Default::default(),
             enablement_idempotency_guard: LastState::from_enabled(enabled),
         }
@@ -705,13 +715,6 @@ impl GmpMode {
             Self::V2 => true,
             Self::V1 { .. } => false,
         }
-    }
-}
-
-impl Default for GmpMode {
-    fn default() -> Self {
-        // TODO(https://fxbug.dev/42071006): Default to V2 once ready.
-        Self::V1 { compat: false }
     }
 }
 
