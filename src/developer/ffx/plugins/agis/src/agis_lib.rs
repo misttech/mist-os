@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::args::{AgisCommand, ListenOp, Operation, RegisterOp};
 use anyhow::{anyhow, Result};
 use errors::ffx_error;
-use ffx_agis_args::{AgisCommand, ListenOp, Operation, RegisterOp};
 use ffx_config::EnvironmentContext;
 use fho::{daemon_protocol, moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{ListenerProxy, TargetQuery};
@@ -70,8 +70,6 @@ pub struct AgisTool {
     cmd: AgisCommand,
     context: EnvironmentContext,
 }
-
-fho::embedded_plugin!(AgisTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for AgisTool {
@@ -188,6 +186,8 @@ async fn agis_impl(
 
 #[cfg(test)]
 mod test {
+    use crate::args::{ShutdownOp, VtcsOp};
+
     use super::*;
     use ffx_config::test_init;
     use fidl_fuchsia_developer_ffx::ListenerRequest;
@@ -288,7 +288,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     pub async fn vtcs() {
-        let cmd = AgisCommand { operation: Operation::Vtcs(ffx_agis_args::VtcsOp {}) };
+        let cmd = AgisCommand { operation: Operation::Vtcs(VtcsOp {}) };
         let component_registry = fake_component_registry();
         let observer = fake_observer();
         let listener = fake_listener();
@@ -305,9 +305,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     pub async fn listen() {
-        let cmd = AgisCommand {
-            operation: Operation::Listen(ffx_agis_args::ListenOp { global_id: GLOBAL_ID }),
-        };
+        let cmd = AgisCommand { operation: Operation::Listen(ListenOp { global_id: GLOBAL_ID }) };
         let component_registry = fake_component_registry();
         let observer = fake_observer();
         let listener = fake_listener();
@@ -319,7 +317,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     pub async fn shutdown() {
-        let cmd = AgisCommand { operation: Operation::Shutdown(ffx_agis_args::ShutdownOp {}) };
+        let cmd = AgisCommand { operation: Operation::Shutdown(ShutdownOp {}) };
         let component_registry = fake_component_registry();
         let observer = fake_observer();
         let listener = fake_listener();
