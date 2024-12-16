@@ -267,10 +267,6 @@ pub struct LogCommand {
     #[argh(option, default = "SymbolizeMode::Pretty")]
     pub symbolize: SymbolizeMode,
 
-    /// DEPRECATED: use --set-severity
-    #[argh(option, from_str_fn(log_interest_selector))]
-    pub select: Vec<LogInterestSelector>,
-
     /// configure the log settings on the target device for components matching
     /// the given selector. This modifies the minimum log severity level emitted
     /// by components during the logging session.
@@ -287,10 +283,6 @@ pub struct LogCommand {
     /// filters by tid
     #[argh(option)]
     pub tid: Option<u64>,
-
-    /// DEPRECATED: use --force-set-severity
-    #[argh(switch)]
-    pub force_select: bool,
 
     /// if enabled, selectors will be passed directly to Archivist without any filtering.
     /// If disabled and no matching components are found, the user will be prompted to
@@ -320,14 +312,12 @@ impl Default for LogCommand {
             kernel: false,
             severity: Severity::Info,
             show_metadata: false,
-            force_select: false,
             force_set_severity: false,
             since: None,
             since_boot: None,
             until: None,
             until_boot: None,
             sub_command: None,
-            select: vec![],
             set_severity: vec![],
             show_full_moniker: false,
             pid: None,
@@ -481,16 +471,6 @@ impl LogCommand {
     }
 
     pub fn validate_cmd_flags_with_warnings(&mut self) -> Result<Vec<&'static str>, LogError> {
-        if !self.select.is_empty() {
-            return Err(LogError::DeprecatedFlag { flag: "--select", new_flag: "--set-severity" });
-        }
-        if self.force_select {
-            return Err(LogError::DeprecatedFlag {
-                flag: "--force-select",
-                new_flag: "--force-set-severity",
-            });
-        }
-
         let mut warnings = vec![];
 
         if !self.moniker.is_empty() {

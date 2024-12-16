@@ -220,18 +220,6 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "select"
-        }
-      },
-      "optionality": "repeating",
-      "long": "--select",
-      "short": null,
-      "description": "DEPRECATED: use --set-severity",
-      "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
           "arg_name": "set-severity"
         }
       },
@@ -263,14 +251,6 @@
       "long": "--tid",
       "short": null,
       "description": "filters by tid",
-      "hidden": false
-    },
-    {
-      "kind": "Switch",
-      "optionality": "optional",
-      "long": "--force-select",
-      "short": null,
-      "description": "DEPRECATED: use --force-set-severity",
       "hidden": false
     },
     {
