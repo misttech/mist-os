@@ -270,7 +270,6 @@ static_library("ddk") {
     "//src/devices/thermal/drivers/aml-thermistor:*",
     "//src/devices/thermal/drivers/aml-thermistor/test:*",
     "//src/devices/usb/drivers/dwc2:*",
-    "//src/devices/usb/drivers/dwc3:*",
     "//src/devices/usb/drivers/usb-bus:*",
     "//src/devices/usb/drivers/usb-composite:*",
     "//src/devices/usb/drivers/usb-hub:*",

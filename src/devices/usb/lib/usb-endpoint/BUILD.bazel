@@ -2,25 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# dma-buffer library that should eventually go into SDK
-
 package(default_visibility = ["//visibility:public"])
 
 cc_library(
-    name = "dma-buffer",
+    name = "usb-endpoint-server",
     srcs = [
-        "dma-buffer.cc",
+        "usb-endpoint-server-sdk.cc",
     ],
     hdrs = [
-        "include/lib/dma-buffer/buffer.h",
-        "include/lib/dma-buffer/phys-iter.h",
+        "include/usb-endpoint/sdk/usb-endpoint-server.h",
     ],
     includes = [
         "include",
     ],
     target_compatible_with = ["@platforms//os:fuchsia"],
     deps = [
-        "//zircon/system/ulib/fbl",
-        "@fuchsia_sdk//pkg/zx",
+        "//src/devices/lib/dma-buffer",
+        "//src/devices/usb/lib/usb:usb-fidl",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
     ],
 )
