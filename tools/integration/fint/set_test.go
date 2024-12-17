@@ -194,15 +194,16 @@ func TestRunGen(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		staticSpec      *fintpb.Static
-		gnTracePath     string
-		expectedOptions []string
+		name              string
+		staticSpec        *fintpb.Static
+		gnTracePath       string
+		expectedOptions   []string
+		unexpectedOptions []string
 	}{
 		{
 			name:            "gn trace",
 			gnTracePath:     "/tmp/gn_trace.json",
-			expectedOptions: []string{"--tracelog=/tmp/gn_trace.json"},
+			expectedOptions: []string{"--gn-tracelog=/tmp/gn_trace.json"},
 		},
 		{
 			name: "generate IDE files",
@@ -210,8 +211,26 @@ func TestRunGen(t *testing.T) {
 				IdeFiles: []string{"json", "vs"},
 			},
 			expectedOptions: []string{
-				"--ide=json",
-				"--ide=vs",
+				"--gn-ide=json",
+				"--gn-ide=vs",
+			},
+		},
+		{
+			name: "rust-project.json export enabled",
+			staticSpec: &fintpb.Static{
+				ExportRustProject: true,
+			},
+			unexpectedOptions: []string{
+				"--no-export-rust-project",
+			},
+		},
+		{
+			name: "rust-project.json export disabled",
+			staticSpec: &fintpb.Static{
+				ExportRustProject: false,
+			},
+			expectedOptions: []string{
+				"--no-export-rust-project",
 			},
 		},
 		{
@@ -219,7 +238,7 @@ func TestRunGen(t *testing.T) {
 			staticSpec: &fintpb.Static{
 				JsonIdeScripts: []string{"foo.py", "bar.py"},
 			},
-			expectedOptions: []string{"--json-ide-script=foo.py", "--json-ide-script=bar.py"},
+			expectedOptions: []string{"--gn-json-ide-script=foo.py", "--gn-json-ide-script=bar.py"},
 		},
 	}
 
@@ -249,13 +268,19 @@ func TestRunGen(t *testing.T) {
 				t.Fatalf("runGen ran wrong command: %v", cmd)
 			}
 
-			exe, subcommand, buildDir := cmd[0], cmd[1], cmd[2]
-			otherOptions := cmd[3:]
-			if filepath.Base(exe) != "gn" {
-				t.Errorf("runGen ran wrong GN executable: wanted basename %q, got %q", "gn", exe)
+			exe, arg1, fuchsiaDir, arg3, buildDir := cmd[0], cmd[1], cmd[2], cmd[3], cmd[4]
+			otherOptions := cmd[5:]
+			if filepath.Base(exe) != "regenerator" {
+				t.Errorf("runGen ran wrong GN executable: wanted basename %q, got %q", "regenerator", exe)
 			}
-			if subcommand != "gen" {
-				t.Errorf("Expected runGen to run `gn gen`, but got `gn %s`", subcommand)
+			if arg1 != "--fuchsia-dir" {
+				t.Errorf("runGen didn't use --fuchsia-dir as second argument, but: %q", arg1)
+			}
+			if fuchsiaDir != contextSpec.CheckoutDir {
+				t.Errorf("runGen didn't use correct --fuchsia-build-dir argument: %q, expected %q", fuchsiaDir, contextSpec.CheckoutDir)
+			}
+			if arg3 != "--fuchsia-build-dir" {
+				t.Errorf("runGen didn't use --fuchsia-build-dir as third argument, but: %q", arg3)
 			}
 			if buildDir != contextSpec.BuildDir {
 				t.Errorf("Expected runGen to use build dir from context (%s) but got %s", contextSpec.BuildDir, buildDir)
@@ -264,6 +289,9 @@ func TestRunGen(t *testing.T) {
 				t.Errorf("Failed to read args.gn file: %s", err)
 			}
 			assertSubset(t, tc.expectedOptions, otherOptions, false, false)
+			if len(tc.unexpectedOptions) > 0 {
+				assertNotOverlap(t, tc.unexpectedOptions, otherOptions)
+			}
 		})
 	}
 }
