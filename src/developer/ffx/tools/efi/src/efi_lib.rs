@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::args::{EfiCommand, EfiSubCommand};
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::ffx_bail;
-use ffx_efi_args::{EfiCommand, EfiSubCommand};
 use std::cmp::max;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
@@ -18,8 +18,6 @@ pub struct Efi {
     #[command]
     cmd: EfiCommand,
 }
-
-fho::embedded_plugin!(Efi);
 
 #[async_trait(?Send)]
 impl fho::FfxMain for Efi {
@@ -137,7 +135,7 @@ pub async fn command(cmd: EfiCommand) -> Result<()> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_efi_args::CreateCommand;
+    use crate::args::CreateCommand;
     use std::fs::metadata;
     use tempfile::tempdir;
 
