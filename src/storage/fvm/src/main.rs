@@ -828,7 +828,7 @@ impl Component {
             | fio::PERM_READABLE
             | fio::PERM_WRITABLE
             | fio::PERM_EXECUTABLE;
-        ObjectRequest::new3(flags, &fio::Options::default(), outgoing_dir).handle(|request| {
+        ObjectRequest::new(flags, &fio::Options::default(), outgoing_dir).handle(|request| {
             self.export_dir.clone().open3(self.scope.clone(), Path::dot(), flags, request)
         });
         Ok(())
@@ -1104,7 +1104,7 @@ impl Component {
                 | fio::PERM_READABLE
                 | fio::PERM_WRITABLE
                 | fio::PERM_EXECUTABLE;
-            ObjectRequest::new3(flags, &fio::Options::default(), server_end).handle(|request| {
+            ObjectRequest::new(flags, &fio::Options::default(), server_end).handle(|request| {
                 outgoing_dir.open3(self.scope.clone(), Path::dot(), flags, request)
             });
         }

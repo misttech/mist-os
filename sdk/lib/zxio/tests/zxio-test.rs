@@ -280,7 +280,7 @@ async fn test_read_link_error() {
     let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
     let scope = ExecutionScope::new();
     let flags = fio::PERM_READABLE | fio::Flags::PROTOCOL_DIRECTORY;
-    ObjectRequest::new3(flags, &fio::Options::default(), dir_server.into_channel())
+    ObjectRequest::new(flags, &fio::Options::default(), dir_server.into_channel())
         .handle(|request| dir.open3(scope, Path::dot(), flags, request));
 
     fasync::unblock(|| {
@@ -565,7 +565,7 @@ async fn test_allocate_file() {
     let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
     let scope = ExecutionScope::new();
     let flags = fio::PERM_READABLE | fio::PERM_WRITABLE;
-    ObjectRequest::new3(flags, &fio::Options::default(), dir_server.into_channel())
+    ObjectRequest::new(flags, &fio::Options::default(), dir_server.into_channel())
         .handle(|request| dir.open3(scope, Path::dot(), flags, request));
 
     fasync::unblock(|| {
@@ -590,7 +590,7 @@ async fn test_allocate_file_not_sup() {
     let (dir_client, dir_server) = create_endpoints::<fio::DirectoryMarker>();
     let scope = ExecutionScope::new();
     let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::PROTOCOL_DIRECTORY;
-    ObjectRequest::new3(flags, &fio::Options::default(), dir_server.into_channel())
+    ObjectRequest::new(flags, &fio::Options::default(), dir_server.into_channel())
         .handle(|request| dir.open3(scope, Path::dot(), flags, request));
 
     fasync::unblock(|| {

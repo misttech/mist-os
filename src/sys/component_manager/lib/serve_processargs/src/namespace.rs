@@ -454,7 +454,7 @@ mod tests {
         ) -> ClientEnd<fio::DirectoryMarker> {
             let scope = ExecutionScope::new();
             let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
-            ObjectRequest::new3(rights, &fio::Options::default(), server.into_channel()).handle(
+            ObjectRequest::new(rights, &fio::Options::default(), server.into_channel()).handle(
                 |request| root.open3(scope.clone(), vfs::path::Path::dot(), rights, request),
             );
             client
@@ -534,7 +534,7 @@ mod tests {
             let scope = ExecutionScope::new();
             let (client, server) = endpoints::create_endpoints::<fio::DirectoryMarker>();
             let flags = fio::PERM_READABLE;
-            ObjectRequest::new3(flags, &fio::Options::default(), server.into_channel()).handle(
+            ObjectRequest::new(flags, &fio::Options::default(), server.into_channel()).handle(
                 |request| root.open3(scope.clone(), vfs::path::Path::dot(), flags, request),
             );
             client

@@ -560,7 +560,7 @@ async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result
                 }
             }
             fio::DirectoryRequest::Open3 { path, flags, options, object, control_handle: _ } => {
-                vfs::ObjectRequest::new3(flags, &options, object).handle(|request| {
+                vfs::ObjectRequest::new(flags, &options, object).handle(|request| {
                     if path == "." {
                         launch_cloned_blobfs(request.take().into_server_end());
                         Ok(())

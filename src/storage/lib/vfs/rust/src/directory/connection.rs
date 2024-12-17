@@ -257,7 +257,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                         flags &= !fio::Flags::PERM_INHERIT_EXECUTE;
                     }
 
-                    ObjectRequest::new3(flags, &options, object)
+                    ObjectRequest::new(flags, &options, object)
                         .handle(|req| self.handle_open3(path, flags, req));
                 }
                 // Since open typically spawns a task, yield to the executor now to give that task a
@@ -296,7 +296,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
 
     fn handle_clone(&mut self, object: fidl::Channel) {
         let flags = self.options.rights.to_flags() | fio::Flags::PROTOCOL_DIRECTORY;
-        ObjectRequest::new3(flags, &Default::default(), object).handle(|req| {
+        ObjectRequest::new(flags, &Default::default(), object).handle(|req| {
             self.directory.clone().open3(self.scope.clone(), Path::dot(), flags, req)
         });
     }

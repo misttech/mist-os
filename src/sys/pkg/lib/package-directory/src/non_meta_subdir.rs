@@ -386,7 +386,7 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let scope = ExecutionScope::new();
         let flags = fio::Flags::PERM_READ;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
             .handle(|req| sub_dir.open3(scope, VfsPath::dot(), flags, req));
 
         assert_eq!(
@@ -407,7 +407,7 @@ mod tests {
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PERM_READ;
-            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
                 .handle(|req| sub_dir.clone().open3(scope, path, flags, req));
 
             assert_eq!(
@@ -429,7 +429,7 @@ mod tests {
             let scope = ExecutionScope::new();
             let path = VfsPath::validate_and_split(path).unwrap();
             let flags = fio::Flags::PERM_READ;
-            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
                 .handle(|req| sub_dir.clone().open3(scope, path, flags, req));
 
             assert_eq!(fuchsia_fs::file::read(&proxy).await.unwrap(), b"bloblob".to_vec())
@@ -446,7 +446,7 @@ mod tests {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::PERM_READ | invalid_flags;
-            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
                 .handle(|req| sub_dir.clone().open3(scope, VfsPath::dot(), flags, req));
 
             assert_matches!(
@@ -465,7 +465,7 @@ mod tests {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::PROTOCOL_FILE;
-            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
                 .handle(|req| sub_dir.clone().open3(scope, VfsPath::dot(), flags, req));
 
             assert_matches!(
@@ -479,7 +479,7 @@ mod tests {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::PERM_READ | file_flags;
-            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
                 .handle(|req| sub_dir.clone().open3(scope, VfsPath::dot(), flags, req));
 
             assert_matches!(

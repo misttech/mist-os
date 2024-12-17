@@ -68,7 +68,7 @@ fn remote_dir_construction_open_node_ref() {
         // Test open3.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PROTOCOL_NODE;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open3(scope, Path::dot(), flags, request));
         assert_close!(proxy);
     })
@@ -94,7 +94,7 @@ fn remote_dir_node_ref_with_path() {
         // Test open3.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PROTOCOL_NODE;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open3(scope, Path::dot(), flags, request));
         assert_close!(proxy);
     })
@@ -126,7 +126,7 @@ fn remote_dir_direct_connection() {
         // Test open3.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_READ;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open3(scope, Path::dot(), flags, request));
         expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
         expected
@@ -159,7 +159,7 @@ fn remote_dir_direct_connection_dir_contents() {
         // Test open3.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_READ;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
             .handle(|request| server.open3(scope, path, flags, request));
         assert_read!(proxy, "a content");
         assert_close!(proxy);

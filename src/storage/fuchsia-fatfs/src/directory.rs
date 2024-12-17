@@ -1278,7 +1278,7 @@ mod tests {
         // Open and close root.
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PERM_READ;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
             .handle(|request| root.clone().open3(scope.clone(), Path::dot(), flags, request));
         proxy
             .close()
@@ -1289,7 +1289,7 @@ mod tests {
 
         // Re-open and close root at "test".
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
             root.clone().open3(
                 scope.clone(),
                 Path::validate_and_split("test").unwrap(),
@@ -1321,7 +1321,7 @@ mod tests {
         let flags = fio::Flags::PERM_READ
             | fio::Flags::FLAG_MUST_CREATE
             | fio::Flags::FLAG_SEND_REPRESENTATION;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
             root.clone().open3(
                 scope.clone(),
                 Path::validate_and_split("test").unwrap(),
@@ -1353,7 +1353,7 @@ mod tests {
         let scope = ExecutionScope::new();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags = fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
             root.clone().open3(
                 scope.clone(),
                 Path::validate_and_split(".").unwrap(),
@@ -1404,7 +1404,7 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         let flags =
             fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES | fio::Flags::PROTOCOL_FILE;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|request| {
             root.clone().open3(
                 scope.clone(),
                 Path::validate_and_split("test_file").unwrap(),

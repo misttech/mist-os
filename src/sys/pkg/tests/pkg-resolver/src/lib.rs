@@ -556,7 +556,7 @@ where
                         .expect("mock component should only be launched once");
                     let scope = vfs::execution_scope::ExecutionScope::new();
                     let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE;
-                    ObjectRequest::new3(
+                    ObjectRequest::new(
                         flags,
                         &fio::Options::default(),
                         handles.outgoing_dir.into_channel(),

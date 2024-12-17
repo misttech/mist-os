@@ -515,7 +515,7 @@ pub mod test_util {
         let scope = ExecutionScope::new();
         let flags =
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::from_bits(fio::R_STAR_DIR.bits()).unwrap();
-        ObjectRequest::new3(flags, &fio::Options::default(), dir_server.into_channel())
+        ObjectRequest::new(flags, &fio::Options::default(), dir_server.into_channel())
             .handle(|request| dir.open3(scope, vfs::path::Path::dot(), flags, request));
         dir_proxy
     }

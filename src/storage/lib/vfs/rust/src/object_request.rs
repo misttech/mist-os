@@ -36,7 +36,7 @@ pub struct ObjectRequest {
 }
 
 impl ObjectRequest {
-    pub(crate) fn new(
+    pub(crate) fn new_deprecated(
         object_request: fidl::Channel,
         what_to_send: ObjectRequestSend,
         attributes: fio::NodeAttributesQuery,
@@ -48,8 +48,9 @@ impl ObjectRequest {
         Self { object_request, what_to_send, attributes, create_attributes, truncate }
     }
 
-    pub fn new3(flags: fio::Flags, options: &fio::Options, object_request: fidl::Channel) -> Self {
-        ObjectRequest::new(
+    /// Create a new [`ObjectRequest`] from a set of [`fio::Flags`] and [`fio::Options`]`.
+    pub fn new(flags: fio::Flags, options: &fio::Options, object_request: fidl::Channel) -> Self {
+        Self::new_deprecated(
             object_request,
             if flags.get_representation() {
                 ObjectRequestSend::OnRepresentation
@@ -60,6 +61,12 @@ impl ObjectRequest {
             options.create_attributes.as_ref(),
             flags.is_truncate(),
         )
+    }
+
+    /// DEPRECATED - Use [`ObjectRequest::new`] instead. For backwards compatibility only.
+    // TODO(https://fxbug.dev/384759360): Remove when out-of-tree instances have been migrated.
+    pub fn new3(flags: fio::Flags, options: &fio::Options, object_request: fidl::Channel) -> Self {
+        Self::new(flags, options, object_request)
     }
 
     pub(crate) fn what_to_send(&self) -> ObjectRequestSend {
@@ -310,14 +317,16 @@ pub trait Representation {
     fn node_info(&self) -> impl Future<Output = Result<fio::NodeInfoDeprecated, Status>> + Send;
 }
 
-/// Trait for converting fio::Flags and fio::OpenFlags into ObjectRequest.
+/// Convenience trait for converting [`fio::Flags`] and [`fio::OpenFlags`] into ObjectRequest.
+///
+/// If [`fio::Options`] need to be specified, use [`ObjectRequest::new`].
 pub trait ToObjectRequest: ProtocolsExt {
     fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest;
 }
 
 impl ToObjectRequest for fio::OpenFlags {
     fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest {
-        ObjectRequest::new(
+        ObjectRequest::new_deprecated(
             object_request.into().into(),
             if self.contains(fio::OpenFlags::DESCRIBE) {
                 ObjectRequestSend::OnOpen
@@ -333,7 +342,7 @@ impl ToObjectRequest for fio::OpenFlags {
 
 impl ToObjectRequest for fio::Flags {
     fn to_object_request(&self, object_request: impl Into<fidl::Handle>) -> ObjectRequest {
-        ObjectRequest::new3(*self, &Default::default(), object_request.into().into())
+        ObjectRequest::new(*self, &Default::default(), object_request.into().into())
     }
 }
 

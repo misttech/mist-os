@@ -287,7 +287,7 @@ pub async fn serve_path(
         }
     };
 
-    ObjectRequest::new3(flags, &fio::Options::default(), server_end.into_channel())
+    ObjectRequest::new(flags, &fio::Options::default(), server_end.into_channel())
         .handle(|request| root_dir.open3(scope, path, flags, request));
     Ok(())
 }

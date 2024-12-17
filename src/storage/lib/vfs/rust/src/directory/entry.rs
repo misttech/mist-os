@@ -534,7 +534,7 @@ mod tests {
         let (proxy, server) = create_proxy::<fio::NodeMarker>();
         let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FILE_APPEND;
         let mut object_request =
-            ObjectRequest::new3(flags, &Default::default(), server.into_channel());
+            ObjectRequest::new(flags, &Default::default(), server.into_channel());
 
         Arc::new(MockNode {
             callback: move |request| {

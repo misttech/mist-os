@@ -536,7 +536,7 @@ mod tests {
         let (_env, validation) = TestEnv::new().await;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags = fio::Flags::PERM_READ;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
             .handle(|req| validation.open3(ExecutionScope::new(), VfsPath::dot(), flags, req));
 
         assert_eq!(
@@ -561,7 +561,7 @@ mod tests {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::PERM_READ | invalid_flags;
-            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
                 .handle(|req| validation.clone().open3(scope, VfsPath::dot(), flags, req));
 
             assert_matches!(
@@ -580,7 +580,7 @@ mod tests {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::PROTOCOL_FILE;
-            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
                 .handle(|req| validation.clone().open3(scope, VfsPath::dot(), flags, req));
 
             assert_matches!(
@@ -594,7 +594,7 @@ mod tests {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let scope = ExecutionScope::new();
             let flags = fio::Flags::PERM_READ | file_flags;
-            ObjectRequest::new3(flags, &fio::Options::default(), server_end.into())
+            ObjectRequest::new(flags, &fio::Options::default(), server_end.into())
                 .handle(|req| validation.clone().open3(scope, VfsPath::dot(), flags, req));
 
             assert_matches!(
@@ -614,7 +614,7 @@ mod tests {
 
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
         let flags = fio::Flags::PERM_READ;
-        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|req| {
+        ObjectRequest::new(flags, &fio::Options::default(), server_end.into()).handle(|req| {
             validation.clone().open3(
                 ExecutionScope::new(),
                 VfsPath::validate_and_split("missing").unwrap(),

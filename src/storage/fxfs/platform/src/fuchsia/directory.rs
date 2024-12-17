@@ -3132,7 +3132,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let request = ObjectRequest::new(flags, &options, server_end.into_channel());
             let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = dir
@@ -3175,7 +3175,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let request = ObjectRequest::new(flags, &options, server_end.into_channel());
             let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = dir
@@ -3222,7 +3222,7 @@ mod tests {
             };
 
             // Create directory node.
-            let request = ObjectRequest::new3(flags, &options, server_end.into());
+            let request = ObjectRequest::new(flags, &options, server_end.into());
             let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             // Verify that the node was created with the attributes requested.
@@ -3280,7 +3280,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let request = ObjectRequest::new(flags, &options, server_end.into_channel());
             let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attributes = file
@@ -3324,7 +3324,7 @@ mod tests {
             let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_MAYBE_CREATE;
             let options = Default::default();
 
-            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let request = ObjectRequest::new(flags, &options, server_end.into_channel());
             let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = file
@@ -3378,7 +3378,7 @@ mod tests {
             };
 
             // Create file node.
-            let request = ObjectRequest::new3(flags, &options, server_end.into());
+            let request = ObjectRequest::new(flags, &options, server_end.into());
             let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             // Verify that the node was created with the attributes requested.
