@@ -516,13 +516,7 @@ impl<I: Ip, BC: GmpBindingsTypes + TimerContext> GmpState<I, BC> {
         bindings_ctx: &mut BC,
         device: D,
     ) -> Self {
-        Self::new_with_enabled_and_mode::<D, CC>(
-            bindings_ctx,
-            device,
-            false,
-            // TODO(https://fxbug.dev/42071006): Default to V2 once ready.
-            GmpMode::V1 { compat: false },
-        )
+        Self::new_with_enabled_and_mode::<D, CC>(bindings_ctx, device, false, GmpMode::V2)
     }
 
     /// Constructs a new `GmpState` for `device` assuming initial enabled state

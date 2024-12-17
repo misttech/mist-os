@@ -115,35 +115,21 @@ fn check_igmpv3_report(
 
 fn check_igmp_report(
     igmp_version: Option<fnet_interfaces_admin::IgmpVersion>,
-    netstack_version: NetstackVersion,
     dst_ip: net_types_ip::Ipv4Addr,
     payload: &[u8],
     expected_group: net_types_ip::Ipv4Addr,
 ) -> bool {
-    match igmp_version {
-        Some(version) => match version {
-            fnet_interfaces_admin::IgmpVersion::V1 => {
-                check_igmpv1_report(dst_ip, payload, expected_group)
-            }
-            fnet_interfaces_admin::IgmpVersion::V2 => {
-                check_igmpv2_report(dst_ip, payload, expected_group)
-            }
-            fnet_interfaces_admin::IgmpVersion::V3 => {
-                check_igmpv3_report(dst_ip, payload, expected_group)
-            }
-            _ => panic!("unknown IGMP version {:?}", version),
-        },
-        None => match netstack_version {
-            NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => {
-                check_igmpv3_report(dst_ip, payload, expected_group)
-            }
-            NetstackVersion::Netstack3 => check_igmpv2_report(dst_ip, payload, expected_group),
-            v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
-            | NetstackVersion::ProdNetstack2
-            | NetstackVersion::ProdNetstack3) => {
-                panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
-            }
-        },
+    match igmp_version.unwrap_or(fnet_interfaces_admin::IgmpVersion::V3) {
+        fnet_interfaces_admin::IgmpVersion::V1 => {
+            check_igmpv1_report(dst_ip, payload, expected_group)
+        }
+        fnet_interfaces_admin::IgmpVersion::V2 => {
+            check_igmpv2_report(dst_ip, payload, expected_group)
+        }
+        fnet_interfaces_admin::IgmpVersion::V3 => {
+            check_igmpv3_report(dst_ip, payload, expected_group)
+        }
+        other => panic!("unknown IGMP version {:?}", other),
     }
 }
 
@@ -281,14 +267,8 @@ async fn sends_igmp_reports<N: Netstack>(
                 //   IP TTL 1, ...
                 assert_eq!(ttl, 1, "IGMP messages must have a TTL of 1");
 
-                check_igmp_report(
-                    igmp_version,
-                    N::VERSION,
-                    dst_ip,
-                    payload,
-                    net_types_ip_multicast_addr,
-                )
-                .then_some(())
+                check_igmp_report(igmp_version, dst_ip, payload, net_types_ip_multicast_addr)
+                    .then_some(())
             }
         },
     );
