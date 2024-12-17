@@ -12,6 +12,7 @@ cc_library(
     hdrs = [
         "mock-mmio-range.h",
     ],
+    include_prefix = "lib/driver/mock-mmio-range/cpp",
     target_compatible_with = ["@platforms//os:fuchsia"],
     deps = [
         "@fuchsia_sdk//pkg/mmio",
