@@ -24,9 +24,10 @@ message Static {
     OPTIMIZE_UNSPECIFIED = 0;
     DEBUG = 1;
     RELEASE = 2;
+    BALANCED = 3;
   }
 
-  // The optimization level for the build.
+  // This is the compilation_mode for the build, not the "optimize" build argument.
   Optimize optimize = 1;
 
   // The board to build.

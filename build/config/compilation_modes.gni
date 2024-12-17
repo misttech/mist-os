@@ -85,6 +85,18 @@ if (compilation_mode == "" && is_debug == "") {
 } else {
   # Compilation mode has not been set, but is_debug has, so set compilation_mode
   # to match
+  if (_print_warnings) {
+    print()
+    print(
+        "WARNING: Setting 'is_debug' is deprecated, please use 'compilation_mode' instead.")
+    print()
+    if (is_debug) {
+      print("  compilation_mode = \"debug\"")
+    } else {
+      print("  compilation_mode = \"release\"")
+    }
+    print()
+  }
   if (is_debug) {
     compilation_mode = "debug"
   } else {

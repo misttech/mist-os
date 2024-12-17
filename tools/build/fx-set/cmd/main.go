@@ -191,6 +191,7 @@ type setArgs struct {
 	includeClippy bool
 
 	isRelease        bool
+	isBalanced       bool
 	netboot          bool
 	cargoTOMLGen     bool
 	jsonIDEScripts   []string
@@ -251,6 +252,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.StringVar(&cmd.mainPbLabel, "main-pb", "", "")
 
 	flagSet.BoolVar(&cmd.isRelease, "release", false, "")
+	flagSet.BoolVar(&cmd.isBalanced, "balanced", false, "")
 	flagSet.BoolVar(&cmd.netboot, "netboot", false, "")
 	flagSet.BoolVar(&cmd.cargoTOMLGen, "cargo-toml-gen", false, "")
 	flagSet.StringSliceVar(&cmd.jsonIDEScripts, "json-ide-script", []string{}, "")
@@ -336,6 +338,8 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		nameComponents = append(nameComponents, cmd.variants...)
 		if cmd.isRelease {
 			nameComponents = append(nameComponents, "release")
+		} else if cmd.isBalanced {
+			nameComponents = append(nameComponents, "balanced")
 		}
 		cmd.buildDir = filepath.Join("out", strings.Join(nameComponents, "-"))
 	}
@@ -363,7 +367,13 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 
 	optimize := fintpb.Static_DEBUG
 	if args.isRelease {
+		if args.isBalanced {
+			return nil, fmt.Errorf("Only one of --release and --balanced can be specified.")
+		}
 		optimize = fintpb.Static_RELEASE
+
+	} else if args.isBalanced {
+		optimize = fintpb.Static_BALANCED
 	}
 
 	variants := args.variants

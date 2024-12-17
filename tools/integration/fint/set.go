@@ -277,11 +277,6 @@ func genArgs(
 		vars["target_cpu"] = strings.ToLower(staticSpec.TargetArch.String())
 	}
 
-	if staticSpec.Optimize == fintpb.Static_OPTIMIZE_UNSPECIFIED {
-		return nil, fmt.Errorf("optimize is unspecified or invalid")
-	}
-	vars["is_debug"] = staticSpec.Optimize == fintpb.Static_DEBUG
-
 	if contextSpec.ClangToolchainDir != "" {
 		vars["clang_prefix"] = filepath.Join(contextSpec.ClangToolchainDir, "bin")
 	}
@@ -418,16 +413,34 @@ func genArgs(
 		vars["rust_incremental"] = filepath.Join(contextSpec.CacheDir, "rust_cache")
 	}
 
-	var importArgs, varArgs, targetListArgs, testArgs, localArgs, overridesArgs []string
+	var importArgs, varArgs, targetListArgs, testArgs, localArgs, overridesArgs, compileArgs []string
 
 	// Add comments to make args.gn more readable.
+	compileArgs = append(compileArgs, "\n\n# Compilation args:")
 	varArgs = append(varArgs, "\n\n# Basic args:")
 	targetListArgs = append(targetListArgs, "\n\n# Target lists:")
 	testArgs = append(testArgs, "\n\n# Tests to add to build: (these are validated by test-type)")
 
-	// vars are directly set in the "basic args" block
+	// compilation args are set in a single block
+	if staticSpec.Optimize == fintpb.Static_OPTIMIZE_UNSPECIFIED {
+		return nil, fmt.Errorf("optimize is unspecified or invalid")
+	}
+	var compilationMode string
+	switch staticSpec.Optimize {
+	case fintpb.Static_DEBUG:
+		compilationMode = "debug"
+	case fintpb.Static_BALANCED:
+		compilationMode = "balanced"
+	case fintpb.Static_RELEASE:
+		compilationMode = "release"
+	default:
+		return nil, fmt.Errorf("unknown Optimize value: %s", staticSpec.Optimize.String())
+	}
+	compileArgs = appendGNArg(compileArgs, "compilation_mode", compilationMode)
+
+	// other vars are directly set in the "basic args" block
 	for k, v := range vars {
-		varArgs = append(varArgs, fmt.Sprintf("%s=%s", k, toGNValue(v)))
+		varArgs = appendGNArg(varArgs, k, v)
 	}
 
 	for _, arg := range staticSpec.GnArgs {
@@ -447,24 +460,24 @@ func genArgs(
 	for k, v := range targetLists {
 		// Products and Boards are now using their own namespace of GN args, and not
 		// using these target lists, which are used only by infra or developers.
-		targetListArgs = append(targetListArgs, fmt.Sprintf("%s=%s", k, toGNValue(v)))
+		targetListArgs = appendGNArg(targetListArgs, k, v)
 	}
 	sort.Strings(targetListArgs)
 
 	// Add the "build_only_labels" to the end of appendArgs so that it stays in
 	// the "#Target lists:" block, which is semantically where it belongs.
-	targetListArgs = append(targetListArgs, fmt.Sprintf("%s=%s", "build_only_labels", toGNValue(staticSpec.BuildOnlyLabels)))
+	targetListArgs = appendGNArg(targetListArgs, "build_only_labels", staticSpec.BuildOnlyLabels)
 
 	// The test vars are kept in a particular order to match the BUILD.gn files.
 	for _, k := range []string{"hermetic_test_package_labels", "test_package_labels", "e2e_test_labels", "host_test_labels"} {
-		testArgs = append(testArgs, fmt.Sprintf("%s=%s", k, toGNValue(testVars[k])))
+		testArgs = appendGNArg(testArgs, k, testVars[k])
 	}
 
 	if len(staticSpec.DeveloperTestLabels) != 0 && skipLocalArgs {
 		return nil, fmt.Errorf("'developer_test_labels' cannot be provided when 'skipLocalArgs' is true")
 	}
 	testArgs = append(testArgs, "\n\n# Additional tests: (not validated by test-type)")
-	testArgs = append(testArgs, fmt.Sprintf("%s=%s", "developer_test_labels", toGNValue(staticSpec.DeveloperTestLabels)))
+	testArgs = appendGNArg(testArgs, "developer_test_labels", staticSpec.DeveloperTestLabels)
 
 	for _, p := range imports {
 		importArgs = append(importArgs, fmt.Sprintf(`import("//%s")`, p))
@@ -528,6 +541,7 @@ func genArgs(
 	// modified by other arguments.
 	var finalArgs []string
 	finalArgs = append(finalArgs, importArgs...)
+	finalArgs = append(finalArgs, compileArgs...)
 	finalArgs = append(finalArgs, varArgs...)
 	finalArgs = append(finalArgs, targetListArgs...)
 	finalArgs = append(finalArgs, testArgs...)
@@ -586,4 +600,11 @@ func toGNValue(x interface{}) string {
 	default:
 		panic(fmt.Sprintf("unsupported arg value type %T", val))
 	}
+}
+
+// appendGNArg appends an argument to a list of GN arguments, which is one per
+// line.  The value is converted from a Go value to a string representation
+// using toGNValue.
+func appendGNArg(varlist []string, name string, value interface{}) []string {
+	return append(varlist, fmt.Sprintf("%s=%s", name, toGNValue(value)))
 }

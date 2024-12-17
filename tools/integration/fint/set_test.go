@@ -335,7 +335,7 @@ func TestGenArgs(t *testing.T) {
 			name: "minimal specs",
 			expectedArgs: []string{
 				`target_cpu="x64"`,
-				`is_debug=true`,
+				`compilation_mode="debug"`,
 			},
 		},
 		{
@@ -344,7 +344,7 @@ func TestGenArgs(t *testing.T) {
 				TargetArch: fintpb.Static_ARM64,
 				Optimize:   fintpb.Static_RELEASE,
 			},
-			expectedArgs: []string{`target_cpu="arm64"`, `is_debug=false`},
+			expectedArgs: []string{`target_cpu="arm64"`, `compilation_mode="release"`},
 		},
 		{
 			name: "clang toolchain",
