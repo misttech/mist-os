@@ -162,26 +162,15 @@ class PowerSampler:
     ```
     sampler:PowerSampler = create_power_sampler(...)
     sampler.start()
-    ... interact with the device, also gather traces ...
-    sampler.stop()
-
-    sampler.metrics_processor().process_and_save(model, output_path="my_test.fuchsiaperf.json")
-    ```
-
-    Alternatively, the sampler can be combined with the results of other metric processors like this:
-    ```
-    power_sampler = PowerSampler(...)
-
-    processor = MetricsProcessorSet([
-      CpuMetricsProcessor(aggregates_only=True),
-      FpsMetricsProcessor(aggregates_only=False),
-      MyCustomProcessor(...),
-      power_sampler.metrics_processor(),
-    ])
 
     ... gather traces, start and stop the power sampler, create the model ...
 
-    processor.process_and_save(model, output_path="my_test.fuchsiaperf.json")
+    sampler.stop()
+
+    trace_model_with_power =
+        power_test_utils.merge_power_data(model, sampler.extract_samples(), outpath)
+    processor = PowerMetricsProcessor()
+    processor.process_metrics(trace_model_with_power)
     ```
     """
 

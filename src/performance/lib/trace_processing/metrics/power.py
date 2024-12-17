@@ -119,7 +119,13 @@ class AggregatePowerMetrics:
 
 
 class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
-    """Computes power consumption metrics."""
+    """Computes aggregate power consumption metrics.
+
+    Given a trace containing power samples, separately computes aggregate power usage metrics for:
+    * The duration of the entire workload captured by the trace.
+    * Any periods of suspension for the device.
+    * Periods during which the device is NOT suspended (iff suspends are detected).
+    """
 
     def __init__(
         self,
