@@ -25,7 +25,7 @@ use packet_formats::igmp::messages::{
     IgmpMembershipReportV2, IgmpMembershipReportV3Builder, IgmpPacket,
 };
 use packet_formats::igmp::{IgmpMessage, IgmpPacketBuilder, MessageType};
-use packet_formats::ip::Ipv4Proto;
+use packet_formats::ip::{DscpAndEcn, Ipv4Proto};
 use packet_formats::ipv4::options::Ipv4Option;
 use packet_formats::ipv4::{
     Ipv4OptionsTooLongError, Ipv4PacketBuilder, Ipv4PacketBuilderWithOptions,
@@ -405,7 +405,8 @@ where
     ) {
         let Self { core_ctx, igmp_state: _ } = self;
         let dst_ip = ALL_IGMPV3_CAPABLE_ROUTERS;
-        let header = new_ip_header_builder(core_ctx, device, dst_ip);
+        let mut header = new_ip_header_builder(core_ctx, device, dst_ip);
+        header.prefix_builder_mut().dscp_and_ecn(IGMPV3_DSCP_AND_ECN);
         let avail_len =
             usize::from(core_ctx.get_mtu(device)).saturating_sub(header.constraints().header_len());
         let reports = match IgmpMembershipReportV3Builder::new(groups).with_len_limits(avail_len) {
@@ -639,6 +640,16 @@ impl Iterator for IgmpIpOptions {
 /// [RFC 3376 section 4]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-4
 const IGMP_IP_TTL: u8 = 1;
+
+/// The required IP DSCP and ECN for IGMPv3 messages.
+///
+/// [RFC 3376 section 4] defines the IP TOS (now DSCP and ECN) as having the
+/// value 0xc0. So we construct the [`DscpAndEcn`] value from the value
+/// specified in the RFC.
+///
+/// [RFC 3376 section 4]:
+///     https://datatracker.ietf.org/doc/html/rfc3376#section-4
+const IGMPV3_DSCP_AND_ECN: DscpAndEcn = DscpAndEcn::new_with_raw(0xc0);
 
 fn new_ip_header_builder<BC: IgmpBindingsContext, CC: IgmpSendContext<BC>>(
     core_ctx: &mut CC,
@@ -1627,6 +1638,7 @@ mod tests {
         assert_eq!(ipv4.src_ip(), MY_ADDR.get());
         assert_eq!(ipv4.dst_ip(), ALL_IGMPV3_CAPABLE_ROUTERS.get());
         assert_eq!(ipv4.proto(), Ipv4Proto::Igmp);
+        assert_eq!(ipv4.dscp_and_ecn(), IGMPV3_DSCP_AND_ECN);
         assert_eq!(
             ipv4.iter_options()
                 .map(|o| {
