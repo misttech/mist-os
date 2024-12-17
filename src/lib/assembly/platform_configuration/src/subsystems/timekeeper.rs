@@ -49,14 +49,11 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
         // to the appropriate hardware device to do so.
         let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms;
 
-        let has_aml_hrtimer = context.board_info.provides_feature("fuchsia::aml-hrtimer");
+        let has_aml_timer = context.board_info.provides_feature("fuchsia::aml-hrtimer");
 
-        if serve_fuchsia_time_alarms {
-            // For devices that use aml-hrtimer.
-            if !has_aml_hrtimer {
-                anyhow::bail!("serve_fuchsia_time_alarms==true requires board feature: `fuchsia::aml-hrtimer`");
-            }
-
+        // Adds hrtimer routing only for boards that have hardware support for
+        // doing so.
+        if has_aml_timer && serve_fuchsia_time_alarms {
             // For all devices.
             builder.platform_bundle("timekeeper_wake_alarms");
             // At the moment only the aml-hrtimer is supported. Stay tuned.
@@ -65,8 +62,6 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
 
         // Allows Timekeeper to short-circuit RTC driver detection at startup.
         let has_real_time_clock = context.board_info.provides_feature("fuchsia::real_time_clock");
-
-        let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms;
 
         let mut config_builder = builder
             .package("timekeeper")
