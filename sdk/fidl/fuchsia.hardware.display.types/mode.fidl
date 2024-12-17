@@ -24,6 +24,8 @@ type Mode = struct {
     /// the "active area" or "active pixels" in raster scan terminology. Despite
     /// the name, some of the "active pixels" may not actually be shown to the
     /// user, for example due to corners or notches.
+    ///
+    /// Valid modes have non-empty active areas.
     active_area fuchsia.math.SizeU;
 
     /// Number of images transmitted to the display in 1,000 seconds.
@@ -31,6 +33,8 @@ type Mode = struct {
     /// This quantity is also known as the display's frame rate, or the
     /// display's vertical refresh rate. The rate is measured in millihertz
     /// (mHz).
+    ///
+    /// Valid modes have positive refresh rates.
     refresh_rate_millihertz uint32;
 
     flags ModeFlags;

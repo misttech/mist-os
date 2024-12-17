@@ -246,17 +246,36 @@ type ModeFlag = strict enum : uint32 {
 };
 
 /// The video parameters which specify the display mode.
+///
+/// A superset of the [`fuchsia.hardware.display.types/Mode`] FIDL type.
 type DisplayMode = struct {
+    /// The rate at which pixel data gets transferred to the display.
+    ///
+    /// Valid modes have positive pixel clock rates. This constraint effectively
+    /// means that the refresh rate / frame rate must be positive.
     pixel_clock_hz int64;
+
+    /// The horizontal size of the display's addresable area.
+    ///
+    /// The value must not be zero for valid modes. This constraint effectively
+    /// means that the display's active area must not be empty.
     h_addressable uint32;
+
     h_front_porch uint32;
     h_sync_pulse uint32;
     h_blanking uint32;
+
+    /// The horizontal size of the display's addresable area.
+    ///
+    /// The value must not be zero for valid modes. This constraint effectively
+    /// means that the display's active area must not be empty.
     v_addressable uint32;
+
     v_front_porch uint32;
     v_sync_pulse uint32;
     v_blanking uint32;
-    /// A bitmask of MODE_FLAG_* values
+
+    /// Reserved for future extensibility. Must be zero.
     flags uint32;
 };
 
