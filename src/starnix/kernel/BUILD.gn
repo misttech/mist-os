@@ -650,14 +650,15 @@ loadable_module("vdso") {
     "vdso/vdso-${current_cpu}.cc",
     "vdso/vdso-common.cc",
   ]
-  deps = [
-    ":vdso-calculate-utc",
-    "//zircon/kernel/lib/fasttime:headers",
-    "//zircon/system/public",
-  ]
+  if (current_cpu == "arm") {
+    sources += [ "vdso/vdso-arm-eabi.cc" ]
+  }
+
+  deps = [ "//zircon/system/public" ]
 
   if (current_cpu != "arm") {
     deps += [
+      ":vdso-calculate-utc",
       "//zircon/kernel/lib/fasttime:headers",
       "//zircon/system/ulib/affine",
     ]
