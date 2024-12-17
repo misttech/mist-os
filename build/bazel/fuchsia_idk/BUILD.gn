@@ -2,9 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/python_build_time_tests.gni")
+
 # All tests here should be run at build time, as they are critical
 # to ensure the build works correctly.
-
 action("integration_test") {
   testonly = true
   script = "//build/bazel/fuchsia_idk/generate_repository_validation.py"
@@ -19,21 +20,9 @@ action("integration_test") {
   hermetic_inputs_file = "$target_out_dir/$target_name.hermetic_inputs"
 }
 
-action("unit_tests") {
-  testonly = true
-  script = "//build/api/run_all_tests.py"
-  inputs = [
-    "generate_repository.py",
-    "generate_repository_test.py",
-  ]
-  outputs = [ "$target_out_dir/$target_name.check" ]
-  args = [
-    "--quiet",
-    "--source-dir",
-    rebase_path(get_label_info(":$target_name", "dir"), root_build_dir),
-    "--stamp",
-    rebase_path(outputs[0], root_build_dir),
-  ]
+python_build_time_tests("unit_tests") {
+  tests = [ "generate_repository_test.py" ]
+  inputs = [ "generate_repository.py" ]
 }
 
 group("tests") {

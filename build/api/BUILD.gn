@@ -2,37 +2,25 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/python/python_host_test.gni")
+import("//build/testing/python_build_time_tests.gni")
 
-group("tests") {
-  testonly = true
-  public_deps = [ ":run_all_tests($host_toolchain)" ]
+python_build_time_tests("tests") {
+  tests = [
+    "build_api_filter_test.py",
+    "client_test.py",
+    "gn_labels_test.py",
+    "gn_ninja_outputs_test.py",
+    "ninja_artifacts_test.py",
+  ]
+  inputs = [
+    "build_api_filter.py",
+    "client",
+    "client.py",
+    "gn_labels.py",
+    "gn_ninja_outputs.py",
+    "ninja_artifacts.py",
+
+    # Ninja is accessed implicitly by the test now.
+    "//prebuilt/third_party/ninja/${host_os}-${host_cpu}/ninja",
+  ]
 }
-
-if (current_toolchain == host_toolchain) {
-  action("run_all_tests") {
-    script = "//build/api/run_all_tests.py"
-    inputs = [
-      "build_api_filter.py",
-      "build_api_filter_test.py",
-      "client",
-      "client.py",
-      "client_test.py",
-      "gn_labels.py",
-      "gn_labels_test.py",
-      "gn_ninja_outputs.py",
-      "gn_ninja_outputs_test.py",
-      "ninja_artifacts.py",
-      "ninja_artifacts_test.py",
-
-      # Ninja is accessed implicitly by the test now.
-      "//prebuilt/third_party/ninja/${host_os}-${host_cpu}/ninja",
-    ]
-    outputs = [ "$target_out_dir/$target_name.check" ]
-    args = [
-      "--quiet",
-      "--stamp",
-      rebase_path(outputs[0], root_build_dir),
-    ]
-  }
-}  # is_host

@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Run all Python tests in source directory. A.k.a. a poor man's pytest."""
+"""Run a series of Python tests from a given directory or explicit list. A.k.a a basic pytest."""
 
 import argparse
 import os
@@ -17,7 +17,14 @@ def main():
     parser.add_argument(
         "--source-dir",
         type=Path,
-        help="Source directory (default is current one)",
+        help="Source directory to scan for *_test.py files to run.",
+    )
+    parser.add_argument(
+        "--test-files",
+        type=Path,
+        nargs="+",
+        default=[],
+        help="Python test file path.",
     )
     parser.add_argument(
         "--quiet",
@@ -30,20 +37,21 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.source_dir:
-        source_dir = Path(__file__).parent
-    else:
+    test_files = args.test_files
+    if args.source_dir:
         source_dir = args.source_dir
+        test_files += sorted(
+            (source_dir / filename)
+            for filename in os.listdir(args.source_dir)
+            if filename.endswith("_test.py")
+        )
 
-    test_files = sorted(
-        file for file in os.listdir(source_dir) if file.endswith("_test.py")
-    )
     failures = []
     for test_file in test_files:
         if not args.quiet:
             print(f"Running {test_file}", file=sys.stderr)
         ret = subprocess.run(
-            [sys.executable, source_dir / test_file],
+            [sys.executable, "-S", test_file],
             text=True,
             capture_output=True,
         )
