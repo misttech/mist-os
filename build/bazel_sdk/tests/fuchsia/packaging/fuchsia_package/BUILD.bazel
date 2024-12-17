@@ -32,9 +32,7 @@ REPO_DEFAULT_ABI_REVISION = [
     if level.api_level == "16"
 ][0]
 
-# Values used in tests of `pkg_for_test` and variantes for different levels.
-EXPECTED_BLOBS_IN_PKG = {
-    "bin/cc_bin": "cc_bin.binary_stripped",
+_COMMON_EXPECTED_BLOBS_IN_PKG_WITH_CC_COMPONENT = {
     "data/text_file.txt": "text_file.txt",
 
     # Common files that should automatically be added
@@ -48,6 +46,17 @@ EXPECTED_BLOBS_IN_PKG = {
     "lib/libunwind.so.1": "libunwind.so.1",
     "lib/libfdio.so": "libfdio.so",
 }
+
+# Values used in tests of `pkg_for_test` and variantes for different levels.
+EXPECTED_BLOBS_IN_PKG = {
+    "bin/cc_bin": "cc_bin.binary_stripped",
+} | _COMMON_EXPECTED_BLOBS_IN_PKG_WITH_CC_COMPONENT
+
+# The C++ binary in package_with_binary_linkable_only_at_head_api_level has
+# a different name.
+EXPECTED_BLOBS_IN_LINKABLE_ONLY_AT_HEAD_PKG = {
+    "bin/cc_bin_with_main_only_at_head": "cc_bin_with_main_only_at_head.binary_stripped",
+} | _COMMON_EXPECTED_BLOBS_IN_PKG_WITH_CC_COMPONENT
 
 MANIFESTS_FOR_PKG = [
     "meta/cc_component.cm",
@@ -97,6 +106,7 @@ test_suite(
         ":failure_test_pkg_without_api_level_and_no_repo_default",
         ":failure_test_pkg_without_api_level_and_unknown_repo_default",
         ":failure_test_pkg_at_next_api_level_with_unknown_override_api_level",
+        ":cc_pkg_linkable_only_at_head_api_level",
     ],
     visibility = ["//visibility:public"],
 )
@@ -450,4 +460,22 @@ unknown_override_api_level_failure_test(
     # ERROR: .../obj/build/bazel/bazel_sdk/bazel_sdk_tests/output_base/external/fuchsia_sdk/pkg/fdio/BUILD.bazel:26:11: @@fuchsia_sdk//fuchsia/constraints:is_x64_api_HEAD is not a valid select() condition for @@fuchsia_sdk//pkg/fdio:fdio.
     # TODO(https://fxbug.dev/382773036): Fix this and use `pkg_at_next_api_level`.
     target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_next_api_level_without_cc_component",
+)
+
+# Tests use of "@fuchsia_sdk//fuchsia/constraints:api_level_HEAD" and the
+# presence of other constraints.
+# Negative tests of the other constraints do not appear to be possible because
+# the binaries would fail to link and failure tests only cover analysis phase.
+# TODO(https://fxbug.dev/382560521): Once the bug is resolved, change all
+# `_only_at_head` to `_only_at_next` because "HEAD" has often been the default
+# and does not provide as much confidence in the excercising of the constraints.
+fuchsia_package_checker_test(
+    name = "cc_pkg_linkable_only_at_head_api_level",
+    package_name = "package_with_binary_linkable_only_at_head_api_level_for_test",
+    size = "small",
+    expected_abi_revision = HEAD_ABI_REVISION,
+    expected_blobs_to_file_names = EXPECTED_BLOBS_IN_LINKABLE_ONLY_AT_HEAD_PKG,
+    manifests = MANIFESTS_FOR_PKG,
+    package_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:package_with_binary_linkable_only_at_head_api_level",
+    structured_config_files = STRUCTURED_CONFIG_FILES,
 )
