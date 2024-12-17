@@ -31,8 +31,40 @@ where
     register_socket_tunnel_device(
         locked,
         current_task,
+        b"/dev/nanohub_bt".into(),
+        b"nanohub_bt".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_console".into(),
+        b"nanohub_console".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_debug_log".into(),
+        b"nanohub_debug_log".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
         b"/dev/nanohub_display".into(),
         b"nanohub_display".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_metrics".into(),
+        b"nanohub_metrics".into(),
         b"nanohub".into(),
         DeviceDirectory::new,
     );
@@ -49,6 +81,30 @@ where
         current_task,
         b"/dev/nanohub_render".into(),
         b"nanohub_render".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_rpc0".into(),
+        b"nanohub_rpc0".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_rpc1".into(),
+        b"nanohub_rpc1".into(),
+        b"nanohub".into(),
+        DeviceDirectory::new,
+    );
+    register_socket_tunnel_device(
+        locked,
+        current_task,
+        b"/dev/nanohub_touch".into(),
+        b"nanohub_touch".into(),
         b"nanohub".into(),
         DeviceDirectory::new,
     );

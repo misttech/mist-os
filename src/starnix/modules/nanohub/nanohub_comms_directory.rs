@@ -54,6 +54,11 @@ impl NanohubCommsDirectory {
         });
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
+            name: b"hw_reset".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
             name: b"wakeup_event_msec".into(),
             inode: None,
         });
@@ -121,6 +126,13 @@ impl FsNodeOps for NanohubCommsDirectory {
                     b"/sys/devices/virtual/nanohub/nanohub_comms/firmware_version".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+            )),
+            b"hw_reset" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/hw_reset".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o220), FsCred::root()),
             )),
             b"wakeup_event_msec" => Ok(node.fs().create_node(
                 current_task,
