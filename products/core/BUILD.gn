@@ -32,12 +32,6 @@ _platform_configuration_base = {
     }
   }
 
-  connectivity = {
-    network = {
-      netstack_version = "netstack3"
-    }
-  }
-
   fonts = {
     # See base_packages below.
     font_collection = "small-open-fonts-collection"
@@ -145,19 +139,6 @@ product_assembly_configuration("core_with_minfs") {
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
     forward_variables_from(_storage_minfs, "*")
-  }
-  product = {
-    build_info = default_product_build_info
-  }
-
-  base_packages = _base_packages
-  deps = [ "//build/info:build_info_files" ]
-}
-
-product_assembly_configuration("core_with_netstack3") {
-  testonly = true
-  platform = {
-    forward_variables_from(_platform_configuration_base, "*")
   }
   product = {
     build_info = default_product_build_info
