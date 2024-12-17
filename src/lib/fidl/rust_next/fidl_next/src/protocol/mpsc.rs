@@ -9,6 +9,7 @@ use core::future::Future;
 use core::mem::take;
 use core::pin::Pin;
 use core::slice::from_raw_parts_mut;
+use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::{Context, Poll};
 use std::sync::{mpsc, Arc};
 
@@ -18,34 +19,42 @@ use crate::decoder::InternalHandleDecoder;
 use crate::protocol::Transport;
 use crate::{Chunk, DecodeError, Decoder, CHUNK_SIZE};
 
+struct Shared {
+    is_closed: AtomicBool,
+    send_wakers: [AtomicWaker; 2],
+}
+
+impl Shared {
+    fn close(&self) {
+        let was_closed = self.is_closed.swap(true, Ordering::Relaxed);
+        if !was_closed {
+            for send_waker in &self.send_wakers {
+                send_waker.wake();
+            }
+        }
+    }
+}
+
 /// A paired mpsc transport.
 pub struct Mpsc {
+    shared: Arc<Shared>,
+    end: usize,
     sender: mpsc::Sender<Vec<Chunk>>,
-    send_waker: Arc<AtomicWaker>,
     receiver: mpsc::Receiver<Vec<Chunk>>,
-    recv_waker: Arc<AtomicWaker>,
 }
 
 impl Mpsc {
     /// Creates two mpscs which can communicate with each other.
     pub fn new() -> (Mpsc, Mpsc) {
+        let shared = Arc::new(Shared {
+            is_closed: AtomicBool::new(false),
+            send_wakers: [AtomicWaker::new(), AtomicWaker::new()],
+        });
         let (a_send, a_recv) = mpsc::channel();
-        let a_send_waker = Arc::new(AtomicWaker::new());
         let (b_send, b_recv) = mpsc::channel();
-        let b_send_waker = Arc::new(AtomicWaker::new());
         (
-            Mpsc {
-                sender: a_send,
-                send_waker: a_send_waker.clone(),
-                receiver: b_recv,
-                recv_waker: b_send_waker.clone(),
-            },
-            Mpsc {
-                sender: b_send,
-                send_waker: b_send_waker,
-                receiver: a_recv,
-                recv_waker: a_send_waker,
-            },
+            Mpsc { shared: shared.clone(), end: 0, sender: a_send, receiver: b_recv },
+            Mpsc { shared, end: 1, sender: b_send, receiver: a_recv },
         )
     }
 }
@@ -68,9 +77,11 @@ impl fmt::Display for Error {
 impl core::error::Error for Error {}
 
 /// The send end of a paired mpsc transport.
+#[derive(Clone)]
 pub struct Sender {
+    shared: Arc<Shared>,
+    end: usize,
     sender: mpsc::Sender<Vec<Chunk>>,
-    waker: Arc<AtomicWaker>,
 }
 
 /// The send future for a paired mpsc transport.
@@ -83,10 +94,14 @@ impl Future for SendFuture<'_> {
     type Output = Result<(), Error>;
 
     fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.sender.shared.is_closed.load(Ordering::Relaxed) {
+            return Poll::Ready(Err(Error::Closed));
+        }
+
         let chunks = take(&mut self.buffer);
         match self.sender.sender.send(chunks) {
             Ok(()) => {
-                self.sender.waker.wake();
+                self.sender.shared.send_wakers[self.sender.end].wake();
                 Poll::Ready(Ok(()))
             }
             Err(_) => Poll::Ready(Err(Error::Closed)),
@@ -96,8 +111,9 @@ impl Future for SendFuture<'_> {
 
 /// The receive end of a paired mpsc transport.
 pub struct Receiver {
+    shared: Arc<Shared>,
+    end: usize,
     receiver: mpsc::Receiver<Vec<Chunk>>,
-    waker: Arc<AtomicWaker>,
 }
 
 /// The receive future for a paired mpsc transport.
@@ -109,7 +125,11 @@ impl Future for RecvFuture<'_> {
     type Output = Result<Option<RecvBuffer>, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.receiver.waker.register(cx.waker());
+        if self.receiver.shared.is_closed.load(Ordering::Relaxed) {
+            return Poll::Ready(Ok(None));
+        }
+
+        self.receiver.shared.send_wakers[1 - self.receiver.end].register(cx.waker());
         match self.receiver.receiver.try_recv() {
             Ok(chunks) => Poll::Ready(Ok(Some(RecvBuffer { chunks, chunks_taken: 0 }))),
             Err(mpsc::TryRecvError::Empty) => Poll::Pending,
@@ -163,8 +183,8 @@ impl Transport for Mpsc {
 
     fn split(self) -> (Self::Sender, Self::Receiver) {
         (
-            Sender { sender: self.sender, waker: self.send_waker },
-            Receiver { receiver: self.receiver, waker: self.recv_waker },
+            Sender { shared: self.shared.clone(), end: self.end, sender: self.sender },
+            Receiver { shared: self.shared, end: self.end, receiver: self.receiver },
         )
     }
 
@@ -183,6 +203,10 @@ impl Transport for Mpsc {
 
     fn send(sender: &Self::Sender, buffer: Self::SendBuffer) -> Self::SendFuture<'_> {
         SendFuture { sender, buffer }
+    }
+
+    fn close(sender: &Self::Sender) {
+        sender.shared.close();
     }
 
     type Receiver = Receiver;
@@ -205,6 +229,12 @@ mod tests {
 
     use super::Mpsc;
     use crate::testing::transport::*;
+
+    #[fasync::run_singlethreaded(test)]
+    async fn close_on_drop() {
+        let (client_end, server_end) = Mpsc::new();
+        test_close_on_drop(client_end, server_end).await;
+    }
 
     #[fasync::run_singlethreaded(test)]
     async fn send_receive() {

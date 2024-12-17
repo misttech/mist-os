@@ -4,97 +4,112 @@
 
 //! FIDL protocol servers.
 
-use crate::protocol::{encode_buffer, MessageBuffer, ProtocolError, Transport};
-use crate::{Decoder, Encode, EncodeError, Encoder};
+use core::num::NonZeroU32;
 
-/// Makes a server endpoint from a transport endpoint.
-pub fn make_server<T: Transport>(transport: T) -> (Server<T>, Requests<T>) {
-    let (sender, receiver) = transport.split();
-    (Server { sender }, Requests { receiver })
+use crate::protocol::{decode_header, encode_header, DispatcherError, Transport};
+use crate::{Encode, EncodeError, EncoderExt as _};
+
+/// A responder for a transactional request.
+#[must_use]
+pub struct Responder {
+    txid: NonZeroU32,
 }
 
 /// A sender for a server endpoint.
-#[derive(Clone)]
 pub struct Server<T: Transport> {
     sender: T::Sender,
 }
 
 impl<T: Transport> Server<T> {
+    /// Creates a new server and dispatcher from a transport.
+    pub fn new(transport: T) -> (Self, ServerDispatcher<T>) {
+        let (sender, receiver) = transport.split();
+        (Self { sender }, ServerDispatcher { receiver })
+    }
+
+    /// Closes the channel from the server end.
+    pub fn close(&self) {
+        T::close(&self.sender);
+    }
+
     /// Send an event.
-    pub fn send_event<'s, M>(
-        &'s self,
+    pub fn send_event<M>(
+        &self,
         ordinal: u64,
         event: &mut M,
-    ) -> Result<T::SendFuture<'s>, EncodeError>
+    ) -> Result<T::SendFuture<'_>, EncodeError>
     where
-        for<'a> T::Encoder<'a>: Encoder,
         M: for<'a> Encode<T::Encoder<'a>>,
     {
         let mut buffer = T::acquire(&self.sender);
-        encode_buffer(&mut buffer, 0, ordinal, event)?;
+        encode_header::<T>(&mut buffer, 0, ordinal)?;
+        T::encoder(&mut buffer).encode_next(event)?;
         Ok(T::send(&self.sender, buffer))
     }
 
     /// Send a response to a transactional request.
-    pub fn send_response<'s, M>(
-        &'s self,
+    pub fn send_response<M>(
+        &self,
         responder: Responder,
         ordinal: u64,
         response: &mut M,
-    ) -> Result<T::SendFuture<'s>, EncodeError>
+    ) -> Result<T::SendFuture<'_>, EncodeError>
     where
-        for<'a> T::Encoder<'a>: Encoder,
         M: for<'a> Encode<T::Encoder<'a>>,
     {
         let mut buffer = T::acquire(&self.sender);
-        encode_buffer(&mut buffer, responder.txid, ordinal, response)?;
+        encode_header::<T>(&mut buffer, responder.txid.get(), ordinal)?;
+        T::encoder(&mut buffer).encode_next(response)?;
         Ok(T::send(&self.sender, buffer))
     }
 }
 
-/// A receiver for a server endpoint.
-pub struct Requests<T: Transport> {
-    receiver: T::Receiver,
-}
-
-impl<T: Transport> Requests<T> {
-    /// Returns the next request from the client, if any.
-    pub async fn next(&mut self) -> Result<Option<Request<T>>, ProtocolError<T::Error>>
-    where
-        for<'a> T::Decoder<'a>: Decoder<'a>,
-    {
-        let next = T::recv(&mut self.receiver).await.map_err(ProtocolError::TransportError)?;
-
-        if let Some(buffer) = next {
-            let (txid, buffer) = MessageBuffer::parse_header(buffer)?;
-            if txid == 0 {
-                Ok(Some(Request::OneWay { buffer }))
-            } else {
-                Ok(Some(Request::Transaction { responder: Responder { txid }, buffer }))
-            }
-        } else {
-            Ok(None)
-        }
+impl<T: Transport> Clone for Server<T> {
+    fn clone(&self) -> Self {
+        Self { sender: self.sender.clone() }
     }
 }
 
-/// A request sent to the server.
-pub enum Request<T: Transport> {
-    /// A one-way request which does not expect a response.
-    OneWay {
-        /// The buffer containing the request.
-        buffer: MessageBuffer<T>,
-    },
-    /// A transactional request which expects a response.
-    Transaction {
-        /// A responder which can be used to answer this request.
-        responder: Responder,
-        /// The buffer containing the request.
-        buffer: MessageBuffer<T>,
-    },
+/// A type which handles incoming events for a server.
+pub trait ServerHandler<T: Transport> {
+    /// Handles a received server event.
+    ///
+    /// The dispatcher cannot handle more messages until `on_event` completes. If `on_event` may
+    /// block, perform asynchronous work, or take a long time to process a message, it should
+    /// offload work to an async task.
+    fn on_event(&mut self, ordinal: u64, buffer: T::RecvBuffer);
+
+    /// Handles a received server transaction.
+    ///
+    /// The dispatcher cannot handle more messages until `on_event` completes. If `on_event` may
+    /// block, perform asynchronous work, or take a long time to process a message, it should
+    /// offload work to an async task.
+    fn on_transaction(&mut self, ordinal: u64, buffer: T::RecvBuffer, responder: Responder);
 }
 
-/// A responder for a transactional request.
-pub struct Responder {
-    txid: u32,
+/// A dispatcher for a server endpoint.
+pub struct ServerDispatcher<T: Transport> {
+    receiver: T::Receiver,
+}
+
+impl<T: Transport> ServerDispatcher<T> {
+    /// Runs the dispatcher with the provided handler.
+    pub async fn run<H>(&mut self, mut handler: H) -> Result<(), DispatcherError<T::Error>>
+    where
+        H: ServerHandler<T>,
+    {
+        while let Some(mut buffer) =
+            T::recv(&mut self.receiver).await.map_err(DispatcherError::TransportError)?
+        {
+            let (txid, ordinal) =
+                decode_header::<T>(&mut buffer).map_err(DispatcherError::InvalidMessageHeader)?;
+            if let Some(txid) = NonZeroU32::new(txid) {
+                handler.on_transaction(ordinal, buffer, Responder { txid });
+            } else {
+                handler.on_event(ordinal, buffer);
+            }
+        }
+
+        Ok(())
+    }
 }

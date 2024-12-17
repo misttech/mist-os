@@ -51,7 +51,6 @@ pub enum TypeKind {
     Endpoint {
         nullable: bool,
         role: EndpointRole,
-        #[expect(dead_code)]
         protocol: CompIdent,
         #[expect(dead_code)]
         protocol_transport: String,

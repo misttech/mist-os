@@ -452,3 +452,131 @@ impl<'buf> ::core::fmt::Debug for WireOptionalExampleFooResult<'buf> {
         self.as_ref().fmt(f)
     }
 }
+
+/// The type corresponding to the Example protocol.
+#[derive(Debug)]
+pub struct Example;
+
+pub mod example {
+
+    pub struct Foo;
+
+    impl ::fidl_next::bind::Method for Foo {
+        const ORDINAL: u64 = 1107623248440401476;
+
+        type Protocol = crate::Example;
+
+        type Request<'buf> = crate::WireExampleFooRequest<'buf>;
+
+        type Response<'buf> = crate::WireExampleFooResult<'buf>;
+    }
+}
+
+/// A helper trait for the `Example` client protocol.
+pub trait ExampleClient<___T: ::fidl_next::protocol::Transport> {
+    fn foo<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<
+        ::fidl_next::bind::TransactionFuture<'_, ___T, example::Foo>,
+        ::fidl_next::EncodeError,
+    >
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireExampleFooRequest<'buf>,
+        >;
+}
+
+impl<___T> ExampleClient<___T> for ::fidl_next::bind::Client<___T, Example>
+where
+    ___T: ::fidl_next::protocol::Transport,
+{
+    fn foo<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<
+        ::fidl_next::bind::TransactionFuture<'_, ___T, example::Foo>,
+        ::fidl_next::EncodeError,
+    >
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireExampleFooRequest<'buf>,
+        >,
+    {
+        self.untyped()
+            .send_transaction(1107623248440401476, request)
+            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+    }
+}
+
+/// A client handler for the Example protocol.
+
+pub trait ExampleClientHandler<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Example
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: ExampleClientHandler<___T>,
+
+    for<'buf> crate::WireExampleFooResult<'buf>:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+}
+
+/// A helper trait for the `Example` server protocol.
+pub trait ExampleServer<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T> ExampleServer<___T> for ::fidl_next::bind::Server<___T, Example> where
+    ___T: ::fidl_next::protocol::Transport
+{
+}
+
+/// A server handler for the Example protocol.
+
+pub trait ExampleServerHandler<___T: ::fidl_next::protocol::Transport> {
+    fn foo(
+        &mut self,
+        request: ::fidl_next::bind::RequestBuffer<___T, example::Foo>,
+        responder: ::fidl_next::bind::Responder<example::Foo>,
+    );
+}
+
+impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for Example
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: ExampleServerHandler<___T>,
+
+    for<'buf> crate::WireExampleFooRequest<'buf>:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+
+    fn on_transaction(
+        handler: &mut ___H,
+        ordinal: u64,
+        mut buffer: ___T::RecvBuffer,
+        responder: ::fidl_next::protocol::Responder,
+    ) {
+        match ordinal {
+            1107623248440401476 => {
+                let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+
+                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                handler.foo(buffer, responder);
+            }
+
+            ordinal => todo!(),
+        }
+    }
+}

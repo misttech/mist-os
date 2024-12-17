@@ -2077,3 +2077,131 @@ impl ::core::fmt::Debug for WireOptionalSomeProtocolSomeMethodResult {
         self.as_ref().fmt(f)
     }
 }
+
+/// The type corresponding to the SomeProtocol protocol.
+#[derive(Debug)]
+pub struct SomeProtocol;
+
+pub mod some_protocol {
+
+    pub struct SomeMethod;
+
+    impl ::fidl_next::bind::Method for SomeMethod {
+        const ORDINAL: u64 = 2515914517457749720;
+
+        type Protocol = crate::SomeProtocol;
+
+        type Request<'buf> = crate::WireSomeProtocolSomeMethodRequest<'buf>;
+
+        type Response<'buf> = crate::WireSomeProtocolSomeMethodResult;
+    }
+}
+
+/// A helper trait for the `SomeProtocol` client protocol.
+pub trait SomeProtocolClient<___T: ::fidl_next::protocol::Transport> {
+    fn some_method<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<
+        ::fidl_next::bind::TransactionFuture<'_, ___T, some_protocol::SomeMethod>,
+        ::fidl_next::EncodeError,
+    >
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireSomeProtocolSomeMethodRequest<'buf>,
+        >;
+}
+
+impl<___T> SomeProtocolClient<___T> for ::fidl_next::bind::Client<___T, SomeProtocol>
+where
+    ___T: ::fidl_next::protocol::Transport,
+{
+    fn some_method<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<
+        ::fidl_next::bind::TransactionFuture<'_, ___T, some_protocol::SomeMethod>,
+        ::fidl_next::EncodeError,
+    >
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireSomeProtocolSomeMethodRequest<'buf>,
+        >,
+    {
+        self.untyped()
+            .send_transaction(2515914517457749720, request)
+            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+    }
+}
+
+/// A client handler for the SomeProtocol protocol.
+
+pub trait SomeProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for SomeProtocol
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: SomeProtocolClientHandler<___T>,
+
+    for<'buf> crate::WireSomeProtocolSomeMethodResult:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+}
+
+/// A helper trait for the `SomeProtocol` server protocol.
+pub trait SomeProtocolServer<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T> SomeProtocolServer<___T> for ::fidl_next::bind::Server<___T, SomeProtocol> where
+    ___T: ::fidl_next::protocol::Transport
+{
+}
+
+/// A server handler for the SomeProtocol protocol.
+
+pub trait SomeProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
+    fn some_method(
+        &mut self,
+        request: ::fidl_next::bind::RequestBuffer<___T, some_protocol::SomeMethod>,
+        responder: ::fidl_next::bind::Responder<some_protocol::SomeMethod>,
+    );
+}
+
+impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for SomeProtocol
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: SomeProtocolServerHandler<___T>,
+
+    for<'buf> crate::WireSomeProtocolSomeMethodRequest<'buf>:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+
+    fn on_transaction(
+        handler: &mut ___H,
+        ordinal: u64,
+        mut buffer: ___T::RecvBuffer,
+        responder: ::fidl_next::protocol::Responder,
+    ) {
+        match ordinal {
+            2515914517457749720 => {
+                let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+
+                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                handler.some_method(buffer, responder);
+            }
+
+            ordinal => todo!(),
+        }
+    }
+}

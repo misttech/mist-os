@@ -21,6 +21,7 @@
         {% when DeclType::Table %} {% let ty_name = ty.camel() %}
         {% when DeclType::Union %} {% let ty_name = ty.camel() %}
         {% when DeclType::Const %} {% let ty_name = ty.screaming_snake() %}
+        {% when DeclType::Protocol %} {% let ty_name = ty.camel() %}
         {% else %}
             {{ todo!() }}
     {% endmatch %}

@@ -911,3 +911,193 @@ where
         Ok(())
     }
 }
+
+/// The type corresponding to the Protocol protocol.
+#[derive(Debug)]
+pub struct Protocol;
+
+pub mod protocol {
+
+    pub struct RequestStrictResponseFlexible;
+
+    impl ::fidl_next::bind::Method for RequestStrictResponseFlexible {
+        const ORDINAL: u64 = 700529454616207123;
+
+        type Protocol = crate::Protocol;
+
+        type Request<'buf> = crate::WireProtocolRequestStrictResponseFlexibleRequest<'buf>;
+
+        type Response<'buf> = crate::WireProtocolRequestStrictResponseFlexibleResponse<'buf>;
+    }
+
+    pub struct RequestFlexibleResponseStrict;
+
+    impl ::fidl_next::bind::Method for RequestFlexibleResponseStrict {
+        const ORDINAL: u64 = 5191655763393883319;
+
+        type Protocol = crate::Protocol;
+
+        type Request<'buf> = crate::WireProtocolRequestFlexibleResponseStrictRequest<'buf>;
+
+        type Response<'buf> = crate::WireProtocolRequestFlexibleResponseStrictResponse<'buf>;
+    }
+}
+
+/// A helper trait for the `Protocol` client protocol.
+pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
+    fn request_strict_response_flexible<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<
+        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::RequestStrictResponseFlexible>,
+        ::fidl_next::EncodeError,
+    >
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireProtocolRequestStrictResponseFlexibleRequest<'buf>,
+        >;
+
+    fn request_flexible_response_strict<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<
+        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::RequestFlexibleResponseStrict>,
+        ::fidl_next::EncodeError,
+    >
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireProtocolRequestFlexibleResponseStrictRequest<'buf>,
+        >;
+}
+
+impl<___T> ProtocolClient<___T> for ::fidl_next::bind::Client<___T, Protocol>
+where
+    ___T: ::fidl_next::protocol::Transport,
+{
+    fn request_strict_response_flexible<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<
+        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::RequestStrictResponseFlexible>,
+        ::fidl_next::EncodeError,
+    >
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireProtocolRequestStrictResponseFlexibleRequest<'buf>,
+        >,
+    {
+        self.untyped()
+            .send_transaction(700529454616207123, request)
+            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+    }
+
+    fn request_flexible_response_strict<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<
+        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::RequestFlexibleResponseStrict>,
+        ::fidl_next::EncodeError,
+    >
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireProtocolRequestFlexibleResponseStrictRequest<'buf>,
+        >,
+    {
+        self.untyped()
+            .send_transaction(5191655763393883319, request)
+            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+    }
+}
+
+/// A client handler for the Protocol protocol.
+
+pub trait ProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Protocol
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: ProtocolClientHandler<___T>,
+
+    for<'buf> crate::WireProtocolRequestStrictResponseFlexibleResponse<'buf>:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+
+    for<'buf> crate::WireProtocolRequestFlexibleResponseStrictResponse<'buf>:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+}
+
+/// A helper trait for the `Protocol` server protocol.
+pub trait ProtocolServer<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T> ProtocolServer<___T> for ::fidl_next::bind::Server<___T, Protocol> where
+    ___T: ::fidl_next::protocol::Transport
+{
+}
+
+/// A server handler for the Protocol protocol.
+
+pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
+    fn request_strict_response_flexible(
+        &mut self,
+        request: ::fidl_next::bind::RequestBuffer<___T, protocol::RequestStrictResponseFlexible>,
+        responder: ::fidl_next::bind::Responder<protocol::RequestStrictResponseFlexible>,
+    );
+
+    fn request_flexible_response_strict(
+        &mut self,
+        request: ::fidl_next::bind::RequestBuffer<___T, protocol::RequestFlexibleResponseStrict>,
+        responder: ::fidl_next::bind::Responder<protocol::RequestFlexibleResponseStrict>,
+    );
+}
+
+impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for Protocol
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: ProtocolServerHandler<___T>,
+
+    for<'buf> crate::WireProtocolRequestStrictResponseFlexibleRequest<'buf>:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+
+    for<'buf> crate::WireProtocolRequestFlexibleResponseStrictRequest<'buf>:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+
+    fn on_transaction(
+        handler: &mut ___H,
+        ordinal: u64,
+        mut buffer: ___T::RecvBuffer,
+        responder: ::fidl_next::protocol::Responder,
+    ) {
+        match ordinal {
+            700529454616207123 => {
+                let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+
+                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                handler.request_strict_response_flexible(buffer, responder);
+            }
+
+            5191655763393883319 => {
+                let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+
+                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                handler.request_flexible_response_strict(buffer, responder);
+            }
+
+            ordinal => todo!(),
+        }
+    }
+}

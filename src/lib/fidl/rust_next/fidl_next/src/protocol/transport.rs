@@ -25,6 +25,9 @@ use crate::{Decoder, Encoder};
 ///
 /// - Operations should not partially complete.
 /// - Operations should only complete during polling.
+///
+/// `SendFuture` should return an `Poll::Ready` with an error when polled after the transport is
+/// closed.
 pub trait Transport: 'static {
     /// The error type for the transport.
     type Error: Error + Send + Sync + 'static;
@@ -33,7 +36,7 @@ pub trait Transport: 'static {
     fn split(self) -> (Self::Sender, Self::Receiver);
 
     /// The sender half of the transport.
-    type Sender: Send;
+    type Sender: Send + Clone;
     /// The buffer type for senders.
     type SendBuffer: Send;
     /// The encoder for send buffers.
@@ -51,6 +54,8 @@ pub trait Transport: 'static {
     fn encoder(buffer: &mut Self::SendBuffer) -> Self::Encoder<'_>;
     /// Sends an encoded message over the transport.
     fn send(sender: &Self::Sender, buffer: Self::SendBuffer) -> Self::SendFuture<'_>;
+    /// Closes the transport.
+    fn close(sender: &Self::Sender);
 
     /// The receiver half of the transport.
     type Receiver: Send;

@@ -96,7 +96,7 @@ macro_rules! impl_primitives {
 }
 
 impl_primitives! {
-    bool, bool; i8, i8; u8, u8;
+    (), (); bool, bool; i8, i8; u8, u8;
 
     i16, i16_le; i32, i32_le; i64, i64_le;
     u16, u16_le; u32, u32_le; u64, u64_le;

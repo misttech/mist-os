@@ -27,6 +27,7 @@
         {% when DeclType::NewType %} {{ todo!() }}
         {% when DeclType::Overlay %} {{ todo!() }}
         {% when DeclType::Protocol %}
+            {{ self.protocol(schema.protocol_declarations[ident]) }}
         {% when DeclType::Resource %}
         {% when DeclType::Service %} {{ todo!() }}
     {% endmatch %}

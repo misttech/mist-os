@@ -1,17 +1,23 @@
+{%- let param -%}
+{%- if anonymous -%}
+    {%- let param = "'_" -%}
+{%- else %}
+    {%- let param = "'buf" -%}
+{%- endif -%}
 {%- match ty.kind -%}
     {%- when TypeKind::Array with { element_type, element_count } -%}
         [{{ context.wire_type(element_type) }}; {{ element_count }}]
     {%- when TypeKind::Vector with { element_type, element_count: _, nullable } -%}
         {%- if nullable -%}
-            ::fidl_next::WireOptionalVector<'buf, {{ context.wire_type(element_type) }}>
+            ::fidl_next::WireOptionalVector<{{ param }}, {{ context.wire_type(element_type) }}>
         {%- else -%}
-            ::fidl_next::WireVector<'buf, {{ context.wire_type(element_type) }}>
+            ::fidl_next::WireVector<{{ param }}, {{ context.wire_type(element_type) }}>
         {%- endif -%}
     {%- when TypeKind::String with { element_count: _, nullable } -%}
         {%- if nullable -%}
-            ::fidl_next::WireOptionalString<'buf>
+            ::fidl_next::WireOptionalString<{{ param }}>
         {%- else -%}
-            ::fidl_next::WireString<'buf>
+            ::fidl_next::WireString<{{ param }}>
         {%- endif -%}
     {%- when TypeKind::Handle with { nullable, rights: _, subtype: _, resource_identifier: _ } -%}
         {%- if nullable -%}
@@ -19,19 +25,20 @@
         {%- else -%}
             {{ context.config.resource_bindings.handle.wire_path }}
         {%- endif -%}
-    {%- when TypeKind::Endpoint with { nullable, role, protocol: _, protocol_transport: _ } -%}
-        ::fidl_next::EndpointResource<
+    {%- when TypeKind::Endpoint with { nullable, role, protocol, protocol_transport: _ } -%}
+        {%- match role -%}
+            {%- when EndpointRole::Client -%}
+                ::fidl_next::bind::ClientEnd
+            {%- when EndpointRole::Server -%}
+                ::fidl_next::bind::ServerEnd
+        {%- endmatch -%}
+        <
             {%- if nullable -%}
                 {{ context.config.resource_bindings.handle.optional_wire_path }},
             {%- else -%}
                 {{ context.config.resource_bindings.handle.wire_path }},
             {%- endif -%}
-            {%- match role -%}
-                {%- when EndpointRole::Client -%}
-                    ::fidl_next::ClientEndpoint
-                {%- when EndpointRole::Server -%}
-                    ::fidl_next::ServerEndpoint
-            {%- endmatch -%}
+            {{ context.natural_id(protocol) }},
         >
     {%- when TypeKind::Primitive with { subtype } -%}
         {{ context.wire_prim(subtype) }}
@@ -39,15 +46,15 @@
         {%- match context.schema.get_decl_type(identifier).unwrap() -%}
             {%- when DeclType::Bits -%} {{ context.wire_id(identifier) }}
             {%- when DeclType::Enum -%} {{ context.wire_id(identifier) }}
-            {%- when DeclType::Table -%} {{ context.wire_id(identifier) }}<'buf>
+            {%- when DeclType::Table -%} {{ context.wire_id(identifier) }}<{{ param }}>
             {%- when DeclType::Struct -%}
                 {%- if nullable -%}
                     ::fidl_next::WireBox<
-                        'buf,
+                        {{ param }},
                         {{ context.wire_id(identifier) }}
                         {%- if let Some(shape) = context.schema.get_type_shape(identifier) -%}
                             {%- if shape.max_out_of_line != 0 -%}
-                                <'buf>
+                                <{{ param }}>
                             {%- endif -%}
                         {%- endif -%}
                     >
@@ -55,7 +62,7 @@
                     {{ context.wire_id(identifier) }}
                     {%- if let Some(shape) = context.schema.get_type_shape(identifier) -%}
                         {%- if shape.max_out_of_line != 0 -%}
-                            <'buf>
+                            <{{ param }}>
                         {%- endif -%}
                     {%- endif -%}
                 {%- endif -%}
@@ -66,7 +73,7 @@
                     {{ context.wire_id(identifier) }}
                 {%- endif -%}
                 {%- if ty.shape.max_out_of_line != 0 -%}
-                    <'buf>
+                    <{{ param }}>
                 {%- endif -%}
             {%- when DeclType::Resource -%}
                 {%- if nullable -%}

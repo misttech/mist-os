@@ -31,6 +31,14 @@ impl Context {
         PrefixedIdTemplate { id, prefix: "Wire", context: self }
     }
 
+    fn wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
+        WireTypeTemplate { ty, anonymous: false, context: self }
+    }
+
+    fn anonymous_wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
+        WireTypeTemplate { ty, anonymous: true, context: self }
+    }
+
     fn wire_optional_id<'a>(&'a self, id: &'a CompId) -> PrefixedIdTemplate<'a> {
         PrefixedIdTemplate { id, prefix: "WireOptional", context: self }
     }
@@ -49,6 +57,14 @@ impl Context {
 struct PrefixedIdTemplate<'a> {
     id: &'a CompId,
     prefix: &'a str,
+    context: &'a Context,
+}
+
+#[derive(Template)]
+#[template(path = "wire_type.askama")]
+struct WireTypeTemplate<'a> {
+    ty: &'a Type,
+    anonymous: bool,
     context: &'a Context,
 }
 
@@ -84,6 +100,7 @@ template!(alias(alias: TypeAlias) -> TypeAliasTemplate = "alias.askama");
 template!(bits(bits: Bits) -> BitsTemplate = "bits.askama");
 template!(cnst(cnst: Const) -> ConstTemplate = "const.askama");
 template!(enm(enm: Enum) -> EnumTemplate = "enum.askama");
+template!(protocol(protocol: Protocol) -> ProtocolTemplate = "protocol.askama");
 template!(strct(strct: Struct) -> StructTemplate = "struct.askama");
 template!(table(table: Table) -> TableTemplate = "table.askama");
 template!(union(union: Union) -> UnionTemplate = "union.askama");
@@ -94,7 +111,6 @@ template!(natural_type(ty: Type) -> NaturalTypeTemplate = "natural_type.askama")
 
 template!(wire_int(int: IntType) -> WireIntTemplate = "wire_int.askama", whitespace = "suppress");
 template!(wire_prim(prim: PrimSubtype) -> WirePrimTemplate = "wire_prim.askama", whitespace = "suppress");
-template!(wire_type(ty: Type) -> WireTypeTemplate = "wire_type.askama");
 
 impl BitsTemplate<'_> {
     fn subtype(&self) -> PrimSubtype {

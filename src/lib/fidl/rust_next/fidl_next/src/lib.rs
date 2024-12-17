@@ -25,12 +25,12 @@
 #[macro_use]
 mod testing;
 
+pub mod bind;
 mod chunk;
 mod decode;
 pub mod decoder;
 mod encode;
 pub mod encoder;
-mod endpoint;
 mod framework_error;
 #[cfg(target_os = "fuchsia")]
 pub mod fuchsia;
@@ -50,7 +50,6 @@ pub use self::decode::*;
 pub use self::decoder::{Decoder, DecoderExt};
 pub use self::encode::*;
 pub use self::encoder::{Encoder, EncoderExt};
-pub use self::endpoint::*;
 pub use self::framework_error::*;
 #[cfg(target_os = "fuchsia")]
 pub use self::fuchsia::*;

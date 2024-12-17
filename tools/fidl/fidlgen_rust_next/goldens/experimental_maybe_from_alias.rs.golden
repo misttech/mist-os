@@ -23,11 +23,11 @@ pub type AliasOfBytes = Vec<u8>;
 pub type WireAliasOfBytes<'buf> = ::fidl_next::WireVector<'buf, u8>;
 
 pub type AliasOfRequest =
-    ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>;
+    ::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>;
 
 /// The wire type corresponding to [`AliasOfRequest`].
 pub type WireAliasOfRequest =
-    ::fidl_next::EndpointResource<::fidl_next::WireOptionalHandle, ::fidl_next::ServerEndpoint>;
+    ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>;
 
 pub type AliasOfString = String;
 
@@ -39,6 +39,71 @@ pub type AliasOfVectorContainingAliasOfVector = Vec<u64>;
 /// The wire type corresponding to [`AliasOfVectorContainingAliasOfVector`].
 pub type WireAliasOfVectorContainingAliasOfVector<'buf> =
     ::fidl_next::WireVector<'buf, ::fidl_next::u64_le>;
+
+/// The type corresponding to the MyProtocol protocol.
+#[derive(Debug)]
+pub struct MyProtocol;
+
+pub mod my_protocol {}
+
+/// A helper trait for the `MyProtocol` client protocol.
+pub trait MyProtocolClient<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T> MyProtocolClient<___T> for ::fidl_next::bind::Client<___T, MyProtocol> where
+    ___T: ::fidl_next::protocol::Transport
+{
+}
+
+/// A client handler for the MyProtocol protocol.
+
+pub trait MyProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for MyProtocol
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: MyProtocolClientHandler<___T>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+}
+
+/// A helper trait for the `MyProtocol` server protocol.
+pub trait MyProtocolServer<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T> MyProtocolServer<___T> for ::fidl_next::bind::Server<___T, MyProtocol> where
+    ___T: ::fidl_next::protocol::Transport
+{
+}
+
+/// A server handler for the MyProtocol protocol.
+
+pub trait MyProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for MyProtocol
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: MyProtocolServerHandler<___T>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+
+    fn on_transaction(
+        handler: &mut ___H,
+        ordinal: u64,
+        mut buffer: ___T::RecvBuffer,
+        responder: ::fidl_next::protocol::Responder,
+    ) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+}
 
 pub type Vector = Option<Vec<u64>>;
 
@@ -73,17 +138,11 @@ pub struct Testing {
 
     pub a3: [[u64; 1]; 4],
 
-    pub r1:
-        ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>,
+    pub r1: ::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>,
 
-    pub r2: Vec<
-        ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>,
-    >,
+    pub r2: Vec<::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>>,
 
-    pub r3: [::fidl_next::EndpointResource<
-        Option<::fidl_next::zx::Handle>,
-        ::fidl_next::ServerEndpoint,
-    >; 4],
+    pub r3: [::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>; 4],
 
     pub b1: Vec<u8>,
 
@@ -142,15 +201,14 @@ where
 
     [[u64; 1]; 4]: ::fidl_next::Encode<___E>,
 
-    ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>:
+    ::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>:
         ::fidl_next::Encode<___E>,
 
-    Vec<
-        ::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>,
-    >: ::fidl_next::Encode<___E>,
+    Vec<::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>>:
+        ::fidl_next::Encode<___E>,
 
-    [::fidl_next::EndpointResource<Option<::fidl_next::zx::Handle>, ::fidl_next::ServerEndpoint>;
-        4]: ::fidl_next::Encode<___E>,
+    [::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::MyProtocol>; 4]:
+        ::fidl_next::Encode<___E>,
 
     Vec<u8>: ::fidl_next::Encode<___E>,
 
@@ -393,18 +451,14 @@ pub struct WireTesting<'buf> {
 
     pub a3: [[::fidl_next::u64_le; 1]; 4],
 
-    pub r1:
-        ::fidl_next::EndpointResource<::fidl_next::WireOptionalHandle, ::fidl_next::ServerEndpoint>,
+    pub r1: ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>,
 
     pub r2: ::fidl_next::WireVector<
         'buf,
-        ::fidl_next::EndpointResource<::fidl_next::WireOptionalHandle, ::fidl_next::ServerEndpoint>,
+        ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>,
     >,
 
-    pub r3: [::fidl_next::EndpointResource<
-        ::fidl_next::WireOptionalHandle,
-        ::fidl_next::ServerEndpoint,
-    >; 4],
+    pub r3: [::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>; 4],
 
     pub b1: ::fidl_next::WireVector<'buf, u8>,
 
@@ -463,16 +517,16 @@ where
 
     [[::fidl_next::u64_le; 1]; 4]: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::EndpointResource<::fidl_next::WireOptionalHandle, ::fidl_next::ServerEndpoint>:
+    ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>:
         ::fidl_next::Decode<___D>,
 
     ::fidl_next::WireVector<
         'buf,
-        ::fidl_next::EndpointResource<::fidl_next::WireOptionalHandle, ::fidl_next::ServerEndpoint>,
+        ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>,
     >: ::fidl_next::Decode<___D>,
 
-    [::fidl_next::EndpointResource<::fidl_next::WireOptionalHandle, ::fidl_next::ServerEndpoint>;
-        4]: ::fidl_next::Decode<___D>,
+    [::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::MyProtocol>; 4]:
+        ::fidl_next::Decode<___D>,
 
     ::fidl_next::WireVector<'buf, u8>: ::fidl_next::Decode<___D>,
 

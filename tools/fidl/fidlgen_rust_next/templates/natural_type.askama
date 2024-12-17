@@ -19,19 +19,20 @@
         {%- else -%}
             {{ context.config.resource_bindings.handle.natural_path }}
         {%- endif -%}
-    {%- when TypeKind::Endpoint with { nullable, role, protocol: _, protocol_transport: _ } -%}
-        ::fidl_next::EndpointResource<
+    {%- when TypeKind::Endpoint with { nullable, role, protocol, protocol_transport: _ } -%}
+        {%- match role -%}
+            {%- when EndpointRole::Client -%}
+                ::fidl_next::bind::ClientEnd
+            {%- when EndpointRole::Server -%}
+                ::fidl_next::bind::ServerEnd
+        {%- endmatch -%}
+        <
             {%- if nullable -%}
                 Option<{{ context.config.resource_bindings.handle.natural_path }}>,
             {%- else -%}
                 {{ context.config.resource_bindings.handle.natural_path }},
             {%- endif -%}
-            {%- match role -%}
-                {%- when EndpointRole::Client -%}
-                    ::fidl_next::ClientEndpoint
-                {%- when EndpointRole::Server -%}
-                    ::fidl_next::ServerEndpoint
-            {%- endmatch -%}
+            {{ context.natural_id(protocol) }},
         >
     {%- when TypeKind::Primitive with { subtype } -%}
         {{ context.natural_prim(subtype) }}

@@ -27,6 +27,7 @@ if (is_host) {
       "src/ir/literal.rs",
       "src/ir/mod.rs",
       "src/ir/primitive.rs",
+      "src/ir/protocol.rs",
       "src/ir/schema.rs",
       "src/ir/struct.rs",
       "src/ir/table.rs",
@@ -53,6 +54,7 @@ if (is_host) {
       "templates/bits.askama",
       "templates/const.askama",
       "templates/enum.askama",
+      "templates/protocol.askama",
       "templates/schema.askama",
       "templates/struct.askama",
       "templates/table.askama",
@@ -131,5 +133,6 @@ group("tests") {
     ":fidlgen_rust_next_test($host_toolchain)",
     ":goldens",
     ":goldens($host_toolchain)",
+    "examples:tests",
   ]
 }
