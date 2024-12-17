@@ -36,6 +36,7 @@ type InitStep = table {
 /// Passed to the clock core driver in metadata as DEVICE_METADATA_CLOCK_INIT. Steps are processed
 /// sequentially in the order that they appear in the vector. Processing occurs once during the
 /// clock core driver's bind hook.
+@serializable
 type InitMetadata = struct {
     steps vector<InitStep>:MAX;
 };
