@@ -103,12 +103,40 @@ fit::result<Errno, NamespaceNode> NamespaceNode::create_node(const CurrentTask& 
   return fit::ok(NamespaceNode::with_new_entry(result.value()));
 }
 
+fit::result<Errno, NamespaceNode> NamespaceNode::create_symlink(const CurrentTask& current_task,
+                                                                const FsStr& name,
+                                                                const FsStr& target) const {
+  LTRACEF_LEVEL(2, "name=[%.*s], target=[%.*s]\n", static_cast<int>(name.length()), name.data(),
+                static_cast<int>(target.length()), target.data());
+
+  auto owner = current_task->as_fscred();
+  auto result = entry_->create_entry(
+      current_task, mount_, name,
+      [&current_task, &target, owner](const FsNodeHandle& dir, const MountInfo& mount,
+                                      const FsStr& name) -> fit::result<Errno, FsNodeHandle> {
+        return dir->create_symlink(current_task, mount, name, target, owner);
+      }) _EP(result);
+
+  return fit::ok(NamespaceNode::with_new_entry(result.value()));
+}
+
 fit::result<Errno, NamespaceNode> NamespaceNode::create_tmpfile(const CurrentTask& current_task,
                                                                 FileMode mode,
                                                                 OpenFlags flags) const {
   // auto owner = current_task->as_fscred();
   // auto _mode = current_task->fs()->apply_umask(mode);
   return fit::error(errno(ENOTSUP));
+}
+
+fit::result<Errno, NamespaceNode> NamespaceNode::link(const CurrentTask& current_task,
+                                                      const FsStr& name,
+                                                      const FsNodeHandle& child) const {
+  return fit::error(errno(ENOTDIR));
+}
+
+fit::result<Errno> NamespaceNode::unlink(const CurrentTask& current_task, const FsStr& name,
+                                         UnlinkKind kind, bool must_be_directory) const {
+  return fit::error(errno(ENOTDIR));
 }
 
 fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask& current_task,

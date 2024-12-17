@@ -105,11 +105,21 @@ fit::result<Errno, size_t> sys_readlink(const CurrentTask& current_task,
   return sys_readlinkat(current_task, FdNumber::AT_FDCWD_, user_path, buffer, buffer_size);
 }
 
+fit::result<Errno> sys_rmdir(const CurrentTask& current_task, starnix_uapi::UserCString user_path) {
+  return sys_unlinkat(current_task, FdNumber::AT_FDCWD_, user_path, AT_REMOVEDIR);
+}
+
 fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
                             starnix_uapi::UserRef<struct ::stat> buffer) {
   // TODO(https://fxbug.dev/42172993): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
   // `sys_newfstatat`.
   return sys_newfstatat(current_task, FdNumber::AT_FDCWD_, user_path, buffer, 0);
+}
+
+fit::result<Errno> sys_symlink(const CurrentTask& current_task,
+                               starnix_uapi::UserCString user_target,
+                               starnix_uapi::UserCString user_path) {
+  return sys_symlinkat(current_task, user_target, FdNumber::AT_FDCWD_, user_path);
 }
 
 fit::result<Errno, pid_t> sys_vfork(CurrentTask& current_task) {

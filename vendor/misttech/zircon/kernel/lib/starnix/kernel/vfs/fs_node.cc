@@ -200,6 +200,20 @@ fit::result<Errno, FsNodeHandle> FsNode::mknod(const CurrentTask& current_task,
   return ops_->mknod(*this, current_task, name, mode, dev, owner);
 }
 
+fit::result<Errno, FsNodeHandle> FsNode::create_symlink(const CurrentTask& current_task,
+                                                        const MountInfo& mount, const FsStr& name,
+                                                        const FsStr& target, FsCred owner) const {
+  _EP(check_access(current_task, mount, Access(AccessEnum::WRITE),
+                   CheckAccessReason::InternalPermissionChecks));
+  // security::check_fs_node_symlink_access(current_task, self, target)?;
+
+  auto new_node = ops_->create_symlink(*this, current_task, name, target, owner) _EP(new_node);
+
+  // self.init_new_node_security_on_create(&mut locked, current_task, &new_node)?;
+
+  return fit::ok(new_node.value());
+}
+
 fit::result<Errno, SymlinkTarget> FsNode::readlink(const CurrentTask& current_task) const {
   // TODO(qsr): Is there a permission check here?
   return ops_->readlink(*this, current_task);

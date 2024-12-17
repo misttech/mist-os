@@ -39,6 +39,11 @@ class CurrentTask;
 using PipeHandle = fbl::RefPtr<Pipe>;
 using starnix_uapi::Credentials;
 
+// Whether linking is allowed for this node
+enum class FsNodeLinkBehavior : uint8_t { kAllowed, kDisallowed };
+
+inline FsNodeLinkBehavior DefaultFsNodeLinkBehavior() { return FsNodeLinkBehavior::kAllowed; }
+
 // The inner class is required because bitflags cannot pass the attribute through to the single
 // variant, and attributes cannot be applied to macro invocations.
 namespace inner_flags {
@@ -216,6 +221,10 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   fit::result<Errno, FsNodeHandle> mknod(const CurrentTask& current_task, const MountInfo& mount,
                                          const FsStr& name, FileMode mode, DeviceType dev,
                                          FsCred owner) const;
+
+  fit::result<Errno, FsNodeHandle> create_symlink(const CurrentTask& current_task,
+                                                  const MountInfo& mount, const FsStr& name,
+                                                  const FsStr& target, FsCred owner) const;
 
   /// This method does not attempt to update the atime of the node.
   /// Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
