@@ -6,8 +6,7 @@
 /// `fx testgen`. Please run that command to make sure the output looks correct before
 /// submitting changes.
 use argh::FromArgs;
-use diagnostics_log::set_minimum_severity;
-use tracing::Level;
+use diagnostics_log::{set_minimum_severity, Severity};
 
 /// testgen generates a Fuchsia test.
 #[derive(FromArgs, Debug)]
@@ -29,8 +28,8 @@ pub(crate) enum Subcommand {
 impl Flags {
     pub fn setup_logging(&self) {
         set_minimum_severity(match self.verbose_logging {
-            true => Level::INFO,
-            false => Level::ERROR,
+            true => Severity::Info,
+            false => Severity::Error,
         });
     }
 }
