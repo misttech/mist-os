@@ -17,8 +17,8 @@ class TestPmmNode {
  public:
   explicit TestPmmNode(bool discardable)
       : evictor_(
-            [this](VmCompressor* compression_instance, Evictor::EvictionLevel eviction_level) {
-              return this->TestReclaim(compression_instance, eviction_level);
+            [this](VmCompression* compression, Evictor::EvictionLevel eviction_level) {
+              return this->TestReclaim(compression, eviction_level);
             },
             [this]() { return this->FreePages(); }),
         discardable_(discardable) {
@@ -46,7 +46,7 @@ class TestPmmNode {
   void UncapEvictions() { max_evictions_ = UINT64_MAX; }
 
  private:
-  ktl::optional<Evictor::EvictedPageCounts> TestReclaim(VmCompressor* compression_instance,
+  ktl::optional<Evictor::EvictedPageCounts> TestReclaim(VmCompression* compression,
                                                         Evictor::EvictionLevel eviction_level) {
     if (total_evictions_ >= max_evictions_) {
       return ktl::nullopt;
