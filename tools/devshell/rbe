@@ -163,7 +163,7 @@ function setup_bazel_workspace() {
 
 function get_loas_cert_type_for_bazel() {
   local loas_cert_type=restricted
-  if [[ "$FX_BUILD_AUTO_AUTH" == 1 ]]
+  if [[ "$FX_BUILD_AUTO_AUTH" != 0 ]]
   then loas_cert_type="$(get_loas_cert_type)"
   fi
   echo "$loas_cert_type"
@@ -176,8 +176,9 @@ function test_bazel_rbe() {
   # stale credentials, and force it to refresh.
   # Limit the number of upload retries to make this operation fail-fast.
 
-  # TODO(b/342026853): using gcert for bazel authentication is opt-in while
-  # it is still experimental.  Opt-in with FX_BUILD_AUTO_AUTH=1.
+  # TODO(b/342026853): using gcert for bazel authentication is now the default
+  # where applicable.  Opt-out with FX_BUILD_AUTO_AUTH=0.
+  # Eventually this will become permanent.
   local -r loas_cert_type="$(get_loas_cert_type_for_bazel)"
   local -a auth_config=()
   if [[ "$loas_cert_type" == "unrestricted" ]]
@@ -353,7 +354,7 @@ function ensure_auth_for_bazel() {
 }
 
 function suggest_gcert() {
-  [[ "$FX_BUILD_AUTO_AUTH" == 1 ]] || cat <<EOF
+  [[ "$FX_BUILD_AUTO_AUTH" != 0 ]] || cat <<EOF
 If you continue to see authentication failures, try opting in to
 go/fuchsia-rbe-gcert, by running 'export FX_BUILD_AUTO_AUTH=1' in
 your shell or adding it to your ~/.bashrc file.

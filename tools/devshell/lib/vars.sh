@@ -972,12 +972,13 @@ function fx-run-ninja {
   then
     local loas_type
     # TODO(b/342026853): automatic use of gcert for authentication in bazel
-    # is still experimental, and is opt-in with FX_BUILD_AUTO_AUTH=1.
+    # is now the default, and is opt-out with FX_BUILD_AUTO_AUTH=0.
+    # Eventually, this will become permanent.
     # gcert authentication for reclient already works.
     local -r loas_type_detected="$(fx-command-run rbe _check_loas_type)"
     local -r loas_type_for_reclient="$loas_type_detected"
     local loas_type_for_bazel
-    if [[ "$FX_BUILD_AUTO_AUTH" == 1 ]]
+    if [[ "$FX_BUILD_AUTO_AUTH" != 0 ]]
     then loas_type_for_bazel="$loas_type_detected"
     else loas_type_for_bazel="restricted"
     fi
