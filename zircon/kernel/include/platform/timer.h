@@ -210,7 +210,8 @@ inline zx_ticks_t timer_current_mono_ticks_synchronized() {
   }
 }
 inline zx_ticks_t timer_current_mono_ticks() {
-  return timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kNone>();
+  return timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousLoads |
+                                               GetTicksSyncFlag::kBeforeSubsequentLoads>();
 }
 
 template <GetTicksSyncFlag Flags>

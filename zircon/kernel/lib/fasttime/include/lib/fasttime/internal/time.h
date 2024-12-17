@@ -177,13 +177,9 @@ inline zx_ticks_t compute_monotonic_ticks(const TimeValues& tvalues) {
     }
   }
   while (true) {
-    // TODO(https://fxbug.dev/341785588): The get_raw_ticks call here does not correctly
-    // enforce ordering. This should be fixed before we suspend the system.
-    const zx_ticks_t obs1 = tvalues.mono_ticks_offset.load(std::memory_order_relaxed);
-    const zx_ticks_t raw_ticks = internal::get_raw_ticks(tvalues);
-    const zx_ticks_t obs2 = tvalues.mono_ticks_offset.load(std::memory_order_relaxed);
-    if (obs1 == obs2) {
-      return raw_ticks + obs1;
+    SequentialReadResult result = read_raw_ticks_sequentially(tvalues, tvalues.mono_ticks_offset);
+    if (result.obs1 == result.obs2) {
+      return result.raw_ticks + result.obs1;
     }
   }
 }
