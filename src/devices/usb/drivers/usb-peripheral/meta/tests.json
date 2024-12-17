@@ -7,10 +7,20 @@
         }
     },
     {
-        "name": "usb peripheral FIDL parent",
+        "name": "usb peripheral DWC3 parent",
         "expected": "match",
         "device": {
+            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_VID.DESIGNWARE",
             "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.DWC3",
+            "fuchsia.hardware.usb.dci.UsbDciService": "fuchsia.hardware.usb.dci.UsbDciService.ZirconTransport"
+        }
+    },
+    {
+        "name": "usb peripheral DWC2 parent",
+        "expected": "match",
+        "device": {
+            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_VID.DESIGNWARE",
+            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.DWC2",
             "fuchsia.hardware.usb.dci.UsbDciService": "fuchsia.hardware.usb.dci.UsbDciService.ZirconTransport"
         }
     },
@@ -18,7 +28,6 @@
         "name": "usb peripheral banjo parent",
         "expected": "match",
         "device": {
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.DWC2",
             "fuchsia.BIND_PROTOCOL": "fuchsia.usb.BIND_PROTOCOL.DCI"
         }
     }

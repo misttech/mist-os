@@ -15,6 +15,7 @@ driver_bind_rules("usb_peripheral_bind") {
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_bindlib",
     "//src/devices/bind/fuchsia",
     "//src/devices/bind/fuchsia.designware.platform",
+    "//src/devices/bind/fuchsia.test.platform",
     "//src/devices/bind/fuchsia.usb",
   ]
 }
