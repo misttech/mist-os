@@ -441,7 +441,12 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             return Err(Status::INVALID_ARGS);
         }
 
-        if !self.options.rights.contains(fio::W_STAR_DIR) {
+        // To avoid rights escalation, we must make sure that the connection to the source directory
+        // has the maximal set of file rights.  We do not check for EXECUTE because mutable
+        // filesystems that support link don't currently support EXECUTE rights.  The target rights
+        // are verified by virtue of the fact that it is not possible to get a token without the
+        // MODIFY_DIRECTORY right (see `MutableConnection::handle_get_token`).
+        if !self.options.rights.contains(fio::RW_STAR_DIR) {
             return Err(Status::BAD_HANDLE);
         }
 
