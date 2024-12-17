@@ -56,6 +56,13 @@
             availability: "optional",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.bluetooth.sys.Access",
+            from: "#bluetooth-core",
+            to: "self/toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
     expose: [
         {
