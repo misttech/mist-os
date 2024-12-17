@@ -9,9 +9,7 @@ use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
 
 use std::future::Future;
 use std::sync::{Arc, Mutex, RwLock};
-use tracing::subscriber::Subscriber;
 use tracing::Metadata;
-use tracing_subscriber::layer::{Context, Layer};
 
 use crate::OnInterestChanged;
 
@@ -88,24 +86,14 @@ impl InterestFilter {
         }
     }
 
+    pub fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        let min_severity = self.min_severity.read().unwrap();
+        metadata.severity() >= *min_severity
+    }
+
     pub fn enabled_for_testing(&self, record: &TestRecord<'_>) -> bool {
         let min_severity = self.min_severity.read().unwrap();
         record.severity >= (*min_severity).into_primitive()
-    }
-}
-
-impl<S: Subscriber> Layer<S> for InterestFilter {
-    /// Always returns `sometimes` so that we can later change the filter on the fly.
-    fn register_callsite(
-        &self,
-        _metadata: &'static Metadata<'static>,
-    ) -> tracing::subscriber::Interest {
-        tracing::subscriber::Interest::sometimes()
-    }
-
-    fn enabled(&self, metadata: &Metadata<'_>, _ctx: Context<'_, S>) -> bool {
-        let min_severity = self.min_severity.read().unwrap();
-        metadata.severity() >= *min_severity
     }
 }
 
@@ -116,9 +104,23 @@ mod tests {
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
-    use tracing::{debug, error, info, trace, warn, Event};
-    use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::Registry;
+    use tracing::{debug, error, info, trace, warn, Event, Subscriber};
+    use tracing_subscriber::layer::{Context, SubscriberExt};
+    use tracing_subscriber::{Layer, Registry};
+
+    impl<S: Subscriber> Layer<S> for InterestFilter {
+        /// Always returns `sometimes` so that we can later change the filter on the fly.
+        fn register_callsite(
+            &self,
+            _metadata: &'static Metadata<'static>,
+        ) -> tracing::subscriber::Interest {
+            tracing::subscriber::Interest::sometimes()
+        }
+
+        fn enabled(&self, metadata: &Metadata<'_>, _ctx: Context<'_, S>) -> bool {
+            self.enabled(metadata)
+        }
+    }
 
     struct SeverityTracker {
         counts: Arc<Mutex<SeverityCount>>,

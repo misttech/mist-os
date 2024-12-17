@@ -7,11 +7,8 @@ use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 
-use std::cell::Cell;
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::ops::Deref;
-use std::sync::OnceLock;
 use thiserror::Error;
 use tracing::span::{Attributes, Id, Record};
 use tracing::subscriber::Subscriber;
@@ -176,9 +173,7 @@ pub fn set_minimum_severity(severity: impl Into<Severity>) {
     let severity: Severity = severity.into();
     tracing::dispatcher::get_default(move |dispatcher| {
         let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
-        let filter: &InterestFilter =
-            (&*publisher.inner as &dyn Subscriber).downcast_ref().unwrap();
-        filter.set_minimum_severity(severity.into());
+        publisher.filter.set_minimum_severity(severity.into());
     });
 }
 
@@ -270,43 +265,11 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
     AbortAndJoinOnDrop(recv.recv().ok(), Some(bg_thread))
 }
 
-/// This custom Lazy implementation can be replaced by LazyLock once that is stabilized:
-/// https://github.com/rust-lang/rust/issues/109736
-struct Lazy<T, F> {
-    cell: OnceLock<T>,
-    init: Cell<Option<F>>,
-}
-
-// SAFETY: We never create a `&F` from a `&Lazy<T, F>` so it is fine to not impl `Sync`
-// for `F`. We do create a `&mut Option<F>` in `deref`, but that is properly synchronized
-// under `get_or_init`, so is safe.
-unsafe impl<T, F: Send> Sync for Lazy<T, F> where OnceLock<T>: Sync {}
-
-impl<T, F: FnOnce() -> T> Lazy<T, F> {
-    fn new(f: F) -> Self {
-        Self { cell: OnceLock::new(), init: Cell::new(Some(f)) }
-    }
-}
-
-impl<T, F: FnOnce() -> T> Deref for Lazy<T, F> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.cell.get_or_init(|| match self.init.take() {
-            Some(f) => f(),
-            None => panic!("Lazy poisoned"),
-        })
-    }
-}
-
 /// A `Publisher` acts as broker, implementing [`tracing::Subscriber`] to receive diagnostic
 /// events from a component, and then forwarding that data on to a diagnostics service.
 pub struct Publisher {
-    #[allow(clippy::type_complexity)]
-    inner: Lazy<
-        Layered<InterestFilter, Layered<Sink, Registry>>,
-        Box<dyn FnOnce() -> Layered<InterestFilter, Layered<Sink, Registry>> + Send>,
-    >,
+    sink: Layered<Sink, Registry>,
+    filter: InterestFilter,
     interest_listening_task: Option<fasync::Task<()>>,
 }
 
@@ -343,20 +306,15 @@ impl Publisher {
         } else {
             None
         };
-
-        Ok(Self {
-            inner: Lazy::new(Box::new(move || Registry::default().with(sink).with(filter))),
-            interest_listening_task,
-        })
+        let sink = Registry::default().with(sink);
+        Ok(Self { sink, filter, interest_listening_task })
     }
 
     // TODO(https://fxbug.dev/42150573) delete this and make Publisher private
     /// Publish the provided event for testing.
     pub fn event_for_testing(&self, record: TestRecord<'_>) {
-        let filter: &InterestFilter = (&*self.inner as &dyn Subscriber).downcast_ref().unwrap();
-        if filter.enabled_for_testing(&record) {
-            let sink: &Sink = (&*self.inner as &dyn Subscriber).downcast_ref().unwrap();
-            sink.event_for_testing(record);
+        if self.filter.enabled_for_testing(&record) {
+            self.sink.downcast_ref::<Sink>().unwrap().event_for_testing(record);
         }
     }
 
@@ -365,8 +323,7 @@ impl Publisher {
     where
         T: OnInterestChanged + Send + Sync + 'static,
     {
-        let filter: &InterestFilter = (&*self.inner as &dyn Subscriber).downcast_ref().unwrap();
-        filter.set_interest_listener(listener);
+        self.filter.set_interest_listener(listener);
     }
 
     /// Takes the task listening for interest changes if one exists.
@@ -377,40 +334,41 @@ impl Publisher {
 
 impl Subscriber for Publisher {
     fn enabled(&self, metadata: &Metadata<'_>) -> bool {
-        self.inner.enabled(metadata)
+        self.filter.enabled(metadata)
     }
     fn new_span(&self, span: &Attributes<'_>) -> Id {
-        self.inner.new_span(span)
+        self.sink.new_span(span)
     }
     fn record(&self, span: &Id, values: &Record<'_>) {
-        self.inner.record(span, values)
+        self.sink.record(span, values)
     }
     fn record_follows_from(&self, span: &Id, follows: &Id) {
-        self.inner.record_follows_from(span, follows)
+        self.sink.record_follows_from(span, follows)
     }
     fn event(&self, event: &Event<'_>) {
-        self.inner.event(event)
+        self.sink.event(event)
     }
     fn enter(&self, span: &Id) {
-        self.inner.enter(span)
+        self.sink.enter(span)
     }
     fn exit(&self, span: &Id) {
-        self.inner.exit(span)
+        self.sink.exit(span)
     }
     fn register_callsite(
         &self,
-        metadata: &'static Metadata<'static>,
+        _metadata: &'static Metadata<'static>,
     ) -> tracing::subscriber::Interest {
-        self.inner.register_callsite(metadata)
+        // Allows for dynamic severity
+        tracing::subscriber::Interest::sometimes()
     }
     fn clone_span(&self, id: &Id) -> Id {
-        self.inner.clone_span(id)
+        self.sink.clone_span(id)
     }
     fn try_close(&self, id: Id) -> bool {
-        self.inner.try_close(id)
+        self.sink.try_close(id)
     }
     fn current_span(&self) -> Current {
-        self.inner.current_span()
+        self.sink.current_span()
     }
 }
 
