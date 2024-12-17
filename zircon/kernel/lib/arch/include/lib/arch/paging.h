@@ -718,7 +718,8 @@ class Paging : public PagingTraits {
       constexpr uint64_t kMapSize = kPageSize<Level>;
       bool terminal = PagingTraits::template LevelCanBeTerminal<Level>(state_) &&  //
                       kMapSize <= size_ &&                                         //
-                      input_vaddr_ % kMapSize == 0;                                //
+                      input_vaddr_ % kMapSize == 0 &&                              //
+                      output_paddr_ % kMapSize == 0;                               //
 
       // We do not constrain the access permissions of intermediate entries,
       // leaving that instead to terminal ones.

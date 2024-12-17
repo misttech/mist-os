@@ -56,6 +56,8 @@ using ArmTableEntry =
 
 constexpr bool kBools[] = {false, true};
 
+constexpr AccessPermissions kR = {.readable = true};
+
 constexpr AccessPermissions kRWXU = {
     .readable = true,
     .writable = true,
@@ -1060,6 +1062,7 @@ void TestX86SetImpliesAccessedAndDirty() {
     entry.set_reg_value(0).Set({}, X86PagingSettings{
                                        .present = true,
                                        .terminal = false,
+                                       .access = kR,
                                    });
     EXPECT_TRUE(entry.accessed());
     EXPECT_TRUE(entry.a());
@@ -1070,6 +1073,7 @@ void TestX86SetImpliesAccessedAndDirty() {
     entry.set_reg_value(0).Set({}, X86PagingSettings{
                                        .present = true,
                                        .terminal = true,
+                                       .access = kR,
                                    });
     EXPECT_TRUE(entry.accessed());
     EXPECT_TRUE(entry.a());
@@ -1092,18 +1096,19 @@ void TestX86GetSetGlobal() {
   // Non-terminal entries ignore settings of `global = true`.
   if constexpr (kX86LevelCanBeNonTerminal<Level>) {
     entry.set_reg_value(0)
-        .Set({}, X86PagingSettings{.present = true, .terminal = false})
+        .Set({}, X86PagingSettings{.present = true, .terminal = false, .access = kR})
         .set_g(false);
     EXPECT_FALSE(entry.global());
 
     entry.set_reg_value(0)
-        .Set({}, X86PagingSettings{.present = true, .terminal = false})
+        .Set({}, X86PagingSettings{.present = true, .terminal = false, .access = kR})
         .set_g(true);
     EXPECT_FALSE(entry.global());
 
     entry.set_reg_value(0).Set({}, X86PagingSettings{
                                        .present = true,
                                        .terminal = false,
+                                       .access = kR,
                                        .global = false,
                                    });
     EXPECT_FALSE(entry.global());
@@ -1111,6 +1116,7 @@ void TestX86GetSetGlobal() {
     entry.set_reg_value(0).Set({}, X86PagingSettings{
                                        .present = true,
                                        .terminal = false,
+                                       .access = kR,
                                        .global = true,
                                    });
     EXPECT_FALSE(entry.global());
@@ -1118,18 +1124,19 @@ void TestX86GetSetGlobal() {
 
   if constexpr (kX86LevelCanBeTerminal<Level>) {
     entry.set_reg_value(0)
-        .Set({}, X86PagingSettings{.present = true, .terminal = true})
+        .Set({}, X86PagingSettings{.present = true, .terminal = true, .access = kR})
         .set_g(false);
     EXPECT_FALSE(entry.global());
 
     entry.set_reg_value(0)
-        .Set({}, X86PagingSettings{.present = true, .terminal = true})
+        .Set({}, X86PagingSettings{.present = true, .terminal = true, .access = kR})
         .set_g(true);
     EXPECT_TRUE(entry.global());
 
     entry.set_reg_value(0).Set({}, X86PagingSettings{
                                        .present = true,
                                        .terminal = true,
+                                       .access = kR,
                                        .global = false,
                                    });
     EXPECT_FALSE(entry.global());
@@ -1137,6 +1144,7 @@ void TestX86GetSetGlobal() {
     entry.set_reg_value(0).Set({}, X86PagingSettings{
                                        .present = true,
                                        .terminal = true,
+                                       .access = kR,
                                        .global = true,
                                    });
     EXPECT_TRUE(entry.global());
@@ -2873,5 +2881,45 @@ void MappedRegionWithMultipleMappings(typename PagingTraits::SystemState state) 
   }
 }
 TEST_FOR_ALL_TRAITS(MappedRegionWithMultipleMappings)
+
+template <class PagingTraits, uint64_t VaddrHighBits = 0>
+void MappedRegionWithDifferentlyAlignedPhysicalRange(typename PagingTraits::SystemState state) {
+  using Paging = arch::Paging<PagingTraits>;
+  using MapSettings = typename Paging::MapSettings;
+
+  constexpr uint64_t k1GiB = 0x4000'0000;
+  constexpr uint64_t k2MiB = 0x0020'0000;
+  constexpr uint64_t k4KiB = 0x0000'1000;
+
+  // Consider a 1GiB region mapped region with the physical address not
+  // starting on a 2MiB boundary. We would expect only 4KiB mappings, as there
+  // isn't a chance for both the physical and virtual addresses to share a
+  // high enough alignment to admit a larger mapping.
+  constexpr uint64_t kPaddr = k4KiB;
+  constexpr uint64_t kVaddr = VaddrHighBits | k2MiB;
+  constexpr uint64_t kSize = k1GiB;
+
+  constexpr MapSettings kSettings = {.access = kRWXU};
+
+  PagingHelper<PagingTraits> helper;
+  Table& root = helper.NewTable();
+
+  {
+    auto result = Paging::template Map(root.paddr(), helper.MakePaddrToIo(), helper.MakeAllocator(),
+                                       state, kVaddr, kSize, kPaddr, kSettings);
+    ASSERT_TRUE(result.is_ok());
+  }
+
+  for (size_t i = 0; i < 0x40000; ++i) {
+    uint64_t offset = i * k4KiB;
+    auto result = Paging::template Query(root.paddr(), helper.MakePaddrToIo(), kVaddr + offset);
+    ASSERT_TRUE(result.is_ok());
+
+    auto& page = result->page;
+    EXPECT_EQ(k4KiB, page.size);
+    EXPECT_EQ(kPaddr + offset, page.paddr);
+  }
+}
+TEST_FOR_ALL_TRAITS(MappedRegionWithDifferentlyAlignedPhysicalRange)
 
 }  // namespace
