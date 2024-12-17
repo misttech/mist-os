@@ -71,6 +71,7 @@ fuchsia_driver_component("platform-bus") {
 
 fuchsia_driver_package("package") {
   package_name = "platform-bus"
+  export_to_bazel = true
   driver_components = [ ":platform-bus" ]
 }
 
