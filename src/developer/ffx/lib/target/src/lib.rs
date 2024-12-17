@@ -463,8 +463,10 @@ pub async fn knock_target_daemonless(
                 .await
                 .map_err(|e| KnockError::CriticalError(e.into()))?;
                 tracing::debug!("daemonless knock connection established");
-                let _ =
-                    conn.rcs_proxy().await.map_err(|e| KnockError::NonCriticalError(e.into()))?;
+                let _ = conn
+                    .rcs_proxy_fdomain()
+                    .await
+                    .map_err(|e| KnockError::NonCriticalError(e.into()))?;
                 conn
             }
         };
