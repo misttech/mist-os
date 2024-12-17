@@ -1544,7 +1544,7 @@ TYPED_TEST(DlTests, InitFiniLegacy) {
 // tests that multiple initializers/finalizers in the dlopen-ed module are run in
 // correct order.
 TYPED_TEST(DlTests, InitFiniArray) {
-  const std::string kFile = TestModule("init-fini-array");
+  const std::string kFile = "init-fini-array.so";
 
   if constexpr (!TestFixture::kSupportsInitFini) {
     GTEST_SKIP() << "test requires init/fini support";
