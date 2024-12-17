@@ -2,9 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(https://fxbug.dev/346628306): Remove this comment to ignore mypy errors.
-# mypy: ignore-errors
-
 import fuchsia_controller_py as fc
 
 from ._ipc import GlobalHandleWaker, HandleWaker
@@ -32,15 +29,15 @@ class AsyncSocket:
         if waker is None:
             self.waker = GlobalHandleWaker()
 
-    def __del__(self):
+    def __del__(self) -> None:
         if self.waker is not None:
             self.waker.unregister(self.socket)
 
-    async def read(self) -> bytearray:
+    async def read(self) -> bytes:
         """Attempts to read off of the socket.
 
         Returns:
-            A byte array to the caller.
+            bytes read from the socket.
 
         Raises:
             ZxStatus exception outlining the specific failure of the underlying handle.
