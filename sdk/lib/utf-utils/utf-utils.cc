@@ -20,7 +20,7 @@ bool utfutils_is_valid_utf8(const char* data, size_t size) {
   return ::utfutils::internal::IsValidUtf8Simd<::utfutils::internal::x86::Avx2>(data, size);
 #elif __SSE4_1__
   return ::utfutils::internal::IsValidUtf8Simd<::utfutils::internal::x86::Ssse3>(data, size);
-#elif __ARM_NEON
+#elif __ARM_NEON && !defined(__arm__)
   return ::utfutils::internal::IsValidUtf8Simd<::utfutils::internal::arm::Neon>(data, size);
 #else
   // Default to scalar implementation for other architectures
@@ -35,7 +35,7 @@ bool utfutils_validate_and_copy_utf8(const char* src, char* dst, size_t size) {
 #elif __SSE4_1__
   return ::utfutils::internal::ValidateAndCopyUtf8Simd<::utfutils::internal::x86::Ssse3>(src, dst,
                                                                                          size);
-#elif __ARM_NEON
+#elif __ARM_NEON && !defined(__arm__)
   return ::utfutils::internal::ValidateAndCopyUtf8Simd<::utfutils::internal::arm::Neon>(src, dst,
                                                                                         size);
 #else
