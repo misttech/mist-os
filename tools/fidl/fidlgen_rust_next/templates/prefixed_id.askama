@@ -9,7 +9,7 @@
         fidl_next::zx::
     {% else %}
         {% let escaped = lib.replace(".", "_") %}
-        fidl_{{ escaped }}::
+        fidl_next_{{ escaped }}::
     {% endif %}
 
     {% let ty_name %}

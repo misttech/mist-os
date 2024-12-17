@@ -18,10 +18,10 @@ pub type VecOfStringsAtMost5 = Vec<String>;
 pub type WireVecOfStringsAtMost5<'buf> =
     ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>;
 
-pub type ReferenceMe = fidl_test_someotherlibrary::ReferenceMe;
+pub type ReferenceMe = fidl_next_test_someotherlibrary::ReferenceMe;
 
 /// The wire type corresponding to [`ReferenceMe`].
-pub type WireReferenceMe = fidl_test_someotherlibrary::WireReferenceMe;
+pub type WireReferenceMe = fidl_next_test_someotherlibrary::WireReferenceMe;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(u32)]
@@ -134,7 +134,7 @@ pub struct ExampleOfUseOfAliases {
 
     pub field_of_vec_of_strings_at_most_5: Vec<String>,
 
-    pub field_of_vec_of_ref_me_at_most_5: Vec<fidl_test_someotherlibrary::ReferenceMe>,
+    pub field_of_vec_of_ref_me_at_most_5: Vec<fidl_next_test_someotherlibrary::ReferenceMe>,
 
     pub field_of_channel: ::fidl_next::zx::Handle,
 
@@ -157,7 +157,7 @@ where
 
     Vec<String>: ::fidl_next::Encode<___E>,
 
-    Vec<fidl_test_someotherlibrary::ReferenceMe>: ::fidl_next::Encode<___E>,
+    Vec<fidl_next_test_someotherlibrary::ReferenceMe>: ::fidl_next::Encode<___E>,
 
     ::fidl_next::zx::Handle: ::fidl_next::Encode<___E>,
 
@@ -296,7 +296,7 @@ pub struct WireExampleOfUseOfAliases<'buf> {
         ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>,
 
     pub field_of_vec_of_ref_me_at_most_5:
-        ::fidl_next::WireVector<'buf, fidl_test_someotherlibrary::WireReferenceMe>,
+        ::fidl_next::WireVector<'buf, fidl_next_test_someotherlibrary::WireReferenceMe>,
 
     pub field_of_channel: ::fidl_next::WireHandle,
 
@@ -317,7 +317,7 @@ where
 
     ::fidl_next::WireVector<'buf, ::fidl_next::WireString<'buf>>: ::fidl_next::Decode<___D>,
 
-    ::fidl_next::WireVector<'buf, fidl_test_someotherlibrary::WireReferenceMe>:
+    ::fidl_next::WireVector<'buf, fidl_next_test_someotherlibrary::WireReferenceMe>:
         ::fidl_next::Decode<___D>,
 
     ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,

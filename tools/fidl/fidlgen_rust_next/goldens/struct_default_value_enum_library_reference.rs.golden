@@ -4,7 +4,7 @@
 
 #[derive(Clone, Debug)]
 pub struct Foo {
-    pub field: fidl_test_dependent::MyEnum,
+    pub field: fidl_next_test_dependent::MyEnum,
 }
 
 impl ::fidl_next::Encodable for Foo {
@@ -13,7 +13,7 @@ impl ::fidl_next::Encodable for Foo {
 
 impl<___E> ::fidl_next::Encode<___E> for Foo
 where
-    fidl_test_dependent::MyEnum: ::fidl_next::Encode<___E>,
+    fidl_next_test_dependent::MyEnum: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -68,14 +68,14 @@ impl ::fidl_next::TakeFrom<WireFoo> for Foo {
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireFoo {
-    pub field: fidl_test_dependent::WireMyEnum,
+    pub field: fidl_next_test_dependent::WireMyEnum,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireFoo
 where
     ___D: ?Sized,
 
-    fidl_test_dependent::WireMyEnum: ::fidl_next::Decode<___D>,
+    fidl_next_test_dependent::WireMyEnum: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,

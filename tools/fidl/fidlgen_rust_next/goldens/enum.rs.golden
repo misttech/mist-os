@@ -2,8 +2,7 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
-#[derive(Clone, Copy)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u32)]
 pub enum MyEmptyFlexibleEnum {
     UnknownOrdinal(u32),
@@ -46,8 +45,7 @@ impl ::fidl_next::TakeFrom<WireMyEmptyFlexibleEnum> for MyEmptyFlexibleEnum {
 }
 
 /// The wire type corresponding to [`MyEmptyFlexibleEnum`].
-#[derive(Clone, Copy)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireMyEmptyFlexibleEnum {
     value: ::fidl_next::u32_le,
@@ -77,8 +75,7 @@ impl ::core::convert::From<MyEmptyFlexibleEnum> for WireMyEmptyFlexibleEnum {
     }
 }
 
-#[derive(Clone, Copy)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u32)]
 pub enum MyFlexibleEnum {
     Foo = 1,
@@ -131,8 +128,7 @@ impl ::fidl_next::TakeFrom<WireMyFlexibleEnum> for MyFlexibleEnum {
 }
 
 /// The wire type corresponding to [`MyFlexibleEnum`].
-#[derive(Clone, Copy)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireMyFlexibleEnum {
     value: ::fidl_next::u32_le,
@@ -172,8 +168,7 @@ impl ::core::convert::From<MyFlexibleEnum> for WireMyFlexibleEnum {
     }
 }
 
-#[derive(Clone, Copy)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u32)]
 pub enum MyFlexibleEnumWithCustomUnknown {
     Foo = 1,
@@ -235,8 +230,7 @@ impl ::fidl_next::TakeFrom<WireMyFlexibleEnumWithCustomUnknown>
 }
 
 /// The wire type corresponding to [`MyFlexibleEnumWithCustomUnknown`].
-#[derive(Clone, Copy)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireMyFlexibleEnumWithCustomUnknown {
     value: ::fidl_next::u32_le,
@@ -285,8 +279,7 @@ impl ::core::convert::From<MyFlexibleEnumWithCustomUnknown>
     }
 }
 
-#[derive(Clone, Copy)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u32)]
 pub enum MyStrictEnum {
     Foo = 1,
@@ -336,8 +329,7 @@ impl ::fidl_next::TakeFrom<WireMyStrictEnum> for MyStrictEnum {
 }
 
 /// The wire type corresponding to [`MyStrictEnum`].
-#[derive(Clone, Copy)]
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireMyStrictEnum {
     value: ::fidl_next::u32_le,
