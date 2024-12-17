@@ -102,8 +102,6 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override;
   void GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer) override;
-  void GetMetadata2(GetMetadata2RequestView request,
-                    GetMetadata2Completer::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;

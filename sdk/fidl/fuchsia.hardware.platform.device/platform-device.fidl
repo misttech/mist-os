@@ -154,15 +154,6 @@ open protocol Device {
     }) -> (struct {
         metadata vector<uint8>:MAX;
     }) error zx.Status;
-
-    // TODO(b/368050069): Remove once no longer used.
-    /// Use GetMetadata() instead.
-    @available(added=HEAD)
-    flexible GetMetadata2(struct {
-        id string:MAX;
-    }) -> (struct {
-        metadata vector<uint8>:MAX;
-    }) error zx.Status;
 };
 
 service Service {

@@ -750,16 +750,6 @@ void PlatformDevice::GetMetadata(GetMetadataRequestView request,
   completer.ReplyError(ZX_ERR_NOT_FOUND);
 }
 
-void PlatformDevice::GetMetadata2(GetMetadata2RequestView request,
-                                  GetMetadata2Completer::Sync& completer) {
-  if (auto metadata = metadata_.find(request->id.get()); metadata != metadata_.end()) {
-    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
-    return;
-  }
-
-  completer.ReplyError(ZX_ERR_NOT_FOUND);
-}
-
 void PlatformDevice::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
