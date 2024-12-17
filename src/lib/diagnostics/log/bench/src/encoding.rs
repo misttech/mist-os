@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use diagnostics_log::TracingEvent;
 use diagnostics_log_encoding::encode::{
-    Encoder, EncoderOpts, TracingEvent, WriteArgumentValue, WriteEventParams,
+    Encoder, EncoderOpts, WriteArgumentValue, WriteEventParams,
 };
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};

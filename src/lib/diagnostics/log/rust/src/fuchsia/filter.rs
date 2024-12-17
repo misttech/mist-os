@@ -1,17 +1,15 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+use crate::{OnInterestChanged, SeverityExt};
 use diagnostics_log_encoding::encode::TestRecord;
-use diagnostics_log_encoding::{FromSeverity as _, Severity, SeverityExt};
+use diagnostics_log_encoding::Severity;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
-
 use std::future::Future;
 use std::sync::{Arc, Mutex, RwLock};
 use tracing::Metadata;
-
-use crate::OnInterestChanged;
 
 pub(crate) struct InterestFilter {
     min_severity: Arc<RwLock<Severity>>,
@@ -94,6 +92,26 @@ impl InterestFilter {
     pub fn enabled_for_testing(&self, record: &TestRecord<'_>) -> bool {
         let min_severity = self.min_severity.read().unwrap();
         record.severity >= (*min_severity).into_primitive()
+    }
+}
+
+/// A type which can be created from a `Severity` value.
+trait FromSeverity {
+    /// Creates `Self` from `severity`.
+    fn from_severity(severity: &Severity) -> Self;
+}
+
+impl FromSeverity for log::LevelFilter {
+    fn from_severity(severity: &Severity) -> Self {
+        match severity {
+            Severity::Error => log::LevelFilter::Error,
+            Severity::Warn => log::LevelFilter::Warn,
+            Severity::Info => log::LevelFilter::Info,
+            Severity::Debug => log::LevelFilter::Debug,
+            Severity::Trace => log::LevelFilter::Trace,
+            // NB: Not a clean mapping.
+            Severity::Fatal => log::LevelFilter::Error,
+        }
     }
 }
 

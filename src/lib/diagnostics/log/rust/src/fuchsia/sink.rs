@@ -3,19 +3,23 @@
 
 use crate::PublishError;
 use diagnostics_log_encoding::encode::{
-    EncodedSpanArguments, Encoder, EncoderOpts, EncodingError, MutableBuffer, TestRecord,
-    TracingEvent, WriteEventParams,
+    Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, ResizableBuffer, TestRecord,
+    WriteArgumentValue, WriteEventParams,
 };
-use diagnostics_log_encoding::Metatag;
+use diagnostics_log_encoding::{Metatag, RawSeverity, Severity};
 use fidl_fuchsia_logger::{LogSinkProxy, MAX_DATAGRAM_LEN_BYTES};
 use fuchsia_runtime as rt;
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::io::Cursor;
+use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tracing::subscriber::Subscriber;
-use tracing::{span, Event};
+use tracing::{span, Event, Level, Metadata};
+use tracing_core::field::{Field, Visit};
+use tracing_log::NormalizeEvent;
 use tracing_subscriber::layer::{Context, Layer};
-use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::registry::{LookupSpan, Scope};
 use zx::{self as zx, AsHandleRef};
 
 #[derive(Default)]
@@ -145,6 +149,201 @@ where
     }
 }
 
+struct TracingEncoder<'a, B>(&'a mut Encoder<B>);
+
+impl<B: MutableBuffer> TracingEncoder<'_, B> {
+    fn maybe_write_argument(&mut self, field: &Field, value: impl WriteArgumentValue<B>) {
+        let name = field.name();
+        if !matches!(name, "log.target" | "log.module_path" | "log.file" | "log.line") {
+            let _ = self.0.write_raw_argument(name, value);
+        }
+    }
+}
+
+impl<B: MutableBuffer> Visit for TracingEncoder<'_, B> {
+    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
+        self.maybe_write_argument(field, format!("{value:?}").as_str());
+    }
+
+    fn record_str(&mut self, field: &Field, value: &str) {
+        self.maybe_write_argument(field, value);
+    }
+
+    fn record_i64(&mut self, field: &Field, value: i64) {
+        self.maybe_write_argument(field, value);
+    }
+
+    fn record_u64(&mut self, field: &Field, value: u64) {
+        self.maybe_write_argument(field, value);
+    }
+
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        self.maybe_write_argument(field, value);
+    }
+}
+
+/// An event emitted by `tracing`.
+#[doc(hidden)]
+pub struct TracingEvent<'a, S> {
+    event: &'a Event<'a>,
+    context: Option<Context<'a, S>>,
+    metadata: StoredMetadata<'a>,
+    timestamp: zx::BootInstant,
+}
+
+// Just like Cow, but without requiring the inner type to be Clone.
+enum StoredMetadata<'a> {
+    Borrowed(&'a Metadata<'a>),
+    Owned(Metadata<'a>),
+}
+
+impl<'a> Deref for StoredMetadata<'a> {
+    type Target = Metadata<'a>;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Borrowed(meta) => meta,
+            Self::Owned(meta) => meta,
+        }
+    }
+}
+
+impl<'a, S> TracingEvent<'a, S> {
+    /// Wraps a tracing event with its associated context.
+    fn new(event: &'a Event<'_>, context: Context<'a, S>) -> TracingEvent<'a, S> {
+        Self::inner(event, Some(context))
+    }
+
+    // Just for benchmark purposes since we can't construct a Context manually.
+    #[doc(hidden)]
+    pub fn from_event(event: &'a Event<'_>) -> TracingEvent<'a, S> {
+        Self::inner(event, None)
+    }
+
+    fn inner(event: &'a Event<'_>, context: Option<Context<'a, S>>) -> TracingEvent<'a, S> {
+        // normalizing is needed to get log records to show up in trace metadata correctly
+        if let Some(metadata) = event.normalized_metadata() {
+            Self {
+                event,
+                context,
+                metadata: StoredMetadata::Owned(metadata),
+                timestamp: zx::BootInstant::get(),
+            }
+        } else {
+            Self {
+                event,
+                context,
+                metadata: StoredMetadata::Borrowed(event.metadata()),
+                timestamp: zx::BootInstant::get(),
+            }
+        }
+    }
+}
+
+impl<S> RecordEvent for TracingEvent<'_, S>
+where
+    for<'lookup> S: Subscriber + LookupSpan<'lookup>,
+{
+    fn raw_severity(&self) -> RawSeverity {
+        self.metadata.raw_severity()
+    }
+
+    fn file(&self) -> Option<&str> {
+        self.metadata.file()
+    }
+
+    fn line(&self) -> Option<u32> {
+        self.metadata.line()
+    }
+
+    fn target(&self) -> &str {
+        self.metadata.target()
+    }
+
+    fn timestamp(&self) -> zx::BootInstant {
+        self.timestamp
+    }
+
+    fn write_arguments<B: MutableBuffer>(
+        self,
+        writer: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        if let Some(context) = self.context {
+            let span_iter =
+                context.event_scope(self.event).map(Scope::from_root).into_iter().flatten();
+            for span in span_iter {
+                let extensions = span.extensions();
+                if let Some(encoded) = extensions.get::<EncodedSpanArguments>() {
+                    encoded.copy_to(writer)?;
+                }
+            }
+        }
+        let mut encoder = TracingEncoder(writer);
+        self.event.record(&mut encoder);
+        Ok(())
+    }
+}
+
+/// The attributes of a Span pre-encoded for usage in child events.
+struct EncodedSpanArguments {
+    encoder: Encoder<Cursor<ResizableBuffer>>,
+}
+
+impl EncodedSpanArguments {
+    /// Encodes the given span attributes.
+    fn new(attrs: &span::Attributes<'_>) -> Result<Self, EncodingError> {
+        let mut encoder =
+            Encoder::new(Cursor::new(ResizableBuffer::default()), EncoderOpts::default());
+        attrs.record(&mut TracingEncoder(&mut encoder));
+        Ok(Self { encoder })
+    }
+
+    /// Encodes the given span attributes, replacing existing ones.
+    // TODO(https://fxbug.dev/312805612): this should update rather than overwrite.
+    fn from_record(record: &span::Record<'_>) -> Result<Self, EncodingError> {
+        let mut encoder =
+            Encoder::new(Cursor::new(ResizableBuffer::default()), EncoderOpts::default());
+        record.record(&mut TracingEncoder(&mut encoder));
+        Ok(Self { encoder })
+    }
+
+    fn copy_to<B: MutableBuffer>(&self, encoder: &mut Encoder<B>) -> Result<(), EncodingError> {
+        let buffer = self.encoder.inner();
+        let end = buffer.cursor().min(buffer.get_ref().len());
+        encoder.write_bytes(&buffer.get_ref()[..end])
+    }
+}
+
+/// A type which has a `Severity`.
+pub trait SeverityExt {
+    /// Return the severity of this value.
+    fn severity(&self) -> Severity;
+
+    /// Return the raw severity of this value.
+    fn raw_severity(&self) -> RawSeverity;
+}
+
+impl SeverityExt for Metadata<'_> {
+    fn severity(&self) -> Severity {
+        match *self.level() {
+            Level::ERROR => Severity::Error,
+            Level::WARN => Severity::Warn,
+            Level::INFO => Severity::Info,
+            Level::DEBUG => Severity::Debug,
+            Level::TRACE => Severity::Trace,
+        }
+    }
+
+    fn raw_severity(&self) -> RawSeverity {
+        match *self.level() {
+            Level::ERROR => Severity::Error.into_primitive(),
+            Level::WARN => Severity::Warn.into_primitive(),
+            Level::INFO => Severity::Info.into_primitive(),
+            Level::DEBUG => Severity::Debug.into_primitive(),
+            Level::TRACE => Severity::Trace.into_primitive(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,6 +354,7 @@ mod tests {
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
     use futures::stream::StreamExt;
     use futures::AsyncReadExt;
+    use std::sync::{LazyLock, Mutex};
     use std::time::Duration;
     use tracing::{debug, error, info, info_span, trace, warn};
     use tracing_subscriber::layer::SubscriberExt;
@@ -540,5 +740,118 @@ mod tests {
         emit_message();
         drain_message(false);
         assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "must drain all messages");
+    }
+
+    #[test]
+    fn build_record_from_tracing_event() {
+        let before_timestamp = zx::BootInstant::get();
+        let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
+        tracing::info!(
+            is_a_str = "hahaha",
+            is_debug = ?PrintMe(5),
+            is_signed = -500,
+            is_unsigned = 1000u64,
+            is_bool = false,
+            "blarg this is a message"
+        );
+
+        let guard = LAST_RECORD.lock().unwrap();
+        let encoder = guard.as_ref().unwrap();
+        let (record, _) = parse_record(encoder.inner().get_ref()).expect("wrote valid record");
+        assert!(record.timestamp > before_timestamp);
+        assert_eq!(
+            record,
+            Record {
+                timestamp: record.timestamp,
+                severity: Severity::Info as u8,
+                arguments: vec![
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
+                    Argument::tag("diagnostics_log_lib_test::fuchsia::sink::tests"),
+                    Argument::message("blarg this is a message"),
+                    Argument::other("is_a_str", "hahaha"),
+                    Argument::other("is_debug", "PrintMe(5)"),
+                    Argument::other("is_signed", -500),
+                    Argument::other("is_unsigned", 1000u64),
+                    Argument::other("is_bool", false),
+                    Argument::tag("a-tag"),
+                ]
+            }
+        );
+    }
+
+    // Note the inner u32 is used in the debug implementation.
+    #[derive(Debug)]
+    struct PrintMe(#[allow(unused)] u32);
+
+    type ByteEncoder = Encoder<Cursor<[u8; 1024]>>;
+    static LAST_RECORD: LazyLock<Mutex<Option<ByteEncoder>>> = LazyLock::new(|| Mutex::new(None));
+
+    struct EncoderLayer;
+    impl<S> Layer<S> for EncoderLayer
+    where
+        for<'lookup> S: Subscriber + LookupSpan<'lookup>,
+    {
+        fn on_event(&self, event: &Event<'_>, cx: Context<'_, S>) {
+            let mut encoder = Encoder::new(Cursor::new([0u8; 1024]), EncoderOpts::default());
+            encoder
+                .write_event(WriteEventParams {
+                    event: TracingEvent::new(event, cx),
+                    tags: &["a-tag"],
+                    metatags: [Metatag::Target].iter(),
+                    pid: zx::Koid::from_raw(0),
+                    tid: zx::Koid::from_raw(0),
+                    dropped: 0,
+                })
+                .expect("wrote event");
+            *LAST_RECORD.lock().unwrap() = Some(encoder);
+        }
+
+        fn on_new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
+            let span = ctx.span(id).expect("Span not found, this is a bug");
+            let mut extensions = span.extensions_mut();
+            if extensions.get_mut::<EncodedSpanArguments>().is_none() {
+                let encoded = EncodedSpanArguments::new(attrs).expect("encoded");
+                extensions.insert(encoded);
+            }
+        }
+    }
+
+    #[test]
+    fn encoder_supports_spans() {
+        let before_timestamp = zx::BootInstant::get();
+        let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
+        let span = info_span!("my span", tag = "span_tag", span_field = 42);
+        span.in_scope(|| {
+            let nested_span =
+                info_span!("my other span", tag = "nested_span_tag", nested_span_field = "hello");
+            nested_span.in_scope(|| {
+                tracing::info!(is_bool = true, "a log in spans");
+            });
+        });
+
+        let guard = LAST_RECORD.lock().unwrap();
+        let encoder = guard.as_ref().unwrap();
+        let (record, _) = parse_record(encoder.inner().get_ref()).expect("wrote valid record");
+        assert!(record.timestamp > before_timestamp);
+        assert_eq!(
+            record,
+            Record {
+                timestamp: record.timestamp,
+                severity: Severity::Info as u8,
+                arguments: vec![
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
+                    Argument::tag("diagnostics_log_lib_test::fuchsia::sink::tests"),
+                    Argument::tag("span_tag"),
+                    Argument::other("span_field", 42),
+                    Argument::tag("nested_span_tag"),
+                    Argument::other("nested_span_field", "hello"),
+                    Argument::message("a log in spans"),
+                    Argument::other("is_bool", true,),
+                    Argument::tag("a-tag",),
+                ]
+            }
+        );
     }
 }

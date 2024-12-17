@@ -8,7 +8,6 @@
 
 use bitfield::bitfield;
 use std::borrow::{Borrow, Cow};
-use tracing::{Level, Metadata};
 use zerocopy::{FromBytes, IntoBytes, KnownLayout};
 
 pub use fidl_fuchsia_diagnostics::Severity;
@@ -362,73 +361,6 @@ impl TryFrom<u8> for ArgType {
             9 => ArgType::Bool,
             _ => return Err(parse::ParseError::ValueOutOfValidRange),
         })
-    }
-}
-
-/// A type which has a `Severity`.
-pub trait SeverityExt {
-    /// Return the severity of this value.
-    fn severity(&self) -> Severity;
-
-    /// Return the raw severity of this value.
-    fn raw_severity(&self) -> RawSeverity;
-}
-
-impl SeverityExt for Metadata<'_> {
-    fn severity(&self) -> Severity {
-        match *self.level() {
-            Level::ERROR => Severity::Error,
-            Level::WARN => Severity::Warn,
-            Level::INFO => Severity::Info,
-            Level::DEBUG => Severity::Debug,
-            Level::TRACE => Severity::Trace,
-        }
-    }
-
-    fn raw_severity(&self) -> RawSeverity {
-        match *self.level() {
-            Level::ERROR => Severity::Error.into_primitive(),
-            Level::WARN => Severity::Warn.into_primitive(),
-            Level::INFO => Severity::Info.into_primitive(),
-            Level::DEBUG => Severity::Debug.into_primitive(),
-            Level::TRACE => Severity::Trace.into_primitive(),
-        }
-    }
-}
-
-impl SeverityExt for log::Level {
-    fn severity(&self) -> Severity {
-        match self {
-            log::Level::Error => Severity::Error,
-            log::Level::Warn => Severity::Warn,
-            log::Level::Info => Severity::Info,
-            log::Level::Debug => Severity::Debug,
-            log::Level::Trace => Severity::Trace,
-        }
-    }
-
-    fn raw_severity(&self) -> RawSeverity {
-        self.severity().into_primitive()
-    }
-}
-
-/// A type which can be created from a `Severity` value.
-pub trait FromSeverity {
-    /// Creates `Self` from `severity`.
-    fn from_severity(severity: &Severity) -> Self;
-}
-
-impl FromSeverity for log::LevelFilter {
-    fn from_severity(severity: &Severity) -> Self {
-        match severity {
-            Severity::Error => log::LevelFilter::Error,
-            Severity::Warn => log::LevelFilter::Warn,
-            Severity::Info => log::LevelFilter::Info,
-            Severity::Debug => log::LevelFilter::Debug,
-            Severity::Trace => log::LevelFilter::Trace,
-            // NB: Not a clean mapping.
-            Severity::Fatal => log::LevelFilter::Error,
-        }
     }
 }
 
