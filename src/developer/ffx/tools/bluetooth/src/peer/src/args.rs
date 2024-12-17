@@ -15,7 +15,7 @@ use ffx_core::ffx_command;
     example = "ffx bluetooth peer"
 )]
 pub struct PeerCommand {
-    /// list
+    /// list or show
     #[argh(subcommand)]
     pub subcommand: PeerSubCommand,
 }
@@ -24,6 +24,7 @@ pub struct PeerCommand {
 #[argh(subcommand)]
 pub enum PeerSubCommand {
     List(ListCommand),
+    Show(ShowCommand),
 }
 
 /// ffx bluetooth peer list
@@ -38,4 +39,18 @@ pub struct ListCommand {
     /// filter all known peers by id, address, or name (case-insensitive)
     #[argh(positional)]
     pub filter: Option<String>,
+}
+
+/// ffx bluetooth peer show
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone)]
+#[argh(
+    subcommand,
+    name = "show",
+    description = "Show details for a known peer.",
+    example = "ffx bluetooth peer show <id|addr>"
+)]
+pub struct ShowCommand {
+    /// specify peer by id or address
+    #[argh(positional)]
+    pub id_or_addr: String,
 }

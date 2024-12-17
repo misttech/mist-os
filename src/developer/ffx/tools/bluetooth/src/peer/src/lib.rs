@@ -15,6 +15,7 @@ use fuchsia_async::TimeoutExt;
 use fuchsia_bluetooth::types::{Address, Peer, PeerId};
 use futures::stream::StreamExt;
 use prettytable::{cell, format, row, Row, Table};
+use regex::Regex;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::time::Duration;
@@ -49,8 +50,27 @@ impl FfxMain for PeerTool {
 
                 Ok(())
             }
+            // ffx bluetooth peer show
+            PeerSubCommand::Show(ref cmd) => {
+                let known_peers = get_known_peers(&mut self).await?;
+
+                let args: &[&str] = &[&cmd.id_or_addr];
+
+                self.state.peers = known_peers;
+
+                writer.line(get_peer(args, self.state))?;
+
+                Ok(())
+            }
         }
     }
+}
+
+/// Get the string representation of a peer from either an identifier or address
+fn get_peer<'a>(args: &'a [&'a str], state: State) -> String {
+    to_identifier(state.clone(), args[0])
+        .and_then(|id| state.peers.get(&id).map(|peer| peer.to_string()))
+        .unwrap_or_else(|| String::from("No known peer"))
 }
 
 fn get_peers<'a>(args: &'a [&'a str], state: &State, full_details: bool) -> String {
@@ -116,6 +136,20 @@ fn peer_to_table_row(peer: &Peer) -> Row {
         peer.connected.to_string(),
         peer.bonded.to_string(),
     ]
+}
+
+// Find the identifier for a `Peer` based on a `key` that is either an identifier or an
+// address.
+// Returns `None` if the given address does not belong to a known peer.
+fn to_identifier(state: State, key: &str) -> Option<PeerId> {
+    // Compile regex inline because it is not ever expected to be a bottleneck
+    let address_pattern = Regex::new(r"^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$")
+        .expect("Could not compile mac address regex pattern.");
+    if address_pattern.is_match(key) {
+        state.peers.values().find(|peer| &peer.address == key).map(|peer| peer.id)
+    } else {
+        key.parse().ok()
+    }
 }
 
 async fn get_known_peers(peer_tool: &mut PeerTool) -> Result<HashMap<PeerId, Peer>, Error> {
@@ -361,5 +395,42 @@ mod tests {
         let peer_b =
             custom_peer(PeerId(0xbaaf), Address::Public([2, 0, 0, 0, 0, 0]), false, true, None);
         assert_eq!(cmp_peers(&peer_a, &peer_b), Ordering::Less);
+    }
+
+    #[test]
+    fn test_get_peer() {
+        let mut state = State::new();
+
+        let peer_id1 = PeerId(0xabcd);
+        let address1 = Address::Public([0xAB, 0x89, 0x67, 0x45, 0x23, 0x01]);
+        let peer1 = named_peer(peer_id1, address1, Some("Sapphire".to_string()));
+        let _ = state.peers.insert(peer_id1, peer1.clone());
+
+        let peer_id2 = PeerId(0xbeef);
+        let address2 = Address::Public([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
+        let peer2 = named_peer(peer_id2, address2, None);
+        let _ = state.peers.insert(peer_id2, peer2.clone());
+
+        // Valid ID
+        let result = get_peer(&[&peer_id1.to_string()], state.clone());
+        assert_eq!(result, peer1.to_string());
+
+        // Valid Address
+        let result = get_peer(&[&address2.as_hex_string()], state.clone());
+        assert_eq!(result, peer2.to_string());
+
+        // Invalid ID
+        let invalid_peer_id = PeerId(0x1234);
+        let result = get_peer(&[&invalid_peer_id.to_string()], state.clone());
+        assert_eq!(result, "No known peer");
+
+        // Invalid Address Format
+        let result = get_peer(&["invalid_address_format"], state.clone());
+        assert_eq!(result, "No known peer");
+
+        // Empty State
+        let empty_state = State::new();
+        let result = get_peer(&[&peer_id1.to_string()], empty_state);
+        assert_eq!(result, "No known peer");
     }
 }
