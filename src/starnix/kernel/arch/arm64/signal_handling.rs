@@ -12,7 +12,7 @@ use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    __NR_restart_syscall, _aarch64_ctx, errno, error, esr_context, fpsimd_context, sigaction,
+    __NR_restart_syscall, _aarch64_ctx, errno, error, esr_context, fpsimd_context, sigaction_t,
     sigaltstack, sigcontext, siginfo_t, ucontext, ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
 };
 use zerocopy::{FromBytes, IntoBytes};
@@ -43,7 +43,7 @@ impl SignalStackFrame {
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
-        _action: sigaction,
+        _action: sigaction_t,
         _stack_pointer: UserAddress,
     ) -> Result<SignalStackFrame, Errno> {
         let mut regs = registers.r.to_vec();

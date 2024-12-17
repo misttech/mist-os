@@ -27,8 +27,8 @@ use starnix_uapi::signals::{
 };
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    errno, error, sigaction as sigaction_t, SA_NODEFER, SA_ONSTACK, SA_RESETHAND, SA_RESTART,
-    SA_SIGINFO, SIG_DFL, SIG_IGN,
+    errno, error, sigaction_t, SA_NODEFER, SA_ONSTACK, SA_RESETHAND, SA_RESTART, SA_SIGINFO,
+    SIG_DFL, SIG_IGN,
 };
 
 /// Indicates where in the signal queue a signal should go.  Signals

@@ -8,6 +8,7 @@
 // This file contains typedefs required by linux headers that may break convention and rely
 // on libc types, which we do not include in bindgen.
 
+#include <asm/signal.h>
 #include <linux/socket.h>
 #include <linux/types.h>
 
@@ -23,7 +24,8 @@ struct sockaddr {
   char sa_data[14];
 };
 
-typedef struct __kernel_sockaddr_storage sockaddr_storage;
 typedef __kernel_sa_family_t sa_family_t;
+
+typedef struct __kernel_sigaction sigaction_t;
 
 #endif  // SRC_STARNIX_LIB_LINUX_UAPI_STUB_TYPEDEFS_H_

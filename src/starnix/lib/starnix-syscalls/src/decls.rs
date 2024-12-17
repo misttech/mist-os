@@ -204,7 +204,6 @@ macro_rules! for_each_arch_syscall {
             $($context;)*
             $($common_name,)*
             renameat,  // renameat2
-            syscalls,
         }
     }
 }
@@ -216,7 +215,6 @@ macro_rules! for_each_arch_syscall {
         $callback!{
             $($context;)*
             $($common_name,)*
-            syscalls,
         }
     }
 }

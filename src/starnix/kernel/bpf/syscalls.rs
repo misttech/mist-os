@@ -282,7 +282,7 @@ pub fn sys_bpf(
             log_trace!("BPF_PROG_QUERY");
             track_stub!(TODO("https://fxbug.dev/322873416"), "Bpf::BPF_PROG_QUERY");
             current_task.write_memory(UserAddress::from(prog_attr.prog_ids), 1.as_bytes())?;
-            prog_attr.prog_cnt = std::mem::size_of::<u64>() as u32;
+            prog_attr.__bindgen_anon_2.prog_cnt = std::mem::size_of::<u64>() as u32;
             current_task.write_memory(attr_addr, prog_attr.as_bytes())?;
             Ok(SUCCESS)
         }

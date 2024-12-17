@@ -184,7 +184,7 @@ pub enum SocketAddress {
 }
 
 pub const SA_FAMILY_SIZE: usize = std::mem::size_of::<uapi::__kernel_sa_family_t>();
-pub const SA_STORAGE_SIZE: usize = std::mem::size_of::<uapi::__kernel_sockaddr_storage>();
+pub const SA_STORAGE_SIZE: usize = std::mem::size_of::<uapi::sockaddr_storage>();
 
 impl SocketAddress {
     pub fn default_for_domain(domain: SocketDomain) -> SocketAddress {

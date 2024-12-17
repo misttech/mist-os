@@ -5,9 +5,6 @@
 #ifndef SRC_STARNIX_LIB_LINUX_UAPI_STUB_ARM_ARCH32_SYSCALLS_H_
 #define SRC_STARNIX_LIB_LINUX_UAPI_STUB_ARM_ARCH32_SYSCALLS_H_
 
-// The uapi for arm linux doesn't provide __NR_syscalls.
-#define __NR_syscalls __NR_cachestat + 1
-
 // The convention starnix uses always use __NR_ as a prefix for syscall number.
 // Defines ARM specific constant using the same convention
 #define __NR_ARM_breakpoint __ARM_NR_breakpoint

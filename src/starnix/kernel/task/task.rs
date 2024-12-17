@@ -34,7 +34,7 @@ use starnix_uapi::signals::{
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, robust_list_head, sigaction, sigaltstack, ucred,
+    errno, error, from_status_like_fdio, pid_t, robust_list_head, sigaction_t, sigaltstack, ucred,
     CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
@@ -1499,7 +1499,7 @@ impl Task {
         }
     }
 
-    pub fn get_signal_action(&self, signal: Signal) -> sigaction {
+    pub fn get_signal_action(&self, signal: Signal) -> sigaction_t {
         self.thread_group.signal_actions.get(signal)
     }
 }

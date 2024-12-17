@@ -10,7 +10,7 @@ use starnix_uapi::union::struct_with_union_into_bytes;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     __sifields__bindgen_ty_1, __sifields__bindgen_ty_2, __sifields__bindgen_ty_4,
-    __sifields__bindgen_ty_7, c_int, c_uint, error, pid_t, sigaction, sigaltstack, sigevent,
+    __sifields__bindgen_ty_7, c_int, c_uint, error, pid_t, sigaction_t, sigaltstack, sigevent,
     siginfo_t, sigval_t, uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID,
     SIG_DFL, SIG_IGN, SI_KERNEL, SI_MAX_SIZE,
 };
@@ -44,28 +44,28 @@ impl From<SignalInfo> for KernelSignalInfo {
     }
 }
 
-/// `SignalActions` contains a `sigaction` for each valid signal.
+/// `SignalActions` contains a `sigaction_t` for each valid signal.
 #[derive(Debug)]
 pub struct SignalActions {
-    actions: RwLock<[sigaction; Signal::NUM_SIGNALS as usize + 1]>,
+    actions: RwLock<[sigaction_t; Signal::NUM_SIGNALS as usize + 1]>,
 }
 
 impl SignalActions {
-    /// Returns a collection of `sigaction`s that contains default values for each signal.
+    /// Returns a collection of `sigaction_t`s that contains default values for each signal.
     pub fn default() -> Arc<SignalActions> {
         Arc::new(SignalActions {
-            actions: RwLock::new([sigaction::default(); Signal::NUM_SIGNALS as usize + 1]),
+            actions: RwLock::new([sigaction_t::default(); Signal::NUM_SIGNALS as usize + 1]),
         })
     }
 
-    /// Returns the `sigaction` that is currently set for `signal`.
-    pub fn get(&self, signal: Signal) -> sigaction {
+    /// Returns the `sigaction_t` that is currently set for `signal`.
+    pub fn get(&self, signal: Signal) -> sigaction_t {
         // This is safe, since the actions always contain a value for each signal.
         self.actions.read()[signal.number() as usize]
     }
 
     /// Update the action for `signal`. Returns the previously configured action.
-    pub fn set(&self, signal: Signal, new_action: sigaction) -> sigaction {
+    pub fn set(&self, signal: Signal, new_action: sigaction_t) -> sigaction_t {
         let mut actions = self.actions.write();
         let old_action = actions[signal.number() as usize];
         actions[signal.number() as usize] = new_action;

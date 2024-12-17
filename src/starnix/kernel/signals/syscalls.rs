@@ -26,7 +26,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::{
-    errno, error, pid_t, rusage, sigaction, sigaltstack, timespec, MINSIGSTKSZ, P_ALL, P_PGID,
+    errno, error, pid_t, rusage, sigaction_t, sigaltstack, timespec, MINSIGSTKSZ, P_ALL, P_PGID,
     P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE,
     SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG,
     WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
@@ -41,8 +41,8 @@ pub fn sys_rt_sigaction(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     signum: UncheckedSignal,
-    user_action: UserRef<sigaction>,
-    user_old_action: UserRef<sigaction>,
+    user_action: UserRef<sigaction_t>,
+    user_old_action: UserRef<sigaction_t>,
     sigset_size: usize,
 ) -> Result<(), Errno> {
     if sigset_size != std::mem::size_of::<SigSet>() {
@@ -1367,8 +1367,8 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(SIGKILL),
                 // The signal is only checked when the action is set (i.e., action is non-null).
-                UserRef::<sigaction>::new(UserAddress::from(10)),
-                UserRef::<sigaction>::default(),
+                UserRef::<sigaction_t>::new(UserAddress::from(10)),
+                UserRef::<sigaction_t>::default(),
                 std::mem::size_of::<SigSet>(),
             ),
             error!(EINVAL)
@@ -1379,8 +1379,8 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(SIGSTOP),
                 // The signal is only checked when the action is set (i.e., action is non-null).
-                UserRef::<sigaction>::new(UserAddress::from(10)),
-                UserRef::<sigaction>::default(),
+                UserRef::<sigaction_t>::new(UserAddress::from(10)),
+                UserRef::<sigaction_t>::default(),
                 std::mem::size_of::<SigSet>(),
             ),
             error!(EINVAL)
@@ -1391,8 +1391,8 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(Signal::NUM_SIGNALS + 1),
                 // The signal is only checked when the action is set (i.e., action is non-null).
-                UserRef::<sigaction>::new(UserAddress::from(10)),
-                UserRef::<sigaction>::default(),
+                UserRef::<sigaction_t>::new(UserAddress::from(10)),
+                UserRef::<sigaction_t>::default(),
                 std::mem::size_of::<SigSet>(),
             ),
             error!(EINVAL)
@@ -1404,23 +1404,23 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .write_memory(addr, &[0u8; std::mem::size_of::<sigaction>()])
+            .write_memory(addr, &[0u8; std::mem::size_of::<sigaction_t>()])
             .expect("failed to clear struct");
 
         let org_mask = SigSet::from(SIGHUP) | SigSet::from(SIGINT);
-        let original_action = sigaction { sa_mask: org_mask.into(), ..sigaction::default() };
+        let original_action = sigaction_t { sa_mask: org_mask.into(), ..sigaction_t::default() };
 
         {
             current_task.thread_group.signal_actions.set(SIGHUP, original_action);
         }
 
-        let old_action_ref = UserRef::<sigaction>::new(addr);
+        let old_action_ref = UserRef::<sigaction_t>::new(addr);
         assert_eq!(
             sys_rt_sigaction(
                 &mut locked,
                 &current_task,
                 UncheckedSignal::from(SIGHUP),
-                UserRef::<sigaction>::default(),
+                UserRef::<sigaction_t>::default(),
                 old_action_ref,
                 std::mem::size_of::<SigSet>()
             ),
@@ -1436,12 +1436,12 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .write_memory(addr, &[0u8; std::mem::size_of::<sigaction>()])
+            .write_memory(addr, &[0u8; std::mem::size_of::<sigaction_t>()])
             .expect("failed to clear struct");
 
         let org_mask = SigSet::from(SIGHUP) | SigSet::from(SIGINT);
-        let original_action = sigaction { sa_mask: org_mask.into(), ..sigaction::default() };
-        let set_action_ref = UserRef::<sigaction>::new(addr);
+        let original_action = sigaction_t { sa_mask: org_mask.into(), ..sigaction_t::default() };
+        let set_action_ref = UserRef::<sigaction_t>::new(addr);
         current_task.write_object(set_action_ref, &original_action).expect("failed to set action");
 
         assert_eq!(
@@ -1450,7 +1450,7 @@ mod tests {
                 &current_task,
                 UncheckedSignal::from(SIGINT),
                 set_action_ref,
-                UserRef::<sigaction>::default(),
+                UserRef::<sigaction_t>::default(),
                 std::mem::size_of::<SigSet>(),
             ),
             Ok(())
@@ -1839,7 +1839,7 @@ mod tests {
         // Register a signal action to ensure that the `SIGUSR1` signal interrupts the task.
         task.thread_group.signal_actions.set(
             SIGUSR1,
-            sigaction { sa_handler: uaddr { addr: 0xDEADBEEF }, ..sigaction::default() },
+            sigaction_t { sa_handler: uaddr { addr: 0xDEADBEEF }, ..sigaction_t::default() },
         );
 
         // Start a child task. This will ensure that `wait_on_pid` tries to wait for the child.
