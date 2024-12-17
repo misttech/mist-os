@@ -255,42 +255,15 @@ fpromise::promise<std::vector<uint8_t>, zx_status_t> BtHciBroadcom::SendCommand(
 }
 
 fpromise::promise<std::vector<uint8_t>, zx_status_t> BtHciBroadcom::ReadEvent() {
-  fidl::Status result = hci_transport_client_.HandleOneEvent(hci_event_handler_);
-  if (result.status() != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get event packet.");
+  zx::result<std::vector<uint8_t>> result = ReadEventSync();
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Failed to read event");
     return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
-        fpromise::error(result.status()));
-  }
-
-  // Read result will be stored in |event_receive_buffer_|.
-  std::vector<uint8_t> packet_bytes = std::move(event_receive_buffer_);
-  // Copy out the data from buffer and clear the buffer.
-  event_receive_buffer_.clear();
-
-  if (packet_bytes.size() < sizeof(HciCommandComplete)) {
-    FDF_LOG(ERROR, "command channel read too short: %zu < %lu", packet_bytes.size(),
-            sizeof(HciCommandComplete));
-    return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
-        fpromise::error(ZX_ERR_INTERNAL));
-  }
-
-  HciCommandComplete event;
-  std::memcpy(&event, packet_bytes.data(), sizeof(HciCommandComplete));
-  if (event.header.event_code != kHciEvtCommandCompleteEventCode ||
-      event.header.parameter_total_size < kMinEvtParamSize) {
-    FDF_LOG(ERROR, "did not receive command complete or params too small");
-    return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
-        fpromise::error(ZX_ERR_INTERNAL));
-  }
-
-  if (event.return_code != 0) {
-    FDF_LOG(ERROR, "got command complete error %u", event.return_code);
-    return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
-        fpromise::error(ZX_ERR_INTERNAL));
+        fpromise::error(result.status_value()));
   }
 
   return fpromise::make_result_promise<std::vector<uint8_t>, zx_status_t>(
-      fpromise::ok(std::move(packet_bytes)));
+      fpromise::ok(std::move(result.value())));
 }
 
 fpromise::promise<void, zx_status_t> BtHciBroadcom::SetBaudRate(uint32_t baud_rate) {
@@ -456,7 +429,7 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
       })
       .and_then([this, fw_vmo = std::move(fw_vmo), fw_size]() mutable {
         // The firmware is a sequence of HCI commands containing the firmware data as payloads.
-        return SendVmoAsCommands(std::move(fw_vmo), fw_size, /*offset=*/0);
+        return SendVmoAsCommands(std::move(fw_vmo), fw_size);
       })
       .and_then([this]() -> fpromise::promise<void, zx_status_t> {
         if (is_uart_) {
@@ -480,50 +453,91 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
       .and_then([]() { FDF_LOG(INFO, "firmware loaded"); });
 }
 
-fpromise::promise<void, zx_status_t> BtHciBroadcom::SendVmoAsCommands(zx::vmo vmo, size_t size,
-                                                                      size_t offset) {
-  if (offset == size) {
-    return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
+zx_status_t BtHciBroadcom::SendCommandSync(const void* command, size_t length) {
+  // send HCI command
+  fidl::Arena arena;
+  auto command_vec = std::vector<uint8_t>(static_cast<const uint8_t*>(command),
+                                          static_cast<const uint8_t*>(command) + length);
+  auto command_view = fidl::VectorView<uint8_t>::FromExternal(command_vec);
+  auto result =
+      hci_transport_client_->Send(fhbt::wire::SentPacket::WithCommand(arena, command_view));
+  if (result.status() != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to send command: %s", result.status_string());
+    return result.status();
   }
 
-  uint8_t buffer[kMaxHciCommandSize];
+  return ReadEventSync().status_value();
+}
 
-  size_t remaining = size - offset;
-  size_t read_amount = (remaining > sizeof(buffer) ? sizeof(buffer) : remaining);
-
-  if (read_amount < sizeof(HciCommandHeader)) {
-    FDF_LOG(ERROR, "short HCI command in firmware download");
-    return fpromise::make_error_promise(ZX_ERR_INTERNAL);
+zx::result<std::vector<uint8_t>> BtHciBroadcom::ReadEventSync() {
+  fidl::Status result = hci_transport_client_.HandleOneEvent(hci_event_handler_);
+  if (result.status() != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to get event packet: %s", zx_status_get_string(result.status()));
+    return zx::error(result.status());
   }
 
-  zx_status_t status = vmo.read(buffer, offset, read_amount);
-  if (status != ZX_OK) {
-    return fpromise::make_error_promise(status);
+  // Read result will be stored in |event_receive_buffer_|.
+  std::vector<uint8_t> packet_bytes = std::move(event_receive_buffer_);
+  // Copy out the data from buffer and clear the buffer.
+  event_receive_buffer_.clear();
+
+  if (packet_bytes.size() < sizeof(HciCommandComplete)) {
+    FDF_LOG(ERROR, "command channel read too short: %zu < %lu", packet_bytes.size(),
+            sizeof(HciCommandComplete));
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
-  HciCommandHeader header;
-  std::memcpy(&header, buffer, sizeof(HciCommandHeader));
-  size_t length = header.parameter_total_size + sizeof(header);
-  if (read_amount < length) {
-    FDF_LOG(ERROR, "short HCI command in firmware download");
-    return fpromise::make_error_promise(ZX_ERR_INTERNAL);
+  HciCommandComplete event;
+  std::memcpy(&event, packet_bytes.data(), sizeof(HciCommandComplete));
+  if (event.header.event_code != kHciEvtCommandCompleteEventCode ||
+      event.header.parameter_total_size < kMinEvtParamSize) {
+    FDF_LOG(ERROR, "did not receive command complete or params too small");
+    return zx::error(ZX_ERR_INTERNAL);
   }
 
-  offset += length;
+  if (event.return_code != 0) {
+    FDF_LOG(ERROR, "got command complete error %u", event.return_code);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
 
-  return SendCommand(buffer, length)
-      .then([this, vmo = std::move(vmo), size,
-             offset](fpromise::result<std::vector<uint8_t>, zx_status_t>& result) mutable
-                -> fpromise::promise<void, zx_status_t> {
-        if (result.is_error()) {
-          FDF_LOG(ERROR, "SendCommand failed in firmware download: %s",
-                  zx_status_get_string(result.error()));
-          return fpromise::make_error_promise<zx_status_t>(result.error());
-        }
+  return zx::ok(std::move(packet_bytes));
+}
 
-        // Send the next command
-        return SendVmoAsCommands(std::move(vmo), size, offset);
-      });
+fpromise::promise<void, zx_status_t> BtHciBroadcom::SendVmoAsCommands(zx::vmo vmo, size_t size) {
+  size_t offset = 0;
+
+  while (offset < size) {
+    uint8_t buffer[kMaxHciCommandSize];
+
+    size_t remaining = size - offset;
+    size_t read_amount = (remaining > sizeof(buffer) ? sizeof(buffer) : remaining);
+
+    if (read_amount < sizeof(HciCommandHeader)) {
+      FDF_LOG(ERROR, "short HCI command in firmware download");
+      return fpromise::make_error_promise(ZX_ERR_INTERNAL);
+    }
+
+    zx_status_t status = vmo.read(buffer, offset, read_amount);
+    if (status != ZX_OK) {
+      return fpromise::make_error_promise(status);
+    }
+
+    HciCommandHeader header;
+    std::memcpy(&header, buffer, sizeof(HciCommandHeader));
+    size_t length = header.parameter_total_size + sizeof(header);
+    if (read_amount < length) {
+      FDF_LOG(ERROR, "short HCI command in firmware download");
+      return fpromise::make_error_promise(ZX_ERR_INTERNAL);
+    }
+
+    offset += length;
+    if (zx_status_t status = SendCommandSync(buffer, length); status != ZX_OK) {
+      FDF_LOG(ERROR, "SendCommand failed in firmware download: %s", zx_status_get_string(status));
+      return fpromise::make_error_promise(status);
+    }
+  }
+
+  return fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
 }
 
 fpromise::promise<void, zx_status_t> BtHciBroadcom::Initialize() {
