@@ -19,124 +19,6 @@
 use crate::fscrypt_key_specifier;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-#[repr(transparent)]
-#[derive(
-    Debug,
-    Default,
-    Clone,
-    Copy,
-    Eq,
-    PartialEq,
-    Hash,
-    Ord,
-    PartialOrd,
-    IntoBytes,
-    FromBytes,
-    KnownLayout,
-    Immutable,
-)]
-pub struct uaddr {
-    pub addr: u64,
-}
-
-#[derive(
-    Debug,
-    Default,
-    Eq,
-    PartialEq,
-    Hash,
-    Ord,
-    PartialOrd,
-    IntoBytes,
-    FromBytes,
-    KnownLayout,
-    Immutable,
-)]
-#[repr(transparent)]
-pub struct uref<T> {
-    pub addr: uaddr,
-    _phantom: std::marker::PhantomData<T>,
-}
-
-impl<T> Copy for uref<T> {}
-
-impl<T> Clone for uref<T> {
-    fn clone(&self) -> Self {
-        Self { addr: self.addr, _phantom: Default::default() }
-    }
-}
-
-impl<T> From<uaddr> for uref<T> {
-    fn from(addr: uaddr) -> Self {
-        Self { addr, _phantom: Default::default() }
-    }
-}
-
-#[repr(transparent)]
-#[derive(
-    Debug,
-    Default,
-    Clone,
-    Copy,
-    Eq,
-    PartialEq,
-    Hash,
-    Ord,
-    PartialOrd,
-    IntoBytes,
-    FromBytes,
-    KnownLayout,
-    Immutable,
-)]
-pub struct uaddr32 {
-    pub addr: u32,
-}
-
-impl From<uaddr32> for uaddr {
-    fn from(addr32: uaddr32) -> Self {
-        Self { addr: addr32.addr as u64 }
-    }
-}
-
-#[derive(
-    Debug,
-    Default,
-    Clone,
-    Copy,
-    Eq,
-    PartialEq,
-    Hash,
-    Ord,
-    PartialOrd,
-    IntoBytes,
-    FromBytes,
-    KnownLayout,
-    Immutable,
-)]
-#[repr(transparent)]
-pub struct uref32<T> {
-    pub addr: uaddr32,
-    _phantom: std::marker::PhantomData<T>,
-}
-
-impl<T> From<uaddr32> for uref32<T> {
-    fn from(addr: uaddr32) -> Self {
-        Self { addr, _phantom: Default::default() }
-    }
-}
-
-impl<T> From<uaddr32> for uref<T> {
-    fn from(addr: uaddr32) -> Self {
-        Self { addr: addr.into(), _phantom: Default::default() }
-    }
-}
-
-impl<T> From<uref32<T>> for uref<T> {
-    fn from(ur: uref32<T>) -> Self {
-        Self { addr: ur.addr.into(), _phantom: Default::default() }
-    }
-}
-
 #[repr(C)]
 #[derive(
     Copy,
@@ -6000,7 +5882,7 @@ pub type __u64 = crate::types::arch32::c_ulonglong;
 pub struct __kernel_fd_set {
     pub fds_bits: [crate::types::arch32::c_ulong; 32usize],
 }
-pub type __kernel_sighandler_t = uaddr32;
+pub type __kernel_sighandler_t = crate::uaddr32;
 pub type __kernel_key_t = crate::types::arch32::c_int;
 pub type __kernel_mqd_t = crate::types::arch32::c_int;
 pub type __kernel_mode_t = crate::types::arch32::c_ushort;
@@ -6034,7 +5916,7 @@ pub type __kernel_time64_t = crate::types::arch32::c_longlong;
 pub type __kernel_clock_t = __kernel_long_t;
 pub type __kernel_timer_t = crate::types::arch32::c_int;
 pub type __kernel_clockid_t = crate::types::arch32::c_int;
-pub type __kernel_caddr_t = uref32<crate::types::arch32::c_char>;
+pub type __kernel_caddr_t = crate::uref32<crate::types::arch32::c_char>;
 pub type __kernel_uid16_t = crate::types::arch32::c_ushort;
 pub type __kernel_gid16_t = crate::types::arch32::c_ushort;
 pub type __le16 = __u16;
@@ -6047,9 +5929,9 @@ pub type __sum16 = __u16;
 pub type __wsum = __u32;
 pub type __poll_t = crate::types::arch32::c_uint;
 pub type sigset_t = crate::types::arch32::c_ulong;
-pub type __signalfn_t = uaddr32;
+pub type __signalfn_t = crate::uaddr32;
 pub type __sighandler_t = __signalfn_t;
-pub type __restorefn_t = uaddr32;
+pub type __restorefn_t = crate::uaddr32;
 pub type __sigrestore_t = __restorefn_t;
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -6057,7 +5939,7 @@ pub struct __kernel_sigaction {
     pub _u: __kernel_sigaction__bindgen_ty_1,
     pub sa_mask: sigset_t,
     pub sa_flags: crate::types::arch32::c_ulong,
-    pub sa_restorer: uaddr32,
+    pub sa_restorer: crate::uaddr32,
 }
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -6066,8 +5948,8 @@ pub union __kernel_sigaction__bindgen_ty_1 {
     pub _sa_sigaction: ::std::option::Option<
         unsafe extern "C" fn(
             arg1: crate::types::arch32::c_int,
-            arg2: uref32<siginfo>,
-            arg3: uaddr32,
+            arg2: crate::uref32<siginfo>,
+            arg3: crate::uaddr32,
         ),
     >,
 }
@@ -6092,7 +5974,7 @@ impl Default for __kernel_sigaction {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct sigaltstack {
-    pub ss_sp: uaddr32,
+    pub ss_sp: crate::uaddr32,
     pub ss_flags: crate::types::arch32::c_int,
     pub ss_size: __kernel_size_t,
 }
@@ -6116,7 +5998,7 @@ pub struct sockaddr_storage {
 #[derive(Copy, Clone)]
 pub union sockaddr_storage__bindgen_ty_1 {
     pub __bindgen_anon_1: sockaddr_storage__bindgen_ty_1__bindgen_ty_1,
-    pub __align: uaddr32,
+    pub __align: crate::uaddr32,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -7100,7 +6982,7 @@ pub struct __user_cap_header_struct {
     pub version: __u32,
     pub pid: crate::types::arch32::c_int,
 }
-pub type cap_user_header_t = uref32<__user_cap_header_struct>;
+pub type cap_user_header_t = crate::uref32<__user_cap_header_struct>;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct __user_cap_data_struct {
@@ -7108,7 +6990,7 @@ pub struct __user_cap_data_struct {
     pub permitted: __u32,
     pub inheritable: __u32,
 }
-pub type cap_user_data_t = uref32<__user_cap_data_struct>;
+pub type cap_user_data_t = crate::uref32<__user_cap_data_struct>;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct vfs_cap_data {
@@ -7277,7 +7159,7 @@ pub struct i2c_msg {
     pub flags: __u16,
     pub len: __u16,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub buf: uref32<__u8>,
+    pub buf: crate::uref32<__u8>,
 }
 impl Default for i2c_msg {
     fn default() -> Self {
@@ -7376,10 +7258,10 @@ pub struct fb_var_screeninfo {
 pub struct fb_cmap {
     pub start: __u32,
     pub len: __u32,
-    pub red: uref32<__u16>,
-    pub green: uref32<__u16>,
-    pub blue: uref32<__u16>,
-    pub transp: uref32<__u16>,
+    pub red: crate::uref32<__u16>,
+    pub green: crate::uref32<__u16>,
+    pub blue: crate::uref32<__u16>,
+    pub transp: crate::uref32<__u16>,
 }
 impl Default for fb_cmap {
     fn default() -> Self {
@@ -7442,7 +7324,7 @@ pub struct fb_image {
     pub bg_color: __u32,
     pub depth: __u8,
     pub __bindgen_padding_0: [u8; 3usize],
-    pub data: uref32<crate::types::arch32::c_char>,
+    pub data: crate::uref32<crate::types::arch32::c_char>,
     pub cmap: fb_cmap,
 }
 impl Default for fb_image {
@@ -7467,7 +7349,7 @@ pub struct fb_cursor {
     pub enable: __u16,
     pub rop: __u16,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub mask: uref32<crate::types::arch32::c_char>,
+    pub mask: crate::uref32<crate::types::arch32::c_char>,
     pub hot: fbcurpos,
     pub image: fb_image,
 }
@@ -9082,7 +8964,7 @@ pub struct sock_filter {
 pub struct sock_fprog {
     pub len: crate::types::arch32::c_ushort,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub filter: uref32<sock_filter>,
+    pub filter: crate::uref32<sock_filter>,
 }
 impl Default for sock_fprog {
     fn default() -> Self {
@@ -9163,7 +9045,7 @@ pub struct futex_waitv {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub struct robust_list {
-    pub next: uref32<robust_list>,
+    pub next: crate::uref32<robust_list>,
 }
 impl Default for robust_list {
     fn default() -> Self {
@@ -9179,7 +9061,7 @@ impl Default for robust_list {
 pub struct robust_list_head {
     pub list: robust_list,
     pub futex_offset: crate::types::arch32::c_long,
-    pub list_op_pending: uref32<robust_list>,
+    pub list_op_pending: crate::uref32<robust_list>,
 }
 impl Default for robust_list_head {
     fn default() -> Self {
@@ -9305,14 +9187,14 @@ pub struct if_settings {
 #[repr(C)]
 #[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub union if_settings__bindgen_ty_1 {
-    pub raw_hdlc: uref32<raw_hdlc_proto>,
-    pub cisco: uref32<cisco_proto>,
-    pub fr: uref32<fr_proto>,
-    pub fr_pvc: uref32<fr_proto_pvc>,
-    pub fr_pvc_info: uref32<fr_proto_pvc_info>,
-    pub x25: uref32<x25_hdlc_proto>,
-    pub sync: uref32<sync_serial_settings>,
-    pub te1: uref32<te1_settings>,
+    pub raw_hdlc: crate::uref32<raw_hdlc_proto>,
+    pub cisco: crate::uref32<cisco_proto>,
+    pub fr: crate::uref32<fr_proto>,
+    pub fr_pvc: crate::uref32<fr_proto_pvc>,
+    pub fr_pvc_info: crate::uref32<fr_proto_pvc_info>,
+    pub x25: crate::uref32<x25_hdlc_proto>,
+    pub sync: crate::uref32<sync_serial_settings>,
+    pub te1: crate::uref32<te1_settings>,
 }
 impl Default for if_settings__bindgen_ty_1 {
     fn default() -> Self {
@@ -9366,7 +9248,7 @@ pub union ifreq__bindgen_ty_2 {
     pub ifru_map: ifmap,
     pub ifru_slave: [crate::types::arch32::c_char; 16usize],
     pub ifru_newname: [crate::types::arch32::c_char; 16usize],
-    pub ifru_data: uaddr32,
+    pub ifru_data: crate::uaddr32,
     pub ifru_settings: if_settings,
 }
 impl Default for ifreq__bindgen_ty_2 {
@@ -9396,8 +9278,8 @@ pub struct ifconf {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union ifconf__bindgen_ty_1 {
-    pub ifcu_buf: uref32<crate::types::arch32::c_char>,
-    pub ifcu_req: uref32<ifreq>,
+    pub ifcu_buf: crate::uref32<crate::types::arch32::c_char>,
+    pub ifcu_req: crate::uref32<ifreq>,
 }
 impl Default for ifconf__bindgen_ty_1 {
     fn default() -> Self {
@@ -9897,7 +9779,7 @@ pub struct ff_periodic_effect {
     pub envelope: ff_envelope,
     pub __bindgen_padding_0: [u8; 2usize],
     pub custom_len: __u32,
-    pub custom_data: uref32<__s16>,
+    pub custom_data: crate::uref32<__s16>,
 }
 impl Default for ff_periodic_effect {
     fn default() -> Self {
@@ -11660,7 +11542,7 @@ pub struct xt_entry_match__bindgen_ty_1__bindgen_ty_1 {
 pub struct xt_entry_match__bindgen_ty_1__bindgen_ty_2 {
     pub match_size: __u16,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub match_: uref32<xt_match>,
+    pub match_: crate::uref32<xt_match>,
 }
 impl Default for xt_entry_match__bindgen_ty_1__bindgen_ty_2 {
     fn default() -> Self {
@@ -11713,7 +11595,7 @@ pub struct xt_entry_target__bindgen_ty_1__bindgen_ty_1 {
 pub struct xt_entry_target__bindgen_ty_1__bindgen_ty_2 {
     pub target_size: __u16,
     pub __bindgen_padding_0: [u8; 2usize],
-    pub target: uref32<xt_target>,
+    pub target: crate::uref32<xt_target>,
 }
 impl Default for xt_entry_target__bindgen_ty_1__bindgen_ty_2 {
     fn default() -> Self {
@@ -11871,7 +11753,7 @@ pub struct ipt_replace {
     pub hook_entry: [crate::types::arch32::c_uint; 5usize],
     pub underflow: [crate::types::arch32::c_uint; 5usize],
     pub num_counters: crate::types::arch32::c_uint,
-    pub counters: uref32<xt_counters>,
+    pub counters: crate::uref32<xt_counters>,
     pub __bindgen_padding_0: [u8; 4usize],
     pub entries: __IncompleteArrayField<ipt_entry>,
 }
@@ -12010,7 +11892,7 @@ pub struct ip6t_replace {
     pub hook_entry: [crate::types::arch32::c_uint; 5usize],
     pub underflow: [crate::types::arch32::c_uint; 5usize],
     pub num_counters: crate::types::arch32::c_uint,
-    pub counters: uref32<xt_counters>,
+    pub counters: crate::uref32<xt_counters>,
     pub __bindgen_padding_0: [u8; 4usize],
     pub entries: __IncompleteArrayField<ip6t_entry>,
 }
@@ -15342,7 +15224,7 @@ pub struct prctl_mm_map {
     pub arg_end: __u64,
     pub env_start: __u64,
     pub env_end: __u64,
-    pub auxv: uref32<__u64>,
+    pub auxv: crate::uref32<__u64>,
     pub auxv_size: __u32,
     pub exe_fd: __u32,
     pub __bindgen_padding_0: [u8; 4usize],
@@ -15623,7 +15505,7 @@ pub struct __sifields__bindgen_ty_4 {
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct __sifields__bindgen_ty_5 {
-    pub _addr: uaddr32,
+    pub _addr: crate::uaddr32,
     pub __bindgen_anon_1: __sifields__bindgen_ty_5__bindgen_ty_1,
 }
 #[repr(C)]
@@ -15639,8 +15521,8 @@ pub union __sifields__bindgen_ty_5__bindgen_ty_1 {
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
     pub _dummy_bnd: [crate::types::arch32::c_char; 4usize],
-    pub _lower: uaddr32,
-    pub _upper: uaddr32,
+    pub _lower: crate::uaddr32,
+    pub _upper: crate::uaddr32,
 }
 impl Default for __sifields__bindgen_ty_5__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
@@ -15691,7 +15573,7 @@ pub struct __sifields__bindgen_ty_6 {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct __sifields__bindgen_ty_7 {
-    pub _call_addr: uaddr32,
+    pub _call_addr: crate::uaddr32,
     pub _syscall: crate::types::arch32::c_int,
     pub _arch: crate::types::arch32::c_uint,
 }
@@ -15778,8 +15660,8 @@ pub union sigevent__bindgen_ty_1 {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, KnownLayout, FromBytes, Immutable)]
 pub struct sigevent__bindgen_ty_1__bindgen_ty_1 {
-    pub _function: uaddr32,
-    pub _attribute: uaddr32,
+    pub _function: crate::uaddr32,
+    pub _attribute: crate::uaddr32,
 }
 impl Default for sigevent__bindgen_ty_1__bindgen_ty_1 {
     fn default() -> Self {
@@ -16147,7 +16029,7 @@ impl Default for uinput_user_dev {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct iovec {
-    pub iov_base: uaddr32,
+    pub iov_base: crate::uaddr32,
     pub iov_len: __kernel_size_t,
 }
 impl Default for iovec {
@@ -16937,7 +16819,7 @@ pub const EVIOCGNAME_0: __u32 = 2147501318;
 #[repr(C)]
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct remote_binder_start_command {
-    pub incoming_service: uref32<crate::types::arch32::c_char>,
+    pub incoming_service: crate::uref32<crate::types::arch32::c_char>,
 }
 impl Default for remote_binder_start_command {
     fn default() -> Self {
