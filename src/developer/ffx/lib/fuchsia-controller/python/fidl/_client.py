@@ -171,7 +171,7 @@ class FidlClient(object):
                     raise e
             loop = asyncio.get_running_loop()
             channel_waker_task = loop.create_task(
-                self.channel_waker.wait_channel_ready(self.channel)
+                self.channel_waker.wait_ready(self.channel)
             )
             staged_msg_task = loop.create_task(self._get_staged_message(txid))
             epitaph_event_task = loop.create_task(self._epitaph_event_wait())
@@ -203,7 +203,7 @@ class FidlClient(object):
                 # the staged message. To ensure another task can be awoken, we must post an event
                 # saying the channel still needs to be read, since we've essentilly stolen it from
                 # another task.
-                self.channel_waker.post_channel_ready(self.channel)
+                self.channel_waker.post_ready(self.channel)
                 return self._decode(txid, msg)
             # Only one notification came in.
             msg = done.pop().result()

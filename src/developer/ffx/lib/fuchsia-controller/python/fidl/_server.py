@@ -157,7 +157,7 @@ class ServerBase(object):
                 # is ZX_ERR_SHOULD_WAIT.
                 if e.args[0] == fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
                     _LOGGER.debug(f"{self} channel spurious wakeup")
-                    await self.channel_waker.wait_channel_ready(self.channel)
+                    await self.channel_waker.wait_ready(self.channel)
                     continue
                 self.channel_waker.unregister(self.channel)
                 _LOGGER.warning(f"{self} channel received error: {e}")

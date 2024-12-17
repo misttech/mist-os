@@ -14,7 +14,7 @@ from fuchsia_controller_py import Channel, ZxStatus
 class FidlClientTests(unittest.IsolatedAsyncioTestCase):
     """Fidl Client tests."""
 
-    async def test_read_and_decode_staged_message(self):
+    async def test_read_and_decode_staged_message(self) -> None:
         channel = Mock()
         channel.__class__ = Channel
         channel.as_int.return_value = 0
@@ -37,7 +37,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         second_task = loop.create_task(proxy._read_and_decode(2))
         await asyncio.gather(first_task, second_task)
 
-    async def test_read_and_decode_blocked(self):
+    async def test_read_and_decode_blocked(self) -> None:
         channel = Mock()
         channel.__class__ = Channel
         channel.as_int.return_value = 0
@@ -58,7 +58,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         proxy._decode.return_value = (bytearray([1, 2, 3]), [])
         await proxy._read_and_decode(1)
 
-    async def test_read_and_decode_simul_notification(self):
+    async def test_read_and_decode_simul_notification(self) -> None:
         channel = Mock()
         channel.__class__ = Channel
         channel.as_int.return_value = 0
@@ -77,7 +77,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         proxy._decode.return_value = (bytearray([1, 2, 3]), [])
         await proxy._read_and_decode(1)
 
-    async def test_unexpected_txid(self):
+    async def test_unexpected_txid(self) -> None:
         channel = Mock()
         channel.__class__ = Channel
         channel.as_int.return_value = 0
@@ -90,17 +90,16 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
             await proxy._read_and_decode(10)
         self.assertEqual(proxy.channel, None)
 
-    async def test_staging_stages(self):
+    async def test_staging_stages(self) -> None:
         channel = Mock()
         channel.__class__ = Channel
         channel.as_int.return_value = 0
         proxy = ffx.Echo.Client(channel)
         proxy.pending_txids.add(1)
-        expect = (bytearray([1, 2, 3]), [])
-        proxy._stage_message(1, expect)
+        proxy._stage_message(1, (bytearray([1, 2, 3]), []))
         self.assertEqual(len(proxy.staged_messages), 1)
         got = await proxy._get_staged_message(1)
-        self.assertEqual(got, expect)
+        self.assertEqual(got, (bytearray([1, 2, 3]), []))
 
         # This part is a little silly. The decode_fidl_message
         # function can't be mocked, so we're decoding with an actual
@@ -126,12 +125,11 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(proxy.staged_messages), 0)
         self.assertEqual(len(proxy.pending_txids), 0)
 
-    def test_queue_wrapper_put_nowait(self):
+    def test_queue_wrapper_put_nowait(self) -> None:
         loop = asyncio.new_event_loop()
 
-        async def return_queue():
-            queue = _QueueWrapper()
-            return queue
+        async def return_queue() -> _QueueWrapper:
+            return _QueueWrapper()
 
         queue = loop.run_until_complete(return_queue())
         loop.close()
@@ -139,7 +137,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         inner = queue.queue
         inner_loop = queue.loop
 
-        async def put_and_wait(queue):
+        async def put_and_wait(queue: _QueueWrapper) -> None:
             queue.put_nowait(2)
             res = await queue.get()
             queue.task_done()
@@ -150,12 +148,11 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(queue.loop, inner_loop)
         self.assertNotEqual(queue.queue, inner)
 
-    def test_queue_wrapper_get(self):
+    def test_queue_wrapper_get(self) -> None:
         loop = asyncio.new_event_loop()
 
-        async def return_queue():
-            queue = _QueueWrapper()
-            return queue
+        async def return_queue() -> _QueueWrapper:
+            return _QueueWrapper()
 
         queue = loop.run_until_complete(return_queue())
         loop.close()
@@ -164,9 +161,11 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         inner_loop = queue.loop
         new_loop = asyncio.new_event_loop()
 
-        async def get_timeout(queue):
+        async def get_timeout(queue: _QueueWrapper) -> None:
             try:
-                await asyncio.wait_for(queue.get(), 0)
+                # Use a non-zero timeout to ensure queue.get()
+                # is polled at least once.
+                await asyncio.wait_for(queue.get(), 0.01)
             except asyncio.exceptions.TimeoutError:
                 pass
 
@@ -174,12 +173,11 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(queue.loop, inner_loop)
         self.assertNotEqual(queue.queue, inner)
 
-    def test_queue_wrapper_task_done(self):
+    def test_queue_wrapper_task_done(self) -> None:
         loop = asyncio.new_event_loop()
 
-        async def return_queue():
-            queue = _QueueWrapper()
-            return queue
+        async def return_queue() -> _QueueWrapper:
+            return _QueueWrapper()
 
         queue = loop.run_until_complete(return_queue())
         loop.close()
@@ -188,7 +186,7 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
         inner_loop = queue.loop
         new_loop = asyncio.new_event_loop()
 
-        async def task_done(queue):
+        async def task_done(queue: _QueueWrapper) -> None:
             with self.assertRaises(ValueError):
                 # It's impossible to call task_done() on a queue in a new loop.
                 queue.task_done()

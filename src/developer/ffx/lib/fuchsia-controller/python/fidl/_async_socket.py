@@ -55,7 +55,7 @@ class AsyncSocket:
                 if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
                     self.waker.unregister(self.socket)
                     raise e
-            await self.waker.wait_channel_ready(self.socket)
+            await self.waker.wait_ready(self.socket)
 
     async def read_all(self) -> bytearray:
         """Attempts to read all data on the socket until it is closed.

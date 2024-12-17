@@ -3,9 +3,6 @@
 # found in the LICENSE file.
 """Module for handling encoding and decoding FIDL messages, as well as for handling async I/O."""
 
-# TODO(https://fxbug.dev/346628306): Remove this comment to ignore mypy errors.
-# mypy: ignore-errors
-
 import asyncio
 import logging
 import os
@@ -17,7 +14,7 @@ import fuchsia_controller_py as fc
 
 
 class _QueueWrapper(object):
-    def __init__(self):
+    def __init__(self) -> None:
         self.queue: asyncio.Queue[int] = asyncio.Queue()
         try:
             self.loop: asyncio.AbstractEventLoop | None = (
@@ -26,27 +23,27 @@ class _QueueWrapper(object):
         except RuntimeError:
             self.loop = None
 
-    def _precheck(self):
+    def _precheck(self) -> None:
         """Checks if this queue is being used across loops. If it is, then this will reset state."""
         if self.loop is None or self.loop.is_closed():
             self.loop = asyncio.get_running_loop()
             self.queue = asyncio.Queue()
 
-    def get(self):
+    async def get(self) -> int:
         self._precheck()
-        return self.queue.get()
+        return await self.queue.get()
 
-    def put_nowait(self, item: int):
+    def put_nowait(self, item: int) -> None:
         self._precheck()
         self.queue.put_nowait(item)
 
-    def task_done(self):
+    def task_done(self) -> None:
         self._precheck()
         self.queue.task_done()
 
 
 class EventWrapper(object):
-    def __init__(self):
+    def __init__(self) -> None:
         self.event = asyncio.Event()
         try:
             self.loop: asyncio.AbstractEventLoop | None = (
@@ -55,7 +52,7 @@ class EventWrapper(object):
         except RuntimeError:
             self.loop = None
 
-    def _precheck(self):
+    def _precheck(self) -> None:
         """Checks if this event is being used across loops. If it is, then this will reset state."""
         if self.loop is None or self.loop.is_closed():
             self.loop = asyncio.get_running_loop()
@@ -64,15 +61,15 @@ class EventWrapper(object):
             if event_state:
                 self.event.set()
 
-    def wait(self):
+    async def wait(self) -> bool:
         self._precheck()
-        return self.event.wait()
+        return await self.event.wait()
 
-    def set(self):
+    def set(self) -> None:
         self._precheck()
         self.event.set()
 
-    def is_set(self):
+    def is_set(self) -> None:
         self._precheck()
         self.event.is_set()
 
@@ -82,7 +79,7 @@ HANDLE_READY_QUEUES: typing.Dict[int, _QueueWrapper] = {}
 
 def enqueue_ready_zx_handle_from_fd(
     fd: int, handle_ready_queues: typing.Dict[int, _QueueWrapper]
-):
+) -> None:
     """Reads zx_handle that is ready for reading, and enqueues it in the appropriate ready queue."""
     handle_no = int.from_bytes(os.read(fd, 4), sys.byteorder)
     queue = handle_ready_queues.get(handle_no)
@@ -96,19 +93,19 @@ class HandleWaker(ABC):
     """Base class for a waker used with potentially blocking handles."""
 
     @abstractmethod
-    def register(self, channel: fc.Channel) -> None:
+    def register(self, channel: fc.BaseHandle) -> None:
         """Registers a handle to receive wake notifications."""
 
     @abstractmethod
-    def unregister(self, channel: fc.Channel) -> None:
+    def unregister(self, channel: fc.BaseHandle) -> None:
         """Unregisters a handle, meaning it is not possible to wait for it to be ready."""
 
     @abstractmethod
-    def post_channel_ready(self, channel: fc.Channel):
+    def post_ready(self, channel: fc.BaseHandle) -> None:
         """Notifies the waker that a channel is ready."""
 
     @abstractmethod
-    async def wait_channel_ready(self, channel: fc.Channel) -> int:
+    async def wait_ready(self, channel: fc.BaseHandle) -> int:
         """Waits for a channel to be ready asynchronously."""
 
 
@@ -119,13 +116,12 @@ class GlobalHandleWaker(HandleWaker):
     with all client and server code, as well as async wrapper code around readable handles.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.handle_ready_queues = HANDLE_READY_QUEUES
 
-    def register(self, channel: fc.Channel):
-        channel_number = channel.as_int()
-        if channel_number not in self.handle_ready_queues:
-            self.handle_ready_queues[channel_number] = _QueueWrapper()
+    def register(self, h: fc.BaseHandle) -> None:
+        if h.as_int() not in self.handle_ready_queues:
+            self.handle_ready_queues[h.as_int()] = _QueueWrapper()
         notification_fd = fc.connect_handle_notifier()
         # This try call is simply here in the event that this registration has happened in a
         # synchronous context (which only happens now when _send_two_way_fidl_request is called
@@ -142,16 +138,15 @@ class GlobalHandleWaker(HandleWaker):
         except RuntimeError:
             pass
 
-    def unregister(self, channel: fc.Channel):
-        channel_number = channel.as_int()
-        if channel_number in self.handle_ready_queues:
-            self.handle_ready_queues.pop(channel_number)
+    def unregister(self, h: fc.BaseHandle) -> None:
+        if h.as_int() in self.handle_ready_queues:
+            self.handle_ready_queues.pop(h.as_int())
 
-    def post_channel_ready(self, channel: fc.Channel):
-        logging.debug(f"Re-notifying for channel: {channel.as_int()}")
-        self.handle_ready_queues[channel.as_int()].put_nowait(channel.as_int())
+    def post_ready(self, h: fc.BaseHandle) -> None:
+        logging.debug(f"Re-notifying for channel: {h.as_int()}")
+        self.handle_ready_queues[h.as_int()].put_nowait(h.as_int())
 
-    async def wait_channel_ready(self, channel: fc.Channel) -> int:
-        res = await self.handle_ready_queues[channel.as_int()].get()
-        self.handle_ready_queues[channel.as_int()].task_done()
+    async def wait_ready(self, h: fc.BaseHandle) -> int:
+        res = await self.handle_ready_queues[h.as_int()].get()
+        self.handle_ready_queues[h.as_int()].task_done()
         return res
