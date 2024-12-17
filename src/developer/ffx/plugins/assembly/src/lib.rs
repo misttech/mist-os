@@ -18,7 +18,6 @@ mod operations;
 mod subpackage_blobs_package;
 mod zbi;
 use assembly_components as _;
-
 pub mod vbmeta;
 pub mod vfs;
 
@@ -28,8 +27,6 @@ pub struct AssemblyTool {
     #[command]
     cmd: AssemblyCommand,
 }
-
-fho::embedded_plugin!(AssemblyTool);
 
 #[async_trait(?Send)]
 impl FfxMain for AssemblyTool {

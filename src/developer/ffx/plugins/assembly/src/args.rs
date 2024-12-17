@@ -5,13 +5,11 @@
 use anyhow::Result;
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
-use ffx_core::ffx_command;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use assembly_images_config::BlobfsLayout;
 
-#[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "assembly", description = "Assemble images")]
 pub struct AssemblyCommand {
