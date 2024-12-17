@@ -2,6 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """The library module handles creating Python classes and types based on FIDL IR rules."""
+
+# TODO(https://fxbug.dev/346628306): Remove this comment to ignore mypy errors.
+# mypy: ignore-errors
+
 from __future__ import annotations
 
 import dataclasses

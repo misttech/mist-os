@@ -2,6 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Defines the import hooks for when a user writes `import fidl.[fidl_library]`."""
+
+# TODO(https://fxbug.dev/346628306): Remove this comment to ignore mypy errors.
+# mypy: ignore-errors
+
 # autoflake: skip_file
 import importlib.abc
 import sys

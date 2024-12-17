@@ -173,9 +173,6 @@ python_library("fidl_bindings") {
     "//src/testing/end_to_end/honeydew:*",
   ]
 
-  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
-  enable_mypy = false
-
   library_name = "fidl"
   source_root = "python/fidl"
   library_deps = [
