@@ -647,6 +647,19 @@ pub fn task_prlimit(
     })
 }
 
+/// Check permission before mounting `fs`.
+/// Corresponds to the `sb_kern_mount()` LSM hook.
+pub fn sb_kern_mount(current_task: &CurrentTask, fs: &FileSystem) -> Result<(), Errno> {
+    profile_duration!("security.hooks.sb_kern_mount");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::superblock::sb_kern_mount(
+            &security_server.as_permission_check(),
+            current_task,
+            fs,
+        )
+    })
+}
+
 /// Check permission before mounting to `path`. `flags` contains the mount flags that determine the
 /// kind of mount operation done, and therefore the permissions that the caller requires.
 /// Corresponds to the `sb_mount()` LSM hook.

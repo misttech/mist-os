@@ -1854,6 +1854,8 @@ fn do_mount_create(
     };
 
     let fs = current_task.create_filesystem(locked, fs_type, options)?;
+
+    security::sb_kern_mount(current_task, &fs)?;
     target.mount(WhatToMount::Fs(fs), flags)
 }
 

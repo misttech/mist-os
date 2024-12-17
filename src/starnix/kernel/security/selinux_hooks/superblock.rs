@@ -27,6 +27,17 @@ fn fs_sid(fs: &FileSystem) -> Result<SecurityId, Errno> {
     Ok(filesystem_sid)
 }
 
+/// Checks if `current_task` has the permission to mount `fs`.
+pub fn sb_kern_mount(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    fs: &FileSystem,
+) -> Result<(), Errno> {
+    let source_sid = current_task.security_state.lock().current_sid;
+    let target_sid = fs_sid(fs)?;
+    check_permission(permission_check, source_sid, target_sid, FileSystemPermission::Mount)
+}
+
 /// Checks if `current_task` has the permission to mount at `path` with the mounting flags `flags`.
 pub fn sb_mount(
     permission_check: &PermissionCheck<'_>,
