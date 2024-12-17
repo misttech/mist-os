@@ -14,8 +14,7 @@
     clippy::alloc_instead_of_core,
     clippy::missing_safety_doc,
     clippy::std_instead_of_core,
-    // TODO: re-enable this lint after justifying unsafe blocks
-    // clippy::undocumented_unsafe_blocks,
+    clippy::undocumented_unsafe_blocks,
     rustdoc::broken_intra_doc_links,
     rustdoc::missing_crate_level_docs
 )]
