@@ -240,7 +240,6 @@ build_api_module("api") {
     "//build/images/archive",
     "//build/rbe:rbe_settings.json",
     "//sdk:sdk_source_set_list",
-    "//sdk/ctf:ctf_artifacts",
     "//sdk/ctf:ctf_artifacts_path",
   ]
 }
