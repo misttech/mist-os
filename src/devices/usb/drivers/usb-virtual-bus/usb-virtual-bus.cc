@@ -18,6 +18,8 @@
 
 #include <variant>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/test/platform/cpp/bind.h>
 #include <ddktl/fidl.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -92,10 +94,20 @@ zx_status_t UsbVirtualBus::CreateDevice() {
     return result.status_value();
   }
 
+  const zx_device_str_prop_t props[] = {
+    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_USB),
+    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_DEVICE),
+  };
+
   std::array offers = {
       fuchsia_hardware_usb_dci::UsbDciService::Name,
   };
   auto status = device_->DdkAdd(ddk::DeviceAddArgs("usb-virtual-device")
+                                    .set_str_props(props)
                                     .set_fidl_service_offers(offers)
                                     .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {
@@ -135,10 +147,20 @@ zx_status_t UsbVirtualBus::CreateHost() {
     return result.status_value();
   }
 
+  const zx_device_str_prop_t props[] = {
+    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
+    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_USB),
+    ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                         bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_VIRTUAL_BUS),
+  };
+
   std::array offers = {
       fuchsia_hardware_usb_hci::UsbHciService::Name,
   };
   auto status = host_->DdkAdd(ddk::DeviceAddArgs("usb-virtual-host")
+                                  .set_str_props(props)
                                   .set_fidl_service_offers(offers)
                                   .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {

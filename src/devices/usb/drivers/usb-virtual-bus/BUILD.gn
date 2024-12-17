@@ -29,6 +29,8 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.test.platform:fuchsia.test.platform_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb",
