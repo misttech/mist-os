@@ -63,7 +63,7 @@ impl PartitionImageMapper {
                     if let Slot::R = slot {
                         // Recovery should not include a separate FVM, because it is embedded into the
                         // ZBI as a ramdisk.
-                        bail!("FVMs cannot be mapped to slot R");
+                        continue;
                     } else {
                         slot_entry.insert(ImageType::FVM, path.clone());
                     }
@@ -72,7 +72,7 @@ impl PartitionImageMapper {
                     if let Slot::R = slot {
                         // Recovery should not include a separate FVM, because it is embedded into the
                         // ZBI as a ramdisk.
-                        bail!("Fxfs cannot be mapped to slot R");
+                        continue;
                     } else {
                         slot_entry.insert(ImageType::Fxfs, path.clone());
                     }
@@ -213,6 +213,8 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
+                Image::FVM("path/to/r/fvm.blk".into()),
+                Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
         };
@@ -302,6 +304,8 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
+                Image::FVM("path/to/r/fvm.blk".into()),
+                Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
         };
@@ -384,6 +388,10 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
+                Image::FxfsSparse {
+                    path: "path/to/r/fxfs.blk".into(),
+                    contents: BlobfsContents::default(),
+                },
             ],
             board_name: "my_board".into(),
         };
@@ -486,6 +494,8 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
+                Image::FVM("path/to/r/fvm.blk".into()),
+                Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
         };
@@ -546,6 +556,8 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/r/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/r/fuchsia.vbmeta".into()),
+                Image::FVM("path/to/r/fvm.blk".into()),
+                Image::FVMFastboot("path/to/r/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
         };
