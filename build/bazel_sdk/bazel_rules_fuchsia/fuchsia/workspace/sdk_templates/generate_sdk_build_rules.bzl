@@ -137,7 +137,7 @@ _SDK_TEMPLATES = {
 # Note that while this is expanded once, then the content of the resulting file is modified
 # multiple times after that by various functions in this script.
 _REPOSITORY_BUILD_TEMPLATE = (
-    "//fuchsia/workspace/sdk_templates:repository.BUILD.template"
+    "//fuchsia/workspace/sdk_templates:fuchsia_sdk.BUILD.bazel"
 )
 
 def resolve_repository_labels(runtime):

@@ -8,7 +8,6 @@
 # the `fuchsia_sdk_repository` rule for more information.
 load("@{{rules_fuchsia}}//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolchain_info")
 load("@{{rules_fuchsia}}//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
-
 load("//:generated_constants.bzl", sdk_constants = "constants")
 
 _TO_BAZEL_CPU_MAP = {
@@ -22,7 +21,7 @@ TARGET_CPUS = [cpu for cpu in sdk_constants.target_cpus]
     filegroup(
         name = "fuchsia-sysroot-headers-" + _TO_BAZEL_CPU_MAP.get(cpu, cpu),
         srcs = glob(["arch/" + cpu + "/sysroot/include/**"]),
-        visibility = [ "//visibility:public" ],
+        visibility = ["//visibility:public"],
     )
     for cpu in TARGET_CPUS
 ]
@@ -31,7 +30,7 @@ TARGET_CPUS = [cpu for cpu in sdk_constants.target_cpus]
     filegroup(
         name = "fuchsia-sysroot-libraries-" + _TO_BAZEL_CPU_MAP.get(cpu, cpu),
         srcs = glob(["arch/" + cpu + "/sysroot/lib/**"]),
-        visibility = [ "//visibility:public" ],
+        visibility = ["//visibility:public"],
     )
     for cpu in TARGET_CPUS
 ]
