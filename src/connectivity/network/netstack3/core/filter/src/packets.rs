@@ -1520,7 +1520,9 @@ pub mod testutil {
 
         pub trait TestIpExt: IpExt {
             const SRC_IP: Self::Addr;
+            const SRC_PORT: u16 = 1234;
             const DST_IP: Self::Addr;
+            const DST_PORT: u16 = 9876;
             const SRC_IP_2: Self::Addr;
             const DST_IP_2: Self::Addr;
             const IP_OUTSIDE_SUBNET: Self::Addr;
