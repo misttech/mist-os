@@ -148,6 +148,10 @@ impl Config {
     fn has_rtc(&self) -> bool {
         self.source_config.has_real_time_clock
     }
+
+    fn serve_fuchsia_time_alarms(&self) -> bool {
+        self.source_config.serve_fuchsia_time_alarms
+    }
 }
 
 /// A definition which time sources to install, along with the URL and child names for each.
@@ -262,6 +266,7 @@ async fn main() -> Result<()> {
 
     let cmd_send_clone = cmd_send.clone();
     let serve_test_protocols = config.serve_test_protocols();
+    let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms();
     let aur = allow_update_rtc.clone();
     fasync::Task::local(async move {
         maintain_utc(
@@ -288,7 +293,11 @@ async fn main() -> Result<()> {
         fs.dir("svc").add_fidl_service(Rpcs::TimeTest);
         info!("serving test protocols: fuchsia.test.time/RTC");
     }
-    fs.dir("svc").add_fidl_service(Rpcs::Wake);
+
+    if serve_fuchsia_time_alarms {
+        fs.dir("svc").add_fidl_service(Rpcs::Wake);
+        info!("serving protocol: fuchsia.time.alarms/Wake");
+    }
     fs.take_and_serve_directory_handle()?;
 
     // Ensures that only one handler of fuchsia.time.test/RPC is active at

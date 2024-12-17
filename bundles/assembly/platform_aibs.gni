@@ -107,6 +107,12 @@ bootstrap_userdebug_platform_aib_names = [
 
   # Trusted application support.
   "trusted_execution_environment",
+
+  # Wake alarms support: generic and then hardware-specific.
+  "timekeeper_wake_alarms",
+
+  # Wake alarms support: hardware-specific.
+  "timekeeper_wake_alarms_aml_hrtimer",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
