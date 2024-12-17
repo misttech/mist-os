@@ -70,10 +70,10 @@ protocol ClientSideBatonManagement {
         /// The deadline at which the timer is supposed to fire.
         deadline zx.InstantBoot;
 
-        /// Used by the callee to ensure that the system does not suspend
-        /// before the alarm is properly scheduled.  The callee may deactivate
-        /// the lease once the alarm is scheduled.
-        keep_alive fuchsia.power.system.LeaseToken;
+        /// The callee signals this event once the alarm is scheduled. This
+        /// signals that the caller can drop any pending wake leases related
+        /// to this call.
+        setup_done zx.Handle:EVENT;
 
         /// Set to a nonempty value to identify the alarm. A unique value
         /// of [AlarmId] must be picked per each unique alarm within a
@@ -103,7 +103,7 @@ protocol ClientSideBatonManagement {
         /// the Cancel call is being processed, or even slightly later.
         /// The caller must handle such an event gracefully.
         alarm_id AlarmId;
-    }) -> () error WakeError;
+    });
 };
 
 /// WakeError describes the error code that can be returned from wake
