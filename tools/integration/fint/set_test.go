@@ -202,7 +202,7 @@ func TestRunGen(t *testing.T) {
 		{
 			name:            "gn trace",
 			gnTracePath:     "/tmp/gn_trace.json",
-			expectedOptions: []string{"--gn-tracelog=/tmp/gn_trace.json"},
+			expectedOptions: []string{"--tracelog=/tmp/gn_trace.json"},
 		},
 		{
 			name: "generate IDE files",
@@ -210,8 +210,8 @@ func TestRunGen(t *testing.T) {
 				IdeFiles: []string{"json", "vs"},
 			},
 			expectedOptions: []string{
-				"--gn-ide=json",
-				"--gn-ide=vs",
+				"--ide=json",
+				"--ide=vs",
 			},
 		},
 		{
@@ -219,7 +219,7 @@ func TestRunGen(t *testing.T) {
 			staticSpec: &fintpb.Static{
 				JsonIdeScripts: []string{"foo.py", "bar.py"},
 			},
-			expectedOptions: []string{"--gn-json-ide-script=foo.py", "--gn-json-ide-script=bar.py"},
+			expectedOptions: []string{"--json-ide-script=foo.py", "--json-ide-script=bar.py"},
 		},
 	}
 
@@ -249,19 +249,13 @@ func TestRunGen(t *testing.T) {
 				t.Fatalf("runGen ran wrong command: %v", cmd)
 			}
 
-			exe, arg1, fuchsiaDir, arg3, buildDir := cmd[0], cmd[1], cmd[2], cmd[3], cmd[4]
-			otherOptions := cmd[5:]
-			if filepath.Base(exe) != "regenerator" {
-				t.Errorf("runGen ran wrong GN executable: wanted basename %q, got %q", "regenerator", exe)
+			exe, subcommand, buildDir := cmd[0], cmd[1], cmd[2]
+			otherOptions := cmd[3:]
+			if filepath.Base(exe) != "gn" {
+				t.Errorf("runGen ran wrong GN executable: wanted basename %q, got %q", "gn", exe)
 			}
-			if arg1 != "--fuchsia-dir" {
-				t.Errorf("runGen didn't use --fuchsia-dir as second argument, but: %q", arg1)
-			}
-			if fuchsiaDir != contextSpec.CheckoutDir {
-				t.Errorf("runGen didn't use correct --fuchsia-build-dir argument: %q, expected %q", fuchsiaDir, contextSpec.CheckoutDir)
-			}
-			if arg3 != "--fuchsia-build-dir" {
-				t.Errorf("runGen didn't use --fuchsia-build-dir as third argument, but: %q", arg3)
+			if subcommand != "gen" {
+				t.Errorf("Expected runGen to run `gn gen`, but got `gn %s`", subcommand)
 			}
 			if buildDir != contextSpec.BuildDir {
 				t.Errorf("Expected runGen to use build dir from context (%s) but got %s", contextSpec.BuildDir, buildDir)
