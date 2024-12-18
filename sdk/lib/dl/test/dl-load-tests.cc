@@ -1632,6 +1632,34 @@ TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
   gInitFiniState = 0;
 }
 
+// dlopen a module with a mix of DT_INIT/DT_FINI and DT_INIT_ARRAY and
+// DT_FINI_ARRAY entries.
+TYPED_TEST(DlTests, InitFiniArrayWithLegacy) {
+  const std::string kFile = TestModule("init-fini-array-with-legacy");
+
+  if constexpr (!TestFixture::kSupportsInitFini) {
+    GTEST_SKIP() << "test requires init/fini support";
+  }
+
+  ASSERT_EQ(gInitFiniState, 0);
+
+  this->ExpectRootModule(kFile);
+
+  auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value()) << open.error_value();
+
+  EXPECT_EQ(gInitFiniState, 202);
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+
+  if (TestFixture::kDlCloseCanRunFinalizers) {
+    EXPECT_EQ(gInitFiniState, 204);
+  }
+
+  gInitFiniState = 0;
+}
+
 // A common test subroutine for basic TLS accesses.
 //
 // This test exercises the following sequence of events:

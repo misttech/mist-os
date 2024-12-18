@@ -24,6 +24,7 @@ per_test_modules = [
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
   ":init-fini-legacy",
+  ":init-fini-array-with-legacy",
 ]
 
 per_test_executables = [
@@ -77,6 +78,7 @@ per_test_suffices = [
   "StartupModulesBasic",
   "StartupModulesPriorityOverGlobal",
   "InitFiniLegacy",
+  "InitFiniArrayWithLegacy",
 ]
 
 # This reaches all the runtime deps of //sdk/lib/dl/test:dl-unittests.
@@ -1535,9 +1537,12 @@ foreach(test, [ "" ] + per_test_suffices) {
   test_loadable_module("init-fini-legacy$suffix.module") {
     sources = [ "init-fini-legacy.cc" ]
     deps = [ ":init-fini-var" ]
+  }
 
-    # This is needed to make sure ctor/dtor are tagged with DT_INIT/DT_FINI.
-    ldflags = [ "-Wl,-init=ctor,-fini=dtor" ]
+  # An module that contains both DT_INIT/DT_FINI and DT_INIT_ARRAY/DT_FINI_ARRAY
+  test_loadable_module("init-fini-array-with-legacy$suffix.module") {
+    sources = [ "init-fini-array-with-legacy.cc" ]
+    deps = [ ":init-fini-var" ]
   }
 }
 
