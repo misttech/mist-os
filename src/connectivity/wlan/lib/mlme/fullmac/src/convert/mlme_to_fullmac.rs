@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/313442116): These are currently only used in tests, but will be
-// used in production when the Banjo FFI is removed.
-#![allow(dead_code)]
 use anyhow::{bail, Result};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
@@ -274,17 +271,6 @@ fn convert_key_type(mlme_key_type: fidl_mlme::KeyType) -> fidl_common::WlanKeyTy
     }
 }
 
-fn convert_delete_key_descriptor(
-    descriptor: fidl_mlme::DeleteKeyDescriptor,
-) -> fidl_fullmac::DeleteKeyDescriptor {
-    fidl_fullmac::DeleteKeyDescriptor {
-        key_id: Some(descriptor.key_id),
-        key_type: Some(convert_key_type(descriptor.key_type)),
-        address: Some(descriptor.address),
-        ..Default::default()
-    }
-}
-
 /// TODO(https://fxbug.dev/353733695): Remove this once CSsid is no longer needed.
 fn convert_ssid(ssid: &[u8]) -> Result<fidl_ieee80211::CSsid> {
     if ssid.len() > fidl_ieee80211::MAX_SSID_BYTE_LEN as usize {
@@ -297,16 +283,6 @@ fn convert_ssid(ssid: &[u8]) -> Result<fidl_ieee80211::CSsid> {
     let mut data = [0; fidl_ieee80211::MAX_SSID_BYTE_LEN as usize];
     data[..ssid.len() as usize].copy_from_slice(&ssid[..]);
     Ok(fidl_ieee80211::CSsid { len: ssid.len() as u8, data })
-}
-
-// TODO(https://fxbug.dev/301104836): Cleanup Fullmac FIDL API such that this is no longer needed.
-fn dummy_delete_key_descriptor() -> fidl_fullmac::DeleteKeyDescriptor {
-    fidl_fullmac::DeleteKeyDescriptor {
-        key_id: Some(0),
-        key_type: Some(fidl_common::WlanKeyType::Pairwise),
-        address: Some([0; 6]),
-        ..Default::default()
-    }
 }
 
 #[cfg(test)]
@@ -339,14 +315,6 @@ mod tests {
             rsc: 123456,
             cipher_suite_oui: [77, 88, 99],
             cipher_suite_type: fidl_ieee80211::CipherSuiteType::Ccmp128,
-        }
-    }
-
-    fn fake_delete_key_descriptor() -> fidl_mlme::DeleteKeyDescriptor {
-        fidl_mlme::DeleteKeyDescriptor {
-            key_id: 23,
-            key_type: fidl_mlme::KeyType::Group,
-            address: [3u8; 6],
         }
     }
 

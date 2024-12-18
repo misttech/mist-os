@@ -30,12 +30,6 @@ type WlanFullmacSetKeysResp = struct {
     statuslist vector<zx.Status>:WLAN_MAX_KEYLIST_SIZE;
 };
 
-type DeleteKeyDescriptor = table {
-    1: key_id uint16;
-    2: key_type fuchsia.wlan.common.WlanKeyType;
-    3: address ieee80211.MacAddr;
-};
-
 /// Contains the information of SAE authentication frames. Shared between transmit and receive
 /// directions, see WlanFullmacImplIfc::SaeFrameRx and WlanFullmacImpl::SaeFrameTx.
 type SaeFrame = table {
