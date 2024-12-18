@@ -1669,6 +1669,15 @@ vaddr_t Riscv64ArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, 
   return PAGE_ALIGN(base);
 }
 
+void Riscv64ArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {
+  while (list_node_t* node = list_remove_head(mmu_pages)) {
+    vm_page_t* page = reinterpret_cast<vm_page_t*>(node);
+    page->set_state(vm_page_state::MMU);
+
+    // TODO(https://fxbug.dev/42164859): Populate vm_page_t::mmu.
+  }
+}
+
 void riscv64_mmu_early_init() {
   // Figure out the number of supported ASID bits by writing all 1s to
   // the asid field in satp and seeing which ones 'stick'.

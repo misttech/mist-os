@@ -1021,6 +1021,15 @@ vaddr_t X86ArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, size
   return PAGE_ALIGN(base);
 }
 
+void X86ArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {
+  while (list_node_t* node = list_remove_head(mmu_pages)) {
+    vm_page_t* page = reinterpret_cast<vm_page_t*>(node);
+    page->set_state(vm_page_state::MMU);
+
+    // TODO(https://fxbug.dev/42164859): Populate vm_page_t::mmu.
+  }
+}
+
 uint32_t arch_address_tagging_features() { return 0; }
 
 void x86_mmu_early_init() {

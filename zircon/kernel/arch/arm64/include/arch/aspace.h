@@ -83,6 +83,8 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
 
   static void ContextSwitch(ArmArchVmAspace* from, ArmArchVmAspace* to);
 
+  static void HandoffPageTablesFromPhysboot(list_node_t* mmu_pages);
+
   // ARM only has accessed flags on terminal page mappings. This means that FreeUnaccessed will
   // only be able to free page tables where terminal accessed flags have been removed using
   // HarvestAccessed.

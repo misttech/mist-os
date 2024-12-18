@@ -2292,6 +2292,15 @@ void ArmArchVmAspace::ContextSwitch(ArmArchVmAspace* old_aspace, ArmArchVmAspace
   }
 }
 
+void ArmArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {
+  while (list_node_t* node = list_remove_head(mmu_pages)) {
+    vm_page_t* page = reinterpret_cast<vm_page_t*>(node);
+    page->set_state(vm_page_state::MMU);
+
+    // TODO(https://fxbug.dev/42164859): Populate vm_page_t::mmu.
+  }
+}
+
 void arch_zero_page(void* _ptr) {
   uintptr_t ptr = (uintptr_t)_ptr;
 

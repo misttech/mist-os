@@ -49,14 +49,14 @@ class ArchVmAspaceInterface {
   // page tables.
   using page_alloc_fn_t = zx_status_t (*)(uint alloc_flags, vm_page** p, paddr_t* pa);
 
-  // The Init* methods are used to initialize the ArchVmAspace. The method that should be used is
-  // dependent on the type of address space being created.
+  // The Init* methods are used to initialize the ArchVmAspace. The method that should be used
+  // is dependent on the type of address space being created.
   //
   // `Init`: This is used to create a regular address space with no special features. In
-  //    architectures that do not support unified address spaces, it is also used to create shared
-  //    and restricted address spaces. However, when unified address spaces are supported, the
-  //    shared and restricted address spaces should be created with `InitShared` and
-  //    `InitRestricted`.
+  //    architectures that do not support unified address spaces, it is also used to create
+  //    shared and restricted address spaces. However, when unified address spaces are
+  //    supported, the shared and restricted address spaces should be created with `InitShared`
+  //    and `InitRestricted`.
   //
   // `InitShared`: This is used to create a shared address space, whose contents can be
   //    accessed from multiple unified address spaces. These address spaces have a statically
