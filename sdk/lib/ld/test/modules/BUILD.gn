@@ -23,8 +23,6 @@ per_test_modules = [
   ":multiple-transitive-foo-deps",
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
-  ":init-fini-legacy",
-  ":init-fini-array-with-legacy",
 ]
 
 per_test_executables = [
@@ -77,8 +75,6 @@ per_test_suffices = [
   "PrecedenceInDepResolution",
   "StartupModulesBasic",
   "StartupModulesPriorityOverGlobal",
-  "InitFiniLegacy",
-  "InitFiniArrayWithLegacy",
 ]
 
 # This reaches all the runtime deps of //sdk/lib/dl/test:dl-unittests.
@@ -89,6 +85,8 @@ group("dl-test-data.deps") {
   deps = [
     ":init-fini-array",
     ":init-fini-array-with-deps",
+    ":init-fini-array-with-legacy",
+    ":init-fini-legacy",
     ":static-tls-desc-module",
     ":static-tls-module",
     ":tls-dep-module",
@@ -1557,18 +1555,6 @@ foreach(test, [ "" ] + per_test_suffices) {
     sources = [ "foo.cc" ]
     deps = [ ":ld-dep-foo-v1$suffix" ]
   }
-
-  # A basic module that will run DT_INIT/DT_FINI functions when it is dlopened.
-  test_loadable_module("init-fini-legacy$suffix.module") {
-    sources = [ "init-fini-legacy.cc" ]
-    deps = [ ":init-fini-var" ]
-  }
-
-  # An module that contains both DT_INIT/DT_FINI and DT_INIT_ARRAY/DT_FINI_ARRAY
-  test_loadable_module("init-fini-array-with-legacy$suffix.module") {
-    sources = [ "init-fini-array-with-legacy.cc" ]
-    deps = [ ":init-fini-var" ]
-  }
 }
 
 # A collection of DT_INIT_ARRAY/DT_FINI_ARRAY tests. Each entry corresponds to
@@ -1761,6 +1747,18 @@ foreach(case, init_fini_array_tests) {
 
     deps += case.shlib_deps + [ ":init-fini-var" ]
   }
+}
+
+# A basic module that will run DT_INIT/DT_FINI functions when it is dlopened.
+test_loadable_module("init-fini-legacy") {
+  sources = [ "init-fini-legacy.cc" ]
+  deps = [ ":init-fini-var" ]
+}
+
+# An module that contains both DT_INIT/DT_FINI and DT_INIT_ARRAY/DT_FINI_ARRAY
+test_loadable_module("init-fini-array-with-legacy") {
+  sources = [ "init-fini-array-with-legacy.cc" ]
+  deps = [ ":init-fini-var" ]
 }
 
 # This is a startup module that exports a global variable that gets modified by

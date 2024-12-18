@@ -1517,7 +1517,7 @@ TYPED_TEST(DlTests, StartupModulesStaticTlsGetAddr) {
 // gInitFiniState, and that value is checked in this test to ensure those
 // functions were run.
 TYPED_TEST(DlTests, InitFiniLegacy) {
-  const std::string kFile = TestModule("init-fini-legacy");
+  const std::string kFile = "init-fini-legacy.so";
 
   if constexpr (!TestFixture::kSupportsInitFini) {
     GTEST_SKIP() << "test requires init/fini support";
@@ -1638,7 +1638,7 @@ TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
 // dlopen a module with a mix of DT_INIT/DT_FINI and DT_INIT_ARRAY and
 // DT_FINI_ARRAY entries.
 TYPED_TEST(DlTests, InitFiniArrayWithLegacy) {
-  const std::string kFile = TestModule("init-fini-array-with-legacy");
+  const std::string kFile = "init-fini-array-with-legacy.so";
 
   if constexpr (!TestFixture::kSupportsInitFini) {
     GTEST_SKIP() << "test requires init/fini support";
