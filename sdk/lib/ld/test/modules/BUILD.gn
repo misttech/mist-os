@@ -93,6 +93,8 @@ group("dl-test-data.deps") {
     ":static-tls-module",
     ":tls-dep-module",
     ":tls-desc-dep-module",
+    ":tls-desc-ld-dep-module",
+    ":tls-ld-dep-module",
   ]
   foreach(suffix, per_test_suffices) {
     foreach(test, per_test_modules + per_test_executables) {
@@ -895,14 +897,13 @@ test_loadable_module("tls-dep-module") {
   configs = [ "//build/config:no-tlsdesc" ]
   deps = [ "//zircon/system/public" ]
 
-  # We need to allow undefined sysmbols, since __tls_get_addr will not be
+  # We need to allow undefined symbols, since __tls_get_addr will not be
   # defined by this module or any link-time dependency, but will be supplied by libc.
   remove_configs = [ "//build/config:symbol_no_undefined" ]
 
   # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs += [ "//build/config/lto" ]
-
   configs += [ "//build/config/lto:no-lto" ]
 }
 
@@ -926,14 +927,38 @@ test_loadable_module("tls-desc-dep-module") {
   configs = [ "//build/config:tlsdesc" ]
   deps = [ "//zircon/system/public" ]
 
-  # We need to allow undefined sysmbols, since __tls_get_addr will not be
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
+}
+
+test_loadable_module("tls-ld-dep-module") {
+  public = [ "tls-ld-dep.h" ]
+  sources = [ "tls-ld-dep.cc" ]
+  configs = [ "//build/config:no-tlsdesc" ]
+  deps = [ "//zircon/system/public" ]
+
+  # We need to allow undefined symbols, since __tls_get_addr will not be
   # defined by this module or any link-time dependency, but will be supplied by libc.
   remove_configs = [ "//build/config:symbol_no_undefined" ]
 
   # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs += [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
+}
 
+# This is the same as tls-dep-ld-module but using TLSDESC, with no __tls_get_addr.
+test_loadable_module("tls-desc-ld-dep-module") {
+  public = [ "tls-ld-dep.h" ]
+  sources = [ "tls-ld-dep.cc" ]
+  configs = [ "//build/config:tlsdesc" ]
+  deps = [ "//zircon/system/public" ]
+
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
   configs += [ "//build/config/lto:no-lto" ]
 }
 
