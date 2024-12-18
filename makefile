@@ -85,7 +85,7 @@ rain: ## Run qemu with precompiled images (do not rebuild)
 .PHONY: rain
 
 kernel_unit_test: gen info ## Make kernel-unittests-boot-test.zbi
-	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin kernel-unittests-boot-test
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin zircon/kernel:kernel-unittests-boot-test.zbi
 .PHONY: kernel_unit_test
 
 run_kernel_unit_test: ## Run test kernel-unittests-boot-test.zbi

@@ -819,6 +819,12 @@ if (is_kernel) {
       "//zircon/kernel/lib/userabi/vdso",
       "//zircon/kernel/lib/version:version-string.txt",
     ]
+    if (is_mistos) {
+      deps -= [
+        "//zircon/kernel/lib/userabi/userboot",
+        "//zircon/kernel/lib/userabi/vdso",
+      ]
+    }
   }
 
   # The final kernel ZBI combines physboot with that kernel storage payload.
@@ -975,6 +981,8 @@ if (!is_efi_toolchain) {
       ]
       deps += invoker.deps
       if (is_mistos) {
+        deps -= [ "//zircon/system/utest/core:core-tests-standalone.args" ]
+
         # needed to run some starnix loader tests from bootfs
         deps += [
           "//vendor/misttech/zircon/kernel/lib/starnix/examples/hello_starnix:bin",
