@@ -47,17 +47,12 @@ pub struct ResolvedElfState {
 
 /// The opaque type used by [`crate::vfs::FsNodeInfo`] to store security state.
 #[derive(Debug, Default)]
-pub struct FsNodeState(Mutex<FsNodeInner>);
+pub struct FsNodeState(Mutex<selinux_hooks::FsNodeState>);
 
 impl FsNodeState {
-    pub fn lock(&self) -> starnix_sync::MutexGuard<'_, FsNodeInner> {
+    pub fn lock(&self) -> starnix_sync::MutexGuard<'_, selinux_hooks::FsNodeState> {
         self.0.lock()
     }
-}
-
-#[derive(Debug, Default)]
-pub struct FsNodeInner {
-    label: selinux_hooks::FsNodeLabel,
 }
 
 /// Opaque structure holding security state for a [`crate::vfs::FileObject`].

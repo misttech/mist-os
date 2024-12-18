@@ -926,7 +926,7 @@ pub(super) fn check_file_ioctl_access(
     let mode = file.node().info().mode;
     let file_class = file_class_from_file_mode(mode)?;
     let subject_sid = current_task.security_state.lock().current_sid;
-    has_file_permissions(&permission_check,subject_sid, file, &[])?;
+    has_file_permissions(&permission_check, subject_sid, file, &[])?;
     let permissions: &[Permission] = match request {
         // The NSA report also has `FIBMAP` follow this branch.
         FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => {
@@ -1428,17 +1428,24 @@ impl FileSystemState {
     }
 }
 
-/// Implicitly used by [`crate::vfs::FsNodeInfo`] to store security label state.
-#[derive(Debug, Clone, Default)]
+/// Holds security state associated with a [`crate::vfs::FsNode`].
+#[derive(Debug, Clone)]
+pub struct FsNodeState {
+    label: FsNodeLabel,
+}
+
+impl Default for FsNodeState {
+    fn default() -> Self {
+        Self { label: FsNodeLabel::Uninitialized }
+    }
+}
+
+/// Describes the security label for a [`crate::vfs::FsNode`].
+#[derive(Debug, Clone)]
 pub(super) enum FsNodeLabel {
-    #[default]
     Uninitialized,
-    SecurityId {
-        sid: SecurityId,
-    },
-    FromTask {
-        weak_task: WeakRef<Task>,
-    },
+    SecurityId { sid: SecurityId },
+    FromTask { weak_task: WeakRef<Task> },
 }
 
 impl FsNodeLabel {
