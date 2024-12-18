@@ -140,62 +140,50 @@ pub async fn get_component_moniker<'a>(
 
 /// Gets inspect data in realm.
 ///
-/// Returns the resulting inspect data for `component`, filtered by
-/// `tree_selector` and with inspect file starting with `file_prefix`.
+/// Returns the resulting inspect data for `component` filtered by `tree_selector`.
 pub async fn get_inspect_data(
     realm: &netemul::TestRealm<'_>,
     component_moniker: impl Into<String>,
     tree_selector: impl Into<String>,
-    file_prefix: &str,
 ) -> Result<diagnostics_hierarchy::DiagnosticsHierarchy> {
     let moniker = realm.get_moniker().await.context("calling get moniker")?;
     let realm_moniker = selectors::sanitize_string_for_selectors(&moniker);
-    let mut archive_reader = diagnostics_reader::ArchiveReader::new();
-    let _archive_reader_ref = archive_reader.add_selector(
-        diagnostics_reader::ComponentSelector::new(vec![
-            NETEMUL_SANDBOX_MONIKER.into(),
-            realm_moniker.into_owned(),
-            component_moniker.into(),
-        ])
-        .with_tree_selector(tree_selector.into()),
+    let mut data = diagnostics_reader::ArchiveReader::new()
+        .retry(diagnostics_reader::RetryConfig::MinSchemaCount(1))
+        .add_selector(
+            diagnostics_reader::ComponentSelector::new(vec![
+                NETEMUL_SANDBOX_MONIKER.into(),
+                realm_moniker.into_owned(),
+                component_moniker.into(),
+            ])
+            .with_tree_selector(tree_selector.into()),
+        )
+        .snapshot::<diagnostics_reader::Inspect>()
+        .await
+        .context("snapshot did not return any inspect data")?
+        .into_iter()
+        .map(|inspect_data| {
+            inspect_data.payload.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "empty inspect payload, metadata errors: {:?}",
+                    inspect_data.metadata.errors
+                )
+            })
+        });
+
+    let Some(datum) = data.next() else {
+        unreachable!("archive reader RetryConfig specifies non-empty")
+    };
+
+    let data: Vec<_> = data.collect();
+    assert!(
+        data.is_empty(),
+        "expected a single inspect entry; got {:?} and also {:?}",
+        datum,
+        data
     );
 
-    // Loop to wait for the component to begin publishing inspect data after it
-    // starts.
-    loop {
-        let mut data = archive_reader
-            .snapshot::<diagnostics_reader::Inspect>()
-            .await
-            .context("snapshot did not return any inspect data")?
-            .into_iter()
-            .filter_map(|inspect_data| {
-                if inspect_data.name().starts_with(file_prefix) {
-                    Some(inspect_data.payload.ok_or_else(|| {
-                        anyhow::anyhow!(
-                            "empty inspect payload, metadata errors: {:?}",
-                            inspect_data.metadata.errors
-                        )
-                    }))
-                } else {
-                    None
-                }
-            });
-        match data.next() {
-            Some(datum) => {
-                let data: Vec<_> = data.collect();
-                assert!(
-                    data.is_empty(),
-                    "expected a single inspect entry; got {:?} and also {:?}",
-                    datum,
-                    data
-                );
-                return datum;
-            }
-            None => {
-                fasync::Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
-            }
-        }
-    }
+    datum
 }
 
 /// Like [`get_inspect_data`] but returns a single property matched by
@@ -204,13 +192,11 @@ pub async fn get_inspect_property(
     realm: &netemul::TestRealm<'_>,
     component_moniker: impl Into<String>,
     property_selector: impl Into<String>,
-    file_prefix: &str,
 ) -> Result<diagnostics_hierarchy::Property> {
     let property_selector = property_selector.into();
-    let hierarchy =
-        get_inspect_data(&realm, component_moniker, property_selector.clone(), file_prefix)
-            .await
-            .context("getting hierarchy")?;
+    let hierarchy = get_inspect_data(&realm, component_moniker, property_selector.clone())
+        .await
+        .context("getting hierarchy")?;
     let property_selector = property_selector.split(&['/', ':']).skip(1).collect::<Vec<_>>();
     let property = hierarchy
         .get_property_by_path(&property_selector)

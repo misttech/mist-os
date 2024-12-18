@@ -603,7 +603,7 @@ async fn test_state<N: Netstack>(
         };
         let duration = std::time::Duration::from_millis(100);
         let yielded = loop {
-            match get_inspect_data(realm_ref, INSPECT_COMPONENT, INSPECT_TREE_SELECTOR, "")
+            match get_inspect_data(realm_ref, INSPECT_COMPONENT, INSPECT_TREE_SELECTOR)
                 .map_ok(|data| extract_reachability_states(&data))
                 .await
             {

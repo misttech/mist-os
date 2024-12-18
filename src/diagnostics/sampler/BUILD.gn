@@ -41,7 +41,10 @@ rustc_library("lib") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
+    "//src/lib/fuchsia",
+  ]
 
   sources = [
     "src/diagnostics.rs",

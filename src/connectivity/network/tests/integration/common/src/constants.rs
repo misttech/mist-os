@@ -47,9 +47,3 @@ pub mod eth {
     /// Another MAC address.
     pub const MAC_ADDR2: Mac = net_mac!("02:FF:FF:FF:FF:FF");
 }
-
-/// Inspect constants.
-pub mod inspect {
-    /// The default name associated with a published `fuchsia.inspect.Tree`.
-    pub const DEFAULT_INSPECT_TREE_NAME: &'static str = "";
-}

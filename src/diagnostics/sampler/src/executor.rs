@@ -1213,6 +1213,7 @@ mod tests {
     use super::*;
     use diagnostics_data::{InspectDataBuilder, Timestamp};
     use diagnostics_hierarchy::hierarchy;
+    use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
 
     #[fuchsia::test]
     fn test_filter_metrics() {
@@ -1378,7 +1379,7 @@ mod tests {
         sampler.rebuild_selector_data_structures();
         match sampler.process_component_data(
             &hierarchy,
-            &InspectHandleName::filename("a_filename"),
+            &InspectHandleName::name(DEFAULT_TREE_NAME),
             &"my/component".try_into().unwrap(),
         ) {
             // This selector will be found and removed from the map, resulting in a
@@ -1405,7 +1406,7 @@ mod tests {
         sampler.rebuild_selector_data_structures();
         match sampler.process_component_data(
             &hierarchy,
-            &InspectHandleName::filename("a_filename"),
+            &InspectHandleName::name(DEFAULT_TREE_NAME),
             &"my/component".try_into().unwrap(),
         ) {
             // This selector will be found and removed from the map, resulting in a
@@ -1431,7 +1432,7 @@ mod tests {
         sampler.rebuild_selector_data_structures();
         match sampler.process_component_data(
             &hierarchy,
-            &InspectHandleName::filename("a_filename"),
+            &InspectHandleName::name(DEFAULT_TREE_NAME),
             &"my/component".try_into().unwrap(),
         ) {
             // This selector will not be found and removed from the map, resulting in SelectorsUnchanged.
@@ -1447,7 +1448,7 @@ mod tests {
         let big_number = Property::Uint("foo".to_string(), 5);
         let small_number = Property::Uint("foo".to_string(), 2);
         let key = MetricCacheKey {
-            handle_name: InspectHandleName::filename("some_file"),
+            handle_name: InspectHandleName::name("some_file"),
             selector: "sel".to_string(),
         };
 
@@ -1516,7 +1517,7 @@ mod tests {
         // Both selectors should be found and removed from the map.
         match sampler.process_component_data(
             &hierarchy,
-            &InspectHandleName::filename("a_filename"),
+            &InspectHandleName::name(DEFAULT_TREE_NAME),
             &"my/component".try_into().unwrap(),
         ) {
             Ok((SnapshotOutcome::SelectorsChanged, _events)) => (),
@@ -1525,7 +1526,7 @@ mod tests {
 
         let moniker: ExtendedMoniker = "my_component".try_into().unwrap();
         assert!(sampler
-            .filter_metrics_by_moniker_and_tree_name(&moniker, "a_filename")
+            .filter_metrics_by_moniker_and_tree_name(&moniker, DEFAULT_TREE_NAME)
             .collect::<Vec<_>>()
             .is_empty());
     }
@@ -1540,7 +1541,7 @@ mod tests {
 
     fn process_occurence_tester(params: EventCountTesterParams) {
         let data_source = MetricCacheKey {
-            handle_name: InspectHandleName::filename("foo.file"),
+            handle_name: InspectHandleName::name("foo.file"),
             selector: "test:root:count".to_string(),
         };
         let event_res = process_occurence(&params.new_val, params.old_val.as_ref(), &data_source);
@@ -1684,7 +1685,7 @@ mod tests {
 
     fn process_int_tester(params: IntTesterParams) {
         let data_source = MetricCacheKey {
-            handle_name: InspectHandleName::filename("foo.file"),
+            handle_name: InspectHandleName::name("foo.file"),
             selector: "test:root:count".to_string(),
         };
         let event_res = process_int(&params.new_val, &data_source);
@@ -1775,7 +1776,7 @@ mod tests {
 
     fn process_string_tester(params: StringTesterParams) {
         let metric_cache_key = MetricCacheKey {
-            handle_name: InspectHandleName::filename("foo.file"),
+            handle_name: InspectHandleName::name("foo.file"),
             selector: "test:root:string_val".to_string(),
         };
 
@@ -1899,7 +1900,7 @@ mod tests {
     }
     fn process_int_histogram_tester(params: IntHistogramTesterParams) {
         let data_source = MetricCacheKey {
-            handle_name: InspectHandleName::filename("foo.file"),
+            handle_name: InspectHandleName::name("foo.file"),
             selector: "test:root:count".to_string(),
         };
         let event_res =
@@ -2081,12 +2082,12 @@ mod tests {
         });
     }
 
-    /// Ensure that data distinguished only by metadata-filename - with the same moniker and
+    /// Ensure that data distinguished only by metadata handle name - with the same moniker and
     /// selector path - is kept properly separate in the previous-value cache. The same
     /// MetricConfig should match each data source, but the occurrence counts
     /// should reflect that the distinct values are individually tracked.
     #[fuchsia::test]
-    async fn test_filename_distinguishes_data() {
+    async fn test_inspect_handle_name_distinguishes_data() {
         let mut sampler = ProjectSampler {
             archive_reader: ArchiveReader::new(),
             metrics: vec![],
@@ -2097,7 +2098,7 @@ mod tests {
             project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
             all_done: true,
         };
-        let selector: String = "my/component:root/branch:leaf".to_string();
+        let selector: String = "my/component:[...]root/branch:leaf".to_string();
         let metric_id = 1;
         let event_codes = vec![];
         sampler.push_metric(MetricConfig {
@@ -2110,37 +2111,37 @@ mod tests {
         });
         sampler.rebuild_selector_data_structures();
 
-        let file1_value4 = vec![InspectDataBuilder::new(
+        let data1_value4 = vec![InspectDataBuilder::new(
             "my/component".try_into().unwrap(),
             "component-url",
             Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
-        .with_name(InspectHandleName::filename("file1"))
+        .with_name(InspectHandleName::name("name1"))
         .build()];
-        let file2_value3 = vec![InspectDataBuilder::new(
+        let data2_value3 = vec![InspectDataBuilder::new(
             "my/component".try_into().unwrap(),
             "component-url",
             Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 3i32}}})
-        .with_name(InspectHandleName::filename("file2"))
+        .with_name(InspectHandleName::name("name2"))
         .build()];
-        let file1_value6 = vec![InspectDataBuilder::new(
+        let data1_value6 = vec![InspectDataBuilder::new(
             "my/component".try_into().unwrap(),
             "component-url",
             Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 6i32}}})
-        .with_name(InspectHandleName::filename("file1"))
+        .with_name(InspectHandleName::name("name1"))
         .build()];
-        let file2_value8 = vec![InspectDataBuilder::new(
+        let data2_value8 = vec![InspectDataBuilder::new(
             "my/component".try_into().unwrap(),
             "component-url",
             Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 8i32}}})
-        .with_name(InspectHandleName::filename("file2"))
+        .with_name(InspectHandleName::name("name2"))
         .build()];
 
         fn expect_one_metric_event_value(
@@ -2164,10 +2165,10 @@ mod tests {
             }
         }
 
-        expect_one_metric_event_value(sampler.process_snapshot(file1_value4).await, 4, "first");
-        expect_one_metric_event_value(sampler.process_snapshot(file2_value3).await, 3, "second");
-        expect_one_metric_event_value(sampler.process_snapshot(file1_value6).await, 2, "third");
-        expect_one_metric_event_value(sampler.process_snapshot(file2_value8).await, 5, "fourth");
+        expect_one_metric_event_value(sampler.process_snapshot(data1_value4).await, 4, "first");
+        expect_one_metric_event_value(sampler.process_snapshot(data2_value3).await, 3, "second");
+        expect_one_metric_event_value(sampler.process_snapshot(data1_value6).await, 2, "third");
+        expect_one_metric_event_value(sampler.process_snapshot(data2_value8).await, 5, "fourth");
     }
 
     // TODO(https://fxbug.dev/42071858): we should remove this once we support batching.
@@ -2183,7 +2184,7 @@ mod tests {
             project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
             all_done: true,
         };
-        let selector: String = "my/component:root/branch:leaf".to_string();
+        let selector: String = "my/component:[name=name1]root/branch:leaf".to_string();
         let metric_id = 1;
         let event_codes = vec![];
         sampler.push_metric(MetricConfig {
@@ -2202,7 +2203,7 @@ mod tests {
             Timestamp::from_nanos(0),
         )
         .with_hierarchy(hierarchy! { root: {branch: {leaf: 4i32}}})
-        .with_name(InspectHandleName::filename("file1"))
+        .with_name(InspectHandleName::name("name1"))
         .build()];
 
         let events = sampler.process_snapshot(value).await.expect("processed snapshot");

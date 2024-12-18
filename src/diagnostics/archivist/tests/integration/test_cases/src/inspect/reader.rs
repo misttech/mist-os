@@ -100,7 +100,7 @@ async fn read_same_named_trees_from_single_component() {
     let accessor = utils::connect_accessor(&realm_proxy, utils::ALL_PIPELINE).await;
     let data = ArchiveReader::new()
         .with_archive(accessor)
-        .add_selector("child:root")
+        .add_selector("child:[name=tree-name]root")
         .with_minimum_schema_count(2)
         .snapshot::<Inspect>()
         .await
@@ -150,7 +150,7 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .with_batch_retrieval_timeout_seconds(10)
-        .add_selector("hanging_data:*")
+        .add_selector("hanging_data:[name=tree-name]*")
         .snapshot::<Inspect>()
         .await
         .expect("got inspect data");

@@ -780,14 +780,12 @@ mod test {
         assert_eq!(2, container.inspect_handles.len());
     }
 
-    // TODO(https://fxbug.dev/355732696): Not specifying a name filter list should implicitly mean
-    // selecting for the root Inspect tree
     #[fuchsia::test]
-    fn none_name_filter_matches_everything() {
+    fn none_name_filter_matches_root_only() {
         let _executor = fuchsia_async::LocalExecutor::new();
 
         let lists_each_name = fdiagnostics::Selector {
-            tree_names: Some(fdiagnostics::TreeNames::Some(vec!["a".to_string(), "b".to_string()])),
+            tree_names: None,
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
                     fdiagnostics::StringSelector::ExactMatch("o".to_string()),
@@ -804,11 +802,11 @@ mod test {
         };
         let selectors = Some(vec![lists_each_name]);
 
-        let iac = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let iac = inspect_artifacts_container_with_n_trees(["a", "b", "root"]);
         let container = iac
             .create_unpopulated(&O_K_IDENTITY, ComponentAllowlist::new_disabled(), &selectors)
             .unwrap();
-        assert_eq!(2, container.inspect_handles.len());
+        assert_eq!(1, container.inspect_handles.len());
     }
 
     #[fuchsia::test]

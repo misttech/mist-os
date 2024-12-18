@@ -255,7 +255,7 @@ impl ArchiveReader {
 
     /// Requests all data for the component identified by the given moniker.
     pub fn select_all_for_moniker(&mut self, moniker: &str) -> &mut Self {
-        let selector = format!("{}:root", selectors::sanitize_moniker_for_selectors(moniker));
+        let selector = format!("{}:[...]root", selectors::sanitize_moniker_for_selectors(moniker));
         self.add_selector(selector)
     }
 
@@ -604,6 +604,8 @@ mod tests {
         Ok(instance)
     }
 
+    // All selectors in this test select against all tree names, in order to ensure the expected
+    // number of trees are published
     #[fuchsia::test]
     async fn inspect_data_for_component() -> Result<(), anyhow::Error> {
         let instance = start_component(ComponentOptions { publish_n_trees: 1 }).await?;
@@ -611,7 +613,7 @@ mod tests {
         let moniker = format!("realm_builder:{}/test_component", instance.root.child_name());
         let component_selector = selectors::sanitize_moniker_for_selectors(&moniker);
         let results = ArchiveReader::new()
-            .add_selector(format!("{component_selector}:root"))
+            .add_selector(format!("{component_selector}:[...]root"))
             .snapshot::<Inspect>()
             .await?;
 
@@ -648,9 +650,11 @@ mod tests {
                     target_properties: fdiagnostics::StringSelector::ExactMatch("a".into()),
                 },
             )),
+            tree_names: Some(fdiagnostics::TreeNames::All(fdiagnostics::All {})),
             ..Default::default()
         };
-        let int_property_selector = format!("{component_selector}:root:int");
+
+        let int_property_selector = format!("{component_selector}:[...]root:int");
         let mut reader = ArchiveReader::new();
         reader.add_selector(int_property_selector).add_selector(lazy_property_selector);
         let response = reader.snapshot::<Inspect>().await?;
@@ -840,8 +844,10 @@ mod tests {
             .await
             .expect("component started");
 
-        let selector =
-            format!("realm_builder\\:{}/test_component:root:tree-0", instance.root.child_name());
+        let selector = format!(
+            "realm_builder\\:{}/test_component:[name=tree-0]root",
+            instance.root.child_name()
+        );
 
         let results = ArchiveReader::new()
             .add_selector(selector)
@@ -851,15 +857,12 @@ mod tests {
             .await
             .expect("snapshotted");
 
-        assert_matches!(
-            results.clone().into_iter().find(|v| v.metadata.name.as_ref() == "tree-1"),
-            None
-        );
+        assert_matches!(results.iter().find(|v| v.metadata.name.as_ref() == "tree-1"), None);
 
         let should_have_data =
             results.into_iter().find(|v| v.metadata.name.as_ref() == "tree-0").unwrap();
 
-        assert_data_tree!(should_have_data.payload.unwrap(), root: {
+        assert_data_tree!(should_have_data.payload.unwrap(), root: contains {
             "tree-0": 0u64,
         });
     }

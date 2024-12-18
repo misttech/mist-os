@@ -300,7 +300,7 @@ mod tests {
         started_stream.await.expect("failed to observe Started event");
 
         let hierarchy = ArchiveReader::new()
-            .add_selector("coll\\:interesting_name:root")
+            .add_selector("coll\\:interesting_name:[name=tree-0]root")
             .snapshot::<Inspect>()
             .await?
             .into_iter()

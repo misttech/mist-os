@@ -267,12 +267,9 @@ This is equivalent to listing all of the names:
 [name=root, name=second_tree]root
 ```
 
-Omitting the list will currently be treated as equivalent to `[...]`, but this is a soft transition.
-Prefer the explicit syntax if you know your component exports multiple trees with different names.
+Omitting a name filter list is equivalent to the filter `[name=root]`.
 
 If a component doesn't specify a name when publishing Inspect, it will implicitly be `root`.
-This [bug](https://fxbug.dev/355732696) tracks making an omitted name filter list equivalent to
-`[name=root]`.
 
 There is no character restriction on the values in a name filter list, but `*` must be escaped.
 If the name contains values other than `[a-zA-Z0-9-_]`, the name must be quoted. In a quoted name,

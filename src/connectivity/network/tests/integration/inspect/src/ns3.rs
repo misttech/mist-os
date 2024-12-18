@@ -21,8 +21,8 @@ use fidl_fuchsia_net_multicast_ext::{
 use net_declare::{fidl_mac, fidl_subnet, net_ip_v6, std_ip_v4, std_ip_v6};
 use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
+use netstack_testing_common::get_inspect_data;
 use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
-use netstack_testing_common::{constants, get_inspect_data};
 use netstack_testing_macros::netstack_test;
 use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
 use packet_formats::ip::IpProto;
@@ -148,9 +148,7 @@ async fn inspect_tcp_sockets<I: Ip>(name: &str, socket_state: TcpSocketState) {
     }
 
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
@@ -348,9 +346,7 @@ async fn inspect_datagram_sockets<I: TestIpExt>(
     };
 
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
@@ -406,9 +402,7 @@ async fn inspect_multicast_group_memberships<I: TestIpExt>(name: &str) {
     };
 
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
@@ -450,9 +444,7 @@ async fn inspect_raw_ip_sockets<I: TestIpExt>(name: &str) {
         .expect("create raw socket");
 
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
@@ -518,9 +510,7 @@ async fn inspect_routes(name: &str) {
         sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
     let loopback_id = get_loopback_id(&realm).await;
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
@@ -593,9 +583,7 @@ async fn inspect_multicast_routes(name: &str) {
     .expect("add multicast route failed");
 
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
 
     let data =
         data.get_child("MulticastForwarding").expect("multicast forwarding data should be present");
@@ -663,9 +651,7 @@ async fn inspect_devices(name: &str) {
         .expect("configure address");
 
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
@@ -833,9 +819,7 @@ async fn inspect_counters(name: &str) {
     assert_eq!(bytes_received, MSG_SIZE);
 
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
 
     // Debug print the tree to make debugging easier in case of failures.
     println!("Got inspect data: {:#?}", data);
@@ -1258,9 +1242,7 @@ async fn inspect_filtering_state(name: &str) {
     // By default, the netstack should report all the filtering hooks for both
     // IP versions, but have no filtering state configured.
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
     // Debug print the tree to make debugging easier in case of failures.
     println!("got inspect data: {:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
@@ -1443,9 +1425,7 @@ async fn inspect_filtering_state(name: &str) {
     controller.commit().await.expect("commit filter changes");
 
     let data =
-        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
-            .await
-            .expect("inspect data should be present");
+        get_inspect_data(&realm, "netstack", "root").await.expect("inspect data should be present");
     // Debug print the tree to make debugging easier in case of failures.
     println!("got inspect data: {:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
@@ -1630,14 +1610,9 @@ struct InspectDataGetter<'a> {
 
 impl<'a> common::InspectDataGetter for InspectDataGetter<'a> {
     async fn get_inspect_data(&self, metric: &str) -> diagnostics_hierarchy::DiagnosticsHierarchy {
-        get_inspect_data(
-            self.realm,
-            "netstack",
-            metric,
-            constants::inspect::DEFAULT_INSPECT_TREE_NAME,
-        )
-        .await
-        .expect("inspect data should be present")
+        get_inspect_data(self.realm, "netstack", metric)
+            .await
+            .expect("inspect data should be present")
     }
 }
 
