@@ -96,6 +96,24 @@ zx_status_t VmObjectDispatcher::Create(fbl::RefPtr<VmObject> vmo, uint64_t conte
       return result.status_value();
     }
     csm = ktl::move(*result);
+
+    uint64_t aligned_content_size = ROUNDUP(content_size, PAGE_SIZE);
+    // The content_size cannot be larger than the VMO size, so this cannot overflow.
+    DEBUG_ASSERT(aligned_content_size >= content_size);
+    if (aligned_content_size < vmo->size()) {
+      // The range beyond the (rounded up) content size to the VMO size is dirty-untracked zero.
+      zx_status_t status =
+          vmo->ZeroRangeUntracked(aligned_content_size, vmo->size() - aligned_content_size);
+      if (status != ZX_OK) {
+        return status;
+      }
+      if (pager_koid != ZX_HANDLE_INVALID) {
+        // Zeroing will qualify as a modification and mark the VMO as modified. Since the zeroing
+        // was part of initialization, reset the modified state.
+        fbl::RefPtr<VmObjectPaged> object_paged = DownCastVmObject<VmObjectPaged>(vmo);
+        object_paged->ResetPagerVmoStats();
+      }
+    }
   }
   return CreateWithCsm(ktl::move(vmo), ktl::move(csm), pager_koid, initial_mutability, handle,
                        rights);
@@ -327,11 +345,17 @@ zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
 
   // Zero the range from min(stream size, old stream size) to the end of the VMO.
   uint64_t zero_start = ktl::min(stream_size, old_stream_size);
-  uint64_t zero_len = vmo_size - zero_start;
+  uint64_t aligned_stream_size = ROUNDUP(stream_size, PAGE_SIZE);
+  DEBUG_ASSERT(aligned_stream_size >= stream_size);
   // Dropping the lock here is fine, as an `Operation` only needs to be locked when initializing,
   // committing, or cancelling.
-  zx_status_t status;
-  guard.CallUnlocked([&] { status = vmo_->ZeroRange(zero_start, zero_len); });
+  zx_status_t status = ZX_OK;
+  guard.CallUnlocked([&] {
+    status = vmo_->ZeroRange(zero_start, aligned_stream_size - zero_start);
+    if (status == ZX_OK) {
+      status = vmo_->ZeroRangeUntracked(aligned_stream_size, vmo_size - aligned_stream_size);
+    }
+  });
 
   // Undo this operation of ZeroRange fails.
   if (status != ZX_OK) {

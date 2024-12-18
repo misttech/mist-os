@@ -204,6 +204,11 @@ class VmObjectPaged final : public VmObject {
     return cow_pages_locked()->QueryPagerVmoStatsLocked(reset, stats);
   }
 
+  void ResetPagerVmoStats() {
+    Guard<CriticalMutex> guard{lock()};
+    cow_pages_locked()->ResetPagerVmoStatsLocked();
+  }
+
   zx_status_t WritebackBegin(uint64_t offset, uint64_t len, bool is_zero_range) override {
     Guard<CriticalMutex> guard{lock()};
     return cow_pages_locked()->WritebackBeginLocked(offset, len, is_zero_range);

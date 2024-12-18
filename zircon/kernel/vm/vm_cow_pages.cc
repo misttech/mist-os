@@ -2325,13 +2325,7 @@ bool VmCowPages::LookupCursor::CursorIsContentZero() const {
   if (owner_->page_source_) {
     // With a page source emptiness implies needing to request content, however we can have zero
     // intervals which do start as zero content.
-    if (CursorIsInIntervalZero()) {
-      return true;
-    }
-    // Knowing that we cannot be in an interval, if the cursor is otherwise empty check if we can
-    // assume this offset is zero content.
-    return zero_above_user_size_ && CursorIsEmpty() && owner()->user_content_size_ &&
-           owner_offset_ >= owner()->user_content_size_->GetContentSize();
+    return CursorIsInIntervalZero();
   }
   // Without a page source emptiness is filled with zeros and intervals are only permitted if there
   // is a page source.
@@ -2757,32 +2751,6 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     // should not be trapped.
     const bool target_page_dirty = TargetZeroContentSupplyDirty(will_write);
     if (target_page_dirty && target_->page_source_->ShouldTrapDirtyTransitions()) {
-      // As we need to generate a dirty request we want to check if we can assume any of the range
-      // we are about to dirty can be zero. If it can, then by first replacing any gaps with zero
-      // intervals these ranges can be included in the dirty request. This prevents us from needing
-      // to read request these pages, and minimizes the number of dirty transitions we need to make.
-      if (zero_above_user_size_ && target_->user_content_size_) {
-        const uint64_t end_offset = offset_ + max_request_pages * PAGE_SIZE;
-        const uint64_t byte_zero_start = target_->user_content_size_->GetContentSize();
-        if (end_offset > byte_zero_start) {
-          // As end_offset is a valid page aligned value, and it is greater than byte_zero_start, we
-          // know that rounding up byte_zero_start is a safe operation. This could cause us to zero
-          // a zero sized range, but that is safe to do.
-          const uint64_t zero_start = ROUNDUP_PAGE_SIZE(byte_zero_start);
-          uint64_t zeroed_out;
-          // Passing in |true| for |only_zero_gaps| is fine here as we do not *have* to zero the
-          // range, rather we *may* zero it, and by only zeroing the gaps this method will not
-          // attempt to zero existing pages, which could otherwise generate dirty requests.
-          zx_status_t status = target_->ZeroPagesPreservingContentLocked(
-              zero_start, end_offset, true, true, nullptr, nullptr, &zeroed_out);
-          // Regardless of the result, the zeroing may modified the page list, invalidating our
-          // cursor.
-          owner_ = nullptr;
-          if (status != ZX_OK) {
-            return zx::error(status);
-          }
-        }
-      }
       zx_status_t status = DirtyRequest(max_request_pages, page_request->GetLazyDirtyRequest());
       // Since we know we have a page source that traps, and page sources will never succeed
       // synchronously, our dirty request must have 'failed'.
@@ -3126,16 +3094,15 @@ bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
   return false;
 }
 
-zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(
-    uint64_t page_start_base, uint64_t page_end_base, bool only_zero_gaps, bool dirty_track,
-    list_node_t* freed_list, MultiPageRequest* page_request, uint64_t* processed_len_out) {
+zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_base,
+                                                         uint64_t page_end_base, bool dirty_track,
+                                                         list_node_t* freed_list,
+                                                         MultiPageRequest* page_request,
+                                                         uint64_t* processed_len_out) {
   // Validate inputs.
   DEBUG_ASSERT(IS_PAGE_ALIGNED(page_start_base) && IS_PAGE_ALIGNED(page_end_base));
   DEBUG_ASSERT(page_end_base <= size_);
   DEBUG_ASSERT(is_source_preserving_page_content());
-  // Page requests and freeing of pages will only happen if we need to actively zero existing pages,
-  // instead of just inserting zero intervals.
-  DEBUG_ASSERT(only_zero_gaps || (page_request && freed_list));
 
   // Give us easier names for our range.
   const uint64_t start = page_start_base;
@@ -3190,12 +3157,6 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(
 
           // If this is a page, see if we can remove it and absorb it into a zero interval.
           if (p->IsPage()) {
-            // If we do not need to zero pages then just increment our tracking and continue.
-            if (only_zero_gaps) {
-              *processed_len_out += PAGE_SIZE;
-              next_start_offset = off + PAGE_SIZE;
-              return ZX_ERR_NEXT;
-            }
             AssertHeld(lock_ref());
             if (p->Page()->object.pin_count > 0) {
               DEBUG_ASSERT(dirty_track);
@@ -3451,8 +3412,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   // If the page source preserves content, we can perform efficient zeroing by inserting dirty zero
   // intervals. Handle this case separately.
   if (is_source_preserving_page_content()) {
-    return ZeroPagesPreservingContentLocked(start, end, false, dirty_track, &freed_list,
-                                            page_request, zeroed_len_out);
+    return ZeroPagesPreservingContentLocked(start, end, dirty_track, &freed_list, page_request,
+                                            zeroed_len_out);
   }
   // dirty_track has no meaning for VMOs without page sources that preserve content, so ignore it
   // for the remainder of the function.
