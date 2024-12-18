@@ -156,10 +156,10 @@ FileSystemHandle create_fs(fbl::RefPtr<starnix::Kernel>& kernel, FsNodeOps* ops)
 
   auto test_fs =
       FileSystem::New(kernel, {.type = CacheModeType::Uncached}, ptr, FileSystemOptions());
-  ZX_ASSERT_MSG(test_fs, "testfs constructed with valid options");
+  ZX_ASSERT_MSG(test_fs.is_ok(), "testfs constructed with valid options");
   auto bus_dir_node = FsNode::new_root(ops);
   test_fs->set_root_node(bus_dir_node);
-  return test_fs;
+  return test_fs.value();
 }
 
 }  // namespace starnix::testing

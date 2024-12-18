@@ -38,8 +38,11 @@ FileSystem::~FileSystem() {
   LTRACE_EXIT_OBJ;
 }
 
-FileSystemHandle FileSystem::New(const fbl::RefPtr<Kernel>& kernel, CacheMode cache_mode,
-                                 FileSystemOps* ops, FileSystemOptions options) {
+fit::result<Errno, FileSystemHandle> FileSystem::New(const fbl::RefPtr<Kernel>& kernel,
+                                                     CacheMode cache_mode, FileSystemOps* ops,
+                                                     FileSystemOptions options) {
+  // let security_state = security::file_system_init_security(ops.name(), &options.params)?;
+
   fbl::AllocChecker ac;
   Entries entries;
   switch (cache_mode.type) {
@@ -55,10 +58,15 @@ FileSystemHandle FileSystem::New(const fbl::RefPtr<Kernel>& kernel, CacheMode ca
       break;
   };
 
-  auto fs = fbl::AdoptRef(new (&ac) FileSystem(kernel, ktl::unique_ptr<FileSystemOps>(ops),
-                                               ktl::move(options), ktl::move(entries)));
+  auto file_system = fbl::AdoptRef(new (&ac) FileSystem(kernel, ktl::unique_ptr<FileSystemOps>(ops),
+                                                        ktl::move(options), ktl::move(entries)));
   ZX_ASSERT(ac.check());
-  return ktl::move(fs);
+
+  // TODO: https://fxbug.dev/366405587 - Workaround to allow SELinux to note that this
+  // `FileSystem` needs labeling, once a policy has been loaded.
+  // security::file_system_post_init_security(kernel, &file_system);
+
+  return fit::ok(ktl::move(file_system));
 }
 
 FileSystem::FileSystem(const fbl::RefPtr<Kernel>& kernel, ktl::unique_ptr<FileSystemOps> ops,

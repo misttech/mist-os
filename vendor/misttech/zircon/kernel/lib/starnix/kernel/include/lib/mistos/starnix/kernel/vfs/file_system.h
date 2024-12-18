@@ -142,8 +142,9 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
   // impl FileSystem
  public:
   /// Create a new filesystem.
-  static FileSystemHandle New(const fbl::RefPtr<Kernel>& kernel, CacheMode cache_mode,
-                              FileSystemOps* ops, FileSystemOptions options);
+  static fit::result<Errno, FileSystemHandle> New(const fbl::RefPtr<Kernel>& kernel,
+                                                  CacheMode cache_mode, FileSystemOps* ops,
+                                                  FileSystemOptions options);
 
   void set_root(FsNodeOps* root);
 

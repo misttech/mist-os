@@ -39,7 +39,9 @@ FileSystemHandle anon_fs(const fbl::RefPtr<Kernel>& kernel) {
     fbl::AllocChecker ac;
     auto anonfs = new (&ac) AnonFs();
     ZX_ASSERT(ac.check());
-    kernel->anon_fs_.set(FileSystem::New(kernel, {.type = CacheModeType::Uncached}, anonfs, {}));
+    auto fs = FileSystem::New(kernel, {.type = CacheModeType::Uncached}, anonfs, {});
+    ZX_ASSERT_MSG(fs.is_ok(), "anonfs constructed with valid options");
+    kernel->anon_fs_.set(ktl::move(fs.value()));
   }
   return kernel->anon_fs_.get();
 }
