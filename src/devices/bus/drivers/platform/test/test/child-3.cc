@@ -12,7 +12,8 @@ class Child3Driver : public fdf::DriverBase {
       : DriverBase("child-3", std::move(start_args), std::move(driver_dispatcher)) {}
 
   zx::result<> Start() override {
-    zx::result result = AddChild("child-3", {}, {});
+    std::vector<fuchsia_driver_framework::NodeProperty2> properties = {};
+    zx::result result = AddChild("child-3", properties, {});
     if (result.is_error()) {
       return result.take_error();
     }

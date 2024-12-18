@@ -226,6 +226,36 @@ class Dfv2NodeTest : public DriverManagerTestBase {
   fidl::ServerBindingGroup<fuchsia_device::Controller> device_controller_bindings_;
 };
 
+TEST_F(Dfv2NodeTest, AddChildWithDuplicatePropertyArgs) {
+  auto node = CreateNode("test");
+  StartTestDriver(node);
+  ASSERT_TRUE(node->HasDriverComponent());
+  ASSERT_EQ(driver_manager::NodeState::kRunning, node->GetNodeState());
+
+  // Add child with both properties and properties2 set in the args. The call should
+  // fail.
+  zx::result node_controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  ASSERT_EQ(node_controller_endpoints.status_value(), ZX_OK);
+
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  ASSERT_EQ(node_endpoints.status_value(), ZX_OK);
+
+  fuchsia_driver_framework::NodeAddArgs args{
+      {.name = "child",
+       .properties = {{fdf::MakeProperty("key", "value")}},
+       .properties2 = {{fdf::MakeProperty2("key", "value")}}}};
+  node->AddChild(std::move(args), std::move(node_controller_endpoints->server),
+                 std::move(node_endpoints->server),
+                 [](fit::result<fuchsia_driver_framework::wire::NodeError,
+                                std::shared_ptr<driver_manager::Node>>
+                        result) {
+                   ASSERT_TRUE(result.is_error());
+                   ASSERT_EQ(result.error_value(),
+                             fuchsia_driver_framework::wire::NodeError::kUnsupportedArgs);
+                 });
+}
+
 TEST_F(Dfv2NodeTest, RemoveDuringFailedBind) {
   auto node = CreateNode("test");
   StartTestDriver(node);
@@ -483,8 +513,8 @@ TEST_F(Dfv2NodeTest, UnbindChildrenFourChildren) {
   ASSERT_TRUE(parent->children().empty());
 }
 
-// Verify that multiple requests to Node::UnbindChildren() will succeed. Both of these requests are
-// sent before the node can complete either.
+// Verify that multiple requests to Node::UnbindChildren() will succeed. Both of these requests
+// are sent before the node can complete either.
 TEST_F(Dfv2NodeTest, UnbindChildrenMultipleCalls) {
   auto parent = CreateNode("parent");
   auto child = CreateNode("child", parent);
@@ -519,8 +549,8 @@ TEST_F(Dfv2NodeTest, DISABLED_UnbindChildrenFailAddChild) {
   auto device_controller = ConnectToDeviceController(parent);
 
   // Get the driver so that the test can prevent Node::UnbindChildren() from fully completing by
-  // pausing TestDriver::Stop(). The driver will live on a separate thread in order to not block the
-  // main thread while the driver waits to complete stopping.
+  // pausing TestDriver::Stop(). The driver will live on a separate thread in order to not block
+  // the main thread while the driver waits to complete stopping.
   async::Loop driver_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   ASSERT_EQ(driver_loop.StartThread("driver"), ZX_OK);
   auto [driver_server, node_client] = node_manager->driver_host().TakeDriver(kChildNode1Name);

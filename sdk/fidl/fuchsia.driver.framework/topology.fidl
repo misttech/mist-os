@@ -201,8 +201,17 @@ type NodeAddArgs = resource table {
     /// Functions to provide to the driver that is bound to this node.
     3: symbols vector<NodeSymbol>:MAX_SYMBOL_COUNT;
 
-    /// Properties of the node.
+    /// Properties of the node. Deprecated: all new usages should set properties2 and leave
+    /// this field blank.
+    @available(
+            deprecated=NEXT,
+            note="Deprecated for 'properties2' which only supports string-based keys.")
     4: properties NodePropertyVector;
+
+    /// Properties of the node. If set, the `properties` field must be blank. Otherwise,
+    /// adding the node will return an error.
+    @available(added=NEXT)
+    8: properties2 NodeProperties;
 
     /// The arguments for how this node should be added to devfs.
     5: devfs_args DevfsAddArgs;

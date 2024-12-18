@@ -656,6 +656,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.driver.framework/NodeAddArgs.properties2",
+        "ordinal": "8",
+        "type": "vector<fuchsia.driver.framework/NodeProperty2>:64"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.driver.framework/NodeAddArgs.symbols",
         "ordinal": "3",
         "type": "vector<fuchsia.driver.framework/NodeSymbol>:64"

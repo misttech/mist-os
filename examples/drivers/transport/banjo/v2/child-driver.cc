@@ -26,7 +26,8 @@ zx::result<> ChildBanjoTransportDriver::Start() {
     return zx::error(status);
   }
 
-  zx::result child_result = AddChild("transport-child", {}, {});
+  std::vector<fuchsia_driver_framework::NodeProperty2> properties = {};
+  zx::result child_result = AddChild("transport-child", properties, {});
   if (child_result.is_error()) {
     return child_result.take_error();
   }

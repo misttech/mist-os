@@ -276,6 +276,18 @@ class DriverBase {
 
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
+      std::string_view node_name,
+      cpp20::span<const fuchsia_driver_framework::NodeProperty2> properties,
+      cpp20::span<const fuchsia_driver_framework::Offer> offers);
+
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
+      std::string_view node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args,
+      cpp20::span<const fuchsia_driver_framework::NodeProperty2> properties,
+      cpp20::span<const fuchsia_driver_framework::Offer> offers);
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+
  private:
   void InitializeAndServe(Namespace incoming,
                           fidl::ServerEnd<fuchsia_io::Directory> outgoing_directory_request);
@@ -297,12 +309,12 @@ class DriverBase {
 #if FUCHSIA_API_LEVEL_AT_MOST(NEXT)
   std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::NodeProperty>>
       node_properties_;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_MOST(NEXT)
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
   std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::NodeProperty2>>
       node_properties_2_;
-#endif
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
 
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   async_dispatcher_t* dispatcher_;

@@ -146,6 +146,20 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> DriverBase
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
 
+zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> DriverBase::AddChild(
+    std::string_view node_name,
+    cpp20::span<const fuchsia_driver_framework::NodeProperty2> properties,
+    cpp20::span<const fuchsia_driver_framework::Offer> offers) {
+  return fdf::AddChild(node(), logger(), node_name, properties, offers);
+}
+
+zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> DriverBase::AddChild(
+    std::string_view node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args,
+    cpp20::span<const fuchsia_driver_framework::NodeProperty2> properties,
+    cpp20::span<const fuchsia_driver_framework::Offer> offers) {
+  return fdf::AddChild(node(), logger(), node_name, devfs_args, properties, offers);
+}
+
 cpp20::span<const fuchsia_driver_framework::NodeProperty2> DriverBase::node_properties_2(
     const std::string& parent_node_name) const {
   auto it = node_properties_2_.find(parent_node_name);
