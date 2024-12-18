@@ -9,9 +9,11 @@ rustc_test("integration_tests_bin") {
   name = "archive_reader_integration_test"
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
   ]
 
