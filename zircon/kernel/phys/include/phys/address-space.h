@@ -186,6 +186,21 @@ class AddressSpace {
     gAddressSpace = const_cast<AddressSpace*>(this);
   }
 
+  // Install new lower and upper root page tables.
+  template <bool DualSpaces = kDualSpaces, typename = ktl::enable_if_t<DualSpaces>>
+  void InstallNewRootTables(uint64_t new_lower_root_paddr, uint64_t new_upper_root_paddr) {
+    lower_root_paddr_ = new_lower_root_paddr;
+    upper_root_paddr_ = new_upper_root_paddr;
+    ArchInstall();
+  }
+
+  // Install a new root page table.
+  template <bool DualSpaces = kDualSpaces, typename = ktl::enable_if_t<!DualSpaces>>
+  void InstallNewRootTable(uint64_t new_root_paddr) {
+    lower_root_paddr_ = new_root_paddr;
+    ArchInstall();
+  }
+
  private:
   static constexpr uint64_t kNumTableEntries =
       LowerPaging::kNumTableEntries<LowerPaging::kFirstLevel>;
