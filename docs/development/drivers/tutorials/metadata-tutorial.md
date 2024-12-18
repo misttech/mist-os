@@ -2,22 +2,24 @@
 
 This guide explains how to pass metadata from one driver to another using the
 [metadata](/sdk/lib/driver/metadata) library. Metadata is any arbitrary data
-created by a driver when it is bound to a node which should be accessible to
-drivers bound to its child nodes. Normally, drivers can create their own FIDL
-protocol in order to pass metadata, however, the
-[metadata](/sdk/lib/driver/metadata) library offers functionality to pass
-metadata between drivers with less code.
+created by a driver that should be accessible to drivers bound to its child
+nodes. Normally, drivers can create their own FIDL protocol in order to pass
+metadata, however, the [metadata](/sdk/lib/driver/metadata) library offers
+functionality to pass metadata between drivers with less code.
 
 You can find an example of drivers sending, retrieving and forwarding metadata
 [here](/examples/drivers/metadata).
 
 ## Metadata definition
-First, the type of metadata must be defined as a FIDL type:
+First, the type of metadata must be defined as a FIDL type and annotated with
+`@serializable`:
 
 ```
 library fuchsia.examples.metadata;
 
 // Type of the metadata to be passed.
+// Make sure to annotate it with `@serializable`.
+@serializable
 type Metadata = table {
     1: test_property string:MAX;
 };
@@ -25,65 +27,16 @@ type Metadata = table {
 
 This metadata will be served in the driver's outgoing namespace using the
 [fuchsia.driver.metadata/Service](/sdk/fidl/fuchsia.driver.metadata/fuchsia.driver.metadata.fidl)
-FIDL service. However, the name of the service within the outgoing namespace
-will not be `fuchsia.driver.metadata.Service`. Instead, it will be a custom
-string that we will provide which is associated with the type of the metadata.
-For this tutorial, we will define that string in the same FIDL library as above:
-
-```
-library fuchsia.examples.metadata;
-
-const SERVICE string = "fuchsia.examples.metadata.Metadata";
-```
+FIDL service. The name of the FIDL service within the driver's outgoing
+namespace will not be `fuchsia.driver.metadata.Service`. Instead, it will be the
+serializable name of the FIDL type. The serializable name is only created if the
+FIDL type is annotated with `@serializable`.
 
 The FIDL library's build target will be defined as the following:
 
 ```
 fidl("fuchsia.examples.metadata") {
   sources = [ "fuchsia.examples.metadata.fidl" ]
-}
-```
-
-## Metadata library
-In order to both send and receive metadata using the
-[metadata](/sdk/lib/driver/metadata) library, we need to specialize the
-[fdf_metadata::ObjectDetails](/sdk/lib/driver/metadata/cpp/metadata.h) template
-class like so:
-
-```cpp
-// Defines `fdf_metadata::ObjectDetails`.
-#include <lib/driver/metadata/cpp/metadata.h>
-
-// Defines the fuchsia.examples.metadata types in C++.
-#include <fidl/fuchsia.examples.metadata/cpp/fidl.h>
-
-// `ObjectDetails` must be specialized within the `fdf_metadata` namespace.
-namespace fdf_metadata {
-
-template <>
-// Pass the metadata type as the template argument.
-struct ObjectDetails<fuchsia_examples_metadata::Metadata> {
-
-  // Specify the name of the service used to serve the metadata.
-  inline static const char* Name = fuchsia_examples_metadata::kService;
-};
-
-}  // namespace fdf_metadata
-
-```
-
-Since both the sending and receiving drivers need to do this, we can insert this
-code into a new library that will be included by both drivers:
-
-```
-source_set("examples_metadata") {
-  # This header file should contain the above code.
-  sources = [ "examples_metadata.h" ]
-
-  public_deps = [
-    # This should be the fuchsia.examples.metadata FIDL library's C++ target.
-    ":fuchsia.examples.metadata_cpp",
-  ]
 }
 ```
 
@@ -97,7 +50,7 @@ Let's say we have a driver that wants to send metadata to its children:
 class Sender : public fdf::DriverBase {
  public:
   Sender(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("parent", std::move(start_args), std::move(driver_dispatcher)) {}
+      : DriverBase("sender", std::move(start_args), std::move(driver_dispatcher)) {}
 };
 
 FUCHSIA_DRIVER_EXPORT(Sender);
@@ -113,8 +66,8 @@ It's component manifest is the following:
     ],
     program: {
         runner: "driver",
-        binary: "driver/parent.so",
-        bind: "meta/bind/parent.bindbc",
+        binary: "driver/sender.so",
+        bind: "meta/bind/sender.bindbc",
     },
 }
 ```
@@ -124,9 +77,9 @@ It's build targets are defined as follows:
 ```
 fuchsia_cc_driver("driver") {
   testonly = true
-  output_name = "parent"
+  output_name = "sender"
   sources = [
-    "parent.cc",
+    "sender.cc",
   ]
   deps = [
     "//src/devices/lib/driver:driver_runtime",
@@ -135,19 +88,19 @@ fuchsia_cc_driver("driver") {
 
 fuchsia_driver_component("component") {
   testonly = true
-  component_name = "parent"
-  manifest = "meta/parent.cml"
+  component_name = "sender"
+  manifest = "meta/sender.cml"
   deps = [
     ":driver",
     ":bind", # Bind rules not specified in this tutorial.
   ]
-  info = "parent.json" # Info not specified in this tutorial.
+  info = "sender.json" # Info not specified in this tutorial.
 }
 ```
 
 ### Send process
-In order for this driver to send metadata to its child drivers, it will need an
-instance of the
+In order for this driver to send metadata to its child drivers, it will need to
+create an instance of the
 [fdf_metadata::MetadataServer](/sdk/lib/driver/metadata/cpp/metadata_server.h)
 class, set the metadata by calling its
 `fdf_metadata::MetadataServer::SetMetadata()` method, and then serve the
@@ -156,11 +109,10 @@ metadata to the driver's outgoing directory by calling its
 
 ```cpp
 {% verbatim %}
-// Make sure to include the metadata library that specializes the
-// `fdf_metadata::ObjectDetails` class. It is needed by
-// `fdf_metadata::MetadataServer`.
-#include "examples_metadata.h"
+// Defines the fuchsia.examples.metadata types in C++.
+#include <fidl/fuchsia.examples.metadata/cpp/fidl.h>
 
+// Defines fdf::MetadataServer.
 #include <lib/driver/metadata/cpp/metadata_server.h>
 
 class Sender : public fdf::DriverBase {
@@ -168,10 +120,10 @@ class Sender : public fdf::DriverBase {
   zx::result<> Start() override {
     // Set the metadata to be served.
     fuchsia_examples_metadata::Metadata metadata{{.test_property = "test value"}};
-    ZX_ASSERT(metadata_server_.SetMetadata(std::move(metadata)) == ZX_OK);
+    ZX_ASSERT(metadata_server_.SetMetadata(std::move(metadata)).is_ok());
 
     // Serve the metadata to the driver's outgoing directory.
-    ZX_ASSERT(metadata_server_.Serve(*outgoing(), dispatcher()) == ZX_OK);
+    ZX_ASSERT(metadata_server_.Serve(*outgoing(), dispatcher()).is_ok());
 
     return zx::ok();
   }
@@ -185,21 +137,27 @@ class Sender : public fdf::DriverBase {
 
 `fdf_metadata::MetadataServer::SetMetadata()` can be called multiple times,
 before or after `fdf_metadata::MetadataServer::Serve()`, and the metadata server
-will serve the latest metadata instance. A driver will fail to retrieve the
-metadata if `fdf_metadata::MetadataServer::SetMetadata()` has not been called
-before it attempts to retrieve the metadata.
+will serve the latest metadata instance. A child driver will fail to retrieve
+the metadata if `fdf_metadata::MetadataServer::SetMetadata()` has not been
+called before it attempts to retrieve the metadata.
 
-The `driver` build target will need to be updated:
+The `driver` build target will need to be updated to include the metadata
+library and the FIDL library that defines the metadata type:
 ```
 fuchsia_cc_driver("driver") {
   testonly = true
-  output_name = "parent"
+  output_name = "sender"
   sources = [
-    "parent.cc",
+    "sender.cc",
   ]
   deps = [
     "//src/devices/lib/driver:driver_runtime",
-    ":examples_metadata",
+
+    # This should be the fuchsia.examples.metadata FIDL library's C++ target.
+    ":fuchsia.examples.metadata_cpp",
+
+    # This library contains `fdf::MetadataServer`.
+    "//sdk/lib/driver/metadata/cpp",
   ]
 }
 ```
@@ -216,8 +174,8 @@ Finally, the driver needs to declare and expose the
     ],
     program: {
         runner: "driver",
-        binary: "driver/parent.so",
-        bind: "meta/bind/parent.bindbc",
+        binary: "driver/sender.so",
+        bind: "meta/bind/sender.bindbc",
     },
     capabilities: [
         { service: "fuchsia.examples.metadata.Metadata" },
@@ -239,15 +197,18 @@ serves the
 FIDL service in order to send metadata. However,
 [fdf_metadata::MetadataServer](/sdk/lib/driver/metadata/cpp/metadata_server.h)
 does not serve this service under the name `fuchsia.driver.metadata.Service`
-like a normal FIDL service would. Instead, the service is served under the name
-`fuchsia.examples.metadata.Metadata`. This allows the receiving driver to
-identify which type of metadata is being passed. This means we need to declare
-and expose the `fuchsia.examples.metadata.Metadata` service even though that
-service doesn't exist.
+like a normal FIDL service would. Instead, the service is served under the
+metadata type's serializable name. In this case that is
+`fuchsia.examples.metadata.Metadata`. This name can be found in the C++ field
+`fuchsia_examples_metadata::Metadata::kSerializableName`. This allows the
+receiving driver to identify which type of metadata is being passed. This means
+that the driver needs to declare and expose the
+`fuchsia.examples.metadata.Metadata` FIDL service even though that service
+doesn't exist.
 
 ## Retrieving metadata
 ### Initial setup
-Let's say we have a driver that wants to receive metadata from its parent
+Let's say we have a driver that wants to retrieve metadata from its parent
 driver:
 
 ```cpp
@@ -256,7 +217,7 @@ driver:
 class Retriever : public fdf::DriverBase {
  public:
   Retriever(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("child", std::move(start_args), std::move(driver_dispatcher)) {}
+      : DriverBase("retriever", std::move(start_args), std::move(driver_dispatcher)) {}
 };
 
 FUCHSIA_DRIVER_EXPORT(Retriever);
@@ -272,8 +233,8 @@ It's component manifest is the following:
     ],
     program: {
         runner: "driver",
-        binary: "driver/child.so",
-        bind: "meta/bind/child.bindbc",
+        binary: "driver/retriever.so",
+        bind: "meta/bind/retriever.bindbc",
     },
 }
 ```
@@ -283,9 +244,9 @@ It's build targets are defined as follows:
 ```
 fuchsia_cc_driver("driver") {
   testonly = true
-  output_name = "child"
+  output_name = "retriever"
   sources = [
-    "child.cc",
+    "retriever.cc",
   ]
   deps = [
     "//src/devices/lib/driver:driver_runtime",
@@ -294,27 +255,26 @@ fuchsia_cc_driver("driver") {
 
 fuchsia_driver_component("component") {
   testonly = true
-  component_name = "child"
-  manifest = "meta/child.cml"
+  component_name = "retriever"
+  manifest = "meta/retriever.cml"
   deps = [
     ":driver",
     ":bind", # Bind rules not specified in this tutorial.
   ]
-  info = "child.json" # Info not specified in this tutorial.
+  info = "retriever.json" # Info not specified in this tutorial.
 }
 ```
 
 ### Retrieval process
-In order to retrieve the metadata from a driver's parent driver, the driver will
-call `fdf_metadata::GetMetadata()`:
+In order for the driver to retrieve metadata from its parent driver, the driver
+needs to call `fdf_metadata::GetMetadata()`:
 
 ```cpp
-#include <lib/driver/metadata/cpp/metadata.h>
+// Defines the fuchsia.examples.metadata types in C++.
+#include <fidl/fuchsia.examples.metadata/cpp/fidl.h>
 
-// Make sure to include the metadata library that specializes the
-// `fdf_metadata::ObjectDetails` class. It is needed by
-// `fdf_metadata::GetMetadata()`.
-#include "examples_metadata.h"
+// Defines fdf::GetMetadata().
+#include <lib/driver/metadata/cpp/metadata.h>
 
 class Retriever : public fdf::DriverBase {
  public:
@@ -328,18 +288,24 @@ class Retriever : public fdf::DriverBase {
 };
 ```
 
-The `driver` build target will need to be updated:
+The `driver` build target will need to be updated to depend on the metadata
+library and the FIDL library that defines the metadata type:
 
 ```
 fuchsia_cc_driver("driver") {
   testonly = true
-  output_name = "child"
+  output_name = "retriever"
   sources = [
-    "child.cc",
+    "retriever.cc",
   ]
   deps = [
     "//src/devices/lib/driver:driver_runtime",
-    ":examples_metadata",
+
+    # This should be the fuchsia.examples.metadata FIDL library's C++ target.
+    ":fuchsia.examples.metadata_cpp",
+
+    # This library contains `fdf::GetMetadata()`.
+    "//sdk/lib/driver/metadata/cpp",
   ]
 }
 ```
@@ -356,8 +322,8 @@ Finally, the driver will need to declare its usage of the
     ],
     program: {
         runner: "driver",
-        binary: "driver/child.so",
-        bind: "meta/bind/child.bindbc",
+        binary: "driver/retriever.so",
+        bind: "meta/bind/retriever.bindbc",
     },
     use: [
         { service: "fuchsia.examples.metadata.Metadata" },
@@ -376,7 +342,7 @@ driver and forward that metadata to its child drivers:
 class Forwarder : public fdf::DriverBase {
  public:
   Forwarder(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : DriverBase("forward", std::move(start_args), std::move(driver_dispatcher)) {}
+      : DriverBase("forwarder", std::move(start_args), std::move(driver_dispatcher)) {}
 };
 
 FUCHSIA_DRIVER_EXPORT(Forwarder);
@@ -392,8 +358,8 @@ It's component manifest is the following:
     ],
     program: {
         runner: "driver",
-        binary: "driver/forward_driver.so",
-        bind: "meta/bind/forward.bindbc",
+        binary: "driver/forwarder.so",
+        bind: "meta/bind/forwarder.bindbc",
     },
 }
 ```
@@ -403,9 +369,9 @@ It's build targets are defined as follows:
 ```
 fuchsia_cc_driver("driver") {
   testonly = true
-  output_name = "forward_driver"
+  output_name = "forwarder"
   sources = [
-    "forward_driver.cc",
+    "forwarder.cc",
   ]
   deps = [
     "//src/devices/lib/driver:driver_runtime",
@@ -426,7 +392,7 @@ fuchsia_driver_component("component") {
 
 ### Forward process
 In order for the driver to forward metadata from its parent driver to its child
-drivers, it will need an instance of the
+drivers, it will need to create an instance of the
 [fdf_metadata::MetadataServer](/sdk/lib/driver/metadata/cpp/metadata_server.h)
 class, set the metadata by calling its
 `fdf_metadata::MetadataServer::ForwardMetadata()` method, and then serve the
@@ -434,21 +400,20 @@ metadata to the driver's outgoing directory by calling its
 `fdf_metadata::MetadataServer::Serve()` method:
 
 ```cpp
-// Make sure to include the metadata library that specializes the
-// `fdf_metadata::ObjectDetails` class. It is needed by
-// `fdf_metadata::MetadataServer`.
-#include "examples_metadata.h"
+// Defines the fuchsia.examples.metadata types in C++.
+#include <fidl/fuchsia.examples.metadata/cpp/fidl.h>
 
+// Defines fdf::MetadataServer.
 #include <lib/driver/metadata/cpp/metadata_server.h>
 
 class Forwarder : public fdf::DriverBase {
  public:
   zx::result<> Start() override {
     // Set metadata using the driver's parent driver metadata.
-    ZX_ASSERT(metadata_server_.ForwardMetadata(incoming()) == ZX_OK);
+    ZX_ASSERT(metadata_server_.ForwardMetadata(incoming()),is_ok());
 
     // Serve the metadata to the driver's outgoing directory.
-    ZX_ASSERT(metadata_server_.Serve(*outgoing(), dispatcher()) == ZX_OK);
+    ZX_ASSERT(metadata_server_.Serve(*outgoing(), dispatcher()).is_ok());
 
     return zx::ok();
   }
@@ -465,18 +430,24 @@ not check if the parent driver has changed what metadata it provides after
 will have to call `fdf_metadata::MetadataServer::ForwardMetadata()` again in
 order to incorporate the change.
 
-The `driver` build target will need to be updated:
+The `driver` build target will need to be updated to depend on the metadata
+library and FIDL library that defines the metadata type:
 
 ```
 fuchsia_cc_driver("driver") {
   testonly = true
-  output_name = "forward_driver"
+  output_name = "forwarder"
   sources = [
-    "forward_driver.cc",
+    "forwarder.cc",
   ]
   deps = [
     "//src/devices/lib/driver:driver_runtime",
-    ":examples_metadata",
+
+    # This should be the fuchsia.examples.metadata FIDL library's C++ target.
+    ":fuchsia.examples.metadata_cpp",
+
+    # This library contains `fdf::MetadataServer`.
+    "//sdk/lib/driver/metadata/cpp",
   ]
 }
 ```
@@ -493,8 +464,8 @@ Finally, the driver will need to declare, use, and expose the
     ],
     program: {
         runner: "driver",
-        binary: "driver/forward_driver.so",
-        bind: "meta/bind/forward.bindbc",
+        binary: "driver/forwarder.so",
+        bind: "meta/bind/forwarder.bindbc",
     },
     capabilities: [
         { service: "fuchsia.examples.metadata.Metadata" },
