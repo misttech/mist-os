@@ -144,10 +144,8 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
   // Child will process the last signal after thawed.
   mask_helper.waitForSignal(SIGUSR1);
 
-  // Kill the child process
-  EXPECT_EQ(0, kill(child_pid, SIGKILL));
   // Wait for the child process to terminate
-  fork_helper.WaitForChildren();
+  EXPECT_TRUE(fork_helper.WaitForChildren());
 }
 
 TEST_F(CgroupFreezerTest, CheckStateInEventsFile) {
