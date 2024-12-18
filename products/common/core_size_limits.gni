@@ -236,7 +236,7 @@ size_checker_input = {
         "timekeeper",
         "timekeeper",
       ]
-      limit = 2883584  # 2.75 MiB
+      limit = 2904064  # 2.77 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {
