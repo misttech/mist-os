@@ -27,11 +27,6 @@ _PRODUCT_CONFIG_BASE_JSON = {
         "fonts": {
             "enabled": False,
         },
-        "connectivity": {
-            "network": {
-                "netstack_version": "netstack3",
-            },
-        },
         "ui": {
             "supported_input_devices": [
                 INPUT_DEVICE_TYPE.BUTTON,
