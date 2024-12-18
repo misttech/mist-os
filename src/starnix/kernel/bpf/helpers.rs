@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::map::{Map, RingBufferWakeupPolicy};
+use crate::bpf::map::{Map, MapKey, RingBufferWakeupPolicy};
 use crate::task::CurrentTask;
 use ebpf::{BpfValue, EbpfHelperImpl, EbpfRunContext, FieldMapping, StructMapping};
 use ebpf_api::SK_BUF_ID;
@@ -70,7 +70,7 @@ fn bpf_map_update_elem(
         unsafe { std::slice::from_raw_parts(value.as_ptr::<u8>(), map.schema.value_size as usize) };
     let flags = flags.as_u64();
 
-    let key = key.to_owned();
+    let key = MapKey::from_slice(key);
     map.update(context.locked, key, value, flags).map(|_| 0).unwrap_or(u64::MAX).into()
 }
 

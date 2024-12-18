@@ -42,7 +42,7 @@ use starnix_uapi::{
 use static_assertions::const_assert;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::ops::{Bound, Deref, DerefMut, Range, RangeBounds};
+use std::ops::{Bound, Deref, DerefMut, Range};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -64,6 +64,9 @@ pub struct Map {
 /// Maps are normally kept pinned in memory since linked eBPF programs store direct pointers to
 /// the maps they depend on.
 pub type PinnedMap = Pin<Arc<Map>>;
+
+// Avoid allocation for eBPF keys smaller than 16 bytes.
+pub type MapKey = smallvec::SmallVec<[u8; 16]>;
 
 impl Map {
     pub fn new(schema: MapSchema, flags: u32) -> Result<Self, Errno> {
@@ -101,7 +104,7 @@ impl Map {
     pub fn update<L>(
         &self,
         locked: &mut Locked<'_, L>,
-        key: Vec<u8>,
+        key: MapKey,
         value: &[u8],
         flags: u64,
     ) -> Result<(), Errno>
@@ -155,35 +158,23 @@ impl Map {
     pub fn get_next_key<L>(
         &self,
         locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        key: Option<Vec<u8>>,
-        user_next_key: UserAddress,
-    ) -> Result<(), Errno>
+        key: Option<&[u8]>,
+    ) -> Result<MapKey, Errno>
     where
         L: LockBefore<BpfMapEntries>,
     {
         let entries = self.entries.lock(locked);
         match entries.deref() {
-            MapStore::Hash(ref entries) => {
-                let next_entry = match key {
-                    Some(key) if entries.contains_key(&key) => {
-                        entries.range((Bound::Excluded(key), Bound::Unbounded)).next()
-                    }
-                    _ => entries.iter().next(),
-                };
-                let next_key = next_entry.ok_or_else(|| errno!(ENOENT))?;
-                current_task.write_memory(user_next_key, next_key)?;
-            }
+            MapStore::Hash(ref entries) => entries.get_next_key(key),
             MapStore::Array(_) => {
                 let next_index = if let Some(key) = key { array_key_to_index(&key) + 1 } else { 0 };
                 if next_index >= self.schema.max_entries {
                     return error!(ENOENT);
                 }
-                current_task.write_memory(user_next_key, &next_index.to_ne_bytes())?;
+                Ok(MapKey::from_slice(&next_index.to_ne_bytes()))
             }
-            MapStore::RingBuffer(_) => return error!(EINVAL),
+            MapStore::RingBuffer(_) => error!(EINVAL),
         }
-        Ok(())
     }
 
     pub fn get_memory<L>(
@@ -499,7 +490,7 @@ fn compute_storage_size(schema: &MapSchema) -> Result<usize, Errno> {
 
 #[derive(Debug)]
 struct HashStorage {
-    index_map: BTreeMap<Vec<u8>, usize>,
+    index_map: BTreeMap<MapKey, usize>,
     data: PinnedBuffer,
     free_list: DenseMap<()>,
 }
@@ -515,10 +506,6 @@ impl HashStorage {
         self.index_map.len()
     }
 
-    fn contains_key(&self, key: &[u8]) -> bool {
-        self.index_map.contains_key(key)
-    }
-
     fn get(&mut self, schema: &MapSchema, key: &[u8]) -> Option<&'_ mut [u8]> {
         if let Some(index) = self.index_map.get(key) {
             Some(&mut self.data[array_range_for_index(schema.value_size, *index as u32)])
@@ -527,15 +514,15 @@ impl HashStorage {
         }
     }
 
-    pub fn range<R>(&self, range: R) -> impl Iterator<Item = &Vec<u8>>
-    where
-        R: RangeBounds<Vec<u8>>,
-    {
-        self.index_map.range(range).map(|(k, _)| k)
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &Vec<u8>> {
-        self.index_map.iter().map(|(k, _)| k)
+    pub fn get_next_key(&self, key: Option<&[u8]>) -> Result<MapKey, Errno> {
+        let next_entry = match key {
+            Some(key) if self.index_map.contains_key(key) => {
+                self.index_map.range::<[u8], _>((Bound::Excluded(key), Bound::Unbounded)).next()
+            }
+            _ => self.index_map.iter().next(),
+        };
+        let key = next_entry.ok_or_else(|| errno!(ENOENT))?.0;
+        Ok(MapKey::from_slice(&key[..]))
     }
 
     fn remove(&mut self, key: &[u8]) -> bool {
@@ -550,7 +537,7 @@ impl HashStorage {
     fn update(
         &mut self,
         schema: &MapSchema,
-        key: Vec<u8>,
+        key: MapKey,
         value: &[u8],
         flags: u64,
     ) -> Result<(), Errno> {
