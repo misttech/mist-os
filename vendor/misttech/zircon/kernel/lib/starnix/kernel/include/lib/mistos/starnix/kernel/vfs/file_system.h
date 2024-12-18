@@ -16,7 +16,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/mount_flags.h>
-#include <lib/mistos/util/onecell.h>
+#include <lib/mistos/util/oncelock.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
@@ -92,7 +92,7 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
   mtl::WeakPtr<Kernel> kernel_;
 
  private:
-  OnceCell<DirEntryHandle> root_;
+  mtl::OnceLock<DirEntryHandle> root_;
 
   mutable ktl::atomic<uint64_t> next_node_id_;
 
