@@ -522,5 +522,8 @@ fn print_developer_overrides_banner(
         }
     }
     println!();
+    // And an additional empty line to make sure that any /r's don't attempt to overwrite the last
+    // line of this warning.
+    println!();
     Ok(())
 }

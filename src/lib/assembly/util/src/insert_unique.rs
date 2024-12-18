@@ -131,6 +131,13 @@ impl<T: Ord> InsertAllUniqueExt<T> for &mut BTreeSet<T> {
 /// Wrapper for adding a Key-Value pair to a Map using InsertUniqueExt.
 pub struct MapEntry<K, V>(pub K, pub V);
 
+impl<K, V> From<(K, V)> for MapEntry<K, V> {
+    fn from(value: (K, V)) -> Self {
+        let (k, v) = value;
+        Self(k, v)
+    }
+}
+
 /// Trait for consistently providing access to the duplicated key, and both the
 /// previously- and newly-inserted values for any Map insert (BTreeMap, HashMap,
 /// etc.).

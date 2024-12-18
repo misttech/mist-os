@@ -35,7 +35,7 @@ use assembly_shell_commands::ShellCommandsBuilder;
 use assembly_structured_config::Repackager;
 use assembly_tool::ToolProvider;
 use assembly_util as util;
-use assembly_util::{InsertAllUniqueExt, InsertUniqueExt, NamedMap};
+use assembly_util::{DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, NamedMap};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use itertools::Itertools;
@@ -76,7 +76,8 @@ pub struct ImageAssemblyConfigBuilder {
     domain_configs: DomainConfigs,
 
     kernel_path: Option<Utf8PathBuf>,
-    kernel_args: BTreeSet<String>,
+    kernel_args: BTreeMap<String, KernelArg>,
+    kernel_arg_overrides: BTreeMap<String, KernelArg>,
 
     qemu_kernel: Option<Utf8PathBuf>,
     bootfs_shell_commands: ShellCommands,
@@ -124,7 +125,8 @@ impl ImageAssemblyConfigBuilder {
             package_configs: PackageConfigs::new("package configs"),
             domain_configs: DomainConfigs::new("domain configs"),
             kernel_path: None,
-            kernel_args: BTreeSet::default(),
+            kernel_args: BTreeMap::default(),
+            kernel_arg_overrides: BTreeMap::default(),
             qemu_kernel: None,
             packages_to_compile: BTreeMap::default(),
             memory_buckets: MemoryBuckets::default(),
@@ -158,8 +160,12 @@ impl ImageAssemblyConfigBuilder {
         // Set the developer-only options for the buidler to use.
         self.developer_only_options = Some(developer_only_options);
 
-        // Add the kernel command line args from the developer
-        self.kernel_args.extend(kernel.command_line_args);
+        // Add the kernel command line args from the developer into the separate "overrides" map, as
+        // these will be applied after all other command-line args have been added.
+        for arg in kernel.command_line_args {
+            let kernel_arg = KernelArg::from(&arg);
+            self.kernel_arg_overrides.insert(kernel_arg.key.clone(), kernel_arg);
+        }
 
         // Add packages specified by the developer
         for package_details in packages {
@@ -277,9 +283,7 @@ impl ImageAssemblyConfigBuilder {
                 anyhow!("Only one input bundle can specify a kernel path"),
             )?;
 
-            self.kernel_args
-                .try_insert_all_unique(kernel.args)
-                .map_err(|arg| anyhow!("duplicate kernel arg found: {}", arg))?;
+            self.add_kernel_args(kernel.args)?;
         }
 
         for (package, entries) in config_data {
@@ -363,9 +367,7 @@ impl ImageAssemblyConfigBuilder {
             }
         }
 
-        self.kernel_args
-            .try_insert_all_unique(bundle.kernel_boot_args)
-            .map_err(|arg| anyhow!("duplicate boot_arg found: {}", arg))?;
+        self.add_kernel_args(bundle.kernel_boot_args)?;
 
         Ok(())
     }
@@ -406,8 +408,19 @@ impl ImageAssemblyConfigBuilder {
     /// Add kernel args to the builder
     pub fn add_kernel_args(&mut self, args: impl IntoIterator<Item = String>) -> Result<()> {
         self.kernel_args
-            .try_insert_all_unique(args)
-            .map_err(|arg| anyhow!("duplicate boot_arg found: {}", arg))?;
+            .try_insert_all_unique(args.into_iter().map(|arg: String| {
+                let kernel_arg = KernelArg::from(&arg);
+                (kernel_arg.key.clone(), kernel_arg).into()
+            }))
+            .map_err(|error| {
+                let previous = error.previous_value().to_string();
+                let new = error.new_value().to_string();
+                if previous == new {
+                    anyhow!("duplicate kernel command line arg found: {}", previous)
+                } else {
+                    anyhow!("duplicate kernel command line arg found: {} was {}", new, previous)
+                }
+            })?;
         Ok(())
     }
 
@@ -808,7 +821,8 @@ impl ImageAssemblyConfigBuilder {
             boot_args,
             bootfs_files,
             kernel_path,
-            kernel_args,
+            mut kernel_args,
+            mut kernel_arg_overrides,
             qemu_kernel,
             bootfs_shell_commands,
             shell_commands,
@@ -1033,6 +1047,10 @@ impl ImageAssemblyConfigBuilder {
             .map(|e| FileEntry { source: e.source.clone(), destination: e.destination.to_string() })
             .collect();
 
+        // merge all the kernel_args overrides into the kernel_args map, letting them replace any
+        // existing values
+        kernel_args.append(&mut kernel_arg_overrides);
+
         // Construct a single "partial" config from the combined fields, and
         // then pass this to the ImageAssemblyConfig::try_from_partials() to get the
         // final validation that it's complete.
@@ -1044,7 +1062,7 @@ impl ImageAssemblyConfigBuilder {
             on_demand: packages.package_manifest_paths(PackageSet::OnDemand),
             kernel: KernelConfig {
                 path: kernel_path.context("A kernel path must be specified")?,
-                args: kernel_args.into_iter().collect(),
+                args: kernel_args.values().map(ToString::to_string).collect(),
             },
             qemu_kernel: qemu_kernel.context("A qemu kernel configuration must be specified")?,
             boot_args: boot_args.into_iter().collect(),
@@ -1212,10 +1230,48 @@ impl std::fmt::Display for PackageOrigin {
     }
 }
 
+/// A key=value kernel commandline argument
+///
+/// This parses an argument like "arg1=value1" into a key-value pair.
+/// For args with no value (vs. empty value), such as "arg2", they are represented as a key with
+/// a None value.
+#[derive(Debug, Serialize)]
+struct KernelArg {
+    key: String,
+    value: Option<String>,
+}
+
+impl From<&str> for KernelArg {
+    fn from(arg: &str) -> KernelArg {
+        if let Some((key, value)) = arg.split_once("=") {
+            Self { key: key.to_owned(), value: Some(value.to_owned()) }
+        } else {
+            Self { key: arg.to_owned(), value: None }
+        }
+    }
+}
+
+impl From<&String> for KernelArg {
+    fn from(arg: &String) -> KernelArg {
+        KernelArg::from(arg.as_str())
+    }
+}
+
+impl std::fmt::Display for KernelArg {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(value) = &self.value {
+            f.write_fmt(format_args!("{}={}", self.key, value))
+        } else {
+            f.write_str(&self.key)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use assembly_config_schema::assembly_config::CompiledComponentDefinition;
+    use assembly_config_schema::developer_overrides::KernelOptions;
     use assembly_config_schema::image_assembly_config::PartialKernelConfig;
     use assembly_constants::CompiledPackageDestination;
     use assembly_constants::TestCompiledPackageDestination::ForTest;
@@ -2253,6 +2309,76 @@ mod tests {
             Some(PackageSetDestination::Blob(PackageDestination::FromBoard(String::from(
                 "pkg_name"
             ))))
+        );
+    }
+
+    #[test]
+    fn test_builder_catches_kernel_arg_duplicates() {
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
+
+        builder.add_kernel_args(vec!["arg1=value1".to_owned()]).unwrap();
+        let result = builder.add_kernel_args(vec!["arg1=value2".to_owned()]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_kernel_arg_overrides() {
+        let vars = TempdirPathsForTest::new();
+        let tools = FakeToolProvider::default();
+
+        let mut builder = ImageAssemblyConfigBuilder::new(
+            BuildType::Eng,
+            "my_board".into(),
+            FilesystemImageMode::default(),
+        );
+
+        // Provide developer overrides for kernel commandline args
+        builder
+            .add_developer_overrides(DeveloperOverrides {
+                kernel: KernelOptions {
+                    command_line_args: vec![
+                        "arg1=override_value_1".to_owned(),
+                        "arg2=override=value=2".to_owned(),
+                        "some_other_arg".to_owned(),
+                    ],
+                },
+                ..Default::default()
+            })
+            .unwrap();
+
+        // Simulate the addition of kernel args from AIBs and platform_configuration:
+        builder
+            .add_kernel_args(vec![
+                "arg1=original_value1".to_owned(),
+                "arg2=original_value2".to_owned(),
+                "another_arg".to_owned(),
+                "and_another_arg".to_owned(),
+            ])
+            .unwrap();
+
+        builder
+            .add_parsed_bundle(
+                &vars.outdir,
+                make_test_assembly_bundle(&vars.outdir, &vars.bundle_path),
+            )
+            .unwrap();
+
+        let config = builder.build(vars.outdir, &tools).unwrap();
+
+        assert_eq!(
+            config.kernel.args,
+            vec![
+                "and_another_arg".to_owned(),
+                "another_arg".to_owned(),
+                "arg1=override_value_1".to_owned(),
+                "arg2=override=value=2".to_owned(),
+                "kernel_arg0".to_owned(), // from the test assembly bundle
+                "some_other_arg".to_owned(),
+            ]
         );
     }
 }
