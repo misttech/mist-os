@@ -86,6 +86,7 @@ group("dl-test-data.deps") {
   testonly = true
   deps = [
     ":init-fini-array",
+    ":init-fini-array-with-deps",
     ":static-tls-desc-module",
     ":static-tls-module",
     ":tls-dep-module",
@@ -1573,6 +1574,120 @@ init_fini_array_tests = [
       {
         prio = 101
         value = 5
+      },
+    ]
+    shlib_deps = []
+  },
+
+  # An init-fini-array module with dependencies:
+  # - init-fini-array-root:
+  #   - init-fini-array-a:
+  #     - init-fini-array-a-dep
+  #   - init-fini-array-b:
+  #     - init-fini-array-b-dep
+  #   - init-fini-array-c
+  {
+    name = "init-fini-array-with-deps"
+    type = "test_loadable_module"
+    ctors = [
+      {
+        prio = false
+        value = 5
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 6
+      },
+    ]
+    shlib_deps = [
+      ":init-fini-array-a",
+      ":init-fini-array-b",
+      ":init-fini-array-c",
+    ]
+  },
+  {
+    name = "init-fini-array-a"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 4
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 7
+      },
+    ]
+    shlib_deps = [ ":init-fini-array-a-dep" ]
+  },
+  {
+    name = "init-fini-array-a-dep"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 1
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 10
+      },
+    ]
+    shlib_deps = []
+  },
+  {
+    name = "init-fini-array-b"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 3
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 8
+      },
+    ]
+    shlib_deps = [ ":init-fini-array-b-dep" ]
+  },
+  {
+    name = "init-fini-array-b-dep"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 0
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 11
+      },
+    ]
+    shlib_deps = []
+  },
+  {
+    name = "init-fini-array-c"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 2
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 9
       },
     ]
     shlib_deps = []

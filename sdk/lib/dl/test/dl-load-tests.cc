@@ -1573,6 +1573,65 @@ TYPED_TEST(DlTests, InitFiniArray) {
   gInitFiniState = 0;
 }
 
+// Test that dlopen will run initializers and finalizers of a module with
+// dependencies that also have initializers and finalizers. Each init/fini
+// function expects the gInitFiniState to be set to a particular value before
+// it's updated.
+//
+// dlopen init-fini-array-root:
+//   - init-fini-array-a:
+//     - init-fini-array-a-dep
+//   - init-fini-array-b:
+//     - init-fini-array-b-dep
+//   - init-fini-array-c
+//
+// Module initializers are run in this order:
+//   init-fini-array-b-dep
+//   init-fini-array-a-dep
+//   init-fini-array-c
+//   init-fini-array-b
+//   init-fini-array-a
+//   init-fini-array-root
+//
+// Module finalizers are run in reverse of the init order:
+//   init-fini-array-root
+//   init-fini-array-a
+//   init-fini-array-b
+//   init-fini-array-c
+//   init-fini-array-a-dep
+//   init-fini-array-b-dep
+TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
+  const std::string kFile = "init-fini-array-with-deps.so";
+  const std::string kAFile = "libinit-fini-array-a.so";
+  const std::string kADepFile = "libinit-fini-array-a-dep.so";
+  const std::string kBFile = "libinit-fini-array-b.so";
+  const std::string kBDepFile = "libinit-fini-array-b-dep.so";
+  const std::string kCFile = "libinit-fini-array-c.so";
+
+  if constexpr (!TestFixture::kSupportsInitFini) {
+    GTEST_SKIP() << "test requires init/fini support";
+  }
+
+  ASSERT_EQ(gInitFiniState, 0);
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kAFile, kBFile, kCFile, kADepFile, kBDepFile});
+
+  auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value()) << open.error_value();
+
+  EXPECT_EQ(gInitFiniState, 6);
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+
+  if (TestFixture::kDlCloseCanRunFinalizers) {
+    EXPECT_EQ(gInitFiniState, 12);
+  }
+
+  gInitFiniState = 0;
+}
+
 // A common test subroutine for basic TLS accesses.
 //
 // This test exercises the following sequence of events:
