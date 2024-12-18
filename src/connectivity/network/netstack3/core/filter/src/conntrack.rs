@@ -186,17 +186,73 @@ impl<
 
         if guard.table.len() >= MAXIMUM_ENTRIES {
             guard.table_limit_hits = guard.table_limit_hits.saturating_add(1);
-            if let Some((original_tuple, reply_tuple)) = guard
-                .table
-                .iter()
-                .filter_map(|(_, conn)| match conn.state.lock().establishment_lifecycle {
-                    EstablishmentLifecycle::SeenOriginal => {
-                        Some((conn.inner.original_tuple.clone(), conn.inner.reply_tuple.clone()))
+
+            struct Info<'a, I: IpExt, BT: FilterBindingsTypes> {
+                original_tuple: &'a Tuple<I>,
+                reply_tuple: &'a Tuple<I>,
+                lifecycle: EstablishmentLifecycle,
+                last_seen: BT::Instant,
+            }
+
+            let mut info: Option<Info<'_, I, BC>> = None;
+
+            let now = bindings_ctx.now();
+            // Find a non-established connection to evict.
+            //
+            // 1. If a connection is expired, immediately choose it.
+            // 2. Otherwise, pick the connection that is "least established".
+            //    - SeenOriginal is less established than SeenReply
+            //    - A connection is less established than another with the same
+            //      establishment lifecycle if it saw a packet less recently.
+            //
+            // If all connections are established, then we can't free any space
+            // and report the error to the caller.
+            for (_, conn) in &guard.table {
+                let state = conn.state.lock();
+                if state.is_expired(now) {
+                    info = Some(Info {
+                        original_tuple: &conn.inner.original_tuple,
+                        reply_tuple: &conn.inner.reply_tuple,
+                        lifecycle: state.establishment_lifecycle,
+                        last_seen: state.last_packet_time,
+                    });
+                    break;
+                }
+
+                match state.establishment_lifecycle {
+                    EstablishmentLifecycle::SeenOriginal | EstablishmentLifecycle::SeenReply => {
+                        match &info {
+                            None => {
+                                info = Some(Info {
+                                    original_tuple: &conn.inner.original_tuple,
+                                    reply_tuple: &conn.inner.reply_tuple,
+                                    lifecycle: state.establishment_lifecycle,
+                                    last_seen: state.last_packet_time,
+                                })
+                            }
+                            Some(existing) => {
+                                if state.establishment_lifecycle < existing.lifecycle
+                                    || (state.establishment_lifecycle == existing.lifecycle
+                                        && state.last_packet_time < existing.last_seen)
+                                {
+                                    info = Some(Info {
+                                        original_tuple: &conn.inner.original_tuple,
+                                        reply_tuple: &conn.inner.reply_tuple,
+                                        lifecycle: state.establishment_lifecycle,
+                                        last_seen: state.last_packet_time,
+                                    })
+                                }
+                            }
+                        }
                     }
-                    EstablishmentLifecycle::SeenReply | EstablishmentLifecycle::Established => None,
-                })
-                .next()
-            {
+                    EstablishmentLifecycle::Established => {}
+                }
+            }
+
+            if let Some(Info { original_tuple, reply_tuple, .. }) = info {
+                let original_tuple = original_tuple.clone();
+                let reply_tuple = reply_tuple.clone();
+
                 assert!(guard.table.remove(&original_tuple).is_some());
                 if original_tuple != reply_tuple {
                     assert!(guard.table.remove(&reply_tuple).is_some());
@@ -746,7 +802,7 @@ impl ProtocolState {
 ///
 /// The first packet is implicit in the creation of the connection when the
 /// first packet is seen.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum EstablishmentLifecycle {
     SeenOriginal,
     SeenReply,
@@ -798,6 +854,22 @@ impl<BT: FilterBindingsTypes> ConnectionState<BT> {
         self.establishment_lifecycle = self.establishment_lifecycle.update(dir);
 
         self.protocol_state.update(dir, transport_data)
+    }
+
+    fn is_expired(&self, now: BT::Instant) -> bool {
+        let duration = now.saturating_duration_since(self.last_packet_time);
+
+        let expiry_duration = match &self.protocol_state {
+            ProtocolState::Tcp(tcp_conn) => tcp_conn.expiry_duration(self.establishment_lifecycle),
+            ProtocolState::Udp => CONNECTION_EXPIRY_TIME_UDP,
+            // ICMP ends up here. The ICMP messages we track are simple
+            // request/response protocols, so we always expect to get a response
+            // quickly (within 2 RTT). Any followup messages (e.g. if making
+            // periodic ECHO requests) should reuse this existing connection.
+            ProtocolState::Other => CONNECTION_EXPIRY_OTHER,
+        };
+
+        duration >= expiry_duration
     }
 }
 
@@ -957,20 +1029,7 @@ impl Debug for TransportProtocol {
 
 impl<I: IpExt, E, BT: FilterBindingsTypes> ConnectionShared<I, E, BT> {
     fn is_expired(&self, now: BT::Instant) -> bool {
-        let state = self.state.lock().clone();
-        let duration = now.saturating_duration_since(state.last_packet_time);
-
-        let expiry_duration = match state.protocol_state {
-            ProtocolState::Tcp(tcp_conn) => tcp_conn.expiry_duration(state.establishment_lifecycle),
-            ProtocolState::Udp => CONNECTION_EXPIRY_TIME_UDP,
-            // ICMP ends up here. The ICMP messages we track are simple
-            // request/response protocols, so we always expect to get a response
-            // quickly (within 2 RTT). Any followup messages (e.g. if making
-            // periodic ECHO requests) should reuse this existing connection.
-            ProtocolState::Other => CONNECTION_EXPIRY_OTHER,
-        };
-
-        duration >= expiry_duration
+        self.state.lock().is_expired(now)
     }
 }
 
@@ -1694,16 +1753,17 @@ mod tests {
         assert!(core_ctx.conntrack().inner.lock().table.is_empty());
     }
 
-    #[ip_test(I)]
-    #[test_case(true; "existing connections established")]
-    #[test_case(false; "existing connections unestablished")]
-    fn table_size_limit<I: IpExt + TestIpExt>(established: bool) {
-        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
-        bindings_ctx.sleep(Duration::from_secs(1));
-        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
-
-        // Fill up the table so that the next insertion will fail.
-        for i in 0..u32::try_from(MAXIMUM_ENTRIES / 2).unwrap() {
+    fn fill_table<I, E, BC>(
+        bindings_ctx: &mut BC,
+        table: &Table<I, E, BC>,
+        entries: impl Iterator<Item = u32>,
+        establishment_lifecycle: EstablishmentLifecycle,
+    ) where
+        I: IpExt + TestIpExt,
+        E: Debug + Default + Send + Sync + PartialEq + CompatibleWith + 'static,
+        BC: FilterBindingsContext,
+    {
+        for i in entries {
             let (packet, reply_packet) = make_test_udp_packets(i);
             let (conn, _dir) = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
@@ -1711,26 +1771,56 @@ mod tests {
                 .expect("packet should be trackable");
             assert_matches!(
                 table
-                    .finalize_connection(&mut bindings_ctx, conn)
+                    .finalize_connection(bindings_ctx, conn)
                     .expect("connection finalize should succeed"),
                 (true, Some(_))
             );
 
-            // Whether to update the connection to be established by sending
-            // through the reply packet.
-            if established {
+            if establishment_lifecycle >= EstablishmentLifecycle::SeenReply {
                 let (conn, _dir) = table
                     .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
                     .expect("packet should be valid")
                     .expect("packet should be trackable");
                 assert_matches!(
                     table
-                        .finalize_connection(&mut bindings_ctx, conn)
+                        .finalize_connection(bindings_ctx, conn)
                         .expect("connection finalize should succeed"),
                     (false, Some(_))
                 );
+
+                if establishment_lifecycle >= EstablishmentLifecycle::Established {
+                    let (conn, _dir) = table
+                        .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+                        .expect("packet should be valid")
+                        .expect("packet should be trackable");
+                    assert_matches!(
+                        table
+                            .finalize_connection(bindings_ctx, conn)
+                            .expect("connection finalize should succeed"),
+                        (false, Some(_))
+                    );
+                }
             }
         }
+    }
+
+    #[ip_test(I)]
+    #[test_case(EstablishmentLifecycle::SeenOriginal; "existing connections unestablished")]
+    #[test_case(EstablishmentLifecycle::SeenReply; "existing connections partially established")]
+    #[test_case(EstablishmentLifecycle::Established; "existing connections established")]
+    fn table_size_limit_evict_less_established<I: IpExt + TestIpExt>(
+        existing_lifecycle: EstablishmentLifecycle,
+    ) {
+        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
+        bindings_ctx.sleep(Duration::from_secs(1));
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+
+        fill_table(
+            &mut bindings_ctx,
+            &table,
+            0..(MAXIMUM_ENTRIES / 2).try_into().unwrap(),
+            existing_lifecycle,
+        );
 
         // The table should be full whether or not the connections are
         // established since finalize_connection always inserts the connection
@@ -1742,7 +1832,7 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        if established {
+        if existing_lifecycle == EstablishmentLifecycle::Established {
             // Inserting a new connection should fail because it would grow the
             // table.
             assert_matches!(
@@ -1771,6 +1861,86 @@ mod tests {
                 (true, Some(_))
             );
         }
+    }
+
+    #[ip_test(I)]
+    fn table_size_limit_evict_expired<I: IpExt + TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+
+        // Add one connection that expires a second sooner than the others.
+        let evicted_tuple = {
+            let (packet, _) = make_test_udp_packets(0);
+            Tuple::from_packet(&packet).unwrap()
+        };
+        fill_table(&mut bindings_ctx, &table, 0..=0, EstablishmentLifecycle::Established);
+        bindings_ctx.sleep(Duration::from_secs(1));
+        fill_table(
+            &mut bindings_ctx,
+            &table,
+            1..(MAXIMUM_ENTRIES / 2).try_into().unwrap(),
+            EstablishmentLifecycle::Established,
+        );
+
+        assert_eq!(table.inner.lock().table.len(), MAXIMUM_ENTRIES);
+        assert!(table.contains_tuple(&evicted_tuple));
+
+        let (packet, _) = make_test_udp_packets((MAXIMUM_ENTRIES / 2).try_into().unwrap());
+        // The table is full, and no connections can be evicted (they're all
+        // established and unexpired), so we can't insert a new connection.
+        let (conn, _dir) = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        assert_matches!(
+            table.finalize_connection(&mut bindings_ctx, conn),
+            Err(FinalizeConnectionError::TableFull)
+        );
+
+        // Now the first connection can be evicted because it's expired, and we
+        // see that we're able to insert a new connection.
+        bindings_ctx.sleep(CONNECTION_EXPIRY_TIME_UDP - Duration::from_secs(1));
+        let (conn, _dir) = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(_));
+        assert!(!table.contains_tuple(&evicted_tuple));
+    }
+
+    #[ip_test(I)]
+    fn table_size_limit_less_established<I: IpExt + TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::<I>::new();
+        let table = Table::<_, (), _>::new::<IntoCoreTimerCtx>(&mut bindings_ctx);
+
+        let evicted_tuple = {
+            let (packet, _) = make_test_udp_packets(0);
+            Tuple::from_packet(&packet).unwrap()
+        };
+        // Add one connection that expires a second sooner than the others.
+        fill_table(&mut bindings_ctx, &table, 0..=0, EstablishmentLifecycle::SeenOriginal);
+        bindings_ctx.sleep(Duration::from_secs(1));
+        fill_table(&mut bindings_ctx, &table, 1..=1, EstablishmentLifecycle::SeenOriginal);
+        fill_table(
+            &mut bindings_ctx,
+            &table,
+            2..(MAXIMUM_ENTRIES / 2).try_into().unwrap(),
+            EstablishmentLifecycle::SeenReply,
+        );
+
+        assert_eq!(table.inner.lock().table.len(), MAXIMUM_ENTRIES);
+        assert!(table.contains_tuple(&evicted_tuple));
+
+        // We can insert since all connections in the table are eligible for
+        // eviction, but we want to be sure that the least established
+        // connection was the one that's actually evicted.
+        let (packet, _) = make_test_udp_packets((MAXIMUM_ENTRIES / 2).try_into().unwrap());
+        let (conn, _dir) = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(_));
+        assert!(!table.contains_tuple(&evicted_tuple));
     }
 
     #[cfg(target_os = "fuchsia")]
@@ -1847,30 +2017,12 @@ mod tests {
         }
 
         // Fill the table up the rest of the way.
-        for i in 1..u32::try_from(MAXIMUM_ENTRIES / 2).unwrap() {
-            let (packet, reply_packet) = make_test_udp_packets(i);
-            let (conn, _dir) = table
-                .get_connection_for_packet_and_update(&bindings_ctx, &packet)
-                .expect("packet should be valid")
-                .expect("packet should be trackable");
-            assert_matches!(
-                table
-                    .finalize_connection(&mut bindings_ctx, conn)
-                    .expect("connection finalize should succeed"),
-                (true, Some(_))
-            );
-
-            let (conn, _dir) = table
-                .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
-                .expect("packet should be valid")
-                .unwrap();
-            assert_matches!(
-                table
-                    .finalize_connection(&mut bindings_ctx, conn)
-                    .expect("connection finalize should succeed"),
-                (false, Some(_))
-            );
-        }
+        fill_table(
+            &mut bindings_ctx,
+            &table,
+            1..(MAXIMUM_ENTRIES / 2).try_into().unwrap(),
+            EstablishmentLifecycle::Established,
+        );
 
         assert_eq!(table.inner.lock().table.len(), MAXIMUM_ENTRIES);
 
@@ -1890,6 +2042,16 @@ mod tests {
         );
         let (conn, _dir) = table
             .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
+            .expect("packet should be valid")
+            .expect("packet should be trackable");
+        assert_matches!(
+            table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"),
+            (false, Some(_))
+        );
+        let (conn, _dir) = table
+            .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
         assert_matches!(
