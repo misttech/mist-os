@@ -170,13 +170,11 @@ fbl::Vector<FsString> DirEntry::copy_child_names() {
   fbl::Vector<FsString> child_names;
   auto c = children_.Read();
   for (auto iter = c->begin(); iter != c->end(); ++iter) {
-    if (iter.IsValid()) {
-      auto child = iter.CopyPointer().Lock();
-      if (child) {
-        fbl::AllocChecker ac;
-        child_names.push_back(child->local_name(), &ac);
-        ZX_ASSERT(ac.check());
-      }
+    auto child = iter->second.Lock();
+    if (child) {
+      fbl::AllocChecker ac;
+      child_names.push_back(child->local_name(), &ac);
+      ZX_ASSERT(ac.check());
     }
   }
   return child_names;
@@ -188,12 +186,11 @@ void DirEntry::internal_remove_child(DirEntry* child) {
   LTRACEF_LEVEL(2, "local_name=[%.*s]\n", static_cast<int>(local_name.length()), local_name.data());
 
   auto children = this->children_.Write();
-  if (auto weak_child = children->find(local_name);
-      weak_child.IsValid() && weak_child != children->end()) {
+  if (auto weak_child = children->find(local_name); weak_child != children->end()) {
     // If this entry is occupied, we need to check whether child is
     // the current occupant. If so, we should remove the entry
     // because the child no longer exists.
-    if (weak_child.CopyPointer().get() == child) {
+    if (weak_child->second.get() == child) {
       children->erase(local_name);
     }
   }

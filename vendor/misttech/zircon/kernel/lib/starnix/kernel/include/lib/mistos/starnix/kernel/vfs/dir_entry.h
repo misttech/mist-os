@@ -12,6 +12,7 @@
 #include <lib/mistos/starnix/kernel/vfs/mount_info.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/util/btree_map.h>
 #include <lib/mistos/util/error_propagation.h>
 #include <lib/starnix_sync/locks.h>
 
@@ -138,11 +139,8 @@ overloaded(Ts...) -> overloaded<Ts...>;
 /// A directory cannot have more than one hard link, which means there is a
 /// single DirEntry for each Directory FsNode. That invariant lets us store the
 /// children for a directory in the DirEntry rather than in the FsNode.
-class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
-                 public fbl::RefCountedUpgradeable<DirEntry> {
+class DirEntry : public fbl::RefCountedUpgradeable<DirEntry> {
  public:
-  using DirEntryChildren = fbl::WAVLTree<FsString, mtl::WeakPtr<DirEntry>>;
-
   /// The FsNode referenced by this DirEntry.
   ///
   /// A given FsNode can be referenced by multiple DirEntry objects, for
@@ -170,6 +168,7 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
   /// Getting the ordering right on these is nearly impossible. However, we only need to lock the
   /// children map on the two parents and we don't need to lock the children map on the two
   /// children. So splitting the children out into its own lock resolves this.
+  using DirEntryChildren = util::BTreeMap<FsString, mtl::WeakPtr<DirEntry>>;
   mutable starnix_sync::RwLock<DirEntryChildren> children_;
 
   /// impl DirEntry
@@ -239,14 +238,14 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
           // Vacant
           auto result = create_child(create_fn) _EP(result);
           auto [child, create_result] = result.value();
-          children_->insert(child->weak_factory_.GetWeakPtr());
+          children_->emplace(child->local_name(), child->weak_factory_.GetWeakPtr());
           return fit::ok(ktl::pair(child, create_result));
         }
         // Occupied
         // It's possible that the upgrade will succeed this time around because we dropped
         // the read lock before acquiring the write lock. Another thread might have
         // populated this entry while we were not holding any locks.
-        auto child = it.CopyPointer().Lock();
+        auto child = it->second.Lock();
         if (child) {
           child->node_->fs()->did_access_dir_entry(child);
           return fit::ok(ktl::pair(child, CreationResult<CreateNodeFn>(create_fn)));
@@ -254,7 +253,7 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
 
         auto result = create_child(create_fn) _EP(result);
         auto [new_child, create_result] = result.value();
-        children_->insert(new_child->weak_factory_.GetWeakPtr());
+        children_->emplace(new_child->local_name(), new_child->weak_factory_.GetWeakPtr());
         return fit::ok(ktl::pair(new_child, create_result));
       }() _EP(result);
 
@@ -431,7 +430,7 @@ class DirEntry : public fbl::WAVLTreeContainable<mtl::WeakPtr<DirEntry>>,
       auto children_lock = children_.Read();
       auto it = children_lock->find(name);
       if (it != children_lock->end()) {
-        auto strong_child = it.CopyPointer().Lock();
+        auto strong_child = it->second.Lock();
         if (strong_child) {
           return strong_child;
         }
