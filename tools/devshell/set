@@ -80,7 +80,10 @@
 ##                         file is given as the first argument to the script.
 ##                         The script may be a path or a gn label.
 ##   --netboot             Ensure that a network ramboot image is always built.
-##   --release             an alias for "--args=is_debug=false"
+##   --release             Sets the `compilation_mode` to `"release"`
+##   --balanced            Sets the `compilation_mode` to `"balanced"`, which is
+##                         less optimized than `"release"`, but still has some
+##                         optimizations enabled.
 ##   --variant             Selects which runtime variant to use (e.g., asan) by
 ##                         passing a `select_variant=[VARIANT*,...]` argument
 ##                         to gn that collects all the --variant arguments in
