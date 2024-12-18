@@ -7,16 +7,16 @@ documentation.
 
 ## Types of diagrams
 
-* **Option 1:** Generate a simple flow diagram from text in the source code
+* Generate a simple flow diagram from text in the source code
 (example: [Sequence Diagram](https://bramp.github.io/js-sequence-diagrams/) or
-go/sequencediagram for Googlers)
+[go/sequencediagram](http://goto.google.com/sequencediagram) for Googlers)
 
-* **Option 2:** Create a visual diagram in Google Drawings, Slides, or other tool
+* Create a visual diagram in Google Drawings, Slides, or other tool
 
 {% dynamic if user.is_googler %}
 
-* **Option 3:** For more complex images, high-level concepts, or diagrams that
-require UX design, partner with XD to create a diagram in Figma. [File a bug](https://buganizer.corp.google.com/issues/new?component=938361&template=1648923)
+* For more complex images, high-level concepts, or diagrams that
+require UX design, partner with XD to create a diagram in Figma. [File a bug](http://goto.google.com/xd-bug)
 to request assistance.
 
 {% dynamic endif %}
@@ -26,18 +26,20 @@ to request assistance.
 If you are creating a visual diagram for documentation on fuchsia.dev, follow
 these steps:
 
-**Step 1:** Create a visual diagram in your tool of choice and export the image
+1. Create a visual diagram in your tool of choice and export the image
 as a .svg (suggested) or .png file
+
 * Optimize your image to ensure it loads quickly. Large images can slow down
 page load times.
 * Use SVG (Scalable Vector Graphics) format whenever possible. SVGs are
 scalable, accessible, and have a smaller file size compared to other image
 formats.
 
-**Step 2:** Embed the image on fuchsia.dev using Markdown [see instructions](/docs/contribute/docs/markdown.md#images)
+2. Embed the image on fuchsia.dev using Markdown [see instructions](/docs/contribute/docs/markdown.md#images)
+
 * Store your image in the same directory as your Markdown file
 
-**Step 3:** Add alt text to the image. Alt text helps screen reader users
+3. Add alt text to the image. Alt text helps screen reader users
 understand the content of your image.
 
 ```
@@ -57,15 +59,16 @@ space.](component_framework.svg)
 
 {% dynamic if user.is_googler %}
 
-**Step 4:** Create an internal Buganizer bug [using this template](https://buganizer.corp.google.com/issues/new?component=1702186&template=2076662).
+4. Create a bug for the diagram [go/fuchsia-diagram](http://goto.google.com/fuchsia-diagram).
 Include:
+
 * Author or owner - best contact for maintaining the diagram
 * Link to source file (Google drawings, Slides, Figma, etc - ensure files are
 shared with rvos)
 * Link to page on fuchsia.dev where diagram can be found
 * Alt text
 
-**Step 5:** Add a comment in Markdown with a link to the bug that contains the
+5. Add a comment in Markdown with a link to the bug that contains the
 diagram source information
 
 ```
@@ -101,7 +104,7 @@ symbols and icons whenever possible.
 
 ### Design considerations
 
-Visual hierarchy: Use clear and consistent visual hierarchy to guide the
+**Visual hierarchy:** Use clear and consistent visual hierarchy to guide the
 reader's eye through the diagram. Use whitespace to create visual separation and
 improve readability.
 
@@ -114,9 +117,7 @@ losing clarity.
 
 ### Alt text
 
-Provide concise and informative alternative text descriptions for all diagrams.
-
-Alt text should:
+Provide concise and informative alternative text descriptions for all diagrams. Alt text should:
 
 * Accurately describe the content and purpose of the diagram
 * Use plain language that is easy for everyone to understand
