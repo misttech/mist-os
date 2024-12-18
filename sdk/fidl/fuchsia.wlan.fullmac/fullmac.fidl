@@ -496,14 +496,6 @@ closed protocol WlanFullmacImplIfc {
     }) -> ();
 };
 
-// TODO(https://g-issues.fuchsia.dev/313442116): This is needed to continue generating
-// the Banjo bindings and will be removed after the Banjo FFI is fully removed.
-@transport("Banjo")
-@layout("ddk_interface")
-closed protocol WlanFullmacImplIfcBanjo {
-    compose WlanFullmacImplIfc;
-};
-
 /// Protocol definition for communication from the platform to the fullmac
 /// vendor driver.
 @discoverable
