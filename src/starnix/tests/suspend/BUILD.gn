@@ -4,6 +4,10 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 import("//src/starnix/build/starnix_linux_executable.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
 
@@ -33,13 +37,16 @@ fuchsia_test_component("realm") {
   manifest = "meta/realm.cml"
 }
 
-fuchsia_test_component("suspend_integration_test") {
+fuchsia_test_component_with_expectations("suspend_integration_test") {
+  expectations = "expectations/suspend_expectations.json5"
   manifest = "meta/integration_test.cml"
   deps = [ ":suspend_integration_test_bin" ]
   test_type = "starnix"
 }
 
-fuchsia_test_package("starnix_suspend_integration_tests") {
+fuchsia_test_with_expectations_package("starnix_suspend_integration_tests") {
+  expectations = "expectations/suspend_expectations.json5"
+
   test_components = [ ":suspend_integration_test" ]
   deps = [ ":realm" ]
 

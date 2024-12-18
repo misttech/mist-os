@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/test_runners/rust/default.shard.cml",
+        "//src/lib/testing/expectation/meta/client.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
         "inspect/client.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
+        runner: "rust_test_runner",
         binary: "bin/suspend_integration_test_bin",
     },
     use: [
