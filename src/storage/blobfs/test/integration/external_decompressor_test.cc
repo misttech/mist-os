@@ -100,13 +100,15 @@ class ExternalDecompressorTest : public ::testing::Test {
     zx::vmo remote_compressed_vmo;
     ASSERT_EQ(ZX_OK, compressed_vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS & (~ZX_RIGHT_WRITE),
                                               &remote_compressed_vmo));
-    ASSERT_EQ(ZX_OK, compressed_mapper_.Map(std::move(compressed_vmo), kMapSize));
+    ASSERT_EQ(ZX_OK, compressed_mapper_.Map(std::move(compressed_vmo), 0, kMapSize,
+                                            ZX_VM_PERM_READ | ZX_VM_PERM_WRITE));
 
     zx::vmo decompressed_vmo;
     ASSERT_EQ(ZX_OK, zx::vmo::create(kMapSize, 0, &decompressed_vmo));
     zx::vmo remote_decompressed_vmo;
     ASSERT_EQ(ZX_OK, decompressed_vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS, &remote_decompressed_vmo));
-    ASSERT_EQ(ZX_OK, decompressed_mapper_.Map(std::move(decompressed_vmo), kMapSize));
+    ASSERT_EQ(ZX_OK, decompressed_mapper_.Map(std::move(decompressed_vmo), 0, kMapSize,
+                                              ZX_VM_PERM_READ | ZX_VM_PERM_WRITE));
 
     DecompressorCreatorConnector& connector =
         DecompressorCreatorConnector::DefaultServiceConnector();

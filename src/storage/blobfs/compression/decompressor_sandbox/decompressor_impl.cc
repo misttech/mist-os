@@ -260,7 +260,8 @@ zx_status_t CreateFifoThread(zx::fifo server_end, zx::vmo compressed_vmo,
   }
 
   fzl::OwnedVmoMapper decompressed_mapper;
-  if (zx_status_t status = decompressed_mapper.Map(std::move(decompressed_vmo), vmo_size);
+  if (zx_status_t status = decompressed_mapper.Map(std::move(decompressed_vmo), 0, vmo_size,
+                                                   ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
       status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to map `decompressed_vmo`";
     return status;
@@ -273,7 +274,7 @@ zx_status_t CreateFifoThread(zx::fifo server_end, zx::vmo compressed_vmo,
 
   fzl::OwnedVmoMapper compressed_mapper;
   if (zx_status_t status =
-          compressed_mapper.Map(std::move(compressed_vmo), vmo_size, ZX_VM_PERM_READ);
+          compressed_mapper.Map(std::move(compressed_vmo), 0, vmo_size, ZX_VM_PERM_READ);
       status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to map `compressed_vmo`";
     return status;

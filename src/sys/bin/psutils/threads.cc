@@ -308,7 +308,7 @@ zx::result<std::unique_ptr<Writer>> Writer::Create() {
 
   // Map vmo.
   fzl::OwnedVmoMapper mapper;
-  status = mapper.Map(std::move(dup), 0, ZX_VM_PERM_READ);
+  status = mapper.Map(std::move(dup), 0, 0, ZX_VM_PERM_READ);
   if (status != ZX_OK) {
     return zx::error(status);
   }

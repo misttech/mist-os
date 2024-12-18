@@ -231,7 +231,8 @@ void MockVmoidRegistry::Replay(std::vector<storage::BufferedOperation>* operatio
   zx::vmo info_vmo;
   ASSERT_EQ(disk_buffers_.info_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &info_vmo), ZX_OK);
   fzl::OwnedVmoMapper mapper;
-  ASSERT_EQ(mapper.Map(std::move(info_vmo), kBlockSize), ZX_OK);
+  ASSERT_EQ(mapper.Map(std::move(info_vmo), 0, kBlockSize, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE),
+            ZX_OK);
   auto info_buffer =
       std::make_unique<storage::VmoBuffer>(this, std::move(mapper), kInfoVmoid, 1, kBlockSize);
   JournalSuperblock superblock(std::move(info_buffer));
@@ -243,7 +244,8 @@ void MockVmoidRegistry::Replay(std::vector<storage::BufferedOperation>* operatio
   ASSERT_EQ(disk_buffers_.journal_vmo.create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0,
                                                    length, &journal_vmo),
             ZX_OK);
-  ASSERT_EQ(mapper.Map(std::move(journal_vmo), length), ZX_OK);
+  ASSERT_EQ(mapper.Map(std::move(journal_vmo), 0, length, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE),
+            ZX_OK);
   storage::VmoBuffer journal_buffer(this, std::move(mapper), kJournalVmoid, kJournalLength,
                                     kBlockSize);
 

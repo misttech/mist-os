@@ -28,9 +28,9 @@ zx_status_t OwnedVmoMapper::CreateAndMap(uint64_t size, const char* name,
   return res;
 }
 
-zx_status_t OwnedVmoMapper::Map(zx::vmo vmo, uint64_t size, zx_vm_option_t map_options,
-                                fbl::RefPtr<VmarManager> vmar_manager) {
-  zx_status_t res = VmoMapper::Map(vmo, 0, size, map_options, vmar_manager);
+zx_status_t OwnedVmoMapper::Map(zx::vmo vmo, uint64_t offset, uint64_t size,
+                                zx_vm_option_t map_options, fbl::RefPtr<VmarManager> vmar_manager) {
+  zx_status_t res = VmoMapper::Map(vmo, offset, size, map_options, vmar_manager);
 
   if (res == ZX_OK) {
     vmo_ = std::move(vmo);

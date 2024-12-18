@@ -46,9 +46,11 @@ zx_status_t ResizeableVmoMapper::CreateAndMap(uint64_t size, const char* name,
   return res;
 }
 
-zx_status_t ResizeableVmoMapper::Map(zx::vmo vmo, uint64_t size, zx_vm_option_t map_options,
+zx_status_t ResizeableVmoMapper::Map(zx::vmo vmo, uint64_t offset, uint64_t size,
+                                     zx_vm_option_t map_options,
                                      fbl::RefPtr<VmarManager> vmar_manager) {
-  zx_status_t res = OwnedVmoMapper::Map(std::move(vmo), size, map_options, std::move(vmar_manager));
+  zx_status_t res =
+      OwnedVmoMapper::Map(std::move(vmo), offset, size, map_options, std::move(vmar_manager));
   if (res == ZX_OK) {
     map_options_ = map_options;
   }

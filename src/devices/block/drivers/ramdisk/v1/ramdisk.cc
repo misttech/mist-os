@@ -52,7 +52,8 @@ zx_status_t Ramdisk::Create(zx_device_t* parent, zx::vmo vmo, uint64_t block_siz
                             uint64_t block_count, const uint8_t* type_guid,
                             std::unique_ptr<Ramdisk>* out) {
   fzl::OwnedVmoMapper mapping;
-  zx_status_t status = mapping.Map(std::move(vmo), block_size * block_count);
+  zx_status_t status =
+      mapping.Map(std::move(vmo), 0, block_size * block_count, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
   if (status != ZX_OK) {
     return status;
   }
