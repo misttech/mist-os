@@ -119,7 +119,7 @@ func mainImpl(ctx context.Context) error {
 			fmt.Printf("Unable to determine RBE access, assuming False.")
 			canUseRbe = false
 		}
-		staticSpec, err = constructStaticSpec(ctx, fx, args.checkoutDir, args, canUseRbe)
+		staticSpec, err = constructStaticSpec(args.checkoutDir, args, canUseRbe)
 		if err != nil {
 			return err
 		}
@@ -352,7 +352,7 @@ func rbeIsSupported() bool {
 	return (runtime.GOOS == "linux") && (runtime.GOARCH == "amd64")
 }
 
-func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, args *setArgs, canUseRbe bool) (*fintpb.Static, error) {
+func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fintpb.Static, error) {
 	productPath, err := findGNIFile(checkoutDir, "products", args.product)
 	if err != nil {
 		productPath, err = findGNIFile(checkoutDir, filepath.Join("products", "tests"), args.product)
@@ -365,15 +365,15 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		return nil, fmt.Errorf("no such board: %q", args.board)
 	}
 
-	optimize := fintpb.Static_DEBUG
+	compilationMode := fintpb.Static_COMPILATION_MODE_DEBUG
 	if args.isRelease {
 		if args.isBalanced {
 			return nil, fmt.Errorf("Only one of --release and --balanced can be specified.")
 		}
-		optimize = fintpb.Static_RELEASE
+		compilationMode = fintpb.Static_COMPILATION_MODE_RELEASE
 
 	} else if args.isBalanced {
-		optimize = fintpb.Static_BALANCED
+		compilationMode = fintpb.Static_COMPILATION_MODE_BALANCED
 	}
 
 	variants := args.variants
@@ -472,7 +472,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		Board:               boardPath,
 		Product:             productPath,
 		MainPbLabel:         args.mainPbLabel,
-		Optimize:            optimize,
+		CompilationMode:     compilationMode,
 		BasePackages:        args.basePackages,
 		CachePackages:       args.cachePackages,
 		UniversePackages:    args.universePackages,

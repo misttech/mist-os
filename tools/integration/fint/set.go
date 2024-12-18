@@ -96,15 +96,24 @@ func setImpl(
 		return nil, fmt.Errorf("build_dir must be set")
 	}
 
+	if staticSpec.CompilationMode == fintpb.Static_COMPILATION_MODE_UNSPECIFIED {
+		// TODO(https://fxbug.dev/382773442): Stop falling back to `optimize`.
+		staticSpec.CompilationMode = fintpb.Static_CompilationMode(staticSpec.Optimize)
+	}
+
 	genArgs, err := genArgs(ctx, staticSpec, contextSpec, skipLocalArgs, assemblyOverridesStrings)
 	if err != nil {
 		return nil, err
 	}
 
+	compMode := strings.ToLower(strings.TrimPrefix(staticSpec.CompilationMode.String(), "COMPILATION_MODE_"))
+
 	artifacts := &fintpb.SetArtifacts{
 		Metadata: &fintpb.SetArtifacts_Metadata{
-			Board:      staticSpec.Board,
-			Optimize:   strings.ToLower(staticSpec.Optimize.String()),
+			Board:           staticSpec.Board,
+			CompilationMode: compMode,
+			// TODO(https://fxbug.dev/382773442): Delete in favor of `compilation_mode`.
+			Optimize:   compMode,
 			Product:    staticSpec.Product,
 			TargetArch: strings.ToLower(staticSpec.TargetArch.String()),
 			Variants:   staticSpec.Variants,
@@ -412,19 +421,19 @@ func genArgs(
 	testArgs = append(testArgs, "\n\n# Tests to add to build: (these are validated by test-type)")
 
 	// compilation args are set in a single block
-	if staticSpec.Optimize == fintpb.Static_OPTIMIZE_UNSPECIFIED {
-		return nil, fmt.Errorf("optimize is unspecified or invalid")
+	if staticSpec.CompilationMode == fintpb.Static_COMPILATION_MODE_UNSPECIFIED {
+		return nil, fmt.Errorf("compilation_mode is unspecified or invalid")
 	}
 	var compilationMode string
-	switch staticSpec.Optimize {
-	case fintpb.Static_DEBUG:
+	switch staticSpec.CompilationMode {
+	case fintpb.Static_COMPILATION_MODE_DEBUG:
 		compilationMode = "debug"
-	case fintpb.Static_BALANCED:
+	case fintpb.Static_COMPILATION_MODE_BALANCED:
 		compilationMode = "balanced"
-	case fintpb.Static_RELEASE:
+	case fintpb.Static_COMPILATION_MODE_RELEASE:
 		compilationMode = "release"
 	default:
-		return nil, fmt.Errorf("unknown Optimize value: %s", staticSpec.Optimize.String())
+		return nil, fmt.Errorf("unknown compilation_mode value: %s", staticSpec.CompilationMode.String())
 	}
 	compileArgs = appendGNArg(compileArgs, "compilation_mode", compilationMode)
 
@@ -489,12 +498,12 @@ func genArgs(
 		}
 	}
 
-	var assemblyOverrides = make(map[string]string)
+	assemblyOverrides := make(map[string]string)
 	// Since map iteration order isn't stable, a separate list is needed to keep a consistent ordering
 	// of the entries (to match user expectations and to allow tests to properly validate which
 	// override target is used by each assembly target).
-	var assemblyTargetOrder = []string{}
-	var mainTargetOverridesLabel = ""
+	var assemblyTargetOrder []string
+	var mainTargetOverridesLabel string
 	for _, overrideString := range assemblyOverridesStrings {
 		pair := strings.Split(overrideString, "=")
 		if len(pair) == 1 {

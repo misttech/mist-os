@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -29,11 +30,15 @@ type fakeSubprocessRunner struct {
 	mockStdout  []byte
 	mockStderr  []byte
 	fail        bool
+	mu          sync.Mutex
 }
 
 var errSubprocessFailure = errors.New("exit status 1")
 
 func (r *fakeSubprocessRunner) Run(_ context.Context, cmd []string, options subprocess.RunOptions) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if options.Stdout == nil {
 		options.Stdout = os.Stdout
 	}
@@ -75,11 +80,12 @@ func TestSet(t *testing.T) {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
 		expectedMetadata := &fintpb.SetArtifacts_Metadata{
-			Board:      staticSpec.Board,
-			Optimize:   "debug",
-			Product:    staticSpec.Product,
-			TargetArch: "x64",
-			Variants:   staticSpec.Variants,
+			Board:           staticSpec.Board,
+			Optimize:        "debug",
+			CompilationMode: "debug",
+			Product:         staticSpec.Product,
+			TargetArch:      "x64",
+			Variants:        staticSpec.Variants,
 		}
 
 		if diff := cmp.Diff(expectedMetadata, artifacts.Metadata, protocmp.Transform()); diff != "" {
@@ -369,8 +375,8 @@ func TestGenArgs(t *testing.T) {
 		{
 			name: "arm64 release",
 			staticSpec: &fintpb.Static{
-				TargetArch: fintpb.Static_ARM64,
-				Optimize:   fintpb.Static_RELEASE,
+				TargetArch:      fintpb.Static_ARM64,
+				CompilationMode: fintpb.Static_COMPILATION_MODE_RELEASE,
 			},
 			expectedArgs: []string{`target_cpu="arm64"`, `compilation_mode="release"`},
 		},
@@ -704,8 +710,8 @@ func TestGenArgs(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			baseStaticSpec := &fintpb.Static{
-				TargetArch: fintpb.Static_X64,
-				Optimize:   fintpb.Static_DEBUG,
+				TargetArch:      fintpb.Static_X64,
+				CompilationMode: fintpb.Static_COMPILATION_MODE_DEBUG,
 			}
 			proto.Merge(baseStaticSpec, tc.staticSpec)
 			tc.staticSpec = baseStaticSpec
