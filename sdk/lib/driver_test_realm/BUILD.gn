@@ -196,6 +196,10 @@ fuchsia_package("package") {
   ]
 }
 
+exported_fuchsia_package_archive("package-archive") {
+  package = ":package"
+}
+
 # Define Bazel input resource so it can be used
 export_fuchsia_package_to_bazel("package-bazel") {
   package = ":package"
