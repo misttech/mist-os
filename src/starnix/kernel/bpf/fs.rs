@@ -5,12 +5,14 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use crate::bpf::map::{Map, PinnedMap};
+use crate::bpf::map::{compute_map_storage_size, Map, PinnedMap, RINGBUF_SIGNAL};
 use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
 use crate::mm::memory::MemoryObject;
-use crate::mm::ProtectionFlags;
-use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter};
+use crate::mm::{ProtectionFlags, PAGE_SIZE};
+use crate::task::{
+    CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, Task, WaitCanceler, Waiter,
+};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir,
@@ -18,6 +20,7 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrStorage as _,
 };
+use ebpf::MapSchema;
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
@@ -25,10 +28,15 @@ use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{errno, error, statfs, BPF_FS_MAGIC};
+use starnix_uapi::{
+    bpf_map_type_BPF_MAP_TYPE_ARRAY, bpf_map_type_BPF_MAP_TYPE_RINGBUF, errno, error, statfs,
+    BPF_FS_MAGIC,
+};
 use std::sync::Arc;
+use zx::AsHandleRef;
 
 /// A reference to a BPF object that can be stored in either an FD or an entry in the /sys/fs/bpf
 /// filesystem.
@@ -54,6 +62,17 @@ impl BpfHandle {
         match self {
             Self::Program(ref program) => Ok(program),
             _ => error!(EINVAL),
+        }
+    }
+
+    // Returns VMO and schema if this handle references a map.
+    fn get_map_vmo(&self) -> Result<(Arc<zx::Vmo>, MapSchema), Errno> {
+        match self {
+            Self::Map(map) => {
+                let vmo = map.vmo().ok_or_else(|| errno!(ENODEV))?;
+                Ok((vmo, map.schema))
+            }
+            _ => error!(ENODEV),
         }
     }
 
@@ -109,42 +128,129 @@ impl FileOps for BpfHandle {
         track_stub!(TODO("https://fxbug.dev/322873841"), "bpf handle write");
         error!(EINVAL)
     }
+
     fn get_memory(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         length: Option<usize>,
         prot: ProtectionFlags,
     ) -> Result<Arc<MemoryObject>, Errno> {
-        match self {
-            Self::Map(map) => map.get_memory(locked, length, prot),
-            _ => error!(ENODEV),
+        let (vmo, schema) = self.get_map_vmo()?;
+
+        // Because of the specific condition needed to map this object, the size must be known.
+        let length = length.ok_or_else(|| errno!(EINVAL))?;
+
+        // This cannot be mapped executable.
+        if prot.contains(ProtectionFlags::EXEC) {
+            return error!(EPERM);
         }
+
+        let memory_object = match schema.map_type {
+            bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
+                // Starting from the second page, this cannot be mapped writable.
+                if length > *PAGE_SIZE as usize {
+                    if prot.contains(ProtectionFlags::WRITE) {
+                        return error!(EPERM);
+                    }
+                    // This cannot be mapped outside of the 2 control pages and the 2 data sections.
+                    if length > 2 * (*PAGE_SIZE as usize) + 2 * schema.max_entries as usize {
+                        return error!(EINVAL);
+                    }
+                }
+
+                let vmo_dup = vmo
+                    .as_handle_ref()
+                    .duplicate(zx::Rights::SAME_RIGHTS)
+                    .map_err(|_| errno!(EIO))?
+                    .into();
+                Arc::new(MemoryObject::RingBuf(vmo_dup))
+            }
+
+            bpf_map_type_BPF_MAP_TYPE_ARRAY => {
+                let array_size =
+                    round_up_to_increment(compute_map_storage_size(&schema)?, *PAGE_SIZE as usize)?;
+                if length > array_size {
+                    return error!(EINVAL);
+                }
+
+                let vmo_dup = vmo
+                    .as_handle_ref()
+                    .duplicate(zx::Rights::SAME_RIGHTS)
+                    .map_err(|_| errno!(EIO))?
+                    .into();
+                Arc::new(MemoryObject::Vmo(vmo_dup))
+            }
+
+            // Other maps cannot be mmap'ed.
+            _ => return error!(ENODEV),
+        };
+
+        Ok(memory_object)
     }
+
     fn wait_async(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        match self {
-            Self::Map(map) => map.wait_async(locked, waiter, events, handler),
-            _ => None,
+        if !events.contains(FdEvents::POLLIN) {
+            return None;
         }
+
+        let Ok((vmo, schema)) = self.get_map_vmo() else {
+            return None;
+        };
+
+        // Only ringbuffers can be polled.
+        if schema.map_type != bpf_map_type_BPF_MAP_TYPE_RINGBUF {
+            return None;
+        }
+
+        let handler = SignalHandler {
+            inner: SignalHandlerInner::ZxHandle(|signals| {
+                if signals.contains(RINGBUF_SIGNAL) {
+                    FdEvents::POLLIN
+                } else {
+                    FdEvents::empty()
+                }
+            }),
+            event_handler: handler,
+            err_code: None,
+        };
+
+        // Reset the signal before waiting. The case when the ring buffer already has some data
+        // is handled by the caller: it should call `query_events` after starting the waiter.
+        vmo.as_handle_ref()
+            .signal(RINGBUF_SIGNAL, zx::Signals::empty())
+            .expect("Failed to set signal or a ring buffer VMO");
+
+        let canceler = waiter
+            .wake_on_zircon_signals(&vmo.as_handle_ref(), RINGBUF_SIGNAL, handler)
+            .expect("Failed to wait for signals on ringbuf VMO");
+        Some(WaitCanceler::new_vmo(Arc::downgrade(&vmo), canceler))
     }
+
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         match self {
-            Self::Map(map) => map.query_events(locked),
-            _ => Ok(FdEvents::empty()),
+            Self::Map(map) if map.schema.map_type == bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
+                if map.can_read() {
+                    Ok(FdEvents::POLLIN)
+                } else {
+                    Ok(FdEvents::empty())
+                }
+            }
+            _ => error!(ENODEV),
         }
     }
 }

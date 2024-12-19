@@ -33,7 +33,7 @@ impl EbpfRunContext for HelperFunctionContextMarker {
 }
 
 fn bpf_map_lookup_elem(
-    context: &mut HelperFunctionContext<'_>,
+    _context: &mut HelperFunctionContext<'_>,
     map: BpfValue,
     key: BpfValue,
     _: BpfValue,
@@ -48,11 +48,11 @@ fn bpf_map_lookup_elem(
     let key =
         unsafe { std::slice::from_raw_parts(key.as_ptr::<u8>(), map.schema.key_size as usize) };
 
-    map.get_raw(context.locked, &key).map(BpfValue::from).unwrap_or_else(BpfValue::default)
+    map.get_raw(&key).map(BpfValue::from).unwrap_or_else(BpfValue::default)
 }
 
 fn bpf_map_update_elem(
-    context: &mut HelperFunctionContext<'_>,
+    _context: &mut HelperFunctionContext<'_>,
     map: BpfValue,
     key: BpfValue,
     value: BpfValue,
@@ -71,7 +71,7 @@ fn bpf_map_update_elem(
     let flags = flags.as_u64();
 
     let key = MapKey::from_slice(key);
-    map.update(context.locked, key, value, flags).map(|_| 0).unwrap_or(u64::MAX).into()
+    map.update(key, value, flags).map(|_| 0).unwrap_or(u64::MAX).into()
 }
 
 fn bpf_map_delete_elem(
@@ -137,7 +137,7 @@ fn bpf_get_current_uid_gid(
 }
 
 fn bpf_ringbuf_reserve(
-    context: &mut HelperFunctionContext<'_>,
+    _context: &mut HelperFunctionContext<'_>,
     map: BpfValue,
     size: BpfValue,
     flags: BpfValue,
@@ -151,7 +151,7 @@ fn bpf_ringbuf_reserve(
     let map: &Map = unsafe { &*map.as_ptr::<Map>() };
     let size = u32::from(size);
     let flags = u64::from(flags);
-    map.ringbuf_reserve(context.locked, size, flags)
+    map.ringbuf_reserve(size, flags)
         .map(BpfValue::from)
         .unwrap_or_else(|_| BpfValue::default())
 }

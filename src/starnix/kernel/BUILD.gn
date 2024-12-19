@@ -342,6 +342,7 @@ rustc_library("starnix_core") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
     "//src/lib/mundane",
     "//src/lib/network/fidl_fuchsia_net_filter_ext",
     "//src/lib/process_builder",

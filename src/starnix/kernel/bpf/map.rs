@@ -4,20 +4,15 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::mm::memory::MemoryObject;
 use crate::mm::vmar::AllocatedVmar;
-use crate::mm::{MemoryAccessor, ProtectionFlags, PAGE_SIZE};
-use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
+use crate::mm::PAGE_SIZE;
 use dense_map::DenseMap;
 use ebpf::MapSchema;
 
-use starnix_lifecycle::AtomicU32Counter;
+use fuchsia_sync::Mutex;
 use starnix_logging::{track_stub, with_zx_name};
-use starnix_sync::{BpfMapEntries, LockBefore, Locked, OrderedMutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
-use starnix_uapi::user_address::UserAddress;
-use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
     bpf_map_type_BPF_MAP_TYPE_ARRAY, bpf_map_type_BPF_MAP_TYPE_ARRAY_OF_MAPS,
     bpf_map_type_BPF_MAP_TYPE_BLOOM_FILTER, bpf_map_type_BPF_MAP_TYPE_CGROUP_ARRAY,
@@ -46,9 +41,10 @@ use std::ops::{Bound, Deref, DerefMut, Range};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use zx::AsHandleRef;
 
 /// Counter for map identifiers.
-static MAP_IDS: AtomicU32Counter = AtomicU32Counter::new(1);
+static MAP_IDS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
 
 /// A BPF map. This is a hashtable that can be accessed both by BPF programs and userspace.
 #[derive(Debug)]
@@ -58,7 +54,7 @@ pub struct Map {
     pub flags: u32,
 
     // This field should be private to this module.
-    entries: OrderedMutex<MapStore, BpfMapEntries>,
+    entries: Mutex<MapStore>,
 }
 
 /// Maps are normally kept pinned in memory since linked eBPF programs store direct pointers to
@@ -70,48 +66,27 @@ pub type MapKey = smallvec::SmallVec<[u8; 16]>;
 
 impl Map {
     pub fn new(schema: MapSchema, flags: u32) -> Result<Self, Errno> {
-        let id = MAP_IDS.next();
+        let id = MAP_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed).into();
         let store = MapStore::new(&schema)?;
-        Ok(Self { id, schema, flags, entries: OrderedMutex::new(store) })
+        Ok(Self { id, schema, flags, entries: Mutex::new(store) })
     }
 
-    pub fn get_raw<L>(&self, locked: &mut Locked<'_, L>, key: &[u8]) -> Option<*mut u8>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
-        let mut entries = self.entries.lock(locked);
+    pub fn get_raw(&self, key: &[u8]) -> Option<*mut u8> {
+        let mut entries = self.entries.lock();
         Self::get(&mut entries, &self.schema, key).map(|s| s.as_mut_ptr())
     }
 
-    pub fn lookup<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        key: &[u8],
-        user_value: UserAddress,
-    ) -> Result<(), Errno>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
-        let mut entries = self.entries.lock(locked);
+    pub fn lookup(&self, key: &[u8]) -> Result<Vec<u8>, Errno> {
+        let mut entries = self.entries.lock();
         if let Some(value) = Self::get(&mut entries, &self.schema, key) {
-            current_task.write_memory(user_value, value).map(|_| ())
+            Ok(value.to_vec())
         } else {
             error!(ENOENT)
         }
     }
 
-    pub fn update<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        key: MapKey,
-        value: &[u8],
-        flags: u64,
-    ) -> Result<(), Errno>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
-        let mut entries = self.entries.lock(locked);
+    pub fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), Errno> {
+        let mut entries = self.entries.lock();
         match entries.deref_mut() {
             MapStore::Hash(ref mut storage) => {
                 storage.update(&self.schema, key, &value, flags)?;
@@ -132,11 +107,8 @@ impl Map {
         Ok(())
     }
 
-    pub fn delete<L>(&self, locked: &mut Locked<'_, L>, key: &[u8]) -> Result<(), Errno>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
-        let mut entries = self.entries.lock(locked);
+    pub fn delete(&self, key: &[u8]) -> Result<(), Errno> {
+        let mut entries = self.entries.lock();
         match entries.deref_mut() {
             MapStore::Hash(ref mut entries) => {
                 if !entries.remove(key) {
@@ -155,15 +127,8 @@ impl Map {
         Ok(())
     }
 
-    pub fn get_next_key<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        key: Option<&[u8]>,
-    ) -> Result<MapKey, Errno>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
-        let entries = self.entries.lock(locked);
+    pub fn get_next_key(&self, key: Option<&[u8]>) -> Result<MapKey, Errno> {
+        let entries = self.entries.lock();
         match entries.deref() {
             MapStore::Hash(ref entries) => entries.get_next_key(key),
             MapStore::Array(_) => {
@@ -177,59 +142,23 @@ impl Map {
         }
     }
 
-    pub fn get_memory<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        length: Option<usize>,
-        prot: ProtectionFlags,
-    ) -> Result<Arc<MemoryObject>, Errno>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
-        self.entries
-            .lock(locked)
-            .as_ringbuf()
-            .ok_or_else(|| errno!(ENODEV))?
-            .get_memory(length, prot)
+    pub fn vmo(&self) -> Option<Arc<zx::Vmo>> {
+        // TODO(https://fxbug.dev/378507648): Arrays should be mappable as well.
+        self.entries.lock().as_ringbuf().map(|rb| rb.vmo().clone())
     }
 
-    pub fn wait_async<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        waiter: &Waiter,
-        events: FdEvents,
-        handler: EventHandler,
-    ) -> Option<WaitCanceler>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
-        self.entries.lock(locked).as_ringbuf()?.wait_async(waiter, events, handler)
-    }
-
-    pub fn query_events<L>(&self, locked: &mut Locked<'_, L>) -> Result<FdEvents, Errno>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
-        let mut entries = self.entries.lock(locked);
-        match entries.deref_mut() {
-            MapStore::RingBuffer(ringbuf) => ringbuf.query_events(),
-            _ => Ok(FdEvents::empty()),
+    pub fn can_read(&self) -> bool {
+        match *self.entries.lock() {
+            MapStore::RingBuffer(ref mut ringbuf) => ringbuf.can_read(),
+            _ => false,
         }
     }
 
-    pub fn ringbuf_reserve<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        size: u32,
-        flags: u64,
-    ) -> Result<usize, Errno>
-    where
-        L: LockBefore<BpfMapEntries>,
-    {
+    pub fn ringbuf_reserve(&self, size: u32, flags: u64) -> Result<usize, Errno> {
         if flags != 0 {
             return error!(EINVAL);
         }
-        self.entries.lock(locked).as_ringbuf().ok_or_else(|| errno!(EINVAL))?.reserve(size)
+        self.entries.lock().as_ringbuf().ok_or_else(|| errno!(EINVAL))?.reserve(size)
     }
 
     /// Submit the data.
@@ -313,7 +242,7 @@ impl MapStore {
                 if schema.key_size != 4 {
                     return error!(EINVAL);
                 }
-                let buffer_size = compute_storage_size(schema)?;
+                let buffer_size = compute_map_storage_size(schema)?;
                 Ok(MapStore::Array(new_pinned_buffer(buffer_size)))
             }
             bpf_map_type_BPF_MAP_TYPE_HASH => Ok(MapStore::Hash(HashStorage::new(&schema)?)),
@@ -338,7 +267,7 @@ impl MapStore {
                 if schema.key_size != 4 {
                     return error!(EINVAL);
                 }
-                let buffer_size = compute_storage_size(schema)?;
+                let buffer_size = compute_map_storage_size(schema)?;
                 Ok(MapStore::Array(new_pinned_buffer(buffer_size)))
             }
 
@@ -480,7 +409,7 @@ impl MapStore {
     }
 }
 
-fn compute_storage_size(schema: &MapSchema) -> Result<usize, Errno> {
+pub fn compute_map_storage_size(schema: &MapSchema) -> Result<usize, Errno> {
     schema
         .value_size
         .checked_mul(schema.max_entries)
@@ -497,7 +426,7 @@ struct HashStorage {
 
 impl HashStorage {
     fn new(schema: &MapSchema) -> Result<Self, Errno> {
-        let buffer_size = compute_storage_size(schema)?;
+        let buffer_size = compute_map_storage_size(schema)?;
         let data = new_pinned_buffer(buffer_size);
         Ok(Self { index_map: Default::default(), data, free_list: Default::default() })
     }
@@ -567,9 +496,16 @@ impl HashStorage {
     }
 }
 
+// Signal used on ring buffer VMOs to indicate that the buffer has
+// incoming data.
+pub const RINGBUF_SIGNAL: zx::Signals = zx::Signals::USER_0;
+
 #[derive(Debug)]
 struct RingBufferStorage {
-    memory: Arc<MemoryObject>,
+    /// VMO used to store the map content. Reference-counted to make it possible to share the
+    /// handle with Starnix kernel, particularly for the case when a process needs to wait for
+    /// signals from the VMO (see RINGBUF_SIGNAL).
+    vmo: Arc<zx::Vmo>,
     /// The mask corresponding to the size of the ring buffer. This is used to map back the
     /// position in the ringbuffer (that are always growing) to their actual position in the memory
     /// object.
@@ -582,8 +518,6 @@ struct RingBufferStorage {
     producer_position: &'static AtomicU32,
     /// Pointer to the start of the data of the ring buffer.
     data: usize,
-    /// WaitQueue to notify userspace when new data is available.
-    wait_queue: WaitQueue,
     /// The specific memory address space used to map the ring buffer. This is the last field in
     /// the struct so that all the data that conceptually points to it is destroyed before the
     /// memory is unmapped.
@@ -674,12 +608,11 @@ impl RingBufferStorage {
         let producer_position = unsafe { &*((base + 2 * page_size) as *const AtomicU32) };
         let data = base + 3 * page_size;
         let storage = Box::pin(Self {
-            memory: Arc::new(MemoryObject::RingBuf(vmo)),
+            vmo: Arc::new(vmo),
             mask,
             consumer_position,
             producer_position,
             data,
-            wait_queue: Default::default(),
             _vmar: vmar,
         });
         // Store the pointer to the storage to the start of the technical vmo. This is required to
@@ -687,11 +620,6 @@ impl RingBufferStorage {
         // This is safe as the returned referenced is Pinned.
         *storage_position = storage.deref();
         Ok(storage)
-    }
-
-    /// The size of the ring buffer.
-    fn size(&self) -> usize {
-        (self.mask + 1) as usize
     }
 
     /// Reserve `size` bytes on the ringbuffer.
@@ -745,7 +673,10 @@ impl RingBufferStorage {
             || (flags == RingBufferWakeupPolicy::DefaultWakeup
                 && self.is_consumer_position(header as *const RingBufferRecordHeader as usize))
         {
-            self.wait_queue.notify_fd_events(FdEvents::POLLIN);
+            self.vmo
+                .as_handle_ref()
+                .signal(zx::Signals::empty(), RINGBUF_SIGNAL)
+                .expect("Failed to set signal or a ring buffer VMO");
         }
     }
 
@@ -772,54 +703,18 @@ impl RingBufferStorage {
         unsafe { &mut *(self.data_position(position) as *mut RingBufferRecordHeader) }
     }
 
-    pub fn get_memory(
-        &self,
-        length: Option<usize>,
-        prot: ProtectionFlags,
-    ) -> Result<Arc<MemoryObject>, Errno> {
-        // Because of the specific condition needed to map this object, the size must be known.
-        let Some(length) = length else {
-            return error!(EINVAL);
-        };
-        // This cannot be mapped executable.
-        if prot.contains(ProtectionFlags::EXEC) {
-            return error!(EPERM);
-        }
-        // The first page has no restriction on read/write protection, just return the memory.
-        if length <= *PAGE_SIZE as usize {
-            return Ok(self.memory.clone());
-        }
-        // Starting from the second page, this cannot be mapped writable.
-        if prot.contains(ProtectionFlags::WRITE) {
-            return error!(EPERM);
-        }
-        // This cannot be mapped outside of the 2 control pages and the 2 data sections.
-        if length > 2 * (*PAGE_SIZE as usize) + 2 * self.size() {
-            return error!(EINVAL);
-        }
-        Ok(self.memory.clone())
+    pub fn vmo(&self) -> &Arc<zx::Vmo> {
+        &self.vmo
     }
 
-    pub fn wait_async(
-        &self,
-        waiter: &Waiter,
-        events: FdEvents,
-        handler: EventHandler,
-    ) -> Option<WaitCanceler> {
-        Some(self.wait_queue.wait_async_fd_events(waiter, events, handler))
-    }
-
-    pub fn query_events(&mut self) -> Result<FdEvents, Errno> {
+    // Return true if POLLIN should be signaled for this ring buffer.
+    pub fn can_read(&mut self) -> bool {
         let consumer_position = self.consumer_position.load(Ordering::Acquire);
         let producer_position = self.producer_position.load(Ordering::Acquire);
-        if consumer_position < producer_position {
-            // Read the header at the consumer position, and check that the entry is not busy.
-            let header = self.header_mut(producer_position);
-            if *header.length.get_mut() & BPF_RINGBUF_BUSY_BIT == 0 {
-                return Ok(FdEvents::POLLIN);
-            }
-        }
-        Ok(FdEvents::empty())
+
+        // Read the header at the consumer position, and check that the entry is not busy.
+        consumer_position < producer_position
+            && ((*self.header_mut(producer_position).length.get_mut()) & BPF_RINGBUF_BUSY_BIT == 0)
     }
 }
 
