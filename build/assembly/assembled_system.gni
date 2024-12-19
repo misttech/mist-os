@@ -185,6 +185,9 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #     [string] The name of the final system ZBI file.
 #
 template("assembled_system") {
+  assert(current_toolchain == default_toolchain,
+         "Assembly can only be performed in the default toolchain.")
+
   _image_name = target_name
   if (defined(invoker.image_name)) {
     _image_name = invoker.image_name
