@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::get_bpf_object;
-use crate::bpf::helpers::{SkBuf, BPF_HELPER_IMPLS_FOR_SOCKET_FILTER, SK_BUF_MAPPING};
+use crate::bpf::helpers::{get_socket_filter_helpers, SocketFilterContext};
 use crate::bpf::program::LinkedProgram;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter};
@@ -18,7 +18,9 @@ use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
     LookupContext, Message,
 };
-use ebpf_api::ProgramType;
+use ebpf::{EbpfRunContext, FieldMapping, StructMapping};
+use ebpf_api::{ProgramType, SK_BUF_ID};
+use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
@@ -28,12 +30,12 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, gid_t, socklen_t, uapi, ucred, uid_t, FIONREAD, SOL_SOCKET, SO_ACCEPTCONN,
-    SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK, SO_PASSCRED,
-    SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
+    __sk_buff, errno, error, gid_t, socklen_t, uapi, ucred, uid_t, uref, FIONREAD, SOL_SOCKET,
+    SO_ACCEPTCONN, SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK,
+    SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
 };
-use std::sync::Arc;
-use zerocopy::IntoBytes;
+use std::sync::{Arc, LazyLock};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 // From unix.go in gVisor.
 const SOCKET_MIN_SIZE: usize = 4 << 10;
@@ -122,7 +124,7 @@ struct UnixSocketInner {
     pub keepalive: bool,
 
     /// See SO_ATTACH_BPF.
-    bpf_program: Option<LinkedProgram>,
+    bpf_program: Option<UnixSocketFilter>,
 
     /// Unix credentials of the owner of this socket, for SO_PEERCRED.
     credentials: Option<ucred>,
@@ -377,7 +379,7 @@ impl UnixSocket {
         inner.keepalive = keepalive;
     }
 
-    fn set_bpf_program(&self, program: Option<LinkedProgram>) {
+    fn set_bpf_program(&self, program: Option<UnixSocketFilter>) {
         let mut inner = self.lock();
         inner.bpf_program = program;
     }
@@ -730,7 +732,7 @@ impl SocketOps for UnixSocket {
                     let linked_program = program.link(
                         ProgramType::SocketFilter,
                         &[SK_BUF_MAPPING.clone()],
-                        &BPF_HELPER_IMPLS_FOR_SOCKET_FILTER,
+                        &get_socket_filter_helpers::<UnixSocketEbpfContext>()[..],
                     )?;
 
                     self.set_bpf_program(Some(linked_program));
@@ -895,8 +897,8 @@ impl UnixSocketInner {
     /// Returns the number of bytes that were written to the socket.
     fn write(
         &mut self,
-        locked: &mut Locked<'_, FileOpsCore>,
-        current_task: &CurrentTask,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
@@ -909,8 +911,9 @@ impl UnixSocketInner {
             let Some(bpf_program) = self.bpf_program.as_ref() else {
                 return Some(message);
             };
+            let mut context = UnixSocketEbpfHelpersContext {};
             let mut sk_buf = SkBuf::default();
-            let s = bpf_program.run(locked, current_task, &mut sk_buf);
+            let s = bpf_program.run(&mut context, &mut sk_buf);
             if s == 0 {
                 None
             } else {
@@ -966,6 +969,54 @@ where
         name.entry.node.bound_socket().map(|s| s.clone()).ok_or_else(|| errno!(ECONNREFUSED))
     }
 }
+
+// Packet buffer representation used for eBPF filters.
+#[repr(C)]
+#[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes, Default)]
+struct SkBuf {
+    // `data` and `data_end` fields in `__sk_buff` are remapped to the 64-bit fields below.
+    sk_buff: __sk_buff,
+
+    // Actual references to the buffer, remapped from the original 32-bit fields above.
+    data: uref<u8>,
+    data_end: uref<u8>,
+}
+
+static SK_BUF_MAPPING: LazyLock<StructMapping> = LazyLock::new(|| StructMapping {
+    memory_id: SK_BUF_ID.clone(),
+    fields: vec![
+        FieldMapping {
+            source_offset: std::mem::offset_of!(__sk_buff, data),
+            target_offset: std::mem::offset_of!(SkBuf, data),
+        },
+        FieldMapping {
+            source_offset: std::mem::offset_of!(__sk_buff, data_end),
+            target_offset: std::mem::offset_of!(SkBuf, data_end),
+        },
+    ],
+});
+
+struct UnixSocketEbpfHelpersContext {}
+
+impl SocketFilterContext for UnixSocketEbpfHelpersContext {
+    type SkBuf = SkBuf;
+    fn get_socket_uid(&self, _sk_buf: &SkBuf) -> uid_t {
+        track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_get_socket_uid");
+        0
+    }
+
+    fn get_socket_cookie(&self, _sk_buf: &Self::SkBuf) -> u64 {
+        track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_get_socket_cookie");
+        0
+    }
+}
+
+struct UnixSocketEbpfContext {}
+impl EbpfRunContext for UnixSocketEbpfContext {
+    type Context<'a> = UnixSocketEbpfHelpersContext;
+}
+
+type UnixSocketFilter = LinkedProgram<UnixSocketEbpfContext>;
 
 #[cfg(test)]
 mod tests {

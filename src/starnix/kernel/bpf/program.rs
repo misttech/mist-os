@@ -3,21 +3,18 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::get_bpf_object;
-use crate::bpf::helpers::{
-    HelperFunctionContext, HelperFunctionContextMarker, BPF_COMMON_HELPER_IMPLS,
-};
+use crate::bpf::helpers::get_common_helpers;
 use crate::bpf::map::{Map, PinnedMap};
 use crate::task::CurrentTask;
 use crate::vfs::{FdNumber, OutputBuffer};
 use ebpf::{
     link_program, verify_program, BpfValue, EbpfError, EbpfHelperImpl, EbpfInstruction,
-    EbpfProgram, EmptyPacketAccessor, MapDescriptor, StructMapping,
+    EbpfProgram, EbpfRunContext, EmptyPacketAccessor, MapDescriptor, StructMapping,
     VerifiedEbpfProgram, VerifierLogger, BPF_LDDW, BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC,
     BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX, BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
 use ebpf_api::ProgramType;
 use starnix_logging::{log_error, log_warn, track_stub};
-use starnix_sync::{BpfHelperOps, LockBefore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};
 use std::collections::HashMap;
@@ -69,12 +66,12 @@ impl Program {
         Ok(Program { info, program, maps })
     }
 
-    pub fn link(
+    pub fn link<C: EbpfRunContext>(
         &self,
         program_type: ProgramType,
         struct_mappings: &[StructMapping],
-        local_helpers: &[(u32, EbpfHelperImpl<HelperFunctionContextMarker>)],
-    ) -> Result<LinkedProgram, Errno> {
+        local_helpers: &[(u32, EbpfHelperImpl<C>)],
+    ) -> Result<LinkedProgram<C>, Errno> {
         if program_type != self.info.program_type {
             return error!(EINVAL);
         }
@@ -82,14 +79,11 @@ impl Program {
         let maps = self
             .maps
             .iter()
-            .map(|m| MapDescriptor {
-                schema: m.schema,
-                ptr: BpfValue::from(&(**m) as *const Map),
-            })
+            .map(|m| MapDescriptor { schema: m.schema, ptr: BpfValue::from(&(**m) as *const Map) })
             .collect::<Vec<MapDescriptor>>();
 
         let mut helpers = HashMap::new();
-        helpers.extend(BPF_COMMON_HELPER_IMPLS.iter().cloned());
+        helpers.extend(get_common_helpers::<C>().iter().cloned());
         helpers.extend(local_helpers.iter().cloned());
 
         let program = link_program(&self.program, struct_mappings, &maps[..], helpers)
@@ -100,8 +94,8 @@ impl Program {
 }
 
 #[derive(Debug)]
-pub struct LinkedProgram {
-    program: EbpfProgram<HelperFunctionContextMarker>,
+pub struct LinkedProgram<C: EbpfRunContext> {
+    program: EbpfProgram<C>,
 
     // Map references kept to ensure that the maps are not dropped before the
     // program.
@@ -111,24 +105,13 @@ pub struct LinkedProgram {
     _maps: Vec<PinnedMap>,
 }
 
-impl LinkedProgram {
-    pub fn run<L, T>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        data: &mut T,
-    ) -> u64
+impl<C: EbpfRunContext> LinkedProgram<C> {
+    pub fn run<T>(&self, context: &mut C::Context<'_>, data: &mut T) -> u64
     where
-        L: LockBefore<BpfHelperOps>,
         T: IntoBytes + FromBytes + Immutable,
     {
-        let mut context = HelperFunctionContext {
-            locked: &mut locked.cast_locked::<BpfHelperOps>(),
-            current_task,
-        };
-
         // TODO(https://fxbug.dev/287120494) Use real PacketAccessor.
-        self.program.run(&mut context, &EmptyPacketAccessor {}, data)
+        self.program.run(context, &EmptyPacketAccessor {}, data)
     }
 }
 
