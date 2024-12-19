@@ -1509,9 +1509,6 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
     }
     // Performing explicit accesses by request of the user, so disable zero forking.
     cursor->DisableZeroFork();
-    if (!!(options & VmObjectReadWriteOptions::ZeroAboveUserSize)) {
-      cursor->ZeroAboveUserSize();
-    }
     AssertHeld(cursor->lock_ref());
 
     StatusType status = ZX_OK;

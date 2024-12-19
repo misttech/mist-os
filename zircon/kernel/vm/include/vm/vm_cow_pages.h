@@ -1601,10 +1601,6 @@ class VmCowPages::LookupCursor {
   // their accessed times updated.
   void DisableMarkAccessed() { mark_accessed_ = false; }
 
-  // Indicates that pages above the user content size can be assumed/made to be zero. See
-  // VmObject::VmObjectReadWriteOptions::ZeroAboveUserSize.
-  void ZeroAboveUserSize() { zero_above_user_size_ = true; }
-
   // Exposed for lock assertions.
   Lock<CriticalMutex>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
   Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(target_->lock_ref()) {
@@ -1827,10 +1823,6 @@ class VmCowPages::LookupCursor {
 
   // Whether existing pages should be have their access time updated when they are returned.
   bool mark_accessed_ = true;
-
-  // Tracks whether any pages above the targets user_content_size_ can be read or set as zero. See
-  // VmObject::VmObjectReadWriteOptions::ZeroAboveUserSize for more.
-  bool zero_above_user_size_ = false;
 
   // Optional allocation list that will be used for any page allocations.
   list_node_t* alloc_list_ = nullptr;

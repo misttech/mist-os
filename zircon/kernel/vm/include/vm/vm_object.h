@@ -285,13 +285,6 @@ enum class VmObjectReadWriteOptions : uint8_t {
   // If set, attempts to read past the end of a VMO will not cause a failure and only copy the
   // existing bytes instead (i.e. the requested length will be trimmed to the actual VMO size).
   TrimLength = (1 << 0),
-
-  // If set the read or write operation is allowed (although not required) to assume that any VMO
-  // offsets above any supplied user content size (via SetUserContentSize) are zero. This also
-  // permits a write operation to actively zero this portion. Zeroing something that is going to get
-  // written to is beneficial when writing to partial pages of a pager backed VMO, where otherwise
-  // the contents of the rest of the page would have to be unnecessarily fetched.
-  ZeroAboveUserSize = (1 << 1),
 };
 FBL_ENABLE_ENUM_BITS(VmObjectReadWriteOptions)
 
@@ -459,7 +452,7 @@ class VmObject : public VmHierarchyBase,
     return ZX_ERR_NOT_SUPPORTED;
   }
   virtual zx_status_t WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len,
-                                      VmObjectReadWriteOptions options, size_t* out_actual,
+                                      size_t* out_actual,
                                       const OnWriteBytesTransferredCallback& on_bytes_transferred);
 
   // Removes the pages from this vmo in the range [offset, offset + len) and returns

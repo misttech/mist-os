@@ -193,7 +193,7 @@ zx_status_t VmObject::ReadUserVector(user_out_iovec_t vec, uint64_t offset, size
 }
 
 zx_status_t VmObject::WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len,
-                                      VmObjectReadWriteOptions options, size_t* out_actual,
+                                      size_t* out_actual,
                                       const OnWriteBytesTransferredCallback& on_bytes_transferred) {
   if (len == 0u) {
     return ZX_OK;
@@ -208,8 +208,8 @@ zx_status_t VmObject::WriteUserVector(user_in_iovec_t vec, uint64_t offset, size
     }
 
     size_t chunk_actual = 0;
-    zx_status_t status =
-        WriteUser(ptr, offset, capacity, options, &chunk_actual, on_bytes_transferred);
+    zx_status_t status = WriteUser(ptr, offset, capacity, VmObjectReadWriteOptions::None,
+                                   &chunk_actual, on_bytes_transferred);
 
     // Always add |chunk_actual| since some bytes may have been transferred, even on error
     if (out_actual != nullptr) {
