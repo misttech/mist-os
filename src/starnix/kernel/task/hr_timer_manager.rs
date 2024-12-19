@@ -266,7 +266,10 @@ impl HrTimerManager {
                 log_warn!("HrTimer manager worker thread woke up with an empty timer heap.");
                 continue;
             };
-            let new_deadline = guard.current_deadline.expect("current deadline should be set");
+            let Some(new_deadline) = guard.current_deadline else {
+                log_warn!("HrTimer manager worker thread woke up without a timer deadline");
+                continue;
+            };
             let wake_source = node.wake_source.clone();
             let hrtimer_ref = node.hr_timer.clone();
 
@@ -315,6 +318,9 @@ impl HrTimerManager {
                         !(t.deadline == new_deadline && Arc::ptr_eq(&t.hr_timer, &hrtimer_ref))
                     });
                     self.record_event(&mut guard, InspectHrTimerEvent::Expired, Some(new_deadline));
+
+                    // Clear the deadline to guarantee the next timer will trigger the driver.
+                    guard.current_deadline = None;
 
                     if guard.timer_heap.is_empty() && !*hrtimer_ref.is_interval.lock() {
                         // Only clear the timer event if there are no more timers to start.
