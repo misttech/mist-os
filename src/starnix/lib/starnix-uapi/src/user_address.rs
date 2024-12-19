@@ -5,7 +5,7 @@
 use super::errors::Errno;
 use super::math::round_up_to_increment;
 use super::uapi;
-use crate::errno;
+use crate::{errno, uref};
 use std::marker::PhantomData;
 use std::{fmt, mem, ops};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -62,6 +62,10 @@ impl UserAddress {
 
     pub fn checked_add(&self, rhs: usize) -> Option<UserAddress> {
         self.0.checked_add(rhs as u64).map(UserAddress)
+    }
+
+    pub fn checked_add_signed(&self, rhs: isize) -> Option<UserAddress> {
+        self.0.checked_add_signed(rhs as i64).map(UserAddress)
     }
 
     pub fn checked_sub(&self, rhs: usize) -> Option<UserAddress> {
@@ -286,6 +290,54 @@ impl<T> ops::Deref for UserRef<T> {
 impl<T> fmt::Display for UserRef<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.addr().fmt(f)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum MultiArchUserRef<T64, T32> {
+    Arch64(UserRef<T64>),
+    Arch32(UserRef<T32>),
+}
+
+impl<T64, T32> MultiArchUserRef<T64, T32> {
+    pub fn null() -> Self {
+        Self::default()
+    }
+
+    pub fn from_32(addr: UserRef<T32>) -> Self {
+        Self::Arch32(addr)
+    }
+
+    pub fn addr(&self) -> UserAddress {
+        match self {
+            Self::Arch64(addr) => addr.addr(),
+            Self::Arch32(addr) => addr.addr(),
+        }
+    }
+}
+
+impl<T64, T32> Default for MultiArchUserRef<T64, T32> {
+    fn default() -> Self {
+        // The 32/64 bits does not matter for the null pointer.
+        Self::Arch64(UserAddress::NULL.into())
+    }
+}
+
+impl<T64, T32> From<UserRef<T64>> for MultiArchUserRef<T64, T32> {
+    fn from(addr: UserRef<T64>) -> Self {
+        Self::Arch64(addr)
+    }
+}
+
+impl<T64, T32> From<uref<T64>> for MultiArchUserRef<T64, T32> {
+    fn from(addr: uref<T64>) -> Self {
+        Self::Arch64(addr.into())
+    }
+}
+
+impl<T64, T32> From<crate::uref32<T32>> for MultiArchUserRef<T64, T32> {
+    fn from(addr: crate::uref32<T32>) -> Self {
+        Self::Arch32(uref::from(addr).into())
     }
 }
 

@@ -31,6 +31,26 @@ use zx::{
     Task, {self as zx},
 };
 
+fn get_clock_res(current_task: &CurrentTask, which_clock: i32) -> Result<timespec, Errno> {
+    match which_clock as u32 {
+        CLOCK_REALTIME
+        | CLOCK_REALTIME_ALARM
+        | CLOCK_REALTIME_COARSE
+        | CLOCK_MONOTONIC
+        | CLOCK_MONOTONIC_COARSE
+        | CLOCK_MONOTONIC_RAW
+        | CLOCK_BOOTTIME
+        | CLOCK_BOOTTIME_ALARM
+        | CLOCK_THREAD_CPUTIME_ID
+        | CLOCK_PROCESS_CPUTIME_ID => Ok(timespec { tv_sec: 0, tv_nsec: 1 }),
+        _ => {
+            // Error if no dynamic clock can be found.
+            let _ = get_dynamic_clock(current_task, which_clock)?;
+            Ok(timespec { tv_sec: 0, tv_nsec: 1 })
+        }
+    }
+}
+
 pub fn sys_clock_getres(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -43,34 +63,12 @@ pub fn sys_clock_getres(
     if tp_addr.is_null() {
         return Ok(());
     }
-
-    let tv = match which_clock as u32 {
-        CLOCK_REALTIME
-        | CLOCK_REALTIME_ALARM
-        | CLOCK_REALTIME_COARSE
-        | CLOCK_MONOTONIC
-        | CLOCK_MONOTONIC_COARSE
-        | CLOCK_MONOTONIC_RAW
-        | CLOCK_BOOTTIME
-        | CLOCK_BOOTTIME_ALARM
-        | CLOCK_THREAD_CPUTIME_ID
-        | CLOCK_PROCESS_CPUTIME_ID => timespec { tv_sec: 0, tv_nsec: 1 },
-        _ => {
-            // Error if no dynamic clock can be found.
-            let _ = get_dynamic_clock(current_task, which_clock)?;
-            timespec { tv_sec: 0, tv_nsec: 1 }
-        }
-    };
+    let tv = get_clock_res(current_task, which_clock)?;
     current_task.write_object(tp_addr, &tv)?;
     Ok(())
 }
 
-pub fn sys_clock_gettime(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    which_clock: i32,
-    tp_addr: UserRef<timespec>,
-) -> Result<(), Errno> {
+fn get_clock_gettime(current_task: &CurrentTask, which_clock: i32) -> Result<timespec, Errno> {
     let nanos = if which_clock < 0 {
         profile_duration!("GetDynamicClock");
         get_dynamic_clock(current_task, which_clock)?
@@ -99,7 +97,16 @@ pub fn sys_clock_gettime(
             _ => return error!(EINVAL),
         }
     };
-    let tv = timespec { tv_sec: nanos / NANOS_PER_SECOND, tv_nsec: nanos % NANOS_PER_SECOND };
+    Ok(timespec { tv_sec: nanos / NANOS_PER_SECOND, tv_nsec: nanos % NANOS_PER_SECOND })
+}
+
+pub fn sys_clock_gettime(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    which_clock: i32,
+    tp_addr: UserRef<timespec>,
+) -> Result<(), Errno> {
+    let tv = get_clock_gettime(current_task, which_clock)?;
     current_task.write_object(tp_addr, &tv)?;
     Ok(())
 }
@@ -558,6 +565,73 @@ pub fn sys_times(
 
     Ok(duration_to_scheduler_clock(zx::MonotonicInstant::get() - zx::MonotonicInstant::ZERO))
 }
+
+// Syscalls for arch32 usage
+#[cfg(feature = "arch32")]
+mod arch32 {
+    use crate::mm::MemoryAccessorExt;
+    use crate::syscalls::time::{
+        get_clock_gettime, get_clock_res, is_valid_cpu_clock, timeval_from_time, utc_now,
+    };
+    use crate::task::CurrentTask;
+    use starnix_logging::track_stub;
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::user_address::UserRef;
+    use starnix_uapi::{errno, error};
+
+    pub fn sys_arch32_clock_getres(
+        _locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        which_clock: i32,
+        tp_addr: UserRef<linux_uapi::arch32::timespec>,
+    ) -> Result<(), Errno> {
+        if which_clock < 0 && !is_valid_cpu_clock(which_clock) {
+            return error!(EINVAL);
+        }
+        if tp_addr.is_null() {
+            return Ok(());
+        }
+        let tv64 = get_clock_res(current_task, which_clock)?;
+        current_task.write_object(tp_addr, &(tv64.into()))?;
+        Ok(())
+    }
+
+    pub fn sys_arch32_gettimeofday(
+        _locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_tv: UserRef<linux_uapi::arch32::timeval>,
+        user_tz: UserRef<linux_uapi::arch32::timezone>,
+    ) -> Result<(), Errno> {
+        if !user_tv.is_null() {
+            let tv = timeval_from_time(utc_now());
+            current_task.write_object(user_tv, &(tv.into()))?;
+        }
+        if !user_tz.is_null() {
+            // Return early if the user passes an obviously invalid pointer. This check is not a guarantee.
+            current_task.mm().ok_or_else(|| errno!(EINVAL))?.check_plausible(
+                user_tz.addr(),
+                std::mem::size_of::<linux_uapi::arch32::timezone>(),
+            )?;
+            track_stub!(TODO("https://fxbug.dev/322874502"), "gettimeofday tz argument");
+        }
+        Ok(())
+    }
+
+    pub fn sys_arch32_clock_gettime(
+        _locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        which_clock: i32,
+        tp_addr: UserRef<linux_uapi::arch32::timespec>,
+    ) -> Result<(), Errno> {
+        let tv = get_clock_gettime(current_task, which_clock)?;
+        current_task.write_object(tp_addr, &(tv.into()))?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "arch32")]
+pub use arch32::*;
 
 #[cfg(test)]
 mod test {

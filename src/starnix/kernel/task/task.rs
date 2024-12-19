@@ -31,11 +31,12 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{
     sigaltstack_contains_pointer, SigSet, Signal, UncheckedSignal, SIGCONT,
 };
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, robust_list_head, sigaction_t, sigaltstack, ucred,
-    CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
+    errno, error, from_status_like_fdio, pid_t, robust_list, robust_list_head, sigaction_t,
+    sigaltstack, uapi, ucred, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED,
+    FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
 use std::ffi::CString;
@@ -321,6 +322,69 @@ pub struct CapturedThreadState {
     pub dirty: bool,
 }
 
+#[cfg(feature = "arch32")]
+#[allow(non_camel_case_types)]
+pub type arch32_robust_list_head = uapi::arch32::robust_list_head;
+#[cfg(not(feature = "arch32"))]
+#[allow(non_camel_case_types)]
+pub type arch32_robust_list_head = uapi::robust_list_head;
+#[cfg(feature = "arch32")]
+#[allow(non_camel_case_types)]
+pub type arch32_robust_list = uapi::arch32::robust_list;
+#[cfg(not(feature = "arch32"))]
+#[allow(non_camel_case_types)]
+pub type arch32_robust_list = uapi::robust_list;
+
+pub type RobustListHeadPtr = MultiArchUserRef<robust_list_head, arch32_robust_list_head>;
+pub type RobustListPtr = MultiArchUserRef<robust_list, arch32_robust_list>;
+
+#[derive(Debug, Default)]
+pub struct RobustListHead {
+    pub list: RobustList,
+    pub futex_offset: isize,
+}
+
+#[derive(Debug, Default)]
+pub struct RobustList {
+    pub next: RobustListPtr,
+}
+
+impl RobustListHead {
+    pub fn read(current_task: &CurrentTask, ptr: RobustListHeadPtr) -> Result<Self, Errno> {
+        match ptr {
+            RobustListHeadPtr::Arch64(user_ref) => {
+                let head = current_task.read_object(user_ref)?;
+                Ok(Self {
+                    list: RobustList { next: RobustListPtr::from(head.list.next) },
+                    futex_offset: head.futex_offset as isize,
+                })
+            }
+            RobustListHeadPtr::Arch32(user_ref) => {
+                let head = current_task.read_object(user_ref)?;
+                Ok(Self {
+                    list: RobustList { next: RobustListPtr::from(head.list.next) },
+                    futex_offset: head.futex_offset as isize,
+                })
+            }
+        }
+    }
+}
+
+impl RobustList {
+    pub fn read(current_task: &CurrentTask, ptr: RobustListPtr) -> Result<Self, Errno> {
+        match ptr {
+            RobustListPtr::Arch64(user_ref) => {
+                let list = current_task.read_object(user_ref)?;
+                Ok(Self { next: RobustListPtr::from(list.next) })
+            }
+            RobustListPtr::Arch32(user_ref) => {
+                let list = current_task.read_object(user_ref)?;
+                Ok(Self { next: RobustListPtr::from(list.next) })
+            }
+        }
+    }
+}
+
 pub struct TaskMutableState {
     // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
     pub clear_child_tid: UserRef<pid_t>,
@@ -372,7 +436,7 @@ pub struct TaskMutableState {
 
     /// A pointer to the head of the robust futex list of this thread in
     /// userspace. See get_robust_list(2)
-    pub robust_list_head: UserRef<robust_list_head>,
+    pub robust_list_head: RobustListHeadPtr,
 
     /// The timer slack used to group timer expirations for the calling thread.
     ///
@@ -1086,7 +1150,7 @@ impl Task {
         no_new_privs: bool,
         seccomp_filter_state: SeccompState,
         seccomp_filters: SeccompFilterContainer,
-        robust_list_head: UserRef<robust_list_head>,
+        robust_list_head: RobustListHeadPtr,
         timerslack_ns: u64,
         security_state: security::TaskState,
     ) -> Self {

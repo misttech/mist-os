@@ -3150,6 +3150,83 @@ pub fn sys_io_uring_register(
     }
 }
 
+// Syscalls for arch32 usage
+#[cfg(feature = "arch32")]
+mod arch32 {
+    use crate::mm::MemoryAccessorExt;
+    use crate::vfs::syscalls::{lookup_at, sys_faccessat, sys_openat, sys_readlinkat, LookupFlags};
+    use crate::vfs::{CurrentTask, FdNumber, FsNode};
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::uapi;
+    use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+
+    pub fn sys_arch32_open(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        flags: u32,
+        mode: FileMode,
+    ) -> Result<FdNumber, Errno> {
+        sys_openat(locked, current_task, FdNumber::AT_FDCWD, user_path, flags, mode)
+    }
+
+    pub fn sys_arch32_access(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        mode: u32,
+    ) -> Result<(), Errno> {
+        sys_faccessat(locked, current_task, FdNumber::AT_FDCWD, user_path, mode)
+    }
+    pub fn stat64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        node: &FsNode,
+        arch32_stat_buf: UserRef<uapi::arch32::stat64>,
+    ) -> Result<(), Errno> {
+        let stat_buffer = node.stat(locked, current_task)?;
+        let result: uapi::arch32::stat64 = stat_buffer.into();
+        // Now we copy to the arch32 version and write.
+        current_task.write_object(arch32_stat_buf, &result)?;
+        Ok(())
+    }
+
+    pub fn sys_arch32_fstat64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        arch32_stat_buf: UserRef<uapi::arch32::stat64>,
+    ) -> Result<(), Errno> {
+        let file = current_task.files.get_allowing_opath(fd)?;
+        stat64(locked, current_task, file.node(), arch32_stat_buf)
+    }
+    pub fn sys_arch32_stat64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        arch32_stat_buf: UserRef<uapi::arch32::stat64>,
+    ) -> Result<(), Errno> {
+        let name =
+            lookup_at(locked, current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+        stat64(locked, current_task, &name.entry.node, arch32_stat_buf)
+    }
+
+    pub fn sys_arch32_readlink(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        buffer: UserAddress,
+        buffer_size: usize,
+    ) -> Result<usize, Errno> {
+        sys_readlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, buffer, buffer_size)
+    }
+}
+
+#[cfg(feature = "arch32")]
+pub use arch32::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;

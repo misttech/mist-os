@@ -18,6 +18,7 @@ use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use starnix_types::arch::ArchWidth;
+use starnix_uapi::user_address::MultiArchUserRef;
 
 use rand::{thread_rng, Rng};
 use range_map::RangeMap;
@@ -2633,6 +2634,18 @@ pub trait MemoryAccessorExt: MemoryAccessor {
                 self.read_memory(user.addr(), buf)
                     .map(|bytes_read| debug_assert_eq!(bytes_read.len(), std::mem::size_of::<T>()))
             })
+        }
+    }
+
+    /// Read an instance of T64 from `user` where the object has a different representation in 32
+    /// and 64 bits.
+    fn read_multi_arch_object<T64: FromBytes, T32: FromBytes + Into<T64>>(
+        &self,
+        user: MultiArchUserRef<T64, T32>,
+    ) -> Result<T64, Errno> {
+        match user {
+            MultiArchUserRef::<T64, T32>::Arch64(user) => self.read_object(user),
+            MultiArchUserRef::<T64, T32>::Arch32(user) => self.read_object(user).map(T32::into),
         }
     }
 
