@@ -758,21 +758,12 @@ impl ResolvedInstanceState {
         let exposes = decl.exposes.iter().filter(|e| !sandbox_construction::is_supported_expose(e));
         let exposes_by_target_name = routing::aggregate_exposes(exposes);
         for (target_name, exposes) in exposes_by_target_name {
-            let first_expose = exposes.first().expect("invalid empty expose list");
-            let request = match first_expose {
-                cm_rust::ExposeDecl::Service(_) | cm_rust::ExposeDecl::Directory(_) => {
-                    Some(RouteRequest::from_expose_decls(&component.moniker, exposes).unwrap())
-                }
-                // These types use bedrock routing.
-                cm_rust::ExposeDecl::Protocol(_)
-                | cm_rust::ExposeDecl::Runner(_)
-                | cm_rust::ExposeDecl::Resolver(_)
-                | cm_rust::ExposeDecl::Config(_) => None,
-                cm_rust::ExposeDecl::Dictionary(_) => None,
-            };
-            let Some(request) = request else {
-                continue;
-            };
+            let request =
+                match routing::request_for_namespace_capability_expose(&component.moniker, exposes)
+                {
+                    Some(r) => r,
+                    None => continue,
+                };
             let Some(capability) = request.into_capability(component) else {
                 continue;
             };

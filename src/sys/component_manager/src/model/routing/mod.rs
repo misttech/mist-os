@@ -21,6 +21,7 @@ use async_trait::async_trait;
 use cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl};
 use cm_types::{Availability, Name};
 use errors::ModelError;
+use moniker::Moniker;
 use router_error::RouterError;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -101,6 +102,34 @@ pub(super) async fn route_and_open_capability_with_reporting(
         Err(e) => {
             report_routing_failure(&route_request, route_request.availability(), &target, &e).await;
             Err(e)
+        }
+    }
+}
+
+/// Create a new `RouteRequest` from an `ExposeDecl`, checking that the capability type can
+/// be installed in a namespace.
+///
+/// REQUIRES: `exposes` is nonempty.
+/// REQUIRES: `exposes` share the same type and target name.
+/// REQUIRES: `exposes.len() > 1` only if it is a service.
+pub fn request_for_namespace_capability_expose(
+    moniker: &Moniker,
+    exposes: Vec<&ExposeDecl>,
+) -> Option<RouteRequest> {
+    let first_expose = exposes.first().expect("invalid empty expose list");
+    match first_expose {
+        cm_rust::ExposeDecl::Protocol(_)
+        | cm_rust::ExposeDecl::Service(_)
+        | cm_rust::ExposeDecl::Directory(_) => {
+            Some(RouteRequest::from_expose_decls(moniker, exposes).unwrap())
+        }
+        // These do not add directory entries.
+        cm_rust::ExposeDecl::Runner(_)
+        | cm_rust::ExposeDecl::Resolver(_)
+        | cm_rust::ExposeDecl::Config(_) => None,
+        cm_rust::ExposeDecl::Dictionary(_) => {
+            // TODO(https://fxbug.dev/301674053): Support this.
+            None
         }
     }
 }
