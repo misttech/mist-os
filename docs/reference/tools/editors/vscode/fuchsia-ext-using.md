@@ -257,7 +257,7 @@ The Fuchsia extension provides a tree view of components on your Fuchsia device.
 This is the equivalent of running [`ffx component list`][ffx-component-list].
 
 To view the Fuchsia component list, open **Run and Debug** (this option is in
-the left side-bar and has a play and bug icon) amd expand the **Fuchsia
+the left side-bar and has a play and bug icon) and expand the **Fuchsia
 Components** section.
 
 <img class="vscode-image vscode-image-center"
