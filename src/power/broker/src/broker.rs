@@ -952,26 +952,6 @@ impl Broker {
                 tracing::debug!("keeping {claim_to_check}, dependent is transiting");
                 continue;
             }
-            // If this is an assertive claim and another activated assertive claim exists whose
-            // required level satisfies its required level, we can drop this claim immediately.
-            if self.catalog.assertive_claims.activated.claims.contains_key(&claim_to_check.id) {
-                for related_claim in self
-                    .catalog
-                    .assertive_claims
-                    .activated
-                    .for_required_element(&claim_to_check.requires().element_id)
-                    .into_iter()
-                    .filter(|c| c.id != claim_to_check.id)
-                {
-                    if related_claim.requires().level.satisfies(claim_to_check.requires().level) {
-                        tracing::debug!(
-                            "claim is redundant, will drop/deactivate {claim_to_check}"
-                        );
-                        claims_to_drop_or_deactivate.push(claim_to_check.clone());
-                        continue;
-                    }
-                }
-            }
             if self.current_level_satisfies(claim_to_check.dependent()) {
                 tracing::debug!("keeping {claim_to_check}, dependent is still satisfied");
                 continue;
@@ -3435,10 +3415,6 @@ mod tests {
             .update(&grandparent, IndexedPowerLevel { level: 90, index: 1 });
         broker_status.assert_matches(&broker);
 
-        // All claims for Lease 1 should now be cleaned up,
-        // even though Lease 2 is still active.
-        assert_lease_cleaned_up(&broker.catalog, &lease1.id);
-
         // Drop lease for Child 2.
         // Child 2's required level should drop to 0.
         broker.drop_lease(&lease2.id).expect("drop failed");
@@ -3464,179 +3440,8 @@ mod tests {
             .required_level
             .update(&grandparent, IndexedPowerLevel { level: 10, index: 0 });
         broker_status.assert_matches(&broker);
-        assert_lease_cleaned_up(&broker.catalog, &lease2.id);
-    }
 
-    #[fuchsia::test]
-    fn test_broker_lease_redundant_claims() {
-        // Create a topology of two child elements with a shared
-        // parent and grandparent
-        // C1 \\
-        //      > P => GP
-        // C2 //
-        // Child 1 ON requires Parent ON.
-        // Parent ON requires Grandparent ON.
-        // C1 => P => GP
-        // Child 2 ON requires Parent ON.
-        // Parent ON requires Grandparent ON.
-        // C2 =>  P => GP
-        let inspect = fuchsia_inspect::component::inspector();
-        let inspect_node = inspect.root().create_child("test");
-        let mut broker = Broker::new(inspect_node);
-        let grandparent_token = DependencyToken::create();
-        let grandparent: ElementID = broker
-            .add_element("GP", OFF.level, BINARY_POWER_LEVELS.to_vec(), vec![])
-            .expect("add_element failed");
-        broker
-            .register_dependency_token(
-                &grandparent,
-                grandparent_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
-                DependencyType::Assertive,
-            )
-            .expect("register_dependency_token failed");
-        let parent_token = DependencyToken::create();
-        let parent: ElementID = broker
-            .add_element(
-                "P",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Assertive,
-                    dependent_level: ON.level,
-                    requires_token: grandparent_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed"),
-                    requires_level_by_preference: vec![ON.level],
-                }],
-            )
-            .expect("add_element failed");
-        broker
-            .register_dependency_token(
-                &parent,
-                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-                DependencyType::Assertive,
-            )
-            .expect("register_dependency_token failed");
-        let child1 = broker
-            .add_element(
-                "C1",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Assertive,
-                    dependent_level: ON.level,
-                    requires_token: parent_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed"),
-                    requires_level_by_preference: vec![ON.level],
-                }],
-            )
-            .expect("add_element failed");
-        let child2 = broker
-            .add_element(
-                "C2",
-                OFF.level,
-                BINARY_POWER_LEVELS.to_vec(),
-                vec![fpb::LevelDependency {
-                    dependency_type: DependencyType::Assertive,
-                    dependent_level: ON.level,
-                    requires_token: parent_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed"),
-                    requires_level_by_preference: vec![ON.level],
-                }],
-            )
-            .expect("add_element failed");
-
-        // Initially, all elements should be OFF.
-        let mut broker_status = BrokerStatusMatcher::new();
-        broker_status.required_level.update(&parent, OFF);
-        broker_status.required_level.update(&grandparent, OFF);
-        broker_status.required_level.update(&child1, OFF);
-        broker_status.required_level.update(&child2, OFF);
-        broker_status.assert_matches(&broker);
-
-        // Acquire lease for Child 1. Initially, Grandparent and Parent
-        // should have required level ON because Child 1 has a dependency
-        // on Parent and Parent has a dependency on Grandparent. Grandparent
-        // has no dependencies so its level should be raised first.
-        let lease1 = broker.acquire_lease(&child1, ON).expect("acquire failed");
-        broker_status.required_level.update(&grandparent, ON);
-        broker_status.lease.update(&lease1.id, LeaseStatus::Pending, false);
-        broker_status.assert_matches(&broker);
-
-        // Raise Grandparent's current level to ON. Now Parent claim should
-        // be enforced, because its dependency on Grandparent is unblocked
-        // raising its required level to ON.
-        broker.update_current_level(&grandparent, ON);
-        broker_status.required_level.update(&parent, ON);
-        broker_status.assert_matches(&broker);
-
-        // Update Parent's current level to ON.
-        // Parent and Grandparent should have required level ON.
-        broker.update_current_level(&parent, ON);
-        broker_status.required_level.update(&child1, ON);
-        broker_status.assert_matches(&broker);
-
-        // Update Child 1's current level to ON.
-        // Lease Child 1's is now satisfied.
-        broker.update_current_level(&child1, ON);
-        broker_status.lease.update(&lease1.id, LeaseStatus::Satisfied, false);
-        broker_status.assert_matches(&broker);
-
-        // Acquire a lease for Child 2. Child 2 requires Parent and
-        // Grandparent ON, which is already met by Child 1's requirements.
-        let lease2 = broker.acquire_lease(&child2, ON).expect("acquire failed");
-        broker_status.required_level.update(&child2, ON);
-        broker_status.lease.update(&lease2.id, LeaseStatus::Pending, false);
-        broker_status.assert_matches(&broker);
-
-        // Update Child 2's current level to ON.
-        // Lease Child 2's is now satisfied.
-        broker.update_current_level(&child2, ON);
-        broker_status.lease.update(&lease2.id, LeaseStatus::Satisfied, false);
-        broker_status.assert_matches(&broker);
-
-        // Drop lease for Child 1.
-        // Child's required level should be OFF.
-        broker.drop_lease(&lease1.id).expect("drop failed");
-        broker_status.required_level.update(&child1, OFF);
-        broker_status.lease.remove(&lease1.id);
-        broker_status.assert_matches(&broker);
-
-        // Drop Child 1's level to OFF.
-        // Parent's required level should not be affected.
-        // Grandparent's required level should not be affected.
-        broker.update_current_level(&child1, OFF);
-        broker_status.lease.remove(&lease1.id);
-        broker_status.assert_matches(&broker);
-
-        // All claims for Lease 1 should now be cleaned up,
-        // even though Lease 2 is still active.
         assert_lease_cleaned_up(&broker.catalog, &lease1.id);
-
-        // Drop lease for Child 2.
-        // Child 2's required level should drop to OFF.
-        broker.drop_lease(&lease2.id).expect("drop failed");
-        broker_status.required_level.update(&child2, OFF);
-        broker_status.lease.remove(&lease2.id);
-        broker_status.assert_matches(&broker);
-
-        // Lower Child 2's current level to OFF.
-        // Parent should have required level OFF.
-        // Grandparent's required level should remain ON.
-        broker.update_current_level(&child2, OFF);
-        broker_status.required_level.update(&parent, OFF);
-        broker_status.assert_matches(&broker);
-
-        // Lower Parent's current level to OFF. Grandparent claim should now be
-        // dropped and have its default required level of OFF.
-        broker.update_current_level(&parent, OFF);
-        broker_status.required_level.update(&grandparent, OFF);
-        broker_status.assert_matches(&broker);
         assert_lease_cleaned_up(&broker.catalog, &lease2.id);
     }
 
@@ -6797,8 +6602,7 @@ mod tests {
 
         // Drop Lease A[3].
         //
-        // A's required level should drop to 0.
-        // B and C's required level should not change.
+        // C's required level should stay at 1 (required by B[2]).
         broker.drop_lease(&lease_a.id).expect("drop_lease failed");
         broker_status.required_level.update(&element_a, ZERO);
         broker_status.lease.remove(&lease_a.id);
@@ -6806,8 +6610,8 @@ mod tests {
 
         // Update A's current level to 0.
         //
-        // B's required level should drop to 0
-        // C's required level should drop to 1 (required by B[2]).
+        // B's required level should now be 0
+        // C's required level should now be 1.
         broker.update_current_level(&element_a, ZERO);
         broker_status.required_level.update(&element_b, ZERO);
         broker_status.required_level.update(&element_c, ONE);
