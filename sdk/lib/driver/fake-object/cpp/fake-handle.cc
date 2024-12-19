@@ -13,7 +13,7 @@
 
 #include "internal.h"
 
-namespace fdf_fake_object {
+namespace fake_object {
 
 __EXPORT
 bool FakeHandleTable::IsValidFakeHandle(zx_handle_t handle) {
@@ -110,4 +110,4 @@ void FakeHandleTable::Dump() {
   }
 }
 
-}  // namespace fdf_fake_object
+}  // namespace fake_object
