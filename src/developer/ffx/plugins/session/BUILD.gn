@@ -41,6 +41,13 @@ group("tests") {
 ffx_tool("ffx_session_tool") {
   edition = "2021"
   output_name = "ffx-session"
+
+  # Needed for Honeydew's SDK inclusion
+  #
+  # TODO(b/330934833): Remove when IDK allows for `testonly` targets in dep
+  # tree or when we can separate the concept of data_dep from host_test_data.
+  testonly = false
+
   deps = [
     ":ffx_session_suite",
     "//src/lib/fuchsia-async",
