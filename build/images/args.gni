@@ -194,11 +194,6 @@ declare_args() {
   # Extra GN targets to include when Bazel assembly is enabled. This list is
   # useful for including verification and other Bazel assembly specific targets.
   extra_bazel_assembly_targets = []
-
-  # Whether to include bootfs test package support inside our bringup image.
-  # Individual tests can be included through either the board or product
-  # bootfs package lists.
-  include_bringup_test_support = false
 }
 
 recovery_is_zedboot =

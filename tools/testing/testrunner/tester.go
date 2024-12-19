@@ -1725,8 +1725,8 @@ func (t *FuchsiaSerialTester) Close() error {
 
 func commandForTest(test *testsharder.Test, useSerial bool, timeout time.Duration) ([]string, error) {
 	command := []string{}
-	if useSerial {
-		// `runtests` is used to run tests over serial.
+	if useSerial && test.PackageURL == "" {
+		// `runtests` is used to run tests over serial when there is no PackageURL.
 		command = []string{runtestsName}
 		if timeout > 0 {
 			command = append(command, "-i", fmt.Sprintf("%d", int64(timeout.Seconds())))

@@ -1034,26 +1034,26 @@ func TestParseOutKernelReader(t *testing.T) {
 
 func TestCommandForTest(t *testing.T) {
 	cases := []struct {
-		name        string
-		test        testsharder.Test
-		useRuntests bool
-		timeout     time.Duration
-		expected    []string
-		wantErr     bool
+		name      string
+		test      testsharder.Test
+		useSerial bool
+		timeout   time.Duration
+		expected  []string
+		wantErr   bool
 	}{
 		{
-			name:        "use runtests URL",
-			useRuntests: true,
+			name:      "use serial URL",
+			useSerial: true,
 			test: testsharder.Test{
 				Test: build.Test{
 					PackageURL: "fuchsia-pkg://example.com/test.cm",
 				},
 			},
-			wantErr: true,
+			expected: []string{"run-test-suite", "--filter-ansi", "fuchsia-pkg://example.com/test.cm"},
 		},
 		{
-			name:        "use runtests path",
-			useRuntests: true,
+			name:      "use serial path",
+			useSerial: true,
 			test: testsharder.Test{
 				Test: build.Test{
 					Path: "/path/to/test",
@@ -1062,8 +1062,8 @@ func TestCommandForTest(t *testing.T) {
 			expected: []string{"runtests", "/path/to/test"},
 		},
 		{
-			name:        "use runtests timeout",
-			useRuntests: true,
+			name:      "use serial timeout",
+			useSerial: true,
 			test: testsharder.Test{
 				Test: build.Test{
 					Path: "/path/to/test",
@@ -1073,8 +1073,8 @@ func TestCommandForTest(t *testing.T) {
 			expected: []string{"runtests", "-i", "1", "/path/to/test"},
 		},
 		{
-			name:        "system path",
-			useRuntests: false,
+			name:      "system path",
+			useSerial: false,
 			test: testsharder.Test{
 				Test: build.Test{
 					Path: "/path/to/test",
@@ -1083,8 +1083,8 @@ func TestCommandForTest(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name:        "components v2",
-			useRuntests: false,
+			name:      "components v2",
+			useSerial: false,
 			test: testsharder.Test{
 				Test: build.Test{
 					Path:       "/path/to/test",
@@ -1094,8 +1094,8 @@ func TestCommandForTest(t *testing.T) {
 			expected: []string{"run-test-suite", "--filter-ansi", "fuchsia-pkg://example.com/test.cm"},
 		},
 		{
-			name:        "components v2 no parallel",
-			useRuntests: false,
+			name:      "components v2 no parallel",
+			useSerial: false,
 			test: testsharder.Test{
 				Test: build.Test{
 					Path:       "/path/to/test",
@@ -1105,8 +1105,8 @@ func TestCommandForTest(t *testing.T) {
 			expected: []string{"run-test-suite", "--filter-ansi", "fuchsia-pkg://example.com/test.cm"},
 		},
 		{
-			name:        "components v2 parallel",
-			useRuntests: false,
+			name:      "components v2 parallel",
+			useSerial: false,
 			test: testsharder.Test{
 				Test: build.Test{
 					Path:       "/path/to/test",
@@ -1117,8 +1117,8 @@ func TestCommandForTest(t *testing.T) {
 			expected: []string{"run-test-suite", "--filter-ansi", "--parallel", "2", "fuchsia-pkg://example.com/test.cm"},
 		},
 		{
-			name:        "components v2 timeout",
-			useRuntests: false,
+			name:      "components v2 timeout",
+			useSerial: false,
 			test: testsharder.Test{
 				Test: build.Test{
 					Path:       "/path/to/test",
@@ -1129,8 +1129,8 @@ func TestCommandForTest(t *testing.T) {
 			expected: []string{"run-test-suite", "--filter-ansi", "--timeout", "1", "fuchsia-pkg://example.com/test.cm"},
 		},
 		{
-			name:        "components v2 with realm",
-			useRuntests: false,
+			name:      "components v2 with realm",
+			useSerial: false,
 			test: testsharder.Test{
 				Test: build.Test{
 					Path:       "/path/to/test",
@@ -1141,8 +1141,8 @@ func TestCommandForTest(t *testing.T) {
 			expected: []string{"run-test-suite", "--filter-ansi", "--realm", "/some/realm", "fuchsia-pkg://example.com/test.cm"},
 		},
 		{
-			name:        "components v2 with empty realm",
-			useRuntests: false,
+			name:      "components v2 with empty realm",
+			useSerial: false,
 			test: testsharder.Test{
 				Test: build.Test{
 					Path:       "/path/to/test",
@@ -1156,7 +1156,7 @@ func TestCommandForTest(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			command, err := commandForTest(&c.test, c.useRuntests, c.timeout)
+			command, err := commandForTest(&c.test, c.useSerial, c.timeout)
 			if err == nil {
 				if c.wantErr {
 					t.Errorf("commandForTest returned nil error, want non-nil error")

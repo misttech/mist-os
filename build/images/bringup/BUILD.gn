@@ -10,6 +10,7 @@ import("//build/board.gni")
 import("//build/images/args.gni")
 import("//build/images/custom_signing.gni")
 import("//build/images/vboot/vboot.gni")
+import("//build/product.gni")
 import("//build/sdk/product_bundle.gni")
 import("//build/security.gni")
 import("//zircon/kernel/phys/qemu.gni")
@@ -49,32 +50,8 @@ _partitions_config_file =
     get_label_info(_partitions_config, "target_out_dir") + "/" +
     get_label_info(_partitions_config, "name") + "/partitions_config.json"
 
-product_assembly_configuration("product_assembly_config") {
-  platform = {
-    feature_set_level = "bootstrap"
-    build_type = "eng"
-    kernel = {
-      oom_behavior = "job_kill"
-    }
-    development_support = {
-      include_netsvc = true
-      if (include_bringup_test_support) {
-        include_bootstrap_testing_framework = true
-      }
-    }
-    storage = {
-      filesystems = {
-        image_name = "bringup"
-        image_mode = "no_image"
-      }
-    }
-  }
-
-  # The bringup product can't specify anything in base/cache packages, as it
-  # doesn't have an fvm with blobfs.
-  product = {
-  }
-}
+assert(fuchsia_product_assembly_config_label != false,
+       "fuchsia_product_assembly_config_label must be defined to use bringup")
 
 bringup_base = {
   testonly = true
@@ -91,7 +68,7 @@ bringup_base = {
     generate_signed_zbi = true
   }
 
-  product_assembly_config_label = ":product_assembly_config"
+  product_assembly_config_label = fuchsia_product_assembly_config_label
   board_config_label = board_configuration_label
   use_bringup_platform_bundles_only = true
 

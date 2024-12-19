@@ -1,0 +1,49 @@
+# Copyright 2024 The Fuchsia Authors.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/product_assembly_configuration.gni")
+
+# This is the base platform configuration used by bringup
+_platform_configuration_base = {
+  feature_set_level = "bootstrap"
+  build_type = "eng"
+  kernel = {
+    oom_behavior = "job_kill"
+  }
+  development_support = {
+    include_netsvc = true
+  }
+  storage = {
+    filesystems = {
+      image_name = "bringup"
+      image_mode = "no_image"
+    }
+  }
+}
+
+product_assembly_configuration("bringup") {
+  testonly = true
+  platform = {
+    forward_variables_from(_platform_configuration_base, "*")
+  }
+}
+
+product_assembly_configuration("bringup_with_tests") {
+  testonly = true
+  platform = {
+    forward_variables_from(_platform_configuration_base, "*")
+    development_support.include_bootstrap_testing_framework = true
+    power = {
+      enable_non_hermetic_testing = true
+    }
+  }
+
+  # These packages will be added to the bootfs package set since the image_mode is no_image.
+  base_packages = [
+    {
+      package_target =
+          "//src/power/testing/system-integration/example:bootstrap_pkg"
+    },
+  ]
+}

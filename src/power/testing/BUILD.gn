@@ -12,6 +12,7 @@ group("tests") {
   testonly = true
   deps = [
     "client:tests",
+    "system-integration:tests",
     "thermal-test-control:tests",
   ]
 }

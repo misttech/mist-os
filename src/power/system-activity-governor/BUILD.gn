@@ -8,6 +8,9 @@ import("//build/rust/rustc_binary.gni")
 rustc_binary("bin") {
   name = "system_activity_governor"
   edition = "2021"
+
+  configs += [ "//build/config/rust:bootfs" ]
+
   sources = [
     "src/cpu_element_manager.rs",
     "src/cpu_manager.rs",

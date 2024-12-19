@@ -97,6 +97,9 @@ _log_severity_allowed_val = [
 #     details.
 #     Type: list of targets
 #
+#   is_bootfs (optional)
+#     ONLY to be used by |fuchsia_bootfs_test_package| to indicate a bootfs based package.
+#
 #   data_deps
 #   deps
 #   visibility
@@ -118,6 +121,11 @@ template("fuchsia_test_package") {
     }
     if (defined(invoker.test_specs)) {
       test_specs = invoker.test_specs
+    }
+
+    if (defined(invoker.is_bootfs) && invoker.is_bootfs) {
+      test_specs.build_rule = "fuchsia_bootfs_test_package"
+      test_specs.expects_ssh = false
     }
 
     # test packages won't be configured by assembly tools, so we can check their config earlier
@@ -148,7 +156,11 @@ template("fuchsia_test_package") {
       manifest_path = get_target_outputs(test)
       manifest_name = get_path_info(manifest_path[0], "file")
 
-      test_url = "fuchsia-pkg://fuchsia.com/$package_name#meta/$manifest_name"
+      if (defined(invoker.is_bootfs) && invoker.is_bootfs) {
+        test_url = "fuchsia-boot:///$package_name#meta/$manifest_name"
+      } else {
+        test_url = "fuchsia-pkg://fuchsia.com/$package_name#meta/$manifest_name"
+      }
 
       _max_severity_logs = "WARN"
 
@@ -343,5 +355,16 @@ template("fuchsia_test_package") {
       deps = [ ":$target_name($default_toolchain)" ]
     }
     not_needed(invoker, "*")
+  }
+}
+
+# Identical to |fuchsia_test_package| with the exceptions that:
+#  - The generated url will be a bootfs "fuchsia-boot:///" url.
+#  - The 'build_rule' in the test specs metadata will be "fuchsia_bootfs_test_package".
+#  - The 'expects_ssh' field in the test specs metadata is set to false.
+template("fuchsia_bootfs_test_package") {
+  fuchsia_test_package(target_name) {
+    forward_variables_from(invoker, "*")
+    is_bootfs = true
   }
 }

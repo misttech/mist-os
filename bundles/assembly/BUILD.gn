@@ -4344,10 +4344,19 @@ assembly_input_bundle("power_framework_sag") {
   ]
 }
 
+# Power Framework power broker.
+#
+# feature_set_levels: all except embeddable
+# build-types: eng, userdebug
+#
+assembly_input_bundle("power_framework_broker") {
+  bootfs_packages = [ "//src/power/broker:package" ]
+}
+
 # Power Framework System Activity Governor for testing. This provides extra controls over the
 # internal state that should only happen for testing.
 #
-# feature_set_levels: all
+# feature_set_levels: all except embeddable
 # build-types: eng
 #
 assembly_input_bundle("power_framework_testing_sag") {
@@ -4356,6 +4365,17 @@ assembly_input_bundle("power_framework_testing_sag") {
     "//src/power/system-activity-governor/fake:package",
     "//src/power/testing/fake-suspend:fake-suspend-pkg",
   ]
+}
+
+# TODO(https://fxbug.dev/335526423): Remove when migrated to power testing phase 2.
+#
+# Bootstrap shard for the power_framework_testing_sag.
+#
+# feature_set_levels: all except embeddable
+# build-types: eng
+#
+assembly_input_bundle(
+    "power_framework_testing_sag_bootstrap_shard_deprecated") {
   compiled_packages = [
     {
       bootfs_package = true
@@ -4368,15 +4388,6 @@ assembly_input_bundle("power_framework_testing_sag") {
       ]
     },
   ]
-}
-
-# Power Framework Support.
-#
-# feature_set_levels: all
-# build-types: eng, userdebug
-#
-assembly_input_bundle("power_framework") {
-  bootfs_packages = [ "//src/power/broker:package" ]
 }
 
 # Power framework cli tools

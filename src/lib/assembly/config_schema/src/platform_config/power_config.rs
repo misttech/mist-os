@@ -17,4 +17,9 @@ pub struct PowerConfig {
     /// is also true, as there is no SAG when suspend support is disabled.
     /// TODO(https://fxbug.dev/335526423): Remove when no longer needed.
     pub testing_sag_enabled: bool,
+
+    /// Whether to include the power framework components that are needed
+    /// for power system non-hermetic testing in the platform.
+    #[serde(default)]
+    pub enable_non_hermetic_testing: bool,
 }

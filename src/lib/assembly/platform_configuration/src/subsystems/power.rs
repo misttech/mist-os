@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::{ensure, Context};
+use anyhow::Context;
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::power_config::PowerConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
@@ -59,54 +59,91 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
 
         if *context.feature_set_level != FeatureSupportLevel::Embeddable {
             builder.platform_bundle("legacy_power_framework");
-            if config.suspend_enabled {
-                ensure!(*context.build_type != BuildType::User);
-                builder.platform_bundle("power_framework");
+        }
 
-                builder.set_config_capability(
-                    "fuchsia.power.WaitForSuspendingToken",
-                    Config::new(
-                        ConfigValueType::Bool,
-                        context.board_info.provides_feature("fuchsia::suspending_token").into(),
-                    ),
-                )?;
+        if config.enable_non_hermetic_testing {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng, BuildType::UserDebug],
+                &[
+                    FeatureSupportLevel::Bootstrap,
+                    FeatureSupportLevel::Utility,
+                    FeatureSupportLevel::Standard,
+                ],
+                "enable_non_hermetic_testing",
+            )?;
 
-                builder.set_config_capability(
-                    "fuchsia.power.UseSuspender",
-                    Config::new(
-                        ConfigValueType::Bool,
-                        context.board_info.provides_feature("fuchsia::suspender").into(),
-                    ),
-                )?;
+            builder.platform_bundle("power_framework_broker");
+            builder.platform_bundle("power_framework_testing_sag");
+        }
 
-                match context.feature_set_level {
-                    FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => {}
-                    FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {
-                        // Include only when the base package set is available
-                        builder.platform_bundle("power_framework_development_support");
-                    }
-                }
+        if config.suspend_enabled {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng, BuildType::UserDebug],
+                &[
+                    FeatureSupportLevel::Bootstrap,
+                    FeatureSupportLevel::Utility,
+                    FeatureSupportLevel::Standard,
+                ],
+                "suspend_enabled",
+            )?;
 
-                match config.testing_sag_enabled {
-                    true => {
-                        builder.platform_bundle("power_framework_testing_sag");
-                    }
-                    false => {
-                        builder.platform_bundle("power_framework_sag");
-                        builder.platform_bundle("topology_test_daemon");
-                    }
+            builder.platform_bundle("power_framework_broker");
+
+            builder.set_config_capability(
+                "fuchsia.power.WaitForSuspendingToken",
+                Config::new(
+                    ConfigValueType::Bool,
+                    context.board_info.provides_feature("fuchsia::suspending_token").into(),
+                ),
+            )?;
+
+            builder.set_config_capability(
+                "fuchsia.power.UseSuspender",
+                Config::new(
+                    ConfigValueType::Bool,
+                    context.board_info.provides_feature("fuchsia::suspender").into(),
+                ),
+            )?;
+
+            match context.feature_set_level {
+                FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => {}
+                FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {
+                    // Include only when the base package set is available as
+                    // these require the core realm, and base package functionality.
+                    builder.platform_bundle("topology_test_daemon");
+                    builder.platform_bundle("power_framework_development_support");
                 }
             }
-            if let Some(cpu_manager_config) = &context.board_info.configuration.cpu_manager {
-                builder.platform_bundle("cpu_manager");
-                builder
-                    .bootfs()
-                    .file(FileEntry {
-                        source: cpu_manager_config.as_utf8_pathbuf().into(),
-                        destination: BootfsDestination::CpuManagerNodeConfig,
-                    })
-                    .context("Adding cpu_manager config file")?;
+
+            // These are mutually exclusive as power_framework_sag has a bootrstrap shard that
+            // conflicts with the testing_sag variant.
+            if config.testing_sag_enabled {
+                builder.platform_bundle("power_framework_testing_sag");
+                builder.platform_bundle("power_framework_testing_sag_bootstrap_shard_deprecated");
+            } else {
+                builder.platform_bundle("power_framework_sag");
             }
+        }
+
+        if let Some(cpu_manager_config) = &context.board_info.configuration.cpu_manager {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng, BuildType::UserDebug, BuildType::User],
+                &[
+                    FeatureSupportLevel::Bootstrap,
+                    FeatureSupportLevel::Utility,
+                    FeatureSupportLevel::Standard,
+                ],
+                "cpu_manager",
+            )?;
+
+            builder.platform_bundle("cpu_manager");
+            builder
+                .bootfs()
+                .file(FileEntry {
+                    source: cpu_manager_config.as_utf8_pathbuf().into(),
+                    destination: BootfsDestination::CpuManagerNodeConfig,
+                })
+                .context("Adding cpu_manager config file")?;
         }
 
         builder.set_config_capability(

@@ -8,6 +8,9 @@ import("//build/rust/rustc_binary.gni")
 rustc_binary("bin") {
   name = "test_system_activity_governor"
   edition = "2021"
+
+  configs += [ "//build/config/rust:bootfs" ]
+
   sources = [
     "src/main.rs",
     "src/system_activity_governor_control.rs",
@@ -43,10 +46,7 @@ fuchsia_component("component") {
 
 fuchsia_package("package") {
   package_name = "fake-system-activity-governor"
-  deps = [
-    ":component",
-    "//src/power/testing/fake-suspend",
-  ]
+  deps = [ ":component" ]
 }
 
 group("tests") {

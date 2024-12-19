@@ -102,7 +102,7 @@ bootstrap_userdebug_platform_aib_names = [
   "paravirtualization_support_bootstrap",
 
   # Power Framework
-  "power_framework",
+  "power_framework_broker",
   "power_framework_sag",
 
   # Trusted application support.
@@ -135,6 +135,7 @@ bootstrap_eng_platform_aib_names = [
 
   # Power Framework
   "power_framework_testing_sag",
+  "power_framework_testing_sag_bootstrap_shard_deprecated",
 
   # Storage
   "fshost_storage_host_fxfs",
@@ -451,10 +452,11 @@ experimental_aib_names = [
   "fshost_storage_host_fvm_minfs",
   "nanohub_support",
   "paravirtualization_support_bootstrap",
-  "power_framework",
+  "power_framework_broker",
   "power_framework_sag",
   "power_framework_development_support",
   "power_framework_testing_sag",
+  "power_framework_testing_sag_bootstrap_shard_deprecated",
 
   # Wake alarms support: generic and then hardware-specific.
   "timekeeper_wake_alarms",
