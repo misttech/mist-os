@@ -1509,10 +1509,7 @@ fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildName) -> bo
         OfferTarget::Collection(target_collection) => {
             Some(target_collection) == child_moniker.collection()
         }
-        OfferTarget::Capability(_target_capability) => {
-            // TODO(https://fxbug.dev/301674053): Support dictionary targets.
-            false
-        }
+        OfferTarget::Capability(_) => false,
     }
 }
 
