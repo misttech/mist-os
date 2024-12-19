@@ -16,7 +16,7 @@ use starnix_core::vfs::{
     FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
     FsString, VecDirectory, VecDirectoryEntry,
 };
-use starnix_logging::track_stub;
+use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::auth::FsCred;
@@ -205,10 +205,18 @@ impl CgroupChildren {
         let mut child_state = child.state.lock();
         assert!(!child_state.deleted, "child cannot be deleted");
 
-        if !get_pids_locked(&mut child_state).is_empty() {
+        let pids = get_pids_locked(&mut child_state);
+        if !pids.is_empty() {
+            // TODO(https://fxbug.dev/384194637): Remove warning log
+            log_warn!("Cannot remove due to active processes: {:?}", pids);
             return error!(EBUSY);
         }
         if !child_state.children.is_empty() {
+            // TODO(https://fxbug.dev/384194637): Remove warning log
+            log_warn!(
+                "Cannot remove due to sub-cgroups: {:?}",
+                child_state.children.keys().cloned().collect::<Vec<FsString>>()
+            );
             return error!(EBUSY);
         }
 

@@ -120,6 +120,7 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
     mask_helper.waitForSignal(SIGUSR1);
     kill(parent_pid, SIGUSR1);
   });
+  printf("Test proc (%d) folked child (%d)\n", parent_pid, child_pid);
   test_pids_.push_back(child_pid);
 
   // Write the child PID to the cgroup
