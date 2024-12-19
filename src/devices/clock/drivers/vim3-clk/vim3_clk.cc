@@ -4,11 +4,11 @@
 
 #include "vim3_clk.h"
 
-#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio-view.h>
@@ -32,27 +32,24 @@ Vim3Clock::Vim3Clock(fdf::DriverStartArgs start_args,
 zx::result<> Vim3Clock::Start() {
   FDF_LOG(INFO, "Vim3Clock::Start()");
 
-  zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
-  if (pdev_client.is_error() || !pdev_client->is_valid()) {
-    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev_client.status_string());
-    return pdev_client.take_error();
+  fdf::PDev pdev;
+  {
+    zx::result result = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to connect to platform device: %s", result.status_string());
+      return result.take_error();
+    }
+    pdev = fdf::PDev{std::move(result.value())};
   }
 
-  zx::result pdev_result = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
-  if (pdev_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to open pdev service: %s", pdev_result.status_string());
-    return pdev_result.take_error();
-  }
-  fidl::WireSyncClient pdev(std::move(pdev_result.value()));
-
-  auto hiu_mmio = MapMmio(pdev, kHiuMmioIndex);
+  zx::result hiu_mmio = pdev.MapMmio(kHiuMmioIndex);
   if (hiu_mmio.is_error()) {
     FDF_LOG(ERROR, "Failed to map HIU mmio, st = %s", zx_status_get_string(hiu_mmio.error_value()));
     return hiu_mmio.take_error();
   }
   hiu_mmio_ = std::move(hiu_mmio.value());
 
-  auto dos_mmio = MapMmio(pdev, kDosMmioIndex);
+  zx::result dos_mmio = pdev.MapMmio(kDosMmioIndex);
   if (dos_mmio.is_error()) {
     FDF_LOG(ERROR, "Failed to map DOS mmio, st = %s", zx_status_get_string(dos_mmio.error_value()));
     return dos_mmio.take_error();
@@ -336,34 +333,6 @@ void Vim3Clock::InitCpuClks() {
   }
 
   FDF_LOG(INFO, "vim3 cpu plls initialized with %lu entries", cpu_clks_.size());
-}
-
-zx::result<fdf::MmioBuffer> Vim3Clock::MapMmio(
-    const fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev, uint32_t idx) {
-  auto mmio = pdev->GetMmioById(idx);
-  if (!mmio.ok()) {
-    FDF_LOG(ERROR, "Call to GetMmioById(%d) failed: %s", idx, mmio.FormatDescription().c_str());
-    return zx::error(mmio.status());
-  }
-  if (mmio->is_error()) {
-    FDF_LOG(ERROR, "GetMmioById(%d) failed: %s", idx, zx_status_get_string(mmio->error_value()));
-    return mmio->take_error();
-  }
-
-  if (!mmio->value()->has_vmo() || !mmio->value()->has_size() || !mmio->value()->has_offset()) {
-    FDF_LOG(ERROR, "GetMmioById(%d) returned invalid MMIO", idx);
-    return zx::error(ZX_ERR_BAD_STATE);
-  }
-
-  zx::result mmio_buffer =
-      fdf::MmioBuffer::Create(mmio->value()->offset(), mmio->value()->size(),
-                              std::move(mmio->value()->vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
-  if (mmio_buffer.is_error()) {
-    FDF_LOG(ERROR, "Failed to map MMIO: %s", mmio_buffer.status_string());
-    return zx::error(mmio_buffer.error_value());
-  }
-
-  return mmio_buffer.take_value();
 }
 
 }  // namespace vim3_clock
