@@ -54,7 +54,7 @@ impl DebugAgent {
             .attach_to(
                 TEST_ROOT_REALM_NAME,
                 fdbg::FilterType::MonikerSuffix,
-                &fdbg::FilterOptions { job_only: Some(true), ..Default::default() },
+                &fdbg::FilterOptions { recursive: Some(true), ..Default::default() },
             )
             .await
             .map_err(|e| DebugAgentError::AttachToTestsLocal(e))?
@@ -99,7 +99,10 @@ impl DebugAgent {
                     filter: Some(fdbg::Filter {
                         pattern: TEST_ROOT_REALM_NAME.to_string(),
                         type_: fdbg::FilterType::MonikerSuffix,
-                        options: fdbg::FilterOptions { ..Default::default() },
+                        options: fdbg::FilterOptions {
+                            recursive: Some(true),
+                            ..Default::default()
+                        },
                     }),
                     interest: Some(fdbg::ThreadDetailsInterest {
                         backtrace: Some(true),
@@ -245,7 +248,10 @@ mod test {
                     filter: Some(fdbg::Filter {
                         pattern: TEST_ROOT_REALM_NAME.to_string(),
                         type_: fdbg::FilterType::MonikerSuffix,
-                        options: fdbg::FilterOptions { ..Default::default() },
+                        options: fdbg::FilterOptions {
+                            recursive: Some(true),
+                            ..Default::default()
+                        },
                     }),
                     interest: Some(fdbg::ThreadDetailsInterest {
                         backtrace: Some(true),
@@ -441,7 +447,7 @@ mod test {
                     .expect_attach_to(
                         TEST_ROOT_REALM_NAME,
                         fdbg::FilterType::MonikerSuffix,
-                        fdbg::FilterOptions { job_only: Some(true), ..Default::default() },
+                        fdbg::FilterOptions { recursive: Some(true), ..Default::default() },
                         0,
                     )
                     .await;
