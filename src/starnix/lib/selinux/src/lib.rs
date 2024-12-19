@@ -497,6 +497,8 @@ class_permission_enum! {
         GetSession("getsession"),
         /// Permission to trace a process.
         Ptrace("ptrace"),
+        /// Permission to inherit the parent process's resource limits on exec.
+        RlimitInh("rlimitinh"),
         /// Permission to set the calling task's current Security Context.
         /// The "dyntransition" permission separately limits which Contexts "setcurrent" may be used to transition to.
         SetCurrent("setcurrent"),

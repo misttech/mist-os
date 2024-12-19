@@ -941,7 +941,7 @@ impl CurrentTask {
             .map_err(|status| from_status_like_fdio!(status))?;
 
         // Update the SELinux state, if enabled.
-        // TODO: Do we need to update this state after up the creds for exec?
+        // TODO: Do we need to update this state after updating the creds for exec?
         security::update_state_on_exec(self, &resolved_elf.security_state);
 
         {

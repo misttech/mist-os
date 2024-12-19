@@ -6,14 +6,15 @@ use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid, fs_node_set_label_with_task,
     todo_check_permission, FsNode, PermissionCheck, ProcessPermission, TaskAttrs,
 };
-use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityServer};
+use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use crate::TODO_DENY;
 use selinux::{FdPermission, FilePermission, NullessByteStr, ObjectClass};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
-use starnix_uapi::{errno, error};
+use starnix_uapi::{errno, error, rlimit};
 
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
 /// resolved elf.
@@ -22,21 +23,33 @@ pub fn update_state_on_exec(
     current_task: &CurrentTask,
     elf_security_state: &ResolvedElfState,
 ) {
-    close_inaccessible_file_descriptors(security_server, current_task, elf_security_state);
+    let (new_sid, old_sid) = {
+        let task_attrs = &mut current_task.security_state.lock();
+        let previous_sid = task_attrs.current_sid;
 
-    let task_attrs = &mut current_task.security_state.lock();
-    let previous_sid = task_attrs.current_sid;
-
-    **task_attrs = TaskAttrs {
-        current_sid: elf_security_state
-            .sid
-            .expect("SELinux enabled but missing resolved elf state"),
-        previous_sid,
-        exec_sid: None,
-        fscreate_sid: None,
-        keycreate_sid: None,
-        sockcreate_sid: None,
+        **task_attrs = TaskAttrs {
+            current_sid: elf_security_state
+                .sid
+                .expect("SELinux enabled but missing resolved elf state"),
+            previous_sid,
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            sockcreate_sid: None,
+        };
+        (task_attrs.current_sid, previous_sid)
     };
+    if new_sid == old_sid {
+        return;
+    }
+    // Do the work of the `selinux_bprm_post_apply_creds` hook:
+    // 1. Revoke access to any file descriptors that `current_task` is not permitted to access.
+    // 2. Reset resource limits if `current_task` is not permitted to inherit rlimits.
+    // 3. TODO(https://fxbug.dev/378655436): Reset signal state if `current task` is not
+    //    permitted to inherit the parent task's signal state.
+    // 4. TODO(https://fxbug.dev/331815418): Wake the parent task if waiting on `current_task`.
+    close_inaccessible_file_descriptors(security_server, current_task, new_sid);
+    maybe_reset_rlimits(security_server, current_task, old_sid, new_sid);
 }
 
 /// "Closes" file descriptors that `current_task` does not have permission to access by remapping
@@ -44,7 +57,7 @@ pub fn update_state_on_exec(
 fn close_inaccessible_file_descriptors(
     security_server: &Arc<SecurityServer>,
     current_task: &CurrentTask,
-    elf_security_state: &ResolvedElfState,
+    new_sid: SecurityId,
 ) {
     let kernel_state = current_task
         .kernel()
@@ -56,8 +69,7 @@ fn close_inaccessible_file_descriptors(
     let null_file_handle =
         kernel_state.selinuxfs_null.get().expect("selinuxfs_init_null() has been called").clone();
 
-    let source_sid =
-        elf_security_state.sid.expect("resolved elf state sid when selinux is enabled");
+    let source_sid = new_sid;
     let permission_check = security_server.as_permission_check();
     // Remap-to-null any fds that failed a check for allowing
     // `[child-process] [fd-from-child-fd-table]:fd { use }`.
@@ -74,6 +86,40 @@ fn close_inaccessible_file_descriptors(
             Ok(_) => None,
             _ => Some(null_file_handle.clone()),
         }
+    });
+}
+
+/// Checks the `rlimitinh` permission for the current task. If the permission is denied, resets
+/// the current task's resource limits.
+fn maybe_reset_rlimits(
+    security_server: &Arc<SecurityServer>,
+    current_task: &CurrentTask,
+    old_sid: SecurityId,
+    new_sid: SecurityId,
+) {
+    let permission_check = security_server.as_permission_check();
+    if check_permission(&permission_check, old_sid, new_sid, ProcessPermission::RlimitInh).is_ok() {
+        // Allow the resource limit inheritance that was applied when the current
+        // task was created.
+        return;
+    }
+    // Compute the new soft resource limits for the current task.
+    // For each resource, the new soft limit is the minimum of the current task's hard limit
+    // and the initial task's soft limit.
+    let weak_init = current_task.kernel().pids.read().get_task(1);
+    let init_task = weak_init.upgrade().expect("get the initial task");
+    let init_rlimits = { init_task.thread_group.limits.lock().clone() };
+    let mut current_rlimits = current_task.thread_group.limits.lock();
+    (Resource::ALL).iter().for_each(|resource| {
+        let current = current_rlimits.get(*resource);
+        let init = init_rlimits.get(*resource);
+        current_rlimits.set(
+            *resource,
+            rlimit {
+                rlim_cur: std::cmp::min(init.rlim_cur, current.rlim_max),
+                rlim_max: current.rlim_max,
+            },
+        )
     });
 }
 
@@ -641,7 +687,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn state_is_updated_on_exec() {
+    async fn security_state_is_updated_on_exec() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
             |_locked, current_task, security_server| {
                 let initial_state = {
@@ -677,6 +723,83 @@ mod tests {
                         sockcreate_sid: None,
                     }
                 );
+            },
+        )
+    }
+
+    #[fuchsia::test]
+    // The hooks_tests_policy denies the `rlimitinh` permission (implicitly, via `handle_unknown deny`)
+    // for processes, so resource limits should be reset when the SID changes during exec.
+    async fn handle_rlimitinh_on_exec() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |mut locked, current_task, security_server| {
+                // In this testing context, `current_task` is the initial task.
+                // Set its rlimits to some known values.
+                assert_eq!(current_task.id, 1);
+                {
+                    let mut initial_limits = current_task.thread_group.limits.lock();
+                    (Resource::ALL).iter().for_each(|resource| {
+                        initial_limits.set(*resource, rlimit { rlim_cur: 10, rlim_max: 20 });
+                    })
+                }
+                // Clone the initial task, then set the child task's rlimits to some new values.
+                let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+                {
+                    let mut child_limits = child_task.thread_group.limits.lock();
+                    (Resource::ALL).iter().for_each(|resource| {
+                        child_limits.set(*resource, rlimit { rlim_cur: 30, rlim_max: 40 });
+                    })
+                }
+
+                // Clone the child task. Before exec, the grandchild task's rlimits should be equal
+                // to its parent's.
+                let grandchild_task = child_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+                let parent_limits = { child_task.thread_group.limits.lock().clone() };
+                let pre_exec_limits = { grandchild_task.thread_group.limits.lock().clone() };
+                {
+                    (Resource::ALL).iter().for_each(|resource| {
+                        let parent = parent_limits.get(*resource);
+                        let pre_exec = pre_exec_limits.get(*resource);
+                        assert_eq!(parent.rlim_cur, pre_exec.rlim_cur);
+                        assert_eq!(parent.rlim_max, pre_exec.rlim_max);
+                    })
+                }
+
+                // Simulate exec of the grandchild task into a new domain.
+                let old_sid = { child_task.security_state.lock().current_sid };
+                let new_sid = security_server
+                    .security_context_to_sid(b"u:object_r:test_valid_t:s0".into())
+                    .expect("invalid security context");
+                assert_ne!(old_sid, new_sid);
+                update_state_on_exec(&grandchild_task, &ResolvedElfState { sid: Some(new_sid) });
+
+                let post_exec_limits = { grandchild_task.thread_group.limits.lock().clone() };
+                {
+                    (Resource::ALL).iter().for_each(|resource| {
+                        let pre_exec = pre_exec_limits.get(*resource);
+                        let post_exec = post_exec_limits.get(*resource);
+                        // Soft limits are reset to the minimum of the pre-exec hard limit and
+                        // the initial task's soft limit.
+                        assert_eq!(post_exec.rlim_cur, 10);
+                        // Hard limits are unchanged.
+                        assert_eq!(pre_exec.rlim_max, post_exec.rlim_max);
+                    })
+                }
+
+                // rlimits are not reset when the task SID does not change.
+                let same_domain_task =
+                    child_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+                update_state_on_exec(&same_domain_task, &ResolvedElfState { sid: Some(old_sid) });
+                let same_domain_limits = { same_domain_task.thread_group.limits.lock().clone() };
+                {
+                    let parent_limits = { child_task.thread_group.limits.lock().clone() };
+                    (Resource::ALL).iter().for_each(|resource| {
+                        let parent = parent_limits.get(*resource);
+                        let same_domain = same_domain_limits.get(*resource);
+                        assert_eq!(parent.rlim_cur, same_domain.rlim_cur);
+                        assert_eq!(parent.rlim_max, same_domain.rlim_max);
+                    })
+                }
             },
         )
     }

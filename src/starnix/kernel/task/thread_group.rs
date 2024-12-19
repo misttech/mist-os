@@ -128,7 +128,7 @@ pub struct ThreadGroupMutableState {
 /// userspace convention, and nothing stops userspace from using `CLONE_THREAD` without
 /// `CLONE_FILES`, for example.
 ///
-/// In Starnix, a `ThreadGroup` corresponds to a Zicon process, which means we do not support the
+/// In Starnix, a `ThreadGroup` corresponds to a Zircon process, which means we do not support the
 /// `CLONE_THREAD` flag without the `CLONE_VM` flag. If we run into problems with this limitation,
 /// we might need to revise this correspondence.
 ///
