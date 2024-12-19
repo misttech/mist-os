@@ -23,6 +23,28 @@ using starnix::FdFlags;
 using starnix::FdFlagsEnum;
 using starnix::FdNumber;
 
+bool test_sys_dup2() {
+  BEGIN_TEST;
+  auto [kernel, current_task] =
+      starnix::testing::create_kernel_task_and_unlocked_with_bootfs_current_zbi();
+  auto fd = FdNumber::from_raw(42);
+  auto result = sys_dup2(*current_task, fd, fd);
+  ASSERT_TRUE(result.is_error());
+  ASSERT_EQ(errno(EBADF).error_code(), result.error_value().error_code());
+
+  auto file_handle = current_task->open_file("data/testfile.txt", OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(file_handle.is_ok(), "open_file");
+
+  auto fd_or_error = (*current_task)->add_file(file_handle.value(), FdFlags::empty());
+  ASSERT_TRUE(fd_or_error.is_ok(), "add");
+  fd = fd_or_error.value();
+
+  result = sys_dup2(*current_task, fd, fd);
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_EQ(fd.raw(), result.value().raw());
+
+  END_TEST;
+}
 
 bool test_sys_creat() {
   BEGIN_TEST;
@@ -48,5 +70,6 @@ bool test_sys_creat() {
 }  // namespace testing
 
 UNITTEST_START_TESTCASE(starnix_arch_syscalls)
+UNITTEST("test sys dup2", testing::test_sys_dup2)
 UNITTEST("test sys creat", testing::test_sys_creat)
 UNITTEST_END_TESTCASE(starnix_arch_syscalls, "starnix_arch_syscalls", "Tests for Tasks Syscalls")
