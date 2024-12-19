@@ -415,24 +415,11 @@ void platform_mexec_prep(uintptr_t new_bootimage_addr, size_t new_bootimage_len)
 // that lives outside of the kernel address space (comes from IdAllocator).
 NO_ASAN void platform_mexec(mexec_asm_func mexec_assembly, memmov_ops_t* ops,
                             uintptr_t new_bootimage_addr, size_t new_bootimage_len,
-                            uintptr_t entry64_addr) {
+                            uintptr_t new_kernel_entry) {
   DEBUG_ASSERT(arch_ints_disabled());
   DEBUG_ASSERT(mp_get_online_mask() == cpu_num_to_mask(BOOT_CPU_ID));
 
-  paddr_t kernel_src_phys = (paddr_t)ops[0].src;
-  paddr_t kernel_dst_phys = (paddr_t)ops[0].dst;
-
-  // check to see if the kernel is packaged as a zbi container
-  zbi_header_t* header = (zbi_header_t*)paddr_to_physmap(kernel_src_phys);
-  if (header[0].type == ZBI_TYPE_CONTAINER && header[1].type == ZBI_TYPE_KERNEL_ARM64) {
-    zbi_kernel_t* kernel_header = (zbi_kernel_t*)&header[2];
-    // add offset from kernel header to entry point
-    kernel_dst_phys += kernel_header->entry;
-  }
-  // else just jump to beginning of kernel image
-
-  mexec_assembly((uintptr_t)new_bootimage_addr, 0, 0, arm64_get_boot_el(), ops,
-                 (void*)kernel_dst_phys);
+  mexec_assembly((uintptr_t)new_bootimage_addr, 0, 0, arm64_get_boot_el(), ops, new_kernel_entry);
 }
 
 // Initialize Resource system after the heap is initialized.

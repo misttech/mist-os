@@ -17,6 +17,8 @@
 #include <lib/syscalls/forward.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
+#include <lib/zbitl/checking.h>
+#include <lib/zbitl/view.h>
 #include <lib/zircon-internal/macros.h>
 #include <mexec.h>
 #include <platform.h>
@@ -343,12 +345,21 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
     return result;
   }
 
-  // for kernels that are bootdata based (eg, x86-64), the location
-  // to find the entrypoint depends on the bootdata format
-  paddr_t entry64_addr =
-      (get_kernel_base_phys() + sizeof(zbi_header_t) +  // ZBI_TYPE_CONTAINER header
-       sizeof(zbi_header_t) +                           // ZBI_TYPE_KERNEL header
-       offsetof(zbi_kernel_t, entry));
+  paddr_t new_kernel_entry;
+  {
+    const zbi_header_t* header =
+        reinterpret_cast<const zbi_header_t*>(paddr_to_physmap(new_kernel_addr));
+    if (zbitl::CheckContainerHeader(*header).is_error()) {
+      return ZX_ERR_IO_DATA_INTEGRITY;
+    }
+    zbitl::View zbi{zbitl::StorageFromRawHeader(header)};
+    if (zbitl::CheckBootable(zbi).is_error()) {
+      return ZX_ERR_IO_DATA_INTEGRITY;
+    }
+    const zbi_kernel_t* kernel = reinterpret_cast<const zbi_kernel_t*>(zbi.begin()->payload.data());
+    new_kernel_entry = get_kernel_base_phys() + kernel->entry;
+    ZX_ASSERT(zbi.take_error().is_ok());
+  }
 
   paddr_t new_bootimage_addr;
   uint8_t* bootimage_buffer;
@@ -483,7 +494,7 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
 
   // Ask the platform to mexec into the next kernel.
   mexec_asm_func mexec_assembly = (mexec_asm_func)id_page_addr;
-  platform_mexec(mexec_assembly, ops, final_bootimage_addr, bootimage_len, entry64_addr);
+  platform_mexec(mexec_assembly, ops, final_bootimage_addr, bootimage_len, new_kernel_entry);
 
   panic("Execution should never reach here\n");
   return ZX_OK;
