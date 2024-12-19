@@ -17,12 +17,6 @@
     },
     {
         "kind": "table/member",
-        "name": "fuchsia.feedback/Annotations.annotations",
-        "ordinal": "1",
-        "type": "vector<fuchsia.feedback/Annotation>:64"
-    },
-    {
-        "kind": "table/member",
         "name": "fuchsia.feedback/Annotations.annotations2",
         "ordinal": "2",
         "type": "vector<fuchsia.feedback/Annotation>:512"
@@ -557,12 +551,6 @@
     },
     {
         "kind": "const",
-        "name": "fuchsia.feedback/MAX_NUM_ANNOTATIONS_PROVIDED",
-        "type": "uint32",
-        "value": "64"
-    },
-    {
-        "kind": "const",
         "name": "fuchsia.feedback/MAX_NUM_ATTACHMENTS_PER_CRASH_REPORT",
         "type": "uint32",
         "value": "16"
@@ -744,12 +732,6 @@
         "kind": "table",
         "name": "fuchsia.feedback/RuntimeCrashReport",
         "resourceness": "resource"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.feedback/Snapshot.annotations",
-        "ordinal": "2",
-        "type": "vector<fuchsia.feedback/Annotation>:64"
     },
     {
         "kind": "table/member",
