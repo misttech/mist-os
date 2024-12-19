@@ -194,6 +194,13 @@ assembly_input_bundle("bootstrap") {
     "//src/zircon/bin/role_manager:package",
   ]
 
+  # Enabling profiling fundamentally changes how the platform is
+  # compiled and requires the addition of instrumentation_data_processor
+  # package in bootfs packages to collect and process profiles.
+  if (is_profile) {
+    bootfs_packages += [ "//src/sys/instrumentation_data_processor:instrumentation_data_processor_pkg" ]
+  }
+
   compiled_packages = [
     {
       bootfs_package = true
@@ -209,9 +216,6 @@ assembly_input_bundle("bootstrap") {
             "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.cml",
           ]
 
-          # Enabling profiling fundamentally changes how the platform is
-          # compiled and requires the addition of instrumentation_data_processor
-          # component to collect and process profiles.
           if (is_profile) {
             shards += [ "//src/sys/instrumentation_data_processor/meta/instrumentation_data_processor.bootstrap_shard.cml" ]
           }

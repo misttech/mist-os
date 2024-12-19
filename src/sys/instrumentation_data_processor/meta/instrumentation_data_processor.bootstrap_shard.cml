@@ -14,5 +14,10 @@
             from: "#instrumentation_data_processor",
             to: "self/diagnostics",
         },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "#archivist",
+            to: "#instrumentation_data_processor",
+        },
     ],
 }
