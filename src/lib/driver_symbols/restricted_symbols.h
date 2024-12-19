@@ -546,8 +546,7 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "freeifaddrs",
     "__freelocale",
     "freopen",
-    // TODO(https://fxbug.dev/380482978): Re-add `frexp` and `sigfillset` when their usage
-    // are removed
+    "frexp",
     "frexpf",
     "frexpl",
     "fscanf",
@@ -1152,6 +1151,7 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "sigandset",
     "sigdelset",
     "sigemptyset",
+    "sigfillset",
     "siginterrupt",
     "sigisemptyset",
     "sigismember",

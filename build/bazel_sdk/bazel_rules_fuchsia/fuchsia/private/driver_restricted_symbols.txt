@@ -323,6 +323,7 @@ freeaddrinfo
 freeifaddrs
 __freelocale
 freopen
+frexp
 frexpf
 frexpl
 fscanf
@@ -927,6 +928,7 @@ sigaltstack
 sigandset
 sigdelset
 sigemptyset
+sigfillset
 siginterrupt
 sigisemptyset
 sigismember
