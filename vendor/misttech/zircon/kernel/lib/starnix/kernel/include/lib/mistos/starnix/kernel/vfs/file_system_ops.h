@@ -38,12 +38,12 @@ class FileSystemOps {
   /// })
   /// ```
   virtual fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
-                                                   const CurrentTask& current_task) = 0;
+                                                   const CurrentTask& current_task) const = 0;
 
-  virtual const FsStr& name() = 0;
+  virtual const FsStr& name() const = 0;
 
   /// Whether this file system generates its own node IDs.
-  virtual bool generate_node_ids() { return false; }
+  virtual bool generate_node_ids() const { return false; }
 
   /// Rename the given node.
   ///
@@ -62,14 +62,15 @@ class FileSystemOps {
   virtual fit::result<Errno> rename(const FileSystem& fs, const CurrentTask& current_task,
                                     const FsNodeHandle& old_parent, const FsStr& old_name,
                                     const FsNodeHandle& new_parent, const FsStr& new_name,
-                                    const FsNodeHandle& renamed, const FsNodeHandle* replaced) {
+                                    const FsNodeHandle& renamed,
+                                    ktl::optional<FsNodeHandle> replaced) const {
     return fit::error(errno(EROFS));
   }
 
   virtual fit::result<Errno> exchange(const FileSystem& fs, const CurrentTask& current_task,
                                       const FsNodeHandle& node1, const FsNodeHandle& parent1,
                                       const FsStr& name1, const FsNodeHandle& node2,
-                                      const FsNodeHandle& parent2, const FsStr& name2) {
+                                      const FsNodeHandle& parent2, const FsStr& name2) const {
     return fit::error(errno(EINVAL));
   }
 

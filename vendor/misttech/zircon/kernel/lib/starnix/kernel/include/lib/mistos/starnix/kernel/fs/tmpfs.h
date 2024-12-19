@@ -33,9 +33,9 @@ class TmpFs : public FileSystemOps {
                                                                   FileSystemOptions options);
 
   fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
-                                           const CurrentTask& current_task) final;
+                                           const CurrentTask& current_task) const final;
 
-  const FsStr& name() final;
+  const FsStr& name() const final;
 
  public:
   // C++

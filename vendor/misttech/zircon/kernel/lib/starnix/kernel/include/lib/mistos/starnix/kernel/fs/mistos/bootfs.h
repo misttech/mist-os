@@ -100,9 +100,9 @@ class BootFs final : public FileSystemOps {
                                                                   FileSystemOptions options);
 
   fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
-                                           const CurrentTask& current_task) final;
+                                           const CurrentTask& current_task) const final;
 
-  const FsStr& name() final { return name_; }
+  const FsStr& name() const final { return name_; }
 
  private:
   // Create a VMO and transfer the entry's data from Bootfs to it. This

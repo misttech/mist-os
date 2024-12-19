@@ -235,7 +235,7 @@ uint32_t from_be_bytes(const std::array<uint8_t, 4>& bytes) {
 }  // namespace
 
 fit::result<Errno, struct statfs> BootFs::statfs(const FileSystem& fs,
-                                                 const CurrentTask& current_task) {
+                                                 const CurrentTask& current_task) const {
   struct statfs stat = default_statfs(from_be_bytes(ktl::array<uint8_t, 4>{'m', 'b', 'f', 's'}));
   return fit::ok(stat);
 }

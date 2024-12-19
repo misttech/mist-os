@@ -134,7 +134,7 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
 }
 
 fit::result<Errno, struct statfs> TmpFs::statfs(const FileSystem& fs,
-                                                const CurrentTask& current_task) {
+                                                const CurrentTask& current_task) const {
   struct statfs stat = default_statfs(TMPFS_MAGIC);
   // Pretend we have a ton of free space.
   stat.f_blocks = 0x100000000;
@@ -143,7 +143,7 @@ fit::result<Errno, struct statfs> TmpFs::statfs(const FileSystem& fs,
   return fit::ok(stat);
 }
 
-const FsStr& TmpFs::name() { return name_; }
+const FsStr& TmpFs::name() const { return name_; }
 
 TmpFs::~TmpFs() { LTRACE_ENTRY_OBJ; }
 
