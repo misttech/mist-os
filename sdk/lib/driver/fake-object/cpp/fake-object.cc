@@ -51,6 +51,8 @@ zx::result<zx_koid_t> fake_object_get_koid(zx_handle_t handle) {
 
 }  // namespace fdf_fake_object
 
+extern "C" {
+
 // Closes a fake handle. Real handles are passed through to |zx_handle_close|.
 // In the event of ZX_HANDLE_INVALID, that is technically a valid fake handle due
 // to fake handles all being even values.
@@ -258,6 +260,8 @@ zx_status_t zx_object_wait_many(zx_wait_item_t* items, size_t count, zx_time_t d
   return REAL_SYSCALL(zx_object_wait_many)(items, count, deadline);
 }
 
+}  // extern "C"
+
 std::vector<zx_handle_disposition_t> FixHandleDisposition(zx_handle_disposition_t* handles,
                                                           uint32_t num_handles) {
   // Fake objects all have type VMO so they will fail any write_etc checks
@@ -285,6 +289,8 @@ void FixIncomingHandleTypes(zx_handle_info_t* handles, uint32_t num_handles) {
     }
   }
 }
+
+extern "C" {
 
 __EXPORT
 zx_status_t zx_channel_write_etc(zx_handle_t handle, uint32_t options, const void* bytes,
@@ -337,3 +343,5 @@ zx_status_t zx_channel_read_etc(zx_handle_t handle, uint32_t options, void* byte
   FixIncomingHandleTypes(handles, std::min(num_handles, *actual_handles));
   return status;
 }
+
+}  // extern "C"
