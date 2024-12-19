@@ -39,3 +39,20 @@ type Mode = struct {
 
     flags ModeFlags;
 };
+
+/// Type of the internal value in [`fuchsia.hardware.display.types/ModeId`].
+alias ModeIdValue = uint16;
+
+/// Identifies a supported operational mode for a display.
+///
+/// Values are unique relatively to a [`DisplayId`] value, which is unique
+/// within a [`fuchsia.hardware.display.engine/Engine`] connection.
+///
+/// [`fuchsia.hardware.display.types/INVALID_MODE_ID`] represents an invalid
+/// value.
+type ModeId = struct {
+    value ModeIdValue;
+};
+
+/// Invalid id for display modes.
+const INVALID_MODE_ID ModeIdValue = 0;

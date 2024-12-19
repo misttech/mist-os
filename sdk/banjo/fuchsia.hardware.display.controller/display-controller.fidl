@@ -52,6 +52,7 @@ type ImageMetadata = struct {
 };
 
 const INVALID_DISPLAY_ID uint64 = 0;
+const INVALID_MODE_ID uint16 = 0;
 const INVALID_ID uint64 = 0;
 
 /// Indicates that a ConfigStamp is invalid.
