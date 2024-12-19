@@ -10,6 +10,7 @@
 #include <dev/init.h>
 #include <dev/interrupt/arm_gicv2_init.h>
 #include <dev/interrupt/arm_gicv3_init.h>
+#include <dev/power/moonflower/init.h>
 #include <dev/power/motmot/init.h>
 #include <dev/psci.h>
 #include <dev/timer/arm_generic.h>
@@ -50,6 +51,10 @@ void PlatformDriverHandoffEarly(const ArchPhysHandoff& arch_handoff) {
 
   if (arch_handoff.motmot_power_driver) {
     motmot_power_init_early();
+  }
+
+  if (arch_handoff.moonflower_power_driver) {
+    moonflower_power_init_early();
   }
 }
 
