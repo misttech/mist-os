@@ -126,25 +126,27 @@ FUNCTION_LABEL(_start)
     orl  $X86_KERNEL_PD_FLAGS, %eax
     set_relocated_page_table_entry %edx, PML4_SHIFT, %eax
 
-    // Now link the table called `id_map_lower_512gib_page_table_phys` as the
-    // first entry of the root: as named, it covers [0, 512GiB). %rdx still
-    // holds the address of the root table.
+    // We want to link the table that identity maps the first 1GiB to the
+    // fourth-last entry pdp_high, effecting a mapping of [-4GiB, -3GiB]
+    // virtual also to [0, 1GiB] physical.
+    //
+    // We first pick out the table mapping the first 1GiB by descending from
+    // the root table, picking out the first entries.
+    //
+    // Note that %rdx still holds the address of the root table.
+
     mov (%rdx), %rax
     movabs $X86_PT_BASE_ADDRESS_MASK, %rbx
-    andl %ebx, %eax
-    mov %eax, id_map_lower_512gib_page_table_phys(%rip)
+    and %rbx, %rax
 
-    // Now link the table called `id_map_lower_1gib_page_table_phys` as the
-    // first entry of the previous table: as named, it covers [0, 1GiB). %rdx
-    // still holds the address of the root table, and %rax the address of the
-    // parent.
+    // %rax now holds the address of the table covering [0, 512GiB); descend
+    // down the first entry again. %rbx still holds the address mask for a
+    // table entry.
     mov (%rax), %rax
-    andl %ebx, %eax
-    mov %eax, id_map_lower_1gib_page_table_phys(%rip)
+    and %rbx, %rax
 
-    // Further, link the table that defines the early 1GiB mapping as the
-    // fourth last entry in `pdp_high`, effectively mapping [-4GiB, -3GiB) to
-    // [0, 1GiB) and the kernel's image within it.
+    // %rax now holds the address of the table covering [0, 1GiB) and we make
+    // the [-4GiB, -3GiB) -> [0, 1GiB) mapping.
     orl  $X86_KERNEL_PD_FLAGS, %eax
     lea pdp_high(%rip), %rbx
     set_relocated_page_table_entry %ebx, PDP_SHIFT, %eax

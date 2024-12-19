@@ -28,6 +28,7 @@
 #include <arch/x86/hypervisor/vmx_state.h>
 #include <arch/x86/mmu_mem_types.h>
 #include <kernel/mp.h>
+#include <ktl/span.h>
 #include <vm/arch_vm_aspace.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -65,10 +66,8 @@ static bool supports_huge_pages = false;
 using PCIDAllocator = id_allocator::IdAllocator<uint16_t, 4096, 1>;
 static lazy_init::LazyInit<PCIDAllocator> pcid_allocator;
 
-// The addresses of some page tables of interest, initialized in start.S.
+// The physical address of the root page table, initialized in start.S.
 paddr_t root_page_table_phys;
-paddr_t id_map_lower_512gib_page_table_phys;
-paddr_t id_map_lower_1gib_page_table_phys;
 
 static pt_entry_t* root_page_table() {
   return reinterpret_cast<pt_entry_t*>(paddr_to_physmap(root_page_table_phys));
@@ -1026,7 +1025,17 @@ void X86ArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {
     vm_page_t* page = reinterpret_cast<vm_page_t*>(node);
     page->set_state(vm_page_state::MMU);
 
-    // TODO(https://fxbug.dev/42164859): Populate vm_page_t::mmu.
+    ktl::span entries{
+        reinterpret_cast<pt_entry_t*>(paddr_to_physmap(page->paddr())),
+        PAGE_SIZE / sizeof(pt_entry_t),
+    };
+    page->mmu.num_mappings = 0;
+    for (pt_entry_t entry : entries) {
+      if ((entry & X86_MMU_PG_P) != 0) {
+        page->mmu.num_mappings++;
+      }
+    }
+    page->set_state(vm_page_state::MMU);
   }
 }
 
@@ -1085,39 +1094,33 @@ void x86_mmu_init() {
              g_max_vaddr_width, kX86VAddrBits);
 }
 
-// Updates the state of a table as MMU if WIRED, also updating the bookkeeping
-// around the present pages it contributes.
-static void unwire_boot_mmu_page(paddr_t paddr) {  // Lookup the page.
+// Updates the page backing a given page table created in the context of
+// start.S, in particular moving it from the WIRED to MMU state.
+//
+// TODO(https://fxbug.dev/42164859): This happens automatically for page tables
+// handed off to the kernel from physboot, so this function will go away once
+// those account for kernel aspace mappings.
+static void unwire_boot_mmu_page(const volatile pt_entry_t* table) {
+  // Convert to a phys address.
+  paddr_t paddr = kernel_base_phys + reinterpret_cast<vaddr_t>(table) -
+                  reinterpret_cast<vaddr_t>(__executable_start);
+
   vm_page_t* page = paddr_to_vm_page(paddr);
   ASSERT(page);
 
-  // Unwire and mark it as an MMU page, unless it already is marked as such.
-  if (page->state() == vm_page_state::WIRED) {
-    pmm_unwire_page(page);
-    page->set_state(vm_page_state::MMU);
-  } else {
-    ASSERT(page->state() == vm_page_state::MMU);
-  }
+  // Unwire and mark it as an MMU page.
+  pmm_unwire_page(page);
+  page->set_state(vm_page_state::MMU);
 
-  page->mmu.num_mappings =
-      X86PageTableMmu::CountPresentEntries(reinterpret_cast<pt_entry_t*>(paddr_to_physmap(paddr)));
+  page->mmu.num_mappings = X86PageTableMmu::CountPresentEntries(table);
 }
 
 void x86_mmu_prevm_init() {
-  // TODO(https://fxbug.dev/42164859): We are in a transitional state where
-  // some of the tables are stored statically (defined above).
-  auto static_table_paddr = [](volatile pt_entry_t* addr) {
-    return reinterpret_cast<uintptr_t>(addr) - reinterpret_cast<vaddr_t>(__executable_start) +
-           KERNEL_LOAD_OFFSET;
-  };
   // Unwire and mark as in use by the MMU all the page tables that might be part of the kernel
-  // aspace as created (or inherited) by start.S.
-  unwire_boot_mmu_page(root_page_table_phys);
-  unwire_boot_mmu_page(id_map_lower_512gib_page_table_phys);
-  unwire_boot_mmu_page(id_map_lower_1gib_page_table_phys);
-  unwire_boot_mmu_page(static_table_paddr(pdp_high));
+  // aspace as created by start.S.
+  unwire_boot_mmu_page(pdp_high);
   for (size_t i = 0; i < sizeof(linear_map_pdp) / sizeof(pt_entry_t); i += NO_OF_PT_ENTRIES) {
-    unwire_boot_mmu_page(static_table_paddr(&linear_map_pdp[i]));
+    unwire_boot_mmu_page(&linear_map_pdp[i]);
   }
 
   // Use of PCID is detected late and on the boot cpu is this happens after x86_mmu_percpu_init

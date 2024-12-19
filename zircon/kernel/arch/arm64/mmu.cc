@@ -33,6 +33,7 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
+#include <ktl/span.h>
 #include <lk/init.h>
 #include <vm/arch_vm_aspace.h>
 #include <vm/physmap.h>
@@ -2297,7 +2298,17 @@ void ArmArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {
     vm_page_t* page = reinterpret_cast<vm_page_t*>(node);
     page->set_state(vm_page_state::MMU);
 
-    // TODO(https://fxbug.dev/42164859): Populate vm_page_t::mmu.
+    ktl::span entries{
+        reinterpret_cast<pte_t*>(paddr_to_physmap(page->paddr())),
+        PAGE_SIZE / sizeof(pte_t),
+    };
+    page->mmu.num_mappings = 0;
+    for (pte_t entry : entries) {
+      if ((entry & MMU_PTE_VALID) != 0) {
+        page->mmu.num_mappings++;
+      }
+    }
+    page->set_state(vm_page_state::MMU);
   }
 }
 
