@@ -45,7 +45,9 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ObjectRequest;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio};
+use {
+    fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+};
 
 // See //src/storage/fvm/format.h for a detailed description of the FVM format.
 
@@ -556,7 +558,10 @@ impl Fvm {
         let slices = slices as u64;
         let mappings = new_metadata.allocate_slices(proposed, 0, slices, max_slice)?;
 
-        let mut inner = self.write_new_metadata(inner, new_metadata).await?;
+        let mut inner = self
+            .write_new_metadata(inner, new_metadata)
+            .await
+            .context("Failed to write metadata")?;
 
         inner.assigned_slice_count = inner.assigned_slice_count.checked_add(slices).unwrap();
         inner.partition_state.insert(proposed, PartitionState { mappings, slice_limit: 0 });
@@ -921,12 +926,17 @@ impl Component {
                             mount_options,
                         )
                         .await
-                        .map_err(map_to_raw_status),
+                        .map_err(|error| {
+                            tracing::warn!(?error, "Create volume failed");
+                            map_to_raw_status(error)
+                        }),
                     )?;
                 }
                 VolumesRequest::Remove { responder, name } => {
-                    responder
-                        .send(self.handle_remove_volume(&name).await.map_err(map_to_raw_status))?;
+                    responder.send(self.handle_remove_volume(&name).await.map_err(|error| {
+                        tracing::warn!(?error, "Remove volume failed");
+                        map_to_raw_status(error)
+                    }))?;
                 }
             }
         }
@@ -1100,13 +1110,22 @@ impl Component {
 
             self.mounted.lock().unwrap().insert(partition_index, block_server.clone());
 
+            // Unmount when the last connection is closed (i.e. when `scope` terminates).
+            let scope = ExecutionScope::new();
+            let scope_clone = scope.clone();
+            let this = self.clone();
+            fasync::Task::spawn(async move {
+                scope_clone.wait().await;
+                this.mounted.lock().unwrap().remove(&partition_index);
+            })
+            .detach();
+
             let flags = fio::Flags::PROTOCOL_DIRECTORY
                 | fio::PERM_READABLE
                 | fio::PERM_WRITABLE
                 | fio::PERM_EXECUTABLE;
-            ObjectRequest::new(flags, &fio::Options::default(), server_end).handle(|request| {
-                outgoing_dir.open3(self.scope.clone(), Path::dot(), flags, request)
-            });
+            ObjectRequest::new(flags, &fio::Options::default(), server_end)
+                .handle(|request| outgoing_dir.open3(scope, Path::dot(), flags, request));
         }
 
         Ok(())
@@ -1144,7 +1163,10 @@ impl Component {
             }
             None => 1,
         };
-        let partition_index = fvm.create_partition(inner, type_guid, guid, slices, name).await?;
+        let partition_index = fvm
+            .create_partition(inner, type_guid, guid, slices, name)
+            .await
+            .context("Failed to create partition")?;
 
         async move {
             self.add_volume_to_volumes_directory(partition_index, name)?;
@@ -2056,6 +2078,65 @@ mod tests {
             .expect("create failed");
 
         let expected = HashSet::from(["bar".to_string(), "blobfs".to_string(), "data".to_string()]);
+        let volumes_dir =
+            open_directory(&fixture.outgoing_dir, "volumes", fio::Flags::empty()).await.unwrap();
+        assert_eq!(
+            &readdir(&volumes_dir)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|d| d.name)
+                .collect::<HashSet<_>>(),
+            &expected,
+        );
+
+        // Check again after a remount.
+        let fixture = Fixture::from_fake_server(fixture.take_fake_server()).await;
+        let volumes_dir =
+            open_directory(&fixture.outgoing_dir, "volumes", fio::Flags::empty()).await.unwrap();
+        assert_eq!(
+            &readdir(&volumes_dir)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|d| d.name)
+                .collect::<HashSet<_>>(),
+            &expected,
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_create_mount_remove() {
+        let fixture = Fixture::new(SLICE_SIZE).await;
+
+        let volumes_proxy =
+            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+
+        {
+            let (_dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            volumes_proxy
+                .create(
+                    "foo",
+                    dir_server_end,
+                    CreateOptions { type_guid: Some([1; 16]), ..CreateOptions::default() },
+                    MountOptions::default(),
+                )
+                .await
+                .expect("create failed (FIDL)")
+                .expect("create failed");
+
+            // Should fail because the volume is mounted.
+            assert_eq!(
+                volumes_proxy.remove("foo").await.expect("remove failed (FIDL)"),
+                Err(zx::sys::ZX_ERR_ALREADY_BOUND)
+            );
+        }
+
+        // Should succeed after dropping the volume's outgoing directory.
+        volumes_proxy.remove("foo").await.expect("remove failed (FIDL)").expect("remove failed");
+
+        let expected = HashSet::from(["blobfs".to_string(), "data".to_string()]);
         let volumes_dir =
             open_directory(&fixture.outgoing_dir, "volumes", fio::Flags::empty()).await.unwrap();
         assert_eq!(
