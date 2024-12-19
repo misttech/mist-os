@@ -983,6 +983,7 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "pthread_setcancelstate",
     "pthread_setcanceltype",
     "pthread_setconcurrency",
+    "pthread_sigmask",
     "pthread_spin_destroy",
     "pthread_spin_init",
     "pthread_spin_lock",
