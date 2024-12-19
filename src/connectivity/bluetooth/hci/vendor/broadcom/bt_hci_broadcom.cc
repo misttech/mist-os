@@ -29,6 +29,7 @@
 
 namespace bt_hci_broadcom {
 namespace fhbt = fuchsia_hardware_bluetooth;
+namespace fhsi = fuchsia_hardware_serialimpl::wire;
 
 constexpr uint32_t kTargetBaudRate = 2000000;
 constexpr uint32_t kDefaultBaudRate = 115200;
@@ -94,6 +95,28 @@ void BtHciBroadcom::Start(fdf::StartCompleter completer) {
   }
 
   serial_pid_ = result.value()->info.serial_pid;
+
+  if (serial_pid_ == PDEV_PID_BCM4381A1) {
+    // BCM4381 board requires flow control by default.
+    fdf::Arena config_arena('CONF');
+    const uint32_t flags = fhsi::kSerialDataBits8 | fhsi::kSerialStopBits1 |
+                           fhsi::kSerialParityNone | fhsi::kSerialFlowCtrlCtsRts;
+    fdf::WireUnownedResult<fuchsia_hardware_serialimpl::Device::Config> result =
+        serial_client_.buffer(config_arena)->Config(kDefaultBaudRate, flags);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Initial UART configuration failed, FIDL error: %s",
+              zx_status_get_string(result.status()));
+      completer(zx::error(result.status()));
+      return;
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "Initial UART configuration failed, domain error: %s",
+              zx_status_get_string(result->error_value()));
+      completer(zx::error(result->error_value()));
+      return;
+    }
+  }
+
   // Continue initialization through the fpromise executor.
   start_completer_.emplace(std::move(completer));
   executor_.emplace(dispatcher());
@@ -281,8 +304,8 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SetBaudRate(uint32_t baud_ra
       .and_then(
           [this, baud_rate](const std::vector<uint8_t>&) -> fpromise::result<void, zx_status_t> {
             fdf::Arena arena('CONF');
-            auto result = serial_client_.buffer(arena)->Config(
-                baud_rate, fuchsia_hardware_serialimpl::wire::kSerialSetBaudRateOnly);
+            fdf::WireUnownedResult<fuchsia_hardware_serialimpl::Device::Config> result =
+                serial_client_.buffer(arena)->Config(baud_rate, fhsi::kSerialSetBaudRateOnly);
             if (!result.ok()) {
               return fpromise::error(result.status());
             }
@@ -435,8 +458,8 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::LoadFirmware() {
         if (is_uart_) {
           // firmware switched us back to 115200. switch back to kTargetBaudRate.
           fdf::Arena arena('CONF');
-          auto result = serial_client_.buffer(arena)->Config(
-              kDefaultBaudRate, fuchsia_hardware_serialimpl::wire::kSerialSetBaudRateOnly);
+          fdf::WireUnownedResult<fuchsia_hardware_serialimpl::Device::Config> result =
+              serial_client_.buffer(arena)->Config(kDefaultBaudRate, fhsi::kSerialSetBaudRateOnly);
           if (!result.ok()) {
             return fpromise::make_result_promise(fpromise::error(result.status()));
           }
