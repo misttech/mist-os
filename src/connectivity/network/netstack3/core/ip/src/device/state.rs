@@ -35,9 +35,9 @@ use crate::internal::device::{
     IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
     Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
-use crate::internal::gmp::igmp::{IgmpConfig, IgmpState, IgmpTimerId};
-use crate::internal::gmp::mld::{MldConfig, MldTimerId};
-use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, MulticastGroupSet};
+use crate::internal::gmp::igmp::{IgmpConfig, IgmpTimerId, IgmpTypeLayout};
+use crate::internal::gmp::mld::{MldConfig, MldTimerId, MldTypeLayout};
+use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, GmpTypeLayout, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
 use super::dad::NonceCollection;
@@ -56,26 +56,26 @@ pub trait IpDeviceStateIpExt: BroadcastIpExt {
     /// Information stored about an IP address assigned to an interface.
     type AssignedAddressState<BT: IpDeviceStateBindingsTypes>: AssignedAddressState<Self::Addr>
         + Debug;
-    /// The GMP protocol-specific state.
-    type GmpProtoState<BT: IpDeviceStateBindingsTypes>: Default;
     /// The GMP protocol-specific configuration.
     type GmpProtoConfig: Default;
+    /// The GMP type layout used by IP-version specific state.
+    type GmpTypeLayout<BT: IpDeviceStateBindingsTypes>: GmpTypeLayout<Self, BT>;
     /// The timer id for GMP timers.
     type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpTimerId<Self, D>>;
 }
 
 impl IpDeviceStateIpExt for Ipv4 {
     type AssignedAddressState<BT: IpDeviceStateBindingsTypes> = Ipv4AddressEntry<BT>;
-    type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
     type GmpTimerId<D: WeakDeviceIdentifier> = IgmpTimerId<D>;
     type GmpProtoConfig = IgmpConfig;
+    type GmpTypeLayout<BT: IpDeviceStateBindingsTypes> = IgmpTypeLayout;
 }
 
 impl IpDeviceStateIpExt for Ipv6 {
     type AssignedAddressState<BT: IpDeviceStateBindingsTypes> = Ipv6AddressEntry<BT>;
-    type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
     type GmpTimerId<D: WeakDeviceIdentifier> = MldTimerId<D>;
     type GmpProtoConfig = MldConfig;
+    type GmpTypeLayout<BT: IpDeviceStateBindingsTypes> = MldTypeLayout;
 }
 
 /// The state associated with an IP address assigned to an IP device.
@@ -256,10 +256,8 @@ pub struct IpDeviceFlags {
 pub struct IpDeviceMulticastGroups<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
     /// Multicast groups this device has joined.
     pub groups: MulticastGroupSet<I::Addr, GmpGroupState<I, BT>>,
-    /// Protocol-specific GMP state.
-    pub gmp_proto: I::GmpProtoState<BT>,
     /// GMP state.
-    pub gmp: GmpState<I, BT>,
+    pub gmp: GmpState<I, I::GmpTypeLayout<BT>, BT>,
     /// GMP protocol-specific configuration.
     pub gmp_config: I::GmpProtoConfig,
 }
@@ -377,7 +375,6 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDev
             addrs: Default::default(),
             multicast_groups: RwLock::new(IpDeviceMulticastGroups {
                 groups: Default::default(),
-                gmp_proto: Default::default(),
                 gmp: GmpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, device_id),
                 gmp_config: Default::default(),
             }),

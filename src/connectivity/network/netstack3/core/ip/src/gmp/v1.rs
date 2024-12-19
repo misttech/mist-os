@@ -99,18 +99,6 @@ pub trait ProtocolConfig {
     /// `None` indicates that the maximum response time is zero and thus a
     /// response should be sent immediately.
     fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration>;
-
-    /// The protocol specific action returned by `do_query_received_specific`.
-    type QuerySpecificActions;
-    /// Respond to a query in a protocol-specific way.
-    ///
-    /// When receiving a query, IGMPv2 needs to check whether the query is an
-    /// IGMPv1 message and, if so, set a local "IGMPv1 Router Present" flag and
-    /// set a timer. For MLD, this function is a no-op.
-    fn do_query_received_specific(
-        &self,
-        max_resp_time: Duration,
-    ) -> Option<Self::QuerySpecificActions>;
 }
 
 /// The transition between one state and the next.
@@ -481,18 +469,18 @@ impl<I: Instant> GmpStateMachine<I> {
 }
 
 pub(super) fn handle_timer<I, CC, BC>(
-    core_ctx: &mut CC::Inner<'_>,
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, CC, BC>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
     timer: DelayedReportTimerId<I>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContext<I, BC>,
+    CC: GmpContextInner<I, BC>,
     I: IpExt,
 {
     let GmpStateRef { enabled: _, groups, gmp, config: _ } = state;
-    debug_assert!(gmp.mode.is_v1());
+    debug_assert!(gmp.gmp_mode().is_v1());
     let DelayedReportTimerId(group_addr) = timer;
     let ReportTimerExpiredActions {} = groups
         .get_mut(group_addr.as_ref())
@@ -500,7 +488,7 @@ pub(super) fn handle_timer<I, CC, BC>(
         .v1_mut()
         .report_timer_expired();
 
-    core_ctx.send_message_v1(bindings_ctx, &device, group_addr, GmpMessageType::Report);
+    core_ctx.send_message_v1(bindings_ctx, &device, &gmp.mode, group_addr, GmpMessageType::Report);
 }
 
 pub(super) fn handle_report_message<I, BC, CC>(
@@ -532,7 +520,7 @@ where
         //     that have not yet been upgraded to IGMPv3.  A host MAY allow its
         //     IGMPv3 Membership Record to be suppressed by either a Version 1
         //     Membership Report, or a Version 2 Membership Report.
-        if !gmp.mode.is_v1() {
+        if !gmp.gmp_mode().is_v1() {
             return Ok(());
         }
         let group_addr =
@@ -573,7 +561,8 @@ where
     Q: QueryMessage<I>,
 {
     core_ctx.with_gmp_state_mut_and_ctx(device, |mut core_ctx, mut state| {
-        // Always enter v1 compatibility mode if we see a v1 message.
+        // Allow protocol to decide entering v1 compatibility mode if we see a
+        // v1 message and we're not in forced v1.
         //
         //   RFC 3810 8.2.1: The Host Compatibility Mode of an interface is set
         //   to MLDv1 whenever an MLDv1 Multicast Address Listener Query is
@@ -581,30 +570,43 @@ where
         //
         //   RFC 3376 7.2.1: In order to switch gracefully between versions of
         //   IGMP, hosts keep both an IGMPv1 Querier Present timer and an IGMPv2
-        //   Querier Present timer per interface.  IGMPv1 Querier Present is set
+        //   Querier Present timer per interface. IGMPv1 Querier Present is set
         //   to Older Version Querier Present Timeout seconds whenever an IGMPv1
         //   Membership Query is received.  IGMPv2 Querier Present is set to
         //   Older Version Querier Present Timeout seconds whenever an IGMPv2
         //   General Query is received.
-        gmp::enter_mode(&mut core_ctx, bindings_ctx, state.as_mut(), GmpMode::V1 { compat: true });
-        // Schedule the compat timer if we're in compat mode.
-        if state.gmp.mode.is_v1_compat() {
+        let new_mode =
+            core_ctx.mode_update_from_v1_query(bindings_ctx, query, &state.gmp, &state.config);
+        gmp::enter_mode(bindings_ctx, state.as_mut(), new_mode);
+        let compat = match state.gmp.gmp_mode() {
+            GmpMode::V1 { compat } => compat,
+            GmpMode::V2 => {
+                // NB: We don't currently support a configuration that refuses
+                // entering compatibility mode, but that's allowed in RFC 3810
+                // for MLDv2, we just don't have a use for it. If need be, this
+                // panic can be replaced with a return to ignore the v1 query
+                // instead.
+                panic!("protocol refused to switch to v1");
+            }
+        };
+        if compat {
             gmp::schedule_v1_compat(bindings_ctx, state.as_mut())
         }
+
         handle_query_message_inner(&mut core_ctx, bindings_ctx, device, state, query)
     })
 }
 
 pub(super) fn handle_query_message_inner<I, CC, BC, Q>(
-    core_ctx: &mut CC::Inner<'_>,
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, CC, BC>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
     query: &Q,
 ) -> Result<(), NotAMemberErr<I>>
 where
     BC: GmpBindingsContext,
-    CC: GmpContext<I, BC>,
+    CC: GmpContextInner<I, BC>,
     I: IpExt,
     Q: QueryMessage<I>,
 {
@@ -629,12 +631,6 @@ where
             either::Either::Right(core::iter::once((group_addr, state)))
         }
     };
-
-    // NB: Run actions before sending messages, which allows IGMP to
-    // understand it should be operating in IGMPv1 compatibility mode.
-    if let Some(ps_actions) = config.do_query_received_specific(query.max_response_time()) {
-        core_ctx.run_actions(bindings_ctx, device, ps_actions, gmp, config);
-    }
 
     for (group_addr, state) in iter {
         let actions = state.v1_mut().query_received(
@@ -662,7 +658,7 @@ where
         };
 
         if let Some(msg) = send_msg {
-            core_ctx.send_message_v1(bindings_ctx, device, group_addr, msg);
+            core_ctx.send_message_v1(bindings_ctx, device, &gmp.mode, group_addr, msg);
         }
     }
 
@@ -670,17 +666,17 @@ where
 }
 
 pub(super) fn handle_enabled<I, CC, BC>(
-    core_ctx: &mut CC::Inner<'_>,
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, CC, BC>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContext<I, BC>,
+    CC: GmpContextInner<I, BC>,
     I: IpExt,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
-    debug_assert!(gmp.mode.is_v1());
+    debug_assert!(gmp.gmp_mode().is_v1());
 
     let now = bindings_ctx.now();
 
@@ -704,22 +700,28 @@ pub(super) fn handle_enabled<I, CC, BC>(
             ),
             None
         );
-        core_ctx.send_message_v1(bindings_ctx, device, group_addr, GmpMessageType::Report);
+        core_ctx.send_message_v1(
+            bindings_ctx,
+            device,
+            &gmp.mode,
+            group_addr,
+            GmpMessageType::Report,
+        );
     }
 }
 
 pub(super) fn handle_disabled<I, CC, BC>(
-    core_ctx: &mut CC::Inner<'_>,
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, CC, BC>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
 ) where
     BC: GmpBindingsContext,
-    CC: GmpContext<I, BC>,
+    CC: GmpContextInner<I, BC>,
     I: IpExt,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
-    debug_assert!(gmp.mode.is_v1());
+    debug_assert!(gmp.gmp_mode().is_v1());
 
     for (group_addr, state) in groups.groups_mut() {
         let group_addr = match GmpEnabledGroup::new(*group_addr) {
@@ -734,25 +736,31 @@ pub(super) fn handle_disabled<I, CC, BC>(
             );
         }
         if send_leave {
-            core_ctx.send_message_v1(bindings_ctx, device, group_addr, GmpMessageType::Leave);
+            core_ctx.send_message_v1(
+                bindings_ctx,
+                device,
+                &gmp.mode,
+                group_addr,
+                GmpMessageType::Leave,
+            );
         }
     }
 }
 
 pub(super) fn join_group<I, CC, BC>(
-    core_ctx: &mut CC::Inner<'_>,
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
-    state: GmpStateRef<'_, I, CC, BC>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
 ) -> GroupJoinResult
 where
     BC: GmpBindingsContext,
-    CC: GmpContext<I, BC>,
+    CC: GmpContextInner<I, BC>,
     I: IpExt,
 {
     let GmpStateRef { enabled, groups, gmp, config } = state;
-    debug_assert!(gmp.mode.is_v1());
+    debug_assert!(gmp.gmp_mode().is_v1());
     let now = bindings_ctx.now();
 
     let group_addr_witness = GmpEnabledGroup::try_new(group_addr);
@@ -777,25 +785,31 @@ where
                 None
             );
 
-            core_ctx.send_message_v1(bindings_ctx, device, group_addr, GmpMessageType::Report);
+            core_ctx.send_message_v1(
+                bindings_ctx,
+                device,
+                &gmp.mode,
+                group_addr,
+                GmpMessageType::Report,
+            );
         }
     })
 }
 
 pub(super) fn leave_group<I, CC, BC>(
-    core_ctx: &mut CC::Inner<'_>,
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     group_addr: MulticastAddr<I::Addr>,
-    state: GmpStateRef<'_, I, CC, BC>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
 ) -> GroupLeaveResult
 where
     BC: GmpBindingsContext,
-    CC: GmpContext<I, BC>,
+    CC: GmpContextInner<I, BC>,
     I: IpExt,
 {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
-    debug_assert!(gmp.mode.is_v1());
+    debug_assert!(gmp.gmp_mode().is_v1());
 
     groups.leave_group(group_addr).map(|state| {
         let actions = state.into_v1().leave_group(config);
@@ -816,15 +830,19 @@ where
             );
         }
         if send_leave {
-            core_ctx.send_message_v1(bindings_ctx, device, group_addr, GmpMessageType::Leave);
+            core_ctx.send_message_v1(
+                bindings_ctx,
+                device,
+                &gmp.mode,
+                group_addr,
+                GmpMessageType::Leave,
+            );
         }
     })
 }
 
 #[cfg(test)]
 mod test {
-    use core::convert::Infallible as Never;
-
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::{new_rng, FakeDeviceId, FakeInstant};
@@ -850,11 +868,6 @@ mod test {
 
         fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration> {
             NonZeroDuration::new(resp_time)
-        }
-
-        type QuerySpecificActions = Never;
-        fn do_query_received_specific(&self, _max_resp_time: Duration) -> Option<Never> {
-            None
         }
     }
 

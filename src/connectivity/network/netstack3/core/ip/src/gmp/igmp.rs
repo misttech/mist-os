@@ -10,7 +10,6 @@
 use core::fmt::Debug;
 use core::time::Duration;
 
-use derivative::Derivative;
 use log::{debug, error};
 use net_declare::net_ip_v4;
 use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
@@ -36,9 +35,9 @@ use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpDeviceMtuContext, IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
-    self, v2, GmpBindingsContext, GmpBindingsTypes, GmpConfigModeRequest, GmpContext,
-    GmpContextInner, GmpEnabledGroup, GmpGroupState, GmpMode, GmpState, GmpStateContext,
-    GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet, NotAMemberErr,
+    self, v2, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpEnabledGroup,
+    GmpGroupState, GmpMode, GmpState, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout,
+    IpExt, MulticastGroupSet, NotAMemberErr,
 };
 
 /// The destination address for all IGMPv3 reports.
@@ -57,49 +56,6 @@ impl<BT> IgmpBindingsTypes for BT where BT: GmpBindingsTypes {}
 /// The bindings execution context for IGMP.
 pub trait IgmpBindingsContext: GmpBindingsContext + 'static {}
 impl<BC> IgmpBindingsContext for BC where BC: GmpBindingsContext + 'static {}
-
-/// The IGMP state for a device.
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct IgmpState<BT: IgmpBindingsTypes> {
-    compat_mode: IgmpCompatMode<BT::Instant>,
-}
-
-#[derive(Default, Debug)]
-#[cfg_attr(test, derive(Eq, PartialEq, Copy, Clone))]
-enum IgmpCompatMode<I: Instant> {
-    /// Running in IGMPv2 or IGMPv3 (depending on generic state in
-    /// [`GmpState`]).
-    #[default]
-    V2OrV3,
-    /// Operating in IGMPv1 mode if `now` is before `until`, otherwise IGMPv2 or
-    /// IGMPv3.
-    V1Compat { until: I },
-    /// Forced V1 mode from user configuration.
-    V1,
-}
-
-impl<I: Instant> IgmpCompatMode<I> {
-    /// Returns `true` if we should send IGMPv1 messages at the current time
-    /// given by `bindings_ctx`.
-    fn should_send_v1<BC: InstantContext<Instant = I>>(&self, bindings_ctx: &mut BC) -> bool {
-        match self {
-            Self::V2OrV3 => false,
-            Self::V1Compat { until } => bindings_ctx.now() < *until,
-            Self::V1 => true,
-        }
-    }
-
-    /// Changes the mode to [`IgmpCompatMode::V2OrV3`] as long as it's not
-    /// discarding current network compatibility mode.
-    fn exit_forced_v1(&mut self) {
-        match self {
-            Self::V2OrV3 => (),
-            Self::V1Compat { .. } => (),
-            Self::V1 => *self = Self::V2OrV3,
-        }
-    }
-}
 
 /// The IGMP mode controllable by the user.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -148,11 +104,7 @@ pub trait IgmpContext<BT: IgmpBindingsTypes>:
     /// and whether or not IGMP is enabled for the `device`.
     fn with_igmp_state_mut<
         O,
-        F: for<'a> FnOnce(
-            Self::SendContext<'a>,
-            GmpStateRef<'a, Ipv4, Self, BT>,
-            &'a mut IgmpState<BT>,
-        ) -> O,
+        F: for<'a> FnOnce(Self::SendContext<'a>, GmpStateRef<'a, Ipv4, IgmpTypeLayout, BT>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -264,6 +216,69 @@ impl<B: SplitByteSlice> gmp::v2::QueryMessage<Ipv4> for IgmpMessage<B, IgmpMembe
     }
 }
 
+/// The IGMPv1 compatibility mode.
+#[derive(Eq, PartialEq, Copy, Clone, Debug)]
+pub enum IgmpV1Mode<I: Instant> {
+    /// Forced IGMPv1 mode.
+    Forced,
+    /// IGMPv2 configuration in IGMPv1 compatibility.
+    ///
+    /// Sends v1 frames if `now` is before `until`.
+    V2Compat { until: I },
+    /// IGMPv3 configuration in IGMPv1 compatibility.
+    ///
+    /// Sends v1 frames if `now` is before `until`.
+    V3Compat { until: I },
+}
+
+/// The IGMP compatibility mode.
+#[derive(Eq, PartialEq, Copy, Clone, Debug, Default)]
+pub enum IgmpMode<I: Instant> {
+    /// Operating in IGMPv1 mode.
+    V1(IgmpV1Mode<I>),
+    /// Operating in IGMPv2 mode.
+    ///
+    /// If `compat` is `true` this is in compatibility mode and it'll eventually
+    /// exit back to `V3` (controlled by GMP).
+    V2 { compat: bool },
+    /// Operating in IGMPv3 mode.
+    #[default]
+    V3,
+}
+
+impl<I: Instant> From<IgmpMode<I>> for GmpMode {
+    fn from(value: IgmpMode<I>) -> Self {
+        match value {
+            IgmpMode::V1(v1) => {
+                let compat = match v1 {
+                    // GMP compat true means GMP expects to come back to GMPv2
+                    // after a timer, which is false if our configured mode is
+                    // IGMPv1 or IGMPv2.
+                    IgmpV1Mode::Forced | IgmpV1Mode::V2Compat { .. } => false,
+                    IgmpV1Mode::V3Compat { .. } => true,
+                };
+                Self::V1 { compat }
+            }
+            IgmpMode::V2 { compat } => Self::V1 { compat },
+            IgmpMode::V3 => Self::V2,
+        }
+    }
+}
+
+impl<I: Instant> IgmpMode<I> {
+    /// Returns `true` if we should send IGMPv1 messages at the current time
+    /// given by `bindings_ctx`.
+    fn should_send_v1<BC: InstantContext<Instant = I>>(&self, bindings_ctx: &mut BC) -> bool {
+        match self {
+            Self::V1(IgmpV1Mode::Forced) => true,
+            Self::V1(IgmpV1Mode::V2Compat { until } | IgmpV1Mode::V3Compat { until }) => {
+                bindings_ctx.now() < *until
+            }
+            Self::V2 { .. } | Self::V3 => false,
+        }
+    }
+}
+
 impl IpExt for Ipv4 {
     type GmpProtoConfigMode = IgmpConfigMode;
 
@@ -285,11 +300,12 @@ impl IpExt for Ipv4 {
     }
 }
 
-impl<BT: IgmpBindingsTypes, CC: DeviceIdContext<AnyDevice> + IgmpContextMarker>
-    GmpTypeLayout<Ipv4, BT> for CC
-{
-    type Actions = Igmpv2Actions;
+/// Uninstantiable type marking a [`GmpState`] as having IGMP types.
+pub enum IgmpTypeLayout {}
+
+impl<BT: IgmpBindingsTypes> GmpTypeLayout<Ipv4, BT> for IgmpTypeLayout {
     type Config = IgmpConfig;
+    type ProtoMode = IgmpMode<BT::Instant>;
 }
 
 impl<BT: IgmpBindingsTypes, CC: IgmpStateContext<BT>> GmpStateContext<Ipv4, BT> for CC {
@@ -303,64 +319,42 @@ impl<BT: IgmpBindingsTypes, CC: IgmpStateContext<BT>> GmpStateContext<Ipv4, BT> 
 }
 
 impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> GmpContext<Ipv4, BC> for CC {
-    type Inner<'a> = IgmpContextInner<'a, CC::SendContext<'a>, BC>;
+    type Inner<'a> = CC::SendContext<'a>;
+    type TypeLayout = IgmpTypeLayout;
 
     fn with_gmp_state_mut_and_ctx<
         O,
-        F: FnOnce(Self::Inner<'_>, GmpStateRef<'_, Ipv4, Self, BC>) -> O,
+        F: FnOnce(Self::Inner<'_>, GmpStateRef<'_, Ipv4, IgmpTypeLayout, BC>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_igmp_state_mut(device, |core_ctx, state_ref, igmp_state| {
-            let inner = IgmpContextInner { igmp_state, core_ctx };
-            cb(inner, state_ref)
-        })
+        self.with_igmp_state_mut(device, cb)
     }
 }
 
-pub struct IgmpContextInner<'a, CC, BT: IgmpBindingsTypes> {
-    igmp_state: &'a mut IgmpState<BT>,
-    core_ctx: CC,
-}
-
-impl<CC, BT: IgmpBindingsTypes> GmpTypeLayout<Ipv4, BT> for IgmpContextInner<'_, CC, BT>
-where
-    CC: DeviceIdContext<AnyDevice>,
-{
-    type Actions = Igmpv2Actions;
-    type Config = IgmpConfig;
-}
-
-impl<BT, CC> DeviceIdContext<AnyDevice> for IgmpContextInner<'_, CC, BT>
-where
-    CC: DeviceIdContext<AnyDevice>,
-    BT: IgmpBindingsTypes,
-{
-    type DeviceId = CC::DeviceId;
-    type WeakDeviceId = CC::WeakDeviceId;
-}
-
-impl<BC, CC> GmpContextInner<Ipv4, BC> for IgmpContextInner<'_, CC, BC>
+impl<CC, BC> GmpContextInner<Ipv4, BC> for CC
 where
     CC: IgmpSendContext<BC>,
     BC: IgmpBindingsContext,
 {
+    type TypeLayout = IgmpTypeLayout;
+
     fn send_message_v1(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
+        cur_mode: &IgmpMode<BC::Instant>,
         group_addr: GmpEnabledGroup<Ipv4Addr>,
         msg_type: gmp::v1::GmpMessageType,
     ) {
         let group_addr = group_addr.into_multicast_addr();
-        let Self { igmp_state: IgmpState { compat_mode, .. }, core_ctx } = self;
         let result = match msg_type {
             gmp::v1::GmpMessageType::Report => {
-                if compat_mode.should_send_v1(bindings_ctx) {
+                if cur_mode.should_send_v1(bindings_ctx) {
                     send_igmp_v2_message::<_, _, IgmpMembershipReportV1>(
-                        core_ctx,
+                        self,
                         bindings_ctx,
                         device,
                         group_addr,
@@ -369,7 +363,7 @@ where
                     )
                 } else {
                     send_igmp_v2_message::<_, _, IgmpMembershipReportV2>(
-                        core_ctx,
+                        self,
                         bindings_ctx,
                         device,
                         group_addr,
@@ -379,7 +373,7 @@ where
                 }
             }
             gmp::v1::GmpMessageType::Leave => send_igmp_v2_message::<_, _, IgmpLeaveGroup>(
-                core_ctx,
+                self,
                 bindings_ctx,
                 device,
                 group_addr,
@@ -403,12 +397,11 @@ where
         device: &Self::DeviceId,
         groups: impl Iterator<Item: gmp::v2::VerifiedReportGroupRecord<Ipv4Addr> + Clone> + Clone,
     ) {
-        let Self { core_ctx, igmp_state: _ } = self;
         let dst_ip = ALL_IGMPV3_CAPABLE_ROUTERS;
-        let mut header = new_ip_header_builder(core_ctx, device, dst_ip);
+        let mut header = new_ip_header_builder(self, device, dst_ip);
         header.prefix_builder_mut().dscp_and_ecn(IGMPV3_DSCP_AND_ECN);
         let avail_len =
-            usize::from(core_ctx.get_mtu(device)).saturating_sub(header.constraints().header_len());
+            usize::from(self.get_mtu(device)).saturating_sub(header.constraints().header_len());
         let reports = match IgmpMembershipReportV3Builder::new(groups).with_len_limits(avail_len) {
             Ok(msg) => msg,
             Err(e) => {
@@ -425,118 +418,130 @@ where
         for report in reports {
             let destination = IpPacketDestination::Multicast(dst_ip);
             let ip_frame = report.into_serializer().encapsulate(header.clone());
-            IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, device, destination, ip_frame)
+            IpLayerHandler::send_ip_frame(self, bindings_ctx, device, destination, ip_frame)
                 .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
                     debug!("failed to send IGMPv3 report over {device:?}: {error:?}")
                 });
         }
     }
 
-    fn run_actions(
+    fn mode_update_from_v1_query<Q: gmp::v1::QueryMessage<Ipv4>>(
         &mut self,
         bindings_ctx: &mut BC,
-        _device: &Self::DeviceId,
-        actions: Igmpv2Actions,
-        gmp_state: &GmpState<Ipv4, BC>,
-        config: &Self::Config,
-    ) {
-        let Self { igmp_state: IgmpState { compat_mode }, core_ctx: _ } = self;
-        match actions {
-            Igmpv2Actions::UpdateV1CompatModeTimeout => {
-                match compat_mode {
-                    IgmpCompatMode::V2OrV3 | IgmpCompatMode::V1Compat { .. } => (),
-                    IgmpCompatMode::V1 => {
-                        // Ignore v1 router present in forced v1 mode.
-                        return;
-                    }
-                }
+        query: &Q,
+        gmp_state: &GmpState<Ipv4, IgmpTypeLayout, BC>,
+        config: &IgmpConfig,
+    ) -> IgmpMode<BC::Instant> {
+        // IGMPv2 hosts should be compatible with routers that only speak
+        // IGMPv1. When an IGMPv2 host receives an IGMPv1 query (whose
+        // `MaxRespCode` is 0), it should set up a timer and only respond with
+        // IGMPv1 responses before the timer expires. Please refer to
+        // https://tools.ietf.org/html/rfc2236#section-4 for details.
 
-                let compat = match gmp_state.mode {
-                    GmpMode::V1 { compat } => compat,
-                    // Can't still be in v2 mode and observing v1 router.
-                    GmpMode::V2 => unreachable!(),
-                };
-                // If we're in compatibility mode, the generic gmp
-                // mode-exit timer will allow us to exit.
-                let duration = if compat {
-                    // From RFC 3376 section 4:
-                    //
-                    // The Group Compatibility Mode variable is based on whether
-                    // an older version report was heard in the last Older
-                    // Version Host Present Timeout seconds.
-                    gmp_state.v2_proto.older_version_querier_present_timeout(config).get()
-                } else {
-                    // From RFC 2236 section 4:
-                    //
-                    // This variable MUST be based upon whether or not an IGMPv1
-                    // query was heard in the last [Version 1 Router Present
-                    // Timeout] seconds, and MUST NOT be based upon the type of
-                    // the last Query heard.
-                    config.v1_router_present_timeout
-                };
-                let until = bindings_ctx.now().saturating_add(duration);
-                *compat_mode = IgmpCompatMode::V1Compat { until };
+        // If this is an IGMPv2 query. Maintain any existing IGMPv1 mode
+        // or forced IGMPv2, otherwise enter IGMPv2 compat.
+        if query.max_response_time() != Duration::ZERO {
+            return match gmp_state.mode {
+                mode @ IgmpMode::V1(_) | mode @ IgmpMode::V2 { compat: false } => mode,
+                IgmpMode::V2 { compat: true } | IgmpMode::V3 => IgmpMode::V2 { compat: true },
+            };
+        }
+
+        // Otherwise this is an IGMPv1 query.
+        match gmp_state.mode {
+            mode @ IgmpMode::V1(IgmpV1Mode::Forced) => mode,
+            IgmpMode::V2 { compat: false } | IgmpMode::V1(IgmpV1Mode::V2Compat { .. }) => {
+                // From RFC 2236 section 4:
+                //
+                // This variable MUST be based upon whether or not an IGMPv1
+                // query was heard in the last Version 1 Router Present Timeout
+                // seconds, and MUST NOT be based upon the type of the last
+                // Query heard.
+                let duration = config.v1_router_present_timeout;
+                IgmpMode::V1(IgmpV1Mode::V2Compat {
+                    until: bindings_ctx.now().saturating_add(duration),
+                })
+            }
+            IgmpMode::V3
+            | IgmpMode::V2 { compat: true }
+            | IgmpMode::V1(IgmpV1Mode::V3Compat { .. }) => {
+                // From RFC 3376 section 4:
+                //
+                // The Group Compatibility Mode variable is based on whether an
+                // older version report was heard in the last Older Version Host
+                // Present Timeout seconds.
+                let duration =
+                    gmp_state.v2_proto.older_version_querier_present_timeout(config).get();
+                IgmpMode::V1(IgmpV1Mode::V3Compat {
+                    until: bindings_ctx.now().saturating_add(duration),
+                })
             }
         }
     }
 
-    fn handle_mode_change(&mut self, new_mode: GmpMode) {
-        match new_mode {
-            GmpMode::V1 { .. } => {}
-            GmpMode::V2 => {
-                let Self { igmp_state: IgmpState { compat_mode }, core_ctx: _ } = self;
-                // Remove any information around v1 routers present when
-                // entering GMPv2.
-                *compat_mode = IgmpCompatMode::V2OrV3;
-            }
-        }
-    }
-
-    fn handle_disabled(&mut self) {
-        let Self { igmp_state: IgmpState { compat_mode }, core_ctx: _ } = self;
-        match compat_mode {
-            IgmpCompatMode::V2OrV3 | IgmpCompatMode::V1 => {}
-            IgmpCompatMode::V1Compat { .. } => {
-                // Exit compat mode on disable.
-                *compat_mode = IgmpCompatMode::V2OrV3;
-            }
-        }
-    }
-
-    fn get_config_mode(&mut self, gmp_mode: GmpMode) -> IgmpConfigMode {
-        let Self { igmp_state: IgmpState { compat_mode }, core_ctx: _ } = self;
-
-        match gmp_mode {
-            GmpMode::V2 | GmpMode::V1 { compat: true } => match compat_mode {
-                IgmpCompatMode::V2OrV3 | IgmpCompatMode::V1Compat { .. } => IgmpConfigMode::V3,
-                IgmpCompatMode::V1 => unreachable!("IGMPv1 forced mode requires forced GMPv1"),
-            },
-            GmpMode::V1 { compat: false } => match compat_mode {
-                IgmpCompatMode::V2OrV3 | IgmpCompatMode::V1Compat { .. } => IgmpConfigMode::V2,
-                IgmpCompatMode::V1 => IgmpConfigMode::V1,
-            },
-        }
-    }
-
-    fn set_config_mode(&mut self, mode: IgmpConfigMode) -> GmpConfigModeRequest {
-        let Self { igmp_state: IgmpState { compat_mode }, core_ctx: _ } = self;
+    fn mode_to_config(mode: &IgmpMode<BC::Instant>) -> IgmpConfigMode {
         match mode {
-            IgmpConfigMode::V1 => {
-                // IGMPv1 requires forced IGMP compat mode and forced GMPv1.
-                *compat_mode = IgmpCompatMode::V1;
-                GmpConfigModeRequest::ForcedV1
+            IgmpMode::V1(IgmpV1Mode::Forced) => IgmpConfigMode::V1,
+            IgmpMode::V1(IgmpV1Mode::V2Compat { .. }) | IgmpMode::V2 { compat: false } => {
+                IgmpConfigMode::V2
             }
-            IgmpConfigMode::V2 => {
-                // IGMPv2 requires forced GMPv1.
-                compat_mode.exit_forced_v1();
-                GmpConfigModeRequest::ForcedV1
-            }
+            IgmpMode::V1(IgmpV1Mode::V3Compat { .. })
+            | IgmpMode::V2 { compat: true }
+            | IgmpMode::V3 => IgmpConfigMode::V3,
+        }
+    }
+
+    fn config_to_mode(
+        cur_mode: &IgmpMode<BC::Instant>,
+        config: IgmpConfigMode,
+    ) -> IgmpMode<BC::Instant> {
+        match config {
+            IgmpConfigMode::V1 => IgmpMode::V1(IgmpV1Mode::Forced),
+            IgmpConfigMode::V2 => match cur_mode {
+                IgmpMode::V1(IgmpV1Mode::V2Compat { .. }) => {
+                    // Switching from IGMPv2 to IGMPv2, copy current mode.
+                    *cur_mode
+                }
+                IgmpMode::V1(IgmpV1Mode::V3Compat { until }) => {
+                    // Switching from IGMPv3 to IGMPV2, copy the compatibility timeline.
+                    IgmpMode::V1(IgmpV1Mode::V2Compat { until: *until })
+                }
+                IgmpMode::V1(IgmpV1Mode::Forced) | IgmpMode::V2 { .. } | IgmpMode::V3 => {
+                    IgmpMode::V2 { compat: false }
+                }
+            },
             IgmpConfigMode::V3 => {
-                // IGMPv3 requires GMPv2.
-                compat_mode.exit_forced_v1();
-                GmpConfigModeRequest::V2
+                match cur_mode {
+                    IgmpMode::V1(IgmpV1Mode::V2Compat { until }) => {
+                        // Switching from IGMPv2 to IGMPv3 just copy current mode.
+                        IgmpMode::V1(IgmpV1Mode::V3Compat { until: *until })
+                    }
+                    IgmpMode::V1(IgmpV1Mode::V3Compat { .. }) | IgmpMode::V2 { compat: true } => {
+                        // Switching from IGMPv3 to IGMPv3, copy current mode.
+                        *cur_mode
+                    }
+                    IgmpMode::V1(IgmpV1Mode::Forced)
+                    | IgmpMode::V2 { compat: false }
+                    | IgmpMode::V3 => IgmpMode::V3,
+                }
             }
         }
+    }
+
+    fn mode_on_disable(cur_mode: &IgmpMode<BC::Instant>) -> IgmpMode<BC::Instant> {
+        match cur_mode {
+            m @ IgmpMode::V1(IgmpV1Mode::Forced)
+            | m @ IgmpMode::V2 { compat: false }
+            | m @ IgmpMode::V3 => *m,
+            IgmpMode::V1(IgmpV1Mode::V2Compat { .. }) => IgmpMode::V2 { compat: false },
+            IgmpMode::V1(IgmpV1Mode::V3Compat { .. }) | IgmpMode::V2 { compat: true } => {
+                IgmpMode::V3
+            }
+        }
+    }
+
+    fn mode_on_exit_compat() -> IgmpMode<BC::Instant> {
+        IgmpMode::V3
     }
 }
 
@@ -697,11 +702,6 @@ where
         .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
 }
 
-#[derive(PartialEq, Eq, Debug)]
-pub enum Igmpv2Actions {
-    UpdateV1CompatModeTimeout,
-}
-
 #[derive(Debug)]
 pub struct IgmpConfig {
     // When a host wants to send a report not because of a query, this value is
@@ -762,17 +762,6 @@ impl gmp::v1::ProtocolConfig for IgmpConfig {
         //        Response Time set to 0.  This MUST be interpreted as a value
         //        of 100 (10 seconds).
         Some(NonZeroDuration::new(resp_time).unwrap_or(DEFAULT_V1_QUERY_MAX_RESP_TIME))
-    }
-
-    type QuerySpecificActions = Igmpv2Actions;
-    fn do_query_received_specific(&self, max_resp_time: Duration) -> Option<Igmpv2Actions> {
-        // IGMPv2 hosts should be compatible with routers that only speak
-        // IGMPv1. When an IGMPv2 host receives an IGMPv1 query (whose
-        // `MaxRespCode` is 0), it should set up a timer and only respond with
-        // IGMPv1 responses before the timer expires. Please refer to
-        // https://tools.ietf.org/html/rfc2236#section-4 for details.
-        let v1_router_present = max_resp_time.as_micros() == 0;
-        v1_router_present.then(|| Igmpv2Actions::UpdateV1CompatModeTimeout)
     }
 }
 
@@ -841,19 +830,18 @@ mod tests {
     /// The parts of `FakeIgmpCtx` that are behind a RefCell, mocking a lock.
     struct Shared {
         groups: MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, FakeBindingsCtx>>,
-        igmp_state: IgmpState<FakeBindingsCtx>,
-        gmp_state: GmpState<Ipv4, FakeBindingsCtx>,
+        gmp_state: GmpState<Ipv4, IgmpTypeLayout, FakeBindingsCtx>,
         config: IgmpConfig,
     }
 
     impl FakeIgmpCtx {
-        fn gmp_state(&mut self) -> &mut GmpState<Ipv4, FakeBindingsCtx> {
+        fn gmp_state(&mut self) -> &mut GmpState<Ipv4, IgmpTypeLayout, FakeBindingsCtx> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().gmp_state
         }
 
         fn gmp_state_and_config(
             &mut self,
-        ) -> (&mut GmpState<Ipv4, FakeBindingsCtx>, &mut IgmpConfig) {
+        ) -> (&mut GmpState<Ipv4, IgmpTypeLayout, FakeBindingsCtx>, &mut IgmpConfig) {
             let shared = Rc::get_mut(&mut self.shared).unwrap().get_mut();
             (&mut shared.gmp_state, &mut shared.config)
         }
@@ -862,10 +850,6 @@ mod tests {
             &mut self,
         ) -> &mut MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, FakeBindingsCtx>> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().groups
-        }
-
-        fn igmp_state(&mut self) -> &mut IgmpState<FakeBindingsCtx> {
-            &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().igmp_state
         }
     }
 
@@ -905,8 +889,7 @@ mod tests {
             O,
             F: for<'a> FnOnce(
                 Self::SendContext<'a>,
-                GmpStateRef<'a, Ipv4, Self, FakeBindingsCtx>,
-                &'a mut IgmpState<FakeBindingsCtx>,
+                GmpStateRef<'a, Ipv4, IgmpTypeLayout, FakeBindingsCtx>,
             ) -> O,
         >(
             &mut self,
@@ -917,8 +900,8 @@ mod tests {
             let enabled = *igmp_enabled;
             let shared = Rc::clone(shared);
             let mut shared = shared.borrow_mut();
-            let Shared { igmp_state, gmp_state, groups, config } = &mut *shared;
-            cb(self, GmpStateRef { enabled, groups, gmp: gmp_state, config }, igmp_state)
+            let Shared { gmp_state, groups, config } = &mut *shared;
+            cb(self, GmpStateRef { enabled, groups, gmp: gmp_state, config })
         }
     }
 
@@ -1040,9 +1023,8 @@ mod tests {
                         bindings_ctx,
                         FakeWeakDeviceId(FakeDeviceId),
                         igmp_enabled,
-                        GmpMode::V1 { compat: false },
+                        IgmpMode::V2 { compat: false },
                     ),
-                    igmp_state: Default::default(),
                     config: Default::default(),
                 })),
                 igmp_enabled,
@@ -1169,7 +1151,7 @@ mod tests {
         run_with_many_seeds(|seed| {
             let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(seed);
 
-            assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
+            assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V2 { compat: false });
             assert_eq!(
                 core_ctx.gmp_join_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
                 GroupJoinResult::Joined(())
@@ -1187,11 +1169,11 @@ mod tests {
             // flag.
             let now = bindings_ctx.now();
             let until = now.panicking_add(DEFAULT_V1_ROUTER_PRESENT_TIMEOUT);
-            assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V1Compat { until });
             assert_eq!(
-                core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx),
-                true
+                core_ctx.state.gmp_state().mode,
+                IgmpMode::V1(IgmpV1Mode::V2Compat { until })
             );
+            assert_eq!(core_ctx.state.gmp_state().mode.should_send_v1(&mut bindings_ctx), true);
             assert_eq!(core_ctx.frames().len(), 1);
             core_ctx.state.gmp_state().timers.assert_range([(
                 &gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
@@ -1220,10 +1202,7 @@ mod tests {
             bindings_ctx.timers.instant.time = until;
 
             // After the elapsed time, we should reset our flag for v1 routers.
-            assert_eq!(
-                core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx),
-                false
-            );
+            assert_eq!(core_ctx.state.gmp_state().mode.should_send_v1(&mut bindings_ctx), false);
 
             receive_igmp_v2_query(
                 &mut core_ctx,
@@ -1670,8 +1649,8 @@ mod tests {
     #[test]
     fn igmpv3_version_compat() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(0);
-        core_ctx.with_gmp_state_mut_and_ctx(&FakeDeviceId, |mut core_ctx, state| {
-            gmp::enter_mode(&mut core_ctx, &mut bindings_ctx, state, GmpMode::V2);
+        core_ctx.with_gmp_state_mut(&FakeDeviceId, |state| {
+            gmp::enter_mode(&mut bindings_ctx, state, IgmpMode::V3);
         });
 
         for _ in 0..2 {
@@ -1687,24 +1666,20 @@ mod tests {
                 ),
                 Ok(())
             );
-            // We should be in GMPv1 compat mode with an IGMPv1 router present
-            // and the compat instant is set by the IGMPv3 RFC definition.
-            assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
+            // We should be in IGMPv1 compat mode and the compat instant is set
+            // by the IGMPv3 RFC definition.
             let (gmp_state, config) = core_ctx.state.gmp_state_and_config();
             let until = bindings_ctx.now().panicking_add(
                 gmp_state.v2_proto.older_version_querier_present_timeout(config).get(),
             );
-            assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V1Compat { until });
-            assert_eq!(
-                core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx),
-                true
-            );
+            assert_eq!(gmp_state.mode, IgmpMode::V1(IgmpV1Mode::V3Compat { until }));
+            assert_eq!(gmp_state.mode.should_send_v1(&mut bindings_ctx), true);
             bindings_ctx.timers.instant.sleep(Duration::from_secs(2));
         }
 
         let (v2_deadline, ()) =
             core_ctx.state.gmp_state().timers.get(&gmp::TimerIdInner::V1Compat).unwrap();
-        let prev_compat = core_ctx.state.igmp_state().compat_mode;
+        let prev_mode = core_ctx.state.gmp_state().mode;
         // Now receive an IGMPv2 query. The IGMPv1 compat deadline should not
         // move.
         assert_eq!(
@@ -1719,29 +1694,25 @@ mod tests {
             ),
             Ok(())
         );
-        assert_eq!(core_ctx.state.igmp_state().compat_mode, prev_compat);
+        assert_eq!(core_ctx.state.gmp_state().mode, prev_mode);
         assert_ne!(
             core_ctx.state.gmp_state().timers.get(&gmp::TimerIdInner::V1Compat).unwrap(),
             (v2_deadline, &())
         );
         // We haven't moved timers so we should still be sending IGMPv1 responses.
-        assert_eq!(core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx), true);
+        assert_eq!(core_ctx.state.gmp_state().mode.should_send_v1(&mut bindings_ctx), true);
 
         // Triggering the next timer should clear IGMPv2 compat back into IGMPv3
         // and we update the compat mode.
         assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(GMP_TIMER_ID));
-        assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V2);
-        assert_eq!(
-            core_ctx.state.igmp_state().compat_mode.should_send_v1(&mut bindings_ctx),
-            false
-        );
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V3);
+        assert_eq!(core_ctx.state.gmp_state().mode.should_send_v1(&mut bindings_ctx), false);
     }
 
     #[test]
     fn version_compat_clears_on_disable() {
         let FakeCtx { mut core_ctx, mut bindings_ctx } = setup_igmpv2_test_environment(0);
-        assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V2 { compat: false });
         assert_eq!(
             gmp::v1::handle_query_message(
                 &mut core_ctx,
@@ -1754,10 +1725,10 @@ mod tests {
             ),
             Ok(())
         );
-        assert_matches!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V1Compat { .. });
+        assert_matches!(core_ctx.state.gmp_state().mode, IgmpMode::V1(IgmpV1Mode::V2Compat { .. }));
         core_ctx.state.igmp_enabled = false;
         core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
-        assert_eq!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V2 { compat: false });
     }
 
     #[test]
@@ -1776,15 +1747,14 @@ mod tests {
             IgmpConfigMode::V2
         );
         assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), IgmpConfigMode::V3);
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V2);
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V3);
         // No side-effects.
         assert_eq!(core_ctx.take_frames(), Vec::new());
 
         // If we receive an IGMPv1 query, we'll go into compat mode but still
         // report IGMPv3 to the user.
         receive_igmp_v1_query(core_ctx, bindings_ctx);
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
-        assert_matches!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V1Compat { .. });
+        assert_matches!(core_ctx.state.gmp_state().mode, IgmpMode::V1(IgmpV1Mode::V3Compat { .. }));
         assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), IgmpConfigMode::V3);
 
         // Acknowledge query response.
@@ -1797,15 +1767,17 @@ mod tests {
             IgmpConfigMode::V3
         );
         assert_eq!(core_ctx.take_frames(), Vec::new());
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
+        let until = assert_matches!(
+            core_ctx.state.gmp_state().mode,
+            IgmpMode::V1(IgmpV1Mode::V3Compat { until }) => until
+        );
         // If the user switches to IGMPv2, we keep the IGMPv1 compat information.
         assert_eq!(
             core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, IgmpConfigMode::V2),
             IgmpConfigMode::V3
         );
         assert_eq!(core_ctx.take_frames(), Vec::new());
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: false });
-        assert_matches!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V1Compat { .. });
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V1(IgmpV1Mode::V2Compat { until }));
 
         // Forcing IGMPv1 mode, however, exits compat.
         assert_eq!(
@@ -1813,29 +1785,25 @@ mod tests {
             IgmpConfigMode::V2
         );
         assert_eq!(core_ctx.take_frames(), Vec::new());
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: false });
-        assert_matches!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V1);
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V1(IgmpV1Mode::Forced));
 
         // Back to IGMPv2...
         assert_eq!(
             core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, IgmpConfigMode::V2),
             IgmpConfigMode::V1
         );
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: false });
-        assert_matches!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V2 { compat: false });
         // ...and then IGMPv3.
         assert_eq!(
             core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, IgmpConfigMode::V3),
             IgmpConfigMode::V2
         );
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V2);
-        assert_matches!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V3);
         assert_eq!(core_ctx.take_frames(), Vec::new());
 
         // Receiving an IGMPv2 query while in IGMPv3 enters compat.
         receive_igmp_v2_query(core_ctx, bindings_ctx, NonZeroDuration::from_secs(1).unwrap());
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
-        assert_matches!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V2 { compat: true });
         assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), IgmpConfigMode::V3);
         // Acknowledge query response.
         assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(GMP_TIMER_ID));
@@ -1847,15 +1815,14 @@ mod tests {
             IgmpConfigMode::V3
         );
         assert_eq!(core_ctx.take_frames(), Vec::new());
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V2 { compat: true });
 
         // Force IGMPv2 exits IGMPv2 compat.
         assert_eq!(
             core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, IgmpConfigMode::V2),
             IgmpConfigMode::V3
         );
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: false });
-        assert_matches!(core_ctx.state.igmp_state().compat_mode, IgmpCompatMode::V2OrV3);
+        assert_eq!(core_ctx.state.gmp_state().mode, IgmpMode::V2 { compat: false });
         assert_eq!(core_ctx.take_frames(), Vec::new());
         // No timers.
         core_ctx.state.gmp_state().timers.assert_timers([]);

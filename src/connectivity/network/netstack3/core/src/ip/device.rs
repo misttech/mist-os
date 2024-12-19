@@ -40,8 +40,8 @@ use netstack3_ip::device::{
     SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
-    GmpGroupState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpState,
-    IgmpStateContext, MldContext, MldContextMarker, MldSendContext, MldStateContext,
+    GmpGroupState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpStateContext,
+    IgmpTypeLayout, MldContext, MldContextMarker, MldSendContext, MldStateContext, MldTypeLayout,
     MulticastGroupSet,
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
@@ -1178,11 +1178,7 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
     /// and whether or not IGMP is enabled for the `device`.
     fn with_igmp_state_mut<
         O,
-        F: for<'b> FnOnce(
-            Self::SendContext<'b>,
-            GmpStateRef<'b, Ipv4, Self, BC>,
-            &'b mut IgmpState<BC>,
-        ) -> O,
+        F: for<'b> FnOnce(Self::SendContext<'b>, GmpStateRef<'b, Ipv4, IgmpTypeLayout, BC>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -1203,13 +1199,9 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
             .ip_enabled;
         let (mut state, mut locked) =
             state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv4>, _>(|x| x.right());
-        let IpDeviceMulticastGroups { groups, gmp, gmp_proto, gmp_config } = &mut *state;
+        let IpDeviceMulticastGroups { groups, gmp, gmp_config } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
-        cb(
-            locked.cast_core_ctx(),
-            GmpStateRef { enabled, groups, gmp, config: gmp_config },
-            gmp_proto,
-        )
+        cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp, config: gmp_config })
     }
 }
 
@@ -1240,7 +1232,7 @@ impl<
 
     fn with_mld_state_mut<
         O,
-        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, BC>) -> O,
+        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, MldTypeLayout, BC>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -1260,7 +1252,7 @@ impl<
             .ip_enabled;
         let (mut state, mut locked) =
             state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv6>, _>(|x| x.right());
-        let IpDeviceMulticastGroups { groups, gmp, gmp_config, gmp_proto: _ } = &mut *state;
+        let IpDeviceMulticastGroups { groups, gmp, gmp_config } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
         cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp, config: gmp_config })
     }

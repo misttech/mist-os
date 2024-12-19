@@ -8,7 +8,6 @@
 //! IGMPv2. One important difference to note is that MLD uses ICMPv6 (IP
 //! Protocol 58) message types, rather than IGMP (IP Protocol 2) message types.
 
-use core::convert::Infallible as Never;
 use core::time::Duration;
 
 use log::{debug, error};
@@ -41,9 +40,9 @@ use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpDeviceMtuContext, IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpBindingsTypes, GmpConfigModeRequest, GmpContext, GmpContextInner,
-    GmpEnabledGroup, GmpGroupState, GmpMode, GmpState, GmpStateContext, GmpStateRef, GmpTimerId,
-    GmpTypeLayout, IpExt, MulticastGroupSet, NotAMemberErr,
+    self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpEnabledGroup,
+    GmpGroupState, GmpMode, GmpState, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout,
+    IpExt, MulticastGroupSet, NotAMemberErr,
 };
 
 /// The destination address for all MLDv2 reports.
@@ -99,7 +98,7 @@ pub trait MldContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> + MldCont
     /// and whether or not MLD is enabled for the `device`.
     fn with_mld_state_mut<
         O,
-        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, BT>) -> O,
+        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, MldTypeLayout, BT>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -271,11 +270,30 @@ impl IpExt for Ipv6 {
     }
 }
 
-impl<BT: MldBindingsTypes, CC: DeviceIdContext<AnyDevice> + MldContextMarker>
-    GmpTypeLayout<Ipv6, BT> for CC
-{
-    type Actions = Never;
+/// Newtype over [`GmpMode`] to tailor it to GMP.
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct MldMode(GmpMode);
+
+impl From<MldMode> for GmpMode {
+    fn from(MldMode(v): MldMode) -> Self {
+        v
+    }
+}
+
+// NB: This could be derived, but it feels better to have it called out
+// explicitly in MLD.
+impl Default for MldMode {
+    fn default() -> Self {
+        Self(GmpMode::V2)
+    }
+}
+
+/// Uninstantiable type marking a [`GmpState`] as having MLD types.
+pub enum MldTypeLayout {}
+
+impl<BT: MldBindingsTypes> GmpTypeLayout<Ipv6, BT> for MldTypeLayout {
     type Config = MldConfig;
+    type ProtoMode = MldMode;
 }
 
 impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> for CC {
@@ -289,11 +307,12 @@ impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> fo
 }
 
 impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
+    type TypeLayout = MldTypeLayout;
     type Inner<'a> = CC::SendContext<'a>;
 
     fn with_gmp_state_mut_and_ctx<
         O,
-        F: FnOnce(Self::Inner<'_>, GmpStateRef<'_, Ipv6, Self, BC>) -> O,
+        F: FnOnce(Self::Inner<'_>, GmpStateRef<'_, Ipv6, Self::TypeLayout, BC>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -304,10 +323,12 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
 }
 
 impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> for CC {
+    type TypeLayout = MldTypeLayout;
     fn send_message_v1(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
+        _cur_mode: &MldMode,
         group_addr: GmpEnabledGroup<Ipv6Addr>,
         msg_type: gmp::v1::GmpMessageType,
     ) {
@@ -377,33 +398,40 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         }
     }
 
-    fn run_actions(
+    fn mode_update_from_v1_query<Q: gmp::v1::QueryMessage<Ipv6>>(
         &mut self,
         _bindings_ctx: &mut BC,
-        _device: &CC::DeviceId,
-        actions: Never,
-        _gmp_state: &GmpState<Ipv6, BC>,
-        _config: &Self::Config,
-    ) {
-        match actions {}
+        _query: &Q,
+        gmp_state: &GmpState<Ipv6, MldTypeLayout, BC>,
+        _config: &MldConfig,
+    ) -> MldMode {
+        let MldMode(gmp) = &gmp_state.mode;
+        MldMode(gmp.maybe_enter_v1_compat())
     }
 
-    fn handle_mode_change(&mut self, _new_mode: gmp::GmpMode) {}
-
-    fn handle_disabled(&mut self) {}
-
-    fn get_config_mode(&mut self, gmp_mode: GmpMode) -> MldConfigMode {
+    fn mode_to_config(MldMode(gmp_mode): &MldMode) -> MldConfigMode {
         match gmp_mode {
             GmpMode::V2 | GmpMode::V1 { compat: true } => MldConfigMode::V2,
             GmpMode::V1 { compat: false } => MldConfigMode::V1,
         }
     }
 
-    fn set_config_mode(&mut self, mode: MldConfigMode) -> GmpConfigModeRequest {
-        match mode {
-            MldConfigMode::V1 => GmpConfigModeRequest::ForcedV1,
-            MldConfigMode::V2 => GmpConfigModeRequest::V2,
-        }
+    fn config_to_mode(MldMode(cur_mode): &MldMode, config: MldConfigMode) -> MldMode {
+        MldMode(match config {
+            MldConfigMode::V1 => GmpMode::V1 { compat: false },
+            MldConfigMode::V2 => match cur_mode {
+                GmpMode::V1 { compat: true } => *cur_mode,
+                GmpMode::V1 { compat: false } | GmpMode::V2 => GmpMode::V2,
+            },
+        })
+    }
+
+    fn mode_on_disable(MldMode(cur_mode): &MldMode) -> MldMode {
+        MldMode(cur_mode.maybe_exit_v1_compat())
+    }
+
+    fn mode_on_exit_compat() -> MldMode {
+        MldMode(GmpMode::V2)
     }
 }
 
@@ -472,11 +500,6 @@ impl gmp::v1::ProtocolConfig for MldConfig {
 
     fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration> {
         NonZeroDuration::new(resp_time)
-    }
-
-    type QuerySpecificActions = Never;
-    fn do_query_received_specific(&self, _max_resp_time: Duration) -> Option<Never> {
-        None
     }
 }
 
@@ -676,7 +699,7 @@ mod tests {
     }
 
     impl FakeMldCtx {
-        fn gmp_state(&mut self) -> &mut GmpState<Ipv6, FakeBindingsCtxImpl> {
+        fn gmp_state(&mut self) -> &mut GmpState<Ipv6, MldTypeLayout, FakeBindingsCtxImpl> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().gmp_state
         }
 
@@ -690,7 +713,7 @@ mod tests {
     /// The parts of `FakeMldCtx` that are behind a RefCell, mocking a lock.
     struct Shared {
         groups: MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, FakeBindingsCtxImpl>>,
-        gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
+        gmp_state: GmpState<Ipv6, MldTypeLayout, FakeBindingsCtxImpl>,
         config: MldConfig,
     }
 
@@ -709,7 +732,7 @@ mod tests {
                         bindings_ctx,
                         FakeWeakDeviceId(FakeDeviceId),
                         mld_enabled,
-                        GmpMode::V1 { compat: false },
+                        MldMode(GmpMode::V1 { compat: false }),
                     ),
                     config: Default::default(),
                 })),
@@ -752,7 +775,10 @@ mod tests {
         type SendContext<'a> = &'a mut Self;
         fn with_mld_state_mut<
             O,
-            F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, FakeBindingsCtxImpl>) -> O,
+            F: FnOnce(
+                Self::SendContext<'_>,
+                GmpStateRef<'_, Ipv6, MldTypeLayout, FakeBindingsCtxImpl>,
+            ) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
@@ -1675,14 +1701,14 @@ mod tests {
             MldConfigMode::V1
         );
         assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), MldConfigMode::V2);
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V2);
+        assert_eq!(core_ctx.state.gmp_state().mode, MldMode(GmpMode::V2));
         // No side-effects.
         assert_eq!(core_ctx.take_frames(), Vec::new());
 
         // If we receive a v1 query, we'll go into compat mode but still report
         // v2 to the user.
         receive_mldv1_query(core_ctx, bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
+        assert_eq!(core_ctx.state.gmp_state().mode, MldMode(GmpMode::V1 { compat: true }));
         // Acknowledge query response.
         assert_eq!(core_ctx.take_frames().len(), 1);
         assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), MldConfigMode::V2);
@@ -1693,7 +1719,7 @@ mod tests {
             MldConfigMode::V2
         );
         assert_eq!(core_ctx.take_frames(), Vec::new());
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: true });
+        assert_eq!(core_ctx.state.gmp_state().mode, MldMode(GmpMode::V1 { compat: true }));
 
         // Forcing V1 mode, however, exits compat.
         assert_eq!(
@@ -1701,6 +1727,6 @@ mod tests {
             MldConfigMode::V2
         );
         assert_eq!(core_ctx.take_frames(), Vec::new());
-        assert_eq!(core_ctx.state.gmp_state().mode, GmpMode::V1 { compat: false });
+        assert_eq!(core_ctx.state.gmp_state().mode, MldMode(GmpMode::V1 { compat: false }));
     }
 }
