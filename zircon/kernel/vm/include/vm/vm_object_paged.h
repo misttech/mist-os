@@ -73,12 +73,11 @@ class VmObjectPaged final : public VmObject {
   // the user changing the value via a syscall, so multiple calls under the same lock acquisition
   // can have different results.
   ktl::optional<uint64_t> user_content_size_locked() TA_REQ(lock()) {
-    auto csm = cow_pages_locked()->GetUserContentSizeLocked();
-    if (!csm) {
+    if (!user_content_size_) {
       return ktl::nullopt;
     }
 
-    return csm->GetContentSize();
+    return user_content_size_->GetContentSize();
   }
 
   bool is_contiguous() const override { return (options_ & kContiguous); }
@@ -221,7 +220,7 @@ class VmObjectPaged final : public VmObject {
   // See VmObject::SetUserContentSize
   void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) override {
     Guard<CriticalMutex> guard{lock()};
-    cow_pages_locked()->SetUserContentSizeLocked(ktl::move(csm));
+    user_content_size_ = ktl::move(csm);
   }
 
   void Dump(uint depth, bool verbose) override {
@@ -449,6 +448,10 @@ class VmObjectPaged final : public VmObject {
   // consequence if this is null it implies that the VMO is *not* in the global list. Otherwise it
   // can generally be assumed that this is non-null.
   fbl::RefPtr<VmCowPages> cow_pages_ TA_GUARDED(lock());
+
+  // A user supplied content size that can be queried. By itself this has no semantic meaning and is
+  // only read and used specifically when requested by the user. See VmObject::SetUserContentSize.
+  fbl::RefPtr<ContentSizeManager> user_content_size_ TA_GUARDED(lock());
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_OBJECT_PAGED_H_

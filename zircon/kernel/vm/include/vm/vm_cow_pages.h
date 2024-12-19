@@ -336,15 +336,6 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t PrepareForWriteLocked(uint64_t offset, uint64_t len, LazyPageRequest* page_request,
                                     uint64_t* dirty_len_out) TA_REQ(lock());
 
-  // See VmObject::SetUserContentSize
-  void SetUserContentSizeLocked(fbl::RefPtr<ContentSizeManager> csm) TA_REQ(lock()) {
-    user_content_size_ = ktl::move(csm);
-  }
-
-  fbl::RefPtr<ContentSizeManager> GetUserContentSizeLocked() TA_REQ(lock()) {
-    return user_content_size_;
-  }
-
   class LookupCursor;
   // See VmObjectPaged::GetLookupCursorLocked
   zx::result<LookupCursor> GetLookupCursorLocked(uint64_t offset, uint64_t max_len) TA_REQ(lock());
@@ -1434,10 +1425,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // The page source, if any.
   const fbl::RefPtr<PageSource> page_source_;
-
-  // A user supplied content size that can be queried. By itself this has no semantic meaning and is
-  // only read and used specifically when requested by the user. See VmObject::SetUserContentSize.
-  fbl::RefPtr<ContentSizeManager> user_content_size_ TA_GUARDED(lock());
 
   // Count reclamation events so that we can report them to the user.
   uint64_t reclamation_event_count_ TA_GUARDED(lock()) = 0;
