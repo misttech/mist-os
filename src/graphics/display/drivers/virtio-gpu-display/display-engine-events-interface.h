@@ -8,7 +8,6 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/stdcompat/span.h>
-#include <lib/zx/result.h>
 #include <lib/zx/time.h>
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"

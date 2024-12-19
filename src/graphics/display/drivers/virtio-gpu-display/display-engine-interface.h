@@ -11,6 +11,7 @@
 
 #include <cstdint>
 
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
@@ -61,7 +62,7 @@ class DisplayEngineInterface {
   // Returns true if the configuration is acceptable to the driver. If false,
   // `layer_composition_operations` must be set to a sequence of operations that
   // are likely to yield an acceptable configuration.
-  virtual bool CheckConfiguration(
+  virtual display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
       cpp20::span<display::LayerCompositionOperations> layer_composition_operations) = 0;
 

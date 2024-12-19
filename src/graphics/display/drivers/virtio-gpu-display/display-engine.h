@@ -25,6 +25,7 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine-interface.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/imported-images.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
@@ -71,7 +72,7 @@ class DisplayEngine final : public DisplayEngineInterface {
   zx::result<display::DriverCaptureImageId> ImportImageForCapture(
       display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) override;
   void ReleaseImage(display::DriverImageId image_id) override;
-  bool CheckConfiguration(
+  display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
       cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
   void ApplyConfiguration(display::DisplayId display_id,

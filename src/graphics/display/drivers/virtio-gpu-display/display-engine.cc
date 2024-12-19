@@ -32,6 +32,7 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -154,7 +155,7 @@ void DisplayEngine::ReleaseImage(display::DriverImageId image_id) {
   }
 }
 
-bool DisplayEngine::CheckConfiguration(
+display::ConfigCheckResult DisplayEngine::CheckConfiguration(
     display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
     cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
@@ -170,29 +171,29 @@ bool DisplayEngine::CheckConfiguration(
       .height = static_cast<int32_t>(current_display_.scanout_info.geometry.height),
   });
 
-  bool is_supported_configuration = true;
+  display::ConfigCheckResult result = display::ConfigCheckResult::kOk;
   if (layer.display_destination() != display_area) {
     // TODO(costan): Doesn't seem right?
     layer_composition_operations[0] = layer_composition_operations[0].WithMergeBase();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_source() != layer.display_destination()) {
     layer_composition_operations[0] = layer_composition_operations[0].WithFrameScale();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_metadata().dimensions() != layer.image_source().dimensions()) {
     layer_composition_operations[0] = layer_composition_operations[0].WithSrcFrame();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.alpha_mode() != display::AlphaMode::kDisable) {
     layer_composition_operations[0] = layer_composition_operations[0].WithAlpha();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
     layer_composition_operations[0] = layer_composition_operations[0].WithTransform();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
-  return is_supported_configuration;
+  return result;
 }
 
 void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
