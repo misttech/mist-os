@@ -470,7 +470,7 @@ impl HrTimerManager {
 
         // Signal the wake event before starting the first timer. This ensures that the
         // kernel will not suspend until the first timer has been started.
-        if after_len == 1 {
+        if after_len == 1 && Some(deadline) != guard.current_deadline {
             guard.set_wake_proxy_signal();
         }
 
