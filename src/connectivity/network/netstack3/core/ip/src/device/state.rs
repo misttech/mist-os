@@ -54,7 +54,7 @@ const DEFAULT_HOP_LIMIT: NonZeroU8 = NonZeroU8::new(64).unwrap();
 /// An `Ip` extension trait adding IP device state properties.
 pub trait IpDeviceStateIpExt: BroadcastIpExt {
     /// Information stored about an IP address assigned to an interface.
-    type AssignedAddressState<BT: IpDeviceStateBindingsTypes>: AssignedAddressState<Self::Addr>
+    type AssignedAddressState<BT: IpDeviceStateBindingsTypes>: AssignedAddressState<Address = Self::Addr>
         + Debug;
     /// The GMP protocol-specific configuration.
     type GmpProtoConfig: Default;
@@ -79,17 +79,25 @@ impl IpDeviceStateIpExt for Ipv6 {
 }
 
 /// The state associated with an IP address assigned to an IP device.
-pub trait AssignedAddressState<A: IpAddress>: Debug + Send + Sync + 'static {
+pub trait AssignedAddressState: Debug + Send + Sync + 'static {
+    /// The type of IP address that is assigned.
+    type Address: IpAddress<Version: AssignedAddrIpExt>;
+
     /// Gets the address.
-    fn addr(&self) -> IpDeviceAddr<A>;
+    fn addr(&self) -> IpDeviceAddr<Self::Address>;
 
     /// Gets the address subnet this ID represents.
-    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness>
-    where
-        A::Version: AssignedAddrIpExt;
+    fn addr_sub(
+        &self,
+    ) -> AddrSubnet<
+        Self::Address,
+        <<Self::Address as IpAddress>::Version as AssignedAddrIpExt>::AssignedWitness,
+    >;
 }
 
-impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv4Addr> for Ipv4AddressEntry<BT> {
+impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState for Ipv4AddressEntry<BT> {
+    type Address = Ipv4Addr;
+
     fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
         IpDeviceAddr::new_from_witness(self.addr_sub().addr())
     }
@@ -99,7 +107,9 @@ impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv4Addr> for Ipv4Addr
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv6Addr> for Ipv6AddressEntry<BT> {
+impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState for Ipv6AddressEntry<BT> {
+    type Address = Ipv6Addr;
+
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
         IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub().addr())
     }
@@ -111,11 +121,14 @@ impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv6Addr> for Ipv6Addr
 
 /// The primary reference to the state associated with an IP address assigned
 /// to an IP device.
-//
-// TODO(https://fxbug.dev/382093426): manually implement `Debug`.
-#[derive(Derivative)]
-#[derivative(Debug(bound = "S: Debug"))]
 pub struct PrimaryAddressId<S>(PrimaryRc<S>);
+
+impl<S: AssignedAddressState> Debug for PrimaryAddressId<S> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        write!(f, "PrimaryAddressId({:?} => {})", rc.debug_id(), self.addr_sub())
+    }
+}
 
 impl<S> Deref for PrimaryAddressId<S> {
     type Target = S;
@@ -153,34 +166,36 @@ impl<S> PrimaryAddressId<S> {
     }
 }
 
-impl<A, S> AssignedAddressState<A> for PrimaryAddressId<S>
-where
-    A: IpAddress<Version: AssignedAddrIpExt>,
-    S: AssignedAddressState<A>,
-{
-    fn addr(&self) -> IpDeviceAddr<A> {
+impl<S: AssignedAddressState> AssignedAddressState for PrimaryAddressId<S> {
+    type Address = S::Address;
+
+    fn addr(&self) -> IpDeviceAddr<S::Address> {
         let Self(inner) = self;
         inner.addr()
     }
 
-    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness> {
+    fn addr_sub(
+        &self,
+    ) -> AddrSubnet<
+        S::Address,
+        <<S::Address as IpAddress>::Version as AssignedAddrIpExt>::AssignedWitness,
+    > {
         let Self(inner) = self;
         inner.addr_sub()
     }
 }
 
 /// A strongly-held reference to an IP address assigned to a device.
-//
-// TODO(https://fxbug.dev/382093426): manually implement `Debug`.
 #[derive(Derivative)]
-#[derivative(
-    Debug(bound = "S: Debug"),
-    Clone(bound = ""),
-    Eq(bound = ""),
-    Hash(bound = ""),
-    PartialEq(bound = "")
-)]
+#[derivative(Clone(bound = ""), Eq(bound = ""), Hash(bound = ""), PartialEq(bound = ""))]
 pub struct AddressId<S>(StrongRc<S>);
+
+impl<S: AssignedAddressState> Debug for AddressId<S> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        write!(f, "AddressId({:?} => {})", rc.debug_id(), self.addr_sub())
+    }
+}
 
 impl<S> Deref for AddressId<S> {
     type Target = S;
@@ -194,7 +209,7 @@ impl<S> Deref for AddressId<S> {
 impl<A, S> IpAddressId<A> for AddressId<S>
 where
     A: IpAddress<Version: AssignedAddrIpExt>,
-    S: AssignedAddressState<A>,
+    S: AssignedAddressState<Address = A>,
 {
     type Weak = WeakAddressId<S>;
 
@@ -215,22 +230,30 @@ where
 }
 
 /// A weakly-held reference to an IP address assigned to a device.
-//
-// TODO(https://fxbug.dev/382093426): manually implement `Debug`.
 #[derive(Derivative)]
-#[derivative(
-    Debug(bound = "S: Debug"),
-    Clone(bound = ""),
-    Eq(bound = ""),
-    Hash(bound = ""),
-    PartialEq(bound = "")
-)]
+#[derivative(Clone(bound = ""), Eq(bound = ""), Hash(bound = ""), PartialEq(bound = ""))]
 pub struct WeakAddressId<S>(WeakRc<S>);
+
+impl<S: AssignedAddressState> Debug for WeakAddressId<S> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        if let Some(id) = self.upgrade() {
+            write!(f, "WeakAddressId({:?} => {})", rc.debug_id(), id.addr_sub())
+        } else {
+            write!(
+                f,
+                "WeakAddressId({:?} => {})",
+                rc.debug_id(),
+                <S::Address as IpAddress>::Version::NAME
+            )
+        }
+    }
+}
 
 impl<A, S> WeakIpAddressId<A> for WeakAddressId<S>
 where
     A: IpAddress<Version: AssignedAddrIpExt>,
-    S: AssignedAddressState<A>,
+    S: AssignedAddressState<Address = A>,
 {
     type Strong = AddressId<S>;
 
