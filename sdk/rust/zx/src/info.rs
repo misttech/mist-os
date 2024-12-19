@@ -140,9 +140,50 @@ pub(crate) fn object_get_info_vec<Q: ObjectQuery>(
             return Ok(out);
         } else {
             // The number of records may increase between retries; reserve space for that.
+            // TODO(https://fxbug.dev/384531846) grow more conservatively
             let needed_space = avail * INFO_VEC_SIZE_PAD;
             if let Some(to_grow) = needed_space.checked_sub(out.capacity()) {
                 out.reserve_exact(to_grow);
+            }
+
+            // We may ask the kernel to copy more than a page in the next iteration of this loop, so
+            // prefault each of the pages in the region.
+            //
+            // Currently Zircon has a very slow path when performing large usercopies into freshly
+            // allocated buffers. In practice our large heap allocated buffers are typically newly
+            // mapped and do not yet have any pages faulted in. Unlike a copy performed by
+            // userspace, Zircon itself has to handle any page faults and in order to avoid
+            // deadlocking with user pagers (among other issues), it will drop locks it holds,
+            // service the page fault, and then reacquire the locks (see linked bug below).
+            //
+            // In order to avoid hitting this slow path, we want to ensure that all of the pages of
+            // our Vec have already been faulted in before we hand off to the kernel to write data
+            // into them. Ideally the kernel would handle this for us but in the meantime we can
+            // shave a lot of time from the heaviest zx_object_get_info calls by faulting the pages
+            // ourselves.
+            //
+            // We only want to do this when the bindings themselves are responsible for creating the
+            // vector, because callers who manage their own buffer for the syscall may be doing
+            // their own page management for the buffer and we don't want to penalize them.
+            // TODO(https://fxbug.dev/383401884) remove once zircon prefaults get_info usercopies
+            // TODO(https://fxbug.dev/384941113) consider zx_vmar_op_range on root vmar instead
+            let maybe_unfaulted = out.spare_capacity_mut();
+
+            // SAFETY: zerocopy::FromBytes means it's OK to write arbitrary bytes to the slice.
+            // TODO(https://github.com/rust-lang/rust/issues/93092) use MaybeUninit::slice_as_bytes_mut
+            let maybe_unfaulted_bytes: &mut [MaybeUninit<u8>] = unsafe {
+                std::slice::from_raw_parts_mut(
+                    maybe_unfaulted.as_mut_ptr().cast::<MaybeUninit<u8>>(),
+                    std::mem::size_of_val(maybe_unfaulted),
+                )
+            };
+
+            // chunks_mut doesn't give us page alignment but that doesn't matter for pre-faulting.
+            for page in maybe_unfaulted_bytes.chunks_mut(crate::system_get_page_size() as usize) {
+                // This writes a single byte to each page to avoid unnecessary memory traffic. A
+                // non-zero byte is written so that these pages won't get picked up by Zircon's
+                // zero page scanner.
+                page[0] = MaybeUninit::new(1u8);
             }
         }
     }
