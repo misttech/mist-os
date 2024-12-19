@@ -16,7 +16,8 @@ use net_types::ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::MulticastAddr;
 use netstack3_base::testutil::{FakeBindingsCtx, FakeDeviceId, FakeWeakDeviceId};
 use netstack3_base::{
-    AnyDevice, CtxPair, DeviceIdContext, HandleableTimer, IntoCoreTimerCtx, TimerBindingsTypes,
+    AnyDevice, CtxPair, DeviceIdContext, HandleableTimer, InspectableValue, Inspector,
+    IntoCoreTimerCtx, TimerBindingsTypes,
 };
 use packet_formats::utils::NonZeroDuration;
 
@@ -270,6 +271,14 @@ impl<I: Ip> gmp::v2::QueryMessage<I> for FakeV2Query<I> {
 
     fn sources(&self) -> impl Iterator<Item = I::Addr> + '_ {
         self.sources.iter().copied()
+    }
+}
+
+// Required to satisfy trait bounds and use GmpMode directly as our protocol
+// mode.
+impl InspectableValue for GmpMode {
+    fn record<I: Inspector>(&self, _name: &str, _inspector: &mut I) {
+        unimplemented!()
     }
 }
 

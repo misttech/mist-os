@@ -32,7 +32,7 @@ use crate::internal::device::{
     self, AddressRemovedReason, DelIpAddr, IpDeviceAddressContext as _, IpDeviceBindingsContext,
     IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceStateContext as _,
 };
-use crate::internal::gmp::GmpHandler as _;
+use crate::internal::gmp::{GmpHandler as _, GmpStateContext};
 use crate::internal::routing::IpRoutingDeviceContext;
 use crate::internal::types::RawMetric;
 
@@ -302,7 +302,9 @@ where
         &mut self,
         device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
         inspector: &mut N,
-    ) {
+    ) where
+        C::CoreContext: GmpStateContext<I, C::BindingsContext>,
+    {
         inspector.record_child("Addresses", |inspector| {
             self.core_ctx().with_address_ids(device, |addrs, core_ctx| {
                 for addr in addrs {
@@ -326,6 +328,12 @@ where
                 inspector.record_bool("MulticastForwardingEnabled", *multicast_forwarding_enabled);
             })
         });
+        inspector.record_child("GMP", |inspector| {
+            self.core_ctx().with_gmp_state(device, |groups, gmp_state| {
+                inspector.record_inspectable_value("Mode", gmp_state.mode());
+                inspector.record_inspectable_value("Groups", groups);
+            })
+        })
     }
 }
 /// The device IP API interacting with all IP versions.

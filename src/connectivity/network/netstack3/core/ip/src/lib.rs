@@ -109,7 +109,7 @@ pub mod gmp {
         MldTypeLayout, MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::{
-        GmpGroupState, GmpHandler, GmpQueryHandler, GmpStateRef, GmpTimerId, IpExt,
+        GmpGroupState, GmpHandler, GmpQueryHandler, GmpState, GmpStateRef, GmpTimerId, IpExt,
         MulticastGroupSet,
     };
 }

@@ -18,7 +18,8 @@ use net_types::{
     Witness,
 };
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, WeakDeviceIdentifier,
+    AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, InspectableValue, Inspector,
+    WeakDeviceIdentifier,
 };
 use netstack3_filter as filter;
 use packet::serialize::{PacketBuilder, Serializer};
@@ -68,7 +69,13 @@ pub trait MldStateContext<BT: MldBindingsTypes>:
 {
     /// Calls the function with an immutable reference to the device's MLD
     /// state.
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>) -> O>(
+    fn with_mld_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>,
+            &GmpState<Ipv6, MldTypeLayout, BT>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -288,6 +295,18 @@ impl Default for MldMode {
     }
 }
 
+impl InspectableValue for MldMode {
+    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
+        let Self(gmp_mode) = self;
+        let v = match gmp_mode {
+            GmpMode::V1 { compat: false } => "MLDv1(compat)",
+            GmpMode::V1 { compat: true } => "MLDv1",
+            GmpMode::V2 => "MLDv2",
+        };
+        inspector.record_str(name, v);
+    }
+}
+
 /// Uninstantiable type marking a [`GmpState`] as having MLD types.
 pub enum MldTypeLayout {}
 
@@ -297,7 +316,15 @@ impl<BT: MldBindingsTypes> GmpTypeLayout<Ipv6, BT> for MldTypeLayout {
 }
 
 impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> for CC {
-    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>) -> O>(
+    type TypeLayout = MldTypeLayout;
+
+    fn with_gmp_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>,
+            &GmpState<Ipv6, MldTypeLayout, BT>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -761,13 +788,17 @@ mod tests {
     impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
             O,
-            F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, FakeBindingsCtxImpl>>) -> O,
+            F: FnOnce(
+                &MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, FakeBindingsCtxImpl>>,
+                &GmpState<Ipv6, MldTypeLayout, FakeBindingsCtxImpl>,
+            ) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            cb(&self.state.shared.borrow().groups)
+            let state = self.state.shared.borrow();
+            cb(&state.groups, &state.gmp_state)
         }
     }
 

@@ -40,9 +40,9 @@ use netstack3_ip::device::{
     SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
-    GmpGroupState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpStateContext,
-    IgmpTypeLayout, MldContext, MldContextMarker, MldSendContext, MldStateContext, MldTypeLayout,
-    MulticastGroupSet,
+    GmpGroupState, GmpState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext,
+    IgmpStateContext, IgmpTypeLayout, MldContext, MldContextMarker, MldSendContext,
+    MldStateContext, MldTypeLayout, MulticastGroupSet,
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::{
@@ -218,15 +218,21 @@ impl<BT: BindingsTypes, L> IgmpContextMarker for CoreCtx<'_, BT, L> {}
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     IgmpStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BC>>) -> O>(
+    fn with_igmp_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BC>>,
+            &GmpState<Ipv4, IgmpTypeLayout, BC>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
         let mut state = crate::device::integration::ip_device_state(self, device);
         let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
-        let IpDeviceMulticastGroups { groups, .. } = &*state;
-        cb(groups)
+        let IpDeviceMulticastGroups { groups, gmp, .. } = &*state;
+        cb(groups, gmp)
     }
 }
 
@@ -235,15 +241,21 @@ impl<BT: BindingsTypes, L> MldContextMarker for CoreCtx<'_, BT, L> {}
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     MldStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BC>>) -> O>(
+    fn with_mld_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BC>>,
+            &GmpState<Ipv6, MldTypeLayout, BC>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
         let mut state = crate::device::integration::ip_device_state(self, device);
         let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
-        let IpDeviceMulticastGroups { groups, .. } = &*state;
-        cb(&groups)
+        let IpDeviceMulticastGroups { groups, gmp, .. } = &*state;
+        cb(groups, gmp)
     }
 }
 

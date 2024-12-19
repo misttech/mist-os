@@ -15,8 +15,8 @@ use net_declare::net_ip_v4;
 use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
 use net_types::{MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, Instant, InstantContext,
-    Ipv4DeviceAddr, WeakDeviceIdentifier,
+    AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, InspectableValue, Inspector,
+    Instant, InstantContext, Ipv4DeviceAddr, WeakDeviceIdentifier,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, PacketBuilder, Serializer};
 use packet_formats::igmp::messages::{
@@ -75,7 +75,13 @@ pub trait IgmpStateContext<BT: IgmpBindingsTypes>:
 {
     /// Calls the function with an immutable reference to the device's IGMP
     /// state.
-    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BT>>) -> O>(
+    fn with_igmp_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BT>>,
+            &GmpState<Ipv4, IgmpTypeLayout, BT>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -279,6 +285,20 @@ impl<I: Instant> IgmpMode<I> {
     }
 }
 
+impl<I: Instant> InspectableValue for IgmpMode<I> {
+    fn record<X: Inspector>(&self, name: &str, inspector: &mut X) {
+        let v = match self {
+            IgmpMode::V1(IgmpV1Mode::Forced) => "IGMPv1",
+            IgmpMode::V1(IgmpV1Mode::V2Compat { .. }) => "IGMPv1(v2-compat)",
+            IgmpMode::V1(IgmpV1Mode::V3Compat { .. }) => "IGMPv1(v3-compat)",
+            IgmpMode::V2 { compat: true } => "IGMPv2(compat)",
+            IgmpMode::V2 { compat: false } => "IGMPv2",
+            IgmpMode::V3 => "IGMPv3",
+        };
+        inspector.record_str(name, v);
+    }
+}
+
 impl IpExt for Ipv4 {
     type GmpProtoConfigMode = IgmpConfigMode;
 
@@ -309,7 +329,14 @@ impl<BT: IgmpBindingsTypes> GmpTypeLayout<Ipv4, BT> for IgmpTypeLayout {
 }
 
 impl<BT: IgmpBindingsTypes, CC: IgmpStateContext<BT>> GmpStateContext<Ipv4, BT> for CC {
-    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BT>>) -> O>(
+    type TypeLayout = IgmpTypeLayout;
+    fn with_gmp_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BT>>,
+            &GmpState<Ipv4, IgmpTypeLayout, BT>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -873,13 +900,17 @@ mod tests {
     impl IgmpStateContext<FakeBindingsCtx> for FakeCoreCtx {
         fn with_igmp_state<
             O,
-            F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, FakeBindingsCtx>>) -> O,
+            F: FnOnce(
+                &MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, FakeBindingsCtx>>,
+                &GmpState<Ipv4, IgmpTypeLayout, FakeBindingsCtx>,
+            ) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            cb(&self.state.shared.borrow().groups)
+            let state = self.state.shared.borrow();
+            cb(&state.groups, &state.gmp_state)
         }
     }
 

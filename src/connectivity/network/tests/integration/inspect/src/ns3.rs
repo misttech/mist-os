@@ -675,6 +675,14 @@ async fn inspect_devices(name: &str) {
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
                     },
+                    GMP: {
+                        Mode: "IGMPv3",
+                        Groups: {
+                            "224.0.0.1": {
+                                Refs: 1u64,
+                            }
+                        }
+                    }
                 },
                 IPv6: {
                     Addresses: {
@@ -691,6 +699,17 @@ async fn inspect_devices(name: &str) {
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
                     },
+                    GMP: {
+                        Mode: "MLDv2",
+                        Groups: {
+                            "ff02::1:ff00:1": {
+                                Refs: 1u64,
+                            },
+                            "ff02::1": {
+                                Refs: 1u64,
+                            }
+                        }
+                    }
                 },
                 Counters: {
                     Rx: {
@@ -735,6 +754,14 @@ async fn inspect_devices(name: &str) {
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
                     },
+                    GMP: {
+                        Mode: "IGMPv3",
+                        Groups: {
+                            "224.0.0.1": {
+                                Refs: 1u64,
+                            }
+                        }
+                    }
                 },
                 IPv6: {
                     "Addresses": {
@@ -753,6 +780,17 @@ async fn inspect_devices(name: &str) {
                         "ForwardingEnabled": false,
                         "MulticastForwardingEnabled": false,
                     },
+                    GMP: {
+                        Mode: "MLDv2",
+                        Groups: {
+                            "ff02::1:ff00:1": {
+                                Refs: 1u64,
+                            },
+                            "ff02::1": {
+                                Refs: 1u64,
+                            },
+                        }
+                    }
                 },
                 NetworkDevice: {
                     MacAddress: "02:00:00:00:00:01",

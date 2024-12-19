@@ -51,8 +51,9 @@ use net_types::ip::{Ip, IpAddress, IpVersionMarker};
 use net_types::MulticastAddr;
 use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult};
 use netstack3_base::{
-    AnyDevice, CoreTimerContext, DeviceIdContext, InstantBindingsTypes, LocalTimerHeap, RngContext,
-    TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, DeviceIdContext, InspectableValue, Inspector,
+    InstantBindingsTypes, LocalTimerHeap, RngContext, TimerBindingsTypes, TimerContext,
+    WeakDeviceIdentifier,
 };
 use rand::Rng;
 
@@ -190,6 +191,18 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
     }
 }
 
+impl<A: IpAddress, T> InspectableValue for MulticastGroupSet<A, T> {
+    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_child(name, |inspector| {
+            for (addr, ref_count) in self.inner.iter_ref_counts() {
+                inspector.record_display_child(addr, |inspector| {
+                    inspector.record_usize("Refs", ref_count.get())
+                });
+            }
+        });
+    }
+}
+
 /// An implementation of query operations on a Group Management Protocol (GMP).
 pub trait GmpQueryHandler<I: Ip, BC>: DeviceIdContext<AnyDevice> {
     /// Returns true if the device is a member of the group.
@@ -261,7 +274,7 @@ impl<I: IpExt, BT: GmpBindingsTypes, CC: GmpStateContext<I, BT>> GmpQueryHandler
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> bool {
-        self.with_gmp_state(device, |groups| groups.contains(&group_addr))
+        self.with_multicast_groups(device, |groups| groups.contains(&group_addr))
     }
 }
 
@@ -457,6 +470,7 @@ impl<I: Ip> From<v2::TimerId<I>> for TimerIdInner<I> {
     }
 }
 
+/// Generic group management state.
 #[cfg_attr(test, derive(Debug))]
 pub struct GmpState<I: Ip, CC: GmpTypeLayout<I, BT>, BT: GmpBindingsTypes> {
     timers: LocalTimerHeap<TimerIdInner<I>, (), BT>,
@@ -540,6 +554,10 @@ impl<I: IpExt, T: GmpTypeLayout<I, BT>, BT: GmpBindingsTypes> GmpState<I, T, BT>
     fn gmp_mode(&self) -> GmpMode {
         self.mode.into()
     }
+
+    pub(crate) fn mode(&self) -> &T::ProtoMode {
+        &self.mode
+    }
 }
 
 /// A reference to a device's GMP state.
@@ -566,7 +584,14 @@ pub trait GmpTypeLayout<I: Ip, BT: GmpBindingsTypes>: Sized {
     /// The type for protocol-specific configs.
     type Config: Debug + v1::ProtocolConfig + v2::ProtocolConfig;
     /// Protocol-specific mode.
-    type ProtoMode: Debug + Copy + Clone + Eq + PartialEq + Into<GmpMode> + Default;
+    type ProtoMode: Debug
+        + Copy
+        + Clone
+        + Eq
+        + PartialEq
+        + Into<GmpMode>
+        + Default
+        + InspectableValue;
 }
 
 /// The state kept by each muitlcast group the host is a member of.
@@ -725,9 +750,31 @@ enum GmpGroupStateByVersion<I: Ip, BT: GmpBindingsTypes> {
 }
 
 /// Provides immutable access to GMP state.
-trait GmpStateContext<I: IpExt, BT: GmpBindingsTypes>: DeviceIdContext<AnyDevice> {
+pub trait GmpStateContext<I: IpExt, BT: GmpBindingsTypes>: DeviceIdContext<AnyDevice> {
+    /// The types used by this context.
+    type TypeLayout: GmpTypeLayout<I, BT>;
+
     /// Calls the function with immutable access to the [`MulticastGroupSet`].
-    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<I::Addr, GmpGroupState<I, BT>>) -> O>(
+    fn with_multicast_groups<
+        O,
+        F: FnOnce(&MulticastGroupSet<I::Addr, GmpGroupState<I, BT>>) -> O,
+    >(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.with_gmp_state(device, |groups, _gmp_state| cb(groups))
+    }
+
+    /// Calls the function with immutable access to the [`MulticastGroupSet`]
+    /// and current GMP state.
+    fn with_gmp_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<I::Addr, GmpGroupState<I, BT>>,
+            &GmpState<I, Self::TypeLayout, BT>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
