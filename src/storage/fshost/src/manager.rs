@@ -71,11 +71,14 @@ impl Manager {
 
             let content_format = device.content_format().await.unwrap_or(DiskFormat::Unknown);
             let label = device.partition_label().await.ok().map(|s| s.to_string());
+            let type_guid =
+                device.partition_type().await.ok().map(|guid| uuid::Uuid::from_bytes(guid.clone()));
             tracing::info!(
                 topological_path=topological_path.as_str(),
                 path = %device.path(),
                 ?content_format,
                 ?label,
+                ?type_guid,
                 is_ramdisk = device.is_fshost_ramdisk(),
                 "Matching device"
             );
