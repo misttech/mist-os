@@ -73,33 +73,6 @@ source_set("mmio") {
   public_deps = [ "//src/devices/lib/mmio" ]
 }
 
-source_set("device") {
-  configs += [ "..:platform_include_config" ]
-
-  sources = [
-    "zircon_platform_device.cc",
-    "zircon_platform_device.h",
-  ]
-
-  public_deps = [
-    ":interrupt",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/mmio",
-    "//src/lib/ddk",
-  ]
-
-  deps = [
-    ":bus_mapper",
-    ":handle",
-    ":mmio",
-    "..:device_header",
-    "//src/devices/lib/driver",
-    "//src/graphics/magma/lib/magma/util:macros",
-    "//src/graphics/magma/lib/magma/util:short_macros",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
 source_set("device_dfv2") {
   configs += [ "..:platform_include_config" ]
 
@@ -112,6 +85,7 @@ source_set("device_dfv2") {
     ":interrupt",
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//src/devices/lib/mmio",
+    "//zircon/system/ulib/trace",
   ]
 
   deps = [
