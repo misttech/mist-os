@@ -65,6 +65,8 @@ fit::result<Errno, size_t> sys_readlink(const CurrentTask& current_task,
                                         starnix_uapi::UserCString user_path,
                                         starnix_uapi::UserAddress buffer, size_t buffer_size);
 
+fit::result<Errno> sys_rmdir(const CurrentTask& current_task, starnix_uapi::UserCString user_path);
+
 fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
                             starnix_uapi::UserRef<struct ::stat> buffer);
 

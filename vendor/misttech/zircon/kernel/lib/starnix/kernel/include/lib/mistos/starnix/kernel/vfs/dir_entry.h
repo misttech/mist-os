@@ -180,6 +180,7 @@ class DirEntry : public fbl::RefCountedUpgradeable<DirEntry> {
 
   class DirEntryLockedChildren {
    private:
+    friend class DirEntry;
     DirEntryHandle entry_;
 
     starnix_sync::RwLock<DirEntryChildren>::RwLockWriteGuard children_;
@@ -189,6 +190,18 @@ class DirEntry : public fbl::RefCountedUpgradeable<DirEntry> {
         DirEntryHandle entry,
         starnix_sync::RwLock<DirEntry::DirEntryChildren>::RwLockWriteGuard children)
         : entry_(ktl::move(entry)), children_(ktl::move(children)) {}
+
+    fit::result<Errno, DirEntryHandle> component_lookup(const CurrentTask& current_task,
+                                                        const MountInfo& mount, const FsStr& name) {
+      ZX_ASSERT(!DirEntry::is_reserved_name(name));
+      auto create_fn = [](const FsNodeHandle&, const MountInfo&,
+                          const FsStr&) -> fit::result<Errno, FsNodeHandle> {
+        return fit::error(errno(ENOENT));
+      };
+
+      auto result = get_or_create_child(current_task, mount, name, create_fn) _EP(result);
+      return fit::ok(result.value().first);
+    }
 
     /// impl<'a> DirEntryLockedChildren<'a>
     template <typename CreateNodeFn>
@@ -395,8 +408,8 @@ class DirEntry : public fbl::RefCountedUpgradeable<DirEntry> {
                                                     const MountInfo& mount, FileMode mode,
                                                     FsCred owner, OpenFlags flags);
 
-  /*fit::result<Errno, void> unlink(const CurrentTask& current_task, const MountInfo& mount,
-                                 const FsStr& name, UnlinkKind kind, bool must_be_directory);*/
+  fit::result<Errno> unlink(const CurrentTask& current_task, const MountInfo& mount,
+                            const FsStr& name, UnlinkKind kind, bool must_be_directory);
 
   /// Destroy this directory entry.
   ///
@@ -404,7 +417,7 @@ class DirEntry : public fbl::RefCountedUpgradeable<DirEntry> {
   /// Destroy this directory entry.
   ///
   /// Notice that this method takes `self` by value to destroy this reference.
-  void destroy(const Mounts& mounts) &&;
+  void destroy(const Mounts& mounts);
 
   /// Returns whether this entry is a descendant of |other|.
   bool is_descendant_of(const DirEntryHandle& other) const;

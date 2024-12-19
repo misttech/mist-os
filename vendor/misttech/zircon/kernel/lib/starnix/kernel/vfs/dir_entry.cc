@@ -26,6 +26,13 @@
 
 #include "../kernel_priv.h"
 
+namespace ktl {
+
+using std::addressof;
+using std::destroy_at;
+
+}  // namespace ktl
+
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
@@ -131,8 +138,65 @@ fit::result<Errno, DirEntryHandle> DirEntry::create_dir_for_testing(const Curren
                       });
 }
 
-void DirEntry::destroy(const Mounts& mounts) && {
-  /*bool unmount = [this]() {
+fit::result<Errno> DirEntry::unlink(const CurrentTask& current_task, const MountInfo& mount,
+                                    const FsStr& name, UnlinkKind kind, bool must_be_directory) {
+  LTRACEF_LEVEL(2, "name=[%.*s]\n", static_cast<int>(name.length()), name.data());
+
+  ZX_ASSERT(!DirEntry::is_reserved_name(name));
+
+  // child *must* be dropped after self_children and child_children below (even in the error paths)
+  DirEntryHandle child;
+
+  auto self_children = lock_children();
+  auto child_result = self_children.component_lookup(current_task, mount, name) _EP(child_result);
+  child = child_result.value();
+  auto child_children = child->children_.Read();
+
+  _EP(child->require_no_mounts(mount));
+
+  // Check that this filesystem entry must be a directory. This can
+  // happen if the path terminates with a trailing slash.
+  //
+  // Example: If we're unlinking a symlink `/foo/bar/`, this would
+  // result in `ENOTDIR` because of the trailing slash, even if
+  // `UnlinkKind::NonDirectory` was used.
+  if (must_be_directory && !child->node_->is_dir()) {
+    return fit::error(errno(ENOTDIR));
+  }
+
+  switch (kind) {
+    case UnlinkKind::Directory:
+      if (!child->node_->is_dir()) {
+        return fit::error(errno(ENOTDIR));
+      }
+      // This check only covers whether the cache is non-empty.
+      // We actually need to check whether the underlying directory is
+      // empty by asking the node via remove below.
+      if (!child_children->empty()) {
+        return fit::error(errno(ENOTEMPTY));
+      }
+      break;
+
+    case UnlinkKind::NonDirectory:
+      if (child->node_->is_dir()) {
+        return fit::error(errno(EISDIR));
+      }
+      break;
+  }
+
+  _EP(node_->unlink(current_task, mount, name, child->node_));
+  self_children.children_->erase(name);
+
+  ktl::destroy_at(ktl::addressof(child_children));
+  ktl::destroy_at(ktl::addressof(self_children));
+
+  child->destroy(current_task->kernel()->mounts_);
+
+  return fit::ok();
+}
+
+void DirEntry::destroy(const Mounts& mounts) {
+  bool unmount = [this]() {
     auto state = state_.Write();
     if (state->is_dead) {
       return false;
@@ -141,12 +205,11 @@ void DirEntry::destroy(const Mounts& mounts) && {
     return ktl::exchange(state->has_mounts, false);
   }();
 
-  node_->fs()->will_destroy_dir_entry(this);
+  node_->fs()->will_destroy_dir_entry(fbl::RefPtr<DirEntry>(this));
   if (unmount) {
-    mounts.unmount(this);
+    mounts.unmount(*this);
   }
-  //notify_deletion();
-  */
+  // notify_deletion();
 }
 
 bool DirEntry::is_descendant_of(const DirEntryHandle& other) const {

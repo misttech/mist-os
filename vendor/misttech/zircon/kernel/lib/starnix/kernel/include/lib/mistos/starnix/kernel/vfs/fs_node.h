@@ -19,6 +19,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/mistos/util/oncelock.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
@@ -131,7 +132,7 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   /// Whether this node can be linked into a directory.
   ///
   /// Only set for nodes created with `O_TMPFILE`.
-  // link_behavior: OnceCell<FsNodeLinkBehavior>,
+  mtl::OnceLock<FsNodeLinkBehavior> link_behavior_;
 
   /// Tracks lock state for this file.
   // pub write_guard_state: Mutex<FileWriteGuardState>,
@@ -230,6 +231,12 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   /// Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
   fit::result<Errno, SymlinkTarget> readlink(const CurrentTask& current_task) const;
 
+  fit::result<Errno, FsNodeHandle> link(const CurrentTask& current_task, const MountInfo& mount,
+                                        const FsStr& name, const FsNodeHandle& child) const;
+
+  fit::result<Errno> unlink(const CurrentTask& current_task, const MountInfo& mount,
+                            const FsStr& name, const FsNodeHandle& child) const;
+
   static fit::result<Errno> default_check_access_impl(
       const CurrentTask& current_task, Access access,
       starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info);
@@ -239,6 +246,12 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   /// owner or is in the file's group.
   fit::result<Errno> check_access(const CurrentTask& current_task, const MountInfo& mount,
                                   Access access, CheckAccessReason reason) const;
+
+  /// Check whether the stick bit, `S_ISVTX`, forbids the `current_task` from removing the given
+  /// `child`. If this node has `S_ISVTX`, then either the child must be owned by the `fsuid` of
+  /// `current_task` or `current_task` must have `CAP_FOWNER`.
+  fit::result<Errno> check_sticky_bit(const CurrentTask& current_task,
+                                      const FsNodeHandle& child) const;
 
   template <typename Fn>
   fit::result<Errno> update_attributes(const CurrentTask& current_task, Fn&& mutator) const {

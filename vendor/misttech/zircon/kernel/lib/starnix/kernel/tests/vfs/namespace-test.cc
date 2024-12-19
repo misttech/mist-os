@@ -12,13 +12,14 @@
 #include <lib/unittest/unittest.h>
 
 namespace unit_testing {
+namespace {
 
 using starnix::LookupContext;
 using starnix::Namespace;
+using starnix::NamespaceNode;
 using starnix::TmpFs;
+using starnix::UnlinkKind;
 using starnix::WhatToMount;
-
-namespace {
 
 bool test_namespace() {
   BEGIN_TEST;
@@ -173,8 +174,43 @@ bool test_shadowing() {
   END_TEST;
 }
 
-}  // namespace
+bool test_unlink_mounted_directory() {
+  BEGIN_TEST;
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
+  auto root_fs = TmpFs::new_fs(kernel);
+  auto ns1 = Namespace::New(root_fs);
+  auto ns2 = Namespace::New(root_fs);
+  auto _foo_node = root_fs->root()->create_dir(*current_task, "foo");
+  ASSERT_TRUE(_foo_node.is_ok(), "failed to create foo dir");
+  auto context = LookupContext::Default();
+  auto foo_dir = ns1->root().lookup_child(*current_task, context, "foo");
+  ASSERT_TRUE(foo_dir.is_ok(), "failed to lookup foo");
 
+  auto foofs = TmpFs::new_fs(kernel);
+  ASSERT_TRUE(foo_dir->mount(WhatToMount::Fs(foofs), MountFlags::empty()).is_ok(),
+              "failed to mount foofs");
+
+  // Trying to unlink from ns1 should fail
+  auto unlink_result1 = ns1->root().unlink(*current_task, "foo", UnlinkKind::Directory, false);
+  ASSERT_TRUE(unlink_result1.is_error(), "unlink from ns1 should fail");
+  ASSERT_EQ(errno(EBUSY).error_code(), unlink_result1.error_value().error_code(),
+            "wrong error code");
+
+  // But unlinking from ns2 should succeed
+  auto unlink_result2 = ns2->root().unlink(*current_task, "foo", UnlinkKind::Directory, false);
+  ASSERT_TRUE(unlink_result2.is_ok(), "unlink from ns2 failed");
+
+  // And it should no longer show up in ns1
+  auto unlink_result3 = ns1->root().unlink(*current_task, "foo", UnlinkKind::Directory, false);
+  ASSERT_TRUE(unlink_result3.is_error(), "unlink from ns1 should fail");
+  ASSERT_EQ(errno(ENOENT).error_code(), unlink_result3.error_value().error_code(),
+            "wrong error code");
+
+  END_TEST;
+}
+
+
+}  // namespace
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_vfs_namespace)
@@ -182,4 +218,5 @@ UNITTEST("test namespace", unit_testing::test_namespace)
 UNITTEST("test mount does not upgrade", unit_testing::test_mount_does_not_upgrade)
 UNITTEST("test path", unit_testing::test_path)
 UNITTEST("test shadowing", unit_testing::test_shadowing)
+UNITTEST("test unlink mounted directory", unit_testing::test_unlink_mounted_directory)
 UNITTEST_END_TESTCASE(starnix_vfs_namespace, "starnix_vfs_namespace", "Tests for VFS Namespace")

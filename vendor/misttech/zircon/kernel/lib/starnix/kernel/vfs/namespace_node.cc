@@ -131,12 +131,38 @@ fit::result<Errno, NamespaceNode> NamespaceNode::create_tmpfile(const CurrentTas
 fit::result<Errno, NamespaceNode> NamespaceNode::link(const CurrentTask& current_task,
                                                       const FsStr& name,
                                                       const FsNodeHandle& child) const {
-  return fit::error(errno(ENOTDIR));
+  LTRACEF_LEVEL(2, "name=[%.*s]\n", static_cast<int>(name.length()), name.data());
+
+  auto result = entry_->create_entry(
+      current_task, mount_, name,
+      [&current_task, &child](const FsNodeHandle& dir, const MountInfo& mount,
+                              const FsStr& name) -> fit::result<Errno, FsNodeHandle> {
+        return dir->link(current_task, mount, name, child);
+      }) _EP(result);
+
+  return fit::ok(NamespaceNode::with_new_entry(result.value()));
 }
 
 fit::result<Errno> NamespaceNode::unlink(const CurrentTask& current_task, const FsStr& name,
                                          UnlinkKind kind, bool must_be_directory) const {
-  return fit::error(errno(ENOTDIR));
+  LTRACEF_LEVEL(2, "name=[%.*s]\n", static_cast<int>(name.length()), name.data());
+
+  if (DirEntry::is_reserved_name(name)) {
+    switch (kind) {
+      case UnlinkKind::Directory:
+        if (name == "..") {
+          return fit::error(errno(ENOTEMPTY));
+        } else if (!parent().has_value()) {
+          // The client is attempting to remove the root.
+          return fit::error(errno(EBUSY));
+        } else {
+          return fit::error(errno(EINVAL));
+        }
+      case UnlinkKind::NonDirectory:
+        return fit::error(errno(ENOTDIR));
+    }
+  }
+  return entry_->unlink(current_task, mount_, name, kind, must_be_directory);
 }
 
 fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask& current_task,

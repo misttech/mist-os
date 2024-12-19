@@ -7,12 +7,14 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/memory_file.h>
 #include <lib/mistos/starnix/kernel/vfs/module.h>
+#include <lib/mistos/starnix/kernel/vfs/symlink_node.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
@@ -186,23 +188,33 @@ fit::result<Errno, FsNodeHandle> TmpfsDirectory::create_symlink(const FsNode& no
                                                                 const FsStr& name,
                                                                 const FsStr& target,
                                                                 FsCred owner) const {
-  return fit::error(errno(ENOTSUP));
+  *child_count_.Lock() += 1;
+  auto [link, info] = SymlinkNode::New(target, owner);
+  return fit::ok(node.fs()->create_node(current_task, ktl::move(link), info));
 }
 
 fit::result<Errno, FsNodeHandle> TmpfsDirectory::create_tmpfile(const FsNode& node,
                                                                 const CurrentTask& current_task,
                                                                 FileMode mode, FsCred owner) const {
-  return fit::error(errno(ENOTSUP));
+  ZX_ASSERT(mode.is_reg());
+  return create_child_node(current_task, node, mode, DeviceType::NONE, owner);
 }
 
 fit::result<Errno> TmpfsDirectory::link(const FsNode& node, const CurrentTask& current_task,
                                         const FsStr& name, const FsNodeHandle& child) const {
-  return fit::error(errno(ENOTSUP));
+  child->update_info<void>([](FsNodeInfo& info) { info.link_count_ += 1; });
+  *child_count_.Lock() += 1;
+  return fit::ok();
 }
 
 fit::result<Errno> TmpfsDirectory::unlink(const FsNode& node, const CurrentTask& current_task,
                                           const FsStr& name, const FsNodeHandle& child) const {
-  return fit::error(errno(ENOTSUP));
+  if (child->is_dir()) {
+    node.update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+  }
+  child->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+  *child_count_.Lock() -= 1;
+  return fit::ok();
 }
 
 fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_task,

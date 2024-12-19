@@ -219,6 +219,83 @@ fit::result<Errno, SymlinkTarget> FsNode::readlink(const CurrentTask& current_ta
   return ops_->readlink(*this, current_task);
 }
 
+fit::result<Errno, FsNodeHandle> FsNode::link(const CurrentTask& current_task,
+                                              const MountInfo& mount, const FsStr& name,
+                                              const FsNodeHandle& child) const {
+  _EP(check_access(current_task, mount, Access(AccessEnum::WRITE),
+                   CheckAccessReason::InternalPermissionChecks));
+
+  if (child->is_dir()) {
+    return fit::error(errno(EPERM));
+  }
+
+  if (child->link_behavior_.get() == FsNodeLinkBehavior::kDisallowed) {
+    return fit::error(errno(ENOENT));
+  }
+
+  // Check that current_task has permission to create the hard link.
+  // See description of /proc/sys/fs/protected_hardlinks in
+  // https://man7.org/linux/man-pages/man5/proc.5.html for details of security vulnerabilities.
+  auto creds = current_task->creds();
+  uid_t child_uid;
+  FileMode mode;
+  {
+    auto info = child->info();
+    child_uid = info->uid_;
+    mode = info->mode_;
+  }
+
+  // Check that the filesystem UID of calling process matches the UID of existing file.
+  // Check can be bypassed if calling process has CAP_FOWNER capability.
+  if (!creds.has_capability(kCapFowner) && child_uid != creds.fsuid_) {
+    // If current_task is not the user of existing file, needs read+write access
+    auto access_result = child->check_access(
+        current_task, mount, Access(Access(AccessEnum::READ) | Access(AccessEnum::WRITE)),
+        CheckAccessReason::InternalPermissionChecks);
+    if (access_result.is_error()) {
+      // check_access returns EACCES when access rights don't match - change to EPERM
+      if (access_result.error_value().error_code() == EACCES) {
+        return fit::error(errno(EPERM));
+      }
+      return access_result.take_error();
+    }
+
+    // Security issues can arise when linking to setuid, setgid or special files
+    if (mode.contains(FileMode::ISGID | FileMode::IXGRP)) {
+      return fit::error(errno(EPERM));
+    }
+    if (mode.contains(FileMode::ISUID)) {
+      return fit::error(errno(EPERM));
+    }
+    if (!mode.contains(FileMode::IFREG)) {
+      return fit::error(errno(EPERM));
+    }
+  }
+
+  // security::check_fs_node_link_access(current_task, self, child)?;
+
+  _EP(ops_->link(*this, current_task, name, child));
+  return fit::ok(child);
+}
+
+fit::result<Errno> FsNode::unlink(const CurrentTask& current_task, const MountInfo& mount,
+                                  const FsStr& name, const FsNodeHandle& child) const {
+  _EP(check_access(current_task, mount,
+                   Access(Access(AccessEnum::WRITE) | Access(AccessEnum::EXEC)),
+                   CheckAccessReason::InternalPermissionChecks));
+  _EP(check_sticky_bit(current_task, child));
+
+  if (child->is_dir()) {
+    // security::check_fs_node_rmdir_access(current_task, self, child)?;
+  } else {
+    // security::check_fs_node_unlink_access(current_task, self, child)?;
+  }
+
+  _EP(ops_->unlink(*this, current_task, name, child));
+  // update_ctime_mtime();
+  return fit::ok();
+}
+
 fit::result<Errno> FsNode::default_check_access_impl(
     const CurrentTask& current_task, Access access,
     starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info) {
@@ -241,6 +318,16 @@ fit::result<Errno> FsNode::check_access(const CurrentTask& current_task, const M
   }
 
   return ops_->check_access(*this, current_task, access, info_, reason);
+}
+
+fit::result<Errno> FsNode::check_sticky_bit(const CurrentTask& current_task,
+                                            const FsNodeHandle& child) const {
+  auto creds = current_task->creds();
+  if (!creds.has_capability(kCapFowner) && info()->mode_.contains(FileMode::ISVTX) &&
+      child->info()->uid_ != creds.fsuid_) {
+    return fit::error(errno(EPERM));
+  }
+  return fit::ok();
 }
 
 fit::result<Errno> FsNode::chmod(const CurrentTask& current_task, const MountInfo& mount,
