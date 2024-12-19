@@ -497,12 +497,16 @@ impl LogCommand {
             let selectors = if self.force_set_severity {
                 Cow::Borrowed(&self.set_severity)
             } else {
-                Cow::Owned(
+                let new_selectors =
                     Self::map_interest_selectors(realm_query, self.set_severity.iter())
                         .await?
                         .map(|s| s.into_owned())
-                        .collect::<Vec<_>>(),
-                )
+                        .collect::<Vec<_>>();
+                if new_selectors.is_empty() {
+                    Cow::Borrowed(&self.set_severity)
+                } else {
+                    Cow::Owned(new_selectors)
+                }
             };
 
             log_settings_client.set_interest(&selectors).await?;
@@ -671,6 +675,47 @@ ffx log --force-set-severity.
         }));
         while scheduler.next().await.is_some() {}
         drop(scheduler);
+        assert_matches!(set_interest_result, Some(Ok(())));
+    }
+
+    #[fuchsia::test]
+    async fn logger_uses_specified_selectors_if_no_results_returned() {
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            set_severity: vec![parse_log_interest_selector(
+                "core/something/a:b/elements:main/otherstuff:*#DEBUG",
+            )
+            .unwrap()],
+            ..LogCommand::default()
+        };
+        let mut set_interest_result = None;
+        let getter = FakeInstanceGetter {
+            expected_selector: Some("core/something/a:b/elements:main/otherstuff:*#DEBUG".into()),
+            output: vec![],
+        };
+        let scheduler = FuturesUnordered::new();
+        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>();
+        scheduler.push(Either::Left(async {
+            set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
+            drop(settings_proxy);
+        }));
+        scheduler.push(Either::Right(async {
+            let request = settings_server.into_stream().next().await;
+            let (selectors, responder) = assert_matches!(
+                request,
+                Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =>
+                (selectors, responder)
+            );
+            responder.send().unwrap();
+            assert_eq!(
+                selectors,
+                vec![parse_log_interest_selector(
+                    "core/something/a:b/elements:main/otherstuff:*#DEBUG"
+                )
+                .unwrap()]
+            );
+        }));
+        scheduler.map(|_| Ok(())).forward(futures::sink::drain()).await.unwrap();
         assert_matches!(set_interest_result, Some(Ok(())));
     }
 
