@@ -4,12 +4,13 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid, fs_node_set_label_with_task,
-    todo_check_permission, FsNode, PermissionCheck, ProcessPermission, TaskAttrs,
+    has_file_permissions, todo_check_permission, FsNode, PermissionCheck, ProcessPermission,
+    TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
 use crate::TODO_DENY;
-use selinux::{FdPermission, FilePermission, NullessByteStr, ObjectClass};
+use selinux::{FilePermission, NullessByteStr, ObjectClass};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::resource_limits::Resource;
@@ -74,18 +75,8 @@ fn close_inaccessible_file_descriptors(
     // Remap-to-null any fds that failed a check for allowing
     // `[child-process] [fd-from-child-fd-table]:fd { use }`.
     current_task.files.remap_fds(|file| {
-        let target_sid = file.security_state.state.sid;
-        let fd_use_result: Result<(), Errno> = todo_check_permission(
-            TODO_DENY!("https://fxbug.dev/379870850", "Requires system to label all FDs correctly"),
-            &permission_check,
-            source_sid,
-            target_sid,
-            FdPermission::Use,
-        );
-        match fd_use_result {
-            Ok(_) => None,
-            _ => Some(null_file_handle.clone()),
-        }
+        let fd_use_result = has_file_permissions(&permission_check, source_sid, file, &[]);
+        fd_use_result.map_or_else(|_| Some(null_file_handle.clone()), |_| None)
     });
 }
 
