@@ -443,9 +443,11 @@ group("default") {
     # Generate ZBIs used to run on target
     "//build/images/mistos",
 
+    # Starnix Examples
+    "//src/starnix/examples",
+
     # Mist Technologies
     "//vendor/misttech/zircon/kernel/lib/linux-rt",
-    "//vendor/misttech/zircon/kernel/lib/starnix/examples",
   ]
 
   # Add any additional targets from the product.

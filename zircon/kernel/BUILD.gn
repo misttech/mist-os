@@ -985,7 +985,7 @@ if (!is_efi_toolchain) {
 
         # needed to run some starnix loader tests from bootfs
         deps += [
-          "//vendor/misttech/zircon/kernel/lib/starnix/examples/hello_starnix:bin",
+          "//src/starnix/examples/hello_starnix",
           "//vendor/misttech/zircon/kernel/lib/starnix/kernel:starnix-test-files",
         ]
       }
