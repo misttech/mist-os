@@ -27,6 +27,7 @@ template("generate_prebuilt_dir_content_hash") {
   }
   action(target_name) {
     script = "//build/bazel/scripts/compute_content_hash.py"
+    inputs = [ "//build/bazel/scripts/get_git_head_commit.py" ]
     outputs = [ _output ]
     depfile = "${_output}.d"
     args = [

@@ -273,8 +273,11 @@ def generate_fuchsia_build_config(fuchsia_dir: str) -> dict[str, str]:
     }
 
 
-def md5_all_files(paths: list[str]) -> str:
-    return compute_content_hash.content_hash_for_files(paths)
+def content_hash_all_files(paths: list[str]) -> str:
+    fstate = compute_content_hash.FileState()
+    for path in paths:
+        fstate.hash_source_path(Path(path))
+    return fstate.content_hash
 
 
 def all_sdk_metas(sdk_root: str) -> list[str]:
@@ -307,9 +310,8 @@ def all_sdk_metas(sdk_root: str) -> list[str]:
 
 def find_clang_content_files(clang_install_dir: str) -> Sequence[Path]:
     """Return a list of content hashing input files for Clang."""
-    return compute_content_hash.find_content_files(
-        clang_install_dir, cipd_name="clang"
-    )
+    fstate = compute_content_hash.FileState(cipd_names=["clang"])
+    return sorted(fstate.find_directory_files(Path(clang_install_dir)))
 
 
 class GeneratedFiles(object):
@@ -345,8 +347,8 @@ class GeneratedFiles(object):
     def add_file_hash(self, dst_path: str) -> None:
         self._check_new_path(dst_path)
         self._files[dst_path] = {
-            "type": "md5",
-            "hash": md5_all_files([dst_path]),
+            "type": "content_hash",
+            "hash": content_hash_all_files([dst_path]),
         }
 
     def add_top_entries(
@@ -380,7 +382,7 @@ class GeneratedFiles(object):
                     f.write(entry["content"])
                 if entry.get("executable", False):
                     os.chmod(file_path, 0o755)
-            elif type == "md5":
+            elif type == "content_hash":
                 # Nothing to do here.
                 pass
             else:
@@ -1119,7 +1121,7 @@ common --enable_bzlmod=false
     for repo_name in sorted(generated_repositories_inputs.keys()):
         repo_inputs = generated_repositories_inputs[repo_name]
         repo_hash_file = _get_repo_hash_file_path(repo_name)
-        generated.add_file(repo_hash_file, md5_all_files(repo_inputs))
+        generated.add_file(repo_hash_file, content_hash_all_files(repo_inputs))
         if args.depfile:
             # Important: quote file paths because some of them may contain spaces!
             out = depfile_quote(
