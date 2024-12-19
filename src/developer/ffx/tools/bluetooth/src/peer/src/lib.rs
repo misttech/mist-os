@@ -46,7 +46,7 @@ impl FfxMain for PeerTool {
 
                 self.state.peers = known_peers;
 
-                writer.line(get_peers(args, &self.state, false))?;
+                writer.line(get_peers(args, &self.state, cmd.details))?;
 
                 Ok(())
             }

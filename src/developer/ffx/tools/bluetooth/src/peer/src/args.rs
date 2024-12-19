@@ -39,6 +39,10 @@ pub struct ListCommand {
     /// filter all known peers by id, address, or name (case-insensitive)
     #[argh(positional)]
     pub filter: Option<String>,
+
+    /// show details for all known peers
+    #[argh(switch)]
+    pub details: bool,
 }
 
 /// ffx bluetooth peer show
