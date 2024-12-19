@@ -24,7 +24,8 @@ use netstack3_base::{
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
-    IpTransportContext, ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
+    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
+    TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
 use packet_formats::error::ParseError;
@@ -107,16 +108,17 @@ where
         );
     }
 
-    fn receive_ip_packet<B: BufferMut>(
+    fn receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
         remote_ip: I::RecvSrcAddr,
         local_ip: SpecifiedAddr<I::Addr>,
         mut buffer: B,
-        meta: ReceiveIpPacketMeta<I>,
+        info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let ReceiveIpPacketMeta { broadcast, transparent_override, dscp_and_ecn: _ } = meta;
+        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let ReceiveIpPacketMeta { broadcast, transparent_override } = meta;
         if let Some(delivery) = transparent_override {
             warn!(
                 "TODO(https://fxbug.dev/337009139): transparent proxy not supported for TCP \

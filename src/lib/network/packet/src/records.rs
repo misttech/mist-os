@@ -23,7 +23,7 @@ use core::convert::Infallible as Never;
 use core::marker::PhantomData;
 use core::ops::Deref;
 
-use zerocopy::{IntoByteSlice, SplitByteSlice};
+use zerocopy::{ByteSlice, IntoByteSlice, SplitByteSlice};
 
 use crate::serialize::InnerPacketBuilder;
 use crate::util::{FromRaw, MaybeParsed};
@@ -750,6 +750,18 @@ where
     /// `bytes` returns a reference to the byte slice backing this `Records`.
     pub fn bytes(&self) -> &[u8] {
         &self.bytes
+    }
+}
+
+impl<B, R> Records<B, R>
+where
+    B: ByteSlice,
+    R: RecordsImpl,
+{
+    /// Returns the same records but coerces the backing `B` type to `&[u8]`.
+    pub fn as_ref(&self) -> Records<&[u8], R> {
+        let Self { bytes, record_count, context } = self;
+        Records { bytes: &*bytes, record_count: *record_count, context: context.clone() }
     }
 }
 

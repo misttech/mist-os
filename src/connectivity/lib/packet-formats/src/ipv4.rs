@@ -223,6 +223,12 @@ pub trait Ipv4Header {
     }
 }
 
+impl Ipv4Header for HeaderPrefix {
+    fn get_header_prefix(&self) -> &HeaderPrefix {
+        self
+    }
+}
+
 /// Packet metadata which is present only in the IPv4 protocol's packet format.
 pub struct Ipv4OnlyMeta {
     /// The packet's ID field.
@@ -593,6 +599,12 @@ impl<B: SplitByteSliceMut> Ipv4Packet<B> {
     /// The packet body.
     pub fn body_mut(&mut self) -> &mut [u8] {
         &mut self.body
+    }
+
+    /// Provides simultaneous access to header prefix, options, and mutable
+    /// body.
+    pub fn parts_with_body_mut(&mut self) -> (&HeaderPrefix, &Options<B>, &mut [u8]) {
+        (&self.hdr_prefix, &self.options, &mut self.body)
     }
 }
 

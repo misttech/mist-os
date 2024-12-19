@@ -40,8 +40,8 @@ use netstack3_datagram::{
 use netstack3_ip::icmp::{EchoTransportContextMarker, IcmpRxCounters};
 use netstack3_ip::socket::SocketHopLimits;
 use netstack3_ip::{
-    IpTransportContext, Mark, MarkDomain, MulticastMembershipHandler, ReceiveIpPacketMeta,
-    TransportIpContext, TransportReceiveError,
+    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, Mark, MarkDomain,
+    MulticastMembershipHandler, ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
 use packet_formats::icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw};
@@ -1046,16 +1046,18 @@ impl<
         })
     }
 
-    fn receive_ip_packet<B: BufferMut>(
+    fn receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
         mut buffer: B,
-        meta: ReceiveIpPacketMeta<I>,
+        info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        if let Some(delivery) = meta.transparent_override {
+        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let ReceiveIpPacketMeta { broadcast: _, transparent_override } = meta;
+        if let Some(delivery) = transparent_override.as_ref() {
             unreachable!(
                 "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
                 transparent proxy rules can only be configured for TCP and UDP packets"
@@ -1170,7 +1172,7 @@ mod tests {
     };
     use netstack3_base::CtxPair;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx};
-    use netstack3_ip::{ReceiveIpPacketMeta, SendIpPacketMeta};
+    use netstack3_ip::{LocalDeliveryPacketInfo, SendIpPacketMeta};
     use packet::Buf;
     use packet_formats::icmp::{IcmpPacket, IcmpParseArgs, IcmpZeroCode};
 
@@ -1508,7 +1510,7 @@ mod tests {
             src_ip.get().try_into().unwrap(),
             dst_ip,
             reply.clone(),
-            ReceiveIpPacketMeta::default(),
+            &LocalDeliveryPacketInfo::default(),
         )
         .unwrap();
 
@@ -1558,7 +1560,7 @@ mod tests {
             I::TEST_ADDRS.remote_ip.get().try_into().unwrap(),
             I::TEST_ADDRS.local_ip,
             reply,
-            ReceiveIpPacketMeta::default(),
+            &LocalDeliveryPacketInfo::default(),
         )
         .unwrap();
         assert_matches!(&bindings_ctx.state.received[..], []);

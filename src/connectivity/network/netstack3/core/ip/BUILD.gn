@@ -35,6 +35,7 @@ rustc_library_with_features("netstack3-ip") {
     "src/icmp.rs",
     "src/ipv6.rs",
     "src/lib.rs",
+    "src/local_delivery.rs",
     "src/multicast_forwarding.rs",
     "src/multicast_forwarding/api.rs",
     "src/multicast_forwarding/counters.rs",

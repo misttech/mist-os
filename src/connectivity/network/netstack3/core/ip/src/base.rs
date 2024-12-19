@@ -9,7 +9,7 @@ use core::convert::Infallible as Never;
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::marker::PhantomData;
-use core::num::{NonZeroU16, NonZeroU8};
+use core::num::NonZeroU8;
 use core::ops::ControlFlow;
 #[cfg(test)]
 use core::ops::DerefMut;
@@ -70,6 +70,10 @@ use crate::internal::icmp::{
     Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
 };
 use crate::internal::ipv6::Ipv6PacketAction;
+use crate::internal::local_delivery::{
+    IpHeaderInfo, Ipv4HeaderInfo, Ipv6HeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
+    TransparentLocalDelivery,
+};
 use crate::internal::multicast_forwarding::counters::MulticastForwardingCounters;
 use crate::internal::multicast_forwarding::route::{
     MulticastRouteIpExt, MulticastRouteTarget, MulticastRouteTargets,
@@ -283,31 +287,6 @@ impl From<SendFrameErrorReason> for IpSendFrameErrorReason {
     }
 }
 
-/// Informs the transport layer of parameters for transparent local delivery.
-#[derive(Debug, GenericOverIp, Clone)]
-#[generic_over_ip(I, Ip)]
-pub struct TransparentLocalDelivery<I: IpExt> {
-    /// The local delivery address.
-    pub addr: SpecifiedAddr<I::Addr>,
-    /// The local delivery port.
-    pub port: NonZeroU16,
-}
-
-/// Meta information for an incoming packet.
-#[derive(Debug, Derivative, GenericOverIp, Clone)]
-#[derivative(Default(bound = ""))]
-#[generic_over_ip(I, Ip)]
-pub struct ReceiveIpPacketMeta<I: IpExt> {
-    /// Indicates that the packet was sent to a broadcast address.
-    pub broadcast: Option<I::BroadcastMarker>,
-
-    /// Destination overrides for the transparent proxy.
-    pub transparent_override: Option<TransparentLocalDelivery<I>>,
-
-    /// DSCP and ECN values received in Traffic Class or TOS field.
-    pub dscp_and_ecn: DscpAndEcn,
-}
-
 /// The execution context provided by a transport layer protocol to the IP
 /// layer.
 ///
@@ -342,14 +321,14 @@ pub trait IpTransportContext<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Siz
     /// In the event of an unreachable port, `receive_ip_packet` returns the
     /// buffer in its original state (with the transport packet un-parsed) in
     /// the `Err` variant.
-    fn receive_ip_packet<B: BufferMut>(
+    fn receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
-        meta: ReceiveIpPacketMeta<I>,
+        info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)>;
 }
 
@@ -366,14 +345,14 @@ impl<I: IpExt, BC, CC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I
         trace!("IpTransportContext::receive_icmp_error: Received ICMP error message ({:?}) for unsupported IP protocol", err);
     }
 
-    fn receive_ip_packet<B: BufferMut>(
+    fn receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
         _core_ctx: &mut CC,
         _bindings_ctx: &mut BC,
         _device: &CC::DeviceId,
         _src_ip: I::RecvSrcAddr,
         _dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
-        _meta: ReceiveIpPacketMeta<I>,
+        _info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
         Err((buffer, TransportReceiveError::ProtocolUnsupported))
     }
@@ -1550,7 +1529,7 @@ impl<
 /// packets.
 pub trait IpTransportDispatchContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// Dispatches a received incoming IP packet to the appropriate protocol.
-    fn dispatch_receive_ip_packet<B: BufferMut>(
+    fn dispatch_receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
@@ -1558,7 +1537,7 @@ pub trait IpTransportDispatchContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDe
         dst_ip: SpecifiedAddr<I::Addr>,
         proto: I::Proto,
         body: B,
-        meta: ReceiveIpPacketMeta<I>,
+        info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), TransportReceiveError>;
 }
 
@@ -2253,8 +2232,7 @@ fn dispatch_receive_ipv4_packet<
     frame_dst: Option<FrameDestination>,
     mut packet: Ipv4Packet<&'a mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv4, CC::WeakAddressId, BC>,
-    transparent_override: Option<TransparentLocalDelivery<Ipv4>>,
-    broadcast_marker: Option<<Ipv4 as BroadcastIpExt>::BroadcastMarker>,
+    receive_meta: ReceiveIpPacketMeta<Ipv4>,
 ) -> Result<(), IcmpErrorSender<'b, Ipv4, CC::DeviceId>> {
     core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.dispatch_receive_ip_packet);
 
@@ -2301,16 +2279,21 @@ fn dispatch_receive_ipv4_packet<
 
     core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &device);
 
-    let meta = ReceiveIpPacketMeta {
-        broadcast: broadcast_marker,
-        transparent_override,
-        dscp_and_ecn: packet.dscp_and_ecn(),
-    };
-
-    let buffer = Buf::new(packet.body_mut(), ..);
+    let (prefix, options, body) = packet.parts_with_body_mut();
+    let buffer = Buf::new(body, ..);
+    let header_info = Ipv4HeaderInfo { prefix, options: options.as_ref() };
+    let receive_info = LocalDeliveryPacketInfo { meta: receive_meta, header_info };
 
     core_ctx
-        .dispatch_receive_ip_packet(bindings_ctx, device, src_ip, dst_ip, proto, buffer, meta)
+        .dispatch_receive_ip_packet(
+            bindings_ctx,
+            device,
+            src_ip,
+            dst_ip,
+            proto,
+            buffer,
+            &receive_info,
+        )
         .or_else(|err| {
             if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
                 let (_, _, _, meta) = packet.into_metadata();
@@ -2404,10 +2387,21 @@ fn dispatch_receive_ipv6_packet<
 
     core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &device);
 
-    let buffer = Buf::new(packet.body_mut(), ..);
+    let (fixed, extension, body) = packet.parts_with_body_mut();
+    let buffer = Buf::new(body, ..);
+    let header_info = Ipv6HeaderInfo { fixed, extension };
+    let receive_info = LocalDeliveryPacketInfo { meta, header_info };
 
     let result = core_ctx
-        .dispatch_receive_ip_packet(bindings_ctx, device, src_ip, dst_ip, proto, buffer, meta)
+        .dispatch_receive_ip_packet(
+            bindings_ctx,
+            device,
+            src_ip,
+            dst_ip,
+            proto,
+            buffer,
+            &receive_info,
+        )
         .or_else(|err| {
             if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                 let (_, _, _, meta) = packet.into_metadata();
@@ -3164,10 +3158,13 @@ pub fn receive_ipv4_packet<
                 return;
             };
 
-            // It's possible that the packet was actually sent to a broadcast
-            // address, but it doesn't matter here since it's being delivered
-            // to a transparent proxy.
-            let broadcast_marker = None;
+            let receive_meta = ReceiveIpPacketMeta {
+                // It's possible that the packet was actually sent to a
+                // broadcast address, but it doesn't matter here since it's
+                // being delivered to a transparent proxy.
+                broadcast: None,
+                transparent_override: Some(TransparentLocalDelivery { addr, port }),
+            };
 
             // Short-circuit the routing process and override local demux, providing a local
             // address and port to which the packet should be transparently delivered at the
@@ -3179,8 +3176,7 @@ pub fn receive_ipv4_packet<
                 frame_dst,
                 packet,
                 packet_metadata,
-                Some(TransparentLocalDelivery { addr, port }),
-                broadcast_marker,
+                receive_meta,
             )
             .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
             return;
@@ -3222,6 +3218,10 @@ pub fn receive_ipv4_packet<
 
             // If we also have an interest in the packet, deliver it locally.
             if let Some(address_status) = address_status {
+                let receive_meta = ReceiveIpPacketMeta {
+                    broadcast: address_status.to_broadcast_marker(),
+                    transparent_override: None,
+                };
                 dispatch_receive_ipv4_packet(
                     core_ctx,
                     bindings_ctx,
@@ -3229,8 +3229,7 @@ pub fn receive_ipv4_packet<
                     frame_dst,
                     packet,
                     packet_metadata.take().unwrap_or_default(),
-                    None,
-                    address_status.to_broadcast_marker(),
+                    receive_meta,
                 )
                 .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
             }
@@ -3257,6 +3256,10 @@ pub fn receive_ipv4_packet<
                 InternalForwarding::NotUsed => {}
             }
 
+            let receive_meta = ReceiveIpPacketMeta {
+                broadcast: address_status.to_broadcast_marker(),
+                transparent_override: None,
+            };
             dispatch_receive_ipv4_packet(
                 core_ctx,
                 bindings_ctx,
@@ -3264,8 +3267,7 @@ pub fn receive_ipv4_packet<
                 frame_dst,
                 packet,
                 packet_metadata,
-                None,
-                address_status.to_broadcast_marker(),
+                receive_meta,
             )
             .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
         }
@@ -3518,6 +3520,7 @@ pub fn receive_ipv6_packet<
     let mut packet_metadata =
         IpLayerPacketMetadata::from_device_ip_layer_metadata(core_ctx, device_ip_layer_metadata);
     let mut filter = core_ctx.filter_handler();
+
     match filter.ingress_hook(bindings_ctx, &mut packet, device, &mut packet_metadata) {
         IngressVerdict::Verdict(filter::Verdict::Accept(())) => {}
         IngressVerdict::Verdict(filter::Verdict::Drop) => {
@@ -3535,10 +3538,9 @@ pub fn receive_ipv6_packet<
                 return;
             };
 
-            let meta = ReceiveIpPacketMeta {
+            let receive_meta = ReceiveIpPacketMeta {
                 broadcast: None,
                 transparent_override: Some(TransparentLocalDelivery { addr, port }),
-                dscp_and_ecn: packet.dscp_and_ecn(),
             };
 
             // Short-circuit the routing process and override local demux, providing a local
@@ -3551,7 +3553,7 @@ pub fn receive_ipv6_packet<
                 frame_dst,
                 packet,
                 packet_metadata,
-                meta,
+                receive_meta,
             )
             .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
             return;
@@ -3600,6 +3602,9 @@ pub fn receive_ipv6_packet<
 
             // If we also have an interest in the packet, deliver it locally.
             if let Some(_) = address_status {
+                let receive_meta =
+                    ReceiveIpPacketMeta { broadcast: None, transparent_override: None };
+
                 dispatch_receive_ipv6_packet(
                     core_ctx,
                     bindings_ctx,
@@ -3607,7 +3612,7 @@ pub fn receive_ipv6_packet<
                     frame_dst,
                     packet,
                     packet_metadata.take().unwrap_or_default(),
-                    ReceiveIpPacketMeta::default(),
+                    receive_meta,
                 )
                 .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
             }
@@ -3656,11 +3661,7 @@ pub fn receive_ipv6_packet<
                         InternalForwarding::NotUsed => {}
                     }
 
-                    let meta = ReceiveIpPacketMeta {
-                        broadcast: None,
-                        transparent_override: None,
-                        dscp_and_ecn: packet.dscp_and_ecn(),
-                    };
+                    let meta = ReceiveIpPacketMeta { broadcast: None, transparent_override: None };
 
                     // TODO(joshlf):
                     // - Do something with ICMP if we don't have a handler for

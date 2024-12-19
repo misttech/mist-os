@@ -24,6 +24,7 @@ mod internal {
     pub(super) mod gmp;
     pub(super) mod icmp;
     pub(super) mod ipv6;
+    pub(super) mod local_delivery;
     pub(super) mod multicast_forwarding;
     pub(super) mod raw;
     pub(super) mod reassembly;
@@ -232,12 +233,14 @@ pub use internal::base::{
     IpRouteTableContext, IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason,
     IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
     Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State,
-    Ipv6StateBuilder, MulticastMembershipHandler, ReceiveIpPacketMeta, ReceivePacketAction,
-    ResolveRouteError, RoutingTableId, SendIpPacketMeta, TransparentLocalDelivery,
-    TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
-    IPV6_DEFAULT_SUBNET,
+    Ipv6StateBuilder, MulticastMembershipHandler, ReceivePacketAction, ResolveRouteError,
+    RoutingTableId, SendIpPacketMeta, TransportIpContext, TransportReceiveError,
+    DEFAULT_HOP_LIMITS, DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
 };
 pub use internal::fragmentation::FragmentationCounters;
+pub use internal::local_delivery::{
+    IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta, TransparentLocalDelivery,
+};
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
 pub use internal::routing::rules::{
@@ -258,6 +261,7 @@ pub use internal::types::{
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::internal::base::testutil::DualStackSendIpPacketMeta;
+    pub use crate::internal::local_delivery::testutil::FakeIpHeaderInfo;
     pub use crate::internal::routing::testutil::{
         add_route, del_device_routes, del_routes_to_subnet, set_rules,
     };
