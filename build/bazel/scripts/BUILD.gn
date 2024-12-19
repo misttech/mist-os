@@ -3,6 +3,12 @@
 # found in the LICENSE file.
 
 import("//build/python/python_host_test.gni")
+import("//build/testing/python_build_time_tests.gni")
+
+python_build_time_tests("get_git_head_commit_test") {
+  tests = [ "get_git_head_commit_test.py" ]
+  inputs = [ "get_git_head_commit.py" ]
+}
 
 if (is_host) {
   python_host_test("update_workspace_test") {
@@ -33,4 +39,10 @@ group("tests") {
     ":minimal_workspace_test($host_toolchain)",
     ":update_workspace_test($host_toolchain)",
   ]
+
+  # TODO(https://fxbug.dev/384878204): enable build-time tests once
+  # CI bots can run git commands properly.
+  if (false) {
+    deps += [ ":get_git_head_commit_tests" ]
+  }
 }
