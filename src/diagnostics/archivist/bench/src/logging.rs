@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_criterion::criterion::{self, Criterion};
-use fuchsia_criterion::FuchsiaCriterion;
-
 use archivist_lib::identity::ComponentIdentity;
 use archivist_lib::logs::shared_buffer::{LazyItem, SharedBuffer};
 use archivist_lib::logs::stored_message::StoredMessage;
 use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
+use diagnostics_log_encoding::{Argument, Record};
+use diagnostics_log_types::Severity;
 use fidl_fuchsia_diagnostics::StreamMode;
 use fuchsia_async as fasync;
+use fuchsia_criterion::criterion::{self, Criterion};
+use fuchsia_criterion::FuchsiaCriterion;
 use futures::StreamExt;
 use std::convert::{TryFrom, TryInto};
 use std::io::Cursor;
@@ -24,7 +24,7 @@ use std::time::Duration;
 fn make_message(msg: &str, timestamp: zx::BootInstant) -> StoredMessage {
     let record = Record {
         timestamp,
-        severity: StreamSeverity::Debug.into_primitive(),
+        severity: Severity::Debug as u8,
         arguments: vec![
             Argument::pid(zx::Koid::from_raw(1)),
             Argument::tid(zx::Koid::from_raw(2)),

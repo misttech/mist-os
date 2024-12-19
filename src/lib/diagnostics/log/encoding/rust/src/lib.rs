@@ -10,8 +10,6 @@ use bitfield::bitfield;
 use std::borrow::{Borrow, Cow};
 use zerocopy::{FromBytes, IntoBytes, KnownLayout};
 
-pub use fidl_fuchsia_diagnostics::Severity;
-
 mod constants;
 pub mod encode;
 pub mod parse;
@@ -368,6 +366,7 @@ impl TryFrom<u8> for ArgType {
 mod tests {
     use super::*;
     use crate::encode::{Encoder, EncoderOpts, EncodingError, MutableBuffer};
+    use fidl_fuchsia_diagnostics::Severity;
     use std::fmt::Debug;
     use std::io::Cursor;
 

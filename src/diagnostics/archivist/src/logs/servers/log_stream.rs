@@ -171,7 +171,8 @@ mod tests {
     use super::*;
     use diagnostics_log_encoding::encode::{EncoderOpts, TestRecord, WriteEventParams};
     use diagnostics_log_encoding::parse::parse_record;
-    use diagnostics_log_encoding::{Argument, Severity};
+    use diagnostics_log_encoding::Argument;
+    use diagnostics_log_types::Severity;
     use test_case::test_case;
 
     #[test_case(ExtendRecordOpts::default(), vec![] ; "no_additional_metadata")]

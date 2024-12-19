@@ -1,11 +1,12 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use crate::{OnInterestChanged, SeverityExt};
+use super::SeverityExt;
+use crate::OnInterestChanged;
 use diagnostics_log_encoding::encode::TestRecord;
-use diagnostics_log_encoding::Severity;
+use diagnostics_log_types::Severity;
 use fidl::endpoints::Proxy;
-use fidl_fuchsia_diagnostics::Interest;
+use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
 use std::future::Future;
 use std::sync::{Arc, Mutex, RwLock};
@@ -21,19 +22,20 @@ impl InterestFilter {
     /// to changes in the LogSink's interest.
     pub fn new(
         proxy: LogSinkProxy,
-        interest: Interest,
+        interest: fdiagnostics::Interest,
         wait_for_initial_interest: bool,
     ) -> (Self, impl Future<Output = ()>) {
-        let default_severity = interest.min_severity.unwrap_or(Severity::Info);
+        let default_severity = interest.min_severity.map(Severity::from).unwrap_or(Severity::Info);
         let (proxy, min_severity) = if wait_for_initial_interest {
             let sync_proxy = LogSinkSynchronousProxy::new(proxy.into_channel().unwrap().into());
-            let initial_severity =
-                match sync_proxy.wait_for_interest_change(zx::MonotonicInstant::INFINITE) {
-                    Ok(Ok(initial_interest)) => {
-                        initial_interest.min_severity.unwrap_or(default_severity)
-                    }
-                    _ => default_severity,
-                };
+            let initial_severity = match sync_proxy
+                .wait_for_interest_change(zx::MonotonicInstant::INFINITE)
+            {
+                Ok(Ok(initial_interest)) => {
+                    initial_interest.min_severity.map(Severity::from).unwrap_or(default_severity)
+                }
+                _ => default_severity,
+            };
             (
                 LogSinkProxy::new(fidl::AsyncChannel::from_channel(sync_proxy.into_channel())),
                 Arc::new(RwLock::new(initial_severity)),
@@ -45,7 +47,7 @@ impl InterestFilter {
         let listener = Arc::new(Mutex::new(None));
         let filter = Self { min_severity: min_severity.clone(), listener: listener.clone() };
         // Keep the max level from the log frontend synchronized.
-        log::set_max_level(log::LevelFilter::from_severity(&default_severity));
+        log::set_max_level(level_filter_from_severity(&default_severity));
         (filter, Self::listen_to_interest_changes(listener, default_severity, min_severity, proxy))
     }
 
@@ -73,13 +75,15 @@ impl InterestFilter {
         while let Ok(Ok(interest)) = proxy.wait_for_interest_change().await {
             let new_min_severity = {
                 let mut min_severity_guard = min_severity.write().unwrap();
-                *min_severity_guard = interest.min_severity.unwrap_or(default_severity);
-                interest.min_severity.unwrap_or(default_severity)
+                let severity =
+                    interest.min_severity.map(Severity::from).unwrap_or(default_severity);
+                *min_severity_guard = severity;
+                severity
             };
-            log::set_max_level(log::LevelFilter::from_severity(&new_min_severity));
+            log::set_max_level(level_filter_from_severity(&new_min_severity));
             let callback_guard = listener.lock().unwrap();
             if let Some(callback) = &*callback_guard {
-                callback.on_changed(new_min_severity.into());
+                callback.on_changed(new_min_severity);
             }
         }
     }
@@ -91,38 +95,31 @@ impl InterestFilter {
 
     pub fn enabled_for_testing(&self, record: &TestRecord<'_>) -> bool {
         let min_severity = self.min_severity.read().unwrap();
-        record.severity >= (*min_severity).into_primitive()
+        record.severity >= (*min_severity as u8)
     }
 }
 
-/// A type which can be created from a `Severity` value.
-trait FromSeverity {
-    /// Creates `Self` from `severity`.
-    fn from_severity(severity: &Severity) -> Self;
-}
-
-impl FromSeverity for log::LevelFilter {
-    fn from_severity(severity: &Severity) -> Self {
-        match severity {
-            Severity::Error => log::LevelFilter::Error,
-            Severity::Warn => log::LevelFilter::Warn,
-            Severity::Info => log::LevelFilter::Info,
-            Severity::Debug => log::LevelFilter::Debug,
-            Severity::Trace => log::LevelFilter::Trace,
-            // NB: Not a clean mapping.
-            Severity::Fatal => log::LevelFilter::Error,
-        }
+fn level_filter_from_severity(severity: &Severity) -> log::LevelFilter {
+    match severity {
+        Severity::Error => log::LevelFilter::Error,
+        Severity::Warn => log::LevelFilter::Warn,
+        Severity::Info => log::LevelFilter::Info,
+        Severity::Debug => log::LevelFilter::Debug,
+        Severity::Trace => log::LevelFilter::Trace,
+        // NB: Not a clean mapping.
+        Severity::Fatal => log::LevelFilter::Error,
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fuchsia::SeverityExt;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest, LogSinkRequestStream};
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
-    use tracing::{debug, error, info, trace, warn, Event, Subscriber};
+    use tracing::{debug, error, info, trace, warn, Event, Metadata, Subscriber};
     use tracing_subscriber::layer::{Context, SubscriberExt};
     use tracing_subscriber::{Layer, Registry};
 
@@ -179,7 +176,8 @@ mod tests {
     #[fuchsia::test(logging = false)]
     async fn default_filter_is_info_when_unspecified() {
         let (proxy, _requests) = create_proxy_and_stream::<LogSinkMarker>();
-        let (filter, _on_changes) = InterestFilter::new(proxy, Interest::default(), false);
+        let (filter, _on_changes) =
+            InterestFilter::new(proxy, fdiagnostics::Interest::default(), false);
         let observed = Arc::new(Mutex::new(SeverityCount::default()));
         tracing::subscriber::set_global_default(
             Registry::default().with(SeverityTracker { counts: observed.clone() }).with(filter),
@@ -210,7 +208,10 @@ mod tests {
         match stream.try_next().await {
             Ok(Some(LogSinkRequest::WaitForInterestChange { responder })) => {
                 responder
-                    .send(Ok(&Interest { min_severity: severity, ..Default::default() }))
+                    .send(Ok(&fdiagnostics::Interest {
+                        min_severity: severity.map(fdiagnostics::Severity::from),
+                        ..Default::default()
+                    }))
                     .expect("send response");
             }
             other => panic!("Expected WaitForInterestChange but got {:?}", other),
@@ -222,7 +223,10 @@ mod tests {
         let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>();
         let (filter, on_changes) = InterestFilter::new(
             proxy,
-            Interest { min_severity: Some(Severity::Warn), ..Default::default() },
+            fdiagnostics::Interest {
+                min_severity: Some(fdiagnostics::Severity::Warn),
+                ..Default::default()
+            },
             false,
         );
         let (send, mut recv) = mpsc::unbounded();
@@ -286,15 +290,16 @@ mod tests {
         let t = std::thread::spawn(move || {
             // Unused, but its existence is needed by AsyncChannel.
             let _executor = fuchsia_async::LocalExecutor::new();
-            let (filter, _on_changes) = InterestFilter::new(proxy, Interest::default(), true);
+            let (filter, _on_changes) =
+                InterestFilter::new(proxy, fdiagnostics::Interest::default(), true);
             filter
         });
         if let Some(Ok(request)) = requests.next().await {
             match request {
                 LogSinkRequest::WaitForInterestChange { responder } => {
                     responder
-                        .send(Ok(&Interest {
-                            min_severity: Some(Severity::Trace),
+                        .send(Ok(&fdiagnostics::Interest {
+                            min_severity: Some(fdiagnostics::Severity::Trace),
                             ..Default::default()
                         }))
                         .expect("sent initial interest");
@@ -314,7 +319,10 @@ mod tests {
         let (proxy, mut requests) = create_proxy_and_stream::<LogSinkMarker>();
         let (filter, on_changes) = InterestFilter::new(
             proxy,
-            Interest { min_severity: Some(Severity::Warn), ..Default::default() },
+            fdiagnostics::Interest {
+                min_severity: Some(fdiagnostics::Severity::Warn),
+                ..Default::default()
+            },
             false,
         );
         // Log frontend tracks the default min_severity.

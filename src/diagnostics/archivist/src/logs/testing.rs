@@ -8,7 +8,8 @@ use crate::logs::repository::LogsRepository;
 use crate::logs::servers::LogServer;
 use crate::logs::stored_message::StoredMessage;
 use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
+use diagnostics_log_encoding::{Argument, Record};
+use diagnostics_log_types::Severity;
 use diagnostics_message::{fx_log_packet_t, MAX_DATAGRAM_LEN};
 use fidl::prelude::*;
 use fidl_fuchsia_logger::{
@@ -619,7 +620,7 @@ pub fn start_listener(directory: &fio::DirectoryProxy) -> mpsc::UnboundedReceive
 pub fn make_message(msg: &str, tag: Option<&str>, timestamp: zx::BootInstant) -> StoredMessage {
     let mut record = Record {
         timestamp,
-        severity: StreamSeverity::Debug.into_primitive(),
+        severity: Severity::Debug as u8,
         arguments: vec![
             Argument::pid(zx::Koid::from_raw(1)),
             Argument::tid(zx::Koid::from_raw(2)),

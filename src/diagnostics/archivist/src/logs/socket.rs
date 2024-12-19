@@ -110,7 +110,7 @@ mod tests {
     use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsField, Severity};
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
+    use diagnostics_log_encoding::{Argument, Record};
     use diagnostics_message::fx_log_packet_t;
 
     use futures::StreamExt;
@@ -158,7 +158,7 @@ mod tests {
         let timestamp = zx::BootInstant::from_nanos(107);
         let record = Record {
             timestamp,
-            severity: StreamSeverity::Fatal.into_primitive(),
+            severity: Severity::Fatal as u8,
             arguments: vec![Argument::new("key", "value"), Argument::tag("tag-a")],
         };
         let mut buffer = Cursor::new(vec![0u8; 1024]);

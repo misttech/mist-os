@@ -1,23 +1,25 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use crate::{PublishOptions, Severity};
+use crate::PublishOptions;
+use diagnostics_log_encoding::RawSeverity;
+use diagnostics_log_types::Severity;
 use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-
 use std::collections::HashSet;
 use std::fmt::Debug;
 use thiserror::Error;
 use tracing::span::{Attributes, Id, Record};
 use tracing::subscriber::Subscriber;
-use tracing::{Event, Metadata};
+use tracing::{Event, Level, Metadata};
 use tracing_core::span::Current;
 use tracing_log::LogTracer;
 use tracing_subscriber::layer::Layered;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::registry::Registry;
+
 mod filter;
 mod sink;
 
@@ -27,7 +29,7 @@ use sink::{Sink, SinkConfig};
 pub use diagnostics_log_encoding::encode::TestRecord;
 pub use diagnostics_log_encoding::Metatag;
 pub use paste::paste;
-pub use sink::{SeverityExt, TracingEvent};
+pub use sink::TracingEvent;
 
 #[cfg(test)]
 use std::{
@@ -174,7 +176,7 @@ pub fn set_minimum_severity(severity: impl Into<Severity>) {
     let severity: Severity = severity.into();
     tracing::dispatcher::get_default(move |dispatcher| {
         let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
-        publisher.filter.set_minimum_severity(severity.into());
+        publisher.filter.set_minimum_severity(severity);
     });
 }
 
@@ -435,6 +437,31 @@ macro_rules! log_every_n_seconds {
             }
             LAST_LOG_TIMESTAMP.store(now, Ordering::Release);
         }
+    }
+}
+
+/// A type which has a `Severity`.
+pub trait SeverityExt {
+    /// Return the severity of this value.
+    fn severity(&self) -> Severity;
+
+    /// Return the raw severity of this value.
+    fn raw_severity(&self) -> RawSeverity;
+}
+
+impl SeverityExt for Metadata<'_> {
+    fn severity(&self) -> Severity {
+        match *self.level() {
+            Level::ERROR => Severity::Error,
+            Level::WARN => Severity::Warn,
+            Level::INFO => Severity::Info,
+            Level::DEBUG => Severity::Debug,
+            Level::TRACE => Severity::Trace,
+        }
+    }
+
+    fn raw_severity(&self) -> RawSeverity {
+        self.severity() as u8
     }
 }
 

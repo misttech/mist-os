@@ -1,12 +1,13 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+use super::SeverityExt;
 use crate::PublishError;
 use diagnostics_log_encoding::encode::{
     Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, ResizableBuffer, TestRecord,
     WriteArgumentValue, WriteEventParams,
 };
-use diagnostics_log_encoding::{Metatag, RawSeverity, Severity};
+use diagnostics_log_encoding::{Metatag, RawSeverity};
 use fidl_fuchsia_logger::{LogSinkProxy, MAX_DATAGRAM_LEN_BYTES};
 use fuchsia_runtime as rt;
 use std::collections::HashSet;
@@ -15,7 +16,7 @@ use std::io::Cursor;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tracing::subscriber::Subscriber;
-use tracing::{span, Event, Level, Metadata};
+use tracing::{span, Event, Metadata};
 use tracing_core::field::{Field, Visit};
 use tracing_log::NormalizeEvent;
 use tracing_subscriber::layer::{Context, Layer};
@@ -313,43 +314,13 @@ impl EncodedSpanArguments {
     }
 }
 
-/// A type which has a `Severity`.
-pub trait SeverityExt {
-    /// Return the severity of this value.
-    fn severity(&self) -> Severity;
-
-    /// Return the raw severity of this value.
-    fn raw_severity(&self) -> RawSeverity;
-}
-
-impl SeverityExt for Metadata<'_> {
-    fn severity(&self) -> Severity {
-        match *self.level() {
-            Level::ERROR => Severity::Error,
-            Level::WARN => Severity::Warn,
-            Level::INFO => Severity::Info,
-            Level::DEBUG => Severity::Debug,
-            Level::TRACE => Severity::Trace,
-        }
-    }
-
-    fn raw_severity(&self) -> RawSeverity {
-        match *self.level() {
-            Level::ERROR => Severity::Error.into_primitive(),
-            Level::WARN => Severity::Warn.into_primitive(),
-            Level::INFO => Severity::Info.into_primitive(),
-            Level::DEBUG => Severity::Debug.into_primitive(),
-            Level::TRACE => Severity::Trace.into_primitive(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{increment_clock, log_every_n_seconds};
     use diagnostics_log_encoding::parse::parse_record;
-    use diagnostics_log_encoding::{Argument, Record, Severity};
+    use diagnostics_log_encoding::{Argument, Record};
+    use diagnostics_log_types::Severity;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequest};
     use futures::stream::StreamExt;
@@ -445,7 +416,7 @@ mod tests {
         {
             let mut expected_trace = Record {
                 timestamp: observed_trace.timestamp,
-                severity: Severity::Trace.into_primitive(),
+                severity: Severity::Trace as u8,
                 arguments: arg_prefix(),
             };
             expected_trace.arguments.push(metatag.clone());
@@ -458,7 +429,7 @@ mod tests {
         {
             let mut expected_debug = Record {
                 timestamp: observed_debug.timestamp,
-                severity: Severity::Debug.into_primitive(),
+                severity: Severity::Debug as u8,
                 arguments: arg_prefix(),
             };
             expected_debug.arguments.push(metatag.clone());
@@ -471,7 +442,7 @@ mod tests {
         {
             let mut expected_info = Record {
                 timestamp: observed_info.timestamp,
-                severity: Severity::Info.into_primitive(),
+                severity: Severity::Info as u8,
                 arguments: arg_prefix(),
             };
             expected_info.arguments.push(metatag.clone());
@@ -483,7 +454,7 @@ mod tests {
         {
             let mut expected_warn = Record {
                 timestamp: observed_warn.timestamp,
-                severity: Severity::Warn.into_primitive(),
+                severity: Severity::Warn as u8,
                 arguments: arg_prefix(),
             };
             expected_warn.arguments.push(metatag.clone());
@@ -496,7 +467,7 @@ mod tests {
         {
             let mut expected_error = Record {
                 timestamp: observed_error.timestamp,
-                severity: Severity::Error.into_primitive(),
+                severity: Severity::Error as u8,
                 arguments: arg_prefix(),
             };
             expected_error
@@ -530,7 +501,7 @@ mod tests {
 
         let mut expected = Record {
             timestamp: observed.timestamp,
-            severity: Severity::Info.into_primitive(),
+            severity: Severity::Info as u8,
             arguments: arg_prefix(),
         };
         expected.arguments.push(Argument::message("this should have a tag"));
@@ -558,7 +529,7 @@ mod tests {
 
             let mut expected = Record {
                 timestamp: observed.timestamp,
-                severity: Severity::Info.into_primitive(),
+                severity: Severity::Info as u8,
                 arguments: arg_prefix(),
             };
             expected.arguments.push(Argument::message("test message"));
@@ -600,7 +571,7 @@ mod tests {
 
             let mut expected = Record {
                 timestamp: observed.timestamp,
-                severity: Severity::Info.into_primitive(),
+                severity: Severity::Info as u8,
                 arguments: arg_prefix(),
             };
             expected.arguments.push(Argument::tag("foo"));
@@ -614,7 +585,7 @@ mod tests {
 
         let mut expected = Record {
             timestamp: observed.timestamp,
-            severity: Severity::Info.into_primitive(),
+            severity: Severity::Info as u8,
             arguments: arg_prefix(),
         };
         expected.arguments.push(Argument::tag("foo"));
@@ -640,7 +611,7 @@ mod tests {
         let observed = next_message();
         let mut expected = Record {
             timestamp: observed.timestamp,
-            severity: Severity::Info.into_primitive(),
+            severity: Severity::Info as u8,
             arguments: arg_prefix(),
         };
         expected.arguments.push(Argument::tag("foo"));
@@ -653,7 +624,7 @@ mod tests {
 
         let mut expected = Record {
             timestamp: observed.timestamp,
-            severity: Severity::Info.into_primitive(),
+            severity: Severity::Info as u8,
             arguments: arg_prefix(),
         };
         expected.arguments.push(Argument::tag("bar"));
@@ -693,7 +664,7 @@ mod tests {
                 record,
                 Record {
                     timestamp: record.timestamp,
-                    severity: Severity::Info.into_primitive(),
+                    severity: Severity::Info as u8,
                     arguments: expected_args
                 }
             );
