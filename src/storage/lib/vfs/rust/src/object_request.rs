@@ -63,12 +63,6 @@ impl ObjectRequest {
         )
     }
 
-    /// DEPRECATED - Use [`ObjectRequest::new`] instead. For backwards compatibility only.
-    // TODO(https://fxbug.dev/384759360): Remove when out-of-tree instances have been migrated.
-    pub fn new3(flags: fio::Flags, options: &fio::Options, object_request: fidl::Channel) -> Self {
-        Self::new(flags, options, object_request)
-    }
-
     pub(crate) fn what_to_send(&self) -> ObjectRequestSend {
         self.what_to_send
     }
