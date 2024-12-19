@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, Waiter, WaiterRef};
+use crate::task::{
+    IntervalTimerHandle, ThreadGroupReadGuard, WaitCanceler, WaitQueue, Waiter, WaiterRef,
+};
 use starnix_sync::{InterruptibleEvent, RwLock};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS};
@@ -21,19 +23,21 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 /// Internal signal that cannot be masked, blocked or ignored.
 pub enum KernelSignal {
-    Freeze(Waiter),
+    Freeze(Waiter, WaitCanceler),
 }
 
 /// Signal info wrapper around user and internal signals.
 pub enum KernelSignalInfo {
     User(SignalInfo),
-    Freeze(Waiter),
+    Freeze(Waiter, WaitCanceler),
 }
 
 impl From<KernelSignal> for KernelSignalInfo {
     fn from(value: KernelSignal) -> Self {
         match value {
-            KernelSignal::Freeze(waiter) => KernelSignalInfo::Freeze(waiter),
+            KernelSignal::Freeze(waiter, wait_canceler) => {
+                KernelSignalInfo::Freeze(waiter, wait_canceler)
+            }
         }
     }
 }

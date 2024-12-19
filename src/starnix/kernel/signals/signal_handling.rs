@@ -9,7 +9,9 @@ use crate::arch::signal_handling::{
 };
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::signals::{KernelSignal, KernelSignalInfo, SignalDetail, SignalInfo, SignalState};
-use crate::task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard, Waiter};
+use crate::task::{
+    CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard, WaitCanceler, Waiter,
+};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_trace, log_warn};
 use starnix_sync::{Locked, Unlocked};
@@ -59,9 +61,19 @@ pub fn send_signal(task: &Task, siginfo: SignalInfo) -> Result<(), Errno> {
     send_signal_prio(task, state, siginfo.into(), SignalPriority::Last, false)
 }
 
-pub fn send_freeze_signal(task: &Task, waiter: Waiter) -> Result<(), Errno> {
+pub fn send_freeze_signal(
+    task: &Task,
+    waiter: Waiter,
+    wait_canceler: WaitCanceler,
+) -> Result<(), Errno> {
     let state = task.write();
-    send_signal_prio(task, state, KernelSignalInfo::Freeze(waiter), SignalPriority::First, true)
+    send_signal_prio(
+        task,
+        state,
+        KernelSignalInfo::Freeze(waiter, wait_canceler),
+        SignalPriority::First,
+        true,
+    )
 }
 
 fn send_signal_prio(
@@ -89,7 +101,7 @@ fn send_signal_prio(
                     Some(action),
                 )
             }
-            KernelSignalInfo::Freeze(_) => (None, None, false, false, false, None, None),
+            KernelSignalInfo::Freeze(_, _) => (None, None, false, false, false, None, None),
         };
 
     if is_real_time && prio != SignalPriority::First {
@@ -119,8 +131,8 @@ fn send_signal_prio(
                 }
                 task_state.set_flags(TaskFlags::SIGNALS_AVAILABLE, true);
             }
-            KernelSignalInfo::Freeze(waiter) => {
-                task_state.enqueue_kernel_signal(KernelSignal::Freeze(waiter))
+            KernelSignalInfo::Freeze(waiter, wait_canceler) => {
+                task_state.enqueue_kernel_signal(KernelSignal::Freeze(waiter, wait_canceler))
             }
         }
     }
@@ -138,6 +150,7 @@ fn send_signal_prio(
     // Unstop the process for SIGCONT. Also unstop for SIGKILL, the only signal that can interrupt
     // a stopped process.
     if signal == Some(SIGKILL) {
+        task.write().freeze_canceler.take().map(|canceler| canceler.cancel());
         task.thread_group.set_stopped(StopState::ForceWaking, siginfo, false);
         task.write().set_stopped(StopState::ForceWaking, None, None, None);
     } else if signal == Some(SIGCONT) || force_wake {
@@ -245,8 +258,11 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
     };
 
     if let Some(kernel_signal) = kernel_signal {
+        let KernelSignal::Freeze(waiter, wait_canceler) = kernel_signal;
+        task_state.freeze_canceler = Some(wait_canceler);
         drop(task_state);
-        let KernelSignal::Freeze(waiter) = kernel_signal;
+
+        // When `Err(EINTR)` is returned, the freeze is canceled due to SIGKILL.
         let _ = waiter.wait(locked, current_task);
     } else if let Some(ref siginfo) = siginfo {
         if let SignalDetail::Timer { timer } = &siginfo.detail {

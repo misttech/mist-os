@@ -108,7 +108,7 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
   mask_helper.blockSignal(SIGUSR1);
 
   pid_t child_pid = fork_helper.RunInForkedProcess([parent_pid] {
-    // Set up a signal set to wait for SIGUSR1 which will be sent by the child process
+    // Set up a signal set to wait for SIGUSR1 which will be sent by the parent process
     test_helper::SignalMaskHelper mask_helper;
     mask_helper.blockSignal(SIGUSR1);
 
@@ -147,6 +147,43 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
 
   // Wait for the child process to terminate
   EXPECT_TRUE(fork_helper.WaitForChildren());
+}
+
+TEST_F(CgroupFreezerTest, SIGKILLAfterFroze) {
+  pid_t parent_pid = getpid();
+  test_helper::ForkHelper fork_helper;
+
+  // Set up a signal set to wait for SIGUSR1 which will be sent by the child process
+  test_helper::SignalMaskHelper mask_helper;
+  mask_helper.blockSignal(SIGUSR1);
+
+  pid_t child_pid = fork_helper.RunInForkedProcess([parent_pid] {
+    // Set up a signal set to wait for SIGUSR1 which will be sent by the parent process
+    test_helper::SignalMaskHelper mask_helper;
+    mask_helper.blockSignal(SIGUSR1);
+
+    // Wait for the SIGUSR1
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
+  });
+  test_pids_.push_back(child_pid);
+
+  // Write the child PID to the cgroup
+  files::WriteFile(procs_path(), std::to_string(child_pid));
+
+  // Freeze the cgroup
+  files::WriteFile(freezer_path(), "1");
+
+  // Send signal; frozen child should *not* receive it.
+  kill(child_pid, SIGUSR1);
+
+  // Set up a time limit for sigtimedwait. Should timeout without receiving the signal.
+  EXPECT_THAT(mask_helper.timedWaitForSignal(SIGUSR1, 2), SyscallFailsWithErrno(EAGAIN));
+
+  // Kill the child process without thawing
+  EXPECT_EQ(0, kill(child_pid, SIGKILL));
+  // Wait for the child process to terminate
+  fork_helper.WaitForChildren();
 }
 
 TEST_F(CgroupFreezerTest, CheckStateInEventsFile) {

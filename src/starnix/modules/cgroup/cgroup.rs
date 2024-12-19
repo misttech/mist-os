@@ -390,8 +390,8 @@ impl CgroupOps for Cgroup {
         for pid in get_pids_locked(&mut guard) {
             if let Some(task) = pids.get_task(pid).upgrade() {
                 let waiter = Waiter::new();
-                guard.wait_queue.wait_async(&waiter);
-                send_freeze_signal(&task, waiter)?;
+                let wait_canceler = guard.wait_queue.wait_async(&waiter);
+                send_freeze_signal(&task, waiter, wait_canceler)?;
             }
         }
         Ok(())
