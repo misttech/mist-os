@@ -23,6 +23,8 @@ rustc_library("lib") {
     "src/client.rs",
     "src/lib.rs",
     "src/sensor_manager.rs",
+    "src/sensor_update_sender.rs",
+    "src/service_watcher.rs",
     "src/utils.rs",
   ]
   deps = [
@@ -56,9 +58,11 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
 }

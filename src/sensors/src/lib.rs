@@ -4,4 +4,6 @@
 
 mod client;
 pub mod sensor_manager;
+pub mod sensor_update_sender;
+mod service_watcher;
 mod utils;

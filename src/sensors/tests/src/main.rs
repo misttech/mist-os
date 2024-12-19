@@ -106,7 +106,10 @@ async fn clear_playback_config(proxy: &ManagerProxy) {
         .await;
 }
 
-async fn setup_second_playback_driver(realm: &InstalledNamespace) -> playback_fidl::PlaybackProxy {
+async fn setup_second_playback_driver(
+    realm: &InstalledNamespace,
+    manager: &ManagerProxy,
+) -> playback_fidl::PlaybackProxy {
     let playback_proxy = connect_to_protocol_at::<playback_fidl::PlaybackMarker>(&realm).unwrap();
 
     let test_sensor = SensorInfo {
@@ -134,7 +137,7 @@ async fn setup_second_playback_driver(realm: &InstalledNamespace) -> playback_fi
     }
 
     let fixed_values_config = playback_fidl::FixedValuesPlaybackConfig {
-        sensor_list: Some(vec![test_sensor]),
+        sensor_list: Some(vec![test_sensor.clone()]),
         sensor_events: Some(playback_events),
         ..Default::default()
     };
@@ -145,6 +148,16 @@ async fn setup_second_playback_driver(realm: &InstalledNamespace) -> playback_fi
         ))
         .await
         .unwrap();
+
+    // Wait for the sensor service to be exposed and for the instance to be managed by the
+    // SensorManager. Eventually the SensorManager could notify its clients that a new sensor has
+    // been added, but currently the clients must check for new sensors.
+    loop {
+        let fidl_sensors = manager.get_sensors_list().await.unwrap();
+        if fidl_sensors.contains(&test_sensor) {
+            break;
+        }
+    }
 
     playback_proxy
 }
@@ -194,7 +207,7 @@ async fn test_configure_playback() -> anyhow::Result<()> {
 #[fuchsia::test]
 async fn test_get_sensors_list() -> anyhow::Result<()> {
     let (realm, proxy) = setup().await?;
-    let _playback = setup_second_playback_driver(&realm).await;
+    let _playback = setup_second_playback_driver(&realm, &proxy).await;
 
     let test_sensor = SensorInfo {
         sensor_id: Some(87654321),
@@ -355,7 +368,7 @@ async fn test_two_clients() -> anyhow::Result<()> {
 #[fuchsia::test]
 async fn test_two_driver_providers() -> anyhow::Result<()> {
     let (realm, proxy) = setup().await?;
-    let _playback = setup_second_playback_driver(&realm).await;
+    let _playback = setup_second_playback_driver(&realm, &proxy).await;
 
     let config = SensorRateConfig {
         sampling_period_ns: Some(500000000), // 0.5s.

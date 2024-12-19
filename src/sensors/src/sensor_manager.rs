@@ -2,30 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::client::*;
+use crate::sensor_update_sender::SensorUpdateSender;
+use crate::service_watcher::*;
 use crate::utils::*;
 use anyhow::{Context as _, Error};
-use fidl::endpoints::{ControlHandle, Proxy, RequestStream};
+use fidl::endpoints::{Proxy, RequestStream};
 use fidl::AsHandleRef;
 use fidl_fuchsia_hardware_sensors::{self as driver_fidl, PlaybackSourceConfig};
 use fidl_fuchsia_sensors::*;
 use fidl_fuchsia_sensors_types::*;
+use fuchsia_component::client as fclient;
 use fuchsia_component::server::ServiceFs;
-use futures::channel::mpsc;
 use futures::lock::Mutex;
-use futures::select;
-use futures::stream::{FuturesUnordered, StreamFuture};
 use futures_util::{StreamExt, TryStreamExt};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-type SensorId = i32;
+pub type SensorId = i32;
 
 #[derive(Debug, Clone)]
 pub struct SensorManager {
-    sensors: HashMap<SensorId, Sensor>,
+    pub(crate) sensors: HashMap<SensorId, Sensor>,
     driver_proxies: Vec<driver_fidl::DriverProxy>,
     playback: Option<Playback>,
     clients: HashSet<Client>,
+    pub(crate) update_sender: SensorUpdateSender,
 }
 
 #[derive(Debug, Clone)]
@@ -33,7 +34,7 @@ pub struct Sensor {
     driver: driver_fidl::DriverProxy,
     info: SensorInfo,
     // A subset of SensorManager::clients.
-    clients: HashSet<Client>,
+    pub(crate) clients: HashSet<Client>,
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +53,6 @@ async fn handle_sensors_request(
     request: ManagerRequest,
     manager: &Arc<Mutex<SensorManager>>,
     client: &Client,
-    update_sender: &mpsc::UnboundedSender<HashMap<SensorId, Sensor>>,
 ) -> anyhow::Result<()> {
     let mut manager = manager.lock().await;
     match request {
@@ -228,76 +228,20 @@ async fn handle_sensors_request(
         }
     }
 
-    if let Err(e) = update_sender.unbounded_send(manager.sensors.clone()) {
-        tracing::warn!("Failed to send update message to sensor_event_sender: {:#?}", e);
-    }
+    manager.update_sender.update_sensor_map(manager.sensors.clone()).await;
 
     Ok(())
-}
-
-async fn sensor_event_sender(
-    mut update_receiver: mpsc::UnboundedReceiver<HashMap<SensorId, Sensor>>,
-    mut event_streams: FuturesUnordered<StreamFuture<driver_fidl::DriverEventStream>>,
-    mut sensors: HashMap<SensorId, Sensor>,
-) {
-    loop {
-        select! {
-            sensor_event = event_streams.next() => {
-                if let Some((sensor_event, stream)) = sensor_event {
-                    match sensor_event {
-                        Some(Ok(driver_fidl::DriverEvent::OnSensorEvent { event })) => {
-                            if let Some(sensor) = sensors.get_mut(&event.sensor_id) {
-                                for client in sensor.clients.clone() {
-                                    if !client.control_handle.is_closed() {
-                                        if let Err(e) = client.control_handle.send_on_sensor_event(&event) {
-                                            tracing::warn!("Failed to send sensor event: {:#?}", e);
-                                        }
-                                    } else {
-                                        tracing::error!("Client was PEER_CLOSED! Removing from clients list");
-                                        sensor.clients.remove(&client);
-                                    }
-                                }
-                            }
-                        }
-                        Some(Ok(driver_fidl::DriverEvent::_UnknownEvent { ordinal, .. })) => {
-                            tracing::warn!(
-                                "SensorManager received an UnknownEvent with ordinal: {:#?}",
-                                ordinal
-                            );
-                        }
-                        Some(Err(e)) => {
-                            tracing::error!("Received an error from sensor driver: {:#?}", e);
-                            break;
-                        }
-                        None => {
-                            tracing::error!("Got None from driver");
-                            break;
-                        }
-                    }
-                    // Once the future has resolved, the rest of the events need to be
-                    // placed back onto the list of futures.
-                    event_streams.push(stream.into_future());
-                }
-            },
-            sensor_update = update_receiver.next() => {
-                if let Some(sensor_update) = sensor_update {
-                    sensors = sensor_update
-                }
-            },
-        }
-    }
 }
 
 async fn handle_sensor_manager_request_stream(
     mut stream: ManagerRequestStream,
     manager: Arc<Mutex<SensorManager>>,
     client: Client,
-    update_sender: mpsc::UnboundedSender<HashMap<SensorId, Sensor>>,
 ) -> Result<(), Error> {
     while let Some(request) =
         stream.try_next().await.context("Error handling SensorManager events")?
     {
-        handle_sensors_request(request, &manager, &client, &update_sender)
+        handle_sensors_request(request, &manager, &client)
             .await
             .expect("Error handling sensor request");
     }
@@ -314,11 +258,20 @@ impl Playback {
 }
 
 impl SensorManager {
-    pub fn new(driver_proxies: Vec<driver_fidl::DriverProxy>, playback: Option<Playback>) -> Self {
+    pub fn new(update_sender: SensorUpdateSender, playback: Option<Playback>) -> Self {
         let sensors = HashMap::new();
         let clients = HashSet::new();
+        let driver_proxies = Vec::new();
 
-        Self { sensors, driver_proxies, playback, clients }
+        Self { sensors, driver_proxies, playback, clients, update_sender }
+    }
+
+    pub(crate) async fn add_instance(&mut self, driver_proxy: driver_fidl::DriverProxy) {
+        let event_stream = driver_proxy.take_event_stream();
+        self.driver_proxies.push(driver_proxy);
+        self.populate_sensors().await;
+        self.update_sender.update_sensor_map(self.sensors.clone()).await;
+        self.update_sender.add_event_stream(event_stream).await;
     }
 
     async fn populate_sensors(&mut self) {
@@ -342,50 +295,54 @@ impl SensorManager {
         self.sensors = sensors;
     }
 
+    async fn start_service_watcher(&self, manager: Arc<Mutex<SensorManager>>) -> Result<(), Error> {
+        let svc = fclient::Service::open(driver_fidl::ServiceMarker)?;
+        // Attempt to watch the service directory. If this fails, the manager will check if
+        // playback is configured and exit early if it is not.
+        svc.watch().await?;
+
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = watch_service_directory(svc, manager).await {
+                tracing::error!("Failed to open sensor service! Error: {:#?}", e);
+            }
+        })
+        .detach();
+
+        Ok(())
+    }
+
     pub async fn run(&mut self) -> Result<(), Error> {
-        // Get the initial list of sensors so that the manager doesn't need to ask the drivers
-        // on every request.
-        self.populate_sensors().await;
-
-        let (update_sender, update_receiver) = mpsc::unbounded::<HashMap<SensorId, Sensor>>();
-
         // Collect all the driver event streams into a set of futures that will be polled when the
         // futures contain a sensor event.
-        let streams = FuturesUnordered::new();
         if let Some(playback) = &self.playback {
-            streams.push(playback.driver_proxy.take_event_stream().into_future());
-        }
-        for proxy in &mut self.driver_proxies {
-            streams.push(proxy.take_event_stream().into_future());
+            self.add_instance(playback.driver_proxy.clone()).await;
         }
 
         let manager: Arc<Mutex<SensorManager>> = Arc::new(Mutex::new(self.clone()));
 
-        let sensors = self.sensors.clone();
-        fuchsia_async::Task::spawn(async move {
-            sensor_event_sender(update_receiver, streams, sensors).await;
-        })
-        .detach();
+        if let Err(_) = self.start_service_watcher(manager.clone()).await {
+            if self.playback.is_some() {
+                tracing::warn!("Failed to open sensor driver service directory. Starting with playback sensors only.");
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Failed to open sensors service and sensor playback is not enabled on the system"
+                ));
+            }
+        }
 
         let mut fs = ServiceFs::new_local();
         fs.dir("svc").add_fidl_service(IncomingRequest::SensorManager);
         fs.take_and_serve_directory_handle()?;
         fs.for_each_concurrent(None, move |request: IncomingRequest| {
-            let update_sender = update_sender.clone();
             let manager = manager.clone();
             async move {
                 match request {
                     IncomingRequest::SensorManager(stream) => {
                         let client = Client::new(stream.control_handle());
                         manager.lock().await.clients.insert(client.clone());
-                        handle_sensor_manager_request_stream(
-                            stream,
-                            manager,
-                            client,
-                            update_sender,
-                        )
-                        .await
-                        .expect("Failed to serve sensor requests");
+                        handle_sensor_manager_request_stream(stream, manager, client)
+                            .await
+                            .expect("Failed to serve sensor requests");
                     }
                 }
             }
@@ -441,6 +398,7 @@ mod tests {
     use super::*;
     use fidl::endpoints::*;
     use fidl_fuchsia_hardware_sensors::*;
+    use futures::channel::mpsc;
 
     #[fuchsia::test]
     async fn test_invalid_configure_playback() {
@@ -449,15 +407,16 @@ mod tests {
         let (playback_proxy, _) = create_proxy::<PlaybackMarker>();
 
         let (driver_proxy, _) = create_proxy::<DriverMarker>();
-        let sm = SensorManager::new(Vec::new(), Some(Playback::new(driver_proxy, playback_proxy)));
+        let (sender, _receiver) = mpsc::channel(100);
+        let sender = SensorUpdateSender::new(Arc::new(Mutex::new(sender)));
+        let sm = SensorManager::new(sender, Some(Playback::new(driver_proxy, playback_proxy)));
 
         let manager = Arc::new(Mutex::new(sm));
         let (proxy, stream) = create_proxy_and_stream::<ManagerMarker>();
         let client = Client::new(stream.control_handle().clone());
-        let (sender, _receiver) = mpsc::unbounded::<HashMap<SensorId, Sensor>>();
         fuchsia_async::Task::spawn(async move {
             manager.lock().await.clients.insert(client.clone());
-            handle_sensor_manager_request_stream(stream, manager, client, sender)
+            handle_sensor_manager_request_stream(stream, manager, client)
                 .await
                 .expect("Failed to process request stream");
         })
