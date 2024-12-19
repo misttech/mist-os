@@ -23,16 +23,11 @@
 ///                +--------------------+                  +---------------------------------+
 ///                |       ACTIVE       |<-----------------|             ACTIVE              |
 ///                +--------------------+                  +---------------------------------+
-/// +--------------|     SUSPENDING     |<--------+        |            INACTIVE             |
-/// |              |                    |         |        +---------------------------------+
-/// |              +--------------------+         |
-/// |              |      INACTIVE      |         |        +---------------------------------+
-/// |              +--------------------+         |        |         **WakeHandling**        |
-/// |                                             |        +---------------------------------+
-/// |                                             +--------|             ACTIVE              |
-/// |                                                      +---------------------------------+
-/// |                                                      |            INACTIVE             |
-/// |                                                      +---------------------------------+
+/// +--------------|     SUSPENDING     |                  |            INACTIVE             |
+/// |              |                    |                  +---------------------------------+
+/// |              +--------------------+
+/// |              |      INACTIVE      |
+/// |              +--------------------+
 /// |
 /// |    +---------------------------------+
 /// |    |             **CPU**             |
@@ -46,13 +41,10 @@
 /// # Usage
 ///
 /// To prevent system suspension, a component can create an assertive dependency
-/// using the `assertive_dependency_token` from `ApplicationActivity` or
-/// `WakeHandling`. If the dependency causes the power level of
-/// `ApplicationActivity` and/or `WakeHandling` to be raised to
-/// [`fuchsia.power.system/ApplicationActivityPowerLevel.ACTIVE`] and/or
-/// [`fuchsia.power.system/WakeHandlingPowerLevel.ACTIVE`], respectively, SAG
-/// will not trigger system suspension until their power levels drop to
-/// `INACTIVE`.
+/// using the `assertive_dependency_token` from `ApplicationActivity`. If the
+/// dependency causes the power level of `ApplicationActivity` to be raised to
+/// [`fuchsia.power.system/ApplicationActivityPowerLevel.ACTIVE`], SAG  will not
+///  trigger system suspension until their power levels drop to `INACTIVE`.
 ///
 /// If a component is managing a power element that requires the platform to be
 /// in a specific state, an opportunistic dependency can be created on
