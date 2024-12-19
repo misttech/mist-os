@@ -5,10 +5,11 @@
 //! Type-safe bindings for Zircon vmar objects.
 
 use crate::{
-    object_get_info_single, object_get_info_vec, ok, sys, AsHandleRef, Handle, HandleBased,
-    HandleRef, Koid, Name, ObjectQuery, Status, Topic, Vmo,
+    object_get_info, object_get_info_single, object_get_info_vec, ok, sys, AsHandleRef, Handle,
+    HandleBased, HandleRef, Koid, Name, ObjectQuery, Status, Topic, Vmo,
 };
 use bitflags::bitflags;
+use std::mem::MaybeUninit;
 use zerocopy::{FromBytes, Immutable};
 use zx_sys::PadByte;
 
@@ -269,6 +270,24 @@ impl Vmar {
         ok(unsafe { sys::zx_vmar_unmap(self.0.raw_handle(), addr, len) })
     }
 
+    /// Perform an operation on VMOs mapped into this VMAR.
+    ///
+    /// Wraps the
+    /// [zx_vmar_op_range](https://fuchsia.dev/fuchsia-src/reference/syscalls/vmar_op_range.md)
+    /// syscall.
+    pub fn op_range(&self, op: VmarOp, addr: usize, len: usize) -> Result<(), Status> {
+        ok(unsafe {
+            sys::zx_vmar_op_range(
+                self.0.raw_handle(),
+                op.into_raw(),
+                addr,
+                len,
+                std::ptr::null_mut(),
+                0,
+            )
+        })
+    }
+
     /// Directly call `zx_vmar_protect`.
     ///
     /// # Safety
@@ -310,10 +329,45 @@ impl Vmar {
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_VMAR_MAPS topic.
+    ///
+    /// Returns an initialized slice of `MapInfo`s, any uninitialized trailing entries, and the
+    /// total number of infos that the kernel had available.
+    pub fn info_maps<'a>(
+        &self,
+        buf: &'a mut [MaybeUninit<MapInfo>],
+    ) -> Result<(&'a mut [MapInfo], &'a mut [MaybeUninit<MapInfo>], usize), Status> {
+        object_get_info::<VmarMapsInfo>(self.as_handle_ref(), buf)
+    }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_VMAR_MAPS topic.
     pub fn info_maps_vec(&self) -> Result<Vec<MapInfo>, Status> {
         object_get_info_vec::<VmarMapsInfo>(self.as_handle_ref())
     }
 }
+
+/// VM Address Range opcodes
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[repr(transparent)]
+pub struct VmarOp(u32);
+impl VmarOp {
+    pub fn from_raw(raw: u32) -> Self {
+        Self(raw)
+    }
+    pub fn into_raw(self) -> u32 {
+        self.0
+    }
+}
+
+assoc_values!(VmarOp, [
+    COMMIT =           sys::ZX_VMAR_OP_COMMIT;
+    DECOMMIT =         sys::ZX_VMAR_OP_DECOMMIT;
+    PREFETCH =         sys::ZX_VMAR_OP_PREFETCH;
+    MAP_RANGE =        sys::ZX_VMAR_OP_MAP_RANGE;
+    DONT_NEED =        sys::ZX_VMAR_OP_DONT_NEED;
+    ALWAYS_NEED =      sys::ZX_VMAR_OP_ALWAYS_NEED;
+]);
 
 // TODO(smklein): Ideally we would have two separate sets of bitflags,
 // and a union of both of them.

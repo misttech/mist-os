@@ -165,7 +165,6 @@ multiconst!(u32, [
     ZX_INFO_VMO_VIA_IOB_HANDLE = 1 << 9;
 ]);
 
-// TODO: add an alias for this type in the C headers.
 multiconst!(u32, [
     ZX_VMO_OP_COMMIT = 1;
     ZX_VMO_OP_DECOMMIT = 2;
@@ -180,6 +179,15 @@ multiconst!(u32, [
     ZX_VMO_OP_DONT_NEED = 12;
     ZX_VMO_OP_ALWAYS_NEED = 13;
     ZX_VMO_OP_PREFETCH = 14;
+]);
+
+multiconst!(u32, [
+    ZX_VMAR_OP_COMMIT = 1;
+    ZX_VMAR_OP_DECOMMIT = 2;
+    ZX_VMAR_OP_MAP_RANGE = 3;
+    ZX_VMAR_OP_DONT_NEED = 12;
+    ZX_VMAR_OP_ALWAYS_NEED = 13;
+    ZX_VMAR_OP_PREFETCH = 14;
 ]);
 
 multiconst!(zx_vm_option_t, [
