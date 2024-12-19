@@ -6,7 +6,6 @@
 #define SRC_DEVICES_ML_DRIVERS_AML_NNA_AML_NNA_H_
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>

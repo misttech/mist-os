@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/fzl/pinned-vmo.h>

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.securemem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async_patterns/cpp/dispatcher_bound.h>
 #include <lib/async_patterns/cpp/receiver.h>
