@@ -29,6 +29,11 @@ impl NanohubCommsDirectory {
         let mut entries = DeviceDirectory::create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
+            name: b"display_panel_name".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
             name: b"display_select".into(),
             inode: None,
         });
@@ -92,6 +97,13 @@ impl FsNodeOps for NanohubCommsDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
+            b"display_panel_name" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/display_panel_name".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+            )),
             b"display_select" => Ok(node.fs().create_node(
                 current_task,
                 SocketTunnelFile::new(
