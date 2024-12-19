@@ -301,7 +301,7 @@ def _find_suspend_windows(
     suspend_windows: list[trace_time.Window] = []
     events = filter(
         lambda e: e.pid == system_activity_governor.pid,
-        suspend_metrics.filter_events(model),
+        suspend_metrics.filter_sag_suspend_events(model),
     )
     for suspend in events:
         if suspend.duration is None:

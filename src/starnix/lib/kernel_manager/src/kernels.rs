@@ -97,11 +97,13 @@ impl Kernels {
 
     /// Drops any active wake lease for the container running in the given `container_job`.
     pub fn drop_wake_lease(&self, container_job: &zx::Job) -> Result<(), Error> {
+        // LINT.IfChange
         fuchsia_trace::instant!(
             c"power",
             c"starnix-runner:drop-application-activity-lease",
             fuchsia_trace::Scope::Process
         );
+        // LINT.ThenChange(//src/performance/lib/trace_processing/metrics/suspend.py)
         let job_koid = container_job.get_koid()?;
         if let Some(kernel) = self.kernels.lock().get(&job_koid) {
             kernel.wake_lease.lock().take();
@@ -112,7 +114,9 @@ impl Kernels {
 
     /// Acquires a wake lease for the container running in the given `container_job`.
     pub async fn acquire_wake_lease(&self, container_job: &zx::Job) -> Result<(), Error> {
+        // LINT.IfChange
         fuchsia_trace::duration!(c"power", c"starnix-runner:acquire-application-activity-lease");
+        // LINT.ThenChange(//src/performance/lib/trace_processing/metrics/suspend.py)
         let job_koid = container_job.get_koid()?;
         if let Some(kernel) = self.kernels.lock().get(&job_koid) {
             let activity_governor = connect_to_protocol::<fpower::ActivityGovernorMarker>()?;
