@@ -939,7 +939,7 @@ pub(super) fn check_file_ioctl_access(
         _ => &[CommonFilePermission::Ioctl.for_class(file_class)],
     };
     todo_has_fs_node_permissions(
-        TODO_DENY!("https://fxbug.dev/364569179", "ioctl"),
+        TODO_DENY!("https://fxbug.dev/385077129", "Enforce file_ioctl() fs-node checks"),
         &permission_check,
         subject_sid,
         &file.name.entry.node,
