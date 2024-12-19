@@ -198,11 +198,6 @@ zx::result<std::vector<std::string>> FindRestrictedSymbols(zx::vmo& driver_vmo,
           kCreateThreadSymbolsDriversAllowlist.end()) {
         matches.push_back(name);
       }
-    } else if (kAdditionalThreadSymbols.find(name) != kAdditionalThreadSymbols.end()) {
-      if (kAdditionalThreadSymbolsDriversAllowlist.find(*relative_url) ==
-          kAdditionalThreadSymbolsDriversAllowlist.end()) {
-        matches.push_back(name);
-      }
     }
   }
   return zx::ok(matches);
