@@ -8,6 +8,7 @@ import("//build/toolchain/toolchain_environment.gni")
 
 library_headers("headers") {
   headers = [
+    "hwreg/array.h",
     "hwreg/asm.h",
     "hwreg/bitfields.h",
     "hwreg/indirect.h",
@@ -21,6 +22,7 @@ library_headers("headers") {
     "//zircon/system/ulib/mmio-ptr",
 
     # <hwreg/array.h> has #include <lib/stdcompat/span.h>.
+    # <hwreg/internal.h> has #include <lib/stdcompat/atomic.h>.
     "//sdk/lib/stdcompat",
   ]
 
