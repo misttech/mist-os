@@ -46,6 +46,7 @@
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
@@ -54,8 +55,7 @@ namespace virtio_display {
 namespace {
 
 // TODO(https://fxbug.dev/42073721): Support more formats.
-constexpr fuchsia_images2::wire::PixelFormat kSupportedPixelFormat =
-    fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
+constexpr display::PixelFormat kSupportedPixelFormat = display::PixelFormat::kB8G8R8A8;
 constexpr uint32_t kRefreshRateHz = 30;
 constexpr display::DisplayId kDisplayId(1);
 constexpr display::ModeId kDisplayModeId(1);
@@ -73,8 +73,7 @@ void DisplayEngine::OnCoordinatorConnected() {
   });
 
   const cpp20::span<const display::ModeAndId> preferred_modes(&mode_and_id, 1);
-  const cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats(&kSupportedPixelFormat,
-                                                                            1);
+  const cpp20::span<const display::PixelFormat> pixel_formats(&kSupportedPixelFormat, 1);
   engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, pixel_formats);
 }
 
@@ -260,7 +259,7 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
 
   constraints.image_format_constraints(
       std::vector{fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
-                      .pixel_format(kSupportedPixelFormat)
+                      .pixel_format(kSupportedPixelFormat.ToFidl())
                       .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
                       .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
                       .bytes_per_row_divisor(4)

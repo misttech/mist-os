@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
 
-#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
@@ -20,6 +19,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 namespace virtio_display {
@@ -121,21 +121,19 @@ zx::result<fbl::Vector<DisplayInfo>> VirtioGpuDevice::GetDisplayInfo() {
 namespace {
 
 // Returns nullopt for an unsupported format.
-std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
-    fuchsia_images2::wire::PixelFormat pixel_format) {
+std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(display::PixelFormat pixel_format) {
   // TODO(https://fxbug.dev/42073721): Support more formats.
-  switch (pixel_format) {
-    case fuchsia_images2::PixelFormat::kB8G8R8A8:
-      return virtio_abi::ResourceFormat::kBgra32;
-    default:
-      return std::nullopt;
+  if (pixel_format == display::PixelFormat::kB8G8R8A8) {
+    return virtio_abi::ResourceFormat::kBgra32;
   }
+
+  return std::nullopt;
 }
 
 }  // namespace
 
-zx::result<uint32_t> VirtioGpuDevice::Create2DResource(
-    uint32_t width, uint32_t height, fuchsia_images2::wire::PixelFormat pixel_format) {
+zx::result<uint32_t> VirtioGpuDevice::Create2DResource(uint32_t width, uint32_t height,
+                                                       display::PixelFormat pixel_format) {
   FDF_LOG(TRACE, "Allocate2DResource");
 
   std::optional<virtio_abi::ResourceFormat> resource_format = To2DResourceFormat(pixel_format);

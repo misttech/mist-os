@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 
-#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
@@ -18,6 +17,7 @@
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace virtio_display {
 
@@ -37,7 +37,7 @@ void DisplayEngineEventsBanjo::SetListener(
 
 void DisplayEngineEventsBanjo::OnDisplayAdded(
     display::DisplayId display_id, cpp20::span<const display::ModeAndId> preferred_modes,
-    cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats) {
+    cpp20::span<const display::PixelFormat> pixel_formats) {
   ZX_DEBUG_ASSERT(preferred_modes.size() == 1);
   ZX_DEBUG_ASSERT(pixel_formats.size() == 1);
 
@@ -46,8 +46,7 @@ void DisplayEngineEventsBanjo::OnDisplayAdded(
   const display_mode_t banjo_preferred_mode = preferred_modes[0].mode().ToBanjo();
   const cpp20::span<const display_mode_t> banjo_preferred_modes(&banjo_preferred_mode, 1);
 
-  const fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format =
-      static_cast<fuchsia_images2_pixel_format_enum_value_t>(pixel_formats[0]);
+  const fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format = pixel_formats[0].ToBanjo();
   const cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats(
       &banjo_pixel_format, 1);
 
