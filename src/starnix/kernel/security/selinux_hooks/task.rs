@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::security::selinux_hooks::{
-    check_permission, check_self_permission, fs_node_effective_sid, fs_node_set_label_with_task,
-    has_file_permissions, todo_check_permission, FsNode, PermissionCheck, ProcessPermission,
-    TaskAttrs,
+    check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
+    fs_node_set_label_with_task, has_file_permissions, todo_check_permission, FsNode,
+    PermissionCheck, ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
@@ -140,7 +140,7 @@ pub fn check_exec_access(
         (state.current_sid, state.exec_sid)
     };
 
-    let executable_sid = fs_node_effective_sid(executable_node);
+    let executable_sid = fs_node_effective_sid_and_class(executable_node).sid;
 
     let new_sid = if let Some(exec_sid) = exec_sid {
         // Use the proc exec SID if set.
@@ -413,6 +413,7 @@ pub fn set_procattr(
 
 /// Sets the sid of `fs_node` to be that of `task`.
 pub fn fs_node_init_with_task(task: &TempRef<'_, Task>, fs_node: &FsNode) {
+    fs_node_ensure_class(fs_node).unwrap();
     fs_node_set_label_with_task(fs_node, task.into());
 }
 

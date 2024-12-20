@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use crate::security::selinux_hooks::{
-    check_permission, fs_node_effective_sid, todo_check_permission, FileSystemLabelState,
+    check_permission, fs_node_effective_sid_and_class, todo_check_permission, FileSystemLabelState,
+    FsNodeSidAndClass,
 };
 use crate::task::CurrentTask;
 use crate::vfs::{FileSystem, NamespaceNode};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
-use selinux::{CommonFilePermission, FileClass, FileSystemPermission, SecurityId};
+use selinux::{CommonFilePermission, FileSystemPermission, SecurityId};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -51,13 +52,14 @@ pub fn sb_mount(
         let target_sid = fs_sid(&mount.root().entry.node.fs())?;
         check_permission(permission_check, source_sid, target_sid, FileSystemPermission::Remount)
     } else {
-        let target_sid = fs_node_effective_sid(&path.entry.node);
+        let FsNodeSidAndClass { sid: target_sid, class: target_class } =
+            fs_node_effective_sid_and_class(&path.entry.node);
         todo_check_permission(
             TODO_DENY!("https://fxbug.dev/380230897", "Check mounton permission."),
             permission_check,
             source_sid,
             target_sid,
-            CommonFilePermission::MountOn.for_class(FileClass::Dir),
+            CommonFilePermission::MountOn.for_class(target_class),
         )
     }
 }
