@@ -17,7 +17,7 @@ use rand::Rng;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use tracing::{error, info};
-use wlan_stash::policy::{PolicyStorage, POLICY_STORAGE_ID};
+use wlan_storage::policy::{PolicyStorage, POLICY_STORAGE_ID};
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async as fasync,

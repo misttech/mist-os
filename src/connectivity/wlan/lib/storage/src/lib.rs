@@ -14,7 +14,7 @@ mod storage_store;
 mod tests {
     use rand::distributions::{Alphanumeric, DistString as _};
     use rand::thread_rng;
-    use wlan_stash_constants::{NetworkIdentifier, SecurityType, StashedSsid};
+    use wlan_storage_constants::{NetworkIdentifier, SecurityType, StashedSsid};
 
     pub fn rand_string() -> String {
         Alphanumeric.sample_string(&mut thread_rng(), 20)

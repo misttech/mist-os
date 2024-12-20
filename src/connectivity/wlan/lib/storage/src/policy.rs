@@ -9,7 +9,7 @@ use fidl_fuchsia_stash as fidl_stash;
 use fuchsia_component::client::connect_to_protocol;
 use wlan_metrics_registry::StashMigrationResultsMetricDimensionMigrationResult as MigrationResult;
 
-pub use wlan_stash_constants::{
+pub use wlan_storage_constants::{
     self, Credential, NetworkIdentifier, PersistentData, PersistentStorageData, SecurityType,
     POLICY_STORAGE_ID,
 };
@@ -221,7 +221,7 @@ mod tests {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use wlan_common::assert_variant;
-    use wlan_stash_constants::PersistentData;
+    use wlan_storage_constants::PersistentData;
 
     /// The PSK provided must be the bytes form of the 64 hexadecimal character hash. This is a
     /// duplicate of a definition in wlan/wlancfg/src, since I don't think there's a good way to

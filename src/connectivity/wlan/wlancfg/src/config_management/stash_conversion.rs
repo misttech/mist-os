@@ -5,7 +5,7 @@
 use super::network_config::{Credential, NetworkConfig, NetworkIdentifier, SecurityType};
 use crate::client::types as client_types;
 use std::collections::HashMap;
-use wlan_stash::policy as storage;
+use wlan_storage::policy as storage;
 
 impl From<storage::NetworkIdentifier> for NetworkIdentifier {
     fn from(item: storage::NetworkIdentifier) -> Self {
@@ -90,7 +90,7 @@ mod tests {
     use super::super::*;
     use super::*;
     use test_case::test_case;
-    use wlan_stash::policy as storage;
+    use wlan_storage::policy as storage;
 
     #[fuchsia::test]
     fn network_identifier_to_stash_from_policy() {

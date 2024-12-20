@@ -6,7 +6,7 @@ use anyhow::{bail, format_err, Context, Error};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_stash as fidl_stash;
 use std::collections::HashMap;
-use wlan_stash_constants::{
+use wlan_storage_constants::{
     NetworkIdentifier, PersistentData, NODE_SEPARATOR, POLICY_DATA_KEY, POLICY_STASH_PREFIX,
 };
 
@@ -251,7 +251,7 @@ mod tests {
     use super::*;
     use crate::tests::{network_id, rand_string};
     use fuchsia_component::client::connect_to_protocol;
-    use wlan_stash_constants::{Credential, SecurityType};
+    use wlan_storage_constants::{Credential, SecurityType};
 
     fn new_stash_store(id: &str) -> fidl_stash::StoreAccessorProxy {
         let store_client = connect_to_protocol::<fidl_stash::StoreMarker>()

@@ -7,14 +7,14 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
-rustc_library("wlan-stash") {
-  name = "wlan_stash"
+rustc_library("wlan-storage") {
+  name = "wlan_storage"
   version = "0.1.0"
   with_unit_tests = true
   edition = "2021"
 
   deps = [
-    ":wlan-stash-constants",
+    ":wlan-storage-constants",
     ":wlan_metrics_registry_rustlib",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.stash:fuchsia.stash_rust",
@@ -42,8 +42,8 @@ rustc_library("wlan-stash") {
   ]
 }
 
-rustc_library("wlan-stash-constants") {
-  name = "wlan_stash_constants"
+rustc_library("wlan-storage-constants") {
+  name = "wlan_storage_constants"
   version = "0.1.0"
   edition = "2021"
   source_root = "src/constants.rs"
@@ -53,14 +53,14 @@ rustc_library("wlan-stash-constants") {
   sources = [ "src/constants.rs" ]
 }
 
-fuchsia_component("wlan_stash_lib_test") {
+fuchsia_component("wlan_storage_lib_test") {
   testonly = true
-  manifest = "meta/wlan_stash_lib_test.cml"
-  deps = [ ":wlan-stash_test" ]
+  manifest = "meta/wlan_storage_lib_test.cml"
+  deps = [ ":wlan-storage_test" ]
 }
 
-fuchsia_test_package("wlan-stash-tests") {
-  test_components = [ ":wlan_stash_lib_test" ]
+fuchsia_test_package("wlan-storage-tests") {
+  test_components = [ ":wlan_storage_lib_test" ]
   deps = [
     "//src/sys/stash:stash_secure_v2",
     "//src/sys/stash:stash_v2",

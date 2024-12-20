@@ -8,17 +8,17 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/wlan_stash_lib_test",
+        binary: "bin/wlan_storage_lib_test",
     },
     children: [
         {
             name: "stash_secure",
-            url: "fuchsia-pkg://fuchsia.com/wlan-stash-tests#meta/stash_secure.cm",
+            url: "fuchsia-pkg://fuchsia.com/wlan-storage-tests#meta/stash_secure.cm",
             startup: "eager",
         },
         {
             name: "stash",
-            url: "fuchsia-pkg://fuchsia.com/wlan-stash-tests#meta/stash.cm",
+            url: "fuchsia-pkg://fuchsia.com/wlan-storage-tests#meta/stash.cm",
             startup: "eager",
         },
     ],

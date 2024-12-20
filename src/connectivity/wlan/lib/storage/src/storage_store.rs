@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::os::fd::AsRawFd;
 use tracing::{error, info, warn};
-use wlan_stash_constants::{FileContent, PersistentStorageData};
+use wlan_storage_constants::{FileContent, PersistentStorageData};
 
 type FileContents = HashMap<String, FileContent>;
 
@@ -106,7 +106,7 @@ impl StorageStore {
 mod tests {
     use super::*;
     use crate::tests::rand_string;
-    use wlan_stash_constants::{Credential, SecurityType};
+    use wlan_storage_constants::{Credential, SecurityType};
 
     #[fuchsia::test]
     fn test_write_and_load() {
