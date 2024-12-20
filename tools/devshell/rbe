@@ -33,6 +33,10 @@
 ##  fx rbe ensure_oauth
 ##      Checks for valid OAuth token, and runs gcloud auth if needed.
 ##
+##  fx rbe last_logdir
+##      Prints the path to the most recent RBE log dir corresponding to the
+##      current build output dir.  If none exists, print nothing.
+##
 ##  fx rbe preflight
 ##      Ensure credentials for using remote build services is valid,
 ##      and prompt the user to re-auth if deemed necessary.
@@ -374,11 +378,29 @@ function preflight_subcommand() {
 
 # LINT.IfChange(reproxy_log_dirs)
 # vars.sh:fx-run-ninja writes RBE logs here:
-readonly rbe_logs_dir="${FUCHSIA_DIR}/out/.reproxy_logs"
+readonly rbe_logs_dir_root="${FUCHSIA_DIR}/out/.reproxy_logs"
 # LINT.ThenChange(/tools/devshell/lib/vars.sh:reproxy_log_dirs)
 function cleanlogs_subcommand() {
-  echo "Removing $rbe_logs_dir"
-  rm -rf "$rbe_logs_dir"
+  echo "Removing $rbe_logs_dir_root"
+  rm -rf "$rbe_logs_dir_root"
+}
+
+# Print the path to the most recent reproxy log dir for the current
+# build output directory.  If none exists, print nothing.
+function last_logdir_subcommand() {
+  fx-build-dir-if-present || return
+  # Location based on $FUCHSIA_DIR/build/rbe/fuchsia-reproxy-wrap.sh
+  local -r build_subdir="$(basename "${FUCHSIA_BUILD_DIR}")"
+  local -r out_dir="$(basename "$(dirname "${FUCHSIA_BUILD_DIR}")")"
+  local -r logs_dir="${FUCHSIA_DIR}/${out_dir}/.reproxy_logs/${build_subdir}"
+  if [[ -d "$logs_dir" ]]
+  then
+    local -r recent_rbe_log_dir="$(ls -1 -d "${logs_dir}"/reproxy.* | tail -n 1)"
+    if [[ -d "$recent_rbe_log_dir" ]]
+    then
+      echo "$recent_rbe_log_dir"
+    fi
+  fi
 }
 
 # main
@@ -394,6 +416,7 @@ case "$action" in
   cleanlogs) cleanlogs_subcommand "${action_args[@]}" ;;
   ensure_loas) ensure_loas "${action_args[@]}" ;;
   ensure_oauth) ensure_oauth "${action_args[@]}" ;;
+  last_logdir) last_logdir_subcommand "${action_args[@]}" ;;
   preflight) preflight_subcommand "${action_args[@]}" ;;
 
   *)
