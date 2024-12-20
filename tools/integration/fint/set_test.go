@@ -66,11 +66,11 @@ func TestSet(t *testing.T) {
 		ArtifactDir: "/tmp/fint-set-artifacts",
 	}
 	staticSpec := &fintpb.Static{
-		Board:      "boards/x64.gni",
-		Optimize:   fintpb.Static_DEBUG,
-		Product:    "products/bringup.gni",
-		TargetArch: fintpb.Static_X64,
-		Variants:   []string{"asan"},
+		Board:           "boards/x64.gni",
+		CompilationMode: fintpb.Static_COMPILATION_MODE_DEBUG,
+		Product:         "products/bringup.gni",
+		TargetArch:      fintpb.Static_X64,
+		Variants:        []string{"asan"},
 	}
 
 	t.Run("sets artifacts metadata fields", func(t *testing.T) {
@@ -81,7 +81,6 @@ func TestSet(t *testing.T) {
 		}
 		expectedMetadata := &fintpb.SetArtifacts_Metadata{
 			Board:           staticSpec.Board,
-			Optimize:        "debug",
 			CompilationMode: "debug",
 			Product:         staticSpec.Product,
 			TargetArch:      "x64",

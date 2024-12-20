@@ -21,21 +21,8 @@ message Static {
     COMPILATION_MODE_BALANCED = 3;
   }
 
-  // TODO(https://fxbug.dev/382773442): Delete in favor of `compilation_mode`.
-  enum Optimize {
-    // Comply with https://protobuf.dev/programming-guides/dos-donts/#unspecified-enum.
-    OPTIMIZE_UNSPECIFIED = 0;
-    DEBUG = 1;
-    RELEASE = 2;
-    BALANCED = 3;
-  }
-
   // Compilation mode for the build.
   CompilationMode compilation_mode = 1;
-
-  // This is the compilation_mode for the build, not the "optimize" build argument.
-  // TODO(https://fxbug.dev/382773442): Delete in favor of `compilation_mode`.
-  Optimize optimize = 45;
 
   // The board to build.
   string board = 2;

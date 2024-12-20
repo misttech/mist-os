@@ -29,8 +29,6 @@ message SetArtifacts {
   // static.proto), to make processing easier for consumers.
   message Metadata {
     string board = 1;
-    // TODO(https://fxbug.dev/382773442): Delete in favor of `compilation_mode`.
-    string optimize = 6;
     string compilation_mode = 2;
     string product = 3;
     string target_arch = 4;

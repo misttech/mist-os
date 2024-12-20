@@ -96,24 +96,16 @@ func setImpl(
 		return nil, fmt.Errorf("build_dir must be set")
 	}
 
-	if staticSpec.CompilationMode == fintpb.Static_COMPILATION_MODE_UNSPECIFIED {
-		// TODO(https://fxbug.dev/382773442): Stop falling back to `optimize`.
-		staticSpec.CompilationMode = fintpb.Static_CompilationMode(staticSpec.Optimize)
-	}
-
 	genArgs, err := genArgs(ctx, staticSpec, contextSpec, skipLocalArgs, assemblyOverridesStrings)
 	if err != nil {
 		return nil, err
 	}
 
-	compMode := strings.ToLower(strings.TrimPrefix(staticSpec.CompilationMode.String(), "COMPILATION_MODE_"))
-
 	artifacts := &fintpb.SetArtifacts{
 		Metadata: &fintpb.SetArtifacts_Metadata{
-			Board:           staticSpec.Board,
-			CompilationMode: compMode,
-			// TODO(https://fxbug.dev/382773442): Delete in favor of `compilation_mode`.
-			Optimize:   compMode,
+			Board: staticSpec.Board,
+			CompilationMode: strings.ToLower(
+				strings.TrimPrefix(staticSpec.CompilationMode.String(), "COMPILATION_MODE_")),
 			Product:    staticSpec.Product,
 			TargetArch: strings.ToLower(staticSpec.TargetArch.String()),
 			Variants:   staticSpec.Variants,
