@@ -50,10 +50,13 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   // new lease will be dropped instead.
   void DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_deadline);
 
-  // Cancel timeout and take the wake lease.
-  // Note that it's possible for the wake lease to not be valid, so the caller should check it's
-  // validity before using.
-  zx::eventpair TakeWakeLease();
+  // Cancel timeout and take the wake lease. Returns ZX_ERR_BAD_HANDLE if we don't currenly have a
+  // wake lease.
+  zx::result<zx::eventpair> TakeWakeLease();
+
+  // Get a duplicate of the stored wake lease. Returns ZX_ERR_BAD_HANDLE if we don't currently have
+  // a wake lease.
+  zx::result<zx::eventpair> GetWakeLeaseCopy();
 
   // fuchsia.power.system/ActivityGovernorListener implementation.
   void OnResume(OnResumeCompleter::Sync& completer) override;

@@ -6,6 +6,8 @@
 #include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/clock.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
@@ -118,10 +120,22 @@ void WakeLease::DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_dead
   lease_task_.PostForTime(dispatcher_, timeout_deadline);
 }
 
-zx::eventpair WakeLease::TakeWakeLease() {
+zx::result<zx::eventpair> WakeLease::TakeWakeLease() {
   lease_task_.Cancel();
   wake_lease_held_.Set(false);
-  return std::move(lease_);
+  if (!lease_.is_valid()) {
+    return zx::error(ZX_ERR_BAD_HANDLE);
+  }
+  return zx::ok(std::move(lease_));
+}
+
+zx::result<zx::eventpair> WakeLease::GetWakeLeaseCopy() {
+  if (!lease_.is_valid()) {
+    return zx::error(ZX_ERR_BAD_HANDLE);
+  }
+  zx::eventpair clone;
+  lease_.duplicate(ZX_RIGHT_SAME_RIGHTS, &clone);
+  return zx::ok(std::move(clone));
 }
 
 void WakeLease::OnResume(OnResumeCompleter::Sync& completer) {
