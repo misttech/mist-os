@@ -10,7 +10,7 @@ load("@bazel_skylib//lib:selects.bzl", "selects")
 # This means that , at the moment, targets in this file cannot be used by a
 # workspace that only wants to use @rules_fuchsia without @fuchsia_sdk
 # (e.g. a Pigweed workspace).
-load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
+load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_ALL_KNOWN_API_LEVELS", "INTERNAL_ONLY_SUPPORTED_API_LEVELS")
 load(":target_compatibility.bzl", "COMPATIBILITY", "define_host_can_build_fuchsia_flag")
 
 package(
@@ -52,7 +52,7 @@ constraint_setting(
             "@fuchsia_sdk//fuchsia:fuchsia_api_level": api_level.api_level,
         },
     )
-    for api_level in INTERNAL_ONLY_VALID_TARGET_APIS
+    for api_level in INTERNAL_ONLY_ALL_KNOWN_API_LEVELS
 ]
 
 # CPU based configurations
@@ -132,7 +132,7 @@ selects.config_setting_group(
             ":api_level_%s" % api_level.api_level,
         ],
     )
-    for api_level in INTERNAL_ONLY_VALID_TARGET_APIS
+    for api_level in INTERNAL_ONLY_SUPPORTED_API_LEVELS
     for cpu in [
         "arm64",
         "x64",

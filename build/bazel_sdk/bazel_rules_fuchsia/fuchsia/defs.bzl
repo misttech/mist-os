@@ -25,7 +25,6 @@ load(
 )
 load(
     "//fuchsia/private:fuchsia_api_level.bzl",
-    _FUCHSIA_API_LEVEL_STATUS_SUPPORTED = "FUCHSIA_API_LEVEL_STATUS_SUPPORTED",
     _get_fuchsia_api_levels = "get_fuchsia_api_levels",
 )
 load(
@@ -233,5 +232,4 @@ fuchsia_platforms = _fuchsia_platforms
 
 # Constants
 COMPATIBILITY = _COMPATIBILITY
-FUCHSIA_API_LEVEL_STATUS_SUPPORTED = _FUCHSIA_API_LEVEL_STATUS_SUPPORTED
 FUCHSIA_TOOLCHAIN_DEFINITION = _FUCHSIA_TOOLCHAIN_DEFINITION

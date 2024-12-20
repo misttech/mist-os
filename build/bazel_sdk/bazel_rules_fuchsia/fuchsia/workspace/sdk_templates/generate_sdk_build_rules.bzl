@@ -615,26 +615,40 @@ def _generate_api_version_rules(
         process_context,
         parent_sdk_contents):
     ctx = runtime.ctx
-    versions = []
+    supported_api_levels = []
+    unsupported_api_levels = []
     for api_level, value in meta["data"]["api_levels"].items():
-        versions.append(
-            runtime.make_struct(
-                abi_revision = value["abi_revision"],
-                api_level = api_level,
-                as_u32 = int(api_level),
-                status = value["status"],
-            ),
+        level = runtime.make_struct(
+            abi_revision = value["abi_revision"],
+            api_level = api_level,
+            as_u32 = int(api_level),
         )
+        if value["status"] == "supported":
+            supported_api_levels.append(level)
+        else:
+            unsupported_api_levels.append(level)
 
     for api_level, value in meta["data"]["special_api_levels"].items():
-        versions.append(
-            runtime.make_struct(
-                abi_revision = value["abi_revision"],
-                api_level = api_level,
-                as_u32 = value["as_u32"],
-                status = value["status"],
-            ),
-        )
+        if api_level == "NEXT" or api_level == "HEAD":
+            supported_api_levels.append(
+                runtime.make_struct(
+                    abi_revision = value["abi_revision"],
+                    api_level = api_level,
+                    as_u32 = value["as_u32"],
+                ),
+            )
+        elif api_level == "PLATFORM":
+            # "PLATFORM" is for Platform use only and not "known" to the SDK.
+            # TODO(https://fxbug.dev/384586484): Do not include in any list.
+            unsupported_api_levels.append(
+                runtime.make_struct(
+                    abi_revision = value["abi_revision"],
+                    api_level = api_level,
+                    as_u32 = value["as_u32"],
+                ),
+            )
+        else:
+            fail("Unrecognized special API level '%s'" % api_level)
 
     # unlike other template rules that affect the corresponding BUILD.bazel file,
     # the api_version template creates a api_version.bzl file that is loaded in
@@ -646,7 +660,8 @@ def _generate_api_version_rules(
         bzl_file,
         _sdk_template_path(runtime, "api_version"),
         {
-            "{{valid_target_apis}}": _get_starlark_list(runtime, versions),
+            "{{supported_api_levels}}": _get_starlark_list(runtime, supported_api_levels),
+            "{{unsupported_api_levels}}": _get_starlark_list(runtime, unsupported_api_levels),
         },
     )
 

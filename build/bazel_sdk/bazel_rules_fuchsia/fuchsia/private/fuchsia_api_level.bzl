@@ -4,9 +4,9 @@
 
 """ Defines utilities for working with fuchsia api levels. """
 
-# NOTE: INTERNAL_ONLY_VALID_TARGET_APIS is part of the generated content of @fuchsia_sdk
+# NOTE: INTERNAL_ONLY_ALL_KNOWN_API_LEVELS is part of the generated content of @fuchsia_sdk
 # and does not exist in @rules_fuchsia.
-load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
+load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_ALL_KNOWN_API_LEVELS")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
 # We define the provider in this file because it is a private implementation
@@ -29,10 +29,6 @@ FUCHSIA_API_LEVEL_ATTRS = {
     ),
 }
 
-FUCHSIA_API_LEVEL_STATUS_SUPPORTED = "supported"
-FUCHSIA_API_LEVEL_STATUS_UNSUPPORTED = "unsupported"
-FUCHSIA_API_LEVEL_STATUS_IN_DEVELOPMENT = "in-development"
-
 def get_fuchsia_api_levels():
     """ Returns the list of API levels in this SDK.
 
@@ -41,7 +37,6 @@ def get_fuchsia_api_levels():
         abi_revision = "0xED74D73009C2B4E3",
         api_level = "10",
         as_u32 = 10,
-        status = "unsupported"
     )
 
     `as_u32` is interesting in the case of special API levels like `HEAD`.
@@ -50,7 +45,7 @@ def get_fuchsia_api_levels():
     The status is not an API to be relied on but the STATUS_* constants can be
     used.
     """
-    return INTERNAL_ONLY_VALID_TARGET_APIS
+    return INTERNAL_ONLY_ALL_KNOWN_API_LEVELS
 
 def get_fuchsia_api_level(ctx):
     """ Returns the raw api level to use for building.
