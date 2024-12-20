@@ -75,9 +75,6 @@ This document uses MUST, SHOULD/RECOMMENDED, and MAY keywords as defined in [RFC
 
 All bit field diagrams are stored in little-endian ordering.
 
-Note: For reference on how to read the bit field diagrams, see
-[Bitfield Diagram reference][bitfield-diagram].
-
 ## Version
 
 _Current version: 2_
@@ -104,19 +101,16 @@ We use 24 bits for indexes, so Inspect Files may be at most 256MiB.
 
 A `block_header` consists of 16 bytes as follows:
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------------------------------|
-| O | R | Type  |                                               |
-|---------------------------------------------------------------|
-|                                                               |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-The rest (left blank) depends on the payload
+```mermaid
+---
+title: "Inspect block header"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type"
+16-63: "depends on type"
+64-127: "depends on type"
 ```
 
 Each block has an `order`, specifying its size.
@@ -195,20 +189,16 @@ Each type interprets the payload differently, as follows:
 
 ## FREE {#free}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------+-----------------------|
-| O | R | Type  | Next free block       |                       |
-|---------------------------------------------------------------|
-|                                                               |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-Type = 0
-Next free block = index (optional)
+```mermaid
+---
+title: "Free block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (0)"
+16-39: "next free block"
+40-127: "unused"
 ```
 
 A `FREE` block is available for allocation. Importantly, the zero-valued
@@ -228,19 +218,15 @@ points to a location that is either not `FREE` or not of the same order
 
 ## RESERVED {#reserved}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------------------------------|
-| O | R | Type  |                                               |
-|---------------------------------------------------------------|
-|                                                               |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-Type = 1
+```mermaid
+---
+title: "Reserved block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (1)"
+16-127: "unused"
 ```
 
 `RESERVED` blocks are simply available to be changed to a different
@@ -251,25 +237,19 @@ not treated as free).
 
 ## HEADER {#header}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+---------------+-------------------------------|
-| O | R | Type  | Version       | Magic number                  |
-|---------------------------------------------------------------|
-| Generation count                                              |
-|-------------------------------+-------------------------------|
-| Size in bytes                 | Unused                        |
-|---------------------------------------------------------------|
-|                                                               |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-Type = 2
-Version = 2
-Magic number = "INSP"
+```mermaid
+---
+title: "Header block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (2)"
+16-31: "version (2)"
+32-63: "magic number (INSP)"
+64-127: "generation count"
+128-159: "size in bytes"
+160-255: "unused"
 ```
 
 There must be one `HEADER` block at the beginning of the file. It consists
@@ -283,19 +263,18 @@ implemented using the generation count.
 
 ## NODE\_VALUE and TOMBSTONE {#node}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------+-----------------------|
-| O | R | Type  | Parent index          | Name index            |
-|---------------------------------------------------------------|
-| Reference count (optional)                                    |
-'---------------------------------------------------------------'
 
-O = Order
-R = Reserved, must be 0
-Type = {3,10}
+```mermaid
+---
+title: "Node value and tombstone"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (3|10)"
+16-39: "parent index"
+40-63: "name index"
+64-127: "reference count (optional)"
 ```
 
 Nodes are anchor points for further nesting, and the `ParentID` field
@@ -330,42 +309,37 @@ Index | Value
 
 ## \{INT,UINT,DOUBLE,BOOL\}\_VALUE {#numeric}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------+-----------------------|
-| O | R | Type  | Parent index          | Name index            |
-|---------------------------------------------------------------|
-| Inlined numeric value                                         |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-Type = {4,5,6,13}
+```mermaid
+---
+title: "Numeric/bool value block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (4|5|6|13)"
+16-39: "parent index"
+40-63: "name index"
+64-127: "inlined value"
 ```
 
 Numeric `VALUE` blocks all contain the 64-bit numeric type inlined into
-the second 8 bytes of the block.
+the second 8 bytes of the block. Numeric values are little endian.
 
 ## BUFFER\_VALUE {#buffer_value}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------+-----------------------|
-| O | R | Type  | Parent index          | Name index            |
-|---------------------------------------------------------------|
-| Total length                  | Extent index              | F |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-Type = 7
-Total length = size of the buffer
-Extent index = index of the first extent containing bytes for the buffer
-F = Display format {0,1}
+```mermaid
+---
+title: "Buffer value block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (7)"
+16-39: "parent index"
+40-63: "name index"
+64-95: "total length"
+96-123: "extent index"
+124-127: "format (0|1)"
 ```
 
 General `BUFFER_VALUE` blocks reference arbitrary byte data across
@@ -385,98 +359,93 @@ kBinary | 1     | The byte data is arbitrary binary data and may not be printabl
 
 ## EXTENT {#extent}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------+-----------------------|
-| O | R | Type  | Next extent index     | R                     |
-|---------------------------------------------------------------|
-| Payload                                                       |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-Type = 8
-Next extent index = index of next extent in the chain
-Extent index = index of the extent containing bytes for the string
-Payload = byte data payload up to at most the end of the block. Size
-          depends on the order
+```mermaid
+---
+title: "Extent block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (8)"
+16-39: "next extent index"
+40-63: "reserved = 0"
+64-127: "payload"
 ```
 
 `EXTENT` blocks contain an arbitrary byte data payload and the index of
 the next `EXTENT` in the chain. The byte data for a buffer_value is retrieved
 by reading each `EXTENT` in order until **Total Length** bytes are read.
 
+The paylaod is byte data up to at most the end of the block. The size depends on
+the order.
+
 ## NAME {#name}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------------------------------|
-| O | R | Type  | Length    | Reserved                          |
-|---------------------------------------------------------------|
-| Payload                                                       |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-Type = 9
-Payload = contents of the name. Size depends on the order
+```mermaid
+---
+title: "Name block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (9)"
+16-27: "length"
+28-63: "reserved = 0"
+64-127: "payload"
 ```
 
 `NAME` blocks give objects and values a human-readable identifier. They
 consist of a UTF-8 payload that fits entirely within the given block.
+The payload is the contents of the name. The size depends on the order.
 
 ## STRING\_REFERENCE {#stringreference}
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------+-----------------------|
-| O | R | Type  | Next Extent Index     | Reference Count       |
-|---------------------------------------------------------------|
-| Total length                  | Payload                       |
-'---------------------------------------------------------------'
 
-O = Order
-R = Reserved
-Type = 14
-Next Extent Index = index of the first overflow EXTENT, or 0 if Payload does not overflow
-Reference Count = number of references to this STRING_REFERENCE
-Total length = size of the Payload in bytes. Payload overflows into Next Extent if
-               Total length > ((16 << Order) - 12)
-Payload = the canonical instance of a string. The size of the Payload field depends on the
-          Order. If the size of the Payload + 12 is greater than 16 << Order, then the Payload
-          is too large to fit in one block and will overflow into Next Extent
+```mermaid
+---
+title: "Name block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (14)"
+16-39: "next extent index"
+40-63: "reference count"
+64-95: "total length"
+96-127: "payload"
 ```
 
 `STRING_REFERENCE` blocks are used to implement strings with reference semantics in the VMO.
 They are the start of a linked list of `EXTENT`s, meaning that their values are not size-restricted.
 `STRING_REFERENCE` blocks may be used where a `NAME` is expected.
 
+Notes:
+
+- The total length is the size of the payload in bytes. Payload overflows into
+  "next extent" if "total length > (16 << order) - 12".
+- The payload is the canonical instance of a string. The size of the payload
+  depends on the order. If the size of the payload + 12 is greater than "16 << order",
+  then the payload is too large to fit in one block and will overflow into the next
+  extent.
+- The next extent index is the index of the first overflow `EXTENT`, or 0 if the
+  payload does not overflow.
+
 ## ARRAY\_VALUE {#array}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------+-----------------------|
-| O | R | Type  | Parent index          | Name index            |
-|---------------------------------------------------------------|
-| T | F | Count | Reserved                                      |
-|---------------------------------------------------------------|
-| Payload                                                       |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-Type = 11
-T = Type of the stored values {4,5,6,14}
-F = Display format {0,1,2}
-Count = Count of stored values
-Payload = array of size |count|
+```mermaid
+---
+title: "Array value block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (11)"
+16-39: "parent index"
+40-63: "name index"
+64-67: "value type (4|5|6|14)"
+68-71: "display format (0|1|2)"
+72-79: "count of stored values"
+80-127: "reserved = 0"
+128-191: "payload"
 ```
 
 The format of an `ARRAY_VALUE` block `Payload` depends on the **Stored Value Type** `T`,
@@ -542,23 +511,19 @@ N+4:   [floor + initial_step * step_multiplier^N, +inf)
 
 ## LINK\_VALUE {#link}
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+---+-------+-----------------------------------------------|
-| O | R | Type  | Parent index          | Name index            |
-|---------------------------------------------------------------|
-| Content index     |                                       | F |
-'---------------------------------------------------------------'
-
-O = Order
-R = Reserved, must be 0
-Type = 12
-Parent index = Index of the parent block
-Name index = Index of the name of this value
-Content index = Index of the content of this link (as a NAME node)
-F = Disposition flags {0,1}
+```mermaid
+---
+title: "Link value block"
+---
+packet-beta
+0-3: "order"
+4-7: "reserved = 0"
+8-15: "type (12)"
+16-39: "parent index"
+40-63: "name index"
+64-83: "content index"
+84-123: "unused"
+124-127: "disposition (0|1)"
 ```
 
 `LINK_VALUE` blocks allow nodes to support children that are present
