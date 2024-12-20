@@ -462,7 +462,7 @@ impl<I: IpExt, A, BC: FilterBindingsContext> State<I, A, BC> {
     }
 }
 
-impl<I: IpExt, A: InspectableValue, BT: FilterBindingsTypes> Inspectable for State<I, A, BT> {
+impl<I: IpExt, A, BT: FilterBindingsTypes> Inspectable for State<I, A, BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
         let Self { installed_routines, uninstalled_routines, conntrack, nat_installed: _ } = self;
         let Routines { ip, nat } = installed_routines.get();

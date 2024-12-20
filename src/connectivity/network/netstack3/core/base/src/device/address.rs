@@ -13,7 +13,6 @@ use net_types::ip::{
 use net_types::{NonMappedAddr, NonMulticastAddr, SpecifiedAddr, UnicastAddr, Witness};
 
 use crate::device::{AnyDevice, DeviceIdContext};
-use crate::inspect::InspectableValue;
 use crate::socket::SocketIpAddr;
 
 /// An extension trait adding an associated type for an IP address assigned to a
@@ -41,9 +40,7 @@ impl AssignedAddrIpExt for Ipv6 {
 }
 
 /// A weak IP address ID.
-pub trait WeakIpAddressId<A: IpAddress>:
-    Clone + Eq + Debug + Hash + Send + Sync + InspectableValue + 'static
-{
+pub trait WeakIpAddressId<A: IpAddress>: Clone + Eq + Debug + Hash + Send + Sync + 'static {
     /// The strong version of this ID.
     type Strong: IpAddressId<A>;
 
@@ -201,7 +198,6 @@ pub mod testutil {
     use net_types::ip::GenericOverIp;
 
     use super::*;
-    use crate::inspect::Inspector;
     use crate::testutil::FakeCoreCtx;
     use crate::StrongDeviceIdentifier;
 
@@ -221,12 +217,6 @@ pub mod testutil {
 
         fn is_assigned(&self) -> bool {
             true
-        }
-    }
-
-    impl<T> InspectableValue for FakeWeakAddressId<T> {
-        fn record<I: Inspector>(&self, _name: &str, _inspector: &mut I) {
-            unimplemented!()
         }
     }
 
