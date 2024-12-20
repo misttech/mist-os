@@ -1072,6 +1072,24 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     ASSERT_TRUE(get_vmo_result->ring_buffer().is_valid());
   }
 
+  void TestGetVmoSize(fuchsia_hardware_audio::ElementId id) {
+    auto client = GetRingBufferClient(id);
+    constexpr uint32_t kMinFrames = 100;
+    auto get_vmo_result =
+        client->GetVmo(fuchsia_hardware_audio::RingBufferGetVmoRequest(kMinFrames, 0));
+    ASSERT_TRUE(get_vmo_result.is_ok());
+    ASSERT_TRUE(get_vmo_result->ring_buffer().is_valid());
+
+    ASSERT_GE(get_vmo_result->num_frames(), kMinFrames);
+
+    uint64_t vmo_size;
+    ASSERT_EQ(ZX_OK, get_vmo_result->ring_buffer().get_size(&vmo_size));
+    fuchsia_hardware_audio::Format format = GetDefaultRingBufferFormat();
+    uint32_t frame_size =
+        format.pcm_format()->number_of_channels() * format.pcm_format()->bytes_per_sample();
+    ASSERT_GE(vmo_size, kMinFrames * frame_size);
+  }
+
   void TestGetVmoMultipleTimes(fuchsia_hardware_audio::ElementId id) {
     auto client = GetRingBufferClient(id);
     constexpr uint32_t kMinFrames = 1;
@@ -1210,6 +1228,12 @@ TEST_F(AmlG12CompositeRingBufferTest, RingBufferProperties) {
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmo) {
   for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestGetVmo(id);
+  }
+}
+
+TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmoSize) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
+    TestGetVmoSize(id);
   }
 }
 
