@@ -81,12 +81,11 @@ these steps:
           {% endverbatim %}
           ```
 
-      * {Rendered}
+     <p>Rendered:</p>
 
           <div>
             {% framebox %}
-            <script type="module">
-              import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+            <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js">
             </script>
 
             <pre class="mermaid">
