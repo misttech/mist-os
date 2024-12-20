@@ -64,7 +64,8 @@ func TestOOMSignal(t *testing.T) {
 	i.WaitForLogMessage("ZIRCON REBOOT REASON (OOM)")
 
 	// Ensure that the system reboots without panicking.
-	i.WaitForLogMessageAssertNotSeen("welcome to Zircon", "KERNEL PANIC")
+	i.WaitForLogMessageAssertNotSeenPrintUntil("welcome to Zircon", "KERNEL PANIC",
+		"entering panic shell loop")
 }
 
 // Verifies that once the system has committed to an OOM reboot, the termination of a critical
@@ -102,7 +103,8 @@ func TestOOMSignalBeforeCriticalProcess(t *testing.T) {
 	i.WaitForLogMessage("ZIRCON REBOOT REASON (OOM)")
 
 	// Ensure that the system reboots without panicking.
-	i.WaitForLogMessageAssertNotSeen("welcome to Zircon", "KERNEL PANIC")
+	i.WaitForLogMessageAssertNotSeenPrintUntil("welcome to Zircon", "KERNEL PANIC",
+		"entering panic shell loop")
 }
 
 // Boots with |cmdline| appended to boot-options, runs |cmd|, then waits for any of |msgs| to be
@@ -131,7 +133,8 @@ func testOOMCommon(t *testing.T, cmdline []string, cmd string, msgs ...string) {
 	i.WaitForAnyLogMessage(msgs...)
 
 	// Ensure that the system reboots without panicking.
-	i.WaitForLogMessageAssertNotSeen("welcome to Zircon", "KERNEL PANIC")
+	i.WaitForLogMessageAssertNotSeenPrintUntil("welcome to Zircon", "KERNEL PANIC",
+		"entering panic shell loop")
 }
 
 var stateTransitionString string = "memory-pressure: memory availability state - OutOfMemory"
