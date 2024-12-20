@@ -67,6 +67,7 @@ use crate::internal::device::state::{
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
 use crate::internal::gmp::{self, GmpHandler, GroupJoinResult, GroupLeaveResult};
+use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo};
 
 /// An IP device timer.
 ///
@@ -884,19 +885,21 @@ impl<
 }
 
 /// Handles receipt of an IGMP packet on `device`.
-pub fn receive_igmp_packet<CC, BC, B>(
+pub fn receive_igmp_packet<CC, BC, B, H>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     src_ip: Ipv4Addr,
     dst_ip: SpecifiedAddr<Ipv4Addr>,
     buffer: B,
+    info: &LocalDeliveryPacketInfo<Ipv4, H>,
 ) where
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
     BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     for<'a> CC::WithIpDeviceConfigurationInnerCtx<'a>: IpDeviceStateContext<Ipv4, BC, DeviceId = CC::DeviceId>
         + IgmpPacketHandler<BC, CC::DeviceId>,
     B: BufferMut,
+    H: IpHeaderInfo<Ipv4>,
 {
     core_ctx.with_ip_device_configuration(device, |_config, mut core_ctx| {
         IgmpPacketHandler::receive_igmp_packet(
@@ -906,6 +909,7 @@ pub fn receive_igmp_packet<CC, BC, B>(
             src_ip,
             dst_ip,
             buffer,
+            info,
         )
     })
 }

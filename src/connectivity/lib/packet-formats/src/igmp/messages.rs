@@ -99,6 +99,21 @@ impl<B> MessageType<B> for IgmpMembershipQueryV2 {
     declare_no_body!();
 }
 
+impl<B: SplitByteSlice> IgmpMessage<B, IgmpMembershipQueryV2> {
+    /// Returns true if this is an IGMPv1 query.
+    ///
+    /// Defined in [RFC 2236 section 4.1]:
+    ///
+    /// > The IGMPv1 router will send General Queries with the Max Response Time
+    /// > set to 0...
+    ///
+    /// [RFC 2236 section 4.1]:
+    ///     https://datatracker.ietf.org/doc/html/rfc2236#section-4
+    pub fn is_igmpv1_query(&self) -> bool {
+        self.prefix.max_resp_code == 0
+    }
+}
+
 /// Fixed information in IGMPv3 Membership Queries.
 ///
 /// A `MembershipQueryData` struct represents the fixed data in IGMPv3

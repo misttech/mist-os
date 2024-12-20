@@ -18,15 +18,13 @@ var igmpv3ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumbe
 	{3, 2}: Inconclusive,
 	{4, 2}: Pass,
 	{4, 3}: Pass,
-	// TODO(https://fxbug.dev/384504921): ignore messages with TTL != 1.
-	{4, 6}: Fail,
+	{4, 6}: Pass,
 	{4, 7}: Pass,
 	// Discard messages with bad TOS. Feels too strict, not explicitly called
 	// out in RFC.
 	{4, 10}: Fail,
 	{4, 11}: Pass,
-	// TODO(https://fxbug.dev/384504921): ignore queries withtout RTRALERT.
-	{4, 14}: Fail,
+	{4, 14}: Pass,
 	{4, 15}: Pass,
 	{4, 20}: Pass,
 	{5, 1}:  Pass,
@@ -36,7 +34,10 @@ var igmpv3ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumbe
 	{5, 10}: Pass,
 	{5, 24}: Pass,
 	{5, 25}: Pass,
-	{5, 31}: Pass,
+	// At odds with test 11.1. Both tests generate the same input. 5.31 expects
+	// an answer, 11.1 expects the query to be ignored. The RFC itself is
+	// ambiguous about this, but we side with 11.1.
+	{5, 31}: Fail,
 	{5, 32}: Pass,
 	{6, 1}:  Pass,
 	{6, 3}:  Pass,
@@ -90,7 +91,5 @@ var igmpv3ExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumbe
 	{10, 14}: Pass,
 	{10, 15}: Fail,
 	{10, 16}: Fail,
-	// TODO(https://fxbug.dev/384504921): ignore queries not destined to all
-	// nodes.
-	{11, 1}: Fail,
+	{11, 1}:  Pass,
 }

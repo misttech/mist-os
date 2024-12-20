@@ -395,7 +395,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                 .map_err(|(_body, err)| err)
             }
             Ipv4Proto::Igmp => {
-                device::receive_igmp_packet(self, bindings_ctx, device, src_ip, dst_ip, body);
+                device::receive_igmp_packet(self, bindings_ctx, device, src_ip, dst_ip, body, info);
                 Ok(())
             }
             Ipv4Proto::Proto(IpProto::Udp) => {

@@ -13,12 +13,13 @@ use core::time::Duration;
 use log::{debug, error};
 use net_declare::net_ip_v4;
 use net_types::ip::{AddrSubnet, Ip as _, Ipv4, Ipv4Addr};
-use net_types::{MulticastAddr, SpecifiedAddr, Witness};
+use net_types::{MulticastAddr, MulticastAddress as _, SpecifiedAddr, Witness};
 use netstack3_base::{
     AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, InspectableValue, Inspector,
     Instant, InstantContext, Ipv4DeviceAddr, WeakDeviceIdentifier,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, PacketBuilder, Serializer};
+use packet_formats::error::ParseError;
 use packet_formats::igmp::messages::{
     IgmpLeaveGroup, IgmpMembershipQueryV2, IgmpMembershipQueryV3, IgmpMembershipReportV1,
     IgmpMembershipReportV2, IgmpMembershipReportV3Builder, IgmpPacket,
@@ -39,6 +40,7 @@ use crate::internal::gmp::{
     GmpGroupState, GmpMode, GmpState, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout,
     IpExt, MulticastGroupSet, NotAMemberErr,
 };
+use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo};
 
 /// The destination address for all IGMPv3 reports.
 ///
@@ -123,66 +125,127 @@ pub trait IgmpContext<BT: IgmpBindingsTypes>:
 /// A blanket implementation is provided for all `C: IgmpContext`.
 pub trait IgmpPacketHandler<BC, DeviceId> {
     /// Receive an IGMP message in an IP packet.
-    fn receive_igmp_packet<B: BufferMut>(
+    fn receive_igmp_packet<B: BufferMut, H: IpHeaderInfo<Ipv4>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &DeviceId,
         src_ip: Ipv4Addr,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         buffer: B,
+        info: &LocalDeliveryPacketInfo<Ipv4, H>,
     );
 }
 
 impl<BC: IgmpBindingsContext, CC: IgmpContext<BC>> IgmpPacketHandler<BC, CC::DeviceId> for CC {
-    fn receive_igmp_packet<B: BufferMut>(
+    fn receive_igmp_packet<B: BufferMut, H: IpHeaderInfo<Ipv4>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
         _src_ip: Ipv4Addr,
-        _dst_ip: SpecifiedAddr<Ipv4Addr>,
-        mut buffer: B,
+        dst_ip: SpecifiedAddr<Ipv4Addr>,
+        buffer: B,
+        info: &LocalDeliveryPacketInfo<Ipv4, H>,
     ) {
-        let packet = match buffer.parse_with::<_, IgmpPacket<&[u8]>>(()) {
-            Ok(packet) => packet,
-            Err(_) => {
-                debug!("Cannot parse the incoming IGMP packet, dropping.");
-                return;
-            }
-        };
-
-        let result = match packet {
-            IgmpPacket::MembershipQueryV2(msg) => {
-                gmp::v1::handle_query_message(self, bindings_ctx, device, &msg).map_err(Into::into)
-            }
-            IgmpPacket::MembershipQueryV3(msg) => {
-                gmp::v2::handle_query_message(self, bindings_ctx, device, &msg).map_err(Into::into)
-            }
-            IgmpPacket::MembershipReportV1(msg) => {
-                let addr = msg.group_addr();
-                MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
-                    gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
-                        .map_err(Into::into)
-                })
-            }
-            IgmpPacket::MembershipReportV2(msg) => {
-                let addr = msg.group_addr();
-                MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
-                    gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
-                        .map_err(Into::into)
-                })
-            }
-            IgmpPacket::LeaveGroup(_) => {
-                debug!("Hosts are not interested in Leave Group messages");
-                return;
-            }
-            IgmpPacket::MembershipReportV3(_) => {
-                debug!("Hosts are not interested in IGMPv3 report messages");
-                return;
-            }
-        };
-        result.unwrap_or_else(|e| {
+        receive_igmp_packet(self, bindings_ctx, device, dst_ip, buffer, info).unwrap_or_else(|e| {
             debug!("Error occurred when handling IGMPv2 message: {}", e);
-        })
+        });
+    }
+}
+
+fn receive_igmp_packet<
+    B: BufferMut,
+    H: IpHeaderInfo<Ipv4>,
+    CC: IgmpContext<BC>,
+    BC: IgmpBindingsContext,
+>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    dst_ip: SpecifiedAddr<Ipv4Addr>,
+    mut buffer: B,
+    info: &LocalDeliveryPacketInfo<Ipv4, H>,
+) -> Result<(), IgmpError> {
+    let LocalDeliveryPacketInfo { meta: _, header_info } = info;
+    let dst_ip = dst_ip.into_addr();
+    let ttl = header_info.hop_limit();
+
+    // All RFCs define messages as being sent with a TTL of 1.
+    //
+    // Rejecting messages with bad TTL is almost a violation of the Robustness
+    // Principle, but a packet with a different TTL is more likely to be
+    // malicious than a poor implementation.
+    //
+    // See RFC 1112 APPENDIX I, RFC 2236 section 2, and RFC 3376 section 4.
+    if ttl != 1 {
+        return Err(IgmpError::BadTtl(ttl));
+    }
+
+    let packet = buffer.parse_with::<_, IgmpPacket<&[u8]>>(()).map_err(IgmpError::Parse)?;
+
+    match packet {
+        IgmpPacket::MembershipQueryV2(msg) => {
+            // From RFC 3376 section 9.1:
+            //
+            // Hosts SHOULD ignore v1, v2 or v3 General Queries sent to a
+            // multicast address other than 224.0.0.1, the all-systems address.
+            if msg.group_addr() == Ipv4::UNSPECIFIED_ADDRESS
+                && dst_ip.is_multicast()
+                && dst_ip != *Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.as_ref()
+            {
+                return Err(IgmpError::RejectedGeneralQuery { dst_ip });
+            }
+            // From RFC 3376 section 9.1:
+            //
+            // Hosts SHOULD ignore v2 or v3 Queries without the Router-Alert
+            // option.
+            if !msg.is_igmpv1_query() && !header_info.router_alert() {
+                return Err(IgmpError::MissingRouterAlertInQuery);
+            }
+            gmp::v1::handle_query_message(core_ctx, bindings_ctx, device, &msg).map_err(Into::into)
+        }
+        IgmpPacket::MembershipQueryV3(msg) => {
+            // From RFC 3376 section 9.1:
+            //
+            // Hosts SHOULD ignore v1, v2 or v3 General Queries sent to a
+            // multicast address other than 224.0.0.1, the all-systems address.
+            if msg.header().group_address() == Ipv4::UNSPECIFIED_ADDRESS
+                && dst_ip.is_multicast()
+                && dst_ip != *Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.as_ref()
+            {
+                return Err(IgmpError::RejectedGeneralQuery { dst_ip });
+            }
+            // From RFC 3376 section 9.1:
+            //
+            // Hosts SHOULD ignore v2 or v3 Queries without the Router-Alert
+            // option.
+            if !header_info.router_alert() {
+                return Err(IgmpError::MissingRouterAlertInQuery);
+            }
+
+            gmp::v2::handle_query_message(core_ctx, bindings_ctx, device, &msg).map_err(Into::into)
+        }
+        IgmpPacket::MembershipReportV1(msg) => {
+            let addr = msg.group_addr();
+            MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
+                gmp::v1::handle_report_message(core_ctx, bindings_ctx, device, group_addr)
+                    .map_err(Into::into)
+            })
+        }
+        IgmpPacket::MembershipReportV2(msg) => {
+            let addr = msg.group_addr();
+            MulticastAddr::new(addr).map_or(Err(IgmpError::NotAMember { addr }), |group_addr| {
+                gmp::v1::handle_report_message(core_ctx, bindings_ctx, device, group_addr)
+                    .map_err(Into::into)
+            })
+        }
+        IgmpPacket::LeaveGroup(_) => {
+            debug!("Hosts are not interested in Leave Group messages");
+            return Ok(());
+        }
+        IgmpPacket::MembershipReportV3(_) => {
+            debug!("Hosts are not interested in IGMPv3 report messages");
+            return Ok(());
+        }
     }
 }
 
@@ -573,6 +636,7 @@ where
 }
 
 #[derive(Debug, Error)]
+#[cfg_attr(test, derive(PartialEq))]
 pub(crate) enum IgmpError {
     /// The host is trying to operate on an group address of which the host is
     /// not a member.
@@ -584,6 +648,14 @@ pub(crate) enum IgmpError {
     /// IGMP is disabled
     #[error("IGMP is disabled on interface")]
     Disabled,
+    #[error("failed to parse: {0}")]
+    Parse(ParseError),
+    #[error("message with incorrect ttl: {0}")]
+    BadTtl(u8),
+    #[error("rejected general query to {dst_ip}")]
+    RejectedGeneralQuery { dst_ip: Ipv4Addr },
+    #[error("router alert not present in query")]
+    MissingRouterAlertInQuery,
 }
 
 impl From<NotAMemberErr<Ipv4>> for IgmpError {
@@ -820,7 +892,10 @@ mod tests {
     use packet::serialize::Buf;
     use packet::{ParsablePacket as _, ParseBuffer};
     use packet_formats::gmp::GroupRecordType;
-    use packet_formats::igmp::messages::IgmpMembershipQueryV2;
+    use packet_formats::igmp::messages::{
+        IgmpMembershipQueryV2, IgmpMembershipQueryV3Builder, Igmpv3QQIC, Igmpv3QRV,
+    };
+    use packet_formats::igmp::IgmpResponseTimeV3;
     use packet_formats::ipv4::{Ipv4Header, Ipv4Packet};
     use packet_formats::testutil::parse_ip_packet;
     use test_case::test_case;
@@ -831,6 +906,7 @@ mod tests {
     use crate::internal::gmp::{
         GmpEnabledGroup, GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult,
     };
+    use crate::testutil::FakeIpHeaderInfo;
 
     /// Metadata for sending an IGMP packet.
     #[derive(Debug, PartialEq)]
@@ -999,13 +1075,31 @@ mod tests {
     const GMP_TIMER_ID: IgmpTimerId<FakeWeakDeviceId<FakeDeviceId>> =
         IgmpTimerId::new(FakeWeakDeviceId(FakeDeviceId));
 
+    fn new_recv_pkt_info() -> LocalDeliveryPacketInfo<Ipv4, FakeIpHeaderInfo> {
+        LocalDeliveryPacketInfo {
+            header_info: FakeIpHeaderInfo {
+                router_alert: true,
+                hop_limit: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+
     fn receive_igmp_v1_query(core_ctx: &mut FakeCoreCtx, bindings_ctx: &mut FakeBindingsCtx) {
         let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipQueryV2>::new_with_resp_time(
             GROUP_ADDR.get(),
             Duration::ZERO.try_into().unwrap(),
         );
         let buff = ser.into_serializer().serialize_vec_outer().unwrap();
-        core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
+        core_ctx.receive_igmp_packet(
+            bindings_ctx,
+            &FakeDeviceId,
+            ROUTER_ADDR,
+            MY_ADDR,
+            buff,
+            &new_recv_pkt_info(),
+        );
     }
 
     fn receive_igmp_v2_query(
@@ -1018,7 +1112,14 @@ mod tests {
             resp_time.get().try_into().unwrap(),
         );
         let buff = ser.into_serializer().serialize_vec_outer().unwrap();
-        core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
+        core_ctx.receive_igmp_packet(
+            bindings_ctx,
+            &FakeDeviceId,
+            ROUTER_ADDR,
+            MY_ADDR,
+            buff,
+            &new_recv_pkt_info(),
+        );
     }
 
     fn receive_igmp_v2_general_query(
@@ -1031,13 +1132,27 @@ mod tests {
             resp_time.get().try_into().unwrap(),
         );
         let buff = ser.into_serializer().serialize_vec_outer().unwrap();
-        core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, ROUTER_ADDR, MY_ADDR, buff);
+        core_ctx.receive_igmp_packet(
+            bindings_ctx,
+            &FakeDeviceId,
+            ROUTER_ADDR,
+            MY_ADDR,
+            buff,
+            &new_recv_pkt_info(),
+        );
     }
 
     fn receive_igmp_report(core_ctx: &mut FakeCoreCtx, bindings_ctx: &mut FakeBindingsCtx) {
         let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipReportV2>::new(GROUP_ADDR.get());
         let buff = ser.into_serializer().serialize_vec_outer().unwrap();
-        core_ctx.receive_igmp_packet(bindings_ctx, &FakeDeviceId, OTHER_HOST_ADDR, MY_ADDR, buff);
+        core_ctx.receive_igmp_packet(
+            bindings_ctx,
+            &FakeDeviceId,
+            OTHER_HOST_ADDR,
+            MY_ADDR,
+            buff,
+            &new_recv_pkt_info(),
+        );
     }
 
     fn setup_igmpv2_test_environment_with_addr_subnet(
@@ -1857,5 +1972,95 @@ mod tests {
         assert_eq!(core_ctx.take_frames(), Vec::new());
         // No timers.
         core_ctx.state.gmp_state().timers.assert_timers([]);
+    }
+
+    #[test]
+    fn reject_bad_messages() {
+        let mut ctx = setup_igmpv2_test_environment(0);
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+
+        let v1_query = {
+            let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipQueryV2>::new_with_resp_time(
+                Ipv4::UNSPECIFIED_ADDRESS,
+                Duration::ZERO.try_into().unwrap(),
+            );
+            ser.into_serializer().serialize_vec_outer().unwrap()
+        };
+        let v2_query = {
+            let ser = IgmpPacketBuilder::<Buf<Vec<u8>>, IgmpMembershipQueryV2>::new_with_resp_time(
+                Ipv4::UNSPECIFIED_ADDRESS,
+                Duration::from_secs(10).try_into().unwrap(),
+            );
+            ser.into_serializer().serialize_vec_outer().unwrap()
+        };
+        let v3_query = {
+            let ser = IgmpMembershipQueryV3Builder::new(
+                IgmpResponseTimeV3::new_exact(Duration::from_secs(1)).unwrap(),
+                None,
+                false,
+                Igmpv3QRV::new(2),
+                Igmpv3QQIC::new_exact(Duration::from_secs(125)).unwrap(),
+                core::iter::empty(),
+            );
+            ser.into_serializer().serialize_vec_outer().unwrap()
+        };
+
+        let base_header_info = new_recv_pkt_info().header_info;
+
+        // TTL must be 1.
+        const BAD_TTL: u8 = 2;
+        for q in [&v1_query, &v2_query, &v3_query] {
+            assert_eq!(
+                receive_igmp_packet(
+                    core_ctx,
+                    bindings_ctx,
+                    &FakeDeviceId,
+                    Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into(),
+                    q.clone(),
+                    &LocalDeliveryPacketInfo {
+                        header_info: FakeIpHeaderInfo { hop_limit: BAD_TTL, ..base_header_info },
+                        ..Default::default()
+                    }
+                ),
+                Err(IgmpError::BadTtl(BAD_TTL))
+            );
+        }
+
+        // Multicast destination IPs must be all nodes.
+        const BAD_DST_IP: MulticastAddr<Ipv4Addr> = GROUP_ADDR;
+        for q in [&v1_query, &v2_query, &v3_query] {
+            assert_eq!(
+                receive_igmp_packet(
+                    core_ctx,
+                    bindings_ctx,
+                    &FakeDeviceId,
+                    BAD_DST_IP.into(),
+                    q.clone(),
+                    &new_recv_pkt_info(),
+                ),
+                Err(IgmpError::RejectedGeneralQuery { dst_ip: BAD_DST_IP.get() })
+            );
+        }
+
+        for q in [&v2_query, &v3_query] {
+            assert_eq!(
+                receive_igmp_packet(
+                    core_ctx,
+                    bindings_ctx,
+                    &FakeDeviceId,
+                    MY_ADDR,
+                    q.clone(),
+                    &LocalDeliveryPacketInfo {
+                        header_info: FakeIpHeaderInfo {
+                            // Router alert must be set.
+                            router_alert: false,
+                            ..base_header_info
+                        },
+                        ..Default::default()
+                    },
+                ),
+                Err(IgmpError::MissingRouterAlertInQuery)
+            );
+        }
     }
 }
