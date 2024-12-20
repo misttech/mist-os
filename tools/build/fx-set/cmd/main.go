@@ -253,7 +253,6 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 
 	flagSet.BoolVar(&cmd.isRelease, "release", false, "")
 	flagSet.BoolVar(&cmd.isBalanced, "balanced", false, "")
-	flagSet.BoolVar(&cmd.netboot, "netboot", false, "")
 	flagSet.BoolVar(&cmd.cargoTOMLGen, "cargo-toml-gen", false, "")
 	flagSet.StringSliceVar(&cmd.jsonIDEScripts, "json-ide-script", []string{}, "")
 	flagSet.StringSliceVar(&cmd.universePackages, "with", []string{}, "")
@@ -453,10 +452,6 @@ func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fi
 
 	if args.buildEventService != "" {
 		gnArgs = append(gnArgs, fmt.Sprintf("bazel_upload_build_events = \"%s\"", args.buildEventService))
-	}
-
-	if args.netboot {
-		gnArgs = append(gnArgs, "enable_netboot=true")
 	}
 
 	if args.includeClippy {

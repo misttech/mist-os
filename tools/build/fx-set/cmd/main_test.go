@@ -226,12 +226,11 @@ func TestParseArgsAndEnv(t *testing.T) {
 		},
 		{
 			name: "simple boolean flags",
-			args: []string{"core.x64", "--include-clippy=false", "--netboot", "--cargo-toml-gen"},
+			args: []string{"core.x64", "--include-clippy=false", "--cargo-toml-gen"},
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
 				includeClippy: false,
-				netboot:       true,
 				cargoTOMLGen:  true,
 			},
 		},
@@ -492,16 +491,6 @@ func TestConstructStaticSpec(t *testing.T) {
 			},
 			expected: &fintpb.Static{
 				Variants: append(fuzzerVariants("asan"), fuzzerVariants("ubsan")...),
-			},
-		},
-		{
-			name: "netboot",
-			args: &setArgs{
-				netboot:       true,
-				disableCxxRbe: true,
-			},
-			expected: &fintpb.Static{
-				GnArgs: []string{rbe_mode_off, "enable_netboot=true"},
 			},
 		},
 		{

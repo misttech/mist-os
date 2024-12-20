@@ -249,10 +249,6 @@ group("images") {
     ":default-images",
     "//build/images/archive:build_args_metadata",
   ]
-
-  if (enable_netboot) {
-    deps += [ labels.netboot ]
-  }
 }
 
 # The default-images target is a dependency of the top level default
@@ -312,10 +308,6 @@ group("default-images") {
     if (!use_bringup_assembly) {
       deps += [ ":record_filesystem_sizes" ]
     }
-  }
-
-  if (enable_netboot) {
-    deps += [ "archive:netboot-script" ]
   }
 
   # TODO(https://fxbug.dev/42123048): The build graph for "bringup" (use_bringup_assembly)

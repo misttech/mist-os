@@ -77,9 +77,7 @@ declare_args() {
   # Typically useful for initially flashing a device from zero-state.
   gpt_image = ""
 
-  # Whether to build the netboot zbi by default.
-  #
-  # You can still build //build/images:netboot explicitly even if enable_netboot is false.
+  # The netboot zbi has been deprecated.  This GN arg is now used to generate a warning.
   enable_netboot = false
 
   # Check that all vtables in fuchsia binaries listed in binaries.json are in
@@ -233,3 +231,7 @@ if (bazel_product_bundle_full != false && bazel_product_bundle_board != "") {
 } else {
   bazel_product_bundle_target = ""
 }
+
+assert(
+    !enable_netboot,
+    "The 'enable_netboot' GN arg has been deprecated, use developer overrides for assembly instead, see the 'netboot_mode' section of the documentation at go/fuchsia-assembly-overrides#bookmark=id.ddsy0djempid for details.")
