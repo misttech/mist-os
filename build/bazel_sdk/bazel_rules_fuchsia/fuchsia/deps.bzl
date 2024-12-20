@@ -22,9 +22,14 @@ load(
     "//fuchsia/workspace:rules_fuchsia_deps.bzl",
     _rules_fuchsia_deps = "rules_fuchsia_deps",
 )
+load(
+    "//fuchsia/private:fuchsia_toolchains.bzl",
+    _register_fuchsia_sdk_toolchain = "register_fuchsia_sdk_toolchain",
+)
 
 # See corresponding `.bzl` files in fuchsia/private for documentation.
 fuchsia_sdk_ext = _fuchsia_sdk_ext
 fuchsia_sdk_repository = _fuchsia_sdk_repository
 rules_fuchsia_deps = _rules_fuchsia_deps
 python_runtime_repository = _python_runtime_repository
+register_fuchsia_sdk_toolchain = _register_fuchsia_sdk_toolchain
