@@ -7922,4 +7922,172 @@ TEST(PagerWriteback, Unbounded) {
   ASSERT_FALSE(pager.CreateVmoWithOptions(1, ZX_VMO_UNBOUNDED, &vmo));
 }
 
+// Tests that unbounded VMOs and setting the stream size correctly create a dirty-untracked zero
+// range beyond the stream size.
+TEST(PagerWriteback, UntrackedBeyondStreamSize) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
+  pager_tests::UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  pager_tests::Vmo* vmo;
+  ASSERT_TRUE(pager.CreateUnboundedVmo(2 * zx_system_get_page_size(), ZX_VMO_TRAP_DIRTY, &vmo));
+
+  // Nothing dirty yet.
+  EXPECT_FALSE(pager.VerifyModified(vmo));
+  size_t actual, avail;
+  // TODO: Replace with UserPager methods once unbounded VMOs are properly supported in the test
+  // helpers. We can't use pager.VerifyDirtyRanges() for now since it uses the size_ which will be 0
+  // for unbounded VMOs.
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        10 * zx_system_get_page_size(), nullptr, 0, &actual,
+                                        &avail));
+  EXPECT_EQ(0u, actual);
+  EXPECT_EQ(0u, avail);
+
+  // Pages beyond the stream size should read as zeros.
+  std::vector<uint8_t> expected(10 * zx_system_get_page_size(), 0);
+  EXPECT_TRUE(check_buffer_data(vmo, 2, 8, expected.data(), false));
+
+  // Increase the stream size. This should reveal a dirty zero range.
+  ASSERT_OK(vmo->vmo().set_stream_size(5 * zx_system_get_page_size()));
+  EXPECT_TRUE(pager.VerifyModified(vmo));
+  zx_vmo_dirty_range_t range;
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        10 * zx_system_get_page_size(), &range, sizeof(range),
+                                        &actual, &avail));
+  EXPECT_EQ(1u, actual);
+  EXPECT_EQ(1u, avail);
+  EXPECT_EQ(2 * zx_system_get_page_size(), range.offset);
+  EXPECT_EQ(3 * zx_system_get_page_size(), range.length);
+  EXPECT_EQ(ZX_VMO_DIRTY_RANGE_IS_ZERO, range.options);
+
+  // Pages beyond the old stream size should still read as zeros.
+  EXPECT_TRUE(check_buffer_data(vmo, 2, 8, expected.data(), false));
+
+  // Decrease the stream size. The dirty zero range should get absorbed back.
+  ASSERT_OK(vmo->vmo().set_stream_size(zx_system_get_page_size()));
+  EXPECT_TRUE(pager.VerifyModified(vmo));
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        10 * zx_system_get_page_size(), nullptr, 0, &actual,
+                                        &avail));
+  EXPECT_EQ(0u, actual);
+  EXPECT_EQ(0u, avail);
+
+  // Pages beyond the new stream size should read as zeros.
+  EXPECT_TRUE(check_buffer_data(vmo, 1, 9, expected.data(), false));
+
+  // No page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+}
+
+// Tests that pages committed beyond the stream size are absorbed back into untracked (or dirty)
+// zero intervals when setting the stream size.
+TEST(PagerWriteback, UntrackedAbsorbsPages) {
+  NEEDS_NEXT_SKIP(zx_pager_query_dirty_ranges);
+
+  pager_tests::UserPager pager;
+  ASSERT_TRUE(pager.Init());
+
+  pager_tests::Vmo* vmo;
+  ASSERT_TRUE(pager.CreateUnboundedVmo(2 * zx_system_get_page_size(), ZX_VMO_TRAP_DIRTY, &vmo));
+
+  // Nothing dirty yet.
+  EXPECT_FALSE(pager.VerifyModified(vmo));
+  size_t actual, avail;
+  // TODO: Replace with UserPager methods once unbounded VMOs are properly supported in the test
+  // helpers. We can't use pager.VerifyDirtyRanges() for now since it uses the size_ which will be 0
+  // for unbounded VMOs.
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        10 * zx_system_get_page_size(), nullptr, 0, &actual,
+                                        &avail));
+  EXPECT_EQ(0u, actual);
+  EXPECT_EQ(0u, avail);
+
+  // Pages beyond the stream size should read as zeros.
+  std::vector<uint8_t> expected(10 * zx_system_get_page_size(), 0);
+  EXPECT_TRUE(check_buffer_data(vmo, 2, 8, expected.data(), false));
+
+  // Dirty a few pages beyond the stream size. Pages 4, 5, and 8 are written.
+  TestThread t([&]() {
+    uint64_t data = 42;
+    if (vmo->vmo().write(&data, 4 * zx_system_get_page_size(), sizeof(data)) != ZX_OK) {
+      return false;
+    }
+    if (vmo->vmo().write(&data, 5 * zx_system_get_page_size(), sizeof(data)) != ZX_OK) {
+      return false;
+    }
+    if (vmo->vmo().write(&data, 8 * zx_system_get_page_size(), sizeof(data)) != ZX_OK) {
+      return false;
+    }
+    return true;
+  });
+  ASSERT_TRUE(t.Start());
+
+  ASSERT_TRUE(pager.WaitForPageDirty(vmo, 4, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.DirtyPages(vmo, 4, 1));
+  ASSERT_TRUE(pager.WaitForPageDirty(vmo, 5, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.DirtyPages(vmo, 5, 1));
+  ASSERT_TRUE(pager.WaitForPageDirty(vmo, 8, 1, ZX_TIME_INFINITE));
+  ASSERT_TRUE(pager.DirtyPages(vmo, 8, 1));
+
+  ASSERT_TRUE(t.Wait());
+
+  // Verify dirty ranges.
+  zx_vmo_dirty_range_t ranges[2];
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        10 * zx_system_get_page_size(), &ranges[0], sizeof(ranges),
+                                        &actual, &avail));
+  EXPECT_EQ(2u, actual);
+  EXPECT_EQ(2u, avail);
+  EXPECT_EQ(4 * zx_system_get_page_size(), ranges[0].offset);
+  EXPECT_EQ(2 * zx_system_get_page_size(), ranges[0].length);
+  EXPECT_EQ(0, ranges[0].options);
+  EXPECT_EQ(8 * zx_system_get_page_size(), ranges[1].offset);
+  EXPECT_EQ(zx_system_get_page_size(), ranges[1].length);
+  EXPECT_EQ(0, ranges[1].options);
+
+  // Pages not dirtied beyond stream size should read as zeros.
+  EXPECT_TRUE(check_buffer_data(vmo, 2, 2, expected.data(), false));
+  EXPECT_TRUE(check_buffer_data(vmo, 6, 2, expected.data(), false));
+  EXPECT_TRUE(check_buffer_data(vmo, 9, 1, expected.data(), false));
+
+  // Increase the stream size so that some pages become a part of a dirty zero interval and some of
+  // an untracked zero interval.
+  ASSERT_OK(vmo->vmo().set_stream_size(7 * zx_system_get_page_size()));
+  EXPECT_TRUE(pager.VerifyModified(vmo));
+
+  // Verify dirty ranges.
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        10 * zx_system_get_page_size(), &ranges[0], sizeof(ranges),
+                                        &actual, &avail));
+  EXPECT_EQ(1u, actual);
+  EXPECT_EQ(1u, avail);
+  EXPECT_EQ(2 * zx_system_get_page_size(), ranges[0].offset);
+  EXPECT_EQ(5 * zx_system_get_page_size(), ranges[0].length);
+  EXPECT_EQ(ZX_VMO_DIRTY_RANGE_IS_ZERO, ranges[0].options);
+
+  // Pages beyond the old stream size should read as zeros.
+  EXPECT_TRUE(check_buffer_data(vmo, 2, 8, expected.data(), false));
+
+  // Decrease the stream size.
+  ASSERT_OK(vmo->vmo().set_stream_size(zx_system_get_page_size()));
+  EXPECT_TRUE(pager.VerifyModified(vmo));
+  ASSERT_OK(zx_pager_query_dirty_ranges(pager.pager().get(), vmo->vmo().get(), 0,
+                                        10 * zx_system_get_page_size(), nullptr, 0, &actual,
+                                        &avail));
+  EXPECT_EQ(0u, actual);
+  EXPECT_EQ(0u, avail);
+
+  // Pages beyond the new stream size should read as zeros.
+  EXPECT_TRUE(check_buffer_data(vmo, 1, 9, expected.data(), false));
+
+  // No more page requests seen.
+  uint64_t offset, length;
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+}
+
 }  // namespace pager_tests
