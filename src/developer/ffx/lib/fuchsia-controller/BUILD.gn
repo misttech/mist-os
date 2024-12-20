@@ -85,7 +85,6 @@ python_c_extension("fidl_codec") {
   ]
   sources = [
     "cpp/abi/convert.h",
-    "cpp/abi/macros.h",
     "cpp/fidl_codec/decode.cc",
     "cpp/fidl_codec/decode.h",
     "cpp/fidl_codec/encode.cc",

@@ -1095,8 +1095,8 @@ PyMODINIT_FUNC PyInit_libfuchsia_controller_internal() {
 
 }  // namespace
 
-DES_MIX struct PyModuleDef fuchsia_controller_internal = {
-    PyModuleDef_HEAD_INIT,
+struct PyModuleDef fuchsia_controller_internal = {
+    .m_base = PyModuleDef_HEAD_INIT,
     .m_name = "fuchsia_controller_internal",
     .m_doc = nullptr,
     .m_size = sizeof(mod::FuchsiaControllerState),
