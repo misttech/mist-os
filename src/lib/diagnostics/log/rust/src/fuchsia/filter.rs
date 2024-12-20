@@ -38,16 +38,18 @@ impl InterestFilter {
             };
             (
                 LogSinkProxy::new(fidl::AsyncChannel::from_channel(sync_proxy.into_channel())),
-                Arc::new(RwLock::new(initial_severity)),
+                initial_severity,
             )
         } else {
-            (proxy, Arc::new(RwLock::new(default_severity)))
+            (proxy, default_severity)
         };
 
-        let listener = Arc::new(Mutex::new(None));
-        let filter = Self { min_severity: min_severity.clone(), listener: listener.clone() };
         // Keep the max level from the log frontend synchronized.
-        log::set_max_level(level_filter_from_severity(&default_severity));
+        log::set_max_level(level_filter_from_severity(&min_severity));
+
+        let listener = Arc::new(Mutex::new(None));
+        let min_severity = Arc::new(RwLock::new(min_severity));
+        let filter = Self { min_severity: min_severity.clone(), listener: listener.clone() };
         (filter, Self::listen_to_interest_changes(listener, default_severity, min_severity, proxy))
     }
 
