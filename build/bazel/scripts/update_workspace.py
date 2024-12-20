@@ -280,12 +280,6 @@ def content_hash_all_files(paths: list[str]) -> str:
     return fstate.content_hash
 
 
-def find_clang_content_files(clang_install_dir: str) -> Sequence[Path]:
-    """Return a list of content hashing input files for Clang."""
-    fstate = compute_content_hash.FileState(cipd_names=["clang"])
-    return sorted(fstate.find_directory_files(Path(clang_install_dir)))
-
-
 class GeneratedFiles(object):
     """Models the content of a generated Bazel workspace."""
 
@@ -872,118 +866,6 @@ common --enable_bzlmod=false
     # Ensure regeneration when this script's content changes!
     generated.add_file_hash(os.path.abspath(__file__))
 
-    # Create hash files to capture current state of locally generated repositories.
-    # This is important for bazel_action.py which will also use these to
-    # fix implicit dependency paths (see comments in this script for details).
-    #
-    # In this case $BAZEL_TOPDIR/workspace/fuchsia_build_generated/<repo_name>.hash
-    # is a file that contains a single hexadecimal content hash corresponding to
-    # the input files that were used to generate its content (except for symlinks
-    # to input files outside of the Bazel topdir).
-    #
-    generated_repositories_inputs = {}
-
-    # Content hash file for @prebuilt_clang, fuchsia_clang, keep in sync with
-    # generate_prebuilt_clang_toolchain_repository() in
-    # //build/bazel_sdk/bazel_rules_fuchsia/fuchsia/workspace/fuchsia_clang_repository.bzl
-
-    clang_dir = (
-        args.clang_dir
-        if args.clang_dir
-        else os.path.join(
-            fuchsia_dir, "prebuilt", "third_party", "clang", host_tag
-        )
-    )
-
-    clang_content_files = list(find_clang_content_files(clang_dir))
-
-    rules_fuchsia_dir = os.path.join(
-        fuchsia_dir, "build", "bazel_sdk", "bazel_rules_fuchsia"
-    )
-
-    fuchsia_clang_content_files = clang_content_files + [
-        os.path.join(
-            rules_fuchsia_dir,
-            "fuchsia",
-            "workspace",
-            "clang_templates",
-            "defs.bzl",
-        ),
-        os.path.join(
-            rules_fuchsia_dir,
-            "fuchsia",
-            "workspace",
-            "clang_templates",
-            "cc_toolchain_config_template.bzl",
-        ),
-        os.path.join(
-            rules_fuchsia_dir,
-            "fuchsia",
-            "workspace",
-            "clang_templates",
-            "crosstool.BUILD.template",
-        ),
-    ]
-
-    rules_fuchsia_files = find_all_files_under(rules_fuchsia_dir)
-
-    python_content_files = find_prebuilt_python_content_files(
-        os.path.join(
-            fuchsia_dir, "prebuilt", "third_party", "python3", host_tag
-        )
-    )
-
-    googletest_dir = os.path.join(
-        fuchsia_dir, "third_party", "googletest", "src"
-    )
-
-    googletest_content_files = [
-        get_git_head_path(googletest_dir),
-        os.path.join(
-            fuchsia_dir,
-            "build",
-            "bazel",
-            "patches",
-            "googletest",
-            "fuchsia-support.bundle",
-        ),
-    ]
-
-    fuchsia_icu_config_files = [
-        get_git_head_path(
-            os.path.join(fuchsia_dir, "third_party", "icu", "default")
-        ),
-        get_git_head_path(
-            os.path.join(fuchsia_dir, "third_party", "icu", "latest")
-        ),
-    ]
-
-    boringssl_content_files = [
-        get_git_head_path(
-            os.path.join(fuchsia_dir, "third_party", "boringssl", "src")
-        ),
-        os.path.join(
-            fuchsia_dir,
-            "build",
-            "bazel",
-            "local_repositories",
-            "boringssl",
-            "BUILD.boringssl",
-        ),
-        os.path.join(
-            fuchsia_dir,
-            "third_party",
-            "boringssl",
-            "BUILD.generated.bzl",
-        ),
-        os.path.join(
-            fuchsia_dir,
-            "third_party",
-            "boringssl",
-            "BUILD.generated_tests.bzl",
-        ),
-    ]
-
     generated.add_symlink(
         os.path.join(
             "workspace",
@@ -1024,67 +906,10 @@ common --enable_bzlmod=false
     )
     # LINT.ThenChange(//build/info/info.gni)
 
-    # LINT.IfChange
-    generated_repositories_inputs["bazel_rules_fuchsia"] = list(
-        rules_fuchsia_files
-    )
-    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-
-    # TODO: support content hash file in fuchsia_clang_repository() definition
-    # This is already supported by generate_prebuilt_clang_repository()
-    generated_repositories_inputs["fuchsia_clang"] = [
-        str(file) for file in fuchsia_clang_content_files
-    ]
-
-    # LINT.IfChange
-    generated_repositories_inputs["prebuilt_clang"] = [
-        str(file) for file in clang_content_files
-    ]
-    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-
-    # LINT.IfChange
-    generated_repositories_inputs["prebuilt_python"] = list(
-        python_content_files
-    )
-    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-
-    # LINT.IfChange
-    generated_repositories_inputs[
-        "com_google_googletest"
-    ] = googletest_content_files
-    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-
-    # LINT.IfChange
-    generated_repositories_inputs[
-        "fuchsia_icu_config"
-    ] = fuchsia_icu_config_files
-    # LINT.ThenChange(../BUILD.gn)
-
-    # LINT.IfChange
-    generated_repositories_inputs["boringssl"] = boringssl_content_files
-    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-
     def _get_repo_hash_file_path(repo_name: str) -> str:
         return os.path.join(
             "workspace", "fuchsia_build_generated", repo_name + ".hash"
         )
-
-    for repo_name in sorted(generated_repositories_inputs.keys()):
-        repo_inputs = generated_repositories_inputs[repo_name]
-        repo_hash_file = _get_repo_hash_file_path(repo_name)
-        generated.add_file(repo_hash_file, content_hash_all_files(repo_inputs))
-        if args.depfile:
-            # Important: quote file paths because some of them may contain spaces!
-            out = depfile_quote(
-                os.path.relpath(
-                    os.path.join(topdir, repo_hash_file), gn_output_dir
-                )
-            )
-            ins = " ".join(
-                depfile_quote(os.path.relpath(p, gn_output_dir))
-                for p in repo_inputs
-            )
-            args.depfile.write(f"{out}: {ins}\n")
 
     force = args.force
     generated_json = generated.to_json()
