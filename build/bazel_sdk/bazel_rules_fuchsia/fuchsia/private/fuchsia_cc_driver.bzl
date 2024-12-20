@@ -64,7 +64,7 @@ def fuchsia_cc_driver(
         "$(location %s)" % driver_ld_target,
     ]
 
-    # maintain backwards compatability with cc_binary
+    # maintain backwards compatibility with cc_binary
     user_link_flags.extend(kwargs.pop("linkopts", []))
 
     # collect any flags that the user passed in

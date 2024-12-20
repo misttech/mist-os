@@ -31,7 +31,7 @@ ignore_policy = struct(
         ]
     ]),
 
-    # Anything withing these workspaces will be ignored:
+    # Anything within these workspaces will be ignored:
     # NOTE: with Bzlmod enabled, these check against canonical repo names, which might not be
     # intended. However, we can't just pass these through `Label()` as some of these repo names
     # are not actually known to `rules_fuchsia` (this module).
@@ -44,7 +44,7 @@ ignore_policy = struct(
         "rules_fuchsia",  # TODO(https://fxbug.dev/42081016): sdk rules should provide licenses.
     ]),
 
-    # Anything withing these package will be ignored:
+    # Anything within these packages will be ignored:
     packages = bool_dict([
         to_package_str(Label(label))
         for label in [

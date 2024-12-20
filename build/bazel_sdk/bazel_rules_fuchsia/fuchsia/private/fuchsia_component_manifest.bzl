@@ -32,7 +32,7 @@ fuchsia_component_manifest_shard_collection = rule(
     doc = """Encapsulates a collection of component manifests and their include paths.
 
     This rule is not intended to be used directly. Rather, it should be added to the
-    fuchsia sdk toolchain to be added as implicity dependencies for all manifests.
+    fuchsia sdk toolchain to be added as implicit dependencies for all manifests.
 """,
     implementation = _fuchsia_component_manifest_shard_collection_impl,
     attrs = {

@@ -220,7 +220,7 @@ def _fuchsia_licenses_collection_impl(ctx):
 
     # Verification is performed as an action (Execution phase) rather than in Starlark (Analysis phase).
     # Otherwise, any verification failure prevents Bazel graph analysis from successful completion,
-    # severly impacting infra integration and usability (e.g. can't even run `bazel query`).
+    # severely impacting infra integration and usability (e.g. can't even run `bazel query`).
     ctx.actions.run(
         progress_message = "Verifying license collection %s" % licenses_collection_file.path,
         inputs = [licenses_collection_file],

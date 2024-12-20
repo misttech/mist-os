@@ -79,7 +79,7 @@ def to_package_str(obj):
     Args:
         obj: The instance to serialize.
     Returns:
-        The seralized label of the object without the in-package suffix.
+        The serialized label of the object without the in-package suffix.
     """
     if is_target(obj):
         label = obj

@@ -5,6 +5,7 @@
 """fuchsia_package() rule."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 load(
@@ -36,7 +37,6 @@ load(
     "rule_variants",
     "stub_executable",
 )
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def get_driver_component_manifests(package):
     """Returns a list of the manifest paths for drivers in the package
@@ -606,7 +606,7 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
             providers = [FuchsiaPackageResourcesInfo, FuchsiaDebugSymbolInfo],
         ),
         "collected_resources": attr.label(
-            doc = "Label to a fuchsia_find_all_package_resources() target for this pacakge.",
+            doc = "Label to a fuchsia_find_all_package_resources() target for this package.",
             providers = [FuchsiaCollectedPackageResourcesInfo],
             mandatory = True,
         ),

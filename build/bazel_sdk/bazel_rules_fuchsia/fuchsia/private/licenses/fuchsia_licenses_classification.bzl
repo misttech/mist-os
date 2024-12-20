@@ -58,10 +58,10 @@ The \\[name\\].json has the following schema:
 
 ```
 {
-    // Dictionary of license_ids : lists of classifcations
+    // Dictionary of license_ids : lists of classifications
     "[license_id]":
         [
-            // list of named classsifications
+            // list of named classifications
             {
                 "name": str,
                 "confidence": float,

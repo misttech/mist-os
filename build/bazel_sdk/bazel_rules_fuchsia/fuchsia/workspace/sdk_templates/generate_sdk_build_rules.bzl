@@ -1471,7 +1471,7 @@ def _sdk_id_from_manifests(runtime, manifests):
     # buildifier: disable=function-docstring-return
     """Gets the SDK id from the given manifests.
 
-    This assumes all of the manifests have the same id an thus only uses the first manifest
+    This assumes all of the manifests have the same id and thus only uses the first manifest
     in the list. If no id is found an empty string will be returned.
     """
     id = ""

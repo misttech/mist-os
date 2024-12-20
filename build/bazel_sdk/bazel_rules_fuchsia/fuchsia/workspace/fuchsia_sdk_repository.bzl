@@ -186,7 +186,7 @@ Loads a particular version of the Fuchsia IDK.
             doc =
                 """
                 If parent_sdk is specified, parent_sdk_local_paths has to contain the same values as the local_paths attribute of the parent SDK.
-                This is required because Bazel does not have a way to evaluate the existance of a Label, so we process the metadata of the parent
+                This is required because Bazel does not have a way to evaluate the existence of a Label, so we process the metadata of the parent
                 SDK again when using layered SDKs.
                 TODO: look for a better approach if this is limiting or causing performance issues.
                 """,

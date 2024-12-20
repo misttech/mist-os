@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Tools to check the comatibility of fuchsia targets"""
+"""Tools to check the compatibility of fuchsia targets"""
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")

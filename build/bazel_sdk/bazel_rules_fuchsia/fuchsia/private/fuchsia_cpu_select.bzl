@@ -38,7 +38,7 @@ def fuchsia_cpu_filter_dict(cpu_map, valid_cpus, common = None):
     Args:
       cpu_map: A dictionary mapping Fuchsia cpu names to { key -> value }
           dictionaries. If the cpu name is listed in `valid_cpus`, then all
-          entries this dictionary will be added to the result, othewise
+          entries this dictionary will be added to the result, otherwise
           they will be ignored.
 
       valid_cpus: A list of Fuchsia cpu names used to filter cpu_map.

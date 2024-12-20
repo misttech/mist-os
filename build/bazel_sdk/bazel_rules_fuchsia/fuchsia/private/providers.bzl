@@ -136,7 +136,7 @@ FuchsiaComponentManifestShardInfo = provider(
 )
 
 FuchsiaComponentManifestShardCollectionInfo = provider(
-    "Contains information about a collection of shards to add as dependencies for for each cmc invocation",
+    "Contains information about a collection of shards to add as dependencies for each cmc invocation",
     fields = {
         "shards": "A list of shards's as targets in the collection",
     },

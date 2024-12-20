@@ -2,11 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""ffx invokation as a workflow task."""
+"""ffx invocation as a workflow task."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load(":fuchsia_shell_task.bzl", "shell_task_rule")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
+load(":fuchsia_shell_task.bzl", "shell_task_rule")
 
 def ffx_task_rule(*, implementation, toolchains = [], attrs = {}, **kwargs):
     """Starlark higher-order rule for creating ffx-based tasks."""

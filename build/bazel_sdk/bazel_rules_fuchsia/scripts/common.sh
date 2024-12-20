@@ -22,7 +22,7 @@ run_bazel() {
   if [[ ! -x "${bazel}" ]]; then
     >&2 echo -n "[31;1m"
     >&2 echo "Bazel does not exist at ${bazel}. "
-    >&2 echo -n "Please run the boostrap script [scripts/bootstrap.sh] and try again:"
+    >&2 echo -n "Please run the bootstrap script [scripts/bootstrap.sh] and try again:"
     >&2 echo "[0m"
     exit 1
   fi

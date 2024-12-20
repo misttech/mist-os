@@ -368,7 +368,7 @@ def transform_collected_debug_symbols_infos(*targets):
     run against them, collect all the debug symbols into a single FuchsiaDebugSymbolsInfo.
 
     Args:
-      *targets: A list of targets. It is ok to passs a list that contains None values
+      *targets: A list of targets. It is ok to pass a list that contains None values
 
     Returns:
       A FuchsiaDebugSymbolsInfo provider.

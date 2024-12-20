@@ -333,7 +333,7 @@ def define_clang_runtime_filegroups(clang_constants):
         srcs =
             # This contains the C++ runtime libraries, including libunwind,
             # and all their variants. Because individual targets can select
-            # a different sanitizer mode than the default for the curent build
+            # a different sanitizer mode than the default for the current build
             # operation, all of them must be exposed at link time.
             #
             #   libc++.a
@@ -606,6 +606,7 @@ def _empty_cc_toolchain_config_impl(ctx):
         ctx = ctx,
         toolchain_identifier = "empty_cpp",
         tool_paths = tool_paths,
+        features = features,
         target_cpu = "x86_64",
         # Required by constructor, but otherwise ignored by Bazel.
         # These string values are arbitrary, but are easy to grep
