@@ -15,20 +15,38 @@ use std::num::{NonZeroU16, NonZeroU64};
 use std::time::Duration;
 
 use assert_matches::assert_matches;
+use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_multicast_ext::{
     self as fnet_multicast_ext, FidlMulticastAdminIpExt, TableControllerProxy,
 };
-use net_declare::{fidl_mac, fidl_subnet, net_ip_v6, std_ip_v4, std_ip_v6};
-use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6};
+use fnet_filter_ext::{
+    Action, AddressMatcher, AddressMatcherType, Change, Controller, ControllerId, Domain,
+    InstalledIpRoutine, InstalledNatRoutine, InterfaceMatcher, IpHook, Matchers, Namespace,
+    NamespaceId, NatHook, PortMatcher, PortRange, Resource, Routine, RoutineId, RoutineType, Rule,
+    RuleId, TransportProtocolMatcher,
+};
+use futures::StreamExt as _;
+use net_declare::{fidl_mac, fidl_subnet, net_ip_v4, net_ip_v6, std_ip_v4, std_ip_v6};
+use net_types::ethernet::Mac;
+use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
-use netstack_testing_common::get_inspect_data;
 use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
+use netstack_testing_common::{constants, get_inspect_data};
 use netstack_testing_macros::netstack_test;
-use packet_formats::ethernet::testutil::ETHERNET_HDR_LEN_NO_TAG;
+use packet::{ParseBuffer as _, Serializer as _};
+use packet_formats::arp::{ArpOp, ArpPacket};
+use packet_formats::ethernet::testutil::{ETHERNET_HDR_LEN_NO_TAG, ETHERNET_MIN_BODY_LEN_NO_TAG};
+use packet_formats::ethernet::{
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
+};
 use packet_formats::ip::IpProto;
+use packet_formats::ipv4::Ipv4PacketBuilder;
+use packet_formats::udp::UdpPacketBuilder;
+use regex::Regex;
 use test_case::test_case;
 use {
-    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
+    fidl_fuchsia_net_filter_ext as fnet_filter_ext,
     fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
     fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
 };
@@ -1261,13 +1279,6 @@ async fn inspect_counters(name: &str) {
 
 #[netstack_test]
 async fn inspect_filtering_state(name: &str) {
-    use fnet_filter_ext::{
-        Action, AddressMatcher, AddressMatcherType, Change, Controller, ControllerId, Domain,
-        InstalledIpRoutine, InstalledNatRoutine, InterfaceMatcher, IpHook, Matchers, Namespace,
-        NamespaceId, NatHook, PortMatcher, PortRange, Resource, Routine, RoutineId, RoutineType,
-        Rule, RuleId, TransportProtocolMatcher,
-    };
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
 
@@ -1639,6 +1650,163 @@ async fn inspect_filtering_state(name: &str) {
                 }
             },
         }
+    });
+}
+
+#[netstack_test]
+async fn inspect_conntrack_nat_state(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let network = sandbox.create_network("net").await.expect("create network");
+    let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+
+    const LOCAL_ADDR_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
+    const LOCAL_IP: Ipv4Addr = net_ip_v4!("192.168.0.1");
+    const SRC_IP: Ipv4Addr = net_ip_v4!("192.168.0.2");
+    const DST_IP: Ipv4Addr = net_ip_v4!("192.168.0.3");
+    const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(11111).unwrap();
+    const SRC_PORT: NonZeroU16 = NonZeroU16::new(22222).unwrap();
+    const DST_PORT: NonZeroU16 = NonZeroU16::new(44444).unwrap();
+
+    let interface = realm.join_network(&network, "ep").await.expect("install interface");
+    interface.add_address_and_subnet_route(LOCAL_ADDR_SUBNET).await.expect("configure address");
+    interface.set_ipv4_forwarding_enabled(true).await.expect("enable forwarding");
+
+    // Install a Masquerade rule on EGRESS.
+    let control = realm
+        .connect_to_protocol::<fnet_filter::ControlMarker>()
+        .expect("connect to filter control");
+    let id = ControllerId(String::from("inspect"));
+    let mut controller = Controller::new(&control, &id).await.expect("open filter controller");
+    let namespace = NamespaceId(String::from("test-namespace"));
+    let nat_routine = RoutineId { namespace: namespace.clone(), name: String::from("nat") };
+    controller
+        .push_changes(
+            [
+                Resource::Namespace(Namespace { id: namespace, domain: Domain::AllIp }),
+                Resource::Routine(Routine {
+                    id: nat_routine.clone(),
+                    routine_type: RoutineType::Nat(Some(InstalledNatRoutine {
+                        hook: NatHook::Egress,
+                        priority: 0,
+                    })),
+                }),
+                Resource::Rule(Rule {
+                    id: RuleId { routine: nat_routine, index: 0 },
+                    matchers: Matchers {
+                        transport_protocol: Some(TransportProtocolMatcher::Udp {
+                            src_port: None,
+                            dst_port: None,
+                        }),
+                        ..Default::default()
+                    },
+                    action: Action::Masquerade {
+                        src_port: Some(PortRange(LOCAL_PORT..=LOCAL_PORT)),
+                    },
+                }),
+            ]
+            .into_iter()
+            .map(Change::Create)
+            .collect(),
+        )
+        .await
+        .expect("push filter changes");
+    controller.commit().await.expect("commit filter changes");
+
+    // Inject an incoming UDP packet to be forwarded (and masqueraded) by the
+    // netstack.
+    let mut payload = [1u8, 2, 3, 4];
+    let frame = packet::Buf::new(&mut payload, ..)
+        .encapsulate(UdpPacketBuilder::new(SRC_IP, DST_IP, Some(SRC_PORT), DST_PORT))
+        .encapsulate(Ipv4PacketBuilder::new(
+            SRC_IP,
+            DST_IP,
+            u8::MAX, /* ttl */
+            IpProto::Udp.into(),
+        ))
+        .encapsulate(EthernetFrameBuilder::new(
+            constants::eth::MAC_ADDR,         /* src_mac */
+            interface.mac().await.into_ext(), /* dst_mac */
+            EtherType::Ipv4,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        ))
+        .serialize_vec_outer()
+        .expect("serialize UDP packet IP packet in ethernet frame")
+        .unwrap_b();
+    let fake_ep = network.create_fake_endpoint().expect("create fake endpoint");
+    fake_ep.write(frame.as_ref()).await.expect("inject incoming UDP packet");
+
+    // Wait to see the ARP request from the netstack attempting to perform neighbor
+    // resolution so we know it has inserted the forwarded flow in the conntrack
+    // table.
+    let mut frames = fake_ep.frame_stream();
+    loop {
+        let (data, dropped) = frames
+            .next()
+            .await
+            .expect("should see forwarded packet before frame stream ends")
+            .expect("should not get FIDL error");
+        assert_eq!(dropped, 0);
+
+        let mut buffer = &data[..];
+        let _ethernet = buffer
+            .parse_with::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck)
+            .expect("parse ethernet frame");
+        let Ok(arp) = buffer.parse::<ArpPacket<_, Mac, Ipv4Addr>>() else {
+            continue;
+        };
+        assert_eq!(arp.operation(), ArpOp::Request);
+        assert_eq!(arp.sender_protocol_address(), LOCAL_IP);
+        assert_eq!(arp.target_protocol_address(), DST_IP);
+        break;
+    }
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root/Filtering\\ State/IPv4/conntrack/connections")
+            .await
+            .expect("inspect data should be present");
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("got inspect data: {:#?}", data);
+
+    // Expect the NAT configuration to report the dynamically assigned IP address
+    // that it is using to masquerade the forwarded connection.
+    let weak_address_id_regex =
+        Regex::new(r"WeakAddressId\([0-9]+:0x[0-9a-fA-F]+ => 192\.168\.0\.1/24\)").unwrap();
+    diagnostics_assertions::assert_data_tree!(data, "root": {
+        "Filtering State": {
+            "IPv4": {
+                "conntrack": {
+                    "connections": {
+                        "0": contains {
+                            "original_tuple": {
+                                "src_addr": SRC_IP.to_string(),
+                                "dst_addr": DST_IP.to_string(),
+                                "src_port_or_id": u64::from(SRC_PORT.get()),
+                                "dst_port_or_id": u64::from(DST_PORT.get()),
+                                "protocol": "UDP",
+                            },
+                            "reply_tuple": {
+                                "src_addr": DST_IP.to_string(),
+                                "dst_addr": LOCAL_IP.to_string(),
+                                "src_port_or_id": u64::from(DST_PORT.get()),
+                                "dst_port_or_id": u64::from(LOCAL_PORT.get()),
+                                "protocol": "UDP",
+                            },
+                            "external_data": {
+                                "NAT": {
+                                    "Destination": {
+                                        "Status": "No-op",
+                                    },
+                                    "Source": {
+                                        "Status": "NAT",
+                                        "To": weak_address_id_regex,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
     });
 }
 

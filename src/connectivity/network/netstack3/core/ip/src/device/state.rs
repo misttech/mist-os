@@ -250,6 +250,12 @@ impl<S: AssignedAddressState> Debug for WeakAddressId<S> {
     }
 }
 
+impl<S: AssignedAddressState> InspectableValue for WeakAddressId<S> {
+    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_debug(name, self);
+    }
+}
+
 impl<A, S> WeakIpAddressId<A> for WeakAddressId<S>
 where
     A: IpAddress<Version: AssignedAddrIpExt>,

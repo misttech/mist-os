@@ -14,7 +14,7 @@ use net_types::ip::IpVersionMarker;
 use net_types::SpecifiedAddr;
 use netstack3_base::sync::Mutex;
 use netstack3_base::{
-    Inspectable, Inspector as _, IpAddressId as _, IpDeviceAddr, WeakIpAddressId,
+    Inspectable, InspectableValue, Inspector as _, IpAddressId as _, IpDeviceAddr, WeakIpAddressId,
 };
 use once_cell::sync::OnceCell;
 use packet_formats::ip::IpExt;
@@ -79,21 +79,30 @@ impl<I: IpExt, A, BT: FilterBindingsTypes> Connection<I, NatConfig<I, A>, BT> {
     }
 }
 
-impl<I: IpExt, A> Inspectable for NatConfig<I, A> {
+impl<I: IpExt, A: InspectableValue> Inspectable for NatConfig<I, A> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
-        fn record_nat_status<I: IpExt, A, Inspector: netstack3_base::Inspector>(
+        fn record_nat_status<
+            I: IpExt,
+            A: InspectableValue,
+            Inspector: netstack3_base::Inspector,
+        >(
             inspector: &mut Inspector,
             config: &OnceCell<ShouldNat<I, A>>,
         ) {
-            const STATUS: &str = "Status";
-            let value = match config.get() {
+            let status = match config.get() {
                 None => "Unconfigured",
                 Some(ShouldNat::No) => "No-op",
-                // TODO(https://fxbug.dev/382093426): debug-print the weak address ID as well,
-                // if one is cached.
-                Some(ShouldNat::Yes(_)) => "NAT",
+                Some(ShouldNat::Yes(cached_addr)) => {
+                    if let Some(CachedAddr { id, _marker }) = cached_addr {
+                        match &*id.lock() {
+                            Some(id) => inspector.record_inspectable_value("To", id),
+                            None => inspector.record_str("To", "InvalidAddress"),
+                        }
+                    }
+                    "NAT"
+                }
             };
-            inspector.record_str(STATUS, value);
+            inspector.record_str("Status", status);
         }
 
         let Self { source, destination } = self;
