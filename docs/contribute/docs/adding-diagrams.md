@@ -46,12 +46,11 @@ these steps:
 2. Embed the image on fuchsia.dev using Markdown. For example:
    [see instructions](/docs/contribute/docs/markdown.md#images).
 
-   Note: If applicable, store your image in a `image/` directory near your Markdown
-   file.
-
    * {mermaid}
 
-      Note: Use the [Mermaid live editor][mermaid] to create your diagram.
+      Note: Use the [Mermaid live editor][mermaid] to create your diagram. For
+      more information about Mermaid syntax, see the
+      [Mermaid documentation][mermaid-docs].
 
       * {markdown}
 
@@ -99,6 +98,9 @@ these steps:
           </div>
 
    * {.svg/.png}
+
+     Note: If applicable, store your image in a `image/` directory near your Markdown
+     file.
 
      Make sure to add alt text to the image. Alt text helps screen reader users
      understand the content of your image. For example:
@@ -227,3 +229,4 @@ already identify them as images.
 </table>
 
 [mermaid]: https://mermaid.live/
+[mermaid-docs]: https://mermaid.js.org/intro/syntax-reference.html
