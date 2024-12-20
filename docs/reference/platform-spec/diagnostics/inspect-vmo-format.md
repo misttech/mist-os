@@ -197,7 +197,8 @@ packet-beta
 4-7: "reserved = 0"
 8-15: "type (0)"
 16-39: "next free block"
-40-127: "unused"
+40-63: "unused"
+64-127: "unused (cont.)"
 ```
 
 A `FREE` block is available for allocation. Importantly, the zero-valued
@@ -225,7 +226,8 @@ packet-beta
 0-3: "order"
 4-7: "reserved = 0"
 8-15: "type (1)"
-16-127: "unused"
+16-31: "unused"
+32-127: "unused (cont.)"
 ```
 
 `RESERVED` blocks are simply available to be changed to a different
@@ -246,9 +248,11 @@ packet-beta
 8-15: "type (2)"
 16-31: "version (2)"
 32-63: "magic number (INSP)"
-64-127: "generation count"
+64-95: "generation count"
+96-127: "generation count (cont.)"
 128-159: "size in bytes"
-160-255: "unused"
+160-191: "unused"
+192-255: "unused (cont.)"
 ```
 
 There must be one `HEADER` block at the beginning of the file. It consists
@@ -273,7 +277,8 @@ packet-beta
 8-15: "type (3|10)"
 16-39: "parent index"
 40-63: "name index"
-64-127: "reference count (optional)"
+64-95: "reference count (optional)"
+96-127: "reference count (cont.)"
 ```
 
 Nodes are anchor points for further nesting, and the `ParentID` field
@@ -318,7 +323,8 @@ packet-beta
 8-15: "type (4|5|6|13)"
 16-39: "parent index"
 40-63: "name index"
-64-127: "inlined value"
+64-95: "inlined value"
+96-127: "inlined value (cont.)"
 ```
 
 Numeric `VALUE` blocks all contain the 64-bit numeric type inlined into
@@ -368,7 +374,8 @@ packet-beta
 8-15: "type (8)"
 16-39: "next extent index"
 40-63: "reserved = 0"
-64-127: "payload"
+64-95: "payload"
+96-127: "payload (cont.)"
 ```
 
 `EXTENT` blocks contain an arbitrary byte data payload and the index of
@@ -390,7 +397,8 @@ packet-beta
 8-15: "type (9)"
 16-27: "length"
 28-63: "reserved = 0"
-64-127: "payload"
+64-95: "payload"
+96-127: "payload (cont.)"
 ```
 
 `NAME` blocks give objects and values a human-readable identifier. They
@@ -444,7 +452,8 @@ packet-beta
 68-71: "display format (0|1|2)"
 72-79: "count of stored values"
 80-127: "reserved = 0"
-128-191: "payload"
+128-159: "payload"
+160-191: "payload (cont.)"
 ```
 
 The format of an `ARRAY_VALUE` block `Payload` depends on the **Stored Value Type** `T`,
