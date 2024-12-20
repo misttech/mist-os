@@ -7,14 +7,16 @@ documentation.
 
 ## Types of diagrams
 
-* Generate a simple flow diagram from text in the source code. For example:
+* Generate a simple flow diagram from text in the source code. Options:
 
   * [Mermaid][mermaid]: This is a simple way to maintain diagrams
-    that are generated from text in the source code.
-  * [Sequence Diagram](https://bramp.github.io/js-sequence-diagrams/).
-  * (Googlers only) [go/sequencediagram](http://goto.google.com/sequencediagram).
+    that are generated from text in the source code
+  * [Sequence Diagram](https://bramp.github.io/js-sequence-diagrams/): Create
+    basic flow diagrams using text in the source code
+  * (Googlers only) [go/sequencediagram](http://goto.google.com/sequencediagram):
+    Internal version of the Sequence Diagram tool
 
-* Create a visual diagram in Google Drawings, Slides, or other tools.
+* Create a visual diagram in Google Drawings, Slides, or other tools
 
 {% dynamic if user.is_googler %}
 
@@ -119,18 +121,18 @@ these steps:
 
 {% dynamic if user.is_googler %}
 
-If you used an internal tool to create your diagram, follow these additional
-steps:
+If you used a tool like Google Drawings or Slides to create a visual diagram,
+follow these additional steps:
 
-1. If your diagram was created internally, create a bug for the diagram
-   [go/fuchsia-diagram](http://goto.google.com/fuchsia-diagram). In the bug,
-   include:
+1. Create a bug to make the diagram maintainable on fuchsia.dev using the
+   template at [go/fuchsia-diagram](http://goto.google.com/fuchsia-diagram). In
+   the bug, include:
 
-   * Author or owner - best point of contact for maintaining the diagram.
+   * Author or owner (best point of contact for maintaining the diagram)
    * Link to the source file (Google drawings, Slides, Figma, etc - ensure files
-     are shared with rvos).
-   * Link to page on fuchsia.dev where the diagram can be found.
-   * Alt text.
+     are shared with rvos)
+   * Link to page on fuchsia.dev where the diagram can be found
+   * Alt text description for the diagram
 
 2. Add a comment in the markdown file with a link to the bug that contains the
    diagram source information. For example:
@@ -185,10 +187,10 @@ support and enhance the accompanying text in documentation.
 
 Provide concise and informative alternative text descriptions for all diagrams. Alt text should:
 
-* Accurately describe the content and purpose of the diagram.
-* Use plain language that is easy for everyone to understand.
-* Be concise and to the point, avoiding unnecessary detail.
-* If a diagram contains text, include that text in the alt text.
+* Accurately describe the content and purpose of the diagram
+* Use plain language that is easy for everyone to understand
+* Be concise and to the point, avoiding unnecessary detail
+* If a diagram contains text, include that text in the alt text
 
 Note: Avoid using phrases like "image of" or "diagram of" as screen readers
 already identify them as images.
