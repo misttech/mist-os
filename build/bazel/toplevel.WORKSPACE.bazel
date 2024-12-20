@@ -256,7 +256,7 @@ fuchsia_idk_repository(
     python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
     # LINT.IfChange
     content_hash_file = "//:fuchsia_build_generated/fuchsia_in_tree_idk.hash",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(BUILD.gn)
 )
 
 # A repository that wraps //sdk:bazel_internal_only_idk in the Bazel graph.
@@ -268,7 +268,7 @@ fuchsia_idk_repository(
     python_executable = "prebuilt/third_party/python3/%s/bin/python3" % fuchsia_host_tag,
     # LINT.IfChange
     content_hash_file = "//:fuchsia_build_generated/fuchsia_internal_only_idk.hash",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(BUILD.gn)
 )
 
 # buildifier: disable=load-on-top
@@ -285,7 +285,7 @@ fuchsia_sdk_repository(
     local_paths = ["@fuchsia_in_tree_idk"],
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_sdk.hash",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(BUILD.gn)
     use_rules_fuchsia = True,
     buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
 )
@@ -298,7 +298,7 @@ fuchsia_sdk_repository(
     local_paths = ["@fuchsia_internal_only_idk"],
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/internal_sdk.hash",
-    # LINT.ThenChange(scripts/update_workspace.py)
+    # LINT.ThenChange(BUILD.gn)
     parent_sdk = "@fuchsia_sdk",
     parent_sdk_local_paths = ["@fuchsia_in_tree_idk"],
     use_rules_fuchsia = True,

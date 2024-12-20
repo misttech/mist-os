@@ -7,6 +7,7 @@ import("//build/assembly/sshd_config.gni")
 import("//build/bazel/bazel_action.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
+import("//build/bazel/generate_content_hash_file.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 import("//build/bazel/remote_services.gni")
 import("//build/config/clang/clang.gni")
@@ -95,8 +96,6 @@ action("generate_main_workspace") {
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/boringssl.hash",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/com_google_googletest.hash",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_clang.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_sdk.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/internal_sdk.hash",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/prebuilt_clang.hash",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/prebuilt_python.hash",
 
@@ -133,6 +132,61 @@ action("generate_main_workspace") {
 # depends on Bazel internals (e.g. whether BzlMod is enabled or not).
 group("generate_fuchsia_sdk_repository") {
   deps = [ ":final_fuchsia_in_tree_sdk" ]
+}
+
+generate_content_hash_file("fuchsia_in_tree_idk.hash") {
+  source_paths = [ "$root_build_dir/sdk/exported/bazel_in_tree_idk" ]
+  output = "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash"
+  deps = [
+    # For now ensure this is run after update_workspace.py to avoid the content
+    # of fuchsia_build_generated/ from being rewritten by it.
+    ":generate_main_workspace",
+    "//sdk:bazel_in_tree_idk",
+  ]
+}
+
+generate_content_hash_file("fuchsia_internal_only_idk.hash") {
+  source_paths = [ "$root_build_dir/sdk/exported/bazel_internal_only_idk" ]
+  output = "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_internal_only_idk.hash"
+  deps = [
+    # For now ensure this is run after update_workspace.py to avoid the content
+    # of fuchsia_build_generated/ from being rewritten by it.
+    ":generate_main_workspace",
+    "//sdk:bazel_internal_only_idk",
+  ]
+}
+
+# The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk
+# so create a symlink for its content hash for better speed. Then do the same for
+# @internal_sdk and @fuchsia_internal_only_idk.
+
+template("_create_content_hash_symlink") {
+  _link_target = invoker.target
+  _output =
+      "${bazel_main_top_dir}/workspace/fuchsia_build_generated/$target_name"
+  _input =
+      "${bazel_main_top_dir}/workspace/fuchsia_build_generated/${_link_target}"
+  _rebased_output = rebase_path(_output, root_build_dir)
+  action(target_name) {
+    script = "/bin/sh"
+    outputs = [ _output ]
+    inputs = [ _input ]
+    args = [
+      "-c",
+      "rm -f ${_rebased_output} && ln -sf ${_link_target} ${_rebased_output}",
+    ]
+    deps = invoker.deps
+  }
+}
+
+_create_content_hash_symlink("fuchsia_sdk.hash") {
+  target = "fuchsia_in_tree_idk.hash"
+  deps = [ ":fuchsia_in_tree_idk.hash" ]
+}
+
+_create_content_hash_symlink("internal_sdk.hash") {
+  target = "fuchsia_internal_only_idk.hash"
+  deps = [ ":fuchsia_internal_only_idk.hash" ]
 }
 
 # Generate a symlink that points to the final version of the in-tree IDK
