@@ -184,6 +184,8 @@ async fn inner_main() -> Result<(), Error> {
         idle_threshold_ms,
         #[cfg(fuchsia_api_level_at_least = "HEAD")]
         suspend_enabled,
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        attach_a11y_view,
         ..
     } = Config::take_from_startup_handle();
 
@@ -218,7 +220,11 @@ async fn inner_main() -> Result<(), Error> {
     let root_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
     let pointerinjector_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
     let scene_flatland = connect_to_protocol::<flatland::FlatlandMarker>()?;
-    let a11y_view_provider = connect_to_protocol::<a11y_view::ProviderMarker>()?;
+    let a11y_view_provider = if attach_a11y_view {
+        Some(connect_to_protocol::<a11y_view::ProviderMarker>()?)
+    } else {
+        None
+    };
     let scene_manager: Arc<Mutex<dyn SceneManagerTrait>> = Arc::new(Mutex::new(
         SceneManager::new(
             flatland_display,

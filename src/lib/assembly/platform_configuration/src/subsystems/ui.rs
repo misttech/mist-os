@@ -170,6 +170,12 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
                 ui_config.viewing_distance.as_ref().to_string().into(),
             ),
         )?;
+
+        builder.set_config_capability(
+            "fuchsia.ui.AttachA11yView",
+            Config::new(ConfigValueType::Bool, ui_config.attach_a11y_view.into()),
+        )?;
+
         builder.set_config_capability(
             "fuchsia.ui.IdleThresholdMs",
             Config::new(ConfigValueType::Uint64, {

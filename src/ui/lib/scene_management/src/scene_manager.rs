@@ -130,6 +130,40 @@ fn request_present_with_pingback(
     Ok(receiver)
 }
 
+async fn setup_child_view(
+    parent_flatland: &FlatlandInstance,
+    viewport_creation_token: scenic::flatland::ViewportCreationToken,
+    id_generator: &mut scenic::flatland::IdGenerator,
+    client_viewport_size: math::SizeU,
+) -> Result<ui_comp::ChildViewWatcherProxy, Error> {
+    let child_viewport_transform_id = id_generator.next_transform_id();
+    let child_viewport_content_id = id_generator.next_content_id();
+
+    let (child_view_watcher, child_view_watcher_request) =
+        create_proxy::<ui_comp::ChildViewWatcherMarker>();
+
+    {
+        let flatland = parent_flatland.flatland.lock();
+        flatland.create_transform(&child_viewport_transform_id)?;
+        flatland.add_child(&parent_flatland.root_transform_id, &child_viewport_transform_id)?;
+
+        let link_properties = ui_comp::ViewportProperties {
+            logical_size: Some(client_viewport_size),
+            ..Default::default()
+        };
+
+        flatland.create_viewport(
+            &child_viewport_content_id,
+            viewport_creation_token,
+            &link_properties,
+            child_view_watcher_request,
+        )?;
+        flatland.set_content(&child_viewport_transform_id, &child_viewport_content_id)?;
+    }
+
+    Ok(child_view_watcher)
+}
+
 /// SceneManager manages the platform/framework-controlled part of the global Scenic scene
 /// graph, with the fundamental goal of connecting the physical display to the product-defined user
 /// shell.  The part of the scene graph managed by the scene manager is split between three Flatland
@@ -164,6 +198,9 @@ fn request_present_with_pingback(
 //      |
 //      (user shell)   The session uses the SceneManager.SetRootView() FIDL API to attach the user
 //                     shell to the scene graph depicted above.
+//
+// A11y View can be disabled via `attach_a11y_view` flag. If disabled, Pa and A* is removed from the
+// scene graph.
 //
 // There is a reason why the "corresponding view/view-refs" are called out in the diagram above.
 // When registering an input device with the fuchsia.ui.pointerinjector.Registry API, the Config
@@ -453,7 +490,7 @@ impl SceneManager {
         root_flatland: ui_comp::FlatlandProxy,
         pointerinjector_flatland: ui_comp::FlatlandProxy,
         scene_flatland: ui_comp::FlatlandProxy,
-        a11y_view_provider: a11y_scene::ProviderProxy,
+        a11y_view_provider: Option<a11y_scene::ProviderProxy>,
         display_rotation: u64,
         display_pixel_density: Option<f32>,
         viewing_distance: Option<ViewingDistance>,
@@ -468,8 +505,6 @@ impl SceneManager {
         // in the Flatland instances managed by SceneManager.
         let pointerinjector_viewport_transform_id = id_generator.next_transform_id();
         let pointerinjector_viewport_content_id = id_generator.next_content_id();
-        let a11y_viewport_transform_id = id_generator.next_transform_id();
-        let a11y_viewport_content_id = id_generator.next_content_id();
 
         root_flatland.set_debug_name(ROOT_VIEW_DEBUG_NAME)?;
         pointerinjector_flatland.set_debug_name(POINTER_INJECTOR_DEBUG_NAME)?;
@@ -606,38 +641,39 @@ impl SceneManager {
             )?;
         }
 
-        let a11y_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+        let mut a11y_view_watcher: Option<ui_comp::ChildViewWatcherProxy> = None;
+        match a11y_view_provider {
+            Some(a11y_view_provider) => {
+                let a11y_view_creation_pair = scenic::flatland::ViewCreationTokenPair::new()?;
 
-        // Bridge the pointerinjector and a11y Flatland instances.
-        let (a11y_view_watcher, a11y_view_watcher_request) =
-            create_proxy::<ui_comp::ChildViewWatcherMarker>();
-        {
-            let flatland = pointerinjector_flatland.flatland.lock();
-            flatland.create_transform(&a11y_viewport_transform_id)?;
-            flatland.add_child(
-                &pointerinjector_flatland.root_transform_id,
-                &a11y_viewport_transform_id,
-            )?;
+                // Bridge the pointerinjector and a11y Flatland instances.
+                a11y_view_watcher = Some(
+                    setup_child_view(
+                        &pointerinjector_flatland,
+                        a11y_view_creation_pair.viewport_creation_token,
+                        &mut id_generator,
+                        client_viewport_size,
+                    )
+                    .await?,
+                );
 
-            let link_properties = ui_comp::ViewportProperties {
-                logical_size: Some(client_viewport_size),
-                ..Default::default()
-            };
-
-            flatland.create_viewport(
-                &a11y_viewport_content_id,
-                a11y_view_creation_pair.viewport_creation_token,
-                &link_properties,
-                a11y_view_watcher_request,
-            )?;
-            flatland.set_content(&a11y_viewport_transform_id, &a11y_viewport_content_id)?;
+                // Request for the a11y manager to create its view.
+                a11y_view_provider.create_view(
+                    a11y_view_creation_pair.view_creation_token,
+                    scene_view_creation_pair.viewport_creation_token,
+                )?;
+            }
+            None => {
+                // Bridge the pointerinjector and scene Flatland instances. This skips the A11y View.
+                let _ = setup_child_view(
+                    &pointerinjector_flatland,
+                    scene_view_creation_pair.viewport_creation_token,
+                    &mut id_generator,
+                    client_viewport_size,
+                )
+                .await?;
+            }
         }
-
-        // Request for the a11y manager to create its view.
-        a11y_view_provider.create_view(
-            a11y_view_creation_pair.view_creation_token,
-            scene_view_creation_pair.viewport_creation_token,
-        )?;
 
         // Start Present() loops for both Flatland instances, and request that both be presented.
         let (root_flatland_presentation_sender, root_receiver) = unbounded();
@@ -665,10 +701,12 @@ impl SceneManager {
             .push(request_present_with_pingback(&pointerinjector_flatland_presentation_sender)?);
         pingback_channels.push(request_present_with_pingback(&scene_flatland_presentation_sender)?);
 
-        // Wait for a11y view to attach before proceeding.
-        let a11y_view_status = a11y_view_watcher.get_status().await?;
-        match a11y_view_status {
-            ui_comp::ChildViewStatus::ContentHasPresented => {}
+        if let Some(a11y_view_watcher) = a11y_view_watcher {
+            // Wait for a11y view to attach before proceeding.
+            let a11y_view_status = a11y_view_watcher.get_status().await?;
+            match a11y_view_status {
+                ui_comp::ChildViewStatus::ContentHasPresented => {}
+            }
         }
 
         // Read device pixel ratio from layout info.

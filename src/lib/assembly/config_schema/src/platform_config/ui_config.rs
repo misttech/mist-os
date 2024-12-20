@@ -58,6 +58,9 @@ pub struct PlatformUiConfig {
 
     /// Set visual_debugging_level to enable visual debugging features.
     pub visual_debugging_level: VisualDebuggingLevel,
+
+    // Attaches a11y view in SceneManager
+    pub attach_a11y_view: bool,
 }
 
 impl Default for PlatformUiConfig {
@@ -77,6 +80,7 @@ impl Default for PlatformUiConfig {
             renderer: Default::default(),
             display_mode: Default::default(),
             visual_debugging_level: Default::default(),
+            attach_a11y_view: true,
         }
     }
 }
