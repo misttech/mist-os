@@ -34,8 +34,6 @@ std::unique_ptr<zx_handle_disposition_t[]> python_obj_to_handle_disps(PyObject *
     if (res == convert::MINUS_ONE_U32 && PyErr_Occurred()) {
       return nullptr;
     }
-    // TODO(https://fxbug.dev/42075167): Properly fill the handle disposition. The code will likely
-    // not just be integers.
     c_handles[i] = zx_handle_disposition_t{.handle = res};
   }
   return c_handles;
