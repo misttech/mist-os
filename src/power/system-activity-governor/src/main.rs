@@ -13,6 +13,7 @@ use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance, open_service};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect::BoolProperty as IBool;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use sag_config::Config;
 use std::rc::Rc;
@@ -74,7 +75,7 @@ enum IncomingService {
     ElementInfoProviderService(fbroker::ElementInfoProviderServiceRequest),
 }
 
-async fn run<F>(cpu_service: Rc<CpuElementManager<F>>) -> Result<()>
+async fn run<F>(cpu_service: Rc<CpuElementManager<F>>, booting_node: Rc<IBool>) -> Result<()>
 where
     F: SystemActivityGovernorFactory,
 {
@@ -95,7 +96,7 @@ where
     service_fs
         .for_each_concurrent(None, move |request: IncomingService| {
             let cpu_service = cpu_service.clone();
-
+            let booting_node = booting_node.clone();
             // Before constructing the SystemActivityGovernor type, the system-activity-governor
             // component must receive a token from another component. To ensure components that
             // depend on fuchsia.power.system.ActivityGovernor, et. al. have consistent behavior,
@@ -107,7 +108,11 @@ where
                         cpu_service.sag().await.handle_activity_governor_stream(stream).await
                     }
                     IncomingService::BootControl(stream) => {
-                        cpu_service.sag().await.handle_boot_control_stream(stream).await
+                        cpu_service
+                            .sag()
+                            .await
+                            .handle_boot_control_stream(stream, booting_node)
+                            .await
                     }
                     IncomingService::CpuElementManager(stream) => {
                         cpu_service.handle_cpu_element_manager_stream(stream).await
@@ -196,7 +201,8 @@ async fn main() -> Result<()> {
     fuchsia_inspect::component::health().set_ok();
 
     // This future should never complete.
-    let result = run(cpu_service).await;
+    let booting_node = Rc::new(inspector.root().create_bool("booting", true));
+    let result = run(cpu_service, booting_node).await;
     tracing::error!(?result, "Unexpected exit");
     fuchsia_inspect::component::health().set_unhealthy(&format!("Unexpected exit: {:?}", result));
     result

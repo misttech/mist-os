@@ -10,7 +10,9 @@ use fidl::endpoints::{create_endpoints, Proxy};
 use fidl_fuchsia_power_system::{
     self as fsystem, ApplicationActivityLevel, CpuLevel, ExecutionStateLevel,
 };
-use fuchsia_inspect::{IntProperty as IInt, Node as INode, Property, UintProperty as IUint};
+use fuchsia_inspect::{
+    BoolProperty as IBool, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
+};
 use fuchsia_inspect_contrib::nodes::NodeTimeExt;
 use futures::future::FutureExt;
 use futures::prelude::*;
@@ -268,8 +270,6 @@ impl LeaseManager {
 /// SystemActivityGovernor runs the server for fuchsia.power.suspend and fuchsia.power.system FIDL
 /// APIs.
 pub struct SystemActivityGovernor {
-    /// The root inspect node for system-activity-governor.
-    inspect_root: INode,
     /// The context used to manage the execution state power element.
     execution_state: PowerElementContext,
     /// The context used to manage the application activity power element.
@@ -427,7 +427,6 @@ impl SystemActivityGovernor {
             SuspendStatsManager::new(inspect_root.create_child(fobs::SUSPEND_STATS_NODE));
 
         Ok(Rc::new(Self {
-            inspect_root,
             execution_state,
             application_activity,
             suspend_stats,
@@ -469,11 +468,7 @@ impl SystemActivityGovernor {
             boot_control_lease.into_client_end().expect("failed to convert to ClientEnd");
         let _ = self.booting_lease.borrow_mut().insert(booting_lease);
 
-        self.run_application_activity(
-            &elements_node,
-            &self.inspect_root,
-            self.booting_lease.clone(),
-        );
+        self.run_application_activity(&elements_node);
 
         tracing::info!("Boot control required. Updating boot_control level to active.");
         let res = self.boot_control.current_level.update(BootControlLevel::Active.into()).await;
@@ -485,18 +480,9 @@ impl SystemActivityGovernor {
         Ok(())
     }
 
-    fn run_application_activity(
-        self: &Rc<Self>,
-        inspect_node: &INode,
-        root_node: &INode,
-        boot_control_lease: Rc<
-            RefCell<Option<fidl::endpoints::ClientEnd<fbroker::LeaseControlMarker>>>,
-        >,
-    ) {
+    fn run_application_activity(self: &Rc<Self>, inspect_node: &INode) {
         let application_activity_node = inspect_node.create_child("application_activity");
-        let booting_node = Rc::new(root_node.create_bool("booting", true));
         let this = self.clone();
-        let this_clone = self.clone();
 
         fasync::Task::local(async move {
             let update_fn = Rc::new(basic_update_fn_factory(&this.application_activity));
@@ -508,33 +494,8 @@ impl SystemActivityGovernor {
                 Some(application_activity_node),
                 Box::new(move |new_power_level: fbroker::PowerLevel| {
                     let update_fn = update_fn.clone();
-                    let boot_control_lease = boot_control_lease.clone();
-                    let booting_node = booting_node.clone();
-                    let this = this_clone.clone();
-
                     async move {
                         update_fn(new_power_level).await;
-
-                        // TODO(https://fxbug.dev/333699275): When the boot indication API is
-                        // available, this logic should be removed in favor of that.
-                        if new_power_level != ApplicationActivityLevel::Inactive.into_primitive()
-                            && boot_control_lease.borrow().is_some()
-                        {
-                            tracing::info!("System has booted. Dropping boot control lease.");
-                            boot_control_lease.borrow_mut().take();
-                            let res = this
-                                .boot_control
-                                .current_level
-                                .update(BootControlLevel::Inactive.into())
-                                .await;
-                            if let Err(error) = res {
-                                tracing::warn!(
-                                    ?error,
-                                    "update boot_control level to inactive failed"
-                                );
-                            }
-                            booting_node.set(false);
-                        }
                     }
                     .boxed_local()
                 }),
@@ -758,6 +719,7 @@ impl SystemActivityGovernor {
     pub async fn handle_boot_control_stream(
         self: Rc<Self>,
         mut stream: fsystem::BootControlRequestStream,
+        booting_node: Rc<IBool>,
     ) {
         // Before handling requests, ensure power elements are initialized and handlers are running.
         self.is_running_signal.wait().await;
@@ -776,6 +738,7 @@ impl SystemActivityGovernor {
                         if let Err(error) = res {
                             tracing::warn!(?error, "update boot_control level to inactive failed");
                         }
+                        booting_node.set(false);
                     }
                     responder.send().unwrap();
                 }

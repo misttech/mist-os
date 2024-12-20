@@ -13,6 +13,7 @@ rustc_test("bin") {
   deps = [
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability_rust",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/reader/rust",

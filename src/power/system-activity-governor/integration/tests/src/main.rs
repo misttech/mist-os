@@ -187,7 +187,6 @@ async fn test_activity_governor_with_no_suspender_returns_not_supported_after_su
         create_realm_ext(ftest::RealmOptions { use_suspender: Some(false), ..Default::default() })
             .await?;
     let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
-    let suspend_controller = create_suspend_topology(&realm).await?;
 
     // First watch should return immediately with default values.
     let current_stats = stats.watch().await?;
@@ -205,7 +204,9 @@ async fn test_activity_governor_with_no_suspender_returns_not_supported_after_su
         }
     );
 
-    lease(&suspend_controller, 1).await?;
+    // Indicate that the boot has complete
+    let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     let current_stats = stats.watch().await?;
     assert_eq!(Some(0), current_stats.success_count);
@@ -232,6 +233,8 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
 
     let suspend_controller = create_suspend_topology(&realm).await?;
     let suspend_lease_control = lease(&suspend_controller, 1).await?;
+    let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -467,6 +470,8 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
 
     let suspend_controller = create_suspend_topology(&realm).await?;
     let suspend_lease_control = lease(&suspend_controller, 1).await?;
+    let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -573,6 +578,8 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
 
     let suspend_controller = create_suspend_topology(&realm).await?;
     let suspend_lease_control = lease(&suspend_controller, 1).await?;
+    let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -768,9 +775,9 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
     .detach();
 
     {
-        let suspend_controller = create_suspend_topology(&realm).await?;
-        // Cycle execution_state power level to trigger a suspend/resume cycle.
-        lease(&suspend_controller, 1).await?;
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
     }
 
     // Await SAG's power elements to drop their power levels.
@@ -938,10 +945,11 @@ async fn test_activity_governor_blocks_for_on_suspend_started() -> Result<()> {
     // SAG requests to suspend the hardware.
     let await_suspend = suspend_device.await_suspend();
 
-    // Cycle execution_state power level to make SAG start suspending.
+    // Call SetBootComplete to allow SAG to start suspending.
     {
-        let suspend_controller = create_suspend_topology(&realm).await?;
-        lease(&suspend_controller, 1).await?;
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
     }
 
     // Wait to receive the OnSuspendStarted() callback.
@@ -965,8 +973,6 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
 
     let suspend_controller = create_suspend_topology(&realm).await?;
-    // Trigger "boot complete" logic.
-    let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
 
     let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
     activity_governor
@@ -1006,7 +1012,9 @@ async fn test_activity_governor_handles_listener_raising_power_levels() -> Resul
     })
     .detach();
 
-    drop(suspend_lease);
+    // Trigger "boot complete" logic.
+    let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     // OnSuspendStarted should have been called.
     on_suspend_started_rx.next().await.unwrap();
@@ -1145,8 +1153,6 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
 
     let suspend_controller = create_suspend_topology(&realm).await?;
-    // Trigger "boot complete" logic.
-    let suspend_lease = lease(&suspend_controller, 1).await.unwrap();
 
     let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
     activity_governor
@@ -1186,7 +1192,9 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
     })
     .detach();
 
-    drop(suspend_lease);
+    // Trigger "boot complete" logic.
+    let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     // OnSuspendStarted should have been called.
     on_suspend_started_rx.next().await.unwrap();
@@ -1308,8 +1316,8 @@ async fn test_activity_governor_handles_boot_signal() -> Result<()> {
     );
 
     // Trigger "boot complete" signal.
-    let suspend_controller = create_suspend_topology(&realm).await?;
-    lease(&suspend_controller, 1).await.unwrap();
+    let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     // Now execution_state should have dropped and booting is false.
     block_until_inspect_matches!(
@@ -1481,11 +1489,12 @@ async fn test_element_info_provider() -> Result<()> {
     assert_eq!(bc_status.watch_power_level().await?.unwrap(), 1);
 
     // Trigger "boot complete" logic.
+    let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
     let suspend_lease_control = lease(&suspend_controller, 1).await?;
 
     assert_eq!(aa_status.watch_power_level().await?.unwrap(), 1);
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
     assert_eq!(bc_status.watch_power_level().await?.unwrap(), 0);
-
     drop(suspend_lease_control);
 
     assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
@@ -1606,8 +1615,9 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
 
     // Trigger "boot complete" signal.
     {
-        let suspend_controller = create_suspend_topology(&realm).await?;
-        lease(&suspend_controller, 1).await.unwrap();
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
     }
 
     assert_eq!(es_status.watch_power_level().await?.unwrap(), 1);
@@ -1678,8 +1688,9 @@ async fn test_activity_governor_acquire_wake_lease_raises_execution_state_to_sus
 
     // Trigger "boot complete" signal.
     {
-        let suspend_controller = create_suspend_topology(&realm).await?;
-        lease(&suspend_controller, 1).await.unwrap();
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
     }
 
     // Execution State should be at the "Suspending" power level, 1.
@@ -1754,8 +1765,9 @@ async fn test_activity_governor_take_application_activity_lease() -> Result<()> 
 
     // Trigger "boot complete" signal.
     {
-        let suspend_controller = create_suspend_topology(&realm).await?;
-        lease(&suspend_controller, 1).await.unwrap();
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
     }
 
     assert_eq!(
@@ -2038,8 +2050,9 @@ async fn test_activity_governor_cpu_element_and_execution_state_interaction() ->
 
     // Trigger "boot complete" signal.
     {
-        let suspend_controller = create_suspend_topology(&realm).await?;
-        lease(&suspend_controller, 1).await.unwrap();
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
     }
 
     block_until_inspect_matches!(

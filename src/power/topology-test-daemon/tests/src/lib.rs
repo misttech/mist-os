@@ -12,7 +12,8 @@ use fuchsia_component_test::{
 use tracing::*;
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
-    fidl_fuchsia_power_topology_test as fpt, fuchsia_async as fasync,
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_power_topology_test as fpt,
+    fuchsia_async as fasync,
 };
 
 // Report prolonged match delay after this many loops.
@@ -251,6 +252,16 @@ async fn create_test_env() -> TestEnv {
         .await
         .unwrap();
 
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.power.system.BootControl"))
+                .from(&system_activity_governor_ref)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+
     let realm_instance = builder.build().await.expect("Failed to build RealmInstance");
 
     let sag_moniker = format!(
@@ -275,6 +286,9 @@ async fn test_system_activity_control() -> Result<()> {
 
     let system_activity_control = env.connect_to_protocol::<fpt::SystemActivityControlMarker>();
     let _ = system_activity_control.start_application_activity().await.unwrap();
+
+    let boot_control = env.connect_to_protocol::<fsystem::BootControlMarker>();
+    let () = boot_control.set_boot_complete().await?;
 
     block_until_inspect_matches!(
         &env.sag_moniker,
