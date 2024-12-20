@@ -5,24 +5,25 @@
 import("//build/rust/rustc_library.gni")
 import("//tools/protobuf/rust_proto_library.gni")
 
-rustc_library("perfetto-consumer") {
-  name = "starnix-modules-perfetto-consumer"
+rustc_library("perfetto") {
   edition = "2021"
-  version = "0.1.0"
-  source_root = "lib.rs"
-
-  sources = [ "lib.rs" ]
-
+  sources = [ "src/lib.rs" ]
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
   deps = [
-    "//src/lib/trace/rust:trace",
-    "//src/lib/trace/rust:trace-observer",
+    ":perfetto_consumer_proto",
     "//src/starnix/kernel:starnix_core",
-    "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/lib/perfetto",
-    "//src/starnix/lib/perfetto:perfetto_consumer_proto",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:prost",
   ]
+}
+
+rust_proto_library("perfetto_consumer_proto") {
+  sources = [
+    "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
+    "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
+  ]
+  packages = [ "perfetto.protos" ]
+  include_dirs = [ "//third_party/perfetto" ]
 }
