@@ -680,7 +680,7 @@ func (m *fakeModules) Args() build.Args {
 		"build_info_product": json.RawMessage(`"core"`),
 		"build_info_board":   json.RawMessage(`"x64"`),
 		"target_cpu":         json.RawMessage(`"x64"`),
-		"is_debug":           json.RawMessage(`true`),
+		"compilation_mode":   json.RawMessage(`"debug"`),
 		"select_variant":     json.RawMessage(`["coverage"]`),
 	}
 }

@@ -26,8 +26,7 @@ func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools b
 	// determine what deps need to be added to the shard.
 	// TODO(ihuh): Dedupe this with fint so only fint needs to know how to generate
 	// this metadata.
-	var board, optimize, product, targetArch string
-	var isDebug bool
+	var board, product, targetArch, compilationMode string
 	var variants []string
 	if err := args.Get("build_info_product", &product); err != nil {
 		return err
@@ -38,24 +37,19 @@ func AddShardDeps(ctx context.Context, shards []*Shard, args build.Args, tools b
 	if err := args.Get("target_cpu", &targetArch); err != nil {
 		return err
 	}
-	if err := args.Get("is_debug", &isDebug); err != nil {
+	if err := args.Get("compilation_mode", &compilationMode); err != nil {
 		return err
-	}
-	if isDebug {
-		optimize = fintpb.Static_DEBUG.String()
-	} else {
-		optimize = fintpb.Static_RELEASE.String()
 	}
 	if err := args.Get("select_variant", &variants); err != nil {
 		// variants may not be set, which is ok.
 		logger.Debugf(ctx, "%s", err)
 	}
 	buildMetadata := fintpb.SetArtifacts_Metadata{
-		Board:      board,
-		Optimize:   strings.ToLower(optimize),
-		Product:    product,
-		TargetArch: targetArch,
-		Variants:   variants,
+		Board:           board,
+		CompilationMode: compilationMode,
+		Product:         product,
+		TargetArch:      targetArch,
+		Variants:        variants,
 	}
 
 	// Add tools to run on host on shard.
