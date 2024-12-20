@@ -51,11 +51,10 @@ struct BaseWlanFullmacServerForStartup
   void Query(QueryCompleter::Sync& completer) override {
     fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse response;
 
-    fuchsia_wlan_fullmac::WlanFullmacBandCapability band_capability;
-    band_capability.band(fuchsia_wlan_ieee80211::WlanBand::kTwoGhz)
-        .basic_rates({1})
-        .operating_channel_count(1)
-        .operating_channel_list({1});
+    fuchsia_wlan_fullmac::BandCapability band_capability;
+    band_capability.band({fuchsia_wlan_ieee80211::WlanBand::kTwoGhz})
+        .basic_rates({{1}})
+        .operating_channels({{1}});
 
     response.sta_addr({std::array<uint8_t, 6>{8, 8, 8, 8, 8, 8}})
         .role({fuchsia_wlan_common::WlanMacRole::kClient})

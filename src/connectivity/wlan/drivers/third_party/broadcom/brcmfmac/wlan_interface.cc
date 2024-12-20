@@ -329,7 +329,9 @@ void WlanInterface::Query(QueryCompleter::Sync& completer) {
   fdf::Arena arena('WLAN');
   fuchsia_wlan_fullmac::wire::WlanFullmacImplQueryResponse info;
   if (wdev_ != nullptr) {
-    brcmf_if_query(wdev_->netdev, &info, arena);
+    fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse natural_info{};
+    brcmf_if_query(wdev_->netdev, natural_info);
+    info = fidl::ToWire(arena, natural_info);
   }
   completer.ReplySuccess(info);
 }

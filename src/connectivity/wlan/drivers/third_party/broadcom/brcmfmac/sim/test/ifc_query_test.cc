@@ -40,7 +40,7 @@ class QueryTest : public SimTest {
   }
 
   void AssertBandCapsSize(
-      std::optional<std::vector<fuchsia_wlan_fullmac::WlanFullmacBandCapability>>& band_caps) {
+      std::optional<std::vector<fuchsia_wlan_fullmac::BandCapability>>& band_caps) {
     ASSERT_TRUE(band_caps.has_value());
     // Number of bands shouldn't exceed the maximum allowable
     ASSERT_LE(band_caps->size(), (size_t)wlan_common::kMaxBands);
@@ -73,14 +73,14 @@ TEST_F(QueryTest, CheckBasicRates) {
 
     if (band_cap.band() == wlan_ieee80211::WlanBand::kTwoGhz) {
       constexpr uint8_t kExpectedBasic2gRates[] = {2, 4, 11, 22, 12, 18, 24, 36, 48, 72, 96, 108};
-      ASSERT_EQ(band_cap.basic_rates().size(), std::size(kExpectedBasic2gRates));
-      EXPECT_BYTES_EQ(band_cap.basic_rates().data(), kExpectedBasic2gRates,
-                      band_cap.basic_rates().size());
+      ASSERT_EQ(band_cap.basic_rates()->size(), std::size(kExpectedBasic2gRates));
+      EXPECT_BYTES_EQ(band_cap.basic_rates()->data(), kExpectedBasic2gRates,
+                      band_cap.basic_rates()->size());
     } else {
       constexpr uint8_t kExpectedBasic5gRates[] = {12, 18, 24, 36, 48, 72, 96, 108};
-      ASSERT_EQ(band_cap.basic_rates().size(), std::size(kExpectedBasic5gRates));
-      EXPECT_BYTES_EQ(band_cap.basic_rates().data(), kExpectedBasic5gRates,
-                      band_cap.basic_rates().size());
+      ASSERT_EQ(band_cap.basic_rates()->size(), std::size(kExpectedBasic5gRates));
+      EXPECT_BYTES_EQ(band_cap.basic_rates()->data(), kExpectedBasic5gRates,
+                      band_cap.basic_rates()->size());
     }
   }
 }
@@ -95,10 +95,10 @@ TEST_F(QueryTest, CheckDefaultHtCaps) {
     ASSERT_TRUE(band_cap.band() == wlan_ieee80211::WlanBand::kTwoGhz ||
                 band_cap.band() == wlan_ieee80211::WlanBand::kFiveGhz);
 
-    ASSERT_TRUE(band_cap.ht_supported());
+    ASSERT_TRUE(band_cap.ht_caps().has_value());
 
     wlan::HtCapabilities* ht_caps =
-        wlan::HtCapabilities::ViewFromRawBytes(band_cap.ht_caps().bytes().data());
+        wlan::HtCapabilities::ViewFromRawBytes(band_cap.ht_caps()->bytes().data());
 
     // From the ldpc_cap iovar. Supported by default.
     EXPECT_TRUE(ht_caps->ht_cap_info.ldpc_coding_cap());
@@ -146,18 +146,18 @@ TEST_F(QueryTest, CheckDefaultVhtCaps) {
   for (auto& band_cap : *ifc_query_result.band_caps()) {
     if (band_cap.band() == wlan_ieee80211::WlanBand::kTwoGhz) {
       // 2Ghz bands don't have VHT caps.
-      ASSERT_FALSE(band_cap.vht_supported());
+      EXPECT_FALSE(band_cap.vht_caps().has_value());
       checked_2ghz_band = true;
       continue;
     }
 
     ASSERT_EQ(band_cap.band(), wlan_ieee80211::WlanBand::kFiveGhz);
-    ASSERT_TRUE(band_cap.vht_supported());
+    ASSERT_TRUE(band_cap.vht_caps().has_value());
 
     checked_5ghz_band = true;
     // Check VHT caps for 5GHz band.
     wlan::VhtCapabilities* vht_caps =
-        wlan::VhtCapabilities::ViewFromRawBytes(band_cap.vht_caps().bytes().data());
+        wlan::VhtCapabilities::ViewFromRawBytes(band_cap.vht_caps()->bytes().data());
 
     // TODO(https://fxbug.dev/42103822): Value hardcoded from firmware behavior of the BCM4356 and
     // BCM4359 chips.
@@ -218,13 +218,13 @@ TEST_F(QueryTest, CheckCapsWithLdpcDisabled) {
   AssertBandCapsSize(ifc_query_result.band_caps());
 
   for (auto& band_cap : *ifc_query_result.band_caps()) {
-    ASSERT_TRUE(band_cap.ht_supported());
+    ASSERT_TRUE(band_cap.ht_caps().has_value());
     wlan::HtCapabilities* ht_caps =
-        wlan::HtCapabilities::ViewFromRawBytes(band_cap.ht_caps().bytes().data());
+        wlan::HtCapabilities::ViewFromRawBytes(band_cap.ht_caps()->bytes().data());
     EXPECT_FALSE(ht_caps->ht_cap_info.ldpc_coding_cap());
-    if (band_cap.vht_supported()) {
+    if (band_cap.vht_caps().has_value()) {
       wlan::VhtCapabilities* vht_caps =
-          wlan::VhtCapabilities::ViewFromRawBytes(band_cap.vht_caps().bytes().data());
+          wlan::VhtCapabilities::ViewFromRawBytes(band_cap.vht_caps()->bytes().data());
       EXPECT_FALSE(vht_caps->vht_cap_info.rx_ldpc());
     }
   }
@@ -238,9 +238,9 @@ TEST_F(QueryTest, CheckCapsWithStbcRxDisabled) {
   AssertBandCapsSize(ifc_query_result.band_caps());
 
   for (auto& band_cap : *ifc_query_result.band_caps()) {
-    ASSERT_TRUE(band_cap.ht_supported());
+    ASSERT_TRUE(band_cap.ht_caps().has_value());
     wlan::HtCapabilities* ht_caps =
-        wlan::HtCapabilities::ViewFromRawBytes(band_cap.ht_caps().bytes().data());
+        wlan::HtCapabilities::ViewFromRawBytes(band_cap.ht_caps()->bytes().data());
     EXPECT_FALSE(ht_caps->ht_cap_info.rx_stbc());
     EXPECT_FALSE(ht_caps->ht_cap_info.tx_stbc());
   }
@@ -260,9 +260,9 @@ TEST_F(QueryTest, CheckCapsWithTxbfHwIovarsFallback) {
 
   for (auto& band_cap : *ifc_query_result.band_caps()) {
     if (band_cap.band() == wlan_ieee80211::WlanBand::kFiveGhz) {
-      ASSERT_TRUE(band_cap.vht_supported());
+      ASSERT_TRUE(band_cap.vht_caps().has_value());
       wlan::VhtCapabilities* vht_caps =
-          wlan::VhtCapabilities::ViewFromRawBytes(band_cap.vht_caps().bytes().data());
+          wlan::VhtCapabilities::ViewFromRawBytes(band_cap.vht_caps()->bytes().data());
       EXPECT_EQ(vht_caps->vht_cap_info.bfee_sts(), 2);
       EXPECT_EQ(vht_caps->vht_cap_info.num_sounding(), SimFirmware::kDefaultTxStreamsCap - 1);
       EXPECT_EQ(vht_caps->vht_cap_info.link_adapt(), 3);
@@ -300,12 +300,37 @@ TEST_F(QueryTest, CheckOperatingChannels) {
 
   for (auto& band_cap : *ifc_query_result.band_caps()) {
     if (band_cap.band() == wlan_ieee80211::WlanBand::kTwoGhz) {
-      EXPECT_EQ(band_cap.operating_channel_count(), 1);
-      EXPECT_EQ(band_cap.operating_channel_list()[0], kExpected2gChannel);
+      ASSERT_EQ(band_cap.operating_channels()->size(), 1);
+      EXPECT_EQ(band_cap.operating_channels()->at(0), kExpected2gChannel);
       checked_2ghz_band = true;
     } else {
-      EXPECT_EQ(band_cap.operating_channel_count(), 1);
-      EXPECT_EQ(band_cap.operating_channel_list()[0], kExpected5gChannel);
+      ASSERT_EQ(band_cap.operating_channels()->size(), 1);
+      EXPECT_EQ(band_cap.operating_channels()->at(0), kExpected5gChannel);
+      checked_5ghz_band = true;
+    }
+  }
+
+  EXPECT_TRUE(checked_2ghz_band);
+  EXPECT_TRUE(checked_5ghz_band);
+}
+
+// Verify that we send up an empty list of operating channels. The platform expects that operating
+// channels is always present.
+TEST_F(QueryTest, CheckOperatingChannelsPresentIfEmpty) {
+  SimFirmware::CapabilityIovars iovars{};
+  ASSERT_TRUE(iovars.SetChanspecList({}).is_ok());
+  SetCapabilityIovars(iovars);
+  fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse ifc_query_result = Query();
+  AssertBandCapsSize(ifc_query_result.band_caps());
+
+  bool checked_2ghz_band = false;
+  bool checked_5ghz_band = false;
+  for (auto& band_cap : *ifc_query_result.band_caps()) {
+    if (band_cap.band() == wlan_ieee80211::WlanBand::kTwoGhz) {
+      ASSERT_EQ(band_cap.operating_channels()->size(), 0);
+      checked_2ghz_band = true;
+    } else {
+      ASSERT_EQ(band_cap.operating_channels()->size(), 0);
       checked_5ghz_band = true;
     }
   }

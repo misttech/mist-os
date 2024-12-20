@@ -99,27 +99,33 @@ type WlanFullmacSignalReportIndication = struct {
     snr_db int8;
 };
 
-type WlanFullmacBandCapability = struct {
-    /// The values of this struct apply to the band indicated in this field.
-    band ieee80211.WlanBand;
+/// Describes parameters and capabilities for a single WlanBand.
+type BandCapability = table {
+    /// The values of this table apply to the band indicated in this field.
+    ///
+    /// Required.
+    1: band ieee80211.WlanBand;
 
     /// Basic rates supported in units of 500 kbit/s (as defined in
     /// IEEE Std 802.11-2016, 9.4.2.3), e.g., 0x02 represents 1 Mbps.
     /// The value returned by this type indicates all the non-HT rates
     /// the device supports transmitting and receiving.
-    basic_rates vector<uint8>:ieee80211.MAX_SUPPORTED_BASIC_RATES;
+    ///
+    /// Required.
+    // TODO(https://fxbug.dev/384771238): Determine if this field is needed.
+    2: basic_rates vector<uint8>:ieee80211.MAX_SUPPORTED_BASIC_RATES;
 
-    /// If the device supports the HT PHY mode in this band, then ht_supported is
-    /// set to true, and the value in ht_caps indicates the capabilities. Otherwise,
-    /// ht_supported is set to false.
-    ht_supported bool;
-    ht_caps ieee80211.HtCapabilities;
+    /// HT PHY mode capabilities.
+    ///
+    /// Optional. If this field is not present, then the device does not support HT PHY mode in this
+    /// band.
+    3: ht_caps ieee80211.HtCapabilities;
 
-    /// If the device supports the VHT PHY mode in this band, then vht_supported is
-    /// set to true, and the value in vht_caps indicates the capabilities. Otherwise,
-    /// vht_supported is set to false.
-    vht_supported bool;
-    vht_caps ieee80211.VhtCapabilities;
+    /// VHT PHY mode capabilities.
+    ///
+    /// Optional. If this field is not present, then the device does not support VHT PHY mode in
+    /// this band.
+    4: vht_caps ieee80211.VhtCapabilities;
 
     /// A list of operating channels considered valid by hardware, in the context of
     /// regulatory information known to the device driver, at the time of its
@@ -130,8 +136,10 @@ type WlanFullmacBandCapability = struct {
     /// This list should be used to determine efficacy of subsequent requests to
     /// scan a subset of channels using the iface, or to determine which operating
     /// channel to use when starting an AP.
-    operating_channel_count uint16;
-    operating_channel_list array<uint8, ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS>;
+    ///
+    /// Required.
+    // TODO(https://fxbug.dev/384771716): Determine if this field is needed.
+    5: operating_channels vector<uint8>:ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS;
 };
 
 type WlanFullmacRssiStats = struct {
@@ -530,7 +538,7 @@ closed protocol WlanFullmacImpl {
         2: role fuchsia.wlan.common.WlanMacRole;
 
         /// Supported bands. Required.
-        3: band_caps vector<WlanFullmacBandCapability>:fuchsia.wlan.common.MAX_BANDS;
+        3: band_caps vector<BandCapability>:fuchsia.wlan.common.MAX_BANDS;
     }) error zx.Status;
 
     strict QueryMacSublayerSupport() -> (struct {

@@ -154,7 +154,8 @@ pub fn convert_device_info(
         .context("missing band_caps")?
         .into_iter()
         .map(|band_cap| convert_band_cap(band_cap))
-        .collect();
+        .collect::<Result<Vec<fidl_mlme::BandCapability>>>()
+        .context("could not convert band_cap")?;
     Ok(fidl_mlme::DeviceInfo {
         sta_addr: info.sta_addr.context("missing sta_addr")?,
         role: info.role.context("missing role")?,
@@ -529,24 +530,17 @@ fn convert_wmm_ac_params(
         acm: params.acm,
     }
 }
-fn convert_band_cap(cap: fidl_fullmac::WlanFullmacBandCapability) -> fidl_mlme::BandCapability {
-    fidl_mlme::BandCapability {
-        band: cap.band,
-        basic_rates: cap.basic_rates,
-        ht_cap: if cap.ht_supported {
-            Some(Box::new(fidl_ieee80211::HtCapabilities { bytes: cap.ht_caps.bytes }))
-        } else {
-            None
-        },
-        vht_cap: if cap.vht_supported {
-            Some(Box::new(fidl_ieee80211::VhtCapabilities { bytes: cap.vht_caps.bytes }))
-        } else {
-            None
-        },
-        operating_channels: cap.operating_channel_list[..cap.operating_channel_count as usize]
-            .to_vec(),
-    }
+
+fn convert_band_cap(cap: fidl_fullmac::BandCapability) -> Result<fidl_mlme::BandCapability> {
+    Ok(fidl_mlme::BandCapability {
+        band: cap.band.context("missing band")?,
+        basic_rates: cap.basic_rates.context("missing basic_rates")?,
+        ht_cap: cap.ht_caps.map(Box::new),
+        vht_cap: cap.vht_caps.map(Box::new),
+        operating_channels: cap.operating_channels.context("missing operating_channels")?,
+    })
 }
+
 fn convert_hist_scope_and_antenna_id(
     scope: fidl_fullmac::WlanFullmacHistScope,
     antenna_id: fidl_fullmac::WlanFullmacAntennaId,
@@ -882,19 +876,17 @@ mod tests {
     //
     #[test]
     fn test_convert_band_cap() {
-        let fullmac = fidl_fullmac::WlanFullmacBandCapability {
-            band: fidl_ieee80211::WlanBand::FiveGhz,
-            basic_rates: vec![123; 3],
-            ht_supported: true,
-            ht_caps: fidl_ieee80211::HtCapabilities { bytes: [8; 26] },
-            vht_supported: true,
-            vht_caps: fidl_ieee80211::VhtCapabilities { bytes: [9; 12] },
-            operating_channel_count: 45,
-            operating_channel_list: [21; 256],
+        let fullmac = fidl_fullmac::BandCapability {
+            band: Some(fidl_ieee80211::WlanBand::FiveGhz),
+            basic_rates: Some(vec![123; 3]),
+            ht_caps: Some(fidl_ieee80211::HtCapabilities { bytes: [8; 26] }),
+            vht_caps: Some(fidl_ieee80211::VhtCapabilities { bytes: [9; 12] }),
+            operating_channels: Some(vec![21; 45]),
+            ..Default::default()
         };
 
         assert_eq!(
-            convert_band_cap(fullmac),
+            convert_band_cap(fullmac).unwrap(),
             fidl_mlme::BandCapability {
                 band: fidl_ieee80211::WlanBand::FiveGhz,
                 basic_rates: vec![123; 3],
@@ -907,18 +899,16 @@ mod tests {
 
     #[test]
     fn test_convert_band_cap_no_ht_vht_become_none() {
-        let fullmac = fidl_fullmac::WlanFullmacBandCapability {
-            band: fidl_ieee80211::WlanBand::FiveGhz,
-            basic_rates: vec![123; 3],
-            ht_supported: false,
-            ht_caps: fidl_ieee80211::HtCapabilities { bytes: [8; 26] },
-            vht_supported: false,
-            vht_caps: fidl_ieee80211::VhtCapabilities { bytes: [9; 12] },
-            operating_channel_count: 45,
-            operating_channel_list: [21; 256],
+        let fullmac = fidl_fullmac::BandCapability {
+            band: Some(fidl_ieee80211::WlanBand::FiveGhz),
+            basic_rates: Some(vec![123; 3]),
+            ht_caps: None,
+            vht_caps: None,
+            operating_channels: Some(vec![21; 45]),
+            ..Default::default()
         };
 
-        let mlme = convert_band_cap(fullmac);
+        let mlme = convert_band_cap(fullmac).unwrap();
         assert!(mlme.ht_cap.is_none());
         assert!(mlme.vht_cap.is_none());
     }

@@ -619,10 +619,10 @@ zx_status_t brcmf_netdev_open(struct net_device* ndev);
 zx_status_t brcmf_if_start(net_device* ndev, zx_handle_t* out_sme_channel);
 void brcmf_if_stop(net_device* ndev);
 
-// Returns the query response in |out_info|, which is allocated on |arena|.
-void brcmf_if_query(net_device* ndev,
-                    fuchsia_wlan_fullmac_wire::WlanFullmacImplQueryResponse* out_info,
-                    fdf::Arena& arena);
+// Returns the query response using natural bindings. The caller is responsible for converting this
+// to wire bindings if necessary.
+void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse& resp);
+
 void brcmf_if_query_mac_sublayer_support(net_device* ndev,
                                          fuchsia_wlan_common::wire::MacSublayerSupport* resp);
 void brcmf_if_query_security_support(net_device* ndev,
