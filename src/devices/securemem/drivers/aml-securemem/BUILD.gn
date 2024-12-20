@@ -26,8 +26,7 @@ group("tests") {
   ]
 }
 
-fuchsia_cc_driver("aml-securemem-driver") {
-  output_name = "aml-securemem"
+source_set("common") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -35,30 +34,41 @@ fuchsia_cc_driver("aml-securemem-driver") {
   sources = [
     "device.cc",
     "device.h",
+    "log.h",
     "secmem-session.cc",
+    "secmem-session.h",
     "sysmem-secure-mem-server.cc",
+    "sysmem-secure-mem-server.h",
   ]
-
   deps = [
-    ":aml-securemem-bind",
+    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/async_patterns/cpp",
+    "//sdk/lib/fit-promise",
+    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+    "//zircon/third_party/ulib/safemath",
+  ]
+  public_deps = [
     "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
-    "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async_patterns/cpp",
-    "//sdk/lib/fit-promise",
-    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
     "//src/security/lib/tee/tee-client-api:tee-client-api-headers",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-    "//zircon/third_party/ulib/safemath",
+  ]
+}
+
+fuchsia_cc_driver("aml-securemem-driver") {
+  output_name = "aml-securemem"
+  deps = [
+    ":aml-securemem-bind",
+    ":common",
   ]
 }
 
@@ -77,39 +87,23 @@ fuchsia_driver_package("package") {
 
 test("aml-securemem-test-bin") {
   output_name = "aml-securemem-test"
-  sources = [
-    "device.cc",
-    "device.h",
-    "secmem-session.cc",
-    "sysmem-secure-mem-server.cc",
-    "test/aml-securemem-test.cc",
-  ]
+  sources = [ "test/aml-securemem-test.cc" ]
   include_dirs = [ "." ]
   deps = [
     ":aml-securemem-bind",
-    "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp",
+    ":common",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
-    "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
-    "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_env",
     "//sdk/lib/fit-promise",
-    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/testing/mock-ddk",
-    "//src/security/lib/tee/tee-client-api:tee-client-api-static",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/zxtest",
-    "//zircon/third_party/ulib/safemath",
   ]
 }
 

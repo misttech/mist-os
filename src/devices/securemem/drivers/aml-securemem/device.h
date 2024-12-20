@@ -16,8 +16,6 @@
 #include <lib/zx/bti.h>
 #include <zircon/types.h>
 
-#include <optional>
-
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 
