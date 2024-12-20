@@ -490,7 +490,7 @@ pub async fn knock_target_daemonless(
 /// an explicit _name_ is provided.  In other contexts, it is valid for the specifier
 /// to be a substring, a network address, etc.
 pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
-    let target_spec = context.get(TARGET_DEFAULT_KEY)?;
+    let target_spec = context.get_optional(TARGET_DEFAULT_KEY)?;
     match target_spec {
         Some(ref target) => info!("Target specifier: ['{target:?}']"),
         None => debug!("No target specified"),

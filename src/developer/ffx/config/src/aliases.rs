@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::api::value::TryConvert;
 use crate::environment::EnvironmentContext;
 use crate::nested::nested_get;
 use crate::ConfigValue;
@@ -57,7 +58,7 @@ async fn get_with_isolated_alias(
     key: &str,
 ) -> Option<(Option<bool>, Option<bool>)> {
     let (v, isov) = ctx.get_with_alias(key, FFX_ISOLATED)?;
-    Some((bool::try_from(v).ok(), bool::try_from(isov).ok()))
+    Some((bool::try_convert(v).ok(), bool::try_convert(isov).ok()))
 }
 
 pub async fn is_usb_discovery_disabled(ctx: &EnvironmentContext) -> bool {

@@ -12,6 +12,7 @@ pub mod value;
 pub type ConfigResult = Result<ConfigValue>;
 pub use query::ConfigQuery;
 pub use value::ConfigValue;
+use value::TryConvert;
 
 #[derive(Debug, Error)]
 #[error("Configuration error")]
@@ -22,6 +23,8 @@ pub enum ConfigError {
     KeyNotFound,
     #[error("Can't remove empty key")]
     EmptyKey,
+    #[error("Bad value: {value}: {reason}")]
+    BadValue { value: Value, reason: String },
 }
 
 impl ConfigError {
@@ -32,10 +35,9 @@ impl ConfigError {
 
 pub(crate) fn validate_type<T>(value: Value) -> Option<Value>
 where
-    T: TryFrom<ConfigValue>,
-    <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
+    T: TryConvert,
 {
-    let result: std::result::Result<T, T::Error> = ConfigValue(Some(value.clone())).try_into();
+    let result = T::try_convert(ConfigValue(Some(value.clone())));
     match result {
         Ok(_) => Some(value),
         Err(_) => None,
