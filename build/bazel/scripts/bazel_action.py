@@ -577,22 +577,13 @@ class BazelLabelMapper(object):
                     # No version, get rid of initial @@
                     file_prefix = file_prefix[1:]
 
-            # First look into $BUILD_DIR/regenerator_outputs/bazel_content_hashes/
-            # then into $WORKSPACE/fuchsia_build_generated/
             hash_file = os.path.join(
-                self._output_dir,
-                "regenerator_outputs",
-                "bazel_content_hashes",
+                self._root_workspace,
+                "fuchsia_build_generated",
                 file_prefix + ".hash",
             )
             if not os.path.exists(hash_file):
-                hash_file = os.path.join(
-                    self._root_workspace,
-                    "fuchsia_build_generated",
-                    file_prefix + ".hash",
-                )
-                if not os.path.exists(hash_file):
-                    hash_file = ""
+                hash_file = ""
 
             self._repository_hash_map[repository_name] = hash_file
 

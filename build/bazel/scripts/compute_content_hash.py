@@ -163,10 +163,6 @@ class FileState(object):
             )
         return self._sorted_input_files
 
-    def get_input_file_paths(self) -> T.Set[Path]:
-        """Return the set of input file Path values used by this instance."""
-        return self._input_files
-
 
 def main() -> int:
     parser = argparse.ArgumentParser(
