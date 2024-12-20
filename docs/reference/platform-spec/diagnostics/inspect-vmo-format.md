@@ -99,7 +99,7 @@ index * 16`).
 
 We use 24 bits for indexes, so Inspect Files may be at most 256MiB.
 
-A `block_header` consists of 16 bytes as follows:
+A `block_header` consists of 8 bytes as follows:
 
 ```mermaid
 ---
@@ -110,7 +110,6 @@ packet-beta
 4-7: "reserved = 0"
 8-15: "type"
 16-63: "depends on type"
-64-127: "depends on type"
 ```
 
 Each block has an `order`, specifying its size.
