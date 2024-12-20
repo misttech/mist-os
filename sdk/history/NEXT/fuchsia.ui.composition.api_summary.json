@@ -301,6 +301,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.ui.composition/Flatland.ReplaceChildren",
+        "strictness": "strict",
+        "ordinal": "6588070039570092822",
+        "direction": "one_way",
+        "request": "fuchsia.ui.composition/FlatlandReplaceChildrenRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.ui.composition/Flatland.SetClipBoundary",
         "strictness": "strict",
         "ordinal": "7279932724241113810",
@@ -762,6 +770,22 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandReplaceChildrenRequest.new_child_transform_ids",
+        "ordinal": "2",
+        "type": "vector<fuchsia.ui.composition/TransformId>:64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.ui.composition/FlatlandReplaceChildrenRequest.parent_transform_id",
+        "ordinal": "1",
+        "type": "fuchsia.ui.composition/TransformId"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.ui.composition/FlatlandReplaceChildrenRequest"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.ui.composition/FlatlandSetClipBoundaryRequest.rect",
         "ordinal": "2",
         "type": "fuchsia.math/Rect:optional"
@@ -1139,6 +1163,12 @@
         "name": "fuchsia.ui.composition/MAX_ACQUIRE_RELEASE_FENCE_COUNT",
         "type": "int32",
         "value": "16"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.ui.composition/MAX_CHILD_TRANSFORMS",
+        "type": "int32",
+        "value": "64"
     },
     {
         "kind": "const",

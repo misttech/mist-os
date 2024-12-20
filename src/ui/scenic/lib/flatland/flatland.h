@@ -153,6 +153,12 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
   void RemoveChild(TransformId parent_transform_id, TransformId child_transform_id);
 
   // |fuchsia_ui_composition::Flatland|
+  void ReplaceChildren(ReplaceChildrenRequest& request,
+                       ReplaceChildrenCompleter::Sync& completer) override;
+  void ReplaceChildren(TransformId parent_transform_id,
+                       const std::vector<TransformId>& new_child_transform_ids);
+
+  // |fuchsia_ui_composition::Flatland|
   void SetRootTransform(SetRootTransformRequest& request,
                         SetRootTransformCompleter::Sync& completer) override;
   void SetRootTransform(TransformId transform_id);

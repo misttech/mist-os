@@ -1408,6 +1408,39 @@ TEST_F(FlatlandTest, AddAndRemoveChildErrorCases) {
   }
 }
 
+TEST_F(FlatlandTest, ReplaceChildren) {
+  const TransformId kIdParent = {1};
+  const TransformId kIdChild1 = {2};
+  const TransformId kIdChild2 = {3};
+  const TransformId kIdChild3 = {4};
+  const TransformId kIdChild4 = {5};
+
+  // Setup.
+  auto SetupFlatland = [&]() {
+    std::shared_ptr<Flatland> flatland = CreateFlatland();
+    flatland->CreateTransform(kIdParent);
+    flatland->CreateTransform(kIdChild1);
+    flatland->CreateTransform(kIdChild2);
+    flatland->CreateTransform(kIdChild3);
+    flatland->CreateTransform(kIdChild4);
+    flatland->AddChild(kIdParent, kIdChild1);
+    return flatland;
+  };
+
+  // ReplaceChildren fails with duplicate new children.
+  {
+    auto flatland = SetupFlatland();
+    flatland->ReplaceChildren(kIdParent, {kIdChild2, kIdChild2, kIdChild3});
+    PRESENT(flatland, false);
+  }
+
+  {
+    auto flatland = SetupFlatland();
+    flatland->ReplaceChildren(kIdParent, {kIdChild2, kIdChild3, kIdChild4});
+    PRESENT(flatland, true);
+  }
+}
+
 // Test that Transforms can be children to multiple different parents.
 TEST_F(FlatlandTest, MultichildUsecase) {
   std::shared_ptr<Flatland> flatland = CreateFlatland();
