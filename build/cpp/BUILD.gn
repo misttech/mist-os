@@ -112,11 +112,7 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/devices/serial/drivers/ftdi:ftdi-driver",
-
-    #------------------
-    #------------------
-    "//src/devices/serial/drivers/ftdi/test:common",
+    "//src/devices/serial/drivers/ftdi:common",
 
     #------------------
     #------------------
