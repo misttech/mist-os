@@ -162,7 +162,17 @@ fn generate(cmd: Command) -> Result<()> {
     let odm_outdir = cmd.outdir.join("odm");
     std::fs::create_dir_all(&odm_outdir)
         .with_context(|| format!("Preparing directory for ODM files: {}", &odm_outdir))?;
-    let mut odm_writer = Writer::new(&odm_outdir)?;
+    let mut odm_writer = Writer::new(&odm_outdir, |path| {
+        // Mimic the SELinux labeling patterns defined for "/odm" in AOSP.
+        let label: &[u8] = if path.len() == 0 {
+            b"u:object_r:vendor_file:s0"
+        } else if path.starts_with(&["etc"]) {
+            b"u:object_r:vendor_configs_file:s0"
+        } else {
+            panic!("No SELinux xattr specified for path {:?}", path);
+        };
+        [((*b"security.selinux").into(), (*label).into())].into()
+    })?;
     odm_writer.add_directory(&["etc"]);
     odm_writer.add_directory(&["etc", "init"]);
     odm_writer.add_directory(&["etc", "vintf"]);
