@@ -39,6 +39,7 @@ source_set("cpp") {
     "layer-id.h",
     "mode-and-id.h",
     "mode.h",
+    "pixel-format.h",
     "rectangle.h",
     "vsync-ack-cookie.h",
   ]
@@ -47,6 +48,8 @@ source_set("cpp") {
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
+    "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/fbl",
   ]
@@ -78,6 +81,7 @@ test_sources = [
   "layer-id-test.cc",
   "mode-and-id-test.cc",
   "mode-test.cc",
+  "pixel-format-test.cc",
   "rectangle-test.cc",
   "vsync-ack-cookie-test.cc",
 ]
