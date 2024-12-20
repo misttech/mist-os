@@ -17,46 +17,32 @@ const_assert!(linux_uapi::S_IFREG < 2_u32.pow(16)); // catch overflow
 const DIRECTORY_MODE: u16 = 0o0555 + linux_uapi::S_IFDIR as u16;
 const_assert!(linux_uapi::S_IFDIR < 2_u32.pow(16)); // catch overflow
 
-type GetExtendedAttributesFn = fn(path: &[&str]) -> ExtendedAttributes;
-
 pub struct Writer {
     pub inner: remote_bundle::Writer,
     next_inode: u64,
-    get_xattrs_for: GetExtendedAttributesFn,
 }
 
 /// Wrapper over [remote_bundle::Writer] that supplies inode numbers and attributes
 /// commonly used in an android image.
 impl Writer {
     /// Creates a remote bundle writer which will store its files at `out_dir`.
-    pub fn new(
-        out_dir: &impl AsRef<str>,
-        get_xattrs_for: GetExtendedAttributesFn,
-    ) -> Result<Writer> {
+    pub fn new(out_dir: &impl AsRef<str>) -> Result<Writer> {
         Ok(Writer {
             inner: remote_bundle::Writer::new(
                 out_dir,
                 ROOT_INODE_NUM,
                 DIRECTORY_MODE,
                 Owner::root(),
-                get_xattrs_for(&[]),
+                ExtendedAttributes::new(),
             )?,
             next_inode: ROOT_INODE_NUM + 1,
-            get_xattrs_for,
         })
     }
 
     /// Add the contents of `data` as a file at `path` in the remote bundle.
     pub fn add_file(&mut self, path: &[&str], data: &mut impl std::io::Read) -> Result<()> {
         let inode = self.alloc_inode();
-        self.inner.add_file(
-            path,
-            data,
-            inode,
-            FILE_MODE,
-            Owner::root(),
-            (self.get_xattrs_for)(path),
-        )
+        self.inner.add_file(path, data, inode, FILE_MODE, Owner::root(), ExtendedAttributes::new())
     }
 
     /// Add an empty directory at `path` in the remote bundle.
@@ -67,7 +53,7 @@ impl Writer {
             inode,
             DIRECTORY_MODE,
             Owner::root(),
-            (self.get_xattrs_for)(path),
+            ExtendedAttributes::new(),
         )
     }
 
