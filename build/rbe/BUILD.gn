@@ -80,47 +80,38 @@ if (is_host) {
   _enable_remote_action_tests = host_os != "mac"
 
   python_library("bbtool") {
-    enable_mypy = true
     sources = _bbtool_sources
   }
   python_host_test("bbtool_test") {
-    enable_mypy = true
     main_source = "bbtool_test.py"
     sources = _bbtool_sources
   }
 
   python_library("build_summary") {
-    enable_mypy = true
     sources = _build_summary_sources
   }
   python_host_test("build_summary_test") {
-    enable_mypy = true
     main_source = "build_summary_test.py"
     sources = _build_summary_sources
   }
 
   python_library("cl_utils") {
-    enable_mypy = true
     sources = _cl_utils_sources
   }
   python_host_test("cl_utils_test") {
-    enable_mypy = true
     main_source = "cl_utils_test.py"
     sources = _cl_utils_sources
   }
 
   python_library("cxx") {
-    enable_mypy = true
     sources = _cxx_sources
   }
   python_host_test("cxx_test") {
-    enable_mypy = true
     main_source = "cxx_test.py"
     sources = _cxx_sources
   }
 
   python_library("cxx_link_remote_wrapper") {
-    enable_mypy = true
     sources = _cxx_link_remote_wrapper_sources
   }
   python_host_test("cxx_link_remote_wrapper_test") {
@@ -130,7 +121,6 @@ if (is_host) {
   }
 
   python_library("cxx_remote_wrapper") {
-    enable_mypy = true
     sources = _cxx_remote_wrapper_sources
   }
   python_host_test("cxx_remote_wrapper_test") {
@@ -140,17 +130,14 @@ if (is_host) {
   }
 
   python_library("depfile") {
-    enable_mypy = true
     sources = _depfile_sources
   }
   python_host_test("depfile_test") {
-    enable_mypy = true
     main_source = "depfile_test.py"
     sources = _depfile_sources
   }
 
   python_library("dlwrap") {
-    enable_mypy = true
     sources = _dlwrap_sources
   }
   python_host_test("dlwrap_test") {
@@ -160,37 +147,30 @@ if (is_host) {
   }
 
   python_library("fuchsia") {
-    enable_mypy = true
     sources = _fuchsia_sources
   }
   python_host_test("fuchsia_test") {
-    enable_mypy = true
     main_source = "fuchsia_test.py"
     sources = _fuchsia_sources
   }
 
   python_library("linker") {
-    enable_mypy = true
     sources = _linker_sources
   }
   python_host_test("linker_test") {
-    enable_mypy = true
     main_source = "linker_test.py"
     sources = _linker_sources
   }
 
   python_library("output_leak_scanner") {
-    enable_mypy = true
     sources = _output_leak_scanner_sources
   }
   python_host_test("output_leak_scanner_test") {
-    enable_mypy = true
     main_source = "output_leak_scanner_test.py"
     sources = _output_leak_scanner_sources
   }
 
   python_library("prebuilt_tool_remote_wrapper") {
-    enable_mypy = true
     sources = _prebuilt_tool_remote_wrapper_sources
   }
   python_host_test("prebuilt_tool_remote_wrapper_test") {
@@ -200,17 +180,14 @@ if (is_host) {
   }
 
   python_library("relativize_args") {
-    enable_mypy = true
     sources = [ "relativize_args.py" ]
   }
   python_host_test("relativize_args_test") {
-    enable_mypy = true
     main_source = "relativize_args_test.py"
     sources = [ "relativize_args.py" ]
   }
 
   python_library("remote_action") {
-    enable_mypy = true
     sources = _remote_action_sources
   }
   python_host_test("remote_action_test") {
@@ -220,27 +197,22 @@ if (is_host) {
   }
 
   python_library("remotetool") {
-    enable_mypy = true
     sources = _remotetool_sources
   }
   python_host_test("remotetool_test") {
-    enable_mypy = true
     main_source = "remotetool_test.py"
     sources = _remotetool_sources
   }
 
   python_library("rustc") {
-    enable_mypy = true
     sources = _rustc_sources
   }
   python_host_test("rustc_test") {
-    enable_mypy = true
     main_source = "rustc_test.py"
     sources = _rustc_sources
   }
 
   python_library("rustc_remote_wrapper") {
-    enable_mypy = true
     sources = _rustc_remote_wrapper_sources
   }
   python_host_test("rustc_remote_wrapper_test") {
@@ -250,21 +222,17 @@ if (is_host) {
   }
 
   python_library("tablefmt") {
-    enable_mypy = true
     sources = _tablefmt_sources
   }
   python_host_test("tablefmt_test") {
-    enable_mypy = true
     main_source = "tablefmt_test.py"
     sources = _tablefmt_sources
   }
 
   python_library("textpb") {
-    enable_mypy = true
     sources = _textpb_sources
   }
   python_host_test("textpb_test") {
-    enable_mypy = true
     main_source = "textpb_test.py"
     sources = _textpb_sources
   }

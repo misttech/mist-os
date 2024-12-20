@@ -60,7 +60,6 @@ validate_json("fhcp-test-json-validate") {
 
 if (is_host) {
   python_host_test("generate-metadata-test") {
-    enable_mypy = true
     main_source = "//src/devices/tests/fhcp/src/generate_metadata_json_test.py"
     sources = [ "//src/devices/tests/fhcp/src/generate_metadata_json.py" ]
   }

@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("build_id_conv_test") {
-    enable_mypy = true
     main_source = "build_id_conv_test.py"
     sources = [ "build_id_conv.py" ]
   }

@@ -118,7 +118,6 @@ template("python_perf_test") {
     python_mobly_test("${_test_target_name}") {
       test_name = "${target_name}"
 
-      enable_mypy = true
       if (defined(invoker.enable_mypy)) {
         enable_mypy = invoker.enable_mypy
       }

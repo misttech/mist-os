@@ -14,7 +14,6 @@ group("tests") {
 
 if (is_host) {
   python_library("dataparse") {
-    enable_mypy = true
     sources = [
       "__init__.py",
       "dataparse.py",
@@ -22,7 +21,6 @@ if (is_host) {
   }
 
   python_host_test("lib_test") {
-    enable_mypy = true
     main_source = "tests/dataparse_test.py"
     main_callable = "unittest.main"
     extra_args = [ "-v" ]

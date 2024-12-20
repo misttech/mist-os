@@ -8,8 +8,6 @@ import("//build/python/python_binary.gni")
 if (is_host) {
   # Main executable target.
   python_binary("power-digest-bin") {
-    enable_mypy = true
-
     # Unbuffer so output can be piped to other programs nicely.
     unbuffered_output = true
 
@@ -25,8 +23,6 @@ if (is_host) {
   }
 
   python_binary("power-viz-bin") {
-    enable_mypy = true
-
     # Unbuffer so output can be piped to other programs nicely.
     unbuffered_output = true
 

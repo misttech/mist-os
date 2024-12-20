@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 
 python_library("fuchsia_inspect") {
-  enable_mypy = true
   library_name = "fuchsia_inspect"
   source_root = "//src/lib/diagnostics/python/fuchsia_inspect"
   sources = [
@@ -18,8 +17,6 @@ python_library("fuchsia_inspect") {
 
 if (is_host) {
   python_host_test("python_inspect_test") {
-    enable_mypy = true
-
     main_source = "tests/test_inspect.py"
     sources = [ "tests/test_inspect.py" ]
     extra_args = [ "-v" ]

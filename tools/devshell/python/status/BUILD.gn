@@ -12,7 +12,6 @@ common_deps = [
 ]
 
 python_binary("status") {
-  enable_mypy = true
   main_source = "main.py"
   sources = [
     "collectors.py",
@@ -23,7 +22,6 @@ python_binary("status") {
 
 if (is_host) {
   python_host_test("status_test") {
-    enable_mypy = true
     main_source = "tests/test_status.py"
     sources = [
       "collectors.py",

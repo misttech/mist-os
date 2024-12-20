@@ -5,7 +5,6 @@
 import("//build/python/python_library.gni")
 
 python_library("lib") {
-  enable_mypy = true
   library_name = "lib"
   sources = [
     "__init__.py",

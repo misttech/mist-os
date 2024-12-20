@@ -20,10 +20,8 @@ if (is_host) {
   ]
 
   python_binary("generated_licenses_spdx_tool") {
-    enable_mypy = true
     main_source = "generated_licenses_spdx_tool.py"
     sources = common_sources
-    enable_mypy = true
     deps = [
       "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/licenses:spdx_types",
     ]
@@ -51,7 +49,6 @@ if (is_host) {
             "collector_test",
           ]) {
     python_host_test(test_name) {
-      enable_mypy = true
       main_source = "${test_name}.py"
       sources = common_sources
       libraries = [ "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/licenses:spdx_types" ]

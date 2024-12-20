@@ -95,7 +95,6 @@ if (is_host) {
   }
 
   python_host_test("gather_package_deps_test") {
-    enable_mypy = true
     main_source = "gather_package_deps_test.py"
     sources = [ "gather_package_deps.py" ]
   }

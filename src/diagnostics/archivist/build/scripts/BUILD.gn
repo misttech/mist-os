@@ -6,13 +6,11 @@ import("//build/python/python_binary.gni")
 import("//build/python/python_host_test.gni")
 
 python_binary("generate_pipeline_test_cml") {
-  enable_mypy = true
   main_source = "generate_pipeline_test_cml.py"
 }
 
 if (is_host) {
   python_host_test("generate_pipeline_test_cml_test") {
-    enable_mypy = true
     main_source = "generate_pipeline_test_cml_test.py"
     sources = [ "generate_pipeline_test_cml.py" ]
   }

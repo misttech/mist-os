@@ -20,7 +20,6 @@ group("e2e_tests") {
 
 if (is_host) {
   python_library("ffx_cmd") {
-    enable_mypy = true
     sources = [
       "__init__.py",
       "inspect.py",
@@ -35,7 +34,6 @@ if (is_host) {
   }
 
   python_host_test("ffx_cmd_tests") {
-    enable_mypy = true
     main_source = "tests/test_ffx_cmd.py"
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
@@ -47,7 +45,6 @@ if (is_host) {
   }
 
   python_mobly_test("ffx_cmd_inspect_e2e_test") {
-    enable_mypy = true
     main_source = "e2e_tests/test_ffx_inspect.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

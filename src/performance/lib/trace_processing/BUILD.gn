@@ -9,7 +9,6 @@ import("//build/python/python_library.gni")
 python_library("trace_processing") {
   testonly = true
   library_name = "trace_processing"
-  enable_mypy = true
   sources = [
     "__init__.py",
     "hardware_configs.py",
@@ -51,7 +50,6 @@ python_binary("run_cpu_breakdown_bin") {
     ":trace_processing",
     "//src/performance/trace2json",
   ]
-  enable_mypy = true
   output_name = "run_cpu_breakdown.pyz"
 }
 
@@ -87,7 +85,6 @@ python_binary("run_power_metrics_bin") {
   testonly = true
   main_source = "run_power_metrics.py"
   deps = [ ":trace_processing" ]
-  enable_mypy = true
   output_name = "run_power_metrics.pyz"
 }
 
@@ -98,7 +95,6 @@ python_binary("run_suspend_metrics_bin") {
     ":trace_processing",
     "//src/performance/trace2json",
   ]
-  enable_mypy = true
   output_name = "run_suspend_metrics.pyz"
 }
 
@@ -123,7 +119,6 @@ python_binary("run_wakeup_metrics_bin") {
     ":trace_processing",
     "//src/performance/trace2json",
   ]
-  enable_mypy = true
   output_name = "run_wakeup_metrics.pyz"
 }
 

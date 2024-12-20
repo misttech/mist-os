@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("system_power_state_controller_using_starnix_test") {
-    enable_mypy = true
     main_source = "system_power_state_controller_using_starnix_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

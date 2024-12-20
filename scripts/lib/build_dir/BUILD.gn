@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 
 python_library("build_dir") {
-  enable_mypy = true
   library_name = "build_dir"
   source_root = "//scripts/lib/build_dir"
   sources = [
@@ -17,8 +16,6 @@ python_library("build_dir") {
 
 if (is_host) {
   python_host_test("build_dir_test") {
-    enable_mypy = true
-
     main_source = "tests/test_build_dir.py"
     sources = [ "tests/test_build_dir.py" ]
 

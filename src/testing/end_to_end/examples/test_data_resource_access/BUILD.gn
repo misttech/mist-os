@@ -22,7 +22,6 @@ python_mobly_test("data_resource_access_test") {
 }
 
 python_library("my_resources") {
-  enable_mypy = true
   testonly = true
   source_root = "my_resources"
   sources = [

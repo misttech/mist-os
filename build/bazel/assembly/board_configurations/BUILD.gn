@@ -5,7 +5,6 @@
 import("//build/python/python_binary.gni")
 
 python_binary("verify_board_configuration") {
-  enable_mypy = true
   main_source = "//build/bazel/assembly/board_configurations/verify_board_configuration.py"
   main_callable = "main"
   deps = [ "//third_party/pyjson5" ]

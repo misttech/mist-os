@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 
 python_library("fx_cmd") {
-  enable_mypy = true
   library_name = "fx_cmd"
   source_root = "//scripts/lib/fx_cmd"
   sources = [
@@ -21,8 +20,6 @@ python_library("fx_cmd") {
 
 if (is_host) {
   python_host_test("fx_cmd_test") {
-    enable_mypy = true
-
     main_source = "tests/test_fx_cmd.py"
     sources = [ "tests/test_fx_cmd.py" ]
     extra_args = [ "-v" ]

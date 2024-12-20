@@ -7,7 +7,6 @@ import("//build/python/python_host_test.gni")
 assert(is_host)
 
 python_host_test("gen_fidldocs_test") {
-  enable_mypy = true
   main_source = "gen_fidldocs_test.py"
   sources = [ "../gen_fidldocs.py" ]
 }

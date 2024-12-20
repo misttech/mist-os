@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("api_ffx_test") {
-    enable_mypy = true
     main_source = "api_ffx_test.py"
     libraries = [
       "//src/testing/end_to_end/mobly_driver",
@@ -15,7 +14,6 @@ if (is_host) {
   }
 
   python_host_test("api_mobly_test") {
-    enable_mypy = true
     main_source = "api_mobly_test.py"
     libraries = [
       "//src/testing/end_to_end/mobly_driver",

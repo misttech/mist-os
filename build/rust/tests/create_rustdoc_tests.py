@@ -421,7 +421,6 @@ class Config:
             f"\n"
             f"if (is_host) {{\n"
             f'  python_host_test("host-test") {{\n'
-            f"    enable_mypy = true\n"
             f'    main_source = "test.py"\n'
             f'    deps = [":host-test-data"]\n'
             f'    extra_args = [rebase_path("$target_gen_dir/{self.index.name}.doc.zip.copy", root_build_dir)]\n'

@@ -7,13 +7,11 @@ import("//build/python/python_host_test.gni")
 assert(is_host)
 
 python_host_test("gen_helpdocs_test") {
-  enable_mypy = true
   main_source = "gen_helpdocs_test.py"
   sources = [ "../gen_helpdocs.py" ]
 }
 
 python_host_test("docsgen_transforms_test") {
-  enable_mypy = true
   main_source = "docsgen_transforms_test.py"
   sources = [ "../docsgen_transforms.py" ]
 }

@@ -9,12 +9,10 @@ import("//build/python/python_host_test.gni")
 assert(is_host, "Only include assembly build scripts via the host toolchain")
 
 python_binary("packages_from_product_assembler") {
-  enable_mypy = true
   main_source = "packages_from_product_assembler.py"
 }
 
 python_binary("generate_scrutiny_configs") {
-  enable_mypy = true
   main_source = "generate_scrutiny_configs.py"
   deps = [
     "//build/python/modules/assembly",
@@ -23,19 +21,16 @@ python_binary("generate_scrutiny_configs") {
 }
 
 python_binary("generate_platform_artifacts") {
-  enable_mypy = true
   main_source = "generate_platform_artifacts.py"
   deps = [ "//build/python/modules/depfile" ]
 }
 
 python_binary("generated_assembly_inputs") {
-  enable_mypy = true
   main_source = "generated_assembly_inputs.py"
   deps = [ "//build/python/modules/assembly" ]
 }
 
 python_binary("check_size_hermetic_inputs") {
-  enable_mypy = true
   main_source = "check_size_hermetic_inputs.py"
   deps = [ "//build/python/modules/assembly" ]
 }
@@ -47,21 +42,18 @@ python_binary("collect_partitions_config") {
 }
 
 python_host_test("compare_json_list_test") {
-  enable_mypy = true
   main_source = "compare_json_list_test.py"
   sources = [ "compare_json_list.py" ]
   libraries = [ "//third_party/parameterized" ]
 }
 
 python_host_test("convert_size_limits_test") {
-  enable_mypy = true
   main_source = "convert_size_limits_test.py"
   sources = [ "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/convert_size_limits.py" ]
   libraries = [ "//third_party/parameterized" ]
 }
 
 python_host_test("check_size_hermetic_inputs_test") {
-  enable_mypy = true
   main_source = "check_size_hermetic_inputs_test.py"
   sources = [ "check_size_hermetic_inputs.py" ]
   libraries = [
@@ -71,7 +63,6 @@ python_host_test("check_size_hermetic_inputs_test") {
 }
 
 python_binary("hermetic_inputs_for_image_assembly") {
-  enable_mypy = true
   main_source = "hermetic_inputs_for_image_assembly.py"
   deps = [
     "//build/python/modules/assembly",
@@ -80,7 +71,6 @@ python_binary("hermetic_inputs_for_image_assembly") {
 }
 
 python_binary("hermetic_inputs_from_assembly_outputs") {
-  enable_mypy = true
   main_source = "hermetic_inputs_from_assembly_outputs.py"
   deps = [
     "//build/python/modules/assembly",
@@ -89,7 +79,6 @@ python_binary("hermetic_inputs_from_assembly_outputs") {
 }
 
 python_binary("make_legacy_config") {
-  enable_mypy = true
   main_source = "make_legacy_config.py"
   deps = [
     "//build/python/modules/assembly",
@@ -99,12 +88,10 @@ python_binary("make_legacy_config") {
 }
 
 python_binary("package_list") {
-  enable_mypy = true
   main_source = "package_list.py"
 }
 
 python_host_test("test_make_legacy_config") {
-  enable_mypy = true
   main_source = "test_make_legacy_config.py"
   sources = [ "make_legacy_config.py" ]
   libraries = [
@@ -115,7 +102,6 @@ python_host_test("test_make_legacy_config") {
 }
 
 python_binary("assembly_input_bundle_tool") {
-  enable_mypy = true
   main_source = "assembly_input_bundle_tool.py"
   deps = [
     "//build/python/modules/assembly",
@@ -124,7 +110,6 @@ python_binary("assembly_input_bundle_tool") {
 }
 
 python_binary("kernel_aib_tool") {
-  enable_mypy = true
   main_source = "kernel_aib.py"
   deps = [ "//build/python/modules/assembly" ]
 }
@@ -141,19 +126,16 @@ copy("assembly_input_bundle_tool_install") {
 }
 
 python_binary("product_def_gn_arg_validator") {
-  enable_mypy = true
   main_source = "validate_product_defs.py"
   deps = [ "//build/python/modules/depfile" ]
 }
 
 python_binary("validate_config_data_is_empty") {
-  enable_mypy = true
   main_source = "validate_config_data_entries_is_empty.py"
   deps = [ "//build/python/modules/serialization" ]
 }
 
 python_binary("developer_overrides") {
-  enable_mypy = true
   main_source = "developer_overrides.py"
   deps = [
     "//build/python/modules/assembly",

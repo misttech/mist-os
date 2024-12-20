@@ -14,7 +14,6 @@
 #     "foo.py",
 #     "bar.py",
 #   ]
-#   enable_mypy = true
 #   output_name = "main.pyz"
 #   deps = [ "//path/to/lib" ]
 # }

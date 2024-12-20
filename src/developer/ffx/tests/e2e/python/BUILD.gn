@@ -39,7 +39,6 @@ python_library("ffx_test_case") {
   visibility = [ ":*" ]
 
   testonly = true
-  enable_mypy = true
   library_name = "ffxtestcase"
   source_root = "//src/developer/ffx/tests/e2e/python"
   sources = [ "__init__.py" ]

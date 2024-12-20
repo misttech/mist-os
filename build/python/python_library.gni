@@ -10,7 +10,6 @@ import("//build/group_with_inputs.gni")
 # ```
 # python_library("lib") {
 #   library_name = "lib"
-#   enable_mypy = true
 #   sources = [
 #     "__init__.py",
 #     "lib.py",

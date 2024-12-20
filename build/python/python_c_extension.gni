@@ -125,7 +125,6 @@ template("python_c_extension") {
         sources += [ rebase_path(stub_output, source_root) ]
       }
     }
-    enable_mypy = true
   }
 }
 

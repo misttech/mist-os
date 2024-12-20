@@ -7,20 +7,17 @@ import("//build/testing/host_test_data.gni")
 
 if (is_host) {
   python_host_test("perf_publish_test") {
-    enable_mypy = true
     main_source = "perf_publish_test.py"
     libraries = [ "//src/performance/lib/perf_publish" ]
     deps = [ ":runtime_deps" ]
   }
 
   python_host_test("metrics_allowlist_test") {
-    enable_mypy = true
     main_source = "metrics_allowlist_test.py"
     libraries = [ "//src/performance/lib/perf_publish" ]
   }
 
   python_host_test("summarize_test") {
-    enable_mypy = true
     main_source = "summarize_test.py"
     libraries = [ "//src/performance/lib/perf_publish" ]
   }

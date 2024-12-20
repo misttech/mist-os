@@ -5,7 +5,6 @@
 import("//build/python/python_host_test.gni")
 
 python_host_test("depfile_module_test") {
-  enable_mypy = true
   main_source = "depfile_test.py"
   libraries = [ "//build/python/modules/depfile" ]
 }

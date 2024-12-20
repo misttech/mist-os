@@ -15,7 +15,6 @@ basic_toolchain("gopher") {
 
 if (is_host) {
   python_host_test("verify_golden_go_proto_file_test") {
-    enable_mypy = true
     main_source = "verify_golden_go_proto_file_test.py"
     sources = [ "verify_golden_go_proto_file.py" ]
   }

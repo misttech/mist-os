@@ -24,7 +24,6 @@ if (is_host) {
   ]
 
   python_binary("search_tests") {
-    enable_mypy = true
     main_source = "search_tests.py"
 
     sources = [ "search_tests.py" ]
@@ -32,7 +31,6 @@ if (is_host) {
   }
 
   python_host_test("test_search_tests") {
-    enable_mypy = true
     main_source = "test_search_tests.py"
     sources = [
       "search_tests.py",

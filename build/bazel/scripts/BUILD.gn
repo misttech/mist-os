@@ -20,7 +20,6 @@ python_build_time_tests("compute_content_hash_test") {
 
 if (is_host) {
   python_host_test("update_workspace_test") {
-    enable_mypy = true
     main_source = "update_workspace_test.py"
     sources = [
       "check_ninja_build_plan.py",
@@ -31,7 +30,6 @@ if (is_host) {
     libraries = [ "//third_party/parameterized" ]
   }
   python_host_test("minimal_workspace_test") {
-    enable_mypy = true
     main_source = "minimal_workspace_test.py"
     sources = [
       "check_ninja_build_plan.py",

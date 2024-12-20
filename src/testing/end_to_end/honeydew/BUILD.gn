@@ -26,7 +26,6 @@ python_library("honeydew_no_testonly") {
     "//src/tests/end_to_end/rtc:*",
   ]
 
-  enable_mypy = true
   library_name = "honeydew"
   source_root = "//src/testing/end_to_end/honeydew/honeydew"
   sources = [

@@ -44,38 +44,32 @@ if (is_host) {
   }
 
   python_host_test("agg_cpu_breakdown_test") {
-    enable_mypy = true
     main_source = "agg_cpu_breakdown_test.py"
     libraries = [ "//src/performance/lib/trace_processing" ]
   }
 
   python_host_test("cpu_breakdown_test") {
-    enable_mypy = true
     main_source = "cpu_breakdown_test.py"
     libraries = [ "//src/performance/lib/trace_processing" ]
   }
 
   python_host_test("memory_test") {
-    enable_mypy = true
     main_source = "memory_test.py"
     libraries = [ "//src/performance/lib/trace_processing" ]
   }
 
   python_host_test("power_metrics_test") {
-    enable_mypy = true
     main_source = "power_metrics_test.py"
     libraries = [ "//src/performance/lib/trace_processing" ]
   }
 
   python_host_test("wakeup_metrics_test") {
-    enable_mypy = true
     main_source = "wakeup_metrics_test.py"
     libraries = [ "//src/performance/lib/trace_processing" ]
     deps = [ ":wakeup_metrics_processor_test_data" ]
   }
 
   python_host_test("trace_importing_test") {
-    enable_mypy = true
     main_source = "trace_importing_test.py"
     sources = [ "test_utils.py" ]
     libraries = [ "//src/performance/lib/trace_processing" ]
@@ -83,7 +77,6 @@ if (is_host) {
   }
 
   python_host_test("trace_metrics_test") {
-    enable_mypy = true
     main_source = "trace_metrics_test.py"
     sources = [ "test_utils.py" ]
     libraries = [
@@ -94,14 +87,12 @@ if (is_host) {
   }
 
   python_host_test("trace_model_test") {
-    enable_mypy = true
     main_source = "trace_model_test.py"
     sources = [ "test_utils.py" ]
     libraries = [ "//src/performance/lib/trace_processing" ]
   }
 
   python_host_test("trace_utils_test") {
-    enable_mypy = true
     main_source = "trace_utils_test.py"
     sources = [ "test_utils.py" ]
     libraries = [ "//src/performance/lib/trace_processing" ]

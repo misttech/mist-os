@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("tracing_fc_test") {
-    enable_mypy = true
     main_source = "tracing_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -17,7 +16,6 @@ if (is_host) {
   }
 
   python_host_test("rtc_fc_test") {
-    enable_mypy = true
     main_source = "rtc_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
@@ -25,7 +23,6 @@ if (is_host) {
   }
 
   python_host_test("user_input_fc_test") {
-    enable_mypy = true
     main_source = "user_input_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
@@ -33,7 +30,6 @@ if (is_host) {
   }
 
   python_host_test("bluetooth_gap_fc_test") {
-    enable_mypy = true
     main_source = "bluetooth_gap_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -43,7 +39,6 @@ if (is_host) {
     extra_args = [ "-v" ]
   }
   python_host_test("bluetooth_le_fc_test") {
-    enable_mypy = true
     main_source = "bluetooth_le_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -53,7 +48,6 @@ if (is_host) {
     extra_args = [ "-v" ]
   }
   python_host_test("bluetooth_fidl_servers_fc_test") {
-    enable_mypy = true
     main_source = "bluetooth_fidl_servers_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
@@ -61,7 +55,6 @@ if (is_host) {
   }
 
   python_host_test("location_fc_test") {
-    enable_mypy = true
     main_source = "location_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
@@ -69,7 +62,6 @@ if (is_host) {
   }
 
   python_host_test("netstack_fc_test") {
-    enable_mypy = true
     main_source = "netstack_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"

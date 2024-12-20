@@ -5,7 +5,6 @@
 import("//build/python/python_library.gni")
 
 python_library("perf_publish") {
-  enable_mypy = true
   testonly = true
   library_name = "perf_publish"
   sources = [
