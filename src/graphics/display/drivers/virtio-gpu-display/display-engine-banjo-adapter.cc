@@ -180,8 +180,9 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   cpp20::span<display::LayerCompositionOperations> layer_composition_operations(
       &layer0_composition_operations, 1);
 
-  display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
-      display::ToDisplayId(banjo_display_config.display_id), layers, layer_composition_operations);
+  display::ConfigCheckResult config_check_result =
+      engine_.CheckConfiguration(display::ToDisplayId(banjo_display_config.display_id),
+                                 display::ModeId(1), layers, layer_composition_operations);
 
   if (config_check_result == display::ConfigCheckResult::kUnsupportedConfig) {
     // `layer_composition_operations` needs to be converted.
@@ -236,7 +237,8 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
   display::DriverLayer layer(banjo_layers[0]);
   cpp20::span<const display::DriverLayer> layers(&layer, 1);
 
-  engine_.ApplyConfiguration(display::ToDisplayId(banjo_display_config.display_id), layers,
+  engine_.ApplyConfiguration(display::ToDisplayId(banjo_display_config.display_id),
+                             display::ModeId(1), layers,
                              display::ToConfigStamp(*banjo_config_stamp));
 }
 

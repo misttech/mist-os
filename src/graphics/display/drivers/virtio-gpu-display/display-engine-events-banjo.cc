@@ -16,6 +16,7 @@
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
 
 namespace virtio_display {
@@ -35,12 +36,14 @@ void DisplayEngineEventsBanjo::SetListener(
 }
 
 void DisplayEngineEventsBanjo::OnDisplayAdded(
-    display::DisplayId display_id, cpp20::span<const display::Mode> preferred_modes,
+    display::DisplayId display_id, cpp20::span<const display::ModeAndId> preferred_modes,
     cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats) {
   ZX_DEBUG_ASSERT(preferred_modes.size() == 1);
   ZX_DEBUG_ASSERT(pixel_formats.size() == 1);
 
-  const display_mode_t banjo_preferred_mode = preferred_modes[0].ToBanjo();
+  ZX_DEBUG_ASSERT(preferred_modes[0].id() == display::ModeId(1));
+
+  const display_mode_t banjo_preferred_mode = preferred_modes[0].mode().ToBanjo();
   const cpp20::span<const display_mode_t> banjo_preferred_modes(&banjo_preferred_mode, 1);
 
   const fuchsia_images2_pixel_format_enum_value_t banjo_pixel_format =

@@ -43,6 +43,8 @@
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
@@ -55,18 +57,22 @@ namespace {
 constexpr fuchsia_images2::wire::PixelFormat kSupportedPixelFormat =
     fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
 constexpr uint32_t kRefreshRateHz = 30;
-constexpr display::DisplayId kDisplayId{1};
+constexpr display::DisplayId kDisplayId(1);
+constexpr display::ModeId kDisplayModeId(1);
 
 }  // namespace
 
 void DisplayEngine::OnCoordinatorConnected() {
-  const display::Mode mode({
-      .active_width = static_cast<int32_t>(current_display_.scanout_info.geometry.width),
-      .active_height = static_cast<int32_t>(current_display_.scanout_info.geometry.height),
-      .refresh_rate_millihertz = kRefreshRateHz * 1'000,
+  const display::ModeAndId mode_and_id({
+      .id = kDisplayModeId,
+      .mode = display::Mode({
+          .active_width = static_cast<int32_t>(current_display_.scanout_info.geometry.width),
+          .active_height = static_cast<int32_t>(current_display_.scanout_info.geometry.height),
+          .refresh_rate_millihertz = kRefreshRateHz * 1'000,
+      }),
   });
 
-  const cpp20::span<const display::Mode> preferred_modes(&mode, 1);
+  const cpp20::span<const display::ModeAndId> preferred_modes(&mode_and_id, 1);
   const cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats(&kSupportedPixelFormat,
                                                                             1);
   engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, pixel_formats);
@@ -156,12 +162,17 @@ void DisplayEngine::ReleaseImage(display::DriverImageId image_id) {
 }
 
 display::ConfigCheckResult DisplayEngine::CheckConfiguration(
-    display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
+    display::DisplayId display_id, display::ModeId display_mode_id,
+    cpp20::span<const display::DriverLayer> layers,
     cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
 
   ZX_DEBUG_ASSERT(layer_composition_operations.size() == layers.size());
   ZX_DEBUG_ASSERT(layers.size() == 1);
+
+  if (display_mode_id != kDisplayModeId) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
+  }
 
   const display::DriverLayer& layer = layers[0];
   const display::Rectangle display_area({
@@ -197,8 +208,12 @@ display::ConfigCheckResult DisplayEngine::CheckConfiguration(
 }
 
 void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
+                                       display::ModeId display_mode_id,
                                        cpp20::span<const display::DriverLayer> layers,
                                        display::ConfigStamp config_stamp) {
+  ZX_DEBUG_ASSERT(display_id == kDisplayId);
+  ZX_DEBUG_ASSERT(display_mode_id == kDisplayModeId);
+
   ZX_DEBUG_ASSERT(layers.size() == 1);
   const display::DriverImageId image_id = layers[0].image_id();
   const ImportedImage* imported_image = imported_images_.FindImageById(image_id);

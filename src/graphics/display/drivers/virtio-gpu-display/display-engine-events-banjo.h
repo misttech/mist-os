@@ -15,7 +15,7 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
-#include "src/graphics/display/lib/api-types/cpp/mode.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 
 namespace virtio_display {
 
@@ -40,7 +40,7 @@ class DisplayEngineEventsBanjo final : public DisplayEngineEventsInterface {
 
   // DisplayEngineEventsInterface:
   void OnDisplayAdded(display::DisplayId display_id,
-                      cpp20::span<const display::Mode> preferred_modes,
+                      cpp20::span<const display::ModeAndId> preferred_modes,
                       cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats) override;
   void OnDisplayRemoved(display::DisplayId display_id) override;
   void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,

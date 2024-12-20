@@ -21,6 +21,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace virtio_display {
 
@@ -63,10 +64,11 @@ class DisplayEngineInterface {
   // `layer_composition_operations` must be set to a sequence of operations that
   // are likely to yield an acceptable configuration.
   virtual display::ConfigCheckResult CheckConfiguration(
-      display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
+      display::DisplayId display_id, display::ModeId display_mode_id,
+      cpp20::span<const display::DriverLayer> layers,
       cpp20::span<display::LayerCompositionOperations> layer_composition_operations) = 0;
 
-  virtual void ApplyConfiguration(display::DisplayId display_id,
+  virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                                   cpp20::span<const display::DriverLayer> layers,
                                   display::ConfigStamp config_stamp) = 0;
 

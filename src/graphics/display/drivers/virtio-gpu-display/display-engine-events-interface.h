@@ -12,7 +12,7 @@
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
-#include "src/graphics/display/lib/api-types/cpp/mode.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 
 namespace virtio_display {
 
@@ -34,7 +34,7 @@ class DisplayEngineEventsInterface {
   DisplayEngineEventsInterface& operator=(DisplayEngineEventsInterface&&) = delete;
 
   virtual void OnDisplayAdded(
-      display::DisplayId display_id, cpp20::span<const display::Mode> preferred_modes,
+      display::DisplayId display_id, cpp20::span<const display::ModeAndId> preferred_modes,
       cpp20::span<const fuchsia_images2::wire::PixelFormat> pixel_formats) = 0;
   virtual void OnDisplayRemoved(display::DisplayId display_id) = 0;
   virtual void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
