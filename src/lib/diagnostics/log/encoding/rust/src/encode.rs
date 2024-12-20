@@ -854,6 +854,21 @@ pub enum EncodingError {
     /// We attempted to write to a buffer with no remaining capacity.
     #[error("the buffer has no remaining capacity")]
     NoCapacity,
+
+    /// Some other error happened. Useful for integrating with this crate, but providing custom
+    /// errors.
+    #[error(transparent)]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl EncodingError {
+    /// Treat a custom error as an encoding error.
+    pub fn other<E>(err: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        Self::Other(err.into())
+    }
 }
 
 impl From<TryFromSliceError> for EncodingError {

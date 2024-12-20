@@ -1,7 +1,6 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use super::SeverityExt;
 use crate::OnInterestChanged;
 use diagnostics_log_encoding::encode::TestRecord;
 use diagnostics_log_types::Severity;
@@ -10,7 +9,6 @@ use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
 use std::future::Future;
 use std::sync::{Arc, Mutex, RwLock};
-use tracing::Metadata;
 
 pub(crate) struct InterestFilter {
     min_severity: Arc<RwLock<Severity>>,
@@ -90,9 +88,9 @@ impl InterestFilter {
         }
     }
 
-    pub fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+    pub fn enabled(&self, severity: Severity) -> bool {
         let min_severity = self.min_severity.read().unwrap();
-        metadata.severity() >= *min_severity
+        severity >= *min_severity
     }
 
     pub fn enabled_for_testing(&self, record: &TestRecord<'_>) -> bool {
@@ -135,7 +133,7 @@ mod tests {
         }
 
         fn enabled(&self, metadata: &Metadata<'_>, _ctx: Context<'_, S>) -> bool {
-            self.enabled(metadata)
+            self.enabled(metadata.severity())
         }
     }
 

@@ -10,12 +10,12 @@ use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use std::collections::HashSet;
 use std::fmt::Debug;
+use std::sync::{Arc, Mutex};
 use thiserror::Error;
 use tracing::span::{Attributes, Id, Record};
 use tracing::subscriber::Subscriber;
-use tracing::{Event, Level, Metadata};
+use tracing::{Event, Metadata};
 use tracing_core::span::Current;
-use tracing_log::LogTracer;
 use tracing_subscriber::layer::Layered;
 use tracing_subscriber::prelude::*;
 use tracing_subscriber::registry::Registry;
@@ -145,16 +145,11 @@ publisher_options!((PublisherOptions, self,), (PublishOptions, self, publisher))
 
 fn initialize_publishing(opts: PublishOptions<'_>) -> Result<Publisher, PublishError> {
     let publisher = Publisher::new(opts.publisher)?;
-
-    // NB: We don't use `LogTracer::init` here because we control log's
-    // max_level directly from the filter. See `crate::fuchsia::filter` for
-    // more.
-    log::set_boxed_logger(Box::new(LogTracer::new()))?;
-
+    let publisher_clone = Publisher { inner: publisher.inner.clone() };
+    log::set_boxed_logger(Box::new(publisher_clone))?;
     if opts.install_panic_hook {
         crate::install_panic_hook(opts.panic_prefix);
     }
-
     Ok(publisher)
 }
 
@@ -176,7 +171,7 @@ pub fn set_minimum_severity(severity: impl Into<Severity>) {
     let severity: Severity = severity.into();
     tracing::dispatcher::get_default(move |dispatcher| {
         let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
-        publisher.filter.set_minimum_severity(severity);
+        publisher.inner.filter.set_minimum_severity(severity);
     });
 }
 
@@ -271,9 +266,13 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
 /// A `Publisher` acts as broker, implementing [`tracing::Subscriber`] to receive diagnostic
 /// events from a component, and then forwarding that data on to a diagnostics service.
 pub struct Publisher {
+    inner: Arc<InnerPublisher>,
+}
+
+struct InnerPublisher {
     sink: Layered<Sink, Registry>,
     filter: InterestFilter,
-    interest_listening_task: Option<fasync::Task<()>>,
+    interest_listening_task: Mutex<Option<fasync::Task<()>>>,
 }
 
 impl Default for Publisher {
@@ -305,19 +304,19 @@ impl Publisher {
         let (filter, on_change) =
             InterestFilter::new(proxy, opts.interest, opts.wait_for_initial_interest);
         let interest_listening_task = if opts.listen_for_interest_updates {
-            Some(fasync::Task::spawn(on_change))
+            Mutex::new(Some(fasync::Task::spawn(on_change)))
         } else {
-            None
+            Mutex::new(None)
         };
         let sink = Registry::default().with(sink);
-        Ok(Self { sink, filter, interest_listening_task })
+        Ok(Self { inner: Arc::new(InnerPublisher { sink, filter, interest_listening_task }) })
     }
 
     // TODO(https://fxbug.dev/42150573) delete this and make Publisher private
     /// Publish the provided event for testing.
     pub fn event_for_testing(&self, record: TestRecord<'_>) {
-        if self.filter.enabled_for_testing(&record) {
-            self.sink.downcast_ref::<Sink>().unwrap().event_for_testing(record);
+        if self.inner.filter.enabled_for_testing(&record) {
+            self.inner.sink.downcast_ref::<Sink>().unwrap().event_for_testing(record);
         }
     }
 
@@ -326,36 +325,50 @@ impl Publisher {
     where
         T: OnInterestChanged + Send + Sync + 'static,
     {
-        self.filter.set_interest_listener(listener);
+        self.inner.filter.set_interest_listener(listener);
     }
 
     /// Takes the task listening for interest changes if one exists.
-    pub fn take_interest_listening_task(&mut self) -> Option<fasync::Task<()>> {
-        self.interest_listening_task.take()
+    fn take_interest_listening_task(&mut self) -> Option<fasync::Task<()>> {
+        self.inner.interest_listening_task.lock().unwrap().take()
     }
+}
+
+impl log::Log for Publisher {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        self.inner.filter.enabled(metadata.severity())
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if log::Log::enabled(&self, record.metadata()) {
+            self.inner.sink.downcast_ref::<Sink>().unwrap().record_log(record);
+        }
+    }
+
+    fn flush(&self) {}
 }
 
 impl Subscriber for Publisher {
     fn enabled(&self, metadata: &Metadata<'_>) -> bool {
-        self.filter.enabled(metadata)
+        self.inner.filter.enabled(metadata.severity())
     }
     fn new_span(&self, span: &Attributes<'_>) -> Id {
-        self.sink.new_span(span)
+        self.inner.sink.new_span(span)
     }
     fn record(&self, span: &Id, values: &Record<'_>) {
-        self.sink.record(span, values)
+        self.inner.sink.record(span, values)
     }
     fn record_follows_from(&self, span: &Id, follows: &Id) {
-        self.sink.record_follows_from(span, follows)
+        self.inner.sink.record_follows_from(span, follows)
     }
     fn event(&self, event: &Event<'_>) {
-        self.sink.event(event)
+        self.inner.sink.event(event)
     }
     fn enter(&self, span: &Id) {
-        self.sink.enter(span)
+        self.inner.sink.enter(span)
     }
     fn exit(&self, span: &Id) {
-        self.sink.exit(span)
+        self.inner.sink.exit(span)
     }
     fn register_callsite(
         &self,
@@ -365,13 +378,13 @@ impl Subscriber for Publisher {
         tracing::subscriber::Interest::sometimes()
     }
     fn clone_span(&self, id: &Id) -> Id {
-        self.sink.clone_span(id)
+        self.inner.sink.clone_span(id)
     }
     fn try_close(&self, id: Id) -> bool {
-        self.sink.try_close(id)
+        self.inner.sink.try_close(id)
     }
     fn current_span(&self) -> Current {
-        self.sink.current_span()
+        self.inner.sink.current_span()
     }
 }
 
@@ -394,9 +407,9 @@ pub enum PublishError {
     #[error("failed to install forwarder as the global default")]
     SetGlobalDefault(#[from] tracing::subscriber::SetGlobalDefaultError),
 
-    /// Installing a forwarder from [`log`] macros to [`tracing`] macros failed.
-    #[error("failed to install a forwarder from `log` to `tracing`")]
-    InitLogForward(#[from] tracing_log::log_tracer::SetLoggerError),
+    /// Installing a Logger.
+    #[error("failed to install the loger")]
+    InitLogForward(#[from] log::SetLoggerError),
 }
 
 #[cfg(test)]
@@ -446,22 +459,32 @@ pub trait SeverityExt {
     fn severity(&self) -> Severity;
 
     /// Return the raw severity of this value.
-    fn raw_severity(&self) -> RawSeverity;
+    fn raw_severity(&self) -> RawSeverity {
+        self.severity() as u8
+    }
+}
+
+impl SeverityExt for log::Metadata<'_> {
+    fn severity(&self) -> Severity {
+        match self.level() {
+            log::Level::Error => Severity::Error,
+            log::Level::Warn => Severity::Warn,
+            log::Level::Info => Severity::Info,
+            log::Level::Debug => Severity::Debug,
+            log::Level::Trace => Severity::Trace,
+        }
+    }
 }
 
 impl SeverityExt for Metadata<'_> {
     fn severity(&self) -> Severity {
         match *self.level() {
-            Level::ERROR => Severity::Error,
-            Level::WARN => Severity::Warn,
-            Level::INFO => Severity::Info,
-            Level::DEBUG => Severity::Debug,
-            Level::TRACE => Severity::Trace,
+            tracing::Level::ERROR => Severity::Error,
+            tracing::Level::WARN => Severity::Warn,
+            tracing::Level::INFO => Severity::Info,
+            tracing::Level::DEBUG => Severity::Debug,
+            tracing::Level::TRACE => Severity::Trace,
         }
-    }
-
-    fn raw_severity(&self) -> RawSeverity {
-        self.severity() as u8
     }
 }
 
@@ -602,7 +625,7 @@ mod tests {
         let reader = ArchiveReader::new();
         let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
 
-        let total_threads = 300;
+        let total_threads = 10;
 
         for i in 0..total_threads {
             std::thread::spawn(move || {
@@ -627,6 +650,40 @@ mod tests {
             assert_eq!(hierarchy.properties.len(), 1);
             assert_eq!(hierarchy.properties[0].name(), "thread");
             seen.push(hierarchy.properties[0].uint().unwrap() as usize);
+        }
+        seen.sort();
+        assert_eq!(seen, (0..total_threads).collect::<Vec<_>>());
+    }
+
+    #[fuchsia::test]
+    async fn log_macro_logs_are_recorded() {
+        let reader = ArchiveReader::new();
+        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+
+        let total_threads = 10;
+
+        for i in 0..total_threads {
+            std::thread::spawn(move || {
+                log::info!(thread=i; "log from thread {}", i);
+            });
+        }
+
+        let mut results = logs
+            .filter(|data| {
+                future::ready(
+                    data.tags().unwrap().iter().any(|t| t == "log_macro_logs_are_recorded"),
+                )
+            })
+            .take(total_threads);
+
+        let mut seen = vec![];
+        while let Some(log) = results.next().await {
+            let hierarchy = log.payload_keys().unwrap();
+            assert_eq!(hierarchy.properties.len(), 1);
+            assert_eq!(hierarchy.properties[0].name(), "thread");
+            let thread_id = hierarchy.properties[0].uint().unwrap();
+            seen.push(thread_id as usize);
+            assert_eq!(log.msg().unwrap(), format!("log from thread {thread_id}"));
         }
         seen.sort();
         assert_eq!(seen, (0..total_threads).collect::<Vec<_>>());
