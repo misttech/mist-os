@@ -1,23 +1,26 @@
 # Adding diagrams to documentation
 
 Diagrams are useful in documentation to help illustrate engineering concepts and
-guides. However, it's important to ensure diagrams on fuchia.dev are accessible
+guides. However, it's important to ensure diagrams on fuchsia.dev are accessible
 and updatable. This guide shows you how to add maintainable diagrams to Fuchsia
 documentation.
 
 ## Types of diagrams
 
-* Generate a simple flow diagram from text in the source code
-(example: [Sequence Diagram](https://bramp.github.io/js-sequence-diagrams/) or
-[go/sequencediagram](http://goto.google.com/sequencediagram) for Googlers)
+* Generate a simple flow diagram from text in the source code. For example:
 
-* Create a visual diagram in Google Drawings, Slides, or other tool
+  * [Mermaid][mermaid]: This is a simple way to maintain diagrams
+    that are generated from text in the source code.
+  * [Sequence Diagram](https://bramp.github.io/js-sequence-diagrams/).
+  * (Googlers only) [go/sequencediagram](http://goto.google.com/sequencediagram).
+
+* Create a visual diagram in Google Drawings, Slides, or other tools.
 
 {% dynamic if user.is_googler %}
 
-* For more complex images, high-level concepts, or diagrams that
-require UX design, partner with XD to create a diagram in Figma. [File a bug](http://goto.google.com/xd-bug)
-to request assistance.
+For more complex images, high-level concepts, or diagrams that require UX
+design, partner with XD to create a diagram in Figma.
+[File a bug](http://goto.google.com/xd-bug) to request assistance.
 
 {% dynamic endif %}
 
@@ -26,59 +29,122 @@ to request assistance.
 If you are creating a visual diagram for documentation on fuchsia.dev, follow
 these steps:
 
-1. Create a visual diagram in your tool of choice and export the image
-as a .svg (suggested) or .png file
+1. Create a visual diagram in your tool of choice and either use a code block
+   for tools like Mermaid or export the image as a `.svg` (suggested) or `.png`
+   file.
 
-* Optimize your image to ensure it loads quickly. Large images can slow down
-page load times.
-* Use SVG (Scalable Vector Graphics) format whenever possible. SVGs are
-scalable, accessible, and have a smaller file size compared to other image
-formats.
+   For images, ensure to do the following:
 
-2. Embed the image on fuchsia.dev using Markdown [see instructions](/docs/contribute/docs/markdown.md#images)
+   * Optimize your image to ensure it loads quickly. Large images can increase
+     page load times.
+   * Use SVG (Scalable Vector Graphics) format whenever possible. SVGs are
+     scalable, accessible, and have a smaller file size compared to other image
+     formats.
 
-* Store your image in the same directory as your Markdown file
+2. Embed the image on fuchsia.dev using Markdown. For example:
+   [see instructions](/docs/contribute/docs/markdown.md#images).
 
-3. Add alt text to the image. Alt text helps screen reader users
-understand the content of your image.
+   Note: If applicable, store your image in a `image/` directory near your Markdown
+   file.
 
-```
-![Alt text](image_filename.svg)
-```
+   * {mermaid}
 
-* Replace `Alt text` with a concise description of the image
-* Replace `image_filename.svg` with the actual filename of your image
+      Note: Use the [Mermaid live editor][mermaid] to create your diagram.
 
-Example:
+      * {markdown}
 
-```
-![A flowchart showing the boot process of a Fuchsia device. The process starts
-with the bootloader, then moves to Zircon kernel, and finally to the user
-space.](component_framework.svg)
-```
+          <pre>
+          {% verbatim %}
+          ```mermaid
+          graph LR
+          A[Square Rect] -- Link text --> B((Circle))
+          A --> C(Round Rect)
+          B --> D{Rhombus}
+          C --> D
+          ```
+          {% endverbatim %}
+          </pre>
+
+      * {html}
+
+          ```none
+          {% verbatim %}
+          <pre class="mermaid">
+            graph LR
+            A[Square Rect] -- Link text --> B((Circle))
+            A --> C(Round Rect)
+            B --> D{Rhombus}
+            C --> D
+          </pre>
+          {% endverbatim %}
+          ```
+
+      * {Rendered}
+
+          <div>
+            {% framebox %}
+            <script type="module">
+              import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+            </script>
+
+            <pre class="mermaid">
+              graph LR
+              A[Square Rect] -- Link text --> B((Circle))
+              A --> C(Round Rect)
+              B --> D{Rhombus}
+              C --> D
+            </pre>
+            {% endframebox %}
+          </div>
+
+   * {.svg/.png}
+
+     Make sure to add alt text to the image. Alt text helps screen reader users
+     understand the content of your image. For example:
+
+      ```none
+      ![Alt text](image_filename.svg)
+      ```
+
+      * Replace `Alt text` with a concise description of the image.
+      * Replace `image_filename.svg` with the actual filename of your image.
+
+      For example:
+
+      ```none
+      ![A flowchart showing the boot process of a Fuchsia device. The process starts
+      with the bootloader, then moves to Zircon kernel, and finally to the user
+      space.](component_framework.svg)
+      ```
 
 {% dynamic if user.is_googler %}
 
-4. Create a bug for the diagram [go/fuchsia-diagram](http://goto.google.com/fuchsia-diagram).
-Include:
+If you used an internal tool to create your diagram, follow these additional
+steps:
 
-* Author or owner - best contact for maintaining the diagram
-* Link to source file (Google drawings, Slides, Figma, etc - ensure files are
-shared with rvos)
-* Link to page on fuchsia.dev where diagram can be found
-* Alt text
+1. If your diagram was created internally, create a bug for the diagram
+   [go/fuchsia-diagram](http://goto.google.com/fuchsia-diagram). In the bug,
+   include:
 
-5. Add a comment in Markdown with a link to the bug that contains the
-diagram source information
+   * Author or owner - best point of contact for maintaining the diagram.
+   * Link to the source file (Google drawings, Slides, Figma, etc - ensure files
+     are shared with rvos).
+   * Link to page on fuchsia.dev where the diagram can be found.
+   * Alt text.
 
-```
-{# Diagram source: link to bug #}
-```
+2. Add a comment in the markdown file with a link to the bug that contains the
+   diagram source information. For example:
 
-Note: We are intentionally making these bugs internal-only, even though there
-will be some instances when the diagram is visible to the public on an open-
-source page. We acknowledge this is not best practice but the bug links will be
-labeled “Diagram source” for transparency.
+    Note: These bugs are intentionally internal-only, even though there
+    may be instances when the diagram is visible to the public on an open source
+    page. While this may not fall under the best practice, the bug links will be
+    labeled “Diagram source” for transparency.
+
+    ```none
+    {% verbatim %}
+    {# Diagram source: link to bug #}
+    {% endverbatim %}
+    ```
 
 {% dynamic endif %}
 
@@ -89,45 +155,45 @@ Diagrams are a useful tool for providing additional clarity or context that is
 not easily conveyed through words alone. Effective diagrams should directly
 support and enhance the accompanying text in documentation.
 
-**Focus:** Each diagram should have a clear focus and convey a specific concept
-or idea. Label all elements clearly and concisely.
+* **Focus:** Each diagram should have a clear focus and convey a specific
+  concept or idea. Label all elements clearly and concisely.
 
-**Simplicity:** Strive for visual clarity. Avoid excessive complexity or visual
-clutter that might confuse the reader.
+* **Simplicity:** Strive for visual clarity. Avoid excessive complexity or
+  visual clutter that might confuse the reader.
 
-**Consistency:** Maintain a consistent style and visual language across all
-diagrams within Fuchsia documentation.
+* **Consistency:** Maintain a consistent style and visual language across all
+  diagrams within Fuchsia documentation.
 
-**Internationalization:** Keep text within diagrams to a minimum. If text is
-necessary, ensure it is translatable and localized. Use universally recognized
-symbols and icons whenever possible.
+* **Internationalization:** Keep text within diagrams to a minimum. If text is
+  necessary, ensure it is translatable and localized. Use universally recognized
+  symbols and icons whenever possible.
 
 ### Design considerations
 
-**Visual hierarchy:** Use clear and consistent visual hierarchy to guide the
-reader's eye through the diagram. Use whitespace to create visual separation and
-improve readability.
+* **Visual hierarchy:** Use clear and consistent visual hierarchy to guide the
+  reader's eye through the diagram. Use whitespace to create visual separation
+  and improve readability.
 
-**Color:** Use sufficient color contrast to ensure readability for users with
-visual impairments. Avoid using color as the sole means of conveying
-information.
+* **Color:** Use sufficient color contrast to ensure readability for users with
+  visual impairments. Avoid using color as the sole means of conveying
+  information.
 
-**Scalability:** Ensure diagrams are scalable and can be zoomed in without
-losing clarity.
+* **Scalability:** Ensure diagrams are scalable and can be zoomed in without
+  losing clarity.
 
 ### Alt text
 
 Provide concise and informative alternative text descriptions for all diagrams. Alt text should:
 
-* Accurately describe the content and purpose of the diagram
-* Use plain language that is easy for everyone to understand
-* Be concise and to the point, avoiding unnecessary detail
-* If a diagram contains text, include that text in the alt text
+* Accurately describe the content and purpose of the diagram.
+* Use plain language that is easy for everyone to understand.
+* Be concise and to the point, avoiding unnecessary detail.
+* If a diagram contains text, include that text in the alt text.
 
 Note: Avoid using phrases like "image of" or "diagram of" as screen readers
 already identify them as images.
 
-**Alt text examples**
+**Alt text examples**:
 
 <table>
   <tr>
@@ -158,3 +224,5 @@ already identify them as images.
    </td>
   </tr>
 </table>
+
+[mermaid]: https://mermaid.live/
