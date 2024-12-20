@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::security;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{
     fs_node_impl_not_dir, CacheMode, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
@@ -49,12 +50,9 @@ impl Anon {
         info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
-        FileObject::new_anonymous(
-            current_task,
-            ops,
-            fs.create_node(current_task, Anon { name: Some(name) }, info),
-            flags,
-        )
+        let node = fs.create_node(current_task, Anon { name: Some(name) }, info);
+        security::fs_node_init_anon(current_task, &node, name);
+        FileObject::new_anonymous(current_task, ops, node, flags)
     }
 
     pub fn new_file(

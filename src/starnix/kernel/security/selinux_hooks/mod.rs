@@ -473,6 +473,21 @@ pub(super) fn fs_node_init_on_create(
     }
 }
 
+/// Called to label file nodes not linked in any filesystem's directory structure, e.g. sockets,
+/// usereventfds, etc.
+pub(super) fn fs_node_init_anon(
+    _security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    new_node: &FsNode,
+    _node_type: &str,
+) {
+    track_stub!(TODO("https://fxbug.dev/364568735"), "Apply labeling rules to anon_inodes");
+    let sid = current_task.security_state.lock().current_sid;
+    let mut state = new_node.security_state.lock();
+    state.class = FileClass::AnonFsNode;
+    state.label = FsNodeLabel::SecurityId { sid };
+}
+
 /// Helper used by filesystem node creation checks to validate that `current_task` has necessary
 /// permissions to create a new node under the specified `parent`.
 fn may_create(
