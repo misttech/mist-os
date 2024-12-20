@@ -364,6 +364,10 @@ if (is_kernel) {
       defines += [ "KERNEL_NO_USERABI" ]
     }
 
+    if (use_elf_kernel) {
+      defines += [ "ELF_KERNEL" ]
+    }
+
     cflags = [ "-fpie" ]
   }
 

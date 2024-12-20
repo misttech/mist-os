@@ -75,11 +75,12 @@ void print_module(FILE* f, const char* build_id) {
 
 // TODO(eieio): Consider whether it makes sense to locate the logic for printing
 // mappings somewhere else (perhaps in vm/vm.cpp?).
-void print_mmap(FILE* f, uintptr_t bias, const void* begin, const void* end, const char* perm) {
-  const uintptr_t start = reinterpret_cast<uintptr_t>(begin);
-  const size_t size = reinterpret_cast<uintptr_t>(end) - start;
+void print_mmap(FILE* f, uintptr_t static_start, const void* begin, const void* end,
+                const char* perm) {
+  const uintptr_t runtime_start = reinterpret_cast<uintptr_t>(begin);
+  const size_t size = reinterpret_cast<uintptr_t>(end) - runtime_start;
   if (size != 0) {
-    fprintf(f, "{{{mmap:%#lx:%#lx:load:0:%s:%#lx}}}\n", start, size, perm, start + bias);
+    fprintf(f, "{{{mmap:%#lx:%#lx:load:0:%s:%#lx}}}\n", runtime_start, size, perm, static_start);
   }
 }
 
@@ -131,15 +132,24 @@ void print_version() {
 }
 
 void PrintSymbolizerContext(FILE* f) {
-  const uintptr_t bias = KERNEL_BASE - reinterpret_cast<uintptr_t>(__executable_start);
+  auto static_start = [](const char* runtime_start) -> uintptr_t {
+  // With ELF-loaded kernels, we link the kernel at 0; else we link at
+  // KERNEL_BASE and then fix up to __executable_start.
+#ifdef ELF_KERNEL
+    return reinterpret_cast<uintptr_t>(runtime_start) - kArchHandoffVirtualAddress;
+#else
+    return KERNEL_BASE + reinterpret_cast<uintptr_t>(runtime_start) -
+           reinterpret_cast<uintptr_t>(__executable_start);
+#endif
+  };
   fprintf(f, "{{{reset}}}\n");
   print_module(f, gElfBuildIdString);
   // These four mappings match the mappings printed by vm_init().
-  print_mmap(f, bias, __code_start, __code_end, "rx");
-  print_mmap(f, bias, __rodata_start, __rodata_end, "r");
-  print_mmap(f, bias, __relro_start, __relro_end, "r");
-  print_mmap(f, bias, __data_start, __data_end, "rw");
-  print_mmap(f, bias, __bss_start, _end, "rw");
+  print_mmap(f, static_start(__code_start), __code_start, __code_end, "rx");
+  print_mmap(f, static_start(__rodata_start), __rodata_start, __rodata_end, "r");
+  print_mmap(f, static_start(__relro_start), __relro_start, __relro_end, "r");
+  print_mmap(f, static_start(__data_start), __data_start, __data_end, "rw");
+  print_mmap(f, static_start(__bss_start), __bss_start, _end, "rw");
 }
 
 void print_backtrace_version_info(FILE* f) {
@@ -149,8 +159,15 @@ void print_backtrace_version_info(FILE* f) {
   // Log the ELF build ID in the format the symbolizer scripts understand.
   if (gElfBuildIdString[0] != '\0') {
     PrintSymbolizerContext(f);
-    fprintf(f, "dso: id=%s base=%#lx name=zircon.elf\n", gElfBuildIdString,
-            reinterpret_cast<uintptr_t>(__executable_start));
+    fprintf(f,
+            "dso: id=%s base=%#lx name="
+#ifdef ELF_KERNEL
+            "physzircon"
+#else
+            "zircon.elf"
+#endif
+            "\n",
+            gElfBuildIdString, reinterpret_cast<uintptr_t>(__executable_start));
   }
 }
 
