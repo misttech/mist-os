@@ -210,6 +210,7 @@ build_api_module("api") {
     ":cipd_assembly_artifacts",
     ":delivery_blob_config",
     ":detailed_size_checker_data",
+    ":exported_files",
     ":fuzzers",
     ":generated_sources",
     ":gerrit_size_report",
@@ -654,6 +655,26 @@ build_api_module("generated_sources") {
 build_api_module("golden_files") {
   testonly = true
   data_keys = [ "golden_files" ]
+  deps = [ ":default" ]
+}
+
+# This describes all exported files in the build, as defined by `exported_files()`.
+# This build api module is used to collect files that needs to be individually released to
+# CIPD, and later used by OOT repository. Examples are devicetree binaries and bootshims.
+#
+# Type: list(scope)
+#
+#  * name
+#    - Required: The name of the target defining the exported files.
+#    - Type: string
+#
+#  * path
+#    - Required: Path to the file.
+#    - Type: string
+#
+build_api_module("exported_files") {
+  testonly = true
+  data_keys = [ "exported_files" ]
   deps = [ ":default" ]
 }
 
