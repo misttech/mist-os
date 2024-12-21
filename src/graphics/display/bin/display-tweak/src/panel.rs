@@ -21,7 +21,7 @@ async fn get_display_coordinator_path() -> anyhow::Result<String> {
 
 /// Obtains a handle to the display entry point at the default hard-coded path.
 async fn open_display_provider() -> Result<display::ProviderProxy, Error> {
-    tracing::trace!("Opening display coordinator");
+    log::trace!("Opening display coordinator");
 
     let (proxy, server) = fidl::endpoints::create_proxy::<display::ProviderMarker>();
     let display_coordinator_path: String =
@@ -95,7 +95,7 @@ impl DisplayProviderClient {
 impl DisplayCoordinatorClient {
     /// Returns when the display coordinator sends the list of connected displays.
     async fn wait_for_display_infos(&mut self) -> Result<Vec<display::Info>, Error> {
-        tracing::trace!("Waiting for events from the display coordinator");
+        log::trace!("Waiting for events from the display coordinator");
 
         let listener_requests = &mut self.listener_requests;
         let mut stream = listener_requests.try_filter_map(|event| match event {
@@ -124,9 +124,9 @@ impl DisplayClient {
         }
 
         let display_id = self.display_infos[0].id;
-        tracing::trace!("First display's id: {}", display_id.value);
+        log::trace!("First display's id: {}", display_id.value);
 
-        tracing::trace!("Setting new power state");
+        log::trace!("Setting new power state");
         utils::flatten_zx_error(
             self.coordinator.set_display_power(&display_id.into(), power_state).await,
         )
