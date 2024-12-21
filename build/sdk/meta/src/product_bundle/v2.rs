@@ -216,7 +216,7 @@ impl Canonicalizer for DiskCanonicalizer {
         match product_bundle_path.canonicalize_utf8() {
             Ok(p) => p,
             Err(e) => {
-                tracing::debug!("Cannot canonicalize {}: {e}", &path.as_ref());
+                log::debug!("Cannot canonicalize {}: {e}", &path.as_ref());
                 for image_type in &image_types {
                     let mut ns = self.not_supported.borrow_mut();
                     ns.insert(image_type.clone());
@@ -254,7 +254,7 @@ impl ProductBundleV2 {
         let res = self.canonicalize_paths_with(product_bundle_dir, &mut canonicalizer);
 
         if !canonicalizer.not_supported.borrow().is_empty() {
-            tracing::warn!("Warning: Missing artifacts. The following functionality will not work correctly: {:#?}", canonicalizer.not_supported);
+            log::warn!("Warning: Missing artifacts. The following functionality will not work correctly: {:#?}", canonicalizer.not_supported);
         }
         res
     }
