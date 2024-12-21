@@ -24,7 +24,7 @@ impl ServerController for HttpServer {
         let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), port);
         let listener = fasync::net::TcpListener::bind(&addr).expect("cannot bind to addr");
         let local_addr = listener.local_addr().expect("cannot get local address");
-        tracing::info!("Http server local address: {:?}", local_addr);
+        log::info!("Http server local address: {:?}", local_addr);
 
         let listener = listener
             .accept_stream()
@@ -43,7 +43,7 @@ impl ServerController for HttpServer {
 }
 
 async fn handle(request: hyper::Request<hyper::Body>) -> hyper::Response<hyper::Body> {
-    tracing::info!("http server request received: {:?}", request);
+    log::info!("http server request received: {:?}", request);
     match request.uri().path() {
         "/png" => {
             let body = stream_file("/pkg/data/fuchsia_logo.png");
@@ -81,11 +81,11 @@ fn stream_file(file: &'static str) -> hyper::body::Body {
     fuchsia_async::Task::spawn(async move {
         let f = file::open_in_namespace(file, fio::OpenFlags::RIGHT_READABLE).expect("cannot open");
         let content_size = f.get_attr().await.unwrap().1.content_size;
-        tracing::info!("file content_size: {:?}", content_size);
+        log::info!("file content_size: {:?}", content_size);
         loop {
             let bytes = f.read(fio::MAX_BUF).await.unwrap().unwrap();
             if bytes.is_empty() {
-                tracing::info!("done sending data");
+                log::info!("done sending data");
                 break;
             }
             writer.send_data(bytes.into()).await.expect("failed to stream data chunk");

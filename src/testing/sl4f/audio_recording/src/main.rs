@@ -9,8 +9,8 @@ use fidl_fuchsia_test_audio_recording::{
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::stream::{StreamExt, TryStreamExt};
+use log::error;
 use std::sync::Arc;
-use tracing::error;
 
 mod audio_facade;
 

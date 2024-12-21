@@ -10,9 +10,9 @@ use fuchsia_async as fasync;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{select, StreamExt, TryFutureExt, TryStreamExt};
+use log::trace;
 use std::io::Write;
 use std::sync::Arc;
-use tracing::trace;
 
 // Fixed configuration for our virtual output device.
 const OUTPUT_SAMPLE_FORMAT: AudioSampleFormat = AudioSampleFormat::Signed16;
@@ -104,7 +104,7 @@ impl OutputWorker {
         self.frames_per_notification = frames_per_millisecond * 50;
         trace!(
             fps = frames_per_second,
-            bpf = self.frame_size,
+            bpf = self.frame_size;
             "AudioFacade::OutputWorker: configuring"
         );
         Ok(())

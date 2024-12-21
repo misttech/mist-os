@@ -16,10 +16,10 @@ use fidl_fuchsia_bluetooth_le::{
 };
 use fuchsia_sync::RwLock;
 use futures::{select, StreamExt};
+use log::*;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
-use tracing::*;
 use {fuchsia_async as fasync, fuchsia_component as app};
 
 use fuchsia_bluetooth::types::le::Peer;
@@ -92,9 +92,9 @@ impl GattClientFacade {
     pub async fn stop_scan(&self) -> Result<(), Error> {
         let tag = "GattClientFacade::stop_scan";
         if self.inner.write().scan_task.take().is_some() {
-            info!(tag = &with_line!(tag), "Scan stopped");
+            info!(tag = &with_line!(tag); "Scan stopped");
         } else {
-            info!(tag = &with_line!(tag), "No scan was running");
+            info!(tag = &with_line!(tag); "No scan was running");
         }
         Ok(())
     }
@@ -129,7 +129,7 @@ impl GattClientFacade {
         let scan_fut = central.scan(&options, watcher_server);
         fasync::Task::spawn(async move {
             if let Err(e) = scan_fut.await {
-                warn!(tag = &with_line!(tag), "FIDL error during scan: {:?}", e);
+                warn!(tag = &with_line!(tag); "FIDL error during scan: {:?}", e);
             }
         })
         .detach();
@@ -138,7 +138,7 @@ impl GattClientFacade {
             GattClientFacade::scan_result_watcher_task(self.inner.clone(), watcher_proxy),
         ));
 
-        info!(tag = &with_line!(tag), "Scan started");
+        info!(tag = &with_line!(tag); "Scan started");
         Ok(())
     }
 
@@ -156,28 +156,28 @@ impl GattClientFacade {
                           Ok(peers) => peers,
                           Err(e) => {
                                info!(
-                                  tag = &with_line!(tag),
+                                  tag = &with_line!(tag);
                                    "FIDL error calling ScanResultWatcher::Watch(): {}", e
                                );
                                break;
                            }};
                      for fidl_peer in peers {
                         let peer: Peer = fidl_peer.try_into().unwrap();
-                        debug!(tag = &with_line!(tag), "Peer discovered (id: {}, name: {:?})", peer.id, peer.name);
+                        debug!(tag = &with_line!(tag); "Peer discovered (id: {}, name: {:?})", peer.id, peer.name);
                         inner.write().scan_results.insert(peer.id, peer);
                      }
                      watch_fut = watcher_proxy.watch();
                   },
                   event = event_stream.next() => {
                     if let Some(Err(err)) = event {
-                              info!(tag = &with_line!(tag), "ScanResultWatcher error: {:?}", err);
+                              info!(tag = &with_line!(tag); "ScanResultWatcher error: {:?}", err);
                     }
                     break; // The only events are those that close the protocol.
                   }
             }
         }
         inner.write().scan_task = None;
-        info!(tag = &with_line!(tag), "ScanResultWatcher closed");
+        info!(tag = &with_line!(tag); "ScanResultWatcher closed");
     }
 
     async fn active_remote_service_event_task(
@@ -187,7 +187,7 @@ impl GattClientFacade {
         let tag = "GattClientFacade::active_remote_service_event_task";
         // There are no events
         event_stream.map(|_| ()).collect::<()>().await;
-        info!(tag = &with_line!(tag), "RemoteService closed");
+        info!(tag = &with_line!(tag); "RemoteService closed");
         inner.write().active_remote_service = None;
     }
 
@@ -203,7 +203,7 @@ impl GattClientFacade {
         if let Some(service) = self.inner.read().active_remote_service.as_ref() {
             if service.peer_id == peer_id && service.service_id == service_id {
                 info!(
-                    tag = &with_line!(tag),
+                    tag = &with_line!(tag);
                     "Aready connected to service (peer: {}, service: {})", peer_id, service_id
                 );
                 return Ok(());
@@ -214,7 +214,7 @@ impl GattClientFacade {
 
         let client_proxy = self.get_client_proxy(peer_id).ok_or_else(|| {
             error!(
-                tag = &with_line!(tag),
+                tag = &with_line!(tag);
                 "Unable to connect to service {} (not connected to peer {})", service_id, peer_id
             );
             format_err!("Not connected to peer")
@@ -422,7 +422,7 @@ impl GattClientFacade {
             match event {
                 CharacteristicNotifierRequest::OnNotification { value, responder } => {
                     info!(
-                        tag = &with_line!(tag),
+                        tag = &with_line!(tag);
                         "Received notification (id: {}, value: {:?})",
                         id,
                         value.value.unwrap()
@@ -431,7 +431,7 @@ impl GattClientFacade {
                 }
             }
         }
-        info!(tag = &with_line!(tag), "CharacteristicNotifier closed (id: {})", id);
+        info!(tag = &with_line!(tag); "CharacteristicNotifier closed (id: {})", id);
         inner.write().active_remote_service.as_mut().and_then(|s| s.notifier_tasks.remove(&id));
     }
 
@@ -521,7 +521,7 @@ impl GattClientFacade {
             if let Err(err) =
                 GattClientFacade::watch_services_and_update_map(&inner, &peer_id).await
             {
-                warn!(tag = &with_line!(tag), "{}", err);
+                warn!(tag = &with_line!(tag); "{}", err);
                 return;
             }
         }
@@ -569,7 +569,7 @@ impl GattClientFacade {
 
         stream.map(|_| ()).collect::<()>().await;
 
-        info!(tag = &with_line!(tag), "Central closed");
+        info!(tag = &with_line!(tag); "Central closed");
         inner.write().central.take();
         return Ok(());
     }
@@ -595,8 +595,8 @@ impl GattClientFacade {
     ) {
         let tag = "GattClientFacade::connection_event_task";
         select! {
-           _ = connection_stream.next() => info!(tag = &with_line!(tag) , "Connection to {} closed", peer_id),
-           _ = client_stream.next() => info!(tag = &with_line!(tag), "Client for {} closed", peer_id),
+           _ = connection_stream.next() => info!(tag = &with_line!(tag) ; "Connection to {} closed", peer_id),
+           _ = client_stream.next() => info!(tag = &with_line!(tag); "Client for {} closed", peer_id),
         }
         inner.write().clients.remove(&peer_id);
     }
@@ -606,7 +606,7 @@ impl GattClientFacade {
         let peer_id = PeerId::from_str(&id)?;
 
         if self.inner.read().clients.contains_key(&peer_id) {
-            info!(tag = &with_line!(tag), "Already connected to {}", peer_id);
+            info!(tag = &with_line!(tag); "Already connected to {}", peer_id);
             return Ok(());
         }
 
@@ -679,7 +679,7 @@ impl GattClientFacade {
         let tag = "GattClientFacade::print";
         let inner = self.inner.read();
         info!(
-            tag = &with_line!(tag),
+            tag = &with_line!(tag);
             "Central: {:?}, Active Service: {:?}, Scan Results: {:?}, Clients: {:?}",
             inner.central,
             inner.active_remote_service,

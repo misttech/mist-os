@@ -7,9 +7,9 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_testing_proxy::{TcpProxyControlMarker, TcpProxyControlProxy, TcpProxy_Marker};
 use fuchsia_component::client::connect_to_protocol;
 use futures::lock::Mutex;
+use log::info;
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
-use tracing::info;
 
 #[derive(Debug)]
 pub struct ProxyFacade {

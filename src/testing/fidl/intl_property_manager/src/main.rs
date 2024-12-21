@@ -12,12 +12,12 @@ use fidl_fuchsia_test_intl_manager::{PropertyManagerRequest, PropertyManagerRequ
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::{debug, error, info};
 use std::collections::HashMap;
 use std::fmt::{self, Debug};
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use structopt::StructOpt;
-use tracing::{debug, error, info};
 
 #[derive(Clone)]
 struct Server(Arc<ServerState>);
@@ -256,7 +256,7 @@ fn initial_profile(opts: &Opts) -> Option<Profile> {
         false => None,
         true => {
             let profile = opts.into();
-            info!(?profile, "Serving initial profile");
+            info!(profile:?; "Serving initial profile");
             Some(profile)
         }
     }

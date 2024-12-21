@@ -13,8 +13,8 @@ use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::RwLock;
 use futures::StreamExt;
+use log::info;
 use std::sync::Arc;
-use tracing::info;
 
 #[derive(Debug)]
 pub struct MediaSessionFacade {
@@ -114,7 +114,7 @@ impl MediaSessionFacade {
                         }
                     },
                     Some(Err(e)) => {
-                        info!(?e, "Mock player request stream error");
+                        info!(e:?; "Mock player request stream error");
                         break;
                     }
                     None => {

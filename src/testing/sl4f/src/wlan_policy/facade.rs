@@ -11,10 +11,10 @@ use fuchsia_async::{self as fasync, DurationExt as _};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::RwLock;
 use futures::TryStreamExt;
+use log::*;
 use std::cell::Cell;
 use std::collections::HashSet;
 use std::fmt::{self, Debug};
-use tracing::*;
 
 pub struct WlanPolicyFacade {
     controller: RwLock<InnerController>,
@@ -62,7 +62,7 @@ impl WlanPolicyFacade {
         controller_guard.inner = None;
 
         let (controller, update_stream) = Self::init_client_controller().await.map_err(|e| {
-            info!(tag = &with_line!(tag), "Error getting client controller: {}", e);
+            info!(tag = &with_line!(tag); "Error getting client controller: {}", e);
             format_err!("Error getting client controller: {}", e)
         })?;
         controller_guard.inner = Some(controller);
@@ -210,7 +210,7 @@ impl WlanPolicyFacade {
             .as_ref()
             .ok_or_else(|| format_err!("client controller has not been initialized"))?;
         info!(
-            tag = &with_line!("WlanPolicyFacade::remove_network"),
+            tag = &with_line!("WlanPolicyFacade::remove_network");
             "Removing network: ({}{:?})",
             String::from_utf8_lossy(&target_ssid),
             type_

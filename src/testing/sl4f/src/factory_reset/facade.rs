@@ -6,7 +6,7 @@ use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
 use crate::common_utils::common::LazyProxy;
 use anyhow::Error;
 use fidl_fuchsia_recovery::{FactoryResetMarker, FactoryResetProxy};
-use tracing::info;
+use log::info;
 
 /// Perform factory reset fidl operations.
 ///

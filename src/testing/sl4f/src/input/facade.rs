@@ -7,9 +7,9 @@ use crate::input::types::{
     SwipeRequest, TapRequest, TextRequest,
 };
 use anyhow::{Context, Error};
+use log::info;
 use serde_json::{from_value, Value};
 use std::time::Duration;
-use tracing::info;
 
 const DEFAULT_DIMENSION: u32 = 1000;
 const DEFAULT_DURATION: Duration = Duration::from_millis(300);
@@ -403,7 +403,7 @@ impl InputFacade {
     /// * `Err(Error)` otherwise.
     ///
     pub async fn key_events(&self, args: Value) -> Result<ActionResult, Error> {
-        info!(?args, "Executing KeyEvents in Input Facade");
+        info!(args:?; "Executing KeyEvents in Input Facade");
         let req: types::KeyEventsRequest = from_value(args)?;
         input_synthesis::dispatch_key_events(&req.key_events[..]).await?;
         Ok(ActionResult::Success)

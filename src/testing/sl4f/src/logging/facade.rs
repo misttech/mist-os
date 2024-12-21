@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use tracing::*;
+use log::*;
 
 /// Perform Logging operations.
 ///

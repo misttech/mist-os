@@ -14,10 +14,10 @@ use futures::future::{select, FutureExt, TryFutureExt};
 use futures::io::AsyncReadExt;
 use futures::lock::Mutex;
 use futures::stream::{StreamExt, TryStreamExt};
+use log::{error, info, warn};
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 
 #[fuchsia::main]
 async fn main() {
@@ -28,7 +28,7 @@ async fn main() {
         fasync::Task::spawn(async move {
             proxy_control_clone
                 .serve_requests_from_stream(stream)
-                .unwrap_or_else(|err| error!(?err, "Error handling TcpProxyControl channel"))
+                .unwrap_or_else(|err| error!(err:?; "Error handling TcpProxyControl channel"))
                 .await;
         })
         .detach();
@@ -63,7 +63,7 @@ impl TcpProxyControl {
             } = req;
             let open_port =
                 self.open_proxy(target_port, proxy_port, tcp_proxy).await.map_err(|err| {
-                    warn!(?err, "Error opening proxy");
+                    warn!(err:?; "Error opening proxy");
                     err
                 })?;
             responder.send(open_port)?;
@@ -94,7 +94,7 @@ impl TcpProxyControl {
             .register_client(tcp_proxy_stream)
             .map_err(|_| anyhow!("Error registering channel with new proxy"))?;
         fasync::Task::spawn(async move {
-            info!(from = ?open_port, to = ?target_port, "Forwarding port");
+            info!(from:? = open_port, to:? = target_port; "Forwarding port");
             tcp_proxy.serve_proxy_while_open_clients().await;
             info!("Stopped forwarding to port {:?}", target_port);
         })
@@ -176,15 +176,15 @@ impl TcpProxy {
                     Ok(v6_conn) => v6_conn,
                     Err(_) => fasync::net::TcpStream::connect(v4_addr.into())?.await?,
                 };
-                info!(from_port = ?addr, to_port = ?target_port, "Serving a connection");
+                info!(from_port:? = addr, to_port:? = target_port; "Serving a connection");
                 Self::serve_single_connection(client_conn, server_conn)
                     .await
-                    .unwrap_or_else(|err| warn!(?err, "Error serving tunnel"));
-                info!(from_port = ?addr, to_port = ?target_port, "Connection to port closed");
+                    .unwrap_or_else(|err| warn!(err:?; "Error serving tunnel"));
+                info!(from_port:? = addr, to_port:? = target_port; "Connection to port closed");
                 Ok(())
             })
             .await
-            .unwrap_or_else(|err| warn!(?err, "Error listening for tcp connections"));
+            .unwrap_or_else(|err| warn!(err:?; "Error listening for tcp connections"));
     }
 
     /// Proxy a single connection between the provided `TcpStream`s.

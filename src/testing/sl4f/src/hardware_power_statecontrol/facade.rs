@@ -6,7 +6,7 @@ use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
 use anyhow::Error;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
 use fuchsia_component as app;
-use tracing::info;
+use log::info;
 
 /// Perform Fuchsia Device Manager fidl operations.
 ///

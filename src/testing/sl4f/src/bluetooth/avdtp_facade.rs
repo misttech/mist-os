@@ -12,10 +12,10 @@ use fuchsia_async as fasync;
 use fuchsia_component::client;
 use fuchsia_sync::RwLock;
 use futures::stream::StreamExt;
+use log::*;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::*;
 
 use crate::bluetooth::types::PeerFactoryMap;
 use crate::common_utils::common::macros::{fx_err_and_bail, with_line};
@@ -56,13 +56,13 @@ impl AvdtpFacade {
         match self.inner.read().avdtp_service_proxy.clone() {
             Some(avdtp_service_proxy) => {
                 info!(
-                    tag = &with_line!(tag),
+                    tag = &with_line!(tag);
                     "Current Avdtp service proxy: {:?}", avdtp_service_proxy
                 );
                 Ok(avdtp_service_proxy)
             }
             None => {
-                info!(tag = &with_line!(tag), "Launching A2DP and setting new Avdtp service proxy");
+                info!(tag = &with_line!(tag); "Launching A2DP and setting new Avdtp service proxy");
 
                 let avdtp_service_proxy = client::connect_to_protocol::<PeerManagerMarker>();
                 if let Err(err) = avdtp_service_proxy {

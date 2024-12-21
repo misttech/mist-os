@@ -6,8 +6,8 @@ use crate::server::Facade;
 use crate::wlan_deprecated::facade::WlanDeprecatedConfigurationFacade;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
+use log::info;
 use serde_json::{to_value, Value};
-use tracing::info;
 
 #[async_trait(?Send)]
 impl Facade for WlanDeprecatedConfigurationFacade {
@@ -16,7 +16,7 @@ impl Facade for WlanDeprecatedConfigurationFacade {
             "suggest_ap_mac" => {
                 let mac = self.parse_mac_argument(args)?;
                 info!(
-                    tag = "WlanDeprecatedConfigurationFacade",
+                    tag = "WlanDeprecatedConfigurationFacade";
                     "setting suggested MAC to: {:?}", mac
                 );
                 let result = self.suggest_access_point_mac_address(mac).await?;

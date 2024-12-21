@@ -14,10 +14,10 @@ use fidl_fuchsia_bluetooth_gatt2::{
 use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_sync::RwLock;
 use futures::stream::TryStreamExt;
+use log::{error, info, warn};
 use serde_json::value::Value;
 use std::collections::HashMap;
 use std::str::FromStr;
-use tracing::{error, info, warn};
 use {fuchsia_async as fasync, fuchsia_component as app};
 
 use crate::bluetooth::constants::{
@@ -89,21 +89,21 @@ impl GattServerFacade {
         match self.inner.read().server_proxy.clone() {
             Some(service) => {
                 info!(
-                    tag = &[tag, &line!().to_string()].join("").as_str(),
+                    tag = &[tag, &line!().to_string()].join("").as_str();
                     "Current service proxy: {:?}", service
                 );
                 Ok(service)
             }
             None => {
                 info!(
-                    tag = &[tag, &line!().to_string()].join("").as_str(),
+                    tag = &[tag, &line!().to_string()].join("").as_str();
                     "Setting new server proxy"
                 );
                 let service = app::client::connect_to_protocol::<Server_Marker>();
                 if let Err(err) = service {
                     error!(
                         tag = &[tag, &line!().to_string()].join("").as_str(),
-                        ?err,
+                        err:?;
                         "Failed to create server proxy"
                     );
                     return Err(format_err!("Failed to create server proxy: {:?}", err));
@@ -139,9 +139,9 @@ impl GattServerFacade {
         let tag = "GattServerFacade::on_characteristic_configuration:";
         info!(
             tag = &[tag, &line!().to_string()].join("").as_str(),
-            %notify,
-            %indicate,
-            id = %peer_id,
+            notify:%,
+            indicate:%,
+            id:% = peer_id;
             "OnCharacteristicConfiguration"
         );
 
@@ -176,9 +176,9 @@ impl GattServerFacade {
         let tag = "GattServerFacade::on_read_value:";
         info!(
             tag = &[tag, &line!().to_string()].join("").as_str(),
-            at_id = ?handle.value,
-            offset = ?offset,
-            id = %peer_id,
+            at_id:? = handle.value,
+            offset:? = offset,
+            id:% = peer_id;
             "OnReadValue request",
         );
         match value_in_mapping {
@@ -218,8 +218,8 @@ impl GattServerFacade {
             tag = &[tag, &line!().to_string()].join("").as_str(),
             at_id = handle.value,
             offset = offset,
-            value = ?value_to_write,
-            id = %peer_id,
+            value:? = value_to_write,
+            id:% = peer_id;
             "OnWriteValue request",
         );
 
@@ -633,7 +633,7 @@ impl GattServerFacade {
         match server_proxy.publish_service(&service_info, service_client).await? {
             Ok(()) => info!(
                 tag = &[tag, &line!().to_string()].join("").as_str(),
-                uuid = ?service_uuid,
+                uuid:? = service_uuid;
                 "Successfully published GATT service",
             ),
             Err(e) => return Err(format_err!("PublishService error: {:?}", e)),
@@ -649,7 +649,7 @@ impl GattServerFacade {
             if let Err(err) = result {
                 error!(
                     tag = "publish_service",
-                    ?err,
+                    err:?;
                     "Failed to create or monitor the gatt service delegate"
                 );
             }
@@ -728,7 +728,7 @@ impl GattServerFacade {
     /// }
     pub async fn publish_server(&self, args: Value) -> Result<(), Error> {
         let tag = "GattServerFacade::publish_server:";
-        info!(tag = &[tag, &line!().to_string()].join("").as_str(), "Publishing service");
+        info!(tag = &[tag, &line!().to_string()].join("").as_str(); "Publishing service");
         let server_proxy = self.create_server_proxy()?;
         self.inner.write().server_proxy = Some(server_proxy);
         let services = args
@@ -761,7 +761,7 @@ impl GattServerFacade {
     // GattServerFacade for cleaning up objects in use.
     pub fn cleanup(&self) {
         let tag = "GattServerFacade::cleanup:";
-        info!(tag = &[tag, &line!().to_string()].join("").as_str(), "Cleanup GATT server objects");
+        info!(tag = &[tag, &line!().to_string()].join("").as_str(); "Cleanup GATT server objects");
         self.inner.write().server_proxy = None;
         let _ = self.inner.write().service_tasks.drain(..).collect::<Vec<fasync::Task<()>>>();
     }
@@ -770,6 +770,6 @@ impl GattServerFacade {
     // debug purposes.
     pub fn print(&self) {
         let tag = "GattServerFacade::print:";
-        info!(tag = &[tag, &line!().to_string()].join("").as_str(), "Unimplemented print function");
+        info!(tag = &[tag, &line!().to_string()].join("").as_str(); "Unimplemented print function");
     }
 }

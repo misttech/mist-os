@@ -18,7 +18,7 @@ const SERVER_PORT: u16 = 80;
 
 #[fuchsia::main(logging_tags = ["sl4f"])]
 async fn main() {
-    tracing::info!("  Starting sl4f server");
+    log::info!("  Starting sl4f server");
 
     // State for clients that utilize the /init endpoint
     let sl4f_clients = Arc::new(RwLock::new(Sl4fClients::new()));
@@ -28,7 +28,7 @@ async fn main() {
     let sl4f = Arc::new(sl4f);
 
     let addr = SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), SERVER_PORT);
-    tracing::info!("Now listening on: {:?}", addr);
+    log::info!("Now listening on: {:?}", addr);
     let listener = fasync::net::TcpListener::bind(&addr).expect("bind");
     let listener = listener
         .accept_stream()
