@@ -5,10 +5,10 @@
 #[path = "../../../../common/lib/types.rs"]
 mod types;
 
+use log::info;
 use named_timer::DeadlineId;
 use power_manager_integration_test_lib::{TestEnv, TestEnvBuilder};
 use test_util::assert_near;
-use tracing::info;
 use types::{Celsius, Farads, Hertz, Nanoseconds, OperatingPoint, Seconds, Volts, Watts};
 use {
     fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, fidl_fuchsia_kernel as fkernel,

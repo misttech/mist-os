@@ -167,7 +167,7 @@ macro_rules! block_until_inspect_matches {
                 Ok(_) => break,
                 Err(error) => {
                     if i == DELAY_NOTIFICATION {
-                        tracing::warn!(?error, "Still awaiting inspect match after {} tries", DELAY_NOTIFICATION);
+                        log::warn!(error:?; "Still awaiting inspect match after {} tries", DELAY_NOTIFICATION);
                     }
                     if  i >= MAX_LOOPS_COUNT {  // upper bound, so test terminates on mismatch
                         // Print the actual, so we know why the match failed if it does.

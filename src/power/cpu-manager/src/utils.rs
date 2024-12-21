@@ -41,28 +41,26 @@ pub async fn get_cpu_ctrl_proxy(
                 .filename
                 .as_path()
                 .to_str()
-                .ok_or_else(|| anyhow::anyhow!("Failed to convert filename to string"))?
-                .to_owned();
+                .ok_or_else(|| anyhow::anyhow!("Failed to convert filename to string"))?;
             if filename != "." {
                 if watch_msg.event == fuchsia_fs::directory::WatchEvent::ADD_FILE
                     || watch_msg.event == fuchsia_fs::directory::WatchEvent::EXISTING
                 {
-                    let proxy =
-                        connect_to_service_instance::<fcpu_ctrl::ServiceMarker>(filename.as_str())?
-                            .connect_to_device()
-                            .map_err(|e| anyhow::anyhow!("Failed to connect to device: {:?}", e))?;
+                    let proxy = connect_to_service_instance::<fcpu_ctrl::ServiceMarker>(filename)?
+                        .connect_to_device()
+                        .map_err(|e| anyhow::anyhow!("Failed to connect to device: {:?}", e))?;
 
                     let relative_perf = proxy.get_relative_performance().await?.map_err(|e| {
                         anyhow::anyhow!("GetRelativePerformance returned err: {:?}", e)
                     })?;
-                    tracing::info!(
+                    log::info!(
                         node_info,
                         instance_filename = filename,
-                        relative_perf,
+                        relative_perf;
                         "CPU device detected"
                     );
                     if proxies.insert(relative_perf, proxy).is_some() {
-                        tracing::warn!(
+                        log::warn!(
                             "CPU driver of relative performance {:?} showed up more than once",
                             relative_perf
                         );

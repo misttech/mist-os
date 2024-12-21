@@ -393,7 +393,7 @@ impl CpuControlHandler {
         );
 
         if let Err(e) = self.set_max_power_consumption(&available_power).await {
-            tracing::error!("Error setting max power consumption: {}", e);
+            log::error!("Error setting max power consumption: {}", e);
         }
 
         Ok(MessageReturn::UpdateThermalLoad)

@@ -14,11 +14,11 @@ use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, Property};
 use futures::prelude::*;
 use futures::TryStreamExt;
+use log::*;
 use serde_derive::Deserialize;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tracing::*;
 use zx::{self as zx, Status as zx_status};
 use {
     fidl_fuchsia_hardware_power_statecontrol as fpowercontrol, fidl_fuchsia_sys2 as fsys,

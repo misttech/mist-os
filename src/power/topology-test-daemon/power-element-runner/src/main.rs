@@ -7,7 +7,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_test_powerelementrunner::{ControlRequest, ControlRequestStream, ControlStartResult};
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 use {fidl_fuchsia_power_broker as fbroker, fuchsia_async as fasync};
 
 #[fuchsia::main]
@@ -64,17 +64,17 @@ fn run_power_element(
         let mut last_required_level = initial_current_level;
 
         loop {
-            tracing::debug!(
-                ?element_name,
-                ?last_required_level,
+            log::debug!(
+                element_name:?,
+                last_required_level:?;
                 "run_power_element: waiting for new level"
             );
             match required_level_proxy.watch().await {
                 Ok(Ok(required_level)) => {
-                    tracing::debug!(
-                        ?element_name,
-                        ?required_level,
-                        ?last_required_level,
+                    log::debug!(
+                        element_name:?,
+                        required_level:?,
+                        last_required_level:?;
                         "run_power_element: new level requested"
                     );
                     fuchsia_trace::counter!(
@@ -82,10 +82,10 @@ fn run_power_element(
                         &element_name => required_level as u32
                     );
                     if required_level == last_required_level {
-                        tracing::debug!(
-                            ?element_name,
-                            ?required_level,
-                            ?last_required_level,
+                        log::debug!(
+                            element_name:?,
+                            required_level:?,
+                            last_required_level:?;
                             "run_power_element: required level has not changed, skipping."
                         );
                         continue;
@@ -97,14 +97,14 @@ fn run_power_element(
                     );
                     let res = current_level_proxy.update(required_level).await;
                     if let Err(error) = res {
-                        tracing::warn!(?error, "update_fn: updating current level failed");
+                        log::warn!(error:?; "update_fn: updating current level failed");
                     }
                     last_required_level = required_level;
                 }
                 error => {
-                    tracing::warn!(
-                        ?element_name,
-                        ?error,
+                    log::warn!(
+                        element_name:?,
+                        error:?;
                         "run_power_element: watch_required_level failed"
                     );
                     break;

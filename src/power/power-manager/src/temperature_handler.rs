@@ -15,11 +15,11 @@ use async_utils::event::Event as AsyncEvent;
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use log::*;
 use serde_derive::Deserialize;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
-use tracing::*;
 use {
     fidl_fuchsia_hardware_temperature as ftemperature, fuchsia_async as fasync, serde_json as json,
     zx,

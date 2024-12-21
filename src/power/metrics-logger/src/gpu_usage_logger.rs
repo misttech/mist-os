@@ -8,11 +8,11 @@ use anyhow::{format_err, Error, Result};
 use fuchsia_inspect::{self as inspect, Property};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::{error, info};
 use magma::magma_total_time_query_result;
 use std::collections::HashMap;
 use std::mem;
 use std::rc::Rc;
-use tracing::{error, info};
 use zerocopy::FromBytes;
 use {
     fidl_fuchsia_gpu_magma as fgpu, fidl_fuchsia_power_metrics as fmetrics, fuchsia_async as fasync,
@@ -208,7 +208,7 @@ impl GpuUsageLogger {
                         );
 
                         if self.output_samples_to_syslog {
-                            info!(name = driver_names[index].as_str(), gpu_usage);
+                            info!(name = driver_names[index].as_str(), gpu_usage; "");
                         }
 
                         trace_args.push(fuchsia_trace::ArgValue::of(
@@ -219,8 +219,8 @@ impl GpuUsageLogger {
                     current_sample = Some(value);
                 }
                 Err(err) => error!(
-                    ?err,
-                    path = self.drivers[index].sensor_name.as_str(),
+                    err:?,
+                    path = self.drivers[index].sensor_name.as_str();
                     "Error reading GPU stats",
                 ),
             }

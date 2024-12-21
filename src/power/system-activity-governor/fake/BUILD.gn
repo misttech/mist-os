@@ -26,7 +26,7 @@ rustc_binary("bin") {
     "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 

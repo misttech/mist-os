@@ -11,7 +11,7 @@ use futures::prelude::*;
 
 #[fuchsia::main]
 async fn main() -> Result<()> {
-    tracing::info!("started");
+    log::info!("started");
 
     let sagctrl = SystemActivityGovernorControl::new().await;
 
@@ -24,6 +24,6 @@ async fn main() -> Result<()> {
     // This future should never complete.
     service_fs.collect::<()>().await;
 
-    tracing::error!("Unexpected exit");
+    log::error!("Unexpected exit");
     Ok(())
 }

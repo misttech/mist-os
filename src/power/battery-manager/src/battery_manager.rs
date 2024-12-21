@@ -6,8 +6,8 @@ use anyhow::Error;
 use fidl::endpoints::Proxy;
 use futures::lock::Mutex;
 use futures::TryStreamExt;
+use log::{debug, error};
 use std::sync::{Arc, RwLock};
-use tracing::{debug, error};
 use {
     fidl_fuchsia_hardware_powersource as hpower, fidl_fuchsia_power_battery as fpower,
     fuchsia_async as fasync,
@@ -103,7 +103,7 @@ impl BatteryManager {
         power_info: hpower::SourceInfo,
         battery_info: Option<hpower::BatteryInfo>,
     ) -> Result<(), anyhow::Error> {
-        debug!(?power_info, ?battery_info, "update_status",);
+        debug!(power_info:?, battery_info:?; "update_status",);
 
         match self.update_battery_info(power_info, battery_info) {
             Ok(StatusUpdateResult::Notify) => {
@@ -175,7 +175,7 @@ impl BatteryManager {
                 "updating battery info with non-battery power source"
             );
 
-            debug!(?power_info, ?bi, "::battery_manager:: update with hpower info");
+            debug!(power_info:?, bi:?; "::battery_manager:: update with hpower info");
 
             // check battery online and update accordingly
             if power_info.state & hpower::POWER_STATE_ONLINE != 0 {
@@ -317,7 +317,7 @@ impl BatteryManager {
                         fpower::BatteryManagerRequest::GetBatteryInfo { responder, .. } => {
                             let info = self.get_battery_info_copy();
                             debug!(
-                                ?info,
+                                info:?;
                                 "::battery_manager_request:: handle GetBatteryInfo request"
                             );
                             responder.send(&info)?;
@@ -330,7 +330,7 @@ impl BatteryManager {
                             // make sure watcher has current battery info
                             let info = self.get_battery_info_copy();
 
-                            debug!(?info, "::battery_manager_request:: callback on new watcher");
+                            debug!(info:?; "::battery_manager_request:: callback on new watcher");
                             watcher.on_change_battery_info(&info).await?;
                         }
                     }

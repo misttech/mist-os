@@ -60,7 +60,7 @@ where
         suspender: Option<fhsuspend::SuspenderProxy>,
         sag_factory: F,
     ) -> Rc<Self> {
-        tracing::info!("Creating CPU power element");
+        log::info!("Creating CPU power element");
         let cpu = Rc::new(
             PowerElementContext::builder(
                 topology,
@@ -87,7 +87,7 @@ where
 
         cpu_manager.run(&inspect_root, &power_elements_node2);
 
-        tracing::info!("Leasing CPU power element");
+        log::info!("Leasing CPU power element");
         let cpu_lease = LeaseHelper::new(
             &topology,
             "cpu_boot_control",
@@ -102,7 +102,7 @@ where
         .lease()
         .await
         .expect("failed to lease CPU element during startup");
-        tracing::info!("Leased CPU power element at 'Active'.");
+        log::info!("Leased CPU power element at 'Active'.");
 
         let sag = Rc::new(OnceCell::<Rc<SystemActivityGovernor>>::new());
         let sag2 = sag.clone();
@@ -111,11 +111,11 @@ where
         fasync::Task::local(async move {
             let sag = sag2.wait().await.clone();
 
-            tracing::info!("Starting activity governor server...");
+            log::info!("Starting activity governor server...");
             cpu_manager2.set_suspend_resume_listener(sag.clone());
             sag.run(&power_elements_node2).await.expect("failed to run activity governor server");
 
-            tracing::info!("Running activity governor server, dropping CPU lease");
+            log::info!("Running activity governor server, dropping CPU lease");
             drop(cpu_lease);
         })
         .detach();
@@ -186,8 +186,8 @@ where
                         assertive_dependency_token: Some(self.cpu_assertive_dependency_token()),
                         ..Default::default()
                     }) {
-                        tracing::warn!(
-                            ?error,
+                        log::warn!(
+                            error:?;
                             "Encountered error while responding to GetCpuDependencyToken request"
                         );
                     }
@@ -208,12 +208,12 @@ where
                             // dependencies after construction is an error and
                             // indicates a bug in the device's configuration.
                             if self.sag.is_initialized() {
-                                tracing::error!("System Activity Governor is already created.");
+                                log::error!("System Activity Governor is already created.");
                                 Err(fsystem::AddExecutionStateDependencyError::BadState)
                             } else {
                                 // We have a valid request to add an Execution State
                                 // dependency, so we can construct SAG now.
-                                tracing::info!("Adding execution state dependency");
+                                log::info!("Adding execution state dependency");
 
                                 let sag = (self.sag_factory)(
                                     self.cpu_manager.clone(),
@@ -237,16 +237,14 @@ where
                                 match self.sag.set(sag).await {
                                     Ok(_) => Ok(()),
                                     Err(_) => {
-                                        tracing::error!(
-                                            "System Activity Governor is already created."
-                                        );
+                                        log::error!("System Activity Governor is already created.");
                                         Err(fsystem::AddExecutionStateDependencyError::BadState)
                                     }
                                 }
                             }
                         }
                         payload => {
-                            tracing::warn!(
+                            log::warn!(
                                 "Invalid payload for AddExecutionStateDependency: {payload:?}"
                             );
                             Err(fsystem::AddExecutionStateDependencyError::InvalidArgs)
@@ -257,17 +255,17 @@ where
                     // handling FIDL requests. Full initialization will
                     // occur asynchronously while responding to the caller.
                     if let Err(error) = responder.send(response) {
-                        tracing::warn!(
-                            ?error,
+                        log::warn!(
+                            error:?;
                             "Encountered error while responding to AddExecutionStateDependency request"
                         );
                     }
                 }
                 Ok(fsystem::CpuElementManagerRequest::_UnknownMethod { ordinal, .. }) => {
-                    tracing::warn!(?ordinal, "Unknown CpuElementManagerRequest method");
+                    log::warn!(ordinal:?; "Unknown CpuElementManagerRequest method");
                 }
                 Err(error) => {
-                    tracing::error!(?error, "Error handling CpuElementManager request stream");
+                    log::error!(error:?; "Error handling CpuElementManager request stream");
                 }
             }
         }

@@ -97,7 +97,7 @@ impl SuspendStatsManager {
             Box::new(
                 |stats: &fsuspend::SuspendStats, res: fsuspend::StatsWatchResponder| -> bool {
                     if let Err(error) = res.send(stats) {
-                        tracing::warn!(?error, "Failed to send suspend stats to client");
+                        log::warn!(error:?; "Failed to send suspend stats to client");
                     }
                     true
                 },
@@ -139,7 +139,7 @@ impl SuspendStatsUpdater for SuspendStatsManager {
                     .set(*stats.last_time_in_suspend_operations.as_ref().unwrap_or(&-1i64));
             });
 
-            tracing::info!(?success, ?stats_opt, "Updating suspend stats");
+            log::info!(success:?, stats_opt:?; "Updating suspend stats");
             success
         });
     }
@@ -198,7 +198,7 @@ impl LeaseManager {
             }],
         )
         .await?;
-        tracing::debug!("Acquiring lease for '{}'", name);
+        log::debug!("Acquiring lease for '{}'", name);
         let lease = lease_helper.lease().await?;
 
         let token_info = server_token.basic_info()?;
@@ -214,7 +214,7 @@ impl LeaseManager {
         fasync::Task::local(async move {
             // Keep lease alive for as long as the client keeps it alive.
             let _ = fasync::OnSignals::new(server_token, zx::Signals::EVENTPAIR_PEER_CLOSED).await;
-            tracing::debug!("Dropping lease for '{}'", name);
+            log::debug!("Dropping lease for '{}'", name);
             drop(inspect_lease_node);
             drop(lease);
         })
@@ -241,7 +241,7 @@ impl LeaseManager {
                 }],
             )
             .await?;
-        tracing::debug!("Acquiring lease for '{}'", name);
+        log::debug!("Acquiring lease for '{}'", name);
         let lease = lease_helper.lease().await?;
 
         let token_info = server_token.basic_info()?;
@@ -257,7 +257,7 @@ impl LeaseManager {
         fasync::Task::local(async move {
             // Keep lease alive for as long as the client keeps it alive.
             let _ = fasync::OnSignals::new(server_token, zx::Signals::EVENTPAIR_PEER_CLOSED).await;
-            tracing::debug!("Dropping lease for '{}'", name);
+            log::debug!("Dropping lease for '{}'", name);
             drop(inspect_lease_node);
             drop(lease);
         })
@@ -445,10 +445,10 @@ impl SystemActivityGovernor {
 
     /// Runs a FIDL server to handle fuchsia.power.suspend and fuchsia.power.system API requests.
     pub async fn run(self: &Rc<Self>, elements_node: &INode) -> Result<()> {
-        tracing::info!("Handling power elements");
+        log::info!("Handling power elements");
 
         self.run_execution_state(&elements_node);
-        tracing::info!("System is booting. Acquiring boot control lease.");
+        log::info!("System is booting. Acquiring boot control lease.");
         let boot_control_lease = self
             .boot_control
             .lessor
@@ -470,10 +470,10 @@ impl SystemActivityGovernor {
 
         self.run_application_activity(&elements_node);
 
-        tracing::info!("Boot control required. Updating boot_control level to active.");
+        log::info!("Boot control required. Updating boot_control level to active.");
         let res = self.boot_control.current_level.update(BootControlLevel::Active.into()).await;
         if let Err(error) = res {
-            tracing::warn!(?error, "failed to update boot_control level to Active");
+            log::warn!(error:?; "failed to update boot_control level to Active");
         }
 
         let _ = self.is_running_signal.set(()).await;
@@ -611,8 +611,8 @@ impl SystemActivityGovernor {
                     });
 
                     if let Err(error) = result {
-                        tracing::warn!(
-                            ?error,
+                        log::warn!(
+                            error:?;
                             "Encountered error while responding to GetPowerElements request"
                         );
                     }
@@ -625,17 +625,17 @@ impl SystemActivityGovernor {
                         match self.lease_manager.create_application_activity_lease(name).await {
                             Ok(client_token) => client_token,
                             Err(error) => {
-                                tracing::warn!(
-                                ?error,
-                                "Encountered error while registering application activity lease"
-                            );
+                                log::warn!(
+                                    error:?;
+                                    "Encountered error while registering application activity lease"
+                                );
                                 return;
                             }
                         };
 
                     if let Err(error) = responder.send(client_token) {
-                        tracing::warn!(
-                            ?error,
+                        log::warn!(
+                            error:?;
                             "Encountered error while responding to TakeApplicationActivity request"
                         );
                     }
@@ -644,24 +644,21 @@ impl SystemActivityGovernor {
                     let client_token = match self.lease_manager.create_wake_lease(name).await {
                         Ok(client_token) => client_token,
                         Err(error) => {
-                            tracing::warn!(
-                                ?error,
-                                "Encountered error while registering wake lease"
-                            );
+                            log::warn!(error:?; "Encountered error while registering wake lease");
                             return;
                         }
                     };
 
                     if let Err(error) = responder.send(client_token) {
-                        tracing::warn!(
-                            ?error,
+                        log::warn!(
+                            error:?;
                             "Encountered error while responding to TakeWakeLease request"
                         );
                     }
                 }
                 Ok(fsystem::ActivityGovernorRequest::AcquireWakeLease { responder, name }) => {
                     let client_token_res = if name.is_empty() {
-                        tracing::warn!("Received invalid name while acquiring wake lease");
+                        log::warn!("Received invalid name while acquiring wake lease");
                         Err(fsystem::AcquireWakeLeaseError::InvalidName)
                     } else {
                         self.lease_manager
@@ -681,8 +678,8 @@ impl SystemActivityGovernor {
                                     })
                             })
                             .or_else(|error| {
-                                tracing::warn!(
-                                    ?error,
+                                log::warn!(
+                                    error:?;
                                     "Encountered error while registering wake lease"
                                 );
 
@@ -691,8 +688,8 @@ impl SystemActivityGovernor {
                     };
 
                     if let Err(error) = responder.send(client_token_res) {
-                        tracing::warn!(
-                            ?error,
+                        log::warn!(
+                            error:?;
                             "Encountered error while responding to AcquireWakeLease request"
                         );
                     }
@@ -702,15 +699,15 @@ impl SystemActivityGovernor {
                         Some(listener) => {
                             self.listeners.borrow_mut().push(listener.into_proxy());
                         }
-                        None => tracing::warn!("No listener provided in request"),
+                        None => log::warn!("No listener provided in request"),
                     }
                     let _ = responder.send();
                 }
                 Ok(fsystem::ActivityGovernorRequest::_UnknownMethod { ordinal, .. }) => {
-                    tracing::warn!(?ordinal, "Unknown ActivityGovernorRequest method");
+                    log::warn!(ordinal:?; "Unknown ActivityGovernorRequest method");
                 }
                 Err(error) => {
-                    tracing::error!(?error, "Error handling ActivityGovernor request stream");
+                    log::error!(error:?; "Error handling ActivityGovernor request stream");
                 }
             }
         }
@@ -728,7 +725,7 @@ impl SystemActivityGovernor {
             match request {
                 fsystem::BootControlRequest::SetBootComplete { responder } => {
                     if self.booting_lease.borrow().is_some() {
-                        tracing::info!("System has booted. Dropping boot control lease.");
+                        log::info!("System has booted. Dropping boot control lease.");
                         self.booting_lease.borrow_mut().take();
                         let res = self
                             .boot_control
@@ -736,14 +733,14 @@ impl SystemActivityGovernor {
                             .update(BootControlLevel::Inactive.into())
                             .await;
                         if let Err(error) = res {
-                            tracing::warn!(?error, "update boot_control level to inactive failed");
+                            log::warn!(error:?; "update boot_control level to inactive failed");
                         }
                         booting_node.set(false);
                     }
                     responder.send().unwrap();
                 }
                 fsystem::BootControlRequest::_UnknownMethod { ordinal, .. } => {
-                    tracing::warn!(?ordinal, "Unknown StatsRequest method");
+                    log::warn!(ordinal:?; "Unknown StatsRequest method");
                 }
             }
         }
@@ -758,11 +755,11 @@ impl SystemActivityGovernor {
             match request {
                 fsuspend::StatsRequest::Watch { responder } => {
                     if let Err(error) = sub.register(responder) {
-                        tracing::warn!(?error, "Failed to register for Watch call");
+                        log::warn!(error:?; "Failed to register for Watch call");
                     }
                 }
                 fsuspend::StatsRequest::_UnknownMethod { ordinal, .. } => {
-                    tracing::warn!(?ordinal, "Unknown StatsRequest method");
+                    log::warn!(ordinal:?; "Unknown StatsRequest method");
                 }
             }
         }
@@ -779,8 +776,8 @@ impl SystemActivityGovernor {
                 fbroker::ElementInfoProviderRequest::GetElementPowerLevelNames { responder } => {
                     let result = responder.send(Ok(&self.element_power_level_names));
                     if let Err(error) = result {
-                        tracing::warn!(
-                            ?error,
+                        log::warn!(
+                            error:?;
                             "Encountered error while responding to GetElementPowerLevelNames request"
                         );
                     }
@@ -788,14 +785,14 @@ impl SystemActivityGovernor {
                 fbroker::ElementInfoProviderRequest::GetStatusEndpoints { responder } => {
                     let result = responder.send(Ok(self.get_status_endpoints().await));
                     if let Err(error) = result {
-                        tracing::warn!(
-                            ?error,
+                        log::warn!(
+                            error:?;
                             "Encountered error while responding to GetStatusEndpoints request"
                         );
                     }
                 }
                 fbroker::ElementInfoProviderRequest::_UnknownMethod { ordinal, .. } => {
-                    tracing::warn!(?ordinal, "Unknown ElementInfoProviderRequest method");
+                    log::warn!(ordinal:?; "Unknown ElementInfoProviderRequest method");
                 }
             }
         }
@@ -809,7 +806,7 @@ impl SuspendResumeListener for SystemActivityGovernor {
     }
 
     async fn on_suspend_ended(&self, suspend_succeeded: bool) {
-        tracing::debug!(?suspend_succeeded, "on_suspend_ended");
+        log::debug!(suspend_succeeded:?; "on_suspend_ended");
         self.suspend_succeeded.set(suspend_succeeded);
         self.waiting_for_es_activation_after_resume.set(true);
 
@@ -834,7 +831,7 @@ impl SuspendResumeListener for SystemActivityGovernor {
     }
 
     async fn notify_on_suspend(&self) {
-        tracing::debug!("notify_on_suspend");
+        log::debug!("notify_on_suspend");
         // A client may call RegisterListener while handling on_suspend which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
@@ -846,7 +843,7 @@ impl SuspendResumeListener for SystemActivityGovernor {
 
     async fn notify_suspend_ended(&self) {
         let suspend_succeeded = self.suspend_succeeded.get();
-        tracing::debug!(?suspend_succeeded, "notify_suspend_ended");
+        log::debug!(suspend_succeeded:?; "notify_suspend_ended");
         if suspend_succeeded {
             self.notify_on_resume().await;
             self.suspend_succeeded.set(false);
@@ -889,7 +886,7 @@ fn register_element_status_endpoint(
             });
         }
         Err(error) => {
-            tracing::warn!(?error, "Failed to register a Status channel for {}", name)
+            log::warn!(error:?; "Failed to register a Status channel for {}", name)
         }
     }
 }

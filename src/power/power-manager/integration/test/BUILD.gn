@@ -57,9 +57,9 @@ rustc_test("integration-test") {
     "//src/power/power-manager/integration/lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:libm",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:serde_json5",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [

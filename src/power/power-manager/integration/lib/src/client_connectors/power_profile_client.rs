@@ -5,7 +5,7 @@
 use crate::TestEnv;
 use futures::channel::mpsc;
 use futures::StreamExt;
-use tracing::*;
+use log::*;
 use {fidl_fuchsia_power_profile as fprofile, fuchsia_async as fasync};
 
 /// Convenience type for interacting with the Power Manager's power profile service.

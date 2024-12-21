@@ -16,9 +16,9 @@ use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
+use log::*;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::*;
 use {
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl,
     fidl_fuchsia_hardware_power_statecontrol as fpower, fidl_fuchsia_io as fio,

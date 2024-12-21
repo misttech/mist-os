@@ -206,7 +206,7 @@ impl CpuCluster {
                 panic!("Wrong response type for SetOperatingPoint: {:?}", r);
             }
             Err(e) => {
-                tracing::error!("SetOperatingPoint failed: {:?}", e);
+                log::error!("SetOperatingPoint failed: {:?}", e);
 
                 // If the update failed, query the value, so at least the current state is known. If
                 // that fails, too, record a range of possible values based on the previous and
@@ -216,7 +216,7 @@ impl CpuCluster {
                         self.current_opp.set(RangedValue::Known(i as usize));
                     }
                     result => {
-                        tracing::error!("Unexpected result from GetOperatingPoint: {:?}", result);
+                        log::error!("Unexpected result from GetOperatingPoint: {:?}", result);
                         let range = Range {
                             lower: std::cmp::min(self.current_opp.get().lower(), index),
                             upper: std::cmp::max(self.current_opp.get().upper(), index),
@@ -731,7 +731,7 @@ impl CpuManagerMain {
         let cpu_loads = match self.get_cpu_loads().await {
             Ok(loads) => loads,
             Err(e) => {
-                tracing::error!(
+                log::error!(
                     "Error querying CPU loads: {}\nWill throttle assuming maximal load.",
                     e
                 );
@@ -780,7 +780,7 @@ impl CpuManagerMain {
 
         if let Err(e) = self.update_thermal_state(new_thermal_state_index).await {
             self.inspect.last_error.set(&e.to_string());
-            tracing::error!("Error updating thermal states: {}", e);
+            log::error!("Error updating thermal states: {}", e);
             return;
         }
 

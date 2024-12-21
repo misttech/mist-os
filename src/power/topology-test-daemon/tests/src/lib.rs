@@ -9,7 +9,7 @@ use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
 };
-use tracing::*;
+use log::*;
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_system as fsystem, fidl_fuchsia_power_topology_test as fpt,
@@ -48,7 +48,7 @@ macro_rules! block_until_inspect_matches {
                 Ok(_) => break,
                 Err(error) => {
                     if i == DELAY_NOTIFICATION {
-                        tracing::warn!(?error, "Still awaiting inspect match after {} tries", DELAY_NOTIFICATION);
+                        log::warn!(error:?; "Still awaiting inspect match after {} tries", DELAY_NOTIFICATION);
                     }
                     if  i >= MAX_LOOPS_COUNT {  // upper bound, so test terminates on mismatch
                         // Print the actual, so we know why the match failed if it does.
@@ -109,7 +109,7 @@ macro_rules! block_until_power_elements_match {
                         },
                         Err(error) => {
                             if i == 10 {
-                                tracing::warn!(?error, "Still awaiting inspect match after 10 tries");
+                                log::warn!(error:?; "Still awaiting inspect match after 10 tries");
                             }
                             if MACRO_LOOP_EXIT && i == 50 {
                                 return Err(error.into())

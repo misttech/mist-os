@@ -8,10 +8,10 @@ use anyhow::{format_err, Result};
 use fuchsia_inspect::{self as inspect, Property};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::{error, info};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tracing::{error, info};
 use {
     fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_power_metrics as fmetrics,
     fuchsia_async as fasync,
@@ -63,7 +63,7 @@ async fn watch_and_update_ports(
         fhwnet::DevicePortEvent::Removed(port_id) => {
             // Remove port if a port was removed from the device.
             if let Some(_) = ports.borrow_mut().remove(&port_id.base) {
-                info!(port_id.base, port_id.salt, "Removed a port");
+                info!(port_id_base = port_id.base, port_id_salt = port_id.salt; "Removed a port");
             }
         }
         // When watcher was created, ports might already exist.
@@ -93,7 +93,11 @@ async fn watch_and_update_ports(
                                 || port_class == fhwnet::PortClass::WlanClient
                             {
                                 if ports.borrow_mut().insert(port_id.base, port).is_none() {
-                                    info!(port_id.base, port_id.salt, "Added a new/existing port");
+                                    info!(
+                                        port_id_base = port_id.base,
+                                        port_id_salt = port_id.salt;
+                                        "Added a new/existing port"
+                                    );
                                 }
                             }
                         }
@@ -350,7 +354,7 @@ impl NetworkActivityLogger {
                             rx_bytes_per_sec,
                             tx_bytes_per_sec,
                             rx_frames_per_sec,
-                            tx_frames_per_sec,
+                            tx_frames_per_sec;
                             "Network activity"
                         );
                     }

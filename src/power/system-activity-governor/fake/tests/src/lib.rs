@@ -9,8 +9,8 @@ use fidl_fuchsia_power_system::{self as fsystem, ApplicationActivityLevel, Execu
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::channel::mpsc;
 use futures::StreamExt;
+use log::*;
 use power_broker_client::PowerElementContext;
-use tracing::*;
 use {fidl_test_sagcontrol as fctrl, fuchsia_async as fasync};
 
 struct TestEnv {

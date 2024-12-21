@@ -26,7 +26,7 @@ rustc_test("bin") {
     "//src/power/system-activity-governor:component",
     "//src/power/topology-test-daemon:component",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]

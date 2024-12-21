@@ -660,7 +660,7 @@ impl Topology {
         let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
         let (Some(dp), Some(rq)) = (self.elements.get(dp_id), self.elements.get(rq_id)) else {
             // elements[dp_id] and elements[rq_id] guaranteed by prior validation
-            tracing::error!(?dep, "Failed to add inspect for dependency.");
+            log::error!(dep:?; "Failed to add inspect for dependency.");
             return;
         };
         let (dp_level, rq_level) = (dep.dependent.level, dep.requires.level);
@@ -686,12 +686,12 @@ impl Topology {
         // elements[dp_id] and elements[rq_id] guaranteed by prior validation
         let (dp_id, rq_id) = (&dep.dependent.element_id, &dep.requires.element_id);
         let Some(dp) = self.elements.get(dp_id) else {
-            tracing::error!(?dp_id, "Missing element for removal");
+            log::error!(dp_id:?; "Missing element for removal");
             return;
         };
         let mut dp_edges = dp.inspect_edges.borrow_mut();
         let Some(inspect) = dp_edges.get_mut(rq_id) else {
-            tracing::error!(?rq_id, "Missing edge for removal");
+            log::error!(rq_id:?; "Missing edge for removal");
             return;
         };
         inspect.meta().remove(&dep.dependent.level.to_string());

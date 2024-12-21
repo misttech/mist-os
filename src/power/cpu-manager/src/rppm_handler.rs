@@ -192,14 +192,14 @@ impl RppmHandler {
                         self.set_processor_power_state(port.raw_handle(), pstate).await;
                     }
                     result => {
-                        tracing::error!("Unexpected result from GetOperatingPoint: {:?}", result);
+                        log::error!("Unexpected result from GetOperatingPoint: {:?}", result);
                     }
                 }
             }
 
             loop {
                 match port.wait(zx::MonotonicInstant::INFINITE) {
-                    Err(e) => tracing::error!("zx_port_wait failed with error: {}", e),
+                    Err(e) => log::error!("zx_port_wait failed with error: {}", e),
                     Ok(p) => {
                         match p.contents() {
                             zx::PacketContents::PowerTransition(packet) => {
@@ -237,7 +237,7 @@ impl RppmHandler {
                                         panic!("Unexpected SetOperatingPoint result: {:?}", other)
                                     }
                                     Err(e) => {
-                                        tracing::error!("Error requesting OPP change: {}", e);
+                                        log::error!("Error requesting OPP change: {}", e);
                                     }
                                 };
                             }
@@ -262,7 +262,7 @@ impl RppmHandler {
                 panic!("Unexpected SetProcessorPowerDomain result: {:?}", other)
             }
             Err(e) => {
-                tracing::error!("Error sending energy model to kernel: {}", e);
+                log::error!("Error sending energy model to kernel: {}", e);
             }
         };
     }
@@ -279,7 +279,7 @@ impl RppmHandler {
                 panic!("Unexpected SetProcessorPowerState result: {:?}", other)
             }
             Err(e) => {
-                tracing::error!("Error sending updated power state to kernel: {}", e);
+                log::error!("Error sending updated power state to kernel: {}", e);
             }
         };
     }

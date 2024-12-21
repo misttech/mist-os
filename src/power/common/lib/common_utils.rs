@@ -7,7 +7,7 @@
 macro_rules! log_if_err {
     ($result:expr, $log_prefix:expr) => {
         if let Err(e) = $result.as_ref() {
-            tracing::error!("{}: {}", $log_prefix, e);
+            log::error!("{}: {}", $log_prefix, e);
         }
     };
 }

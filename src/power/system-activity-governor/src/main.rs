@@ -133,7 +133,7 @@ where
 
 #[fuchsia::main]
 async fn main() -> Result<()> {
-    tracing::info!("started");
+    log::info!("started");
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
     let inspector = fuchsia_inspect::component::inspector();
@@ -145,25 +145,25 @@ async fn main() -> Result<()> {
     inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
 
     // Set up the SystemActivityGovernor.
-    tracing::info!(?config, "config");
+    log::info!(config:?; "config");
 
     let suspender = if config.use_suspender {
         loop {
-            tracing::info!("Attempting to connect to suspender...");
+            log::info!("Attempting to connect to suspender...");
             match connect_to_suspender().await {
                 Ok(s) => {
-                    tracing::info!("Connected to suspender");
+                    log::info!("Connected to suspender");
                     break Some(s);
                 }
                 Err(e) => {
-                    tracing::error!("Unable to connect to suspender protocol: {e:?}");
+                    log::error!("Unable to connect to suspender protocol: {e:?}");
                 }
             }
             // Delay retry for some time to reduce log spam.
             fuchsia_async::Timer::new(SUSPENDER_CONNECT_RETRY_DELAY).await;
         }
     } else {
-        tracing::info!("Skipping connecting to suspender.");
+        log::info!("Skipping connecting to suspender.");
         None
     };
 
@@ -173,7 +173,7 @@ async fn main() -> Result<()> {
     let sag_factory_fn = move |cpu_manager, execution_state_dependencies| {
         let topology = topology2.clone();
         async move {
-            tracing::info!("Creating activity governor server...");
+            log::info!("Creating activity governor server...");
             SystemActivityGovernor::new(
                 &topology,
                 inspector.root().clone_weak(),
@@ -203,7 +203,7 @@ async fn main() -> Result<()> {
     // This future should never complete.
     let booting_node = Rc::new(inspector.root().create_bool("booting", true));
     let result = run(cpu_service, booting_node).await;
-    tracing::error!(?result, "Unexpected exit");
+    log::error!(result:?; "Unexpected exit");
     fuchsia_inspect::component::health().set_unhealthy(&format!("Unexpected exit: {:?}", result));
     result
 }

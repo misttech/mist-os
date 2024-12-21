@@ -26,11 +26,11 @@ use futures::future::join_all;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
 use futures::task::Context;
 use futures::{FutureExt, TryFutureExt};
+use log::{error, info, warn};
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::pin::Pin;
 use std::rc::Rc;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_ui_activity as factivity,
     fuchsia_async as fasync, fuchsia_inspect as inspect, serde_json as json,
@@ -435,7 +435,7 @@ impl MetricsLoggerServer {
 
         let drivers =
             Rc::new(generate_temperature_drivers(driver_aliases).await.map_err(|err| {
-                error!(%err, "Request failed with internal error");
+                error!(err:%; "Request failed with internal error");
                 fmetrics::RecorderError::Internal
             })?);
         self.temperature_drivers.replace(Some(drivers.clone()));
@@ -457,7 +457,7 @@ impl MetricsLoggerServer {
         };
 
         let drivers = Rc::new(generate_power_drivers(driver_aliases).await.map_err(|err| {
-            error!(%err, "Request failed with internal error");
+            error!(err:%; "Request failed with internal error");
             fmetrics::RecorderError::Internal
         })?);
         self.power_drivers.replace(Some(drivers.clone()));
@@ -479,7 +479,7 @@ impl MetricsLoggerServer {
         };
 
         let drivers = Rc::new(generate_gpu_drivers(driver_aliases).await.map_err(|err| {
-            error!(%err, "Request failed with internal error");
+            error!(err:%; "Request failed with internal error");
             fmetrics::RecorderError::Internal
         })?);
         self.gpu_drivers.replace(Some(drivers.clone()));
@@ -493,7 +493,7 @@ impl MetricsLoggerServer {
         }
 
         let driver = Rc::new(generate_cpu_stats_driver().await.map_err(|err| {
-            error!(%err, "Request failed with internal error");
+            error!(err:%; "Request failed with internal error");
             fmetrics::RecorderError::Internal
         })?);
         self.cpu_stats_driver.replace(Some(driver.clone()));
@@ -509,7 +509,7 @@ impl MetricsLoggerServer {
         }
 
         let device = Rc::new(generate_network_devices().await.map_err(|err| {
-            error!(%err, "Request failed with internal error");
+            error!(err:%; "Request failed with internal error");
             fmetrics::RecorderError::Internal
         })?);
         self.network_devices.replace(Some(device.clone()));
@@ -580,7 +580,7 @@ struct CmdArgs {
 async fn main() {
     // v2 components can't surface stderr yet, so we need to explicitly log errors.
     match inner_main(argh::from_env()).await {
-        Err(err) => error!(%err, "Terminated with error"),
+        Err(err) => error!(err:%; "Terminated with error"),
         Ok(()) => info!("Terminated with Ok(())"),
     }
 }

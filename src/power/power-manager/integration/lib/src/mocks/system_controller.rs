@@ -9,8 +9,8 @@ use fuchsia_component_test::LocalComponentHandles;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
+use log::*;
 use std::sync::Arc;
-use tracing::*;
 use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 /// Mocks the fuchsia.sys2.SystemController service to be used in integration tests.

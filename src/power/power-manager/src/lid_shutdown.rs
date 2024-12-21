@@ -16,12 +16,12 @@ use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::channel::mpsc;
 use futures::future::{FutureExt, LocalBoxFuture};
 use futures::{StreamExt, TryStreamExt};
+use log::*;
 use serde_derive::Deserialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
-use tracing::*;
 use {fidl_fuchsia_hardware_hidbus as fhidbus, fuchsia_async as fasync, serde_json as json};
 
 /// Node: LidShutdown

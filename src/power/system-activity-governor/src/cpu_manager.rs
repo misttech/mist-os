@@ -113,20 +113,20 @@ impl CpuManager {
     /// Returns a Result that indicates whether the system should suspend or not.
     /// If an error occurs while updating the power level, the error is forwarded to the caller.
     pub async fn update_current_level(&self, required_level: fbroker::PowerLevel) -> Result<bool> {
-        tracing::debug!(?required_level, "update_current_level: acquiring inner lock");
+        log::debug!(required_level:?; "update_current_level: acquiring inner lock");
         let mut inner = self.inner.lock().await;
 
-        tracing::debug!(?required_level, "update_current_level: updating current level");
+        log::debug!(required_level:?; "update_current_level: updating current level");
         let res = inner.cpu.current_level.update(required_level).await;
         if let Err(error) = res {
-            tracing::warn!(?error, "update_current_level: current_level.update failed");
+            log::warn!(error:?; "update_current_level: current_level.update failed");
             return Err(error.into());
         }
 
         // After other elements have been informed of required_level for cpu,
         // check whether the system can be suspended.
         if required_level == CpuLevel::Inactive.into_primitive() {
-            tracing::debug!("beginning suspend process for cpu");
+            log::debug!("beginning suspend process for cpu");
             inner.suspend_allowed = true;
             return Ok(true);
         } else {
@@ -156,10 +156,10 @@ impl CpuManager {
         let listener = self.suspend_resume_listener.get().unwrap();
         let mut suspend_failed = false;
         {
-            tracing::debug!("trigger_suspend: acquiring inner lock");
+            log::debug!("trigger_suspend: acquiring inner lock");
             let inner = self.inner.lock().await;
             if !inner.suspend_allowed {
-                tracing::info!("Suspend not allowed");
+                log::info!("Suspend not allowed");
                 return SuspendResult::NotAllowed;
             }
 
@@ -170,7 +170,7 @@ impl CpuManager {
                 );
             });
             // LINT.IfChange
-            tracing::info!("Suspending");
+            log::info!("Suspending");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
 
             let response = if let Some(suspender) = inner.suspender.as_ref() {
@@ -189,7 +189,7 @@ impl CpuManager {
                 None
             };
             // LINT.IfChange
-            tracing::info!(?response, "Resuming");
+            log::info!(response:?; "Resuming");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
             self._inspect_node.borrow_mut().add_entry(|node| {
                 let time = zx::MonotonicInstant::get().into_nanos();
@@ -217,13 +217,13 @@ impl CpuManager {
                             if stats.last_time_in_suspend.is_some() {
                                 stats.success_count = stats.success_count.map(|c| c + 1);
                             } else {
-                                tracing::warn!("Failed to suspend in Suspender");
+                                log::warn!("Failed to suspend in Suspender");
                                 suspend_failed = true;
                                 stats.fail_count = stats.fail_count.map(|c| c + 1);
                             }
                         }
                         Some(error) => {
-                            tracing::warn!(?error, "Failed to suspend");
+                            log::warn!(error:?; "Failed to suspend");
                             stats.fail_count = stats.fail_count.map(|c| c + 1);
                             suspend_failed = true;
 
@@ -232,7 +232,7 @@ impl CpuManager {
                             }
                         }
                         None => {
-                            tracing::warn!("No suspender available, suspend was a no-op");
+                            log::warn!("No suspender available, suspend was a no-op");
                             stats.fail_count = stats.fail_count.map(|c| c + 1);
                             stats.last_failed_error = Some(zx::sys::ZX_ERR_NOT_SUPPORTED);
                         }
@@ -270,10 +270,10 @@ impl CpuManager {
             let _unhandled_suspend_failures_node =
                 inspect_node.create_uint(fobs::UNHANDLED_SUSPEND_FAILURES_COUNT, 0);
             loop {
-                tracing::debug!("awaiting suspend signals");
+                log::debug!("awaiting suspend signals");
                 suspend_signal.next().await;
-                tracing::debug!("attempting to suspend");
-                tracing::info!("trigger_suspend result: {:?}", cpu_manager.trigger_suspend().await);
+                log::debug!("attempting to suspend");
+                log::info!("trigger_suspend result: {:?}", cpu_manager.trigger_suspend().await);
             }
         })
         .detach();

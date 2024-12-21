@@ -11,12 +11,12 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::error;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use tracing::error;
 
 use {fidl_test_sagcontrol as fctrl, fuchsia_async as fasync};
 
@@ -130,7 +130,7 @@ impl SystemActivityGovernorControl {
                  res: fctrl::StateWatchResponder|
                  -> bool {
                     if let Err(error) = res.send(state) {
-                        tracing::warn!(?error, "Failed to send SAG state to client");
+                        log::warn!(error:?; "Failed to send SAG state to client");
                     }
                     true
                 },
@@ -203,11 +203,11 @@ impl SystemActivityGovernorControl {
                         }
                         fctrl::StateRequest::Watch { responder } => {
                             if let Err(error) = sub.register(responder) {
-                                tracing::warn!(?error, "Failed to register for Watch call");
+                                log::warn!(error:?; "Failed to register for Watch call");
                             }
                         }
                         fctrl::StateRequest::_UnknownMethod { ordinal, .. } => {
-                            tracing::warn!(?ordinal, "Unknown StateRequest method");
+                            log::warn!(ordinal:?; "Unknown StateRequest method");
                         }
                     }
                 }
@@ -273,7 +273,7 @@ impl SystemActivityGovernorControl {
                 self.handle_application_activity_changes(required_application_activity_level)
                     .await
                     .map_err(|err| {
-                        error!(%err, "Request failed with internal error");
+                        error!(err:%; "Request failed with internal error");
                         fctrl::SetSystemActivityGovernorStateError::Internal
                     })?;
             }
@@ -288,7 +288,7 @@ impl SystemActivityGovernorControl {
                 self.handle_application_activity_changes(required_application_activity_level)
                     .await
                     .map_err(|err| {
-                        error!(%err, "Request failed with internal error");
+                        error!(err:%; "Request failed with internal error");
                         fctrl::SetSystemActivityGovernorStateError::Internal
                     })?;
             }
@@ -301,7 +301,7 @@ impl SystemActivityGovernorControl {
                 self.handle_application_activity_changes(required_application_activity_level)
                     .await
                     .map_err(|err| {
-                        error!(%err, "Request failed with internal error");
+                        error!(err:%; "Request failed with internal error");
                         fctrl::SetSystemActivityGovernorStateError::Internal
                     })?;
             }

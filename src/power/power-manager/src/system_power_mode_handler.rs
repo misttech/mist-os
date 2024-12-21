@@ -14,6 +14,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use futures::prelude::*;
 use futures::TryStreamExt;
+use log::*;
 use serde_derive::Deserialize;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -22,7 +23,6 @@ use std::rc::Rc;
 use system_power_mode_config::{
     ClientConfig, ClientConfigExt, ClientType, SystemMode, SystemPowerModeConfig,
 };
-use tracing::*;
 use {
     fidl_fuchsia_power_clientlevel as fpowerclient, fidl_fuchsia_power_systemmode as fpowermode,
     fuchsia_async as fasync, serde_json as json,
