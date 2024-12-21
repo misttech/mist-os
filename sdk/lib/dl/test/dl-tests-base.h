@@ -44,9 +44,6 @@ class DlTestsBase : public ::testing::Test {
   // Whether the test fixture supports dynamic TLS.
   static constexpr bool kSupportsDynamicTls = true;
 
-  // Whether the test fixture can support initializers/finalizers at all.
-  static constexpr bool kSupportsInitFini = true;
-
   // Whether the test fixture's dlclose function will run finalizers.
   static constexpr bool kDlCloseCanRunFinalizers = true;
 

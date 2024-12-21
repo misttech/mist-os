@@ -1519,10 +1519,6 @@ TYPED_TEST(DlTests, StartupModulesStaticTlsGetAddr) {
 TYPED_TEST(DlTests, InitFiniLegacy) {
   const std::string kFile = "init-fini-legacy.so";
 
-  if constexpr (!TestFixture::kSupportsInitFini) {
-    GTEST_SKIP() << "test requires init/fini support";
-  }
-
   ASSERT_EQ(gInitFiniState, 0);
 
   this->ExpectRootModule(kFile);
@@ -1548,10 +1544,6 @@ TYPED_TEST(DlTests, InitFiniLegacy) {
 // correct order.
 TYPED_TEST(DlTests, InitFiniArray) {
   const std::string kFile = "init-fini-array.so";
-
-  if constexpr (!TestFixture::kSupportsInitFini) {
-    GTEST_SKIP() << "test requires init/fini support";
-  }
 
   ASSERT_EQ(gInitFiniState, 0);
 
@@ -1611,10 +1603,6 @@ TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
   const std::string kBDepFile = "libinit-fini-array-b-dep.so";
   const std::string kCFile = "libinit-fini-array-c.so";
 
-  if constexpr (!TestFixture::kSupportsInitFini) {
-    GTEST_SKIP() << "test requires init/fini support";
-  }
-
   ASSERT_EQ(gInitFiniState, 0);
 
   this->ExpectRootModule(kFile);
@@ -1640,10 +1628,6 @@ TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
 TYPED_TEST(DlTests, InitFiniArrayWithLegacy) {
   const std::string kFile = "init-fini-array-with-legacy.so";
 
-  if constexpr (!TestFixture::kSupportsInitFini) {
-    GTEST_SKIP() << "test requires init/fini support";
-  }
-
   ASSERT_EQ(gInitFiniState, 0);
 
   this->ExpectRootModule(kFile);
@@ -1662,7 +1646,6 @@ TYPED_TEST(DlTests, InitFiniArrayWithLegacy) {
 
   gInitFiniState = 0;
 }
-
 
 // Holds the names for the TLS module and test APIs.
 struct TlsLoadedSymbolNames {
