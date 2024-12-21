@@ -22,7 +22,7 @@ if (current_build_target_api_level == "NEXT") {
         "NEXT",
         "HEAD",
       ]
-  greater_fuchsia_api_levels += [ "PLATFORM" ]
+  greater_fuchsia_api_levels = [ "PLATFORM" ]
 } else if (current_build_target_api_level == "PLATFORM") {
   lesser_or_equal_fuchsia_api_levels =
       platform_version.all_numbered_api_levels + [
