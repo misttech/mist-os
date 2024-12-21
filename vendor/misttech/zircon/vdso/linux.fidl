@@ -130,8 +130,12 @@ closed protocol Linux {
     // STUB 15
     strict A0015RtSigreturn() -> () error int64;
 
-    // STUB 16
-    strict A0016Ioctl() -> () error int64;
+    // #16, SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
+    strict A0016Ioctl(resource struct {
+        fd uint32;
+        cmd uint32;
+        arg uint64;
+    }) -> () error int64;
 
     // #17, SYSCALL_DEFINE4(pread64, unsigned int, fd, char __user *, buf, size_t, count, loff_t, pos)
     strict A0017Pread64(resource struct {
@@ -170,7 +174,7 @@ closed protocol Linux {
     // STUB 23
     strict A0023Select() -> () error int64;
 
-    // STUB 24
+    // #24, SYSCALL_DEFINE0(sched_yield)
     strict A0024SchedYield() -> () error int64;
 
     // STUB 25

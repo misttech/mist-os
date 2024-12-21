@@ -8,10 +8,10 @@
 
 #include "../../priv.h"
 
-#define LOCAL_TRACE SYSCALLS_GLOBAL_TRACE(0)
+#define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(0)
 
-long sys_sched_yield() {
-  auto status = zx_thread_legacy_yield(0);
+long sys_a0024_sched_yield() {
+  auto status = sys_thread_legacy_yield(0);
   if (status == ZX_ERR_INVALID_ARGS) {
     return -EINVAL;
   }
