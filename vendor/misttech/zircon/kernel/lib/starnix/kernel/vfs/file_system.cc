@@ -117,6 +117,17 @@ fit::result<Errno> FileSystem::exchange(const CurrentTask& current_task, const F
   return ops_->exchange(*this, current_task, node1, parent1, name1, node2, parent2, name2);
 }
 
+fit::result<Errno, struct ::statfs> FileSystem::statfs(const CurrentTask& current_task) const {
+  // Check security permissions first
+  // security::sb_statfs(current_task, &self)?;
+  auto result = ops_->statfs(*this, current_task) _EP(result);
+  struct ::statfs stat = result.value();
+  if (stat.f_frsize == 0) {
+    stat.f_frsize = stat.f_bsize;
+  }
+  return fit::ok(stat);
+}
+
 void FileSystem::set_root(FsNodeOps* root) { set_root_node(FsNode::new_root(root)); }
 
 // Set up the root of the filesystem. Must not be called more than once.

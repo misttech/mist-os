@@ -265,6 +265,30 @@ fit::result<Errno, size_t> sys_writev(const CurrentTask& current_task, FdNumber 
   return do_writev(current_task, fd, iovec_addr, iovec_count, ktl::nullopt, 0);
 }
 
+fit::result<Errno> sys_fstatfs(const CurrentTask& current_task, FdNumber fd,
+                               starnix_uapi::UserRef<struct ::statfs> user_buf) {
+  // O_PATH allowed for:
+  //
+  //   fstatfs(2) (since Linux 3.12).
+  //
+  // See https://man7.org/linux/man-pages/man2/open.2.html
+  auto file = current_task->files_.get_allowing_opath(fd) _EP(file);
+  auto stat = file->fs_->statfs(current_task) _EP(stat);
+  stat->f_flags |= static_cast<uint64_t>(file->name_->mount_.flags().bits());
+  auto write_result = current_task.write_object(user_buf, stat.value()) _EP(write_result);
+  return fit::ok();
+}
+
+fit::result<Errno> sys_statfs(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
+                              starnix_uapi::UserRef<struct ::statfs> user_buf) {
+  auto name = lookup_at(current_task, FdNumber::AT_FDCWD_, user_path, LookupFlags()) _EP(name);
+  auto fs = name->entry_->node_->fs();
+  auto stat = fs->statfs(current_task) _EP(stat);
+  stat->f_flags |= static_cast<uint64_t>(name->mount_.flags().bits());
+  auto write_result = current_task.write_object(user_buf, stat.value()) _EP(write_result);
+  return fit::ok();
+}
+
 fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumber dir_fd,
                                         UserCString user_path, uint32_t flags, FileMode mode) {
   return do_openat(current_task, dir_fd, user_path, flags, mode, ResolveFlags::empty());

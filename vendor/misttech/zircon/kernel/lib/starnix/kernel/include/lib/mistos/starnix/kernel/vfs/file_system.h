@@ -267,6 +267,14 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
                               const FsNodeHandle& node2, const FsNodeHandle& parent2,
                               const FsStr& name2) const;
 
+  /// Returns the `statfs` for this filesystem.
+  ///
+  /// Each `FileSystemOps` impl is expected to override this to return the specific statfs for
+  /// the filesystem.
+  ///
+  /// Returns `ENOSYS` if the `FileSystemOps` don't implement `stat`.
+  fit::result<Errno, struct ::statfs> statfs(const CurrentTask& current_task) const;
+
   void did_create_dir_entry(const DirEntryHandle& entry);
 
   void will_destroy_dir_entry(const DirEntryHandle& entry);

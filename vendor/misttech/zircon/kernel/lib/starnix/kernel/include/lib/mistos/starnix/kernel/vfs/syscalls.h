@@ -17,6 +17,7 @@
 #include <lib/mistos/starnix_uapi/user_value.h>
 
 #include <asm/stat.h>
+#include <asm/statfs.h>
 #include <linux/openat2.h>
 
 namespace starnix {
@@ -74,6 +75,12 @@ fit::result<Errno, size_t> sys_pwritev2(const CurrentTask& current_task, FdNumbe
                                         starnix_uapi::UserAddress iovec_addr,
                                         starnix_uapi::UserValue<uint32_t> iovec_count, off_t offset,
                                         uint64_t arg, uint32_t flags);
+
+fit::result<Errno> sys_fstatfs(const CurrentTask& current_task, FdNumber fd,
+                               starnix_uapi::UserRef<struct ::statfs> user_buf);
+
+fit::result<Errno> sys_statfs(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
+                              starnix_uapi::UserRef<struct ::statfs> user_buf);
 
 fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumber dir_fd,
                                         starnix_uapi::UserCString user_path, uint32_t flags,

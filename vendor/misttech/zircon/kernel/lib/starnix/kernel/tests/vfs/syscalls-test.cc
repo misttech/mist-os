@@ -193,6 +193,40 @@ bool test_sys_open_cloexec() {
   END_TEST;
 }
 
+bool test_fstat_tmp_file() {
+  BEGIN_TEST;
+
+  auto [kernel, current_task] =
+      starnix::testing::create_kernel_task_and_unlocked_with_bootfs_current_zbi();
+
+  // Create the file that will be used to stat
+  auto file_handle = current_task->open_file("data/testfile.txt", OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(file_handle.is_ok());
+
+  // Write path to user memory
+  auto path_addr =
+      starnix::testing::map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  ktl::string_view path("data/testfile.txt");
+  auto write_result = (*current_task).write_memory(path_addr, {(uint8_t*)path.data(), path.size()});
+  ASSERT_TRUE(write_result.is_ok());
+
+  auto user_stat = starnix_uapi::UserRef<struct ::statfs>::New(path_addr + path.size());
+  auto write_stat_result = (*current_task).write_object(user_stat, default_statfs(0));
+  ASSERT_TRUE(write_stat_result.is_ok());
+
+  auto statfs_result = sys_statfs(*current_task, UserCString::New(path_addr), user_stat);
+  ASSERT_TRUE(statfs_result.is_ok());
+
+  auto returned_stat = (*current_task).read_object(user_stat);
+  ASSERT_TRUE(returned_stat.is_ok());
+
+  // auto expected_stat =
+  //     default_statfs(starnix::util::from_be32(*reinterpret_cast<const uint32_t*>("f.io")));
+  // ASSERT_EQ(memcmp(&returned_stat.value(), &expected_stat, sizeof(struct ::statfs)), 0);
+
+  END_TEST;
+}
+
 bool test_unlinkat_dir() {
   BEGIN_TEST;
 
@@ -288,6 +322,7 @@ UNITTEST("test sys lseek", unit_testing::test_sys_lseek)
 UNITTEST("test sys dup", unit_testing::test_sys_dup)
 UNITTEST("test sys dup3", unit_testing::test_sys_dup3)
 UNITTEST("test sys open cloexec", unit_testing::test_sys_open_cloexec)
+UNITTEST("test sys statfs", unit_testing::test_fstat_tmp_file)
 UNITTEST("test unlinkat dir", unit_testing::test_unlinkat_dir)
 UNITTEST("test rename noreplace", unit_testing::test_rename_noreplace)
 UNITTEST_END_TESTCASE(starnix_vfs_syscalls, "starnix_vfs_syscalls", "Tests for VFS Syscalls")
