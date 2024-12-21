@@ -189,8 +189,8 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
     return fit::error(errno(ENOMEM));
   }
 
-  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, bootfs, ktl::move(options))
-      _EP(fs);
+  auto fs = FileSystem::New(kernel, {.type = CacheMode::Type::Permanent}, bootfs,
+                            ktl::move(options)) _EP(fs);
   TreeBuilder tree = TreeBuilder::empty_dir();
   auto mode = FILE_MODE(IFDIR, 0755);
 

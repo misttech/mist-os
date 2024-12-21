@@ -31,8 +31,12 @@
 
 namespace starnix {
 
-Entries Entries::Perm(ktl::unique_ptr<Permanent> perm) { return Entries(ktl::move(perm)); }
-Entries Entries::Lru(ktl::unique_ptr<LruCache> lru) { return Entries(ktl::move(lru)); }
+Entries Entries::Permanent(ktl::unique_ptr<Entries::Inner::Permanent> perm) {
+  return Entries(ktl::move(perm));
+}
+Entries Entries::Lru(ktl::unique_ptr<Entries::Inner::LruCache> lru) {
+  return Entries(ktl::move(lru));
+}
 Entries Entries::None() { return Entries(Variant()); }
 Entries::Entries(Variant entries) : entries_(ktl::move(entries)) {}
 Entries::Entries(Entries&& other) = default;
@@ -54,17 +58,17 @@ fit::result<Errno, FileSystemHandle> FileSystem::New(const fbl::RefPtr<Kernel>& 
   auto cache = [&cache_mode]() -> Entries {
     fbl::AllocChecker ac;
     switch (cache_mode.type) {
-      case CacheModeType::Permanent: {
-        auto ptr = ktl::make_unique<Permanent>(&ac);
+      case CacheMode::Type::Permanent: {
+        auto ptr = ktl::make_unique<Entries::Inner::Permanent>(&ac);
         ZX_ASSERT(ac.check());
-        return Entries::Perm(ktl::move(ptr));
+        return Entries::Permanent(ktl::move(ptr));
       }
-      case CacheModeType::Cached: {
-        auto ptr = ktl::make_unique<LruCache>(&ac, cache_mode.config.capacity);
+      case CacheMode::Type::Cached: {
+        auto ptr = ktl::make_unique<Entries::Inner::LruCache>(&ac, cache_mode.config.capacity);
         ZX_ASSERT(ac.check());
         return Entries::Lru(ktl::move(ptr));
       }
-      case CacheModeType::Uncached:
+      case CacheMode::Type::Uncached:
         return Entries::None();
     };
   };
@@ -163,56 +167,59 @@ void FileSystem::remove_node(const FsNode& node) {
 }
 
 void FileSystem::did_create_dir_entry(const DirEntryHandle& entry) {
-  ktl::visit(overloaded{[](const ktl::monostate&) {},
-                        [&entry](const ktl::unique_ptr<Permanent>& p) {
-                          p->entries.Lock()->insert_or_find(entry);
-                        },
-                        [&entry](const ktl::unique_ptr<LruCache>& c) {
-                          c->entries.Lock()->insert_or_find(entry);
-                        }},
+  ktl::visit(Entries::overloaded{[](const ktl::monostate&) {},
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::Permanent>& p) {
+                                   p->entries.Lock()->insert_or_find(entry);
+                                 },
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::LruCache>& c) {
+                                   c->entries.Lock()->insert_or_find(entry);
+                                 }},
              entries_.entries_);
 }
 
 void FileSystem::will_destroy_dir_entry(const DirEntryHandle& entry) {
-  ktl::visit(overloaded{[](const ktl::monostate&) {},
-                        [&entry](const ktl::unique_ptr<Permanent>& p) {
-                          p->entries.Lock()->erase(entry->GetKey());
-                        },
-                        [&entry](const ktl::unique_ptr<LruCache>& c) {
-                          c->entries.Lock()->erase(entry->GetKey());
-                        }},
+  ktl::visit(Entries::overloaded{[](const ktl::monostate&) {},
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::Permanent>& p) {
+                                   p->entries.Lock()->erase(entry->GetKey());
+                                 },
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::LruCache>& c) {
+                                   c->entries.Lock()->erase(entry->GetKey());
+                                 }},
              entries_.entries_);
 }
 
 void FileSystem::did_access_dir_entry(const DirEntryHandle& entry) {
-  ktl::visit(overloaded{[](const ktl::monostate&) {}, [](const ktl::unique_ptr<Permanent>&) {},
-                        [&entry](const ktl::unique_ptr<LruCache>& c) {
-                          auto entries = c->entries.Lock();
-                          if (auto it = entries->find(entry->GetKey()); it != entries->end()) {
-                            // Move to end to mark as most recently used
-                            auto node = entries->erase(it);
-                            entries->insert(node);
-                          }
-                        }},
+  ktl::visit(Entries::overloaded{[](const ktl::monostate&) {},
+                                 [](const ktl::unique_ptr<Entries::Inner::Permanent>&) {},
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::LruCache>& c) {
+                                   auto entries = c->entries.Lock();
+                                   if (auto it = entries->find(entry->GetKey());
+                                       it != entries->end()) {
+                                     // Move to end to mark as most recently used
+                                     auto node = entries->erase(it);
+                                     entries->insert(node);
+                                   }
+                                 }},
              entries_.entries_);
 }
 
 void FileSystem::purge_old_entries() {
-  ktl::visit(overloaded{[](const ktl::monostate&) {}, [](const ktl::unique_ptr<Permanent>&) {},
-                        [](const ktl::unique_ptr<LruCache>& c) {
-                          fbl::AllocChecker ac;
-                          fbl::Vector<DirEntryHandle> purged;
-                          {
-                            auto entries = c->entries.Lock();
-                            while (entries->size() > c->capacity) {
-                              auto it = entries->begin();
-                              purged.push_back(it.CopyPointer(), &ac);
-                              ZX_ASSERT(ac.check());
-                              entries->erase(it);
-                            }
-                          }
-                          // Entries will get dropped here while not holding the lock
-                        }},
+  ktl::visit(Entries::overloaded{[](const ktl::monostate&) {},
+                                 [](const ktl::unique_ptr<Entries::Inner::Permanent>&) {},
+                                 [](const ktl::unique_ptr<Entries::Inner::LruCache>& c) {
+                                   fbl::AllocChecker ac;
+                                   fbl::Vector<DirEntryHandle> purged;
+                                   {
+                                     auto entries = c->entries.Lock();
+                                     while (entries->size() > c->capacity) {
+                                       auto it = entries->begin();
+                                       purged.push_back(it.CopyPointer(), &ac);
+                                       ZX_ASSERT(ac.check());
+                                       entries->erase(it);
+                                     }
+                                   }
+                                   // Entries will get dropped here while not holding the lock
+                                 }},
              entries_.entries_);
 }
 

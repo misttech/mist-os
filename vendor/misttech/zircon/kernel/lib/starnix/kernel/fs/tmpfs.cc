@@ -81,7 +81,7 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
     return fit::error(errno(ENOMEM));
   }
 
-  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, tmpfs, ktl::move(options))
+  auto fs = FileSystem::New(kernel, {.type = CacheMode::Type::Permanent}, tmpfs, ktl::move(options))
       _EP(fs);
   auto mount_options = fs->options_.params;
 

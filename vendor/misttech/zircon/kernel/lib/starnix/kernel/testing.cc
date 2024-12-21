@@ -155,7 +155,7 @@ FileSystemHandle create_fs(fbl::RefPtr<starnix::Kernel>& kernel, FsNodeOps* ops)
   ZX_ASSERT(ac.check());
 
   auto test_fs =
-      FileSystem::New(kernel, {.type = CacheModeType::Uncached}, ptr, FileSystemOptions());
+      FileSystem::New(kernel, {.type = CacheMode::Type::Uncached}, ptr, FileSystemOptions());
   ZX_ASSERT_MSG(test_fs.is_ok(), "testfs constructed with valid options");
   auto bus_dir_node = FsNode::new_root(ops);
   test_fs->set_root_node(bus_dir_node);

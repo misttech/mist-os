@@ -31,15 +31,6 @@ namespace starnix {
 
 const size_t DEFAULT_LRU_CAPACITY = 32;
 
-struct LruCache {
-  size_t capacity;
-  mutable starnix_sync::Mutex<fbl::HashTable<size_t, fbl::RefPtr<DirEntry>>> entries;
-};
-
-struct Permanent {
-  mutable starnix_sync::Mutex<fbl::HashTable<size_t, fbl::RefPtr<DirEntry>>> entries;
-};
-
 // Configuration for CacheMode::Cached.
 struct CacheConfig {
   size_t capacity = DEFAULT_LRU_CAPACITY;
@@ -47,11 +38,22 @@ struct CacheConfig {
 
 class Entries {
  public:
-  using Variant =
-      ktl::variant<ktl::monostate, ktl::unique_ptr<Permanent>, ktl::unique_ptr<LruCache>>;
+  class Inner {
+   public:
+    struct LruCache {
+      size_t capacity;
+      mutable starnix_sync::Mutex<fbl::HashTable<size_t, fbl::RefPtr<DirEntry>>> entries;
+    };
 
-  static Entries Perm(ktl::unique_ptr<Permanent>);
-  static Entries Lru(ktl::unique_ptr<LruCache>);
+    struct Permanent {
+      mutable starnix_sync::Mutex<fbl::HashTable<size_t, fbl::RefPtr<DirEntry>>> entries;
+    };
+  };
+  using Variant = ktl::variant<ktl::monostate, ktl::unique_ptr<Inner::Permanent>,
+                               ktl::unique_ptr<Inner::LruCache>>;
+
+  static Entries Permanent(ktl::unique_ptr<Inner::Permanent>);
+  static Entries Lru(ktl::unique_ptr<Inner::LruCache>);
   static Entries None();
 
   Entries(Entries&& other);
@@ -75,20 +77,20 @@ class Entries {
   Variant entries_;
 };
 
-enum class CacheModeType : uint8_t {
-  /// Entries are pemanent, instead of a cache of the backing storage. An example is tmpfs: the
-  /// DirEntry tree *is* the backing storage, as opposed to ext4, which uses the DirEntry tree as
-  /// a cache and removes unused nodes from it.
-  Permanent,
-  /// Entries are cached.
-  Cached,
-  /// Entries are uncached. This can be appropriate in cases where it is difficult for the
-  /// filesystem to keep the cache coherent: e.g. the /proc/<pid>/task directory.
-  Uncached
-};
-
 struct CacheMode {
-  CacheModeType type;
+  enum class Type : uint8_t {
+    /// Entries are pemanent, instead of a cache of the backing storage. An example is tmpfs: the
+    /// DirEntry tree *is* the backing storage, as opposed to ext4, which uses the DirEntry tree as
+    /// a cache and removes unused nodes from it.
+    Permanent,
+    /// Entries are cached.
+    Cached,
+    /// Entries are uncached. This can be appropriate in cases where it is difficult for the
+    /// filesystem to keep the cache coherent: e.g. the /proc/<pid>/task directory.
+    Uncached
+  };
+
+  Type type;
   CacheConfig config;
 };
 
