@@ -93,6 +93,13 @@ fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task) {
   return fit::ok(current_task->thread_group_->Read()->process_group_->leader_);
 }
 
+fit::result<Errno> sys_link(const CurrentTask& current_task,
+                            starnix_uapi::UserCString old_user_path,
+                            starnix_uapi::UserCString new_user_path) {
+  return sys_linkat(current_task, FdNumber::AT_FDCWD_, old_user_path, FdNumber::AT_FDCWD_,
+                    new_user_path, 0);
+}
+
 fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
                                       starnix_uapi::UserCString user_path, uint32_t flags,
                                       starnix_uapi::FileMode mode) {
@@ -125,6 +132,11 @@ fit::result<Errno> sys_symlink(const CurrentTask& current_task,
 fit::result<Errno, __kernel_time_t> sys_time(const CurrentTask& current_task,
                                              starnix_uapi::UserRef<__kernel_time_t> time_addr) {
   return fit::error(errno(ENOSYS));
+}
+
+fit::result<Errno> sys_unlink(const CurrentTask& current_task,
+                              starnix_uapi::UserCString user_path) {
+  return sys_unlinkat(current_task, FdNumber::AT_FDCWD_, user_path, 0);
 }
 
 fit::result<Errno, pid_t> sys_vfork(CurrentTask& current_task) {
