@@ -413,6 +413,14 @@ fit::result<Errno> NamespaceNode::unmount(UnmountFlags flags) const {
   return fit::error(errno(ENOTSUP));
 }
 
+fit::result<Errno> NamespaceNode::rename(const CurrentTask& current_task,
+                                         const NamespaceNode& old_parent, const FsStr& old_name,
+                                         const NamespaceNode& new_parent, const FsStr& new_name,
+                                         RenameFlags flags) {
+  return DirEntry::rename(current_task, old_parent.entry_, old_parent.mount_, old_name,
+                          new_parent.entry_, new_parent.mount_, new_name, flags);
+}
+
 fit::result<Errno, SymlinkTarget> NamespaceNode::readlink(const CurrentTask& current_task) const {
   return entry_->node_->readlink(current_task);
 }

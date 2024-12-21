@@ -434,6 +434,15 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
   /// Returns whether this entry is a descendant of |other|.
   bool is_descendant_of(const DirEntryHandle& other) const;
 
+  /// Rename the file with old_basename in old_parent to new_basename in new_parent.
+  ///
+  /// old_parent and new_parent must belong to the same file system.
+  static fit::result<Errno> rename(const CurrentTask& current_task,
+                                   const DirEntryHandle& old_parent, const MountInfo& old_mount,
+                                   const FsStr& old_basename, const DirEntryHandle& new_parent,
+                                   const MountInfo& new_mount, const FsStr& new_basename,
+                                   RenameFlags flags);
+
   template <typename CreateNodeFn>
   fit::result<Errno, ktl::pair<DirEntryHandle, bool>> get_or_create_child(
       const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,
@@ -617,6 +626,7 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
   DISALLOW_COPY_ASSIGN_AND_MOVE(DirEntry);
 
   friend bool unit_testing::test_tmpfs();
+  friend class RenameGuard;
 
   DirEntry(FsNodeHandle node, ktl::unique_ptr<DirEntryOps> ops, DirEntryState state);
 

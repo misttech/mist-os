@@ -233,6 +233,10 @@ class NamespaceNode {
   /// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
   fit::result<Errno> unmount(UnmountFlags flags) const;
 
+  static fit::result<Errno> rename(const CurrentTask& current_task, const NamespaceNode& old_parent,
+                                   const FsStr& old_name, const NamespaceNode& new_parent,
+                                   const FsStr& new_name, RenameFlags flags);
+
   NamespaceNode with_new_entry(DirEntryHandle entry) const;
 
   fit::result<Errno, UserAndOrGroupId> suid_and_sgid(const CurrentTask& current_task) const;

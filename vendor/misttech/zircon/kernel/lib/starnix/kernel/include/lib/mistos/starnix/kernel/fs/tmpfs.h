@@ -27,13 +27,26 @@ class Kernel;
 
 class TmpFs : public FileSystemOps {
  public:
+  /// impl TmpFs
   static FileSystemHandle new_fs(const fbl::RefPtr<Kernel>& kernel);
 
   static fit::result<Errno, FileSystemHandle> new_fs_with_options(const fbl::RefPtr<Kernel>& kernel,
                                                                   FileSystemOptions options);
 
+  /// impl FileSystemOps for Arc<TmpFs>
   fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
                                            const CurrentTask& current_task) const final;
+
+  fit::result<Errno> rename(const FileSystem& fs, const CurrentTask& current_task,
+                            const FsNodeHandle& old_parent, const FsStr& old_name,
+                            const FsNodeHandle& new_parent, const FsStr& new_name,
+                            const FsNodeHandle& renamed,
+                            ktl::optional<FsNodeHandle> replaced) const final;
+
+  fit::result<Errno> exchange(const FileSystem& fs, const CurrentTask& current_task,
+                              const FsNodeHandle& node1, const FsNodeHandle& parent1,
+                              const FsStr& name1, const FsNodeHandle& node2,
+                              const FsNodeHandle& parent2, const FsStr& name2) const final;
 
   const FsStr& name() const final;
 
@@ -85,6 +98,7 @@ class TmpfsDirectory : public FsNodeOps {
                             const FsNodeHandle& child) const final;
 
  private:
+  friend class TmpFs;
   TmpfsDirectory();
 };
 

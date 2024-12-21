@@ -138,7 +138,8 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
   /// how rename operations can interleave.
   ///
   /// See DirEntry::rename.
-  // pub rename_mutex: Mutex<()>,
+  struct Dummy {};
+  starnix_sync::Mutex<Dummy> rename_mutex_;
 
  private:
   /// The FsNode cache for this file system.
@@ -249,6 +250,22 @@ class FileSystem : public fbl::RefCountedUpgradeable<FileSystem> {
   void remove_node(const FsNode& node);
 
   ino_t next_node_id() const;
+
+  /// Move |renamed| that is at |old_name| in |old_parent| to |new_name| in |new_parent|
+  /// replacing |replaced|.
+  /// If |replaced| exists and is a directory, this function must check that |renamed| is n
+  /// directory and that |replaced| is empty.
+  fit::result<Errno> rename(const CurrentTask& current_task, const FsNodeHandle& old_parent,
+                            const FsString& old_name, const FsNodeHandle& new_parent,
+                            const FsString& new_name, const FsNodeHandle& renamed,
+                            ktl::optional<FsNodeHandle> replaced) const;
+
+  /// Exchanges `node1` and `node2`. Parent directory node and the corresponding names
+  /// for the two exchanged nodes are passed as `parent1`, `name1`, `parent2`, `name2`.
+  fit::result<Errno> exchange(const CurrentTask& current_task, const FsNodeHandle& node1,
+                              const FsNodeHandle& parent1, const FsStr& name1,
+                              const FsNodeHandle& node2, const FsNodeHandle& parent2,
+                              const FsStr& name2) const;
 
   void did_create_dir_entry(const DirEntryHandle& entry);
 

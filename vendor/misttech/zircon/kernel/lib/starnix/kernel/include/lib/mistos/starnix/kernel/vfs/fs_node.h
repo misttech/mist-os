@@ -209,6 +209,12 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
 
   FsNodeOps& ops() const { return *ops_; }
 
+  template <typename T>
+  ktl::optional<T*> downcast_ops() const {
+    auto ptr = static_cast<T*>(ops_.get());
+    return ptr ? ktl::optional<T*>(ptr) : ktl::nullopt;
+  }
+
   fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const CurrentTask& current_task,
                                                                OpenFlags flags) const;
 

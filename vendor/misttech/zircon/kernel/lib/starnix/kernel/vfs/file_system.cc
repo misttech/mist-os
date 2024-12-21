@@ -100,6 +100,23 @@ ino_t FileSystem::next_node_id() const {
   return next_node_id_.fetch_add(1, ktl::memory_order_relaxed);
 }
 
+fit::result<Errno> FileSystem::rename(const CurrentTask& current_task,
+                                      const FsNodeHandle& old_parent, const FsString& old_name,
+                                      const FsNodeHandle& new_parent, const FsString& new_name,
+                                      const FsNodeHandle& renamed,
+                                      ktl::optional<FsNodeHandle> replaced) const {
+  // auto locked = starnix_sync::Locked<FileOpsCore>::from(mount);
+  return ops_->rename(*this, current_task, old_parent, old_name, new_parent, new_name, renamed,
+                      replaced);
+}
+
+fit::result<Errno> FileSystem::exchange(const CurrentTask& current_task, const FsNodeHandle& node1,
+                                        const FsNodeHandle& parent1, const FsStr& name1,
+                                        const FsNodeHandle& node2, const FsNodeHandle& parent2,
+                                        const FsStr& name2) const {
+  return ops_->exchange(*this, current_task, node1, parent1, name1, node2, parent2, name2);
+}
+
 void FileSystem::set_root(FsNodeOps* root) { set_root_node(FsNode::new_root(root)); }
 
 // Set up the root of the filesystem. Must not be called more than once.

@@ -111,9 +111,12 @@ bool test_persistence() {
 
   {
     auto root = (*current_task)->fs()->root().entry_;
-    auto usr = root->create_dir(*current_task, "usr").value();
-    auto _etc = root->create_dir(*current_task, "etc").value();
-    auto _usr_bin = usr->create_dir(*current_task, "bin").value();
+    auto usr = root->create_dir(*current_task, "usr");
+    ASSERT_TRUE(usr.is_ok(), "failed to create usr");
+    auto _etc = root->create_dir(*current_task, "etc");
+    ASSERT_TRUE(_etc.is_ok(), "failed to create etc");
+    auto _usr_bin = usr->create_dir(*current_task, "bin");
+    ASSERT_TRUE(_usr_bin.is_ok(), "failed to create usr/bin");
   }
 
   // At this point, all the nodes are dropped.
@@ -137,8 +140,40 @@ bool test_persistence() {
   auto usr_bin = (*current_task).open_file("/usr/bin", OpenFlags(OpenFlagsEnum::RDONLY));
   ASSERT_TRUE(usr_bin.is_ok(), "failed to open /usr/bin");
 
-  // TODO (Herrera) add missing method unlink
-  // usr_bin->name->unlink();
+  auto unlink_result =
+      usr_bin->name_->unlink(*current_task, "test.txt", UnlinkKind::NonDirectory, false);
+  ASSERT_TRUE(unlink_result.is_ok(), "failed to unlink test.text");
+
+  ASSERT_EQ(errno(ENOENT).error_code(),
+            current_task->open_file("/usr/bin/test.txt", OpenFlags(OpenFlagsEnum::RDWR))
+                .error_value()
+                .error_code());
+
+  ASSERT_EQ(errno(ENOENT).error_code(),
+            usr_bin->name_->unlink(*current_task, "test.txt", UnlinkKind::NonDirectory, false)
+                .error_value()
+                .error_code());
+
+  auto out = starnix::VecOutputBuffer::New(0);
+  auto read_result = txt->read(*current_task, &out);
+  ASSERT_TRUE(read_result.is_ok(), "failed to read");
+  ASSERT_EQ(0u, read_result.value());
+  std::destroy_at(std::addressof(txt));
+  ASSERT_EQ(errno(ENOENT).error_code(),
+            current_task->open_file("/usr/bin/test.txt", OpenFlags(OpenFlagsEnum::RDWR))
+                .error_value()
+                .error_code());
+  std::destroy_at(std::addressof(usr_bin));
+
+  auto usr = current_task->open_file("/usr", OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(usr.is_ok(), "failed to open /usr");
+  ASSERT_EQ(errno(ENOENT).error_code(),
+            current_task->open_file("/usr/foo", OpenFlags(OpenFlagsEnum::RDONLY))
+                .error_value()
+                .error_code());
+
+  unlink_result = usr.value()->name_->unlink(*current_task, "bin", UnlinkKind::Directory, false);
+  ASSERT_TRUE(unlink_result.is_ok(), "failed to unlink /usr/bin");
 
   END_TEST;
 }
@@ -169,6 +204,6 @@ UNITTEST_START_TESTCASE(starnix_fs_tmpfs)
 UNITTEST("test tmpfs", unit_testing::test_tmpfs)
 UNITTEST("test write read", unit_testing::test_write_read)
 UNITTEST("test permissions", unit_testing::test_permissions)
-// UNITTEST("test persistence", unit_testing::test_persistence)
+UNITTEST("test persistence", unit_testing::test_persistence)
 UNITTEST("test data", unit_testing::test_data)
 UNITTEST_END_TESTCASE(starnix_fs_tmpfs, "starnix_fs_tmpfs", "Tests for starnix tempfs")

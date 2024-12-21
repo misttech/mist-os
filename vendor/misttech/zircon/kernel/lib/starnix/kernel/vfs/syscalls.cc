@@ -438,6 +438,12 @@ fit::result<Errno> sys_unlinkat(const CurrentTask& current_task, FdNumber dir_fd
   return fit::ok();
 }
 
+fit::result<Errno> sys_renameat2(const CurrentTask& current_task, FdNumber old_dir_fd,
+                                 starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
+                                 starnix_uapi::UserCString new_user_path, uint32_t flags) {
+  return fit::error(errno(EINVAL));
+}
+
 fit::result<Errno> sys_fchmod(const CurrentTask& current_task, FdNumber fd,
                               starnix_uapi::FileMode mode) {
   // Remove the filetype from the mode

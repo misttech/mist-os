@@ -147,6 +147,66 @@ fit::result<Errno, struct statfs> TmpFs::statfs(const FileSystem& fs,
 
 const FsStr& TmpFs::name() const { return name_; }
 
+fit::result<Errno> TmpFs::rename(const FileSystem& fs, const CurrentTask& current_task,
+                                 const FsNodeHandle& old_parent, const FsStr& old_name,
+                                 const FsNodeHandle& new_parent, const FsStr& new_name,
+                                 const FsNodeHandle& renamed,
+                                 ktl::optional<FsNodeHandle> replaced) const {
+  auto child_count = [](const FsNodeHandle& node) -> starnix_sync::MutexGuard<uint32_t> {
+    // The following casts are safe, unless something is seriously wrong:
+    // - The filesystem should not be asked to rename nodes that it doesn't handle
+    // - Parents in a rename operation need to be directories
+    // - TmpfsDirectory is the ops for directories in this filesystem
+    auto downcast = node->downcast_ops<TmpfsDirectory>();
+    ZX_ASSERT(downcast.has_value());
+    return downcast.value()->child_count_.Lock();
+  };
+
+  if (replaced.has_value()) {
+    if ((*replaced)->is_dir()) {
+      // Ensure replaced is empty
+      if (*child_count(*replaced) != 0) {
+        return fit::error(errno(ENOTEMPTY));
+      }
+    }
+  }
+
+  *child_count(old_parent) -= 1;
+  *child_count(new_parent) += 1;
+  if (renamed->is_dir()) {
+    old_parent->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+    new_parent->update_info<void>([](FsNodeInfo& info) { info.link_count_ += 1; });
+  }
+
+  // Fix the wrong changes to new_parent due to the fact that the target element has
+  // been replaced instead of added
+  if (replaced.has_value()) {
+    if ((*replaced)->is_dir()) {
+      new_parent->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+    }
+    *child_count(new_parent) -= 1;
+  }
+
+  return fit::ok();
+}
+
+fit::result<Errno> TmpFs::exchange(const FileSystem& fs, const CurrentTask& current_task,
+                                   const FsNodeHandle& node1, const FsNodeHandle& parent1,
+                                   const FsStr& name1, const FsNodeHandle& node2,
+                                   const FsNodeHandle& parent2, const FsStr& name2) const {
+  if (node1->is_dir()) {
+    parent1->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+    parent2->update_info<void>([](FsNodeInfo& info) { info.link_count_ += 1; });
+  }
+
+  if (node2->is_dir()) {
+    parent1->update_info<void>([](FsNodeInfo& info) { info.link_count_ += 1; });
+    parent2->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+  }
+
+  return fit::ok();
+}
+
 TmpFs::~TmpFs() { LTRACE_ENTRY_OBJ; }
 
 TmpfsDirectory::TmpfsDirectory() : xattrs_(MemoryXattrStorage::Default()) {}

@@ -21,6 +21,8 @@ namespace {
 using starnix::FdFlags;
 using starnix::FdFlagsEnum;
 using starnix::FdNumber;
+using starnix::RenameFlags;
+using starnix::RenameFlagsEnum;
 
 bool test_sys_lseek() {
   BEGIN_TEST;
@@ -191,6 +193,47 @@ bool test_sys_open_cloexec() {
   END_TEST;
 }
 
+bool test_rename_noreplace() {
+  BEGIN_TEST;
+
+  auto [kernel, current_task] =
+      starnix::testing::create_kernel_task_and_unlocked_with_bootfs_current_zbi();
+
+  // Create the file that will be renamed
+  ktl::string_view old_path("data/testfile.txt");
+  auto old_file_handle = current_task->open_file(old_path, OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(old_file_handle.is_ok());
+
+  // Write old path to user memory
+  auto old_path_addr =
+      starnix::testing::map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  auto write_result =
+      (*current_task)->write_memory(old_path_addr, {(uint8_t*)old_path.data(), old_path.size()});
+  ASSERT_TRUE(write_result.is_ok());
+
+  // Create second file that we'll attempt to rename to
+  ktl::string_view new_path("data/testfile2.txt");
+  auto new_file_handle = current_task->open_file(new_path, OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(new_file_handle.is_ok());
+
+  // Write new path to user memory
+  auto new_path_addr =
+      starnix::testing::map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  write_result =
+      (*current_task)->write_memory(new_path_addr, {(uint8_t*)new_path.data(), new_path.size()});
+  ASSERT_TRUE(write_result.is_ok());
+
+  // Try to rename first file to second file's name with RENAME_NOREPLACE flag
+  // Should fail with EEXIST
+  auto rename_result = sys_renameat2(
+      *current_task, FdNumber::AT_FDCWD_, UserCString::New(old_path_addr), FdNumber::AT_FDCWD_,
+      UserCString::New(new_path_addr), RenameFlags(RenameFlagsEnum::NOREPLACE).bits());
+  ASSERT_TRUE(rename_result.is_error());
+  ASSERT_EQ(rename_result.error_value().error_code(), errno(EEXIST).error_code());
+
+  END_TEST;
+}
+
 }  // namespace
 }  // namespace unit_testing
 
@@ -199,4 +242,5 @@ UNITTEST("test sys lseek", unit_testing::test_sys_lseek)
 UNITTEST("test sys dup", unit_testing::test_sys_dup)
 UNITTEST("test sys dup3", unit_testing::test_sys_dup3)
 UNITTEST("test sys open cloexec", unit_testing::test_sys_open_cloexec)
+UNITTEST("test rename noreplace", unit_testing::test_rename_noreplace)
 UNITTEST_END_TESTCASE(starnix_vfs_syscalls, "starnix_vfs_syscalls", "Tests for VFS Syscalls")
