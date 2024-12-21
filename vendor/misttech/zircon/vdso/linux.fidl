@@ -398,20 +398,36 @@ closed protocol Linux {
     // STUB 83
     strict A0083Mkdir() -> () error int64;
 
-    // STUB 84
-    strict A0084Rmdir() -> () error int64;
+    // #84, SYSCALL_DEFINE1(rmdir, const char __user *, pathname)
+    strict A0084Rmdir(resource struct {
+        @in
+        pathname experimental_pointer<uchar>;
+    }) -> () error int64;
 
     // STUB 85
     strict A0085Creat() -> () error int64;
 
-    // STUB 86
-    strict A0086Link() -> () error int64;
+    // #86, SYSCALL_DEFINE2(link, const char __user *, oldname, const char __user *, newname)
+    strict A0086Link(resource struct {
+        @in
+        oldname experimental_pointer<uchar>;
+        @in
+        newname experimental_pointer<uchar>;
+    }) -> () error int64;
 
-    // STUB 87
-    strict A0087Unlink() -> () error int64;
+    // #87, SYSCALL_DEFINE1(unlink, const char __user *, pathname)
+    strict A0087Unlink(resource struct {
+        @in
+        pathname experimental_pointer<uchar>;
+    }) -> () error int64;
 
-    // STUB 88
-    strict A0088Symlink() -> () error int64;
+    // #88, SYSCALL_DEFINE2(symlink, const char __user *, oldname, const char __user *, newname)
+    strict A0088Symlink(resource struct {
+        @in
+        oldname experimental_pointer<uchar>;
+        @in
+        newname experimental_pointer<uchar>;
+    }) -> () error int64;
 
     // #89, SYSCALL_DEFINE3(readlink, const char __user *, path, char __user *, buf, int, bufsiz)
     strict A0089Readlink(resource struct {
@@ -976,17 +992,37 @@ closed protocol Linux {
     // STUB 262
     strict A0262Newfstatat() -> () error int64;
 
-    // STUB 263
-    strict A0263Unlinkat() -> () error int64;
+    // #263, SYSCALL_DEFINE3(unlinkat, int, dfd, const char __user *, pathname, int, flag)
+    strict A0263Unlinkat(resource struct {
+        dfd int32;
+        @in
+        pathname experimental_pointer<uchar>;
+        flag int32;
+    }) -> () error int64;
 
     // STUB 264
     strict A0264Renameat() -> () error int64;
 
-    // STUB 265
-    strict A0265Linkat() -> () error int64;
+    // #265, SYSCALL_DEFINE5(linkat, int, olddfd, const char __user *, oldname,
+    // int, newdfd, const char __user *, newname, int, flags)
+    strict A0265Linkat(resource struct {
+        olddfd int32;
+        @in
+        oldname experimental_pointer<uchar>;
+        newdfd int32;
+        @in
+        newname experimental_pointer<uchar>;
+        flags int32;
+    }) -> () error int64;
 
-    // STUB 266
-    strict A0266Symlinkat() -> () error int64;
+    // #266, SYSCALL_DEFINE3(symlinkat, const char __user *, oldname, int, newdfd, const char __user *, newname)
+    strict A0266Symlinkat(resource struct {
+        @in
+        oldname experimental_pointer<uchar>;
+        newdfd int32;
+        @in
+        newname experimental_pointer<uchar>;
+    }) -> () error int64;
 
     // #267, SYSCALL_DEFINE4(readlinkat, int, dfd, const char __user *, pathname, char __user *, buf, int, bufsiz)
     strict A0267Readlinkat(resource struct {
