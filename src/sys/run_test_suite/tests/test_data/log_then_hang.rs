@@ -10,7 +10,7 @@ use std::io::Write;
 async fn log_then_hang() {
     println!("stdout from hanging test");
     writeln!(std::io::stderr(), "stderr from hanging test").unwrap();
-    tracing::info!("syslog from hanging test");
+    log::info!("syslog from hanging test");
 
     loop {
         // deliberate hang

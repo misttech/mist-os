@@ -11,5 +11,5 @@ fn stdout_ansi_test() {
 
 #[fuchsia::test]
 fn log_ansi_test() {
-    tracing::info!("{}", Red.paint("red log"));
+    log::info!("{}", Red.paint("red log"));
 }

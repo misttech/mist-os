@@ -18,11 +18,11 @@ use futures::future::Either;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::{error, info, warn};
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 
 /// Struct used by |run_suite_and_collect_logs| to track the state of test cases and suites.
 struct CollectedEntityState<R> {

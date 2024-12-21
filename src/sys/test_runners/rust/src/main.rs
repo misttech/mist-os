@@ -6,10 +6,10 @@ mod test_server;
 
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
+use log::{error, info, warn};
 use test_runners_lib::elf;
 use test_server::TestServer;
 use thiserror::Error;
-use tracing::{error, info, warn};
 use {fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync};
 
 #[fuchsia::main(logging_tags=["rust_test_runner"])]
@@ -56,7 +56,7 @@ async fn start_runner(
                 };
             }
             fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown ComponentRunner request");
+                warn!(ordinal:%; "Unknown ComponentRunner request");
             }
         }
     }

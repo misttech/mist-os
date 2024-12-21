@@ -4,9 +4,9 @@
 
 use futures::future::Future;
 use futures::task::{Context, Poll};
+use log::warn;
 use pin_project::pin_project;
 use std::pin::Pin;
-use tracing::warn;
 
 /// An extension trait that allows futures to be cancelled. Cancellation is signalled
 /// by a second future.

@@ -7,7 +7,7 @@
     logging_minimum_severity = "debug"
 )]
 async fn log_and_exit() {
-    tracing::info!("my info message");
-    tracing::warn!("my warn message");
-    tracing::error!("my error message");
+    log::info!("my info message");
+    log::warn!("my warn message");
+    log::error!("my error message");
 }

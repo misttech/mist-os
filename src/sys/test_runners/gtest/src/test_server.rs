@@ -14,6 +14,7 @@ use futures::prelude::*;
 use futures::TryStreamExt;
 use gtest_runner_lib::parser::*;
 use lazy_static::lazy_static;
+use log::{debug, error, info, warn};
 use namespace::NamespaceError;
 use std::num::NonZeroUsize;
 use std::str::from_utf8;
@@ -26,7 +27,6 @@ use test_runners_lib::elf::{
 use test_runners_lib::errors::*;
 use test_runners_lib::launch;
 use test_runners_lib::logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter};
-use tracing::{debug, error, info, warn};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";

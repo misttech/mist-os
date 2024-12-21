@@ -29,14 +29,14 @@ pub async fn handle_runner_requests(
             fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
                 fasync::Task::local(async move {
                     match serve_test_suite(start_info, controller).await {
-                        Ok(_) => tracing::info!("Finished serving test suite for component."),
-                        Err(e) => tracing::error!("Error serving test suite: {:?}", e),
+                        Ok(_) => log::info!("Finished serving test suite for component."),
+                        Err(e) => log::error!("Error serving test suite: {:?}", e),
                     }
                 })
                 .detach();
             }
             fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                tracing::warn!(%ordinal, "Unknown ComponentRunner request");
+                log::warn!(ordinal:%; "Unknown ComponentRunner request");
             }
         }
     }
@@ -83,9 +83,9 @@ async fn serve_test_suite(
                 let start_info =
                     clone_start_info(&mut start_info.lock()).expect("Failed to clone start info");
                 match handle_suite_requests(start_info, stream).await {
-                    Ok(_) => tracing::info!("Finished serving test suite requests."),
+                    Ok(_) => log::info!("Finished serving test suite requests."),
                     Err(e) => {
-                        tracing::error!("Error serving test suite requests: {:?}", e)
+                        log::error!("Error serving test suite requests: {:?}", e)
                     }
                 }
                 let _ = controller.lock().take().map(|c| c.close_with_epitaph(zx::Status::OK));

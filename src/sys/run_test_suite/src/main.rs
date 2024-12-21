@@ -232,7 +232,7 @@ async fn main() {
         futures::future::pending(),
     )
     .await;
-    tracing::info!("run test suite duration: {:?}", start_time.elapsed().as_secs_f32());
+    log::info!("run test suite duration: {:?}", start_time.elapsed().as_secs_f32());
     if outcome != run_test_suite_lib::Outcome::Passed {
         println!("One or more test runs failed.");
     }
