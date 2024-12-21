@@ -25,7 +25,7 @@ rustc_library("rust") {
     "//src/sys/lib/cm_types",
     "//src/sys/lib/namespace",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [

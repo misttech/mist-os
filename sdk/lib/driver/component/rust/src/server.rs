@@ -8,7 +8,7 @@ use std::num::NonZero;
 use std::ops::ControlFlow;
 use std::sync::OnceLock;
 
-use tracing::{debug, warn};
+use log::{debug, warn};
 use zx::Status;
 
 use fdf::{Channel, DispatcherBuilder, DispatcherRef};
@@ -149,7 +149,7 @@ impl<T: Driver> DriverServer<T> {
         let context = DriverContext::new(self.root_dispatcher.clone(), start_args)?;
         context.start_logging(T::NAME)?;
 
-        tracing::debug!("driver starting");
+        log::debug!("driver starting");
 
         let driver = T::start(context).await?;
         self.driver.set(driver).map_err(|_| ()).expect("Driver received start message twice");
@@ -157,7 +157,7 @@ impl<T: Driver> DriverServer<T> {
     }
 
     async fn handle_stop(&mut self) {
-        tracing::debug!("driver stopping");
+        log::debug!("driver stopping");
         self.driver
             .take()
             .expect("received stop message more than once or without successfully starting")

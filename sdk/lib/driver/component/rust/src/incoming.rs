@@ -14,7 +14,7 @@ use fuchsia_component::client::{
 use fuchsia_component::directory::{AsRefDirectory, Directory};
 use fuchsia_component::DEFAULT_SERVICE_INSTANCE;
 use namespace::{Entry, Namespace};
-use tracing::error;
+use log::error;
 use zx::Status;
 
 /// Implements access to the incoming namespace for a driver. It provides methods
