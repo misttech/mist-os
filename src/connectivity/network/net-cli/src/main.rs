@@ -6,11 +6,8 @@ use anyhow::Error;
 use component_debug::dirs::{connect_to_instance_protocol_at_dir_root, OpenDirType};
 use fidl::endpoints::ProtocolMarker;
 use fuchsia_component::client::connect_to_protocol_at_path;
-use tracing::{Level, Subscriber};
-use tracing_subscriber::fmt::format::{self, FormatEvent, FormatFields};
-use tracing_subscriber::fmt::FmtContext;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::registry::LookupSpan;
+use log::{Level, LevelFilter, Log, Metadata, Record};
+use std::io::Write;
 use {
     fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
     fidl_fuchsia_net_filter as ffilter, fidl_fuchsia_net_filter_deprecated as ffilter_deprecated,
@@ -21,35 +18,39 @@ use {
     fuchsia_async as fasync,
 };
 
-const LOG_LEVEL: Level = Level::INFO;
+const LOG_LEVEL: LevelFilter = LevelFilter::Info;
 
-struct SimpleFormatter;
+struct SimpleLogger;
 
-impl<S, N> FormatEvent<S, N> for SimpleFormatter
-where
-    S: Subscriber + for<'a> LookupSpan<'a>,
-    N: for<'a> FormatFields<'a> + 'static,
-{
-    fn format_event(
-        &self,
-        ctx: &FmtContext<'_, S, N>,
-        mut writer: format::Writer<'_>,
-        event: &tracing::Event<'_>,
-    ) -> std::fmt::Result {
-        ctx.format_fields(writer.by_ref(), event)?;
-        writeln!(writer)
+impl Log for SimpleLogger {
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
+        metadata.level() <= LOG_LEVEL
+    }
+
+    fn log(&self, record: &Record<'_>) {
+        if self.enabled(record.metadata()) {
+            match record.level() {
+                Level::Error | Level::Warn => {
+                    let mut stderr = std::io::stderr();
+                    let _ = writeln!(&mut stderr, "{}", record.args());
+                }
+                _ => {
+                    let mut stdout = std::io::stdout();
+                    let _ = writeln!(&mut stdout, "{}", record.args());
+                }
+            }
+        }
+    }
+
+    fn flush(&self) {
+        use std::io::Write;
+        let _ = std::io::stdout().flush();
     }
 }
 
 fn logger_init() {
-    tracing_subscriber::fmt()
-        .event_format(SimpleFormatter)
-        .with_writer(
-            std::io::stderr
-                .with_max_level(Level::WARN)
-                .or_else(std::io::stdout.with_max_level(LOG_LEVEL)),
-        )
-        .init()
+    static LOGGER: SimpleLogger = SimpleLogger;
+    log::set_logger(&LOGGER).map(|_| log::set_max_level(LOG_LEVEL)).unwrap();
 }
 
 struct Connector {

@@ -6,6 +6,7 @@
 
 use std::num::NonZeroI32;
 
+use log::warn;
 use net_types::ip::{Ip, Ipv4Addr, Ipv6Addr};
 use netlink_packet_core::buffer::NETLINK_HEADER_LEN;
 use netlink_packet_core::constants::NLM_F_MULTIPART;
@@ -14,7 +15,6 @@ use netlink_packet_core::{
 };
 use netlink_packet_route::route::RouteAddress;
 use netlink_packet_utils::Emitable as _;
-use tracing::warn;
 
 use crate::netlink_packet::errno::Errno;
 

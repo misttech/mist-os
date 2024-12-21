@@ -392,7 +392,7 @@ pub(crate) mod testutil {
         }
 
         async fn wait_until(&self, time: Self::Instant) {
-            tracing::info!("registering timer at {:?}", time);
+            log::info!("registering timer at {:?}", time);
             let receiver = {
                 let mut ctl = self.borrow_mut();
                 let FakeTimeController { timer_heap, current_time } = ctl.deref_mut();

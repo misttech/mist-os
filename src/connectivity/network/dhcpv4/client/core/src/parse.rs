@@ -373,7 +373,7 @@ fn collect_common_fields<T: Copy>(
             DhcpOption::IpAddressLeaseTime(value) => match NonZeroU32::try_from(*value) {
                 Err(e) => {
                     let _: TryFromIntError = e;
-                    tracing::warn!("dropping 0 lease time");
+                    log::warn!("dropping 0 lease time");
                 }
                 Ok(value) => {
                     builder.ip_address_lease_time_secs(value).ignore_unused_result();

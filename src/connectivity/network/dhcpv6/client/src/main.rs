@@ -10,7 +10,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::{future, StreamExt as _, TryStreamExt as _};
 
 use anyhow::{Error, Result};
-use tracing::info;
+use log::info;
 
 enum IncomingService {
     ClientProvider(ClientProviderRequestStream),

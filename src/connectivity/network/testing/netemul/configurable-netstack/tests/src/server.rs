@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use configurable_netstack_test::{server_ips, BUS_NAME, REQUEST, RESPONSE, SERVER_NAME};
+use log::info;
 use std::io::{Read as _, Write as _};
-use tracing::info;
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {

@@ -1168,7 +1168,7 @@ pub mod options {
             };
 
             if len < 2 || (len - 2) > bytes.len() {
-                tracing::error!("option length {} is either too short or longer than the total buffer length of {}", len, bytes.len());
+                log::error!("option length {} is either too short or longer than the total buffer length of {}", len, bytes.len());
                 return Err(OptionParseErr::Internal);
             }
 

@@ -118,7 +118,7 @@ impl Controller {
         input: Option<&str>,
     ) -> Result<()> {
         let (return_code, stdout, stderr) = self.exec(command, env, input).await?;
-        tracing::info!(
+        log::info!(
             "command `{}` for guest {} output\nstdout: {}\nstderr: {}",
             command,
             self.name,

@@ -7,8 +7,8 @@ use fidl_fuchsia_netemul_test::{CounterRequest, CounterRequestStream};
 use fuchsia_component::client;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::prelude::*;
+use log::{error, info};
 use std::sync::{Arc, Mutex};
-use tracing::{error, info};
 
 struct CounterData {
     value: u32,

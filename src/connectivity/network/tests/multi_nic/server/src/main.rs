@@ -7,7 +7,7 @@ use std::net::{Ipv6Addr, SocketAddr};
 
 use fuchsia_async as fasync;
 
-use tracing::info;
+use log::info;
 
 const BUS_NAME: &str = "test-bus";
 const SERVER_NAME: &str = "server";

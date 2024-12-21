@@ -232,7 +232,7 @@ impl dhcp_client_core::deps::Socket<net_types::ethernet::Mac> for PacketSocket {
         } = sock_addr.try_to_sockaddr_ll().expect("addr from packet socket must be sockaddr_ll");
 
         if sll_hatype != ARPHRD_ETHER {
-            tracing::error!("unsupported sll_hatype: {}", sll_hatype);
+            log::error!("unsupported sll_hatype: {}", sll_hatype);
             return Err(dhcp_client_core::deps::SocketError::UnsupportedHardwareType);
         }
 
@@ -271,7 +271,7 @@ impl PacketSocketProviderImpl {
             sll_pkttype: _,
         } = sock_addr.try_to_sockaddr_ll().expect("addr from packet socket must be sockaddr_ll");
         if sll_hatype != ARPHRD_ETHER {
-            tracing::error!("unsupported sll_hatype: {}", sll_hatype);
+            log::error!("unsupported sll_hatype: {}", sll_hatype);
             return Err(dhcp_client_core::deps::SocketError::UnsupportedHardwareType);
         }
 

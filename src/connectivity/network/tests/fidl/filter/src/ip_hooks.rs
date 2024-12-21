@@ -19,6 +19,7 @@ use futures::future::LocalBoxFuture;
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use heck::SnakeCase as _;
+use log::info;
 use net_declare::fidl_subnet;
 use net_types::ip::{GenericOverIp, Ip, IpVersion, IpVersionMarker, Ipv4, Ipv6};
 use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
@@ -27,7 +28,6 @@ use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
 use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
 use test_case::test_case;
-use tracing::info;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_routes_ext as fnet_routes_ext,

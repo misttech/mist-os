@@ -9,7 +9,7 @@ use fidl_fuchsia_net_dhcpv6_ext::NewClientParams;
 use futures::{Future, StreamExt as _};
 
 use anyhow::Result;
-use tracing::warn;
+use log::warn;
 
 /// Handles client provider requests from the input stream.
 pub(crate) async fn run_client_provider<Fut, F>(

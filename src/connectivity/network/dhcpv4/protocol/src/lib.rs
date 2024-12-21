@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::debug;
 use net_types::ethernet::Mac as MacAddr;
 use net_types::ip::{Ipv4, NotSubnetMaskError, PrefixLength};
 use num_derive::FromPrimitive;
@@ -10,7 +11,6 @@ use std::fmt;
 use std::net::Ipv4Addr;
 use std::num::{NonZeroU16, NonZeroU8};
 use thiserror::Error;
-use tracing::debug;
 
 #[cfg(target_os = "fuchsia")]
 use std::convert::Infallible as Never;

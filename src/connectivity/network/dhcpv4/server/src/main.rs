@@ -14,6 +14,7 @@ use fuchsia_async::net::UdpSocket;
 use fuchsia_async::{self as fasync};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::{Future, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use log::{debug, error, info, warn};
 use net_declare::net::prefix_length_v4;
 use net_types::ethernet::Mac;
 use packet::serialize::InnerPacketBuilder;
@@ -25,7 +26,6 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryInto as _};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use tracing::{debug, error, info, warn};
 
 /// A buffer size in excess of the maximum allowable DHCP message size.
 const BUF_SZ: usize = 1024;

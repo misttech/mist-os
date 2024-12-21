@@ -117,7 +117,7 @@ pub async fn apply_new_routers(
             .map_err(Error::Fidl)?
             .map_err(Error::RouteSet)?;
         if !removed {
-            tracing::warn!("attempt to remove {router} from RouteSet was no-op");
+            log::warn!("attempt to remove {router} from RouteSet was no-op");
         }
     }
 
@@ -132,7 +132,7 @@ pub async fn apply_new_routers(
             .map_err(Error::Fidl)?
             .map_err(Error::RouteSet)?;
         if !added {
-            tracing::warn!("attempt to add {router} to RouteSet was no-op");
+            log::warn!("attempt to add {router} to RouteSet was no-op");
         }
     }
 

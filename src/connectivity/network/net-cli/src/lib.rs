@@ -11,6 +11,7 @@ use ffx_writer::ToolIO as _;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
+use log::{info, warn};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use netfilter::FidlReturn as _;
 use prettytable::{cell, format, row, Row, Table};
@@ -24,8 +25,6 @@ use std::iter::FromIterator as _;
 use std::ops::Deref;
 use std::pin::pin;
 use std::str::FromStr as _;
-
-use tracing::{info, warn};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_debug as fdebug, fidl_fuchsia_net_dhcp as fdhcp,
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_filter as fnet_filter,

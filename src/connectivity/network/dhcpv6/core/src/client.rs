@@ -6,6 +6,7 @@
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
+use log::{debug, info, warn};
 use net_types::ip::{Ipv6Addr, Subnet};
 use num::rational::Ratio;
 use num::CheckedMul;
@@ -19,7 +20,6 @@ use std::fmt::Debug;
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::time::Duration;
-use tracing::{debug, info, warn};
 use zerocopy::SplitByteSlice;
 
 use crate::{ClientDuid, Instant, InstantExt as _};

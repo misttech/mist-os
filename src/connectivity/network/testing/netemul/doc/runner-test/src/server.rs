@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::info;
 use std::io::{Read as _, Write as _};
-use tracing::info;
 
 const BUS_NAME: &str = "test-bus";
 const SERVER_NAME: &str = "server";

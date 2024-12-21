@@ -27,7 +27,7 @@ ffx_plugin("ffx_net_test_realm") {
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:uuid",
   ]
   test_deps = [

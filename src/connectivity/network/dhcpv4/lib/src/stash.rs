@@ -6,10 +6,10 @@ use crate::configuration::ServerParameters;
 use crate::protocol::identifier::ClientIdentifier;
 use crate::protocol::{DhcpOption, OptionCode};
 use crate::server::{ClientRecords, DataStore, LeaseRecord};
+use log::warn;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr as _;
 use std::string::ToString as _;
-use tracing::warn;
 
 /// A wrapper around a `fuchsia.stash.StoreAccessor` proxy.
 ///

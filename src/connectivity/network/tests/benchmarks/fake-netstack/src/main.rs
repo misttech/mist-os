@@ -14,6 +14,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::io::AsyncReadExt as _;
 use futures::stream::SelectAll;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
+use log::{error, info};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use packet::{ParseBuffer as _, Serializer as _};
@@ -25,7 +26,6 @@ use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom as _, TryInto as _};
 use std::rc::Rc;
-use tracing::{error, info};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_posix as fposix,
     fidl_fuchsia_posix_socket as fposix_socket,

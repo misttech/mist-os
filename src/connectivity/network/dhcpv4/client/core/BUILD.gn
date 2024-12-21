@@ -18,17 +18,17 @@ rustc_library("core") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derive_builder",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
   test_deps = [
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/network/dhcpv4/lib",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:simplelog",
     "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:tracing-subscriber",
   ]
 
   sources = [

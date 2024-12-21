@@ -20,8 +20,8 @@ rustc_test("iptables_test") {
     "//src/lib/network/fidl_fuchsia_net_filter_ext",
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:tracing",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }

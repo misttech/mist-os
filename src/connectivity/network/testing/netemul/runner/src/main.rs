@@ -10,7 +10,7 @@ use fuchsia_component::client::{
 };
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
-use tracing::{error, info, warn};
+use log::{error, info, warn};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_netemul as fnetemul,
@@ -236,7 +236,7 @@ async fn handle_runner_request(
             }
         }
         frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-            warn!(%ordinal, "Unknown ComponentRunner request");
+            warn!(ordinal:%; "Unknown ComponentRunner request");
         }
     }
     Ok(())
