@@ -193,6 +193,52 @@ bool test_sys_open_cloexec() {
   END_TEST;
 }
 
+bool test_unlinkat_dir() {
+  BEGIN_TEST;
+
+  auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
+
+  // Create the dir that we will attempt to unlink later
+  auto no_slash_path_addr =
+      starnix::testing::map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  ktl::string_view no_slash_path("testdir");
+  auto write_result =
+      (*current_task)
+          .write_memory(no_slash_path_addr, {(uint8_t*)no_slash_path.data(), no_slash_path.size()});
+  ASSERT_TRUE(write_result.is_ok());
+  auto no_slash_user_path = UserCString::New(no_slash_path_addr);
+
+  auto mkdir_result =
+      sys_mkdirat(*current_task, FdNumber::AT_FDCWD_, UserCString::New(no_slash_path_addr),
+                  FileMode::ALLOW_ALL.with_type(FileMode::IFDIR));
+  ASSERT_TRUE(mkdir_result.is_ok());
+
+  auto slash_path_addr =
+      starnix::testing::map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  ktl::string_view slash_path("testdir/");
+  write_result =
+      (*current_task)
+          .write_memory(slash_path_addr, {(uint8_t*)slash_path.data(), slash_path.size()});
+  ASSERT_TRUE(write_result.is_ok());
+  auto slash_user_path = UserCString::New(slash_path_addr);
+
+  // Try to remove directory without AT_REMOVEDIR
+  // Should fail with EISDIR regardless of trailing slash
+  auto unlink_result = sys_unlinkat(*current_task, FdNumber::AT_FDCWD_, slash_user_path, 0);
+  ASSERT_TRUE(unlink_result.is_error());
+  ASSERT_EQ(errno(EISDIR).error_code(), unlink_result.error_value().error_code());
+
+  unlink_result = sys_unlinkat(*current_task, FdNumber::AT_FDCWD_, no_slash_user_path, 0);
+  ASSERT_TRUE(unlink_result.is_error());
+  ASSERT_EQ(errno(EISDIR).error_code(), unlink_result.error_value().error_code());
+
+  // Success with AT_REMOVEDIR
+  unlink_result = sys_unlinkat(*current_task, FdNumber::AT_FDCWD_, slash_user_path, AT_REMOVEDIR);
+  ASSERT_TRUE(unlink_result.is_ok());
+
+  END_TEST;
+}
+
 bool test_rename_noreplace() {
   BEGIN_TEST;
 
@@ -242,5 +288,6 @@ UNITTEST("test sys lseek", unit_testing::test_sys_lseek)
 UNITTEST("test sys dup", unit_testing::test_sys_dup)
 UNITTEST("test sys dup3", unit_testing::test_sys_dup3)
 UNITTEST("test sys open cloexec", unit_testing::test_sys_open_cloexec)
+UNITTEST("test unlinkat dir", unit_testing::test_unlinkat_dir)
 UNITTEST("test rename noreplace", unit_testing::test_rename_noreplace)
 UNITTEST_END_TESTCASE(starnix_vfs_syscalls, "starnix_vfs_syscalls", "Tests for VFS Syscalls")
