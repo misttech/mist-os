@@ -96,3 +96,12 @@ long sys_a0157_prctl(int option, unsigned long arg2, unsigned long arg3, unsigne
   auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
   return execute_syscall(starnix::sys_prctl, current_task, option, arg2, arg3, arg4, arg5);
 }
+
+long sys_a0302_prlimit64(int32_t pid, uint32_t resource, user_in_ptr<const void> new_rlim,
+                         user_out_ptr<void> old_rlim) {
+  LTRACEF_LEVEL(2, "pid=%d, resource=%d, new_rlim=%p, old_rlim=0%p\n", pid, resource,
+                new_rlim.get(), old_rlim.get());
+  // auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  //  return execute_syscall(starnix::sys_prctl, current_task, option, arg2, arg3, arg4, arg5);
+  return -1;
+}

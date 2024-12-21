@@ -30,15 +30,19 @@
 
 #include "../kernel_priv.h"
 
+namespace ktl {
+using std::is_invocable_r_v;
+}  // namespace ktl
+
 #include <ktl/enforce.h>
 
+#include <asm/ioctls.h>
 #include <asm/stat.h>
 #include <linux/fcntl.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
-
 namespace {
 
 /// A convenient wrapper for Task::open_file_at.
@@ -50,7 +54,7 @@ fit::result<Errno, FileHandle> open_file_at(const CurrentTask& current_task, FdN
   auto path = current_task.read_c_string_to_vec(user_path, PATH_MAX) _EP(path);
   LTRACEF("dir_fd %d, path %s\n", dir_fd.raw(), path->c_str());
   return current_task.open_file_at(dir_fd, path.value(), OpenFlags::from_bits_truncate(flags), mode,
-                                   resolve_flags);
+                                   resolve_flags, AccessCheck());
 }
 
 template <typename T, typename CallbackFn>
@@ -63,7 +67,19 @@ fit::result<Errno, T> lookup_parent_at(const CurrentTask& current_task, FdNumber
   }
   auto context = LookupContext::Default();
   auto result = current_task.lookup_parent_at(context, dir_fd, path.value()) _EP(result);
+  return callback(context, result->first, result->second);
+}
 
+template <typename CallbackFn>
+fit::result<Errno> lookup_parent_at(const CurrentTask& current_task, FdNumber dir_fd,
+                                    UserCString user_path, CallbackFn&& callback) {
+  auto path = current_task.read_c_string_to_vec(user_path, PATH_MAX) _EP(path);
+  LTRACEF("dir_fd %d, path %s\n", dir_fd.raw(), path->c_str());
+  if (path->empty()) {
+    return fit::error(errno(ENOENT));
+  }
+  auto context = LookupContext::Default();
+  auto result = current_task.lookup_parent_at(context, dir_fd, path.value()) _EP(result);
   return callback(context, result->first, result->second);
 }
 
@@ -108,6 +124,14 @@ struct LookupFlags {
                                         ((flags & O_PATH) != 0 && (flags & O_NOFOLLOW) != 0),
                     .symlink_mode = follow_symlinks ? SymlinkMode::Follow : SymlinkMode::NoFollow,
                     .automount = automount});
+  }
+
+  /// impl From<StatxFlags> for LookupFlags
+  static LookupFlags from(StatxFlags flags) {
+    auto lookup_flags = StatxFlags(StatxFlagsEnum::_AT_SYMLINK_NOFOLLOW) |
+                        StatxFlags(StatxFlagsEnum::_AT_EMPTY_PATH) |
+                        StatxFlags(StatxFlagsEnum::_AT_NO_AUTOMOUNT);
+    return from_bits(flags.bits() & lookup_flags.bits(), lookup_flags.bits()).value();
   }
 };
 
@@ -215,6 +239,13 @@ fit::result<Errno> sys_close(const CurrentTask& current_task, FdNumber fd) {
   return fit::ok();
 }
 
+fit::result<Errno, off_t> sys_lseek(const CurrentTask& current_task, FdNumber fd, off_t offset,
+                                    uint32_t whence) {
+  auto file = current_task->files_.get(fd) _EP(file);
+  auto target = SeekTarget::from_raw(whence, offset) _EP(target);
+  return file->seek(current_task, target.value());
+}
+
 fit::result<Errno, size_t> sys_pread64(const CurrentTask& current_task, FdNumber fd,
                                        starnix_uapi::UserAddress address, size_t length,
                                        off_t offset) {
@@ -232,6 +263,30 @@ fit::result<Errno, size_t> sys_writev(const CurrentTask& current_task, FdNumber 
                                       starnix_uapi::UserAddress iovec_addr,
                                       starnix_uapi::UserValue<uint32_t> iovec_count) {
   return do_writev(current_task, fd, iovec_addr, iovec_count, ktl::nullopt, 0);
+}
+
+fit::result<Errno> sys_fstatfs(const CurrentTask& current_task, FdNumber fd,
+                               starnix_uapi::UserRef<struct ::statfs> user_buf) {
+  // O_PATH allowed for:
+  //
+  //   fstatfs(2) (since Linux 3.12).
+  //
+  // See https://man7.org/linux/man-pages/man2/open.2.html
+  auto file = current_task->files_.get_allowing_opath(fd) _EP(file);
+  auto stat = file->fs_->statfs(current_task) _EP(stat);
+  stat->f_flags |= static_cast<uint64_t>(file->name_->mount_.flags().bits());
+  auto write_result = current_task.write_object(user_buf, stat.value()) _EP(write_result);
+  return fit::ok();
+}
+
+fit::result<Errno> sys_statfs(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
+                              starnix_uapi::UserRef<struct ::statfs> user_buf) {
+  auto name = lookup_at(current_task, FdNumber::AT_FDCWD_, user_path, LookupFlags()) _EP(name);
+  auto fs = name->entry_->node_->fs();
+  auto stat = fs->statfs(current_task) _EP(stat);
+  stat->f_flags |= static_cast<uint64_t>(name->mount_.flags().bits());
+  auto write_result = current_task.write_object(user_buf, stat.value()) _EP(write_result);
+  return fit::ok();
 }
 
 fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumber dir_fd,
@@ -278,6 +333,28 @@ fit::result<Errno> sys_newfstatat(const CurrentTask& current_task, FdNumber dir_
       _EP(lflags);
   auto name = lookup_at(current_task, dir_fd, user_path, lflags.value()) _EP(name);
   auto result = name->entry_->node_->stat(current_task) _EP(result);
+  return fit::ok();
+}
+
+fit::result<Errno> sys_statx(const CurrentTask& current_task, FdNumber dir_fd,
+                             starnix_uapi::UserCString user_path, uint32_t flags, uint32_t mask,
+                             starnix_uapi::UserRef<struct ::statx> statxbuf) {
+  auto statx_flags = StatxFlags::from_bits(flags);
+  if (!statx_flags) {
+    return fit::error(errno(EINVAL));
+  }
+
+  if ((statx_flags.value() & (StatxFlags(StatxFlagsEnum::_AT_STATX_FORCE_SYNC) |
+                              StatxFlags(StatxFlagsEnum::_AT_STATX_DONT_SYNC))) ==
+      (StatxFlags(StatxFlagsEnum::_AT_STATX_FORCE_SYNC) |
+       StatxFlags(StatxFlagsEnum::_AT_STATX_DONT_SYNC))) {
+    return fit::error(errno(EINVAL));
+  }
+
+  auto name =
+      lookup_at(current_task, dir_fd, user_path, LookupFlags::from(statx_flags.value())) _EP(name);
+  auto result = name->entry_->node_->statx(current_task, statx_flags.value(), mask) _EP(result);
+  _EP(current_task.write_object(statxbuf, *result));
   return fit::ok();
 }
 
@@ -334,6 +411,106 @@ fit::result<Errno> sys_mkdirat(const CurrentTask& current_task, FdNumber dir_fd,
   return fit::ok();
 }
 
+fit::result<Errno> sys_linkat(const CurrentTask& current_task, FdNumber old_dir_fd,
+                              starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
+                              starnix_uapi::UserCString new_user_path, uint32_t flags) {
+  if ((flags & ~(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH)) != 0) {
+    // TODO(https://fxbug.dev/322875706): Handle unknown linkat flags
+    return fit::error(errno(EINVAL));
+  }
+
+  if ((flags & AT_EMPTY_PATH) && !current_task->creds().has_capability(kCapDacReadSearch)) {
+    return fit::error(errno(ENOENT));
+  }
+
+  auto lookup_flags =
+      LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_FOLLOW) _EP(lookup_flags);
+
+  auto target =
+      lookup_at(current_task, old_dir_fd, old_user_path, lookup_flags.value()) _EP(target);
+
+  auto result = lookup_parent_at<NamespaceNode>(
+      current_task, new_dir_fd, new_user_path,
+      [&](LookupContext context, NamespaceNode parent,
+          const FsStr& basename) -> fit::result<Errno, NamespaceNode> {
+        // The path to a new symlink cannot end in `/`. That would imply
+        // that we are dereferencing the symlink to a directory.
+        //
+        // See
+        // https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap03.html#tag_21_03_00_75
+        if (context.must_be_directory) {
+          return fit::error(errno(ENOENT));
+        }
+        return parent.link(current_task, basename, target->entry_->node_);
+      }) _EP(result);
+
+  return fit::ok();
+}
+
+fit::result<Errno> sys_unlinkat(const CurrentTask& current_task, FdNumber dir_fd,
+                                starnix_uapi::UserCString user_path, uint32_t flags) {
+  if ((flags & ~AT_REMOVEDIR) != 0) {
+    return fit::error(errno(EINVAL));
+  }
+  auto kind = (flags & AT_REMOVEDIR) ? UnlinkKind::Directory : UnlinkKind::NonDirectory;
+  auto result = lookup_parent_at(current_task, dir_fd, user_path,
+                                 [&](LookupContext context, NamespaceNode parent,
+                                     const FsStr& basename) -> fit::result<Errno> {
+                                   return parent.unlink(current_task, basename, kind,
+                                                        context.must_be_directory);
+                                 }) _EP(result);
+  return fit::ok();
+}
+
+fit::result<Errno> sys_renameat2(const CurrentTask& current_task, FdNumber old_dir_fd,
+                                 starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
+                                 starnix_uapi::UserCString new_user_path, uint32_t flags) {
+  auto rename_flags = RenameFlags::from_bits(flags);
+  if (!rename_flags.has_value()) {
+    return fit::error(errno(EINVAL));
+  }
+
+  if (rename_flags->intersects(RenameFlagsEnum::INTERNAL)) {
+    return fit::error(errno(EINVAL));
+  }
+
+  // RENAME_EXCHANGE cannot be combined with the other flags
+  if ((rename_flags->contains(RenameFlagsEnum::EXCHANGE)) &&
+      (rename_flags->intersects(RenameFlags(RenameFlagsEnum::NOREPLACE) |
+                                RenameFlagsEnum::WHITEOUT))) {
+    return fit::error(errno(EINVAL));
+  }
+
+  // RENAME_WHITEOUT is not supported
+  if (rename_flags->contains(RenameFlagsEnum::WHITEOUT)) {
+    // track_stub!(TODO("https://fxbug.dev/322875416"), "RENAME_WHITEOUT");
+    return fit::error(errno(ENOSYS));
+  }
+
+  auto lookup =
+      [&](FdNumber dir_fd,
+          UserCString user_path) -> fit::result<Errno, ktl::pair<NamespaceNode, BString>> {
+    return lookup_parent_at<ktl::pair<NamespaceNode, BString>>(
+        current_task, dir_fd, user_path,
+        [](LookupContext context, NamespaceNode parent, const FsStr& basename) {
+          return fit::ok(ktl::pair(parent, basename));
+        });
+  };
+
+  auto old_lookup = lookup(old_dir_fd, old_user_path) _EP(old_lookup);
+  auto& [old_parent, old_basename] = old_lookup.value();
+
+  auto new_lookup = lookup(new_dir_fd, new_user_path) _EP(new_lookup);
+  auto& [new_parent, new_basename] = new_lookup.value();
+
+  if (new_basename.size() > NAME_MAX) {
+    return fit::error(errno(ENAMETOOLONG));
+  }
+
+  return old_parent.rename(current_task, old_parent, old_basename, new_parent, new_basename,
+                           rename_flags.value());
+}
+
 fit::result<Errno> sys_fchmod(const CurrentTask& current_task, FdNumber fd,
                               starnix_uapi::FileMode mode) {
   // Remove the filetype from the mode
@@ -387,6 +564,58 @@ fit::result<Errno, size_t> sys_getcwd(const CurrentTask& current_task,
                                     user_cwd.size())));
 
   return fit::ok(user_cwd.size());
+}
+
+fit::result<Errno, starnix_syscalls::SyscallResult> sys_ioctl(const CurrentTask& current_task,
+                                                              FdNumber fd, uint32_t request,
+                                                              starnix_syscalls::SyscallArg arg) {
+  // TODO: https://fxbug.dev/364569179 - Figure out what to do about the security
+  // check for FIONREAD, FIBMAP, FIGETBSZ, FIONBIO, and FIOASYNC. These ioctls check
+  // a different set of permissions than other arbitrary ioctls.
+  switch (request) {
+    case FIOCLEX:
+      _EP(current_task->files_.set_fd_flags(fd, FdFlags(FdFlagsEnum::CLOEXEC)));
+      return fit::ok(starnix_syscalls::SUCCESS);
+    case FIONCLEX:
+      _EP(current_task->files_.set_fd_flags(fd, FdFlags::empty()));
+      return fit::ok(starnix_syscalls::SUCCESS);
+    default: {
+      auto file = current_task->files_.get(fd) _EP(file);
+      //_EP(security::check_file_ioctl_access(current_task, file));
+      return file->ioctl(current_task, request, arg);
+    }
+  }
+}
+
+fit::result<Errno> sys_symlinkat(const CurrentTask& current_task,
+                                 starnix_uapi::UserCString user_target, FdNumber new_dir_fd,
+                                 starnix_uapi::UserCString user_path) {
+  auto target = current_task->read_c_string_to_vec(user_target, PATH_MAX) _EP(target);
+  if (target->empty()) {
+    return fit::error(errno(ENOENT));
+  }
+
+  auto path = current_task->read_c_string_to_vec(user_path, PATH_MAX) _EP(path);
+  if (path->empty()) {
+    return fit::error(errno(ENOENT));
+  }
+
+  auto result = lookup_parent_at<NamespaceNode>(
+      current_task, new_dir_fd, user_path,
+      [&](LookupContext context, NamespaceNode parent,
+          const FsStr& basename) -> fit::result<Errno, NamespaceNode> {
+        // The path to a new symlink cannot end in `/`. That would imply
+        // that we are dereferencing the symlink to a directory.
+        //
+        // See
+        // https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xbd_chap03.html#tag_21_03_00_75
+        if (context.must_be_directory) {
+          return fit::error(errno(ENOENT));
+        }
+        return parent.create_symlink(current_task, basename, target.value());
+      }) _EP(result);
+
+  return fit::ok();
 }
 
 fit::result<Errno, FdNumber> sys_dup(const CurrentTask& current_task, FdNumber oldfd) {

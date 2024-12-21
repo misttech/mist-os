@@ -189,7 +189,8 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
     return fit::error(errno(ENOMEM));
   }
 
-  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, bootfs, ktl::move(options));
+  auto fs = FileSystem::New(kernel, {.type = CacheMode::Type::Permanent}, bootfs,
+                            ktl::move(options)) _EP(fs);
   TreeBuilder tree = TreeBuilder::empty_dir();
   auto mode = FILE_MODE(IFDIR, 0755);
 
@@ -211,7 +212,7 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
     ZX_ASSERT(result.is_ok());
   }
 
-  auto root = tree.build(fs);
+  auto root = tree.build(fs.value());
 
   auto root_node =
       FsNode::new_root_with_properties(root, [&mode /*, &uid, &gid*/](FsNodeInfo& info) -> void {
@@ -221,7 +222,7 @@ fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefP
       });
   fs->set_root_node(root_node);
 
-  return fit::ok(ktl::move(fs));
+  return fit::ok(ktl::move(fs.value()));
 }
 
 namespace {
@@ -234,7 +235,7 @@ uint32_t from_be_bytes(const std::array<uint8_t, 4>& bytes) {
 }  // namespace
 
 fit::result<Errno, struct statfs> BootFs::statfs(const FileSystem& fs,
-                                                 const CurrentTask& current_task) {
+                                                 const CurrentTask& current_task) const {
   struct statfs stat = default_statfs(from_be_bytes(ktl::array<uint8_t, 4>{'m', 'b', 'f', 's'}));
   return fit::ok(stat);
 }

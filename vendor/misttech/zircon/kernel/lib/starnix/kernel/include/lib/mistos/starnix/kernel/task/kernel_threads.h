@@ -9,7 +9,7 @@
 #include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
-#include <lib/mistos/util/onecell.h>
+#include <lib/mistos/util/oncelock.h>
 
 namespace starnix {
 
@@ -36,7 +36,7 @@ class Kernel;
 class KernelThreads {
  private:
   /// Information about the main system task that is bound to the kernel main thread.
-  OnceCell<SystemTask> system_task_;
+  mtl::OnceLock<SystemTask> system_task_;
 
   /// A weak reference to the kernel owning this struct.
   mtl::WeakPtr<Kernel> kernel_;

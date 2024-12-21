@@ -67,6 +67,7 @@ struct Flags {
 
   // Whether any set bits in a source flags value are also set in a target flags value.
   bool intersects(const Flags& other) const { return (bits() & other.bits()) != EMPTY; }
+  bool intersects(const Enum& value) const { return intersects(Flags(value)); }
 
   // Whether all set bits in a source flags value are also set in a target flags value.
   bool contains(const Flags& other) const { return (bits() & other.bits()) == other.bits(); }

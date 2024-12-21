@@ -117,7 +117,7 @@ bool test_trivial_initial_stack() {
 fit::result<Errno> exec_hello_starnix(starnix::CurrentTask& current_task) {
   fbl::Vector<BString> argv;
   fbl::AllocChecker ac;
-  argv.push_back("bin/hello_starnix", &ac);
+  argv.push_back("data/tests/hello_starnix", &ac);
   ZX_ASSERT(ac.check());
 
   auto executable =

@@ -12,12 +12,18 @@
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
 #include <zircon/assert.h>
 
-// #include <ktl/enforce.h>
+namespace ktl {
+
+using std::function;
+
+}  // namespace ktl
+
+#include <ktl/enforce.h>
 
 namespace starnix {
 
 FileHandle Anon::new_file_extended(const CurrentTask& current_task, ktl::unique_ptr<FileOps> ops,
-                                   OpenFlags flags, std::function<FsNodeInfo(ino_t)> info) {
+                                   OpenFlags flags, ktl::function<FsNodeInfo(ino_t)> info) {
   fbl::AllocChecker ac;
   auto anon = new (&ac) Anon();
   ZX_ASSERT(ac.check());
@@ -39,7 +45,9 @@ FileSystemHandle anon_fs(const fbl::RefPtr<Kernel>& kernel) {
     fbl::AllocChecker ac;
     auto anonfs = new (&ac) AnonFs();
     ZX_ASSERT(ac.check());
-    kernel->anon_fs_.set(FileSystem::New(kernel, {.type = CacheModeType::Uncached}, anonfs, {}));
+    auto fs = FileSystem::New(kernel, {.type = CacheMode::Type::Uncached}, anonfs, {});
+    ZX_ASSERT_MSG(fs.is_ok(), "anonfs constructed with valid options");
+    kernel->anon_fs_.set(ktl::move(fs.value()));
   }
   return kernel->anon_fs_.get();
 }

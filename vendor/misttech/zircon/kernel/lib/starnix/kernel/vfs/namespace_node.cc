@@ -51,8 +51,8 @@ NamespaceNode NamespaceNode::new_anonymous_unrooted(FsNodeHandle node) {
 }
 
 fit::result<Errno, FileHandle> NamespaceNode::open(const CurrentTask& current_task, OpenFlags flags,
-                                                   bool check_access) const {
-  auto open = entry_->node_->open(current_task, mount_, flags, check_access) _EP(open);
+                                                   AccessCheck access_check) const {
+  auto open = entry_->node_->open(current_task, mount_, flags, access_check) _EP(open);
   return FileObject::New(ktl::move(open.value()), *this, flags);
 }
 
@@ -103,12 +103,70 @@ fit::result<Errno, NamespaceNode> NamespaceNode::create_node(const CurrentTask& 
   return fit::ok(NamespaceNode::with_new_entry(result.value()));
 }
 
+fit::result<Errno, NamespaceNode> NamespaceNode::create_symlink(const CurrentTask& current_task,
+                                                                const FsStr& name,
+                                                                const FsStr& target) const {
+  LTRACEF_LEVEL(2, "name=[%.*s], target=[%.*s]\n", static_cast<int>(name.length()), name.data(),
+                static_cast<int>(target.length()), target.data());
+
+  auto owner = current_task->as_fscred();
+  auto result = entry_->create_entry(
+      current_task, mount_, name,
+      [&current_task, &target, owner](const FsNodeHandle& dir, const MountInfo& mount,
+                                      const FsStr& name) -> fit::result<Errno, FsNodeHandle> {
+        return dir->create_symlink(current_task, mount, name, target, owner);
+      }) _EP(result);
+
+  return fit::ok(NamespaceNode::with_new_entry(result.value()));
+}
+
 fit::result<Errno, NamespaceNode> NamespaceNode::create_tmpfile(const CurrentTask& current_task,
                                                                 FileMode mode,
                                                                 OpenFlags flags) const {
-  // auto owner = current_task->as_fscred();
-  // auto _mode = current_task->fs()->apply_umask(mode);
-  return fit::error(errno(ENOTSUP));
+  LTRACEF_LEVEL(2, "mode=0x%x\n", mode.bits());
+
+  auto owner = current_task->as_fscred();
+  auto mask_mode = current_task->fs()->apply_umask(mode);
+  auto result = entry_->create_tmpfile(current_task, mount_, mask_mode, owner, flags) _EP(result);
+
+  return fit::ok(NamespaceNode::with_new_entry(result.value()));
+}
+
+fit::result<Errno, NamespaceNode> NamespaceNode::link(const CurrentTask& current_task,
+                                                      const FsStr& name,
+                                                      const FsNodeHandle& child) const {
+  LTRACEF_LEVEL(2, "name=[%.*s]\n", static_cast<int>(name.length()), name.data());
+
+  auto result = entry_->create_entry(
+      current_task, mount_, name,
+      [&current_task, &child](const FsNodeHandle& dir, const MountInfo& mount,
+                              const FsStr& name) -> fit::result<Errno, FsNodeHandle> {
+        return dir->link(current_task, mount, name, child);
+      }) _EP(result);
+
+  return fit::ok(NamespaceNode::with_new_entry(result.value()));
+}
+
+fit::result<Errno> NamespaceNode::unlink(const CurrentTask& current_task, const FsStr& name,
+                                         UnlinkKind kind, bool must_be_directory) const {
+  LTRACEF_LEVEL(2, "name=[%.*s]\n", static_cast<int>(name.length()), name.data());
+
+  if (DirEntry::is_reserved_name(name)) {
+    switch (kind) {
+      case UnlinkKind::Directory:
+        if (name == "..") {
+          return fit::error(errno(ENOTEMPTY));
+        } else if (!parent().has_value()) {
+          // The client is attempting to remove the root.
+          return fit::error(errno(EBUSY));
+        } else {
+          return fit::error(errno(EINVAL));
+        }
+      case UnlinkKind::NonDirectory:
+        return fit::error(errno(ENOTDIR));
+    }
+  }
+  return entry_->unlink(current_task, mount_, name, kind, must_be_directory);
 }
 
 fit::result<Errno, NamespaceNode> NamespaceNode::lookup_child(const CurrentTask& current_task,
@@ -357,6 +415,14 @@ fit::result<Errno> NamespaceNode::mount(WhatToMount what, MountFlags flags) cons
 /// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
 fit::result<Errno> NamespaceNode::unmount(UnmountFlags flags) const {
   return fit::error(errno(ENOTSUP));
+}
+
+fit::result<Errno> NamespaceNode::rename(const CurrentTask& current_task,
+                                         const NamespaceNode& old_parent, const FsStr& old_name,
+                                         const NamespaceNode& new_parent, const FsStr& new_name,
+                                         RenameFlags flags) {
+  return DirEntry::rename(current_task, old_parent.entry_, old_parent.mount_, old_name,
+                          new_parent.entry_, new_parent.mount_, new_name, flags);
 }
 
 fit::result<Errno, SymlinkTarget> NamespaceNode::readlink(const CurrentTask& current_task) const {

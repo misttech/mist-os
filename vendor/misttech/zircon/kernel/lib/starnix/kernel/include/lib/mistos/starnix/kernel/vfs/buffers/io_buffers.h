@@ -664,9 +664,11 @@ class VecOutputBuffer : public OutputBuffer {
   friend bool unit_testing::test_vec_output_buffer();
 
   explicit VecOutputBuffer(size_t capacity) : capacity_(capacity) {
-    fbl::AllocChecker ac;
-    buffer_.reserve(capacity, &ac);
-    ASSERT(ac.check());
+    if (capacity > 0) {
+      fbl::AllocChecker ac;
+      buffer_.reserve(capacity, &ac);
+      ASSERT(ac.check());
+    }
   }
 };
 

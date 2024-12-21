@@ -9,6 +9,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
+#include <lib/mistos/starnix_syscalls/syscall_arg.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
@@ -16,6 +17,7 @@
 #include <lib/mistos/starnix_uapi/user_value.h>
 
 #include <asm/stat.h>
+#include <asm/statfs.h>
 #include <linux/openat2.h>
 
 namespace starnix {
@@ -74,6 +76,12 @@ fit::result<Errno, size_t> sys_pwritev2(const CurrentTask& current_task, FdNumbe
                                         starnix_uapi::UserValue<uint32_t> iovec_count, off_t offset,
                                         uint64_t arg, uint32_t flags);
 
+fit::result<Errno> sys_fstatfs(const CurrentTask& current_task, FdNumber fd,
+                               starnix_uapi::UserRef<struct ::statfs> user_buf);
+
+fit::result<Errno> sys_statfs(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
+                              starnix_uapi::UserRef<struct ::statfs> user_buf);
+
 fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumber dir_fd,
                                         starnix_uapi::UserCString user_path, uint32_t flags,
                                         starnix_uapi::FileMode mode);
@@ -115,6 +123,17 @@ fit::result<Errno, size_t> sys_readlinkat(const CurrentTask& current_task, FdNum
 fit::result<Errno> sys_mkdirat(const CurrentTask& current_task, FdNumber dir_fd,
                                starnix_uapi::UserCString user_path, starnix_uapi::FileMode mode);
 
+fit::result<Errno> sys_linkat(const CurrentTask& current_task, FdNumber old_dir_fd,
+                              starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
+                              starnix_uapi::UserCString new_user_path, uint32_t flags);
+
+fit::result<Errno> sys_unlinkat(const CurrentTask& current_task, FdNumber dir_fd,
+                                starnix_uapi::UserCString user_path, uint32_t flags);
+
+fit::result<Errno> sys_renameat2(const CurrentTask& current_task, FdNumber old_dir_fd,
+                                 starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
+                                 starnix_uapi::UserCString new_user_path, uint32_t flags);
+
 fit::result<Errno> sys_fchmod(const CurrentTask& current_task, FdNumber fd,
                               starnix_uapi::FileMode mode);
 
@@ -123,6 +142,14 @@ fit::result<Errno> sys_fchmodat(const CurrentTask& current_task, FdNumber dir_fd
 
 fit::result<Errno, size_t> sys_getcwd(const CurrentTask& current_task,
                                       starnix_uapi::UserAddress buf, size_t size);
+
+fit::result<Errno, starnix_syscalls::SyscallResult> sys_ioctl(const CurrentTask& current_task,
+                                                              FdNumber fd, uint32_t request,
+                                                              starnix_syscalls::SyscallArg arg);
+
+fit::result<Errno> sys_symlinkat(const CurrentTask& current_task,
+                                 starnix_uapi::UserCString user_target, FdNumber new_dir_fd,
+                                 starnix_uapi::UserCString user_path);
 
 fit::result<Errno, FdNumber> sys_dup(const CurrentTask& current_task, FdNumber oldfd);
 

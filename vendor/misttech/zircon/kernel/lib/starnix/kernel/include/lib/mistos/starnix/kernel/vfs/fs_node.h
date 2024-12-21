@@ -19,6 +19,7 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/mistos/util/oncelock.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/compiler.h>
 
@@ -38,6 +39,30 @@ class Kernel;
 class CurrentTask;
 using PipeHandle = fbl::RefPtr<Pipe>;
 using starnix_uapi::Credentials;
+
+// Whether linking is allowed for this node
+enum class FsNodeLinkBehavior : uint8_t { kAllowed, kDisallowed };
+
+inline FsNodeLinkBehavior DefaultFsNodeLinkBehavior() { return FsNodeLinkBehavior::kAllowed; }
+
+// The inner class is required because bitflags cannot pass the attribute through to the single
+// variant, and attributes cannot be applied to macro invocations.
+namespace inner_flags {
+enum class StatxFlagsEnum : uint32_t {
+  _AT_SYMLINK_NOFOLLOW = AT_SYMLINK_NOFOLLOW,
+  _AT_EMPTY_PATH = AT_EMPTY_PATH,
+  _AT_NO_AUTOMOUNT = AT_NO_AUTOMOUNT,
+  _AT_STATX_SYNC_AS_STAT = AT_STATX_SYNC_AS_STAT,
+  _AT_STATX_FORCE_SYNC = AT_STATX_FORCE_SYNC,
+  _AT_STATX_DONT_SYNC = AT_STATX_DONT_SYNC,
+  _STATX_ATTR_VERITY = STATX_ATTR_VERITY,
+};
+
+using StatxFlags = Flags<StatxFlagsEnum>;
+}  // namespace inner_flags
+
+using StatxFlags = inner_flags::StatxFlags;
+using StatxFlagsEnum = inner_flags::StatxFlagsEnum;
 
 class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
                      public fbl::RefCountedUpgradeable<FsNode> {
@@ -107,7 +132,7 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   /// Whether this node can be linked into a directory.
   ///
   /// Only set for nodes created with `O_TMPFILE`.
-  // link_behavior: OnceCell<FsNodeLinkBehavior>,
+  mtl::OnceLock<FsNodeLinkBehavior> link_behavior_;
 
   /// Tracks lock state for this file.
   // pub write_guard_state: Mutex<FileWriteGuardState>,
@@ -164,11 +189,9 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   void set_id(ino_t node_id) {
     DEBUG_ASSERT(node_id_ == 0);
     node_id_ = node_id;
-    /*
-      if self.info.get_mut().ino == 0 {
-          self.info.get_mut().ino = node_id;
-      }
-    */
+    if (info_.Write()->ino_ == 0) {
+      info_.Write()->ino_ = node_id;
+    }
   }
 
   FileSystemHandle fs() const {
@@ -178,18 +201,25 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   }
 
   void set_fs(const FileSystemHandle& fs) {
+    DEBUG_ASSERT(fs_.get() == nullptr);
     fs_ = fs->weak_factory_.GetWeakPtr();
     kernel_ = fs->kernel_;
   }
 
   FsNodeOps& ops() const { return *ops_; }
 
+  template <typename T>
+  ktl::optional<T*> downcast_ops() const {
+    auto ptr = static_cast<T*>(ops_.get());
+    return ptr ? ktl::optional<T*>(ptr) : ktl::nullopt;
+  }
+
   fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const CurrentTask& current_task,
                                                                OpenFlags flags) const;
 
   fit::result<Errno, ktl::unique_ptr<FileOps>> open(const CurrentTask& current_task,
                                                     const MountInfo& mount, OpenFlags flags,
-                                                    bool check_access) const;
+                                                    AccessCheck access_check) const;
 
   fit::result<Errno, FsNodeHandle> lookup(const CurrentTask& current_task, const MountInfo& mount,
                                           const FsStr& name) const;
@@ -198,19 +228,43 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
                                          const FsStr& name, FileMode mode, DeviceType dev,
                                          FsCred owner) const;
 
+  fit::result<Errno, FsNodeHandle> create_symlink(const CurrentTask& current_task,
+                                                  const MountInfo& mount, const FsStr& name,
+                                                  const FsStr& target, FsCred owner) const;
+
+  fit::result<Errno, FsNodeHandle> create_tmpfile(const CurrentTask& current_task,
+                                                  const MountInfo& mount, FileMode& mode,
+                                                  FsCred& owner,
+                                                  FsNodeLinkBehavior link_behavior) const;
+
   /// This method does not attempt to update the atime of the node.
   /// Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
   fit::result<Errno, SymlinkTarget> readlink(const CurrentTask& current_task) const;
 
+  fit::result<Errno, FsNodeHandle> link(const CurrentTask& current_task, const MountInfo& mount,
+                                        const FsStr& name, const FsNodeHandle& child) const;
+
+  fit::result<Errno> unlink(const CurrentTask& current_task, const MountInfo& mount,
+                            const FsStr& name, const FsNodeHandle& child) const;
+
   static fit::result<Errno> default_check_access_impl(
       const CurrentTask& current_task, Access access,
       starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info);
+
+  void update_metadata_for_child(const CurrentTask& current_task, FileMode& mode,
+                                 FsCred& owner) const;
 
   /// Check whether the node can be accessed in the current context with the specified access
   /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
   /// owner or is in the file's group.
   fit::result<Errno> check_access(const CurrentTask& current_task, const MountInfo& mount,
                                   Access access, CheckAccessReason reason) const;
+
+  /// Check whether the stick bit, `S_ISVTX`, forbids the `current_task` from removing the given
+  /// `child`. If this node has `S_ISVTX`, then either the child must be owned by the `fsuid` of
+  /// `current_task` or `current_task` must have `CAP_FOWNER`.
+  fit::result<Errno> check_sticky_bit(const CurrentTask& current_task,
+                                      const FsNodeHandle& child) const;
 
   template <typename Fn>
   fit::result<Errno> update_attributes(const CurrentTask& current_task, Fn&& mutator) const {
@@ -254,11 +308,15 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
 
   fit::result<Errno, struct ::stat> stat(const CurrentTask& current_task) const;
 
+  fit::result<Errno, struct ::statx> statx(const CurrentTask& current_task, StatxFlags flags,
+                                           uint32_t mask) const;
+
   // Returns current `FsNodeInfo`.
-  starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info() const { return info_.Read(); }
+  starnix_sync::RwLock<FsNodeInfo>::RwLockReadGuard info() const { return info_.Read(); }
 
   /// Refreshes the `FsNodeInfo` if necessary and returns a read lock.
-  fit::result<Errno, FsNodeInfo> fetch_and_refresh_info(const CurrentTask& current_task) const;
+  fit::result<Errno, starnix_sync::RwLock<FsNodeInfo>::RwLockReadGuard> fetch_and_refresh_info(
+      const CurrentTask& current_task) const;
 
   template <typename T, typename F>
   T update_info(F&& mutator) const {
@@ -290,5 +348,17 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
 };
 
 }  // namespace starnix
+
+template <>
+constexpr Flag<starnix::inner_flags::StatxFlagsEnum>
+    Flags<starnix::inner_flags::StatxFlagsEnum>::FLAGS[] = {
+        {starnix::inner_flags::StatxFlagsEnum::_AT_SYMLINK_NOFOLLOW},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_EMPTY_PATH},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_NO_AUTOMOUNT},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_STATX_SYNC_AS_STAT},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_STATX_FORCE_SYNC},
+        {starnix::inner_flags::StatxFlagsEnum::_AT_STATX_DONT_SYNC},
+        {starnix::inner_flags::StatxFlagsEnum::_STATX_ATTR_VERITY},
+};
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_FS_NODE_H_

@@ -48,6 +48,13 @@ int64_t sys_a0003_close(unsigned int fd) {
                          starnix::FdNumber::from_raw(static_cast<uint32_t>(fd)));
 }
 
+int64_t sys_a0008_lseek(uint32_t fd, uint64_t offset, uint32_t whence) {
+  LTRACEF_LEVEL(2, "fd=%d\n", fd);
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_lseek, current_task,
+                         starnix::FdNumber::from_raw(static_cast<uint32_t>(fd)), offset, whence);
+}
+
 int64_t sys_a0017_pread64(unsigned int fd, user_out_ptr<char> buf, size_t count, int64_t pos) {
   LTRACEF_LEVEL(2, "fd=%d count=%zu pos=%ld\n", fd, count, pos);
   auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();

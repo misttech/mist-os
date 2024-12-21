@@ -844,7 +844,8 @@ fit::result<Errno, FileHandle> CurrentTask::open_file(const FsStr& path, OpenFla
     // FileMode argument.
     return fit::error(errno(EINVAL));
   }
-  return open_file_at(FdNumber::AT_FDCWD_, path, flags, FileMode(), ResolveFlags::empty());
+  return open_file_at(FdNumber::AT_FDCWD_, path, flags, FileMode(), ResolveFlags::empty(),
+                      AccessCheck());
 }
 
 fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_path(
@@ -942,7 +943,8 @@ fit::result<Errno, ktl::pair<NamespaceNode, bool>> CurrentTask::resolve_open_pat
 
 fit::result<Errno, FileHandle> CurrentTask::open_file_at(FdNumber dir_fd, const FsStr& path,
                                                          OpenFlags flags, FileMode mode,
-                                                         ResolveFlags resolve_flags) const {
+                                                         ResolveFlags resolve_flags,
+                                                         AccessCheck access_check) const {
   LTRACEF_LEVEL(2, "path=[%.*s], flags=0x%x, mode=0x%x, resolve_flags=0x%x\n",
                 static_cast<int>(path.length()), path.data(), flags.bits(), mode.bits(),
                 resolve_flags.bits());
@@ -953,12 +955,14 @@ fit::result<Errno, FileHandle> CurrentTask::open_file_at(FdNumber dir_fd, const 
 
   auto result = resolve_dir_fd(dir_fd, path, resolve_flags) _EP(result);
   auto& [dir, lpath] = result.value();
-  return open_namespace_node_at(dir, lpath, flags, mode, resolve_flags);
+  return open_namespace_node_at(dir, lpath, flags, mode, resolve_flags, access_check);
 }
 
-fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
-    NamespaceNode dir, const FsStr& path, OpenFlags flags, FileMode mode,
-    ResolveFlags& resolve_flags) const {
+fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(NamespaceNode dir,
+                                                                   const FsStr& path,
+                                                                   OpenFlags flags, FileMode mode,
+                                                                   ResolveFlags& resolve_flags,
+                                                                   AccessCheck access_check) const {
   LTRACEF_LEVEL(2, "path=[%.*s], flags=0x%x, mode=0x%x, resolve_flags=0x%x\n",
                 static_cast<int>(path.length()), path.data(), flags.bits(), mode.bits(),
                 resolve_flags.bits());
@@ -1082,8 +1086,7 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
   // > descriptor.
 
   // let access_check = if created { AccessCheck::skip() } else { access_check };
-  auto access_check = !created;
-  return name_result->open(*this, flags, access_check);
+  return name_result->open(*this, flags, created ? AccessCheck::skip() : access_check);
 }
 
 fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_parent_at(

@@ -7,12 +7,15 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
+#include <lib/mistos/starnix/kernel/vfs/directory_file.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/memory_file.h>
 #include <lib/mistos/starnix/kernel/vfs/module.h>
+#include <lib/mistos/starnix/kernel/vfs/symlink_node.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
@@ -54,7 +57,7 @@ class TmpfsSpecialNode : public FsNodeOps {
   fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
                                                                const CurrentTask& current_task,
                                                                OpenFlags flags) const final {
-    panic("Special nodes cannot be opened.\n");
+    PANIC("Special nodes cannot be opened.\n");
   }
 
  private:
@@ -79,7 +82,8 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
     return fit::error(errno(ENOMEM));
   }
 
-  auto fs = FileSystem::New(kernel, {.type = CacheModeType::Permanent}, tmpfs, ktl::move(options));
+  auto fs = FileSystem::New(kernel, {.type = CacheMode::Type::Permanent}, tmpfs, ktl::move(options))
+      _EP(fs);
   auto mount_options = fs->options_.params;
 
   auto result = [&]() -> fit::result<Errno, FileMode> {
@@ -129,11 +133,11 @@ fit::result<Errno, FileSystemHandle> TmpFs::new_fs_with_options(const fbl::RefPt
     );*/
   }
 
-  return fit::ok(ktl::move(fs));
+  return fit::ok(ktl::move(fs.value()));
 }
 
 fit::result<Errno, struct statfs> TmpFs::statfs(const FileSystem& fs,
-                                                const CurrentTask& current_task) {
+                                                const CurrentTask& current_task) const {
   struct statfs stat = default_statfs(TMPFS_MAGIC);
   // Pretend we have a ton of free space.
   stat.f_blocks = 0x100000000;
@@ -142,7 +146,67 @@ fit::result<Errno, struct statfs> TmpFs::statfs(const FileSystem& fs,
   return fit::ok(stat);
 }
 
-const FsStr& TmpFs::name() { return name_; }
+const FsStr& TmpFs::name() const { return name_; }
+
+fit::result<Errno> TmpFs::rename(const FileSystem& fs, const CurrentTask& current_task,
+                                 const FsNodeHandle& old_parent, const FsStr& old_name,
+                                 const FsNodeHandle& new_parent, const FsStr& new_name,
+                                 const FsNodeHandle& renamed,
+                                 ktl::optional<FsNodeHandle> replaced) const {
+  auto child_count = [](const FsNodeHandle& node) -> starnix_sync::MutexGuard<uint32_t> {
+    // The following casts are safe, unless something is seriously wrong:
+    // - The filesystem should not be asked to rename nodes that it doesn't handle
+    // - Parents in a rename operation need to be directories
+    // - TmpfsDirectory is the ops for directories in this filesystem
+    auto downcast = node->downcast_ops<TmpfsDirectory>();
+    ZX_ASSERT(downcast.has_value());
+    return downcast.value()->child_count_.Lock();
+  };
+
+  if (replaced.has_value()) {
+    if ((*replaced)->is_dir()) {
+      // Ensure replaced is empty
+      if (*child_count(*replaced) != 0) {
+        return fit::error(errno(ENOTEMPTY));
+      }
+    }
+  }
+
+  *child_count(old_parent) -= 1;
+  *child_count(new_parent) += 1;
+  if (renamed->is_dir()) {
+    old_parent->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+    new_parent->update_info<void>([](FsNodeInfo& info) { info.link_count_ += 1; });
+  }
+
+  // Fix the wrong changes to new_parent due to the fact that the target element has
+  // been replaced instead of added
+  if (replaced.has_value()) {
+    if ((*replaced)->is_dir()) {
+      new_parent->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+    }
+    *child_count(new_parent) -= 1;
+  }
+
+  return fit::ok();
+}
+
+fit::result<Errno> TmpFs::exchange(const FileSystem& fs, const CurrentTask& current_task,
+                                   const FsNodeHandle& node1, const FsNodeHandle& parent1,
+                                   const FsStr& name1, const FsNodeHandle& node2,
+                                   const FsNodeHandle& parent2, const FsStr& name2) const {
+  if (node1->is_dir()) {
+    parent1->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+    parent2->update_info<void>([](FsNodeInfo& info) { info.link_count_ += 1; });
+  }
+
+  if (node2->is_dir()) {
+    parent1->update_info<void>([](FsNodeInfo& info) { info.link_count_ += 1; });
+    parent2->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+  }
+
+  return fit::ok();
+}
 
 TmpFs::~TmpFs() { LTRACE_ENTRY_OBJ; }
 
@@ -157,7 +221,7 @@ TmpfsDirectory* TmpfsDirectory::New() {
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> TmpfsDirectory::create_file_ops(
     const FsNode& node, const CurrentTask& current_task, OpenFlags flags) const {
-  return fit::error(errno(ENOTSUP));
+  return fit::ok(ktl::unique_ptr<FileOps>(MemoryDirectoryFile::New()));
 }
 
 fit::result<Errno, FsNodeHandle> TmpfsDirectory::mkdir(const FsNode& node,
@@ -185,23 +249,33 @@ fit::result<Errno, FsNodeHandle> TmpfsDirectory::create_symlink(const FsNode& no
                                                                 const FsStr& name,
                                                                 const FsStr& target,
                                                                 FsCred owner) const {
-  return fit::error(errno(ENOTSUP));
+  *child_count_.Lock() += 1;
+  auto [link, info] = SymlinkNode::New(target, owner);
+  return fit::ok(node.fs()->create_node(current_task, ktl::move(link), info));
 }
 
 fit::result<Errno, FsNodeHandle> TmpfsDirectory::create_tmpfile(const FsNode& node,
                                                                 const CurrentTask& current_task,
                                                                 FileMode mode, FsCred owner) const {
-  return fit::error(errno(ENOTSUP));
+  ZX_ASSERT(mode.is_reg());
+  return create_child_node(current_task, node, mode, DeviceType::NONE, owner);
 }
 
 fit::result<Errno> TmpfsDirectory::link(const FsNode& node, const CurrentTask& current_task,
                                         const FsStr& name, const FsNodeHandle& child) const {
-  return fit::error(errno(ENOTSUP));
+  child->update_info<void>([](FsNodeInfo& info) { info.link_count_ += 1; });
+  *child_count_.Lock() += 1;
+  return fit::ok();
 }
 
 fit::result<Errno> TmpfsDirectory::unlink(const FsNode& node, const CurrentTask& current_task,
                                           const FsStr& name, const FsNodeHandle& child) const {
-  return fit::error(errno(ENOTSUP));
+  if (child->is_dir()) {
+    node.update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+  }
+  child->update_info<void>([](FsNodeInfo& info) { info.link_count_ -= 1; });
+  *child_count_.Lock() -= 1;
+  return fit::ok();
 }
 
 fit::result<Errno, FsNodeHandle> create_child_node(const CurrentTask& current_task,

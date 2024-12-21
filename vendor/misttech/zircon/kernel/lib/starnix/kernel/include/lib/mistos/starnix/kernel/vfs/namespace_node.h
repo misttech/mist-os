@@ -22,6 +22,7 @@
 namespace starnix {
 
 using starnix_uapi::Access;
+using starnix_uapi::AccessCheck;
 using starnix_uapi::DeviceType;
 using starnix_uapi::Errno;
 using starnix_uapi::FileMode;
@@ -95,6 +96,14 @@ class PathWithReachability {
 
 class ActiveNamespaceNode;
 
+enum class UnlinkKind : uint8_t {
+  /// Unlink a directory.
+  Directory,
+
+  /// Unlink a non-directory.
+  NonDirectory
+};
+
 /// A node in a mount namespace.
 ///
 /// This tree is a composite of the mount tree and the FsNode tree.
@@ -129,7 +138,7 @@ class NamespaceNode {
   /// FileObject records the NamespaceNode that created it in order to
   /// remember its path in the Namespace.
   fit::result<Errno, FileHandle> open(const CurrentTask& current_task, OpenFlags flags,
-                                      bool check_access) const;
+                                      AccessCheck access_check) const;
 
   /// Create or open a node in the file system.
   ///
@@ -151,6 +160,12 @@ class NamespaceNode {
   fit::result<Errno, NamespaceNode> create_node(const CurrentTask& current_task, const FsStr& name,
                                                 FileMode mode, DeviceType dev) const;
 
+  /// Create a symlink in the file system.
+  ///
+  /// To create another type of node, use `create_node`.
+  fit::result<Errno, NamespaceNode> create_symlink(const CurrentTask& current_task,
+                                                   const FsStr& name, const FsStr& target) const;
+
   /// Creates an anonymous file.
   ///
   /// The FileMode::IFMT of the FileMode is always FileMode::IFREG.
@@ -158,6 +173,12 @@ class NamespaceNode {
   /// Used by O_TMPFILE.
   fit::result<Errno, NamespaceNode> create_tmpfile(const CurrentTask& current_task, FileMode mode,
                                                    OpenFlags flags) const;
+
+  fit::result<Errno, NamespaceNode> link(const CurrentTask& current_task, const FsStr& name,
+                                         const FsNodeHandle& child) const;
+
+  fit::result<Errno> unlink(const CurrentTask& current_task, const FsStr& name, UnlinkKind kind,
+                            bool must_be_directory) const;
 
   /// Traverse down a parent-to-child link in the namespace.
   fit::result<Errno, NamespaceNode> lookup_child(const CurrentTask& current_task,
@@ -211,6 +232,10 @@ class NamespaceNode {
 
   /// If this is the root of a filesystem, unmount. Otherwise return EINVAL.
   fit::result<Errno> unmount(UnmountFlags flags) const;
+
+  static fit::result<Errno> rename(const CurrentTask& current_task, const NamespaceNode& old_parent,
+                                   const FsStr& old_name, const NamespaceNode& new_parent,
+                                   const FsStr& new_name, RenameFlags flags);
 
   NamespaceNode with_new_entry(DirEntryHandle entry) const;
 

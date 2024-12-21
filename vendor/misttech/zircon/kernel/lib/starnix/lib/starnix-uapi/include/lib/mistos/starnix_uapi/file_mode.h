@@ -87,16 +87,16 @@ class FileMode {
   FileMode fmt() const { return FileMode(bits() & S_IFMT); }
 
   FileMode with_type(const FileMode& file_type) const {
-    return FileMode((mode_ & PERMISSIONS.bits()) | (file_type.bits() & S_IFMT));
+    return FileMode((bits() & PERMISSIONS.bits()) | (file_type.bits() & S_IFMT));
   }
 
-  bool is_lnk() const { return (mode_ & S_IFMT) == S_IFLNK; }
-  bool is_reg() const { return (mode_ & S_IFMT) == S_IFREG; }
-  bool is_dir() const { return (mode_ & S_IFMT) == S_IFDIR; }
-  bool is_chr() const { return (mode_ & S_IFMT) == S_IFCHR; }
-  bool is_blk() const { return (mode_ & S_IFMT) == S_IFBLK; }
-  bool is_fifo() const { return (mode_ & S_IFMT) == S_IFIFO; }
-  bool is_sock() const { return (mode_ & S_IFMT) == S_IFSOCK; }
+  bool is_lnk() const { return (bits() & S_IFMT) == S_IFLNK; }
+  bool is_reg() const { return (bits() & S_IFMT) == S_IFREG; }
+  bool is_dir() const { return (bits() & S_IFMT) == S_IFDIR; }
+  bool is_chr() const { return (bits() & S_IFMT) == S_IFCHR; }
+  bool is_blk() const { return (bits() & S_IFMT) == S_IFBLK; }
+  bool is_fifo() const { return (bits() & S_IFMT) == S_IFIFO; }
+  bool is_sock() const { return (bits() & S_IFMT) == S_IFSOCK; }
 
   bool operator!=(const FileMode& other) const { return mode_ != other.mode_; }
   bool operator==(const FileMode& other) const { return mode_ == other.mode_; }
@@ -107,6 +107,10 @@ class FileMode {
     return *this;
   }
   FileMode operator|(const FileMode& other) const { return mode_ | other.mode_; }
+  FileMode& operator|=(const FileMode& other) {
+    mode_ |= other.mode_;
+    return *this;
+  }
   FileMode operator~() const { return ~mode_; }
 
  private:
@@ -162,6 +166,35 @@ class Access : public AccessFlags {
 
 using Access = inner_access::Access;
 using AccessEnum = inner_access::AccessEnum;
+
+class AccessCheck {
+ public:
+  // Perform the default access checks.
+  AccessCheck() : access_(std::nullopt) {}
+
+  // Skip access checks.
+  static AccessCheck skip() { return AccessCheck(Access(AccessEnum::EXIST)); }
+
+  // Check for the given access values.
+  static AccessCheck check_for(Access access) { return AccessCheck(access); }
+
+  // The actual access bits to check for given the open flags.
+  //
+  // If the access check is the default, then this function will return
+  // the access bits needed to open the file with the rights specified in
+  // open flags.
+  Access resolve(OpenFlags flags) const {
+    if (access_.has_value()) {
+      return access_.value();
+    }
+    return Access::from_open_flags(flags);
+  }
+
+ private:
+  explicit AccessCheck(Access access) : access_(access) {}
+
+  std::optional<Access> access_;
+};
 
 }  // namespace starnix_uapi
 

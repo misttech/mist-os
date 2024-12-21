@@ -277,16 +277,23 @@ fit::result<Errno, FdFlags> FdTable::get_fd_flags_allowing_opath(FdNumber fd) co
   return fit::ok(result->second);
 }
 
-fit::result<Errno, FdFlags> FdTable::get_fd_flags(FdNumber fd) const {
-  auto result = get_allowing_opath_with_flags(fd);
-  if (result.is_error()) {
-    return result.take_error();
-  }
-  return fit::ok(result->second);
-}
-
 fit::result<Errno> FdTable::set_fd_flags(FdNumber fd, FdFlags flags) const {
   // profile_duration!("SetFdFlags");
+  auto inner = inner_.Lock();
+  auto state = inner->get()->store_.Lock();
+  auto entry = state->get_mut(fd);
+  if (!entry.has_value()) {
+    return fit::error(errno(EBADF));
+  }
+  if (entry->get()->file_->flags().contains(OpenFlagsEnum::PATH)) {
+    return fit::error(errno(EBADF));
+  }
+  entry->get()->flags_ = flags;
+  return fit::ok();
+}
+
+fit::result<Errno> FdTable::set_fd_flags_allowing_opath(FdNumber fd, FdFlags flags) const {
+  // profile_duration!("SetFdFlagsAllowingOpath");
   auto entry = (*(*inner_.Lock())->store_.Lock()).get_mut(fd);
   if (entry.has_value() && entry->get().has_value()) {
     entry->get()->flags_ = flags;

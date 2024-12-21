@@ -11,7 +11,7 @@
 #include <lib/mistos/starnix/kernel/lifecycle/atomic_counter.h>
 #include <lib/mistos/starnix/kernel/task/kernel_threads.h>
 #include <lib/mistos/starnix/kernel/task/pid_table.h>
-#include <lib/mistos/util/onecell.h>
+#include <lib/mistos/util/oncelock.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/types.h>
 
@@ -106,29 +106,27 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   BString cmdline_;
 
   // Owned by anon_node.rs
-  // pub anon_fs: OnceCell<FileSystemHandle>,
-  OnceCell<FileSystemHandle> anon_fs_;
+  // pub anon_fs: OnceLock<FileSystemHandle>,
+  mtl::OnceLock<FileSystemHandle> anon_fs_;
 
   // Owned by pipe.rs
-  // pub pipe_fs: OnceCell<FileSystemHandle>,
+  // pub pipe_fs: OnceLock<FileSystemHandle>,
   // Owned by socket.rs
-  // pub socket_fs: OnceCell<FileSystemHandle>,
+  // pub socket_fs: OnceLock<FileSystemHandle>,
   // Owned by devtmpfs.rs
-  // pub dev_tmp_fs: OnceCell<FileSystemHandle>,
+  // pub dev_tmp_fs: OnceLock<FileSystemHandle>,
   // Owned by devpts.rs
-  // pub dev_pts_fs: OnceCell<FileSystemHandle>,
+  // pub dev_pts_fs: OnceLock<FileSystemHandle>,
   // Owned by procfs.rs
-  // pub proc_fs: OnceCell<FileSystemHandle>,
+  // pub proc_fs: OnceLock<FileSystemHandle>,
   // Owned by sysfs.rs
-  // pub sys_fs: OnceCell<FileSystemHandle>,
+  // pub sys_fs: OnceLock<FileSystemHandle>,
   // Owned by selinux/fs.rs
   // pub selinux_fs: OnceCell<FileSystemHandle>,
   // The SELinux security server. Initialized if SELinux is enabled.
   // pub security_server: Option<Arc<SecurityServer>>,
   // Owned by tracefs/fs.rs
-  // pub trace_fs: OnceCell<FileSystemHandle>,
-  // Owned by vfs/fuse.rs
-  // pub fusectl_fs: OnceCell<Arc<FuseCtlFs>>,
+  // pub trace_fs: OnceLock<FileSystemHandle>,
 
   /// The registry of device drivers.
   DeviceRegistry device_registry_;

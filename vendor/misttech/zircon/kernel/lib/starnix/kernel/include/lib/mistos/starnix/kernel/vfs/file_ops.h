@@ -31,12 +31,14 @@ class InputBuffer;
 class DirectSink;
 
 using WeakFileHandle = mtl::WeakPtr<FileObject>;
+using starnix_syscalls::SyscallArg;
 using starnix_syscalls::SyscallResult;
 using starnix_uapi::UserAddress;
 
 fit::result<Errno, SyscallResult> default_fcntl(uint32_t cmd);
-fit::result<Errno, SyscallResult> default_ioctl(const FileObject&, const CurrentTask&,
-                                                uint32_t request, long arg);
+fit::result<Errno, SyscallResult> default_ioctl(const FileObject& file,
+                                                const CurrentTask& current_task, uint32_t request,
+                                                SyscallArg arg);
 
 /// Corresponds to struct file_operations in Linux, plus any filesystem-specific data.
 class FileOps {
@@ -153,7 +155,7 @@ class FileOps {
 
   virtual fit::result<Errno, SyscallResult> ioctl(const FileObject& file,
                                                   const CurrentTask& current_task, uint32_t request,
-                                                  long arg) const {
+                                                  SyscallArg arg) const {
     return default_ioctl(file, current_task, request, arg);
   }
 
@@ -207,50 +209,47 @@ template <typename ComputeEndFn>
 fit::result<Errno, off_t> default_seek(off_t current_offset, SeekTarget target,
                                        ComputeEndFn&& compute_end) {
   static_assert(std::is_invocable_r_v<fit::result<Errno, off_t>, ComputeEndFn, off_t>);
-  auto lresult = [&]() -> fit::result<Errno, ktl::optional<uint64_t>> {
-    switch (target.type) {
-      case SeekTargetType::Set:
-        return fit::ok(target.offset);
-      case SeekTargetType::Cur:
-        return fit::ok(mtl::checked_add(current_offset, target.offset));
-      case SeekTargetType::End: {
-        auto result = compute_end(target.offset);
-        if (result.is_error())
-          return result.take_error();
-        return fit::ok(result.value());
-      }
-      case SeekTargetType::Data: {
-        auto eof = compute_end(0).value_or(std::numeric_limits<off_t>::max());
-        if (target.offset >= eof) {
-          return fit::error(errno(ENXIO));
-        }
-        return fit::ok(target.offset);
-      }
-      case SeekTargetType::Hole:
-        auto eof_result = compute_end(0);
-        if (eof_result.is_error())
-          return eof_result.take_error();
-        auto eof = eof_result.value();
-        if (target.offset >= eof) {
-          return fit::error(errno(ENXIO));
-        }
-        return fit::ok(eof);
-    }
-  }();
+  auto lresult = [&]() -> fit::result<Errno, ktl::optional<int64_t>> {
+    return ktl::visit(
+        SeekTarget::overloaded{
+            [](const internal::Set& s) -> fit::result<Errno, ktl::optional<int64_t>> {
+              return fit::ok(s.offset);
+            },
+            [current_offset](const internal::Cur& c) -> fit::result<Errno, ktl::optional<int64_t>> {
+              return fit::ok(mtl::checked_add(current_offset, c.offset));
+            },
+            [&compute_end](const internal::End& e) -> fit::result<Errno, ktl::optional<int64_t>> {
+              auto result = compute_end(e.offset) _EP(result);
+              return fit::ok(result.value());
+            },
+            [&compute_end](const internal::Data& d) -> fit::result<Errno, ktl::optional<int64_t>> {
+              auto eof = compute_end(0).value_or(std::numeric_limits<off_t>::max());
+              if (d.offset >= eof) {
+                return fit::error(errno(ENXIO));
+              }
+              return fit::ok(d.offset);
+            },
+            [&compute_end](const internal::Hole& h) -> fit::result<Errno, ktl::optional<int64_t>> {
+              auto eof_result = compute_end(0) _EP(eof_result);
+              auto eof = eof_result.value();
+              if (h.offset >= eof) {
+                return fit::error(errno(ENXIO));
+              }
+              return fit::ok(eof);
+            }},
+        target.variant_);
+  }() _EP(lresult);
 
-  if (lresult.is_error())
-    return lresult.take_error();
-
-  auto new_offset = lresult.value();
-  if (!new_offset.has_value()) {
+  if (!lresult.value().has_value()) {
     return fit::error(errno(EINVAL));
   }
 
+  auto new_offset = lresult.value().value();
   if (new_offset < 0) {
     return fit::error(errno(EINVAL));
   }
 
-  return fit::ok(*new_offset);
+  return fit::ok(new_offset);
 }
 
 /// Implement the seek method for a file without an upper bound on the resulting offset.
@@ -392,7 +391,7 @@ struct OPathOps : FileOps {
   }
 
   fit::result<Errno, SyscallResult> ioctl(const FileObject& file, const CurrentTask& current_task,
-                                          uint32_t request, long arg) const final {
+                                          uint32_t request, SyscallArg arg) const final {
     return fit::error(errno(EBADF));
   }
 };

@@ -257,7 +257,8 @@ fit::result<Errno, FileHandle> new_memfd(const CurrentTask& current_task, FsStri
                       FsNodeInfo::new_factory(FILE_MODE(IFREG, 0600), current_task->as_fscred()));
   /*node.write_guard_state.lock().enable_sealing(seals);*/
 
-  auto open_result = node->open(current_task, MountInfo::detached(), flags, false) _EP(open_result);
+  auto open_result =
+      node->open(current_task, MountInfo::detached(), flags, AccessCheck::skip()) _EP(open_result);
 
   // In /proc/[pid]/fd, the target of this memfd's symbolic link is "/memfd:[name]".
   auto local_name = FsString("/memfd:");

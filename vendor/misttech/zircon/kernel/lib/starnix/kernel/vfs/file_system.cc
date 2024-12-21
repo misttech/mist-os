@@ -31,6 +31,18 @@
 
 namespace starnix {
 
+Entries Entries::Permanent(ktl::unique_ptr<Entries::Inner::Permanent> perm) {
+  return Entries(ktl::move(perm));
+}
+Entries Entries::Lru(ktl::unique_ptr<Entries::Inner::LruCache> lru) {
+  return Entries(ktl::move(lru));
+}
+Entries Entries::None() { return Entries(Variant()); }
+Entries::Entries(Variant entries) : entries_(ktl::move(entries)) {}
+Entries::Entries(Entries&& other) = default;
+Entries& Entries::operator=(Entries&& other) = default;
+Entries::~Entries() = default;
+
 FileSystem::~FileSystem() {
   LTRACE_ENTRY_OBJ;
   ops_->unmount();
@@ -38,27 +50,39 @@ FileSystem::~FileSystem() {
   LTRACE_EXIT_OBJ;
 }
 
-FileSystemHandle FileSystem::New(const fbl::RefPtr<Kernel>& kernel, CacheMode cache_mode,
-                                 FileSystemOps* ops, FileSystemOptions options) {
-  fbl::AllocChecker ac;
-  Entries entries;
-  switch (cache_mode.type) {
-    case CacheModeType::Permanent:
-      entries = ktl::make_unique<Permanent>(&ac);
-      ZX_ASSERT(ac.check());
-      break;
-    case CacheModeType::Cached:
-      entries = ktl::make_unique<LruCache>(&ac, cache_mode.config.capacity);
-      ZX_ASSERT(ac.check());
-      break;
-    case CacheModeType::Uncached:
-      break;
+fit::result<Errno, FileSystemHandle> FileSystem::New(const fbl::RefPtr<Kernel>& kernel,
+                                                     CacheMode cache_mode, FileSystemOps* ops,
+                                                     FileSystemOptions options) {
+  // let security_state = security::file_system_init_security(ops.name(), &options.params)?;
+
+  auto cache = [&cache_mode]() -> Entries {
+    fbl::AllocChecker ac;
+    switch (cache_mode.type) {
+      case CacheMode::Type::Permanent: {
+        auto ptr = ktl::make_unique<Entries::Inner::Permanent>(&ac);
+        ZX_ASSERT(ac.check());
+        return Entries::Permanent(ktl::move(ptr));
+      }
+      case CacheMode::Type::Cached: {
+        auto ptr = ktl::make_unique<Entries::Inner::LruCache>(&ac, cache_mode.config.capacity);
+        ZX_ASSERT(ac.check());
+        return Entries::Lru(ktl::move(ptr));
+      }
+      case CacheMode::Type::Uncached:
+        return Entries::None();
+    };
   };
 
-  auto fs = fbl::AdoptRef(new (&ac) FileSystem(kernel, ktl::unique_ptr<FileSystemOps>(ops),
-                                               ktl::move(options), ktl::move(entries)));
+  fbl::AllocChecker ac;
+  auto file_system = fbl::AdoptRef(new (&ac) FileSystem(kernel, ktl::unique_ptr<FileSystemOps>(ops),
+                                                        ktl::move(options), ktl::move(cache())));
   ZX_ASSERT(ac.check());
-  return ktl::move(fs);
+
+  // TODO: https://fxbug.dev/366405587 - Workaround to allow SELinux to note that this
+  // `FileSystem` needs labeling, once a policy has been loaded.
+  // security::file_system_post_init_security(kernel, &file_system);
+
+  return fit::ok(ktl::move(file_system));
 }
 
 FileSystem::FileSystem(const fbl::RefPtr<Kernel>& kernel, ktl::unique_ptr<FileSystemOps> ops,
@@ -74,6 +98,34 @@ FileSystem::FileSystem(const fbl::RefPtr<Kernel>& kernel, ktl::unique_ptr<FileSy
 ino_t FileSystem::next_node_id() const {
   ZX_ASSERT(!ops_->generate_node_ids());
   return next_node_id_.fetch_add(1, ktl::memory_order_relaxed);
+}
+
+fit::result<Errno> FileSystem::rename(const CurrentTask& current_task,
+                                      const FsNodeHandle& old_parent, const FsString& old_name,
+                                      const FsNodeHandle& new_parent, const FsString& new_name,
+                                      const FsNodeHandle& renamed,
+                                      ktl::optional<FsNodeHandle> replaced) const {
+  // auto locked = starnix_sync::Locked<FileOpsCore>::from(mount);
+  return ops_->rename(*this, current_task, old_parent, old_name, new_parent, new_name, renamed,
+                      replaced);
+}
+
+fit::result<Errno> FileSystem::exchange(const CurrentTask& current_task, const FsNodeHandle& node1,
+                                        const FsNodeHandle& parent1, const FsStr& name1,
+                                        const FsNodeHandle& node2, const FsNodeHandle& parent2,
+                                        const FsStr& name2) const {
+  return ops_->exchange(*this, current_task, node1, parent1, name1, node2, parent2, name2);
+}
+
+fit::result<Errno, struct ::statfs> FileSystem::statfs(const CurrentTask& current_task) const {
+  // Check security permissions first
+  // security::sb_statfs(current_task, &self)?;
+  auto result = ops_->statfs(*this, current_task) _EP(result);
+  struct ::statfs stat = result.value();
+  if (stat.f_frsize == 0) {
+    stat.f_frsize = stat.f_bsize;
+  }
+  return fit::ok(stat);
 }
 
 void FileSystem::set_root(FsNodeOps* root) { set_root_node(FsNode::new_root(root)); }
@@ -142,13 +194,62 @@ void FileSystem::remove_node(const FsNode& node) {
   }
 }
 
-void FileSystem::did_create_dir_entry(const DirEntryHandle& entry) { LTRACE; }
+void FileSystem::did_create_dir_entry(const DirEntryHandle& entry) {
+  ktl::visit(Entries::overloaded{[](const ktl::monostate&) {},
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::Permanent>& p) {
+                                   p->entries.Lock()->insert_or_find(entry);
+                                 },
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::LruCache>& c) {
+                                   c->entries.Lock()->insert_or_find(entry);
+                                 }},
+             entries_.entries_);
+}
 
-void FileSystem::will_destroy_dir_entry(const DirEntryHandle& entry) { LTRACE; }
+void FileSystem::will_destroy_dir_entry(const DirEntryHandle& entry) {
+  ktl::visit(Entries::overloaded{[](const ktl::monostate&) {},
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::Permanent>& p) {
+                                   p->entries.Lock()->erase(entry->GetKey());
+                                 },
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::LruCache>& c) {
+                                   c->entries.Lock()->erase(entry->GetKey());
+                                 }},
+             entries_.entries_);
+}
 
-void FileSystem::did_access_dir_entry(const DirEntryHandle& entry) { LTRACE; }
+void FileSystem::did_access_dir_entry(const DirEntryHandle& entry) {
+  ktl::visit(Entries::overloaded{[](const ktl::monostate&) {},
+                                 [](const ktl::unique_ptr<Entries::Inner::Permanent>&) {},
+                                 [&entry](const ktl::unique_ptr<Entries::Inner::LruCache>& c) {
+                                   auto entries = c->entries.Lock();
+                                   if (auto it = entries->find(entry->GetKey());
+                                       it != entries->end()) {
+                                     // Move to end to mark as most recently used
+                                     auto node = entries->erase(it);
+                                     entries->insert(node);
+                                   }
+                                 }},
+             entries_.entries_);
+}
 
-void FileSystem::purge_old_entries() { LTRACE; }
+void FileSystem::purge_old_entries() {
+  ktl::visit(Entries::overloaded{[](const ktl::monostate&) {},
+                                 [](const ktl::unique_ptr<Entries::Inner::Permanent>&) {},
+                                 [](const ktl::unique_ptr<Entries::Inner::LruCache>& c) {
+                                   fbl::AllocChecker ac;
+                                   fbl::Vector<DirEntryHandle> purged;
+                                   {
+                                     auto entries = c->entries.Lock();
+                                     while (entries->size() > c->capacity) {
+                                       auto it = entries->begin();
+                                       purged.push_back(it.CopyPointer(), &ac);
+                                       ZX_ASSERT(ac.check());
+                                       entries->erase(it);
+                                     }
+                                   }
+                                   // Entries will get dropped here while not holding the lock
+                                 }},
+             entries_.entries_);
+}
 
 FsStr FileSystem::name() const { return ops_->name(); }
 

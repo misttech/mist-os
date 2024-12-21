@@ -79,9 +79,9 @@ bool test_fd_table_fork() {
   ASSERT_TRUE(files.get(fd2).is_error());
   ASSERT_TRUE(forked.get(fd2).is_error());
 
-  ASSERT_TRUE(files.set_fd_flags(fd0, FdFlags(FdFlagsEnum::CLOEXEC)).is_ok());
-  ASSERT_EQ(FdFlags(FdFlagsEnum::CLOEXEC).bits(), files.get_fd_flags(fd0).value().bits());
-  ASSERT_NE(FdFlags(FdFlagsEnum::CLOEXEC).bits(), forked.get_fd_flags(fd0).value().bits());
+  ASSERT_TRUE(files.set_fd_flags_allowing_opath(fd0, FdFlags(FdFlagsEnum::CLOEXEC)).is_ok());
+  ASSERT_EQ(FdFlags(FdFlagsEnum::CLOEXEC).bits(), files.get_fd_flags_allowing_opath(fd0).value().bits());
+  ASSERT_NE(FdFlags(FdFlagsEnum::CLOEXEC).bits(), forked.get_fd_flags_allowing_opath(fd0).value().bits());
 
   forked.release();
   files.release();
@@ -99,7 +99,7 @@ bool test_fd_table_exec() {
   auto fd0 = add(*current_task, files, fbl::RefPtr<FileObject>(file.get())).value();
   auto fd1 = add(*current_task, files, file).value();
 
-  ASSERT_TRUE(files.set_fd_flags(fd0, FdFlags(FdFlagsEnum::CLOEXEC)).is_ok());
+  ASSERT_TRUE(files.set_fd_flags_allowing_opath(fd0, FdFlags(FdFlagsEnum::CLOEXEC)).is_ok());
 
   ASSERT_TRUE(files.get(fd0).is_ok());
   ASSERT_TRUE(files.get(fd1).is_ok());

@@ -67,7 +67,7 @@ class PanickingFile : public FileOps {
   }
 
   fit::result<Errno, SyscallResult> ioctl(const FileObject& file, const CurrentTask& current_task,
-                                          uint32_t request, long arg) const final {
+                                          uint32_t request, SyscallArg arg) const final {
     panic("ioctl called on PanickingFile");
   }
 };
@@ -196,16 +196,16 @@ UserAddress map_memory_with_flags(starnix::CurrentTask& current_task, UserAddres
 class TestFs : public FileSystemOps {
  public:
   fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
-                                           const CurrentTask& current_task) override {
+                                           const CurrentTask& current_task) const override {
     return fit::ok(default_statfs(0));
   }
 
-  const FsStr& name() override { return name_; }
+  const FsStr& name() const override { return kTestFs; }
 
-  bool generate_node_ids() override { return false; }
+  bool generate_node_ids() const override { return false; }
 
  private:
-  const FsStr name_ = "test";
+  constexpr static FsStr kTestFs = "test";
 };
 
 FileSystemHandle create_fs(fbl::RefPtr<starnix::Kernel>& kernel, FsNodeOps* ops);

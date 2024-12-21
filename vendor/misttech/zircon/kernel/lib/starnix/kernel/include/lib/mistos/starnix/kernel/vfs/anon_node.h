@@ -43,14 +43,14 @@ class Anon : public FsNodeOps {
 class AnonFs : public FileSystemOps {
  public:
   fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
-                                           const CurrentTask& current_task) final {
+                                           const CurrentTask& current_task) const final {
     return fit::ok(starnix_uapi::default_statfs(ANON_INODE_FS_MAGIC));
   }
 
-  const FsStr& name() final { return name_; }
+  const FsStr& name() const final { return kAnon; }
 
  private:
-  const FsStr name_ = "anon";
+  constexpr static FsStr kAnon = "anon";
 };
 
 FileSystemHandle anon_fs(const fbl::RefPtr<Kernel>& kernel);

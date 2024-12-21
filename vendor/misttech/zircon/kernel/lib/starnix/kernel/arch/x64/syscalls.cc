@@ -93,6 +93,13 @@ fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task) {
   return fit::ok(current_task->thread_group_->Read()->process_group_->leader_);
 }
 
+fit::result<Errno> sys_link(const CurrentTask& current_task,
+                            starnix_uapi::UserCString old_user_path,
+                            starnix_uapi::UserCString new_user_path) {
+  return sys_linkat(current_task, FdNumber::AT_FDCWD_, old_user_path, FdNumber::AT_FDCWD_,
+                    new_user_path, 0);
+}
+
 fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
                                       starnix_uapi::UserCString user_path, uint32_t flags,
                                       starnix_uapi::FileMode mode) {
@@ -105,11 +112,44 @@ fit::result<Errno, size_t> sys_readlink(const CurrentTask& current_task,
   return sys_readlinkat(current_task, FdNumber::AT_FDCWD_, user_path, buffer, buffer_size);
 }
 
+fit::result<Errno> sys_rmdir(const CurrentTask& current_task, starnix_uapi::UserCString user_path) {
+  return sys_unlinkat(current_task, FdNumber::AT_FDCWD_, user_path, AT_REMOVEDIR);
+}
+
+fit::result<Errno> sys_rename(const CurrentTask& current_task,
+                              starnix_uapi::UserCString old_user_path,
+                              starnix_uapi::UserCString new_user_path) {
+  return sys_renameat2(current_task, FdNumber::AT_FDCWD_, old_user_path, FdNumber::AT_FDCWD_,
+                       new_user_path, 0);
+}
+
+fit::result<Errno> sys_renameat(const CurrentTask& current_task, FdNumber old_dir_fd,
+                                starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
+                                starnix_uapi::UserCString new_user_path) {
+  return sys_renameat2(current_task, old_dir_fd, old_user_path, new_dir_fd, new_user_path, 0);
+}
+
 fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
                             starnix_uapi::UserRef<struct ::stat> buffer) {
   // TODO(https://fxbug.dev/42172993): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
   // `sys_newfstatat`.
   return sys_newfstatat(current_task, FdNumber::AT_FDCWD_, user_path, buffer, 0);
+}
+
+fit::result<Errno> sys_symlink(const CurrentTask& current_task,
+                               starnix_uapi::UserCString user_target,
+                               starnix_uapi::UserCString user_path) {
+  return sys_symlinkat(current_task, user_target, FdNumber::AT_FDCWD_, user_path);
+}
+
+fit::result<Errno, __kernel_time_t> sys_time(const CurrentTask& current_task,
+                                             starnix_uapi::UserRef<__kernel_time_t> time_addr) {
+  return fit::error(errno(ENOSYS));
+}
+
+fit::result<Errno> sys_unlink(const CurrentTask& current_task,
+                              starnix_uapi::UserCString user_path) {
+  return sys_unlinkat(current_task, FdNumber::AT_FDCWD_, user_path, 0);
 }
 
 fit::result<Errno, pid_t> sys_vfork(CurrentTask& current_task) {

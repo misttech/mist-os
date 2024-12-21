@@ -43,9 +43,10 @@ fit::result<Errno, SyscallResult> default_fcntl(uint32_t cmd) {
   return fit::error(errno(EINVAL));
 }
 
-fit::result<Errno, SyscallResult> default_ioctl(const FileObject&, const CurrentTask&,
-                                                uint32_t request, long arg) {
-  return fit::error(errno(ENOTSUP));
+fit::result<Errno, SyscallResult> default_ioctl(const FileObject& file,
+                                                const CurrentTask& current_task, uint32_t request,
+                                                SyscallArg arg) {
+  return fit::error(errno(ENOTTY));
 }
 
 FileObject::FileObject(WeakFileHandle weak_handle, FileObjectId id, ActiveNamespaceNode name,
@@ -153,8 +154,7 @@ fit::result<Errno, size_t> FileObject::write(const CurrentTask& current_task,
     size_t bytes_written;
     if (flags().contains(OpenFlagsEnum::APPEND)) {
       // let _guard = self.node().append_lock.write(current_task)?;
-      auto seek = ops().seek(*this, current_task, *offset,
-                             SeekTarget{.type = SeekTargetType::End, .offset = 0}) _EP(seek);
+      auto seek = ops().seek(*this, current_task, *offset, SeekTarget::End(0)) _EP(seek);
 
       *offset = *seek;
       auto result = write_common(current_task, static_cast<size_t>(*offset), data) _EP(result);
@@ -237,6 +237,11 @@ fit::result<Errno, UserAddress> FileObject::mmap(const CurrentTask& current_task
   }
   // TODO (Herrera): Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
   return ops().mmap(*this, current_task, addr, vmo_offset, length, prot_flags, options, filename);
+}
+
+fit::result<Errno, starnix_syscalls::SyscallResult> FileObject::ioctl(
+    const CurrentTask& current_task, uint32_t request, starnix_syscalls::SyscallArg arg) const {
+  return ops().ioctl(*this, current_task, request, arg);
 }
 
 fit::result<Errno, off_t> default_eof_offset(const FileObject& file,

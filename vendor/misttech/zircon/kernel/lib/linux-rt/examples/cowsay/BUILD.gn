@@ -45,6 +45,12 @@ resource("libc") {
   outputs = [ "usr/lib/libc.so.6" ]
 }
 
+# This target creates a placeholder in /tmp, allowing the tests to mount things there.
+resource("tmp_target") {
+  sources = [ "//src/starnix/containers/placeholder" ]
+  outputs = [ "tmp/.placeholder" ]
+}
+
 zbi("cowsay") {
   deps = [
     ":bin",
@@ -52,6 +58,7 @@ zbi("cowsay") {
     ":ld",
     ":libc",
     ":libm",
+    ":tmp_target",
     "//zircon/kernel",
   ]
 

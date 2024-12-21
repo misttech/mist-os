@@ -69,7 +69,7 @@ bool test_write_read() {
   ASSERT(ac.check());
 
   ktl::span<uint16_t> tmp(test_vec.data(), test_vec.capacity());
-  ktl::span<uint8_t> test_bytes(reinterpret_cast<uint8_t*>(tmp.data()), tmp.size_bytes());
+  ktl::span<uint8_t> test_bytes(reinterpret_cast<uint8_t *>(tmp.data()), tmp.size_bytes());
 
   auto buffer = VecInputBuffer::New(test_bytes);
   auto write_result = wr_file->write(*current_task, &buffer);
@@ -98,9 +98,47 @@ bool test_permissions() {
   auto file = (*current_task)
                   .open_file_at(FdNumber::AT_FDCWD_, path,
                                 OpenFlags(OpenFlagsEnum::CREAT) | OpenFlags(OpenFlagsEnum::RDONLY),
-                                FileMode::from_bits(0777), ResolveFlags::empty());
+                                FileMode::from_bits(0777), ResolveFlags::empty(), AccessCheck());
 
   ASSERT_TRUE(file.is_ok(), "failed to create file");
+
+  auto out1 = VecOutputBuffer::New(0);
+  auto read_result = file.value()->read(*current_task, &out1);
+  ASSERT_TRUE(read_result.is_ok(), "failed to read");
+  ASSERT_EQ(0u, read_result.value());
+
+  auto in1 = VecInputBuffer::New(ktl::span<uint8_t>());
+  auto write_result = file.value()->write(*current_task, &in1);
+  ASSERT_TRUE(write_result.is_error());
+
+  auto file_wo = (*current_task)
+                     .open_file_at(FdNumber::AT_FDCWD_, path, OpenFlags(OpenFlagsEnum::WRONLY),
+                                   FileMode::EMPTY, ResolveFlags::empty(), AccessCheck());
+  ASSERT_TRUE(file_wo.is_ok(), "failed to open file WRONLY");
+
+  auto out2 = VecOutputBuffer::New(0);
+  read_result = file_wo.value()->read(*current_task, &out2);
+  ASSERT_TRUE(read_result.is_error());
+
+  // auto in2 = VecInputBuffer::New(ktl::span<uint8_t>());
+  // write_result = file_wo.value()->write(*current_task, &in2);
+  // ASSERT_TRUE(write_result.is_ok());
+  // ASSERT_EQ(0u, write_result.value());
+
+  auto file_rw = (*current_task)
+                     .open_file_at(FdNumber::AT_FDCWD_, path, OpenFlags(OpenFlagsEnum::RDWR),
+                                   FileMode::EMPTY, ResolveFlags::empty(), AccessCheck());
+  ASSERT_TRUE(file_rw.is_ok(), "failed to open file RDWR");
+
+  auto out3 = VecOutputBuffer::New(0);
+  read_result = file_rw.value()->read(*current_task, &out3);
+  ASSERT_TRUE(read_result.is_ok());
+  ASSERT_EQ(0u, read_result.value());
+
+  // auto in3 = VecInputBuffer::New(ktl::span<uint8_t>());
+  // write_result = file_rw.value()->write(*current_task, &in3);
+  // ASSERT_TRUE(write_result.is_ok());
+  // ASSERT_EQ(0u, write_result.value());
 
   END_TEST;
 }
@@ -111,9 +149,12 @@ bool test_persistence() {
 
   {
     auto root = (*current_task)->fs()->root().entry_;
-    auto usr = root->create_dir(*current_task, "usr").value();
-    auto _etc = root->create_dir(*current_task, "etc").value();
-    auto _usr_bin = usr->create_dir(*current_task, "bin").value();
+    auto usr = root->create_dir(*current_task, "usr");
+    ASSERT_TRUE(usr.is_ok(), "failed to create usr");
+    auto _etc = root->create_dir(*current_task, "etc");
+    ASSERT_TRUE(_etc.is_ok(), "failed to create etc");
+    auto _usr_bin = usr->create_dir(*current_task, "bin");
+    ASSERT_TRUE(_usr_bin.is_ok(), "failed to create usr/bin");
   }
 
   // At this point, all the nodes are dropped.
@@ -130,15 +171,47 @@ bool test_persistence() {
   auto _txt = (*current_task)
                   .open_file_at(FdNumber::AT_FDCWD_, "/usr/bin/test.txt",
                                 OpenFlags(OpenFlagsEnum::RDWR) | OpenFlags(OpenFlagsEnum::CREAT),
-                                FileMode::from_bits(0777), ResolveFlags::empty());
+                                FileMode::from_bits(0777), ResolveFlags::empty(), AccessCheck());
   auto txt = (*current_task).open_file("/usr/bin/test.txt", OpenFlags(OpenFlagsEnum::RDWR));
   ASSERT_TRUE(txt.is_ok(), "failed to open test.txt");
 
   auto usr_bin = (*current_task).open_file("/usr/bin", OpenFlags(OpenFlagsEnum::RDONLY));
   ASSERT_TRUE(usr_bin.is_ok(), "failed to open /usr/bin");
 
-  // TODO (Herrera) add missing method unlink
-  // usr_bin->name->unlink();
+  auto unlink_result =
+      usr_bin->name_->unlink(*current_task, "test.txt", UnlinkKind::NonDirectory, false);
+  ASSERT_TRUE(unlink_result.is_ok(), "failed to unlink test.text");
+
+  ASSERT_EQ(errno(ENOENT).error_code(),
+            current_task->open_file("/usr/bin/test.txt", OpenFlags(OpenFlagsEnum::RDWR))
+                .error_value()
+                .error_code());
+
+  ASSERT_EQ(errno(ENOENT).error_code(),
+            usr_bin->name_->unlink(*current_task, "test.txt", UnlinkKind::NonDirectory, false)
+                .error_value()
+                .error_code());
+
+  auto out = starnix::VecOutputBuffer::New(0);
+  auto read_result = txt->read(*current_task, &out);
+  ASSERT_TRUE(read_result.is_ok(), "failed to read");
+  ASSERT_EQ(0u, read_result.value());
+  std::destroy_at(std::addressof(txt));
+  ASSERT_EQ(errno(ENOENT).error_code(),
+            current_task->open_file("/usr/bin/test.txt", OpenFlags(OpenFlagsEnum::RDWR))
+                .error_value()
+                .error_code());
+  std::destroy_at(std::addressof(usr_bin));
+
+  auto usr = current_task->open_file("/usr", OpenFlags(OpenFlagsEnum::RDONLY));
+  ASSERT_TRUE(usr.is_ok(), "failed to open /usr");
+  ASSERT_EQ(errno(ENOENT).error_code(),
+            current_task->open_file("/usr/foo", OpenFlags(OpenFlagsEnum::RDONLY))
+                .error_value()
+                .error_code());
+
+  unlink_result = usr.value()->name_->unlink(*current_task, "bin", UnlinkKind::Directory, false);
+  ASSERT_TRUE(unlink_result.is_ok(), "failed to unlink /usr/bin");
 
   END_TEST;
 }
@@ -169,6 +242,6 @@ UNITTEST_START_TESTCASE(starnix_fs_tmpfs)
 UNITTEST("test tmpfs", unit_testing::test_tmpfs)
 UNITTEST("test write read", unit_testing::test_write_read)
 UNITTEST("test permissions", unit_testing::test_permissions)
-// UNITTEST("test persistence", unit_testing::test_persistence)
+UNITTEST("test persistence", unit_testing::test_persistence)
 UNITTEST("test data", unit_testing::test_data)
 UNITTEST_END_TESTCASE(starnix_fs_tmpfs, "starnix_fs_tmpfs", "Tests for starnix tempfs")

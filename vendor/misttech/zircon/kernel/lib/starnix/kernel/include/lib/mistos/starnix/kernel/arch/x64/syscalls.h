@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_SYSCALLS_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_SYSCALLS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_SYSCALLS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_SYSCALLS_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
@@ -53,6 +53,10 @@ fit::result<Errno, FdNumber> sys_dup2(const CurrentTask& current_task, FdNumber 
 
 fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task);
 
+fit::result<Errno> sys_link(const CurrentTask& current_task,
+                            starnix_uapi::UserCString old_user_path,
+                            starnix_uapi::UserCString new_user_path);
+
 fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
                                       starnix_uapi::UserCString user_path, uint32_t flags,
                                       starnix_uapi::FileMode mode);
@@ -61,13 +65,31 @@ fit::result<Errno, size_t> sys_readlink(const CurrentTask& current_task,
                                         starnix_uapi::UserCString user_path,
                                         starnix_uapi::UserAddress buffer, size_t buffer_size);
 
+fit::result<Errno> sys_rmdir(const CurrentTask& current_task, starnix_uapi::UserCString user_path);
+
+fit::result<Errno> sys_rename(const CurrentTask& current_task,
+                              starnix_uapi::UserCString old_user_path,
+                              starnix_uapi::UserCString new_user_path);
+
+fit::result<Errno> sys_renameat(const CurrentTask& current_task, FdNumber old_dir_fd,
+                                starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
+                                starnix_uapi::UserCString new_user_path);
+
 fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
                             starnix_uapi::UserRef<struct ::stat> buffer);
 
+// https://man7.org/linux/man-pages/man2/symlink.2.html
+fit::result<Errno> sys_symlink(const CurrentTask& current_task,
+                               starnix_uapi::UserCString user_target,
+                               starnix_uapi::UserCString user_path);
+
+fit::result<Errno, __kernel_time_t> sys_time(const CurrentTask& current_task,
+                                             starnix_uapi::UserRef<__kernel_time_t> time_addr);
+
+fit::result<Errno> sys_unlink(const CurrentTask& current_task, starnix_uapi::UserCString user_path);
+
 fit::result<Errno, pid_t> sys_vfork(CurrentTask& current_task);
-
-
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_SYSCALLS_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_SYSCALLS_H_

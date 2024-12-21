@@ -14,6 +14,8 @@
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
+#include <lib/mistos/starnix_syscalls/syscall_arg.h>
+#include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/starnix_sync/locks.h>
 
@@ -41,23 +43,101 @@ using FileSystemHandle = fbl::RefPtr<FileSystem>;
 using WeakFileHandle = mtl::WeakPtr<FileObject>;
 using starnix_uapi::OpenFlagsImpl;
 
-enum class SeekTargetType : uint8_t {
-  // Seek to the given offset relative to the start of the file.
-  Set,
-  // Seek to the given offset relative to the current position.
-  Cur,
-  // Seek to the given offset relative to the end of the file.
-  End,
-  // Seek for the first data after the given offset,
-  Data,
-  // Seek for the first hole after the given offset,
-  Hole,
+namespace internal {
+
+/// Seek to the given offset relative to the start of the file.
+struct Set {
+  off_t offset;
 };
 
-struct SeekTarget {
-  SeekTargetType type;
-
+// Seek to the given offset relative to the current position.
+struct Cur {
   off_t offset;
+};
+
+// Seek to the given offset relative to the end of the file.
+struct End {
+  off_t offset;
+};
+
+// Seek for the first data after the given offset,
+struct Data {
+  off_t offset;
+};
+
+// Seek for the first hole after the given offset,
+struct Hole {
+  off_t offset;
+};
+
+}  // namespace internal
+
+class SeekTarget {
+ public:
+  using Variant =
+      ktl::variant<internal::Set, internal::Cur, internal::End, internal::Data, internal::Hole>;
+
+  Variant variant_;
+
+  static SeekTarget Set(off_t offset) { return SeekTarget{internal::Set{offset}}; }
+  static SeekTarget Cur(off_t offset) { return SeekTarget{internal::Cur{offset}}; }
+  static SeekTarget End(off_t offset) { return SeekTarget{internal::End{offset}}; }
+  static SeekTarget Data(off_t offset) { return SeekTarget{internal::Data{offset}}; }
+  static SeekTarget Hole(off_t offset) { return SeekTarget{internal::Hole{offset}}; }
+
+  // impl SeekTarget
+
+  static fit::result<Errno, SeekTarget> from_raw(uint32_t whence, off_t offset) {
+    switch (whence) {
+      case SEEK_SET:
+        return fit::ok(Set(offset));
+      case SEEK_CUR:
+        return fit::ok(Cur(offset));
+      case SEEK_END:
+        return fit::ok(End(offset));
+      case SEEK_DATA:
+        return fit::ok(Data(offset));
+      case SEEK_HOLE:
+        return fit::ok(Hole(offset));
+      default:
+        return fit::error(errno(EINVAL));
+    }
+  }
+
+  uint32_t whence() const {
+    return ktl::visit(overloaded{
+                          [](const internal::Set&) { return SEEK_SET; },
+                          [](const internal::Cur&) { return SEEK_CUR; },
+                          [](const internal::End&) { return SEEK_END; },
+                          [](const internal::Data&) { return SEEK_DATA; },
+                          [](const internal::Hole&) { return SEEK_HOLE; },
+                      },
+                      variant_);
+  }
+
+  off_t offset() const {
+    return ktl::visit(overloaded{
+                          [](const internal::Set& s) { return s.offset; },
+                          [](const internal::Cur& c) { return c.offset; },
+                          [](const internal::End& e) { return e.offset; },
+                          [](const internal::Data& d) { return d.offset; },
+                          [](const internal::Hole& h) { return h.offset; },
+                      },
+                      variant_);
+  }
+
+  // Helpers from the reference documentation for std::visit<>, to allow
+  // visit-by-overload of the std::variant<> returned by GetLastReference():
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
+ private:
+  explicit SeekTarget(Variant variant) : variant_(variant) {}
 };
 
 struct FileObjectId {
@@ -203,11 +283,14 @@ class FileObject : public fbl::RefCounted<FileObject> {
                                        ProtectionFlags prot_flags, MappingOptionsFlags options,
                                        NamespaceNode filename) const;
 
+  fit::result<Errno, starnix_syscalls::SyscallResult> ioctl(const CurrentTask& current_task,
+                                                            uint32_t request,
+                                                            starnix_syscalls::SyscallArg arg) const;
   ~FileObject();
 
  private:
-  FileObject(WeakFileHandle weak_handle, FileObjectId id, ActiveNamespaceNode name, FileSystemHandle fs,
-             ktl::unique_ptr<FileOps> ops, OpenFlags flags);
+  FileObject(WeakFileHandle weak_handle, FileObjectId id, ActiveNamespaceNode name,
+             FileSystemHandle fs, ktl::unique_ptr<FileOps> ops, OpenFlags flags);
 
  public:
   mtl::WeakPtrFactory<FileObject> weak_factory_;
