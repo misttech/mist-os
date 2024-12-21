@@ -6,7 +6,8 @@ use fidl_fuchsia_hardware_sensors as driver_fidl;
 use fuchsia_component::client as fclient;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use sensors_lib::sensor_manager::{Playback, SensorManager};
+use sensors_lib::playback::Playback;
+use sensors_lib::sensor_manager::SensorManager;
 use sensors_lib::sensor_update_sender::*;
 use std::sync::Arc;
 

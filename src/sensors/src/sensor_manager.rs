@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::client::*;
+use crate::playback::*;
 use crate::sensor_update_sender::SensorUpdateSender;
 use crate::service_watcher::*;
 use crate::utils::*;
 use anyhow::{Context as _, Error};
-use fidl::endpoints::{Proxy, RequestStream};
-use fidl::AsHandleRef;
-use fidl_fuchsia_hardware_sensors::{self as driver_fidl, PlaybackSourceConfig};
+use fidl::endpoints::RequestStream;
+use fidl_fuchsia_hardware_sensors::{self as driver_fidl};
 use fidl_fuchsia_sensors::*;
 use fidl_fuchsia_sensors_types::*;
 use fuchsia_component::client as fclient;
@@ -31,18 +31,10 @@ pub struct SensorManager {
 
 #[derive(Debug, Clone)]
 pub struct Sensor {
-    driver: driver_fidl::DriverProxy,
-    info: SensorInfo,
+    pub(crate) driver: driver_fidl::DriverProxy,
+    pub(crate) info: SensorInfo,
     // A subset of SensorManager::clients.
     pub(crate) clients: HashSet<Client>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Playback {
-    driver_proxy: driver_fidl::DriverProxy,
-    playback_proxy: driver_fidl::PlaybackProxy,
-    playback_sensor_ids: Vec<SensorId>,
-    configured: bool,
 }
 
 enum IncomingRequest {
@@ -151,49 +143,19 @@ async fn handle_sensors_request(
 
                 match res {
                     Ok(Ok(())) => {
-                        // In a FixedValuesConfig, the list of sensors is known, so they can be
-                        // added directly to the map of sensors.
-                        //
-                        // In a FilePlaybackConfig, the playback_controller needs to read the list
-                        // of sensors from a file first, so the list needs to come from the proxy.
-                        if let PlaybackSourceConfig::FixedValuesConfig(val) = source_config {
-                            if let Some(sensor_list) = val.sensor_list {
-                                for sensor in sensor_list {
-                                    if is_sensor_valid(&sensor) {
-                                        let id = sensor.sensor_id.expect("sensor_id");
-                                        manager.sensors.insert(
-                                            id,
-                                            Sensor {
-                                                driver: playback.driver_proxy.clone(),
-                                                info: sensor,
-                                                clients: HashSet::new(),
-                                            },
-                                        );
-                                        playback.playback_sensor_ids.push(id);
-                                    }
-                                }
-                            }
-                        } else {
-                            if let Ok(sensors) = playback.driver_proxy.get_sensors_list().await {
-                                for sensor in sensors {
-                                    if is_sensor_valid(&sensor) {
-                                        let id = sensor.sensor_id.expect("sensor_id");
-                                        manager.sensors.insert(
-                                            id,
-                                            Sensor {
-                                                driver: playback.driver_proxy.clone(),
-                                                info: sensor,
-                                                clients: HashSet::new(),
-                                            },
-                                        );
+                        manager
+                            .sensors
+                            .extend(playback.get_sensors_from_config(source_config).await);
 
-                                        playback.playback_sensor_ids.push(id);
-                                    }
-                                }
-                            }
+                        // Don't add the playback driver proxy if playback was previously
+                        // configured.
+                        if !manager
+                            .driver_proxies
+                            .iter()
+                            .any(|x| playback.is_playback_driver_proxy(x))
+                        {
+                            manager.driver_proxies.push(playback.driver_proxy.clone());
                         }
-
-                        manager.driver_proxies.push(playback.driver_proxy.clone());
                         response = Ok(());
                     }
                     Err(e) => {
@@ -207,13 +169,8 @@ async fn handle_sensors_request(
 
                 if !response.is_ok() {
                     // Remove the playback driver proxy and its sensors.
-                    manager.driver_proxies.retain(|x| {
-                        x.as_channel().raw_handle()
-                            != playback.driver_proxy.as_channel().raw_handle()
-                    });
-                    for id in &playback.playback_sensor_ids {
-                        manager.sensors.remove(id);
-                    }
+                    manager.driver_proxies.retain(|x| !playback.is_playback_driver_proxy(&x));
+                    manager.sensors.retain(|id, _| !playback.playback_sensor_ids.contains(id));
                     playback.playback_sensor_ids.clear();
                 } else {
                     playback.configured = response.is_ok();
@@ -246,15 +203,6 @@ async fn handle_sensor_manager_request_stream(
             .expect("Error handling sensor request");
     }
     Ok(())
-}
-
-impl Playback {
-    pub fn new(
-        driver_proxy: driver_fidl::DriverProxy,
-        playback_proxy: driver_fidl::PlaybackProxy,
-    ) -> Self {
-        Self { driver_proxy, playback_proxy, playback_sensor_ids: Vec::new(), configured: false }
-    }
 }
 
 impl SensorManager {
@@ -350,46 +298,6 @@ impl SensorManager {
         .await;
 
         Err(anyhow::anyhow!("SensorManager completed unexpectedly."))
-    }
-}
-
-fn from_driver_playback_error(val: driver_fidl::ConfigurePlaybackError) -> ConfigurePlaybackError {
-    match val {
-        driver_fidl::ConfigurePlaybackError::InvalidConfigType => {
-            ConfigurePlaybackError::InvalidConfigType
-        }
-        driver_fidl::ConfigurePlaybackError::ConfigMissingFields => {
-            ConfigurePlaybackError::ConfigMissingFields
-        }
-        driver_fidl::ConfigurePlaybackError::DuplicateSensorInfo => {
-            ConfigurePlaybackError::DuplicateSensorInfo
-        }
-        driver_fidl::ConfigurePlaybackError::NoEventsForSensor => {
-            ConfigurePlaybackError::NoEventsForSensor
-        }
-        driver_fidl::ConfigurePlaybackError::EventFromUnknownSensor => {
-            ConfigurePlaybackError::EventFromUnknownSensor
-        }
-        driver_fidl::ConfigurePlaybackError::EventSensorTypeMismatch => {
-            ConfigurePlaybackError::EventSensorTypeMismatch
-        }
-        driver_fidl::ConfigurePlaybackError::EventPayloadTypeMismatch => {
-            ConfigurePlaybackError::EventPayloadTypeMismatch
-        }
-        driver_fidl::ConfigurePlaybackError::FileOpenFailed => {
-            ConfigurePlaybackError::FileOpenFailed
-        }
-        driver_fidl::ConfigurePlaybackError::FileParseError => {
-            ConfigurePlaybackError::FileParseError
-        }
-        driver_fidl::ConfigurePlaybackError::__SourceBreaking { unknown_ordinal } => {
-            // This should be unreachable because playback is subpackaged with the sensor manager.
-            tracing::error!(
-                "Received unknown error from Sensor Playback with ordinal: {:#?}",
-                unknown_ordinal
-            );
-            ConfigurePlaybackError::PlaybackUnavailable
-        }
     }
 }
 

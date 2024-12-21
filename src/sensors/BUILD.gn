@@ -22,6 +22,7 @@ rustc_library("lib") {
   sources = [
     "src/client.rs",
     "src/lib.rs",
+    "src/playback.rs",
     "src/sensor_manager.rs",
     "src/sensor_update_sender.rs",
     "src/service_watcher.rs",
