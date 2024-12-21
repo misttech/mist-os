@@ -3,6 +3,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/mistos/starnix/kernel/signals/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
@@ -10,7 +11,6 @@
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/testing/unittest.h>
-#include <lib/mistos/memory/weak_ptr.h>
 #include <lib/unittest/unittest.h>
 #include <zircon/assert.h>
 
