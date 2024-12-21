@@ -89,7 +89,7 @@ pub async fn get_bootloader_type() -> Result<BootloaderType, Error> {
     let (status, bootloader) =
         proxy.get_bootloader_vendor().await.context("Getting bootloader vendor")?;
     if let Some(bootloader) = bootloader {
-        tracing::info!("Bootloader vendor = {}", bootloader);
+        log::info!("Bootloader vendor = {}", bootloader);
         if bootloader == "coreboot" {
             Ok(BootloaderType::Coreboot)
         } else {
@@ -143,7 +143,7 @@ where
     F: Send + Sync + Fn(String),
 {
     if installation_paths.install_target.is_some() {
-        tracing::warn!("Ignoring install target; this will be removed in the future.");
+        log::warn!("Ignoring install target; this will be removed in the future.");
     }
     let install_source =
         installation_paths.install_source.ok_or_else(|| anyhow!("No installation source?"))?;
@@ -151,11 +151,11 @@ where
 
     let (paver, data_sink) = paver_connect().context("Could not contact paver")?;
 
-    tracing::info!("Initializing Fuchsia partition tables...");
+    log::info!("Initializing Fuchsia partition tables...");
     progress_callback(String::from("Initializing Fuchsia partition tables..."));
     data_sink.initialize_partition_tables().await?;
 
-    tracing::info!("Getting source partitions");
+    log::info!("Getting source partitions");
     progress_callback(String::from("Getting source partitions"));
     let to_install = Partition::get_partitions(
         &install_source,
@@ -193,10 +193,10 @@ where
             )));
         };
 
-        tracing::info!("Paving partition: {:?}", part);
+        log::info!("Paving partition: {:?}", part);
         part.pave(&data_sink, &pave_progress_callback).await?;
         if part.is_ab() {
-            tracing::info!("Paving partition: {:?} [-B]", part);
+            log::info!("Paving partition: {:?} [-B]", part);
             part.pave_b(&data_sink).await?
         }
 

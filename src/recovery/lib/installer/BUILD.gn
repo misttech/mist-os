@@ -24,8 +24,8 @@ rustc_library("installer") {
     "//src/sys/lib/payload_streamer",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:regex",
-    "//third_party/rust_crates:tracing",
   ]
   test_deps = [ "//src/lib/fuchsia-async" ]
   sources = [

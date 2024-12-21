@@ -546,7 +546,7 @@ async fn get_installation_paths(app_sender: AppSender, view_key: ViewKey) -> Res
 async fn setup_installation_paths(app_sender: AppSender, view_key: ViewKey) {
     match get_installation_paths(app_sender.clone(), view_key).await {
         Ok(_install_source) => {
-            tracing::info!("Found installer & block devices ");
+            log::info!("Found installer & block devices ");
         }
         Err(e) => {
             // Send error
@@ -554,7 +554,7 @@ async fn setup_installation_paths(app_sender: AppSender, view_key: ViewKey) {
                 MessageTarget::View(view_key),
                 make_message(InstallerMessages::Error(e.to_string())),
             );
-            tracing::info!("ERROR getting install target: {}", e);
+            log::info!("ERROR getting install target: {}", e);
         }
     };
 }
@@ -579,7 +579,7 @@ async fn fuchsia_install(
             );
         }
         Err(e) => {
-            tracing::error!("Error while installing: {:#}", e);
+            log::error!("Error while installing: {:#}", e);
             app_sender.queue_message(
                 MessageTarget::View(view_key),
                 make_message(InstallerMessages::Error(e.to_string())),
@@ -615,7 +615,7 @@ async fn check_is_interactive() -> Result<bool, Error> {
         .context("Connecting to boot arguments service")?;
     let automated =
         proxy.get_bool("installer.non-interactive", false).await.context("Getting bool")?;
-    tracing::info!(
+    log::info!(
         "workstation installer: {}doing automated install.",
         if automated { "" } else { "not " }
     );
@@ -661,7 +661,7 @@ async fn wait_for_install_disk() -> Result<(), Error> {
 
 #[fuchsia::main]
 fn main() -> Result<(), Error> {
-    tracing::info!("workstation installer: started.");
+    log::info!("workstation installer: started.");
 
     // Before we give control to carnelian, wait until a display driver is bound.
     let (display_result, interactive_result) = fuchsia_async::LocalExecutor::new()
@@ -679,7 +679,7 @@ fn main() -> Result<(), Error> {
         90 => DisplayRotation::Deg270,
         270 => DisplayRotation::Deg90,
         val => {
-            tracing::error!("Invalid display_rotation {}, defaulting to 0 degrees", val);
+            log::error!("Invalid display_rotation {}, defaulting to 0 degrees", val);
             DisplayRotation::Deg0
         }
     };

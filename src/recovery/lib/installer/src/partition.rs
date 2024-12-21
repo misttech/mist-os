@@ -249,7 +249,7 @@ impl Partition {
                 let secs = nanos / NS_PER_S;
                 let rate = ((data_read as f64) / (secs as f64)) / (1024 as f64);
 
-                tracing::info!("Paving FVM: {}% ({:.02} KiB/s)", percent, rate);
+                log::info!("Paving FVM: {}% ({:.02} KiB/s)", percent, rate);
                 *prev = percent;
             }
         };
