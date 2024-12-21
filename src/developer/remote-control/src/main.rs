@@ -9,11 +9,11 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc::unbounded;
 use futures::join;
 use futures::prelude::*;
+use log::{debug, error, info};
 use remote_control::{ConnectionRequest, RemoteControlService};
 use remote_control_config::Config;
 use std::rc::Rc;
 use std::sync::Arc;
-use tracing::{debug, error, info};
 use {fidl_fuchsia_developer_remotecontrol as rcs, fuchsia_async as fasync};
 
 mod fdomain;
@@ -45,7 +45,7 @@ async fn exec_server(config: &Config) -> Result<(), Error> {
                         ),
                         errors
                             .map(|e| {
-                                tracing::warn!("A client circuit stream failed: {e:?}");
+                                log::warn!("A client circuit stream failed: {e:?}");
                             })
                             .collect::<()>(),
                     )
@@ -121,7 +121,7 @@ async fn exec_server(config: &Config) -> Result<(), Error> {
 async fn main() -> Result<(), Error> {
     let config = Config::take_from_startup_handle();
     if let Err(err) = exec_server(&config).await {
-        error!(%err, "Error executing server");
+        error!(err:%; "Error executing server");
     }
     Ok(())
 }

@@ -9,11 +9,11 @@ use component_debug::lifecycle::*;
 use fidl::endpoints::ServerEnd;
 use fuchsia_component::client::connect_to_protocol_at_path;
 use futures::prelude::*;
+use log::*;
 use moniker::Moniker;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
-use tracing::*;
 use {
     fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_developer_remotecontrol_connector as connector,
@@ -104,13 +104,13 @@ impl RemoteControlService {
             }
             rcs::RemoteControlRequest::LogMessage { tag, message, severity, responder } => {
                 match severity {
-                    diagnostics::Severity::Trace => trace!(%tag, "{}", message),
-                    diagnostics::Severity::Debug => debug!(%tag, "{}", message),
-                    diagnostics::Severity::Info => info!(%tag, "{}", message),
-                    diagnostics::Severity::Warn => warn!(%tag, "{}", message),
-                    diagnostics::Severity::Error => error!(%tag, "{}", message),
+                    diagnostics::Severity::Trace => trace!(tag:%; "{}", message),
+                    diagnostics::Severity::Debug => debug!(tag:%; "{}", message),
+                    diagnostics::Severity::Info => info!(tag:%; "{}", message),
+                    diagnostics::Severity::Warn => warn!(tag:%; "{}", message),
+                    diagnostics::Severity::Error => error!(tag:%; "{}", message),
                     // Tracing crate doesn't have a Fatal level, just log an error with a FATAL message embedded.
-                    diagnostics::Severity::Fatal => error!(%tag, "<FATAL> {}", message),
+                    diagnostics::Severity::Fatal => error!(tag:%; "<FATAL> {}", message),
                 }
                 responder.send()?;
                 Ok(())
@@ -206,7 +206,7 @@ impl RemoteControlService {
         let identifier = match (self.id_allocator)() {
             Ok(i) => i,
             Err(e) => {
-                error!(%e, "Allocating host identifier");
+                error!(e:%; "Allocating host identifier");
                 return responder
                     .send(Err(rcs::IdentifyHostError::ProxyConnectionFailed))
                     .context("responding to client");
@@ -254,7 +254,7 @@ impl RemoteControlService {
             "/svc/fuchsia.sys2.LifecycleController.root",
         )
         .map_err(|err| {
-            error!(%err, "could not connect to lifecycle controller");
+            error!(err:%; "could not connect to lifecycle controller");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })?;
 
@@ -263,7 +263,7 @@ impl RemoteControlService {
             "/svc/fuchsia.sys2.RealmQuery.root",
         )
         .map_err(|err| {
-            error!(%err, "could not connect to realm query");
+            error!(err:%; "could not connect to realm query");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })?;
 
@@ -289,7 +289,7 @@ impl RemoteControlService {
             "/svc/fuchsia.sys2.LifecycleController.root",
         )
         .map_err(|err| {
-            error!(%err, "could not connect to lifecycle controller");
+            error!(err:%; "could not connect to lifecycle controller");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })?;
 
@@ -298,7 +298,7 @@ impl RemoteControlService {
             "/svc/fuchsia.sys2.RealmQuery.root",
         )
         .map_err(|err| {
-            error!(%err, "could not connect to realm query");
+            error!(err:%; "could not connect to realm query");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })?;
 
@@ -328,14 +328,14 @@ impl RemoteControlService {
             &query,
         )
         .map_err(|err| {
-            error!(?err, "error opening exposed dir");
+            error!(err:?; "error opening exposed dir");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })
         .await?;
 
         dir.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "svc", server_end.into())
             .map_err(|err| {
-                error!(?err, "error opening svc dir in toolbox");
+                error!(err:?; "error opening svc dir in toolbox");
                 rcs::ConnectCapabilityError::CapabilityConnectFailed
             })?;
         Ok(())
@@ -359,7 +359,7 @@ async fn connect_to_capability_at_moniker(
                 rcs::ConnectCapabilityError::NoMatchingComponent
             }
             err => {
-                error!(?err, "error resolving component");
+                error!(err:?; "error resolving component");
                 rcs::ConnectCapabilityError::CapabilityConnectFailed
             }
         })
@@ -367,7 +367,7 @@ async fn connect_to_capability_at_moniker(
 
     let dir = open_instance_dir_root_readable(&moniker, capability_set.into(), &query)
         .map_err(|err| {
-            error!(?err, "error opening exposed dir");
+            error!(err:?; "error opening exposed dir");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })
         .await?;
@@ -391,7 +391,7 @@ async fn connect_to_capability_in_dir(
         ServerEnd::new(server_end),
     )
     .map_err(|err| {
-        error!(%err, "error opening capability from exposed dir");
+        error!(err:%; "error opening capability from exposed dir");
         rcs::ConnectCapabilityError::CapabilityConnectFailed
     })
 }

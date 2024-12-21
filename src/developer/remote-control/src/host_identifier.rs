@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::{Context as _, Result};
+use log::*;
 use std::collections::HashMap;
-use tracing::*;
 use {
     fidl_fuchsia_buildinfo as buildinfo, fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_device as fdevice, fidl_fuchsia_hwinfo as hwinfo,
@@ -84,7 +84,7 @@ impl Identifier for HostIdentifier {
                 fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
             )
             .map_err(|e| {
-                error!(%e, "Getting interface watcher failed");
+                error!(e:%; "Getting interface watcher failed");
                 rcs::IdentifyHostError::ListInterfacesFailed
             })?;
         let ilist = fnet_interfaces_ext::existing(
@@ -93,7 +93,7 @@ impl Identifier for HostIdentifier {
         )
         .await
         .map_err(|e| {
-            error!(%e, "Getting existing interfaces failed");
+            error!(e:%; "Getting existing interfaces failed");
             rcs::IdentifyHostError::ListInterfacesFailed
         })?;
 
@@ -102,14 +102,14 @@ impl Identifier for HostIdentifier {
                 Ok(Ok(serial)) => break 'serial Some(serial),
                 Ok(Err(status)) => {
                     let status = zx::Status::from_raw(status);
-                    warn!(%status, "Failed to get serial from SysInfo")
+                    warn!(status:%; "Failed to get serial from SysInfo")
                 }
-                Err(err) => error!(%err, "SysInfoProxy internal err"),
+                Err(err) => error!(err:%; "SysInfoProxy internal err"),
             }
 
             match self.device_info_proxy.get_info().await {
                 Ok(info) => break 'serial info.serial_number,
-                Err(err) => error!(%err, "DeviceProxy internal err"),
+                Err(err) => error!(err:%; "DeviceProxy internal err"),
             }
 
             None
@@ -119,7 +119,7 @@ impl Identifier for HostIdentifier {
             .build_info_proxy
             .get_build_info()
             .await
-            .map_err(|e| error!(%e, "buildinfo::ProviderProxy internal err"))
+            .map_err(|e| error!(e:%; "buildinfo::ProviderProxy internal err"))
             .ok()
             .and_then(|i| Some((i.product_config, i.board_config)))
             .unwrap_or((None, None));
@@ -146,12 +146,12 @@ impl Identifier for HostIdentifier {
             Ok(result) => match result {
                 Ok(name) => Some(name),
                 Err(err) => {
-                    error!(%err, "NameProvider internal error");
+                    error!(err:%; "NameProvider internal error");
                     return Err(rcs::IdentifyHostError::GetDeviceNameFailed);
                 }
             },
             Err(err) => {
-                error!(%err, "Getting nodename failed");
+                error!(err:%; "Getting nodename failed");
                 return Err(rcs::IdentifyHostError::GetDeviceNameFailed);
             }
         };

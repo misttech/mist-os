@@ -6,12 +6,12 @@ use fdomain_container::wire::FDomainCodec;
 use fdomain_container::FDomain;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::StreamExt;
+use log::{debug, error};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::pin::pin;
 use std::rc::Weak;
 use std::task::{Context, Poll};
-use tracing::{debug, error};
 
 /// Returns a sender that you can send fio::Directory server ends to, and they
 /// will have the toolbox namespace served on them.
@@ -30,7 +30,7 @@ fn serve_toolboxes(
             };
 
             if let Err(err) = rcs.open_toolboox(server_end.into_channel()).await {
-                error!(?err, "Could not open toolbox for client");
+                error!(err:?; "Could not open toolbox for client");
             }
         }
 
@@ -72,7 +72,7 @@ fn poll_process_out_queue(
             }
             Poll::Ready(Err(err)) => {
                 if err != fidl::Status::PEER_CLOSED {
-                    error!(error = ?err, "FDomain socket write error");
+                    error!(error:? = err; "FDomain socket write error");
                 } else {
                     debug!("FDomain connection closed");
                 }
@@ -89,7 +89,7 @@ pub async fn serve_fdomain_connection(
     rcs: Weak<remote_control::RemoteControlService>,
     socket: fuchsia_async::Socket,
 ) {
-    tracing::debug!("Spawned new FDomain connection");
+    log::debug!("Spawned new FDomain connection");
 
     let (toolbox_server_sender, toolbox_task) = serve_toolboxes(rcs);
     let mut toolbox_task = pin!(toolbox_task);
@@ -131,7 +131,7 @@ pub async fn serve_fdomain_connection(
                     out_queue.extend(outgoing.iter().copied());
                 }
                 Err(err) => {
-                    error!(?err, "FDomain encountered an internal error");
+                    error!(err:?; "FDomain encountered an internal error");
                     return Poll::Ready(());
                 }
             }
@@ -186,7 +186,7 @@ pub async fn serve_fdomain_connection(
             Ok(n) => n,
             Err(err) => {
                 if err != fidl::Status::PEER_CLOSED {
-                    error!(error = ?err, "FDomain socket read error")
+                    error!(error:? = err; "FDomain socket read error")
                 } else {
                     debug!("FDomain connection closed");
                 }
@@ -214,7 +214,7 @@ pub async fn serve_fdomain_connection(
             let data = &head[4..][..len];
 
             if let Err(err) = codec.message(data) {
-                error!(?err, "FDomain could not interpret an incoming message");
+                error!(err:?; "FDomain could not interpret an incoming message");
                 return Poll::Ready(());
             }
 
