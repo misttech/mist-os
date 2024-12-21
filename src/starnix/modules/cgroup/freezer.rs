@@ -40,7 +40,7 @@ impl FreezerFile {
 }
 
 impl BytesFileOps for FreezerFile {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+    fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let state_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
         let state = match state_str.trim() {
             "1" => FreezerState::Frozen,
@@ -50,7 +50,7 @@ impl BytesFileOps for FreezerFile {
         let cgroup = self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))?;
         match state {
             FreezerState::Frozen => {
-                cgroup.freeze(current_task)?;
+                cgroup.freeze()?;
             }
             FreezerState::Thawed => {
                 cgroup.thaw();
