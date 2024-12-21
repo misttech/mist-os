@@ -116,6 +116,19 @@ fit::result<Errno> sys_rmdir(const CurrentTask& current_task, starnix_uapi::User
   return sys_unlinkat(current_task, FdNumber::AT_FDCWD_, user_path, AT_REMOVEDIR);
 }
 
+fit::result<Errno> sys_rename(const CurrentTask& current_task,
+                              starnix_uapi::UserCString old_user_path,
+                              starnix_uapi::UserCString new_user_path) {
+  return sys_renameat2(current_task, FdNumber::AT_FDCWD_, old_user_path, FdNumber::AT_FDCWD_,
+                       new_user_path, 0);
+}
+
+fit::result<Errno> sys_renameat(const CurrentTask& current_task, FdNumber old_dir_fd,
+                                starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
+                                starnix_uapi::UserCString new_user_path) {
+  return sys_renameat2(current_task, old_dir_fd, old_user_path, new_dir_fd, new_user_path, 0);
+}
+
 fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
                             starnix_uapi::UserRef<struct ::stat> buffer) {
   // TODO(https://fxbug.dev/42172993): Add the `AT_NO_AUTOMOUNT` flag once it is supported in

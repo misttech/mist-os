@@ -67,6 +67,14 @@ fit::result<Errno, size_t> sys_readlink(const CurrentTask& current_task,
 
 fit::result<Errno> sys_rmdir(const CurrentTask& current_task, starnix_uapi::UserCString user_path);
 
+fit::result<Errno> sys_rename(const CurrentTask& current_task,
+                              starnix_uapi::UserCString old_user_path,
+                              starnix_uapi::UserCString new_user_path);
+
+fit::result<Errno> sys_renameat(const CurrentTask& current_task, FdNumber old_dir_fd,
+                                starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
+                                starnix_uapi::UserCString new_user_path);
+
 fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
                             starnix_uapi::UserRef<struct ::stat> buffer);
 
