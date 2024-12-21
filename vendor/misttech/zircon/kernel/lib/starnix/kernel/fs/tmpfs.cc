@@ -57,7 +57,7 @@ class TmpfsSpecialNode : public FsNodeOps {
   fit::result<Errno, ktl::unique_ptr<FileOps>> create_file_ops(const FsNode& node,
                                                                const CurrentTask& current_task,
                                                                OpenFlags flags) const final {
-    panic("Special nodes cannot be opened.\n");
+    PANIC("Special nodes cannot be opened.\n");
   }
 
  private:
