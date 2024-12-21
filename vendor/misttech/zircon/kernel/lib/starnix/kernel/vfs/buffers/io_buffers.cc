@@ -56,11 +56,13 @@ fit::result<Errno, fbl::Vector<uint8_t>> InputBuffer::peek_all() {
 }
 
 VecInputBuffer VecInputBuffer::New(const ktl::span<const uint8_t>& data) {
-  fbl::AllocChecker ac;
   fbl::Vector<uint8_t> buffer;
-  buffer.resize(data.size(), &ac);
-  ASSERT(ac.check());
-  memcpy(buffer.data(), data.data(), data.size());
+  if (data.size() > 0) {
+    fbl::AllocChecker ac;
+    buffer.resize(data.size(), &ac);
+    ASSERT(ac.check());
+    memcpy(buffer.data(), data.data(), data.size());
+  }
   return VecInputBuffer(ktl::move(buffer));
 }
 
