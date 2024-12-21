@@ -25,6 +25,7 @@ enum class ExceptionReason {
   kPageFaultIoDataIntegrity,
   kPageFaultBadState,
   kPageFaultNoMemory,
+  kPageFaultTimedOut,
   kArm64UnknownException,
 };
 

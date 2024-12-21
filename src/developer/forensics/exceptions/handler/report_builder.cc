@@ -204,6 +204,9 @@ fuchsia::feedback::CrashReport CrashReportBuilder::Consume() {
       case ExceptionReason::kPageFaultNoMemory:
         crash_report.set_crash_signature("fuchsia-page_fault-no_memory");
         break;
+      case ExceptionReason::kPageFaultTimedOut:
+        crash_report.set_crash_signature("fuchsia-page_fault-timed_out");
+        break;
       case ExceptionReason::kArm64UnknownException:
         crash_report.set_crash_signature("fuchsia-arm64-unknown-exception");
         break;
