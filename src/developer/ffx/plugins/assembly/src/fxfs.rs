@@ -85,7 +85,6 @@ mod tests {
     use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
-    use utf8_path::path_relative_from_current_dir;
 
     // Generates a package manifest to be used for testing. The file is written
     // into `dir`, and the location is returned. The `name` is used in the blob
@@ -163,10 +162,6 @@ mod tests {
             &product_config,
         )
         .unwrap();
-        assert_eq!(
-            base_package.path,
-            path_relative_from_current_dir(dir.join("base/meta.far")).unwrap()
-        );
 
         let size_byteses = vec![None, Some(32 * 1024 * 1024)];
         for size_bytes in size_byteses {

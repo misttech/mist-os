@@ -5,29 +5,15 @@
 use anyhow::{Context, Result};
 use assembly_manifest::{AssemblyManifest, PackagesMetadata};
 use assembly_subpackage_blobs_package::SubpackageBlobsPackageBuilder;
-use camino::{Utf8Path, Utf8PathBuf};
-use fuchsia_merkle::{Hash, MerkleTree};
+use camino::Utf8Path;
+use fuchsia_merkle::MerkleTree;
 use fuchsia_pkg::PackageManifest;
-use std::collections::BTreeMap;
 use std::fs::File;
 use tracing::info;
-use utf8_path::path_relative_from_current_dir;
 
 #[derive(Debug)]
 pub struct SubpackageBlobsPackage {
-    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub merkle: Hash,
-    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub contents: BTreeMap<Utf8PathBuf, Utf8PathBuf>,
-    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub path: Utf8PathBuf,
     pub manifest: PackageManifest,
-    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub manifest_path: Utf8PathBuf,
 }
 
 pub fn construct_subpackage_blobs_package(
@@ -66,16 +52,7 @@ pub fn construct_subpackage_blobs_package(
         .root();
     info!("SubpackageBlobs merkle: {}", &subpackage_blobs_merkle);
 
-    let subpackage_blobs_package_path_relative =
-        path_relative_from_current_dir(subpackage_blobs_package_path)?;
-
-    Ok(SubpackageBlobsPackage {
-        merkle: subpackage_blobs_merkle,
-        contents: build_results.contents,
-        path: subpackage_blobs_package_path_relative,
-        manifest: build_results.manifest,
-        manifest_path: build_results.manifest_path,
-    })
+    Ok(SubpackageBlobsPackage { manifest: build_results.manifest })
 }
 
 #[cfg(test)]
@@ -83,11 +60,13 @@ mod tests {
     use super::*;
 
     use assembly_manifest::{BlobfsContents, Image};
+    use camino::Utf8PathBuf;
     use fuchsia_archive::Utf8Reader;
     use fuchsia_pkg::PackageBuilder;
     use pretty_assertions::assert_eq;
     use std::collections::{BTreeSet, HashMap};
     use tempfile::tempdir;
+    use utf8_path::path_relative_from_current_dir;
 
     fn create_package(
         root: &Utf8Path,
@@ -159,14 +138,11 @@ mod tests {
         };
 
         // Construct the subpackage blobs package.
-        let subpackage_blobs_package =
-            construct_subpackage_blobs_package(&assembly_manifest, dir, dir, "subpackage_blobs")
-                .unwrap();
+        construct_subpackage_blobs_package(&assembly_manifest, dir, dir, "subpackage_blobs")
+            .unwrap();
 
-        assert_eq!(
-            subpackage_blobs_package.path,
-            path_relative_from_current_dir(dir.join("subpackage_blobs/meta.far")).unwrap()
-        );
+        let subpackage_blobs_package_path =
+            path_relative_from_current_dir(dir.join("subpackage_blobs/meta.far")).unwrap();
 
         // Collect all the expected subpackage merkles from the subpackages.
         let expected_merkles = base_child_manifest
@@ -177,7 +153,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         // Read the base package, and assert the contents are correct.
-        let subpackage_blobs_package_file = File::open(subpackage_blobs_package.path).unwrap();
+        let subpackage_blobs_package_file = File::open(subpackage_blobs_package_path).unwrap();
         let mut far_reader = Utf8Reader::new(&subpackage_blobs_package_file).unwrap();
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
