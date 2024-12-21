@@ -5,7 +5,7 @@
 use assert_matches::assert_matches;
 use fidl_fidl_examples_routing_echo::EchoMarker;
 use fuchsia_component::client;
-use tracing::*;
+use log::*;
 
 #[fuchsia::test]
 async fn use_runtime_populated_dictionary() {

@@ -9,7 +9,7 @@ use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
     fuchsia_async as fasync,

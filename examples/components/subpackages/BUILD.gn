@@ -20,7 +20,7 @@ rustc_test("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test:lib",
     "//src/sys/lib/component-events",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]

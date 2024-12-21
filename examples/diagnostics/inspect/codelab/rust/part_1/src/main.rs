@@ -8,7 +8,7 @@ use {
     fidl_fuchsia_examples_inspect::FizzBuzzMarker,
     fuchsia_component::{client, server::ServiceFs},
     futures::{future::try_join, FutureExt, StreamExt},
-    tracing::info,
+    log::info,
     // CODELAB: Use inspect.
 };
 
@@ -41,7 +41,7 @@ async fn main() -> Result<(), Error> {
         let fizzbuzz = client::connect_to_protocol::<FizzBuzzMarker>()
             .context("failed to connect to fizzbuzz")?;
         match fizzbuzz.execute(30u32).await {
-            Ok(result) => info!(%result, "Got FizzBuzz"),
+            Ok(result) => info!(result:%; "Got FizzBuzz"),
             Err(_) => {}
         };
         Ok(())

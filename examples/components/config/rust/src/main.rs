@@ -5,7 +5,7 @@
 // [START imports]
 use example_config::Config;
 // [END imports]
-use tracing::info;
+use log::info;
 
 #[fuchsia::main]
 async fn main() {

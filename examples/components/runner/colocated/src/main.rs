@@ -19,7 +19,7 @@ use {
     fidl_fuchsia_memory_attribution as fattribution, fuchsia_async as fasync,
 };
 
-use tracing::{info, warn};
+use log::{info, warn};
 use zx::{HandleBased, Koid};
 
 mod program;

@@ -32,7 +32,7 @@ rustc_binary("power_config_client_bin") {
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 
@@ -60,8 +60,8 @@ rustc_test("power_config_client_integration_test") {
     "//src/lib/fuchsia-component-test",
     "//src/sys/lib/cm_rust",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:tracing",
   ]
 }
 

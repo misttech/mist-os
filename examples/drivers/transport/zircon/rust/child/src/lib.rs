@@ -4,7 +4,7 @@
 
 use fdf_component::{driver_register, Driver, DriverContext, Node, NodeBuilder};
 use fidl_fuchsia_hardware_i2c as i2c;
-use tracing::{error, info};
+use log::{error, info};
 use zx::Status;
 
 /// The implementation of our driver will live in this object, which implements [`Driver`].

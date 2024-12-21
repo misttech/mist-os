@@ -9,9 +9,9 @@ use fidl_fuchsia_process::HandleInfo;
 use fuchsia_runtime::HandleType;
 use futures::future::{BoxFuture, FutureExt};
 use futures::TryStreamExt;
+use log::warn;
 use runner::component::{Controllable, StopInfo};
 use std::sync::Arc;
-use tracing::warn;
 use zx::{AsHandleRef, Koid};
 use {fidl_fuchsia_examples_colocated as fcolocated, fuchsia_async as fasync};
 

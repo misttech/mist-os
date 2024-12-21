@@ -55,7 +55,7 @@ async fn create_realm(suspend_enabled: bool) -> Result<RealmInstance> {
 async fn test_config_user(suspend_enabled: bool) {
     let realm = create_realm(suspend_enabled).await.expect("Failed to create realm");
 
-    tracing::info!("Connecting to user protocol");
+    log::info!("Connecting to user protocol");
     let proxy = realm
         .root
         .connect_to_protocol_at_exposed_dir::<ConfigUserMarker>()

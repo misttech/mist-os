@@ -4,7 +4,7 @@
 
 use fidl_fidl_examples_routing_echo::EchoMarker;
 use fuchsia_component::client;
-use tracing::info;
+use log::info;
 
 // [START imports]
 use fidl_fuchsia_component::{BinderMarker, CreateChildArgs, RealmMarker};

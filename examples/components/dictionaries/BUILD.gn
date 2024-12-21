@@ -22,7 +22,7 @@ rustc_test("bin") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]
@@ -41,7 +41,7 @@ rustc_binary("provider_bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/sandbox",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   source_root = "provider/src/main.rs"

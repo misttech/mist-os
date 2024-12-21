@@ -5,7 +5,7 @@
 use fdf_component::{driver_register, Driver, DriverContext, Node, NodeBuilder};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_driver_framework::NodeMarker;
-use tracing::info;
+use log::info;
 use zx::Status;
 
 /// The implementation of our driver will live in this object, which implements [`Driver`].

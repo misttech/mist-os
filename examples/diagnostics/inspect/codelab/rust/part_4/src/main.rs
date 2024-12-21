@@ -10,7 +10,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use futures::{FutureExt, StreamExt};
-use tracing::info;
+use log::info;
 
 mod reverser;
 
@@ -49,7 +49,7 @@ async fn main() -> Result<(), Error> {
     match fizzbuzz.execute(30u32).await {
         Ok(result) => {
             component::health().set_ok();
-            info!(%result, "Got FizzBuzz");
+            info!(result:%; "Got FizzBuzz");
         }
         Err(_) => {
             component::health().set_unhealthy("FizzBuzz connection closed");

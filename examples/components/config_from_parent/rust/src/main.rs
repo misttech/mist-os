@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use example_config::Config;
-use tracing::info;
+use log::info;
 
 #[fuchsia::main]
 async fn main() {
