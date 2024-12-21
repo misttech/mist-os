@@ -46,9 +46,9 @@ rustc_library("stream_processor_test_lib") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [
@@ -321,7 +321,7 @@ rustc_library("audio_roundtrip_test_lib") {
     ":stream_processor_encoder_factory_lib",
     ":stream_processor_test_lib",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]
@@ -530,7 +530,7 @@ rustc_test("h265_encoder_test_bin") {
     "//src/lib/fuchsia-image-format",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [

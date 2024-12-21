@@ -9,12 +9,12 @@ use fidl_fuchsia_media::{FormatDetails, StreamOutputFormat};
 use fidl_table_validation::*;
 use fuchsia_stream_processors::*;
 use hex::{decode, encode};
+use log::info;
 use mundane::hash::{Digest, Hasher, Sha256};
 use num_traits::PrimInt;
 use std::fmt;
 use std::io::Write;
 use std::rc::Rc;
-use tracing::info;
 
 #[derive(ValidFidlTable, Debug, PartialEq)]
 #[fidl_table_src(StreamOutputFormat)]

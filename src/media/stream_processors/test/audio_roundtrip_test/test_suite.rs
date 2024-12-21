@@ -6,11 +6,11 @@
 
 use audio_encoder_test_lib::pcm_audio::*;
 use fidl_fuchsia_media::*;
+use log::info;
 use std::rc::Rc;
 use stream_processor_decoder_factory::*;
 use stream_processor_encoder_factory::*;
 use stream_processor_test::*;
-use tracing::info;
 
 #[derive(Clone, Debug)]
 pub struct EncoderStream {

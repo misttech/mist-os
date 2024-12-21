@@ -25,7 +25,7 @@ use crate::default::DefaultConfigurator;
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), anyhow::Error> {
     component::health().set_ok();
-    tracing::trace!("Initialized.");
+    log::trace!("Initialized.");
     let codec_proxy =
         fuchsia_fs::directory::open_in_namespace("/dev/class/codec", fuchsia_fs::Flags::empty())?;
     let dai_proxy =
@@ -37,11 +37,11 @@ async fn main() -> Result<(), anyhow::Error> {
     let dai_future = discover::find_dais(&dai_proxy, 0, configurator);
     match futures::try_join!(codec_future, dai_future) {
         Ok(value) => {
-            tracing::error!("Find devices returned: {:?}", value);
+            log::error!("Find devices returned: {:?}", value);
             return Err(anyhow!("Find devices returned: {:?}", value));
         }
         Err(e) => {
-            tracing::error!("Find devices error: {:?}", e);
+            log::error!("Find devices error: {:?}", e);
             return Err(e);
         }
     };

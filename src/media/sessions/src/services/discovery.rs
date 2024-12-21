@@ -20,9 +20,9 @@ use futures::future::BoxFuture;
 use futures::prelude::*;
 use futures::stream::Once;
 use futures::StreamExt;
+use log::{info, warn};
 use std::collections::{HashMap, HashSet};
 use std::ops::RangeFrom;
-use tracing::{info, warn};
 
 const LOG_TAG: &str = "discovery";
 
@@ -99,7 +99,7 @@ impl Discovery {
         }))
         .filter_map(move |(id, event)| {
             if id != session_id {
-                warn!(tag = LOG_TAG, "Watcher did not filter sessions by id");
+                warn!(tag = LOG_TAG; "Watcher did not filter sessions by id");
                 future::ready(None)
             } else {
                 match event {
@@ -193,7 +193,7 @@ impl Discovery {
             if let Some(usage) = usage {
                 if let Err(e) = self.interrupter.watch_usage(usage).await {
                     warn!(
-                        tag = LOG_TAG,
+                        tag = LOG_TAG;
                         concat!(
                             "Audio policy service UsageReporter is unavailable; ",
                             "interruptions will not work. Error: {:?}"
@@ -214,7 +214,7 @@ impl Discovery {
 
         if let InterruptionStage::Begin = stage {
             info!(
-                tag = LOG_TAG,
+                tag = LOG_TAG;
                 concat!(
                     "Usage {:?} was interrputed; will pause the players ",
                     "that requested to be paused on interruption.",
@@ -319,7 +319,7 @@ impl Discovery {
                 // A new player has been published to `fuchsia.media.sessions2.Publisher`.
                 mut new_player = self.player_stream.select_next_some() => {
                     if let Err(e) = new_player.notify_published() {
-                        warn!(tag = LOG_TAG, "Notify failed {:?}", e);
+                        warn!(tag = LOG_TAG; "Notify failed {:?}", e);
                     }
                     self.players.insert(new_player.id(), new_player);
                 }

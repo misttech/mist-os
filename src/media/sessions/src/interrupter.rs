@@ -7,9 +7,9 @@ use async_utils::stream::StreamMap;
 use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_media::*;
 use futures::stream::{FusedStream, Stream};
+use log::warn;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::warn;
 
 const LOG_TAG: &str = "interrupter";
 
@@ -66,7 +66,7 @@ impl Stream for Interrupter {
         ) {
             Ok(state_change) => state_change,
             Err(e) => {
-                warn!(tag = LOG_TAG, "Audio policy service died: {:?}", e);
+                warn!(tag = LOG_TAG; "Audio policy service died: {:?}", e);
                 return Poll::Pending;
             }
         };
@@ -75,7 +75,7 @@ impl Stream for Interrupter {
             Usage::RenderUsage(usage) => usage,
             _ => {
                 warn!(
-                    tag = LOG_TAG,
+                    tag = LOG_TAG;
                     concat!(
                         "Audio policy service sent a capture usage state change; ",
                         "we only subscribe to renderer usage state changes."
@@ -89,7 +89,7 @@ impl Stream for Interrupter {
             UsageState::Muted(_) | UsageState::Ducked(_) => InterruptionStage::Begin,
             UsageState::Unadjusted(_) => InterruptionStage::End,
             UsageStateUnknown!() => {
-                warn!(tag = LOG_TAG, "Audio policy service sent unknown UsageState variant");
+                warn!(tag = LOG_TAG; "Audio policy service sent unknown UsageState variant");
                 return Poll::Pending;
             }
         };

@@ -13,9 +13,9 @@ use fuchsia_async::Task;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::lock::Mutex;
 use futures::StreamExt;
+use log::error;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use tracing::error;
 use zx_status::Status;
 
 #[derive(Debug, Clone)]
@@ -52,7 +52,7 @@ impl Registry {
                 if let Err(err) =
                     watch_devices(proxy, devices, devices_initialized, event_senders).await
                 {
-                    error!(%err, "Failed to watch Registry devices");
+                    error!(err:%; "Failed to watch Registry devices");
                 }
             }
         });
@@ -225,7 +225,7 @@ impl SignalProcessing {
                     watch_element_states(proxy, element_states, element_states_initialized.clone())
                         .await
                 {
-                    error!(%err, "Failed to watch Registry element states");
+                    error!(err:%; "Failed to watch Registry element states");
                     // Watching the element states will fail if the device does not support signal
                     // processing. In this case, mark the states as initialized so the getter can
                     // return the initial None value.
@@ -242,7 +242,7 @@ impl SignalProcessing {
                 if let Err(err) =
                     watch_topology(proxy, topology_id, topology_id_initialized.clone()).await
                 {
-                    error!(%err, "Failed to watch Registry topology");
+                    error!(err:%; "Failed to watch Registry topology");
                     // Watching the topology ID will fail if the device does not support signal
                     // processing. In this case, mark the ID as initialized so the getter can
                     // return the initial None value.
