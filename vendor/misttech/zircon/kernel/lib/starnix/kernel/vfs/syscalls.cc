@@ -465,7 +465,50 @@ fit::result<Errno> sys_unlinkat(const CurrentTask& current_task, FdNumber dir_fd
 fit::result<Errno> sys_renameat2(const CurrentTask& current_task, FdNumber old_dir_fd,
                                  starnix_uapi::UserCString old_user_path, FdNumber new_dir_fd,
                                  starnix_uapi::UserCString new_user_path, uint32_t flags) {
-  return fit::error(errno(EINVAL));
+  auto rename_flags = RenameFlags::from_bits(flags);
+  if (!rename_flags.has_value()) {
+    return fit::error(errno(EINVAL));
+  }
+
+  if (rename_flags->intersects(RenameFlagsEnum::INTERNAL)) {
+    return fit::error(errno(EINVAL));
+  }
+
+  // RENAME_EXCHANGE cannot be combined with the other flags
+  if ((rename_flags->contains(RenameFlagsEnum::EXCHANGE)) &&
+      (rename_flags->intersects(RenameFlags(RenameFlagsEnum::NOREPLACE) |
+                                RenameFlagsEnum::WHITEOUT))) {
+    return fit::error(errno(EINVAL));
+  }
+
+  // RENAME_WHITEOUT is not supported
+  if (rename_flags->contains(RenameFlagsEnum::WHITEOUT)) {
+    // track_stub!(TODO("https://fxbug.dev/322875416"), "RENAME_WHITEOUT");
+    return fit::error(errno(ENOSYS));
+  }
+
+  auto lookup =
+      [&](FdNumber dir_fd,
+          UserCString user_path) -> fit::result<Errno, ktl::pair<NamespaceNode, BString>> {
+    return lookup_parent_at<ktl::pair<NamespaceNode, BString>>(
+        current_task, dir_fd, user_path,
+        [](LookupContext context, NamespaceNode parent, const FsStr& basename) {
+          return fit::ok(ktl::pair(parent, basename));
+        });
+  };
+
+  auto old_lookup = lookup(old_dir_fd, old_user_path) _EP(old_lookup);
+  auto& [old_parent, old_basename] = old_lookup.value();
+
+  auto new_lookup = lookup(new_dir_fd, new_user_path) _EP(new_lookup);
+  auto& [new_parent, new_basename] = new_lookup.value();
+
+  if (new_basename.size() > NAME_MAX) {
+    return fit::error(errno(ENAMETOOLONG));
+  }
+
+  return old_parent.rename(current_task, old_parent, old_basename, new_parent, new_basename,
+                           rename_flags.value());
 }
 
 fit::result<Errno> sys_fchmod(const CurrentTask& current_task, FdNumber fd,

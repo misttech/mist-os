@@ -309,7 +309,7 @@ bool test_rename_noreplace() {
       *current_task, FdNumber::AT_FDCWD_, UserCString::New(old_path_addr), FdNumber::AT_FDCWD_,
       UserCString::New(new_path_addr), RenameFlags(RenameFlagsEnum::NOREPLACE).bits());
   ASSERT_TRUE(rename_result.is_error());
-  ASSERT_EQ(rename_result.error_value().error_code(), errno(EEXIST).error_code());
+  ASSERT_EQ(errno(EEXIST).error_code(), rename_result.error_value().error_code());
 
   END_TEST;
 }
