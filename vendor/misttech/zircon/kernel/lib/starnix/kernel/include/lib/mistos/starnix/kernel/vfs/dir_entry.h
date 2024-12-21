@@ -139,7 +139,8 @@ overloaded(Ts...) -> overloaded<Ts...>;
 /// A directory cannot have more than one hard link, which means there is a
 /// single DirEntry for each Directory FsNode. That invariant lets us store the
 /// children for a directory in the DirEntry rather than in the FsNode.
-class DirEntry : public fbl::RefCountedUpgradeable<DirEntry> {
+class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
+                 public fbl::RefCountedUpgradeable<DirEntry> {
  public:
   /// The FsNode referenced by this DirEntry.
   ///
@@ -585,14 +586,17 @@ class DirEntry : public fbl::RefCountedUpgradeable<DirEntry> {
   // impl fmt::Debug for DirEntry
   mtl::BString debug() const;
 
+  // Define the key extraction function
+  size_t GetKey() const;
+
+  // Define the hash function for the key
+  static size_t GetHash(const size_t key);
+
   // C++
   /// The Drop trait for DirEntry removes the entry from the child list of the
   /// parent entry, which means we cannot drop DirEntry objects while holding a
   /// lock on the parent's child list.
   ~DirEntry();
-
-  // WAVL-tree Index
-  FsString GetKey() const;
 
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(DirEntry);

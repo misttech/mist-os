@@ -31,27 +31,48 @@ namespace starnix {
 
 const size_t DEFAULT_LRU_CAPACITY = 32;
 
-struct Dummy : public fbl::SinglyLinkedListable<Dummy*> {
-  static size_t GetHash(uint64_t key) { return static_cast<size_t>(key); }
-};
-
 struct LruCache {
-  explicit LruCache(size_t c) : capacity(c) {}
-
   size_t capacity;
-
-  mutable starnix_sync::Mutex<fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*>> entries;
+  mutable starnix_sync::Mutex<fbl::HashTable<size_t, fbl::RefPtr<DirEntry>>> entries;
 };
 
 struct Permanent {
-  mutable starnix_sync::Mutex<fbl::HashTable<fbl::RefPtr<DirEntry>, Dummy*>> entries;
+  mutable starnix_sync::Mutex<fbl::HashTable<size_t, fbl::RefPtr<DirEntry>>> entries;
 };
-
-using Entries = ktl::variant<ktl::monostate, ktl::unique_ptr<Permanent>, ktl::unique_ptr<LruCache>>;
 
 // Configuration for CacheMode::Cached.
 struct CacheConfig {
   size_t capacity = DEFAULT_LRU_CAPACITY;
+};
+
+class Entries {
+ public:
+  using Variant =
+      ktl::variant<ktl::monostate, ktl::unique_ptr<Permanent>, ktl::unique_ptr<LruCache>>;
+
+  static Entries Perm(ktl::unique_ptr<Permanent>);
+  static Entries Lru(ktl::unique_ptr<LruCache>);
+  static Entries None();
+
+  Entries(Entries&& other);
+  Entries& operator=(Entries&& other);
+  ~Entries();
+
+ private:
+  // Helpers from the reference documentation for std::visit<>, to allow
+  // visit-by-overload of the std::variant<> returned by GetLastReference():
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
+  friend class FileSystem;
+  explicit Entries(Variant entries);
+
+  Variant entries_;
 };
 
 enum class CacheModeType : uint8_t {

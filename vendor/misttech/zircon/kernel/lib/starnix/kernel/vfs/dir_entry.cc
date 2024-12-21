@@ -30,6 +30,7 @@ namespace ktl {
 
 using std::addressof;
 using std::destroy_at;
+using std::hash;
 
 }  // namespace ktl
 
@@ -46,6 +47,12 @@ fit::result<Errno, bool> DirEntryOps::revalidate(const CurrentTask& current_task
 DirEntryOps::~DirEntryOps() = default;
 
 DefaultDirEntryOps::~DefaultDirEntryOps() = default;
+
+// Define the key extraction function
+size_t DirEntry::GetKey() const { return reinterpret_cast<size_t>(this); }
+
+// Define the hash function for the key
+size_t DirEntry::GetHash(const size_t key) { return ktl::hash<size_t>()(key); }
 
 DirEntry::~DirEntry() {
   LTRACE_ENTRY_OBJ;
@@ -114,8 +121,6 @@ fit::result<Errno, DirEntryHandle> DirEntry::component_lookup(const CurrentTask&
   auto [node, _] = result.value();
   return fit::ok(node);
 }
-
-FsString DirEntry::GetKey() const { return local_name(); }
 
 DirEntry::DirEntry(FsNodeHandle node, ktl::unique_ptr<DirEntryOps> ops, DirEntryState state)
     : node_(ktl::move(node)), ops_(ktl::move(ops)), state_(ktl::move(state)), weak_factory_(this) {
