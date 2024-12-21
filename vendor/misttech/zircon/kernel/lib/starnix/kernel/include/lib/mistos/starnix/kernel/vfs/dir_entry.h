@@ -443,6 +443,17 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
                                    const MountInfo& new_mount, const FsStr& new_basename,
                                    RenameFlags flags);
 
+  template <typename T, typename Fn>
+  T get_children(Fn&& callback) const {
+    static_assert(std::is_invocable_r_v<T, Fn, const DirEntryChildren&>);
+    auto children_lock = children_.Read();
+    if constexpr (std::is_same_v<T, void>) {
+      callback(*children_lock);
+    } else {
+      return callback(*children_lock);
+    }
+  }
+
   template <typename CreateNodeFn>
   fit::result<Errno, ktl::pair<DirEntryHandle, bool>> get_or_create_child(
       const CurrentTask& current_task, const MountInfo& mount, const FsStr& name,

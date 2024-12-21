@@ -8,6 +8,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
+#include <lib/mistos/starnix/kernel/vfs/directory_file.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
@@ -220,7 +221,7 @@ TmpfsDirectory* TmpfsDirectory::New() {
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> TmpfsDirectory::create_file_ops(
     const FsNode& node, const CurrentTask& current_task, OpenFlags flags) const {
-  return fit::error(errno(ENOTSUP));
+  return fit::ok(ktl::unique_ptr<FileOps>(MemoryDirectoryFile::New()));
 }
 
 fit::result<Errno, FsNodeHandle> TmpfsDirectory::mkdir(const FsNode& node,
