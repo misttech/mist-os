@@ -55,7 +55,7 @@ async fn run_application(mut stream: ApplicationRequestStream) -> Result<(), Err
                 // TODO(https://fxbug.dev/332956721): If we get an unexpected message from the client
                 // we're supposed to tell the TA to close any open sessions and then destroy it.
                 // Same goes for errors in the handlers above.
-                tracing::warn!("Unexpected request: {e}");
+                log::warn!("Unexpected request: {e}");
                 break;
             }
         }
