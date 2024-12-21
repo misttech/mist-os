@@ -12,6 +12,7 @@ alias NewUtsname = byte;
 alias Statx = byte;
 alias Stat = byte;
 alias Rusage = byte;
+alias Rlimit64 = byte;
 
 //alias Pid = int32;
 @no_protocol_prefix
@@ -1149,8 +1150,18 @@ closed protocol Linux {
     // STUB 301
     strict A0301FanotifyMark() -> () error int64;
 
-    // STUB 302
-    strict A0302Prlimit64() -> () error int64;
+    // #302, SYSCALL_DEFINE4(prlimit64, pid_t, pid, unsigned int, resource, 
+    // const struct rlimit64 __user *, new_rlim, struct rlimit64 __user *, old_rlim)
+    strict A0302Prlimit64(resource struct {
+        pid int32;
+        resource uint32;
+        @voidptr
+        @in
+        new_rlim experimental_pointer<Rlimit64>;
+        @voidptr
+        @out
+        old_rlim experimental_pointer<Rlimit64>;
+    }) -> () error int64;
 
     // STUB 303
     strict A0303NameToHandleAt() -> () error int64;
