@@ -102,6 +102,44 @@ bool test_permissions() {
 
   ASSERT_TRUE(file.is_ok(), "failed to create file");
 
+  auto out1 = VecOutputBuffer::New(0);
+  auto read_result = file.value()->read(*current_task, &out1);
+  ASSERT_TRUE(read_result.is_ok(), "failed to read");
+  ASSERT_EQ(0u, read_result.value());
+
+  auto in1 = VecInputBuffer::New(ktl::span<uint8_t>());
+  auto write_result = file.value()->write(*current_task, &in1);
+  ASSERT_TRUE(write_result.is_error());
+
+  auto file_wo = (*current_task)
+                     .open_file_at(FdNumber::AT_FDCWD_, path, OpenFlags(OpenFlagsEnum::WRONLY),
+                                   FileMode::EMPTY, ResolveFlags::empty(), AccessCheck());
+  ASSERT_TRUE(file_wo.is_ok(), "failed to open file WRONLY");
+
+  auto out2 = VecOutputBuffer::New(0);
+  read_result = file_wo.value()->read(*current_task, &out2);
+  ASSERT_TRUE(read_result.is_error());
+
+  // auto in2 = VecInputBuffer::New(ktl::span<uint8_t>());
+  // write_result = file_wo.value()->write(*current_task, &in2);
+  // ASSERT_TRUE(write_result.is_ok());
+  // ASSERT_EQ(0u, write_result.value());
+
+  auto file_rw = (*current_task)
+                     .open_file_at(FdNumber::AT_FDCWD_, path, OpenFlags(OpenFlagsEnum::RDWR),
+                                   FileMode::EMPTY, ResolveFlags::empty(), AccessCheck());
+  ASSERT_TRUE(file_rw.is_ok(), "failed to open file RDWR");
+
+  auto out3 = VecOutputBuffer::New(0);
+  read_result = file_rw.value()->read(*current_task, &out3);
+  ASSERT_TRUE(read_result.is_ok());
+  ASSERT_EQ(0u, read_result.value());
+
+  // auto in3 = VecInputBuffer::New(ktl::span<uint8_t>());
+  // write_result = file_rw.value()->write(*current_task, &in3);
+  // ASSERT_TRUE(write_result.is_ok());
+  // ASSERT_EQ(0u, write_result.value());
+
   END_TEST;
 }
 
