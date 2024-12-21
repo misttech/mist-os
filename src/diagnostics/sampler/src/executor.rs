@@ -106,6 +106,7 @@ use futures::channel::oneshot;
 use futures::future::join_all;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt};
+use log::{info, warn};
 use moniker::ExtendedMoniker;
 use sampler_config::{DataType, MetricConfig, ProjectConfig, SamplerConfig, SelectorList};
 use selectors::SelectorExt;
@@ -113,7 +114,6 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{info, warn};
 
 /// An event to be logged to the cobalt logger. Events are generated first,
 /// then logged. (This permits unit-testing the code that generates events from
@@ -211,8 +211,8 @@ impl RebootSnapshotProcessor {
             .peekable();
         if projects.peek().is_none() {
             warn!(
-                %moniker,
-                tree_name = inspect_handle_name.as_ref(),
+                moniker:%,
+                tree_name = inspect_handle_name.as_ref();
                 "no metrics found for moniker and tree_name combination"
             );
             return;
@@ -233,7 +233,7 @@ impl RebootSnapshotProcessor {
                 }
             };
             if let Some(err) = maybe_err {
-                warn!(?err, "A project sampler failed to process a reboot sample");
+                warn!(err:?; "A project sampler failed to process a reboot sample");
             }
         }
     }
@@ -260,7 +260,7 @@ impl SamplerExecutor {
             SamplerExecutorStats::new()
                 .with_inspect(inspect::component::inspector().root(), "sampler_executor_stats")
                 .unwrap_or_else(|err| {
-                    warn!(?err, "Failed to attach inspector to SamplerExecutorStats struct");
+                    warn!(err:?; "Failed to attach inspector to SamplerExecutorStats struct");
                     SamplerExecutorStats::default()
                 }),
         );
@@ -284,7 +284,7 @@ impl SamplerExecutor {
                                 )
                                 .unwrap_or_else(|err| {
                                     warn!(
-                                        ?err,
+                                        err:?;
                                         "Failed to attach inspector to ProjectSamplerStats struct"
                                     );
                                     ProjectSamplerStats::default()
@@ -691,7 +691,11 @@ impl ProjectSampler {
                         break;
                     }
                     too_many => {
-                        warn!(?too_many, %parsed_selector.selector_string, "Too many matches for selector")
+                        warn!(
+                            too_many:?,
+                            selector:% = parsed_selector.selector_string;
+                            "Too many matches for selector"
+                        );
                     }
                 }
             }
@@ -822,7 +826,7 @@ fn process_sample_for_data_type(
     match event_payload_res {
         Ok(payload_opt) => payload_opt,
         Err(err) => {
-            warn!(?data_source, ?err, "Failed to process Inspect property for cobalt",);
+            warn!(data_source:?, err:?; "Failed to process Inspect property for cobalt",);
             None
         }
     }
@@ -1199,11 +1203,11 @@ fn process_schema_errors(
     match errors {
         Some(errors) => {
             for error in errors {
-                warn!(%moniker, ?error);
+                warn!(moniker:%, error:?; "");
             }
         }
         None => {
-            warn!(%moniker, "Encountered null payload and no errors.");
+            warn!(moniker:%; "Encountered null payload and no errors.");
         }
     }
 }

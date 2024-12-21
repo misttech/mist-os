@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{Inner, InnerValueType, InspectType, Property};
-use tracing::error;
+use log::error;
 
 /// Inspect API Bool Property data type.
 ///

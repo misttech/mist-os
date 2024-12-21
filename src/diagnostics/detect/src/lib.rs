@@ -27,11 +27,11 @@ use futures::lock::Mutex;
 use futures::{join, StreamExt};
 use glob::glob;
 use injectable_time::MonotonicInstant;
+use log::{error, info, warn};
 use serde_derive::Deserialize;
 use snapshot::SnapshotRequest;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use triage_detect_config::Config as ComponentConfig;
 
 const MINIMUM_CHECK_TIME_NANOS: i64 = 60 * 1_000_000_000;

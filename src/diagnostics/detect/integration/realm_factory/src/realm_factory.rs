@@ -18,8 +18,8 @@ use fuchsia_component_test::{
 };
 use futures::lock::Mutex;
 use futures::StreamExt;
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 use {
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_feedback as fcrash,
     fidl_test_detect_factory as ftest, fuchsia_async as fasync,

@@ -20,10 +20,10 @@ rustc_library("fuchsia-inspect") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:paste",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

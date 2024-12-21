@@ -206,8 +206,8 @@ pub(crate) mod tests {
     use fuchsia_async as fasync;
     use fuchsia_inspect::{Inspector, InspectorConfig, IntProperty, Node};
     use futures::prelude::*;
+    use log::info;
     use std::collections::HashMap;
-    use tracing::info;
     use zx::HandleBased;
 
     #[fuchsia::test]

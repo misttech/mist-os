@@ -10,12 +10,12 @@ use fidl_fuchsia_diagnostics_persist::{
 use fidl_fuchsia_samplertestcontroller::{SamplerTestControllerMarker, SamplerTestControllerProxy};
 use fidl_test_persistence_factory::{ControllerMarker, ControllerProxy};
 use fuchsia_component_test::RealmInstance;
+use log::*;
 use serde_json::Value;
 use std::fs::File;
 use std::io::Read;
 use std::mem::take;
 use std::{thread, time};
-use tracing::*;
 use zx::{MonotonicDuration, MonotonicInstant};
 
 mod mock_fidl;

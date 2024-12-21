@@ -21,11 +21,11 @@ use fuchsia_inspect::health::Reporter;
 use fuchsia_sync::Mutex;
 use futures::future::join;
 use futures::StreamExt;
+use log::*;
 use persist_server::PersistServer;
 use persistence_config::Config;
 use scheduler::Scheduler;
 use std::sync::Arc;
-use tracing::*;
 use zx::BootInstant;
 
 /// The name of the subcommand and the logs-tag.
@@ -87,13 +87,13 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
             Ok(proxy) => match proxy.wait_for_first_update_check_to_complete().await {
                 Ok(()) => {}
                 Err(e) => {
-                    warn!(?e, "Error waiting for first update check; not publishing.");
+                    warn!(e:?; "Error waiting for first update check; not publishing.");
                     return;
                 }
             },
             Err(e) => {
                 warn!(
-                    ?e,
+                    e:?;
                     "Unable to connect to fuchsia.update.Listener; will publish immediately."
                 );
             }

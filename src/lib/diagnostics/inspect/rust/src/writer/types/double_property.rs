@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{Inner, InnerValueType, InspectType, NumericProperty, Property};
-use tracing::error;
+use log::error;
 
 /// Inspect double property type.
 ///
@@ -30,7 +30,7 @@ impl Property<'_> for DoubleProperty {
                 .try_lock()
                 .and_then(|mut state| state.set_double_metric(inner_ref.block_index, value))
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to set property");
+                    error!(err:?; "Failed to set property");
                 });
         }
     }
@@ -45,7 +45,7 @@ impl NumericProperty<'_> for DoubleProperty {
                 .and_then(|mut state| state.add_double_metric(inner_ref.block_index, value))
                 .map(Option::from)
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to set property");
+                    error!(err:?; "Failed to set property");
                     None
                 })
         } else {
@@ -61,7 +61,7 @@ impl NumericProperty<'_> for DoubleProperty {
                 .and_then(|mut state| state.subtract_double_metric(inner_ref.block_index, value))
                 .map(Option::from)
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to set property");
+                    error!(err:?; "Failed to set property");
                     None
                 })
         } else {

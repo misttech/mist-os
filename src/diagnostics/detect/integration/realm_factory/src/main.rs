@@ -12,7 +12,7 @@ use fidl_test_detect_factory::*;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

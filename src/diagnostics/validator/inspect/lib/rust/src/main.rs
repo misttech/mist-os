@@ -18,8 +18,8 @@ use fuchsia_inspect::Property as UsablePropertyTrait;
 use fuchsia_inspect::*;
 use futures::prelude::*;
 use inspect_runtime::{service, TreeServerSendPreference};
+use log::{error, info, warn};
 use std::collections::HashMap;
-use tracing::{error, info, warn};
 use zx::HandleBased;
 
 #[derive(Debug)]

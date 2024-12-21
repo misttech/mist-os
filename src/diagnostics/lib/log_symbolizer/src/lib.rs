@@ -106,7 +106,7 @@ impl Symbolizer for LogSymbolizer {
         let sdk =
             global_env_context().context("Loading global environment context")?.get_sdk().await?;
         if let Err(e) = ensure_symbol_index_registered(&sdk).await {
-            tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
+            log::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
 
         let path = ffx_config::get_host_tool(&sdk, "symbolizer")
@@ -137,7 +137,7 @@ impl Symbolizer for LogSymbolizer {
                     let mut msg = match rx.next().await {
                         Some(s) => s,
                         None => {
-                            tracing::warn!("input stream is now empty");
+                            log::warn!("input stream is now empty");
                             break;
                         }
                     };
@@ -147,7 +147,7 @@ impl Symbolizer for LogSymbolizer {
                     match stdin.write_all(msg.as_bytes()).await {
                         Ok(_) => {},
                         Err(e) => {
-                            tracing::warn!("writing to symbolizer stdin failed: {}", e);
+                            log::warn!("writing to symbolizer stdin failed: {}", e);
                             continue;
                         }
                     }
@@ -156,7 +156,7 @@ impl Symbolizer for LogSymbolizer {
                     match stdout_reader.read_line(&mut stdout_buf).await {
                         Ok(_) => {},
                         Err(e) => {
-                            tracing::warn!("reading from symbolizer stdout failed: {}", e);
+                            log::warn!("reading from symbolizer stdout failed: {}", e);
                             continue;
                         }
                     }
@@ -172,14 +172,14 @@ impl Symbolizer for LogSymbolizer {
                         stdout_buf = String::default();
                         stdout_reader.read_line(&mut stdout_buf).map(|r| {
                             if let Err(e) = r {
-                                tracing::warn!("got error trying to write to symbolizer output channel: {}", e);
+                                log::warn!("got error trying to write to symbolizer output channel: {}", e);
                             }
                         }).await;
 
                     }
                     tx.send(result).map(|r| {
                         if let Err(e) = r {
-                            tracing::warn!("got error trying to write to symbolizer output channel: {}", e);
+                            log::warn!("got error trying to write to symbolizer output channel: {}", e);
                         }
                     }).await;
                 }

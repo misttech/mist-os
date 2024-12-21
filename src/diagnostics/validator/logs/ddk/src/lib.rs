@@ -10,7 +10,7 @@ use fidl_fuchsia_validate_logs::{
 };
 use fuchsia_async::Task;
 use futures::StreamExt;
-use tracing::*;
+use log::*;
 
 struct Puppet {
     _info: PuppetInfo,

@@ -5,13 +5,13 @@
 use anyhow::{format_err, Error};
 use diagnostics_data::ExtendedMoniker;
 use glob::glob;
+use log::{info, warn};
 use persistence_config::{ServiceName, Tag};
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
-use tracing::{info, warn};
 
 const CURRENT_PATH: &str = "/cache/current";
 const PREVIOUS_PATH: &str = "/cache/previous";

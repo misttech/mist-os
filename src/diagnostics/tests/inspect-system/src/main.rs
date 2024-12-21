@@ -17,6 +17,7 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{AsyncWriteExt, SinkExt, StreamExt};
+use log::{debug, error, info};
 use metrics::{MetricSet, MetricTypeHint};
 use rust_measure_tape_for_case::Measurable as _;
 use std::collections::HashSet;
@@ -25,7 +26,6 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::time::Instant;
-use tracing::{debug, error, info};
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {fidl_fuchsia_test as ftest, fuchsia_async as fasync};
 

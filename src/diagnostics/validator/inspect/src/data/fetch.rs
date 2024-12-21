@@ -97,8 +97,8 @@ mod tests {
     use fidl_fuchsia_mem::Buffer;
     use fuchsia_async as fasync;
     use futures::{TryFutureExt, TryStreamExt};
+    use log::{error, warn};
     use std::sync::Arc;
-    use tracing::{error, warn};
     use zx::{self as zx, HandleBased};
 
     const MAX_TREE_NAME_LIST_SIZE: usize = 1;
@@ -157,7 +157,7 @@ mod tests {
         fasync::Task::spawn(async move {
             handle_request_stream(name, vmos, stream)
                 .await
-                .unwrap_or_else(|err: Error| error!(?err, "Couldn't run tree server"));
+                .unwrap_or_else(|err: Error| error!(err:?; "Couldn't run tree server"));
         })
         .detach();
     }
@@ -184,7 +184,7 @@ mod tests {
                     spawn_tree_server(child_name, Arc::clone(&vmos), tree.into_stream())
                 }
                 TreeRequest::_UnknownMethod { ordinal, method_type, .. } => {
-                    warn!(ordinal, ?method_type, "Unknown request");
+                    warn!(ordinal, method_type:?; "Unknown request");
                 }
             }
         }
@@ -216,14 +216,14 @@ mod tests {
                         TreeNameIteratorRequest::_UnknownMethod {
                             ordinal, method_type, ..
                         } => {
-                            warn!(ordinal, ?method_type, "Unknown request");
+                            warn!(ordinal, method_type:?; "Unknown request");
                         }
                     }
                 }
                 Ok(())
             }
             .unwrap_or_else(|err: Error| {
-                error!(?err, "Failed to running tree name iterator server");
+                error!(err:?; "Failed to running tree name iterator server");
             }),
         )
         .detach()

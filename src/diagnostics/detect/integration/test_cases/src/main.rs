@@ -30,11 +30,11 @@ use fidl_fuchsia_testing_harness::{self as ffth, RealmProxy_Marker};
 use fidl_test_detect_factory as ftest;
 use fuchsia_component::client::connect_to_protocol;
 use futures::StreamExt;
+use log::*;
 use realm_proxy_client::Error::OperationError;
 use std::cmp::Ordering;
 use std::time::Duration;
 use test_case::test_case;
-use tracing::*;
 
 // Test that the "repeat" field of snapshots works correctly.
 mod test_snapshot_throttle;

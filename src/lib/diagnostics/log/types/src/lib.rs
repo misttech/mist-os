@@ -151,6 +151,18 @@ impl From<tracing::Level> for Severity {
     }
 }
 
+impl From<log::Level> for Severity {
+    fn from(level: log::Level) -> Severity {
+        match level {
+            log::Level::Trace => Severity::Trace,
+            log::Level::Debug => Severity::Debug,
+            log::Level::Info => Severity::Info,
+            log::Level::Warn => Severity::Warn,
+            log::Level::Error => Severity::Error,
+        }
+    }
+}
+
 impl From<Severity> for fdiagnostics::Severity {
     fn from(s: Severity) -> fdiagnostics::Severity {
         match s {

@@ -12,10 +12,10 @@ use inspect_format::{
     constants, utils, ArrayFormat, Block, BlockAccessorExt, BlockAccessorMutExt, BlockContainer,
     BlockIndex, BlockType, Container, Error as FormatError, LinkNodeDisposition, PropertyFormat,
 };
+use log::error;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tracing::error;
 
 /// Callback used to fill inspector lazy nodes.
 pub type LazyNodeContextFnArc =
@@ -499,7 +499,7 @@ impl Drop for LockedStateGuard<'_> {
                 .block_at_mut(BlockIndex::HEADER)
                 .unlock_header()
                 .unwrap_or_else(|e| {
-                    error!(?e, "Failed to unlock header");
+                    error!(e:?; "Failed to unlock header");
                 });
         }
     }

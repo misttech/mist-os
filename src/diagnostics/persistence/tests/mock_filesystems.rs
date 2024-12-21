@@ -50,7 +50,7 @@ pub(crate) async fn create_config_data(builder: &RealmBuilder) -> Result<ChildRe
 pub(crate) fn setup_backing_directories() {
     let path = "/tmp/cache";
     fs::create_dir_all(path)
-        .map_err(|err| tracing::warn!(%path, ?err, "Could not create directory"))
+        .map_err(|err| log::warn!(path:%, err:?; "Could not create directory"))
         .ok();
 }
 

@@ -4,7 +4,7 @@
 
 use anyhow::{bail, Error};
 use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
-use tracing::*;
+use log::*;
 
 // Selectors for Inspect data must start with this exact string.
 const INSPECT_PREFIX: &str = "INSPECT:";

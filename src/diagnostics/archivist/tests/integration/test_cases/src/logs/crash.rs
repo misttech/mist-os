@@ -7,7 +7,7 @@ use crate::{test_topology, utils};
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::Severity;
 use futures::StreamExt;
-use tracing::warn;
+use log::warn;
 
 #[fuchsia::test]
 async fn logs_from_crashing_component() -> Result<(), anyhow::Error> {

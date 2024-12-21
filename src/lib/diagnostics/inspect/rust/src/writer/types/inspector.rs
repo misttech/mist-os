@@ -7,11 +7,11 @@ use crate::writer::state::Stats;
 use crate::writer::{Error, Heap, Node, State};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter};
 use inspect_format::{constants, BlockContainer, Container};
+use log::error;
 use std::borrow::Cow;
 use std::cmp::max;
 use std::fmt;
 use std::sync::Arc;
-use tracing::error;
 
 #[cfg(target_os = "fuchsia")]
 use zx::{self as zx, AsHandleRef, HandleBased};

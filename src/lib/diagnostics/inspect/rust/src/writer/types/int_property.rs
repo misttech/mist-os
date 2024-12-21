@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{Inner, InnerValueType, InspectType, NumericProperty, Property};
-use tracing::error;
+use log::error;
 
 /// Inspect int property data type.
 ///
@@ -30,7 +30,7 @@ impl Property<'_> for IntProperty {
                 .try_lock()
                 .and_then(|mut state| state.set_int_metric(inner_ref.block_index, value))
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to set property");
+                    error!(err:?; "Failed to set property");
                 });
         }
     }
@@ -45,7 +45,7 @@ impl NumericProperty<'_> for IntProperty {
                 .and_then(|mut state| state.add_int_metric(inner_ref.block_index, value))
                 .map(Option::from)
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to set property");
+                    error!(err:?; "Failed to set property");
                     None
                 })
         } else {
@@ -61,7 +61,7 @@ impl NumericProperty<'_> for IntProperty {
                 .and_then(|mut state| state.subtract_int_metric(inner_ref.block_index, value))
                 .map(Option::from)
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to set property");
+                    error!(err:?; "Failed to set property");
                     None
                 })
         } else {

@@ -11,8 +11,8 @@ use fidl_fuchsia_diagnostics::{
 };
 
 use futures::prelude::*;
+use log::warn;
 use thiserror::Error;
-use tracing::warn;
 use zx_status::Status as ZxStatus;
 
 pub struct AccessorServer {

@@ -8,7 +8,7 @@ use fidl_fuchsia_archivist_test::*;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
-use tracing::warn;
+use log::warn;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_diagnostics_host as fdiagnostics_host, fidl_fuchsia_inspect as finspect,
@@ -71,7 +71,7 @@ impl ArchivistRealmFactory {
                             (&interest.moniker, &interest.log_severity)
                         else {
                             warn!(
-                                ?interest,
+                                interest:?;
                                 "Expected both moniker and severity for the intial interest"
                             );
                             return None;

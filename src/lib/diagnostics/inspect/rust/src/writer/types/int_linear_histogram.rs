@@ -8,7 +8,7 @@ use crate::writer::{
 };
 use diagnostics_hierarchy::{ArrayFormat, LinearHistogramParams};
 use inspect_format::constants;
-use tracing::error;
+use log::error;
 
 #[derive(Debug, Default)]
 /// A linear histogram property for integer values.
@@ -71,7 +71,7 @@ impl HistogramProperty for IntLinearHistogramProperty {
                     )
                 })
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to clear property");
+                    error!(err:?; "Failed to clear property");
                 });
         }
     }

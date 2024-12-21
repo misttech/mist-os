@@ -8,8 +8,8 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::{self as inspect};
 use futures::{StreamExt, TryStreamExt};
+use log::{info, warn};
 use sampler_component_config::Config as ComponentConfig;
-use tracing::{info, warn};
 use {
     fidl_fuchsia_hardware_power_statecontrol as reboot, fuchsia_async as fasync,
     sampler_config as config,

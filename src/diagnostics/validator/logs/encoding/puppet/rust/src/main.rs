@@ -9,8 +9,8 @@ use fidl_fuchsia_mem::Buffer;
 use fidl_fuchsia_validate_logs::{EncodingPuppetRequest, EncodingPuppetRequestStream, PuppetError};
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
+use log::*;
 use std::io::Cursor;
-use tracing::*;
 use zx::Vmo;
 
 const BUFFER_SIZE: usize = 1024;
