@@ -37,6 +37,7 @@ py_binary(
     name = "publish_packages",
     srcs = ["publish_packages.py"],
     python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
 )
 
 py_binary(

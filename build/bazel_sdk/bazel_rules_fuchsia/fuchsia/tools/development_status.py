@@ -8,7 +8,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from fuchsia_task_lib import Terminal
+from fuchsia.tools.fuchsia_task_lib import Terminal
 
 
 def run(*command):

@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 from shutil import rmtree
 
-from fuchsia_task_lib import *
+from fuchsia.tools.fuchsia_task_lib import *
 
 
 def run(*command):

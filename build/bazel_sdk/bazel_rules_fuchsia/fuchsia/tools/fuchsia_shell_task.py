@@ -7,7 +7,7 @@ import os
 import subprocess
 from shutil import which
 
-from fuchsia_task_lib import *
+from fuchsia.tools.fuchsia_task_lib import *
 
 
 class FuchsiaShellTask(FuchsiaTask):
