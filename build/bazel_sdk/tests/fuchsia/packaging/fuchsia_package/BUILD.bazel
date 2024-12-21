@@ -91,10 +91,7 @@ test_suite(
         ":cc_driver_pkg_with_tool_test",
         ":cc_pkg_at_numerical_api_level_test",
         ":cc_pkg_at_next_test",
-
-        # TODO(https://fxbug.dev/354047162): Enable once the issue described in
-        # the test is resolved.
-        # ":cc_pkg_at_retired_api_level_test",
+        ":cc_pkg_at_retired_api_level_test",
         ":pkg_at_unknown_numerical_api_level_test",
         ":pkg_at_lowercase_next_api_level_test",
         ":pkg_at_next_api_level_and_no_repo_default",
@@ -300,22 +297,16 @@ fuchsia_package_checker_test(
     structured_config_files = STRUCTURED_CONFIG_FILES,
 )
 
-# This test does not currently behave as expected as described below.
-# API level "21" is known in version_history.json but "unsupported", and the
-# SDK does not currently respect API level status. The test gives a different
-# wrong result depending on whether ":cc_component" is included in the package:
-# 1. With ":cc_component", there is a dependency on fdio, and the result is
-# similar to https://fxbug.dev/382560521 except that we do not expect the
-# artifacts to ever exist.
-# 2. Without ":cc_component", the test unexpectedly passes because the SDK does
-# not filter the retired API level, and there is no dependency on fdio.
-# TODO(https://fxbug.dev/354047162): Make it behave as expected and enable it.
 failure_test(
     name = "cc_pkg_at_retired_api_level_test",
     size = "small",
     expected_failure_message = 'ERROR: "21" is not an API level supported by this SDK. API level should be one of ["',
     tags = ["manual"],
-    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_retired_api_level",
+
+    # With ":cc_component" included in the package, this test fails with:
+    # ERROR: .../obj/build/bazel/bazel_sdk/bazel_sdk_tests/output_base/external/fuchsia_sdk/pkg/fdio/BUILD.bazel:26:11: @@fuchsia_sdk//fuchsia/constraints:is_x64_api_HEAD is not a valid select() condition for @@fuchsia_sdk//pkg/fdio:fdio.
+    # TODO(https://fxbug.dev/382773036): Fix this and use ":cc_component to pkg_at_retired_api_level.
+    target_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_at_retired_api_level_without_cc_component",
 )
 
 failure_test(

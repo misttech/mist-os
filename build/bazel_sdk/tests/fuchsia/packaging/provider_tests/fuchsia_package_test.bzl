@@ -381,10 +381,7 @@ def fuchsia_package_test_suite(name, **kwargs):
             ":dependencies_test_single_driver",
             ":dependencies_test_composite",
             ":next_api_level",
-
-            # The scenario in this test currently succeeds because the SDK ignores API level status.
-            # TODO(https://fxbug.dev/354047162): Enable once the SDK respects API level status.
-            # ":failure_test_retired_api_level",
+            ":failure_test_retired_api_level",
             ":failure_test_unknown_numerical_api_level",
             ":failure_test_lowercase_next_api_level",
             ":failure_test_pkg_without_api_level_and_no_repo_default",

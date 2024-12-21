@@ -606,6 +606,11 @@ def _generate_companion_host_tool_build_rules(
 
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files_str)
 
+# Only numerical API levels in the Supported phase and the mutable API level
+# "NEXT" are supported in the IDK and SDKs.
+# "HEAD" is technically not supported in the IDK or SDK(s) - see
+# https://fxbug.dev/334936990 - but it is currently used (without proper
+# versioning) in-tree.
 # buildifier: disable=unused-variable
 def _generate_api_version_rules(
         runtime,
@@ -639,14 +644,8 @@ def _generate_api_version_rules(
             )
         elif api_level == "PLATFORM":
             # "PLATFORM" is for Platform use only and not "known" to the SDK.
-            # TODO(https://fxbug.dev/384586484): Do not include in any list.
-            unsupported_api_levels.append(
-                runtime.make_struct(
-                    abi_revision = value["abi_revision"],
-                    api_level = api_level,
-                    as_u32 = value["as_u32"],
-                ),
-            )
+            pass
+
         else:
             fail("Unrecognized special API level '%s'" % api_level)
 

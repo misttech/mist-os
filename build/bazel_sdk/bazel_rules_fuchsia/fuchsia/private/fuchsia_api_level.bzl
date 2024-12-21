@@ -6,7 +6,7 @@
 
 # NOTE: INTERNAL_ONLY_ALL_KNOWN_API_LEVELS is part of the generated content of @fuchsia_sdk
 # and does not exist in @rules_fuchsia.
-load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_ALL_KNOWN_API_LEVELS")
+load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_SUPPORTED_API_LEVELS")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
 # We define the provider in this file because it is a private implementation
@@ -30,7 +30,7 @@ FUCHSIA_API_LEVEL_ATTRS = {
 }
 
 def get_fuchsia_api_levels():
-    """ Returns the list of API levels in this SDK.
+    """ Returns the list of API levels supported by this SDK version.
 
     Values are returned as a struct with the following fields:
     struct(
@@ -45,7 +45,7 @@ def get_fuchsia_api_levels():
     The status is not an API to be relied on but the STATUS_* constants can be
     used.
     """
-    return INTERNAL_ONLY_ALL_KNOWN_API_LEVELS
+    return INTERNAL_ONLY_SUPPORTED_API_LEVELS
 
 def get_fuchsia_api_level(ctx):
     """ Returns the raw api level to use for building.

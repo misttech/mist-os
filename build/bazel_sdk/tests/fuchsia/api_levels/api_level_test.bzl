@@ -83,19 +83,6 @@ def _test_level_setting():
         tags = ["manual"],
     )
 
-    # TODO(https://fxbug.dev/354047162): Move to failures when filtering supported levels.
-    _make_test_fuchsia_api_level(
-        name = "platform",
-        level = "PLATFORM",
-    )
-
-    level_setting_test(
-        name = "test_setting_platform",
-        target_under_test = ":platform",
-        expected_level = "PLATFORM",
-        tags = ["manual"],
-    )
-
     _make_test_fuchsia_api_level(
         name = "unset",
         level = "",
@@ -144,14 +131,13 @@ def _test_level_setting_failures():
 
     _make_test_fuchsia_api_level(
         name = "retired_level",
-        # TODO(https://fxbug.dev/354047162): Change to 21 when filtering supported levels.
-        level = "3",
+        level = "21",
     )
 
     level_setting_failure_test(
         name = "test_retired",
         target_under_test = ":retired_level",
-        expected_failure_message = '"3" is not an API level supported by this SDK. API level should be one of ["',
+        expected_failure_message = '"21" is not an API level supported by this SDK. API level should be one of ["',
         tags = ["manual"],
     )
 
@@ -176,6 +162,18 @@ def _test_level_setting_failures():
         name = "test_setting_next_lowercase",
         target_under_test = ":next_lowercase",
         expected_failure_message = '"next" is not an API level supported by this SDK. API level should be one of ["',
+        tags = ["manual"],
+    )
+
+    _make_test_fuchsia_api_level(
+        name = "platform",
+        level = "PLATFORM",
+    )
+
+    level_setting_failure_test(
+        name = "test_setting_platform",
+        target_under_test = ":platform",
+        expected_failure_message = '"PLATFORM" is not an API level supported by this SDK. API level should be one of ["',
         tags = ["manual"],
     )
 
