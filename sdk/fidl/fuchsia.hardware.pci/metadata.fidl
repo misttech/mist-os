@@ -5,9 +5,6 @@
 library fuchsia.hardware.pci;
 
 @available(added=HEAD)
-const METADATA_TYPE_NAME string = "fuchsia.hardware.pci.BoardConfiguration";
-
-@available(added=HEAD)
 type UseIntxWorkaroundType = struct {};
 
 @available(added=HEAD)

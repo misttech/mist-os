@@ -6,8 +6,6 @@ library fuchsia.hardware.test;
 
 using zx;
 
-const METADATA_SERVICE string = "fuchsia.hardware.test.Metadata";
-
 @serializable
 type Metadata = table {
     1: test_property string:MAX;

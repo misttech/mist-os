@@ -137,7 +137,7 @@ zx::result<> AdcVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       return zx::error(encoded_controller_metadata.error_value().status());
     }
     fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
-        .id = fuchsia_hardware_adcimpl::kMetadataTypeName,
+        .id = fuchsia_hardware_adcimpl::Metadata::kSerializableName,
         .data = encoded_controller_metadata.value(),
     }};
     node.AddMetadata(std::move(controller_metadata));

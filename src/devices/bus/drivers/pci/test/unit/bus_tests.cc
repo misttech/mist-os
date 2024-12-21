@@ -30,7 +30,6 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/bus/drivers/pci/bus.h"
-#include "src/devices/bus/drivers/pci/metadata.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_pciroot.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
@@ -67,8 +66,8 @@ class PciBusTests : public ::gtest::TestLoopFixture {
     incoming_namespace_.SyncCall(&IncomingNamespace::Init, std::move(endpoints->server));
 
     parent_->AddProtocol(ZX_PROTOCOL_PCIROOT, pciroot_->proto()->ops, pciroot_->proto()->ctx);
-    parent_->AddFidlService(fuchsia_hardware_pci::kMetadataTypeName, std::move(endpoints->client),
-                            "default");
+    parent_->AddFidlService(fuchsia_hardware_pci::BoardConfiguration::kSerializableName,
+                            std::move(endpoints->client), "default");
   }
 
   void TearDown() final {

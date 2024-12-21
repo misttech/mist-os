@@ -364,7 +364,7 @@ class AmlSdmmc : public fdf::DriverBase,
   fdf::Dispatcher worker_dispatcher_;
 
   fdf_metadata::MetadataServer<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata_server_{
-      fuchsia_hardware_sdmmc::kMetadataTypeName,
+      fuchsia_hardware_sdmmc::SdmmcMetadata::kSerializableName,
       component::OutgoingDirectory::kDefaultServiceInstance};
 };
 

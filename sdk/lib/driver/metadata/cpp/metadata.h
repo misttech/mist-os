@@ -14,12 +14,6 @@
 
 namespace fdf_metadata {
 
-// TODO(b/378118627): Remove once no longer referenced.
-template <typename FidlType>
-struct ObjectDetails {
-  inline static const char* Name;
-};
-
 // Connects to the fuchsia.driver.metadata/Metadata FIDL protocol found within the |incoming|
 // incoming namespace at FIDL service |service_name| and instance |instance_name|.
 zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadataProtocol(

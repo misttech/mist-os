@@ -4,6 +4,7 @@
 
 #include "src/devices/adc/drivers/adc/adc.h"
 
+#include <fidl/fuchsia.hardware.adcimpl/cpp/driver/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
@@ -12,8 +13,7 @@
 
 #include <bind/fuchsia/adc/cpp/bind.h>
 #include <fbl/alloc_checker.h>
-
-#include "src/devices/adc/metadata/metadata.h"
+#include <sdk/lib/driver/metadata/cpp/metadata.h>
 
 namespace adc {
 

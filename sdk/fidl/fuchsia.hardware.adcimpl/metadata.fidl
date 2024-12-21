@@ -19,7 +19,3 @@ type Metadata = table {
     /// ADC Channels to expose.
     1: channels vector<AdcChannel>:MAX;
 };
-
-// Name of the FIDL type [`fuchsia.hardware.adcimpl/Metadata`]. Also used as the ID for metadata
-// stored within the ADC platform device.
-const METADATA_TYPE_NAME string = "fuchsia.hardware.adcimpl.Metadata";

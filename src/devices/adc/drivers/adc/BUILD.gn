@@ -17,7 +17,7 @@ driver_bind_rules("adc_bind") {
 
 source_set("common") {
   sources = [ "adc.cc" ]
-  deps = [ "//src/devices/adc/metadata" ]
+  deps = [ "//sdk/lib/driver/metadata/cpp" ]
   public_deps = [
     ":adc_bind",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
@@ -61,8 +61,8 @@ test("adc-test-bin") {
   sources = [ "adc-test.cc" ]
   deps = [
     ":common",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
-    "//src/devices/adc/metadata",
     "//src/lib/fxl/test:gtest_main",
   ]
 }

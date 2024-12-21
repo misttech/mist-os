@@ -204,7 +204,7 @@ zx::result<> AmlSaradc::Start() {
   }
 
   zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_adcimpl::Metadata>(
-      fuchsia_hardware_adcimpl::kMetadataTypeName);
+      fuchsia_hardware_adcimpl::Metadata::kSerializableName);
   if (metadata.is_error()) {
     FDF_SLOG(ERROR, "Failed to get metadata from platform device.",
              KV("status", metadata.status_string()));

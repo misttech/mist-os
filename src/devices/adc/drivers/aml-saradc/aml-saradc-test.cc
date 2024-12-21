@@ -59,7 +59,7 @@ class AmlSaradcTestEnvironment : fdf_testing::Environment {
     auto raw_metadata = fidl::Persist(metadata);
     EXPECT_TRUE(raw_metadata.is_ok());
     pdev_server_.set_metadata(
-        {{fuchsia_hardware_adcimpl::kMetadataTypeName, std::move(raw_metadata.value())}});
+        {{fuchsia_hardware_adcimpl::Metadata::kSerializableName, std::move(raw_metadata.value())}});
     return to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
         pdev_server_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()));
   }

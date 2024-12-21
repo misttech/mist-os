@@ -4,11 +4,6 @@
 
 library fuchsia.hardware.light;
 
-// Name of the FIDL type [`fuchsia.hardware.light/Metadata`]. Also used as the ID for metadata
-// stored within the light platform device.
-@available(added=HEAD)
-const METADATA_TYPE_NAME string = "fuchsia.hardware.light.Metadata";
-
 @available(added=HEAD)
 type Config = table {
     1: name string:MAX;
@@ -19,6 +14,7 @@ type Config = table {
 };
 
 @available(added=HEAD)
+@serializable
 type Metadata = table {
     1: configs vector<Config>:MAX;
 };

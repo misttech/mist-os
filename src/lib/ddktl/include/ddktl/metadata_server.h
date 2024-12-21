@@ -15,12 +15,6 @@
 
 namespace ddk {
 
-// TODO(b/378118627): Remove once no longer referenced.
-template <typename FidlType>
-struct ObjectDetails {
-  inline static const char* Name;
-};
-
 // Connects to the FIDL service that provides |FidlType|. This service is found within |device|'s
 // incoming namespace at FIDL service instance |instance_name|.
 template <typename FidlType>
