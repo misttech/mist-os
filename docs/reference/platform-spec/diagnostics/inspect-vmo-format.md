@@ -97,7 +97,11 @@ All blocks must be aligned on 16-byte boundaries, and addressing within
 the VMO is in terms of an Index, specifying a 16-byte offsets (`offset =
 index * 16`).
 
-We use 24 bits for indexes, so Inspect Files may be at most 256MiB.
+We use 24 bits for indexes, but Inspect Files may be at most 128MiB for legacy reasons.
+
+Note: The content index of Link Value nodes is only 20 bits. That can't account for a 256MB VMO.
+Instead of fixing the node, which would require a version bump and extensive testing, we just
+restrict the size of the VMO.
 
 A `block_header` consists of 8 bytes as follows:
 
