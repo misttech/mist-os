@@ -201,11 +201,13 @@ class CurrentTask : public TaskMemoryAccessor {
   /// Returns a FileHandle but does not install the FileHandle in the FdTable
   /// for this task.
   fit::result<Errno, FileHandle> open_file_at(FdNumber dir_fd, const FsStr& path, OpenFlags flags,
-                                              FileMode mode, ResolveFlags resolve_flags) const;
+                                              FileMode mode, ResolveFlags resolve_flags,
+                                              AccessCheck access_check) const;
 
   fit::result<Errno, FileHandle> open_namespace_node_at(NamespaceNode dir, const FsStr& path,
                                                         OpenFlags flags, FileMode mode,
-                                                        ResolveFlags& resolve_flags) const;
+                                                        ResolveFlags& resolve_flags,
+                                                        AccessCheck access_check) const;
 
   /// A wrapper for FsContext::lookup_parent_at that resolves the given
   /// dir_fd to a NamespaceNode.

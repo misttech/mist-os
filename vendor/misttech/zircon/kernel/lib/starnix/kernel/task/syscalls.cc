@@ -277,9 +277,11 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
       // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
       // file->name()
       return file->name_->open(current_task,
-                               starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY), true);
+                               starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY),
+                               AccessCheck::check_for(Access(AccessEnum::EXEC)));
     }
-    return current_task.open_file_at(dir_fd, *path, open_flags, FileMode(), ResolveFlags::empty());
+    return current_task.open_file_at(dir_fd, *path, open_flags, FileMode(), ResolveFlags::empty(),
+                                     AccessCheck::check_for(Access(AccessEnum::EXEC)));
   }() _EP(executable);
 
   // This path can affect script resolution (the path is appended to the script args)

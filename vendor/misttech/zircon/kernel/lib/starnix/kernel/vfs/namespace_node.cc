@@ -51,8 +51,8 @@ NamespaceNode NamespaceNode::new_anonymous_unrooted(FsNodeHandle node) {
 }
 
 fit::result<Errno, FileHandle> NamespaceNode::open(const CurrentTask& current_task, OpenFlags flags,
-                                                   bool check_access) const {
-  auto open = entry_->node_->open(current_task, mount_, flags, check_access) _EP(open);
+                                                   AccessCheck access_check) const {
+  auto open = entry_->node_->open(current_task, mount_, flags, access_check) _EP(open);
   return FileObject::New(ktl::move(open.value()), *this, flags);
 }
 

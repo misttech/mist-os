@@ -54,7 +54,7 @@ fit::result<Errno, FileHandle> open_file_at(const CurrentTask& current_task, FdN
   auto path = current_task.read_c_string_to_vec(user_path, PATH_MAX) _EP(path);
   LTRACEF("dir_fd %d, path %s\n", dir_fd.raw(), path->c_str());
   return current_task.open_file_at(dir_fd, path.value(), OpenFlags::from_bits_truncate(flags), mode,
-                                   resolve_flags);
+                                   resolve_flags, AccessCheck());
 }
 
 template <typename T, typename CallbackFn>

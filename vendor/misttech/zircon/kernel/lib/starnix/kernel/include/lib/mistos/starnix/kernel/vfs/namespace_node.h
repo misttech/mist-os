@@ -22,6 +22,7 @@
 namespace starnix {
 
 using starnix_uapi::Access;
+using starnix_uapi::AccessCheck;
 using starnix_uapi::DeviceType;
 using starnix_uapi::Errno;
 using starnix_uapi::FileMode;
@@ -137,7 +138,7 @@ class NamespaceNode {
   /// FileObject records the NamespaceNode that created it in order to
   /// remember its path in the Namespace.
   fit::result<Errno, FileHandle> open(const CurrentTask& current_task, OpenFlags flags,
-                                      bool check_access) const;
+                                      AccessCheck access_check) const;
 
   /// Create or open a node in the file system.
   ///

@@ -130,24 +130,38 @@ fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::create_file_ops(
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> FsNode::open(const CurrentTask& current_task,
                                                           const MountInfo& mount, OpenFlags flags,
-                                                          bool check_access) const {
+                                                          AccessCheck access_check) const {
   // If O_PATH is set, there is no need to create a real FileOps because
   // most file operations are disabled.
   if (flags.contains(OpenFlagsEnum::PATH)) {
     return fit::ok(ktl::move(ktl::unique_ptr<OPathOps>(OPathOps::New())));
   }
 
-  if (check_access) {
+  auto access = access_check.resolve(flags);
+  if (access.is_nontrivial()) {
     if (flags.contains(OpenFlagsEnum::NOATIME)) {
       // self.check_o_noatime_allowed(current_task) ? ;
     }
-    // self.check_access(current_task, mount, Access::from_open_flags(flags)) ? ;
+
+    _EP(check_access(current_task, mount, Access::from_open_flags(flags),
+                     CheckAccessReason::InternalPermissionChecks));
   }
 
   auto [mode, rdev] = [&]() -> auto {
+    // Don't hold the info lock while calling into open_device or self.ops().
+    // TODO: The mode and rdev are immutable and shouldn't require a lock to read.
     auto info = this->info();
     return ktl::pair(info->mode_, info->rdev_);
   }();
+
+  // `flags` doesn't contain any information about the EXEC permission. Instead the syscalls
+  // used to execute a file (`sys_execve` and `sys_execveat`) call `open()` with the EXEC
+  // permission request in `access`.
+  // auto permission_flags = flags.contains(OpenFlagsEnum::APPEND) ?
+  // PermissionFlags::APPEND :
+  // PermissionFlags::empty();
+
+  // security::fs_node_permission(current_task, self, permission_flags | access.into())?;
 
   auto fmt_mode = (mode & FileMode::IFMT);
   if (fmt_mode == FileMode::IFCHR || fmt_mode == FileMode::IFBLK || fmt_mode == FileMode::IFIFO) {
@@ -171,33 +185,48 @@ fit::result<Errno, FsNodeHandle> FsNode::mknod(const CurrentTask& current_task,
                                                const MountInfo& mount, const FsStr& name,
                                                FileMode mode, DeviceType dev, FsCred owner) const {
   ASSERT_MSG((mode & FileMode::IFMT) != FileMode::EMPTY, "mknod called without node type.");
-  /*
-    self.check_access(current_task, mount, Access::WRITE)?;
-    self.update_metadata_for_child(current_task, &mut mode, &mut owner);
-  */
+  _EP(check_access(current_task, mount, Access(AccessEnum::WRITE),
+                   CheckAccessReason::InternalPermissionChecks));
 
-  if (mode.is_dir()) {
-    return ops_->mkdir(*this, current_task, name, mode, owner);
+  if (mode.is_reg()) {
+    //_EP(security::check_fs_node_create_access(current_task, *this, mode));
+  } else if (mode.is_dir()) {
+    // Even though the man page for mknod(2) says that mknod "cannot be used to create
+    // directories" in starnix the mkdir syscall (`sys_mkdirat`) ends up calling mknod.
+    //_EP(security::check_fs_node_mkdir_access(current_task, *this, mode));
+  } else if (!((mode.fmt() == FileMode::IFCHR) || (mode.fmt() == FileMode::IFBLK) ||
+               (mode.fmt() == FileMode::IFIFO) || (mode.fmt() == FileMode::IFSOCK))) {
+    //_EP(security::check_fs_node_mknod_access(current_task, *this, mode, dev));
   }
-  // https://man7.org/linux/man-pages/man2/mknod.2.html says:
-  //
-  //   mode requested creation of something other than a regular
-  //   file, FIFO (named pipe), or UNIX domain socket, and the
-  //   caller is not privileged (Linux: does not have the
-  //   CAP_MKNOD capability); also returned if the filesystem
-  //   containing pathname does not support the type of node
-  //   requested.
 
-  /*
-    let creds = current_task.creds();
-    if !creds.has_capability(CAP_MKNOD) {
-        if !matches!(mode.fmt(), FileMode::IFREG | FileMode::IFIFO | FileMode::IFSOCK) {
-            return error!(EPERM);
-        }
+
+  FsNodeHandle new_node;
+  if (mode.is_dir()) {
+    auto result = ops_->mkdir(*this, current_task, name, mode, owner) _EP(result);
+    new_node = result.value();
+  } else {
+    // https://man7.org/linux/man-pages/man2/mknod.2.html says on error EPERM:
+    //
+    //   mode requested creation of something other than a regular
+    //   file, FIFO (named pipe), or UNIX domain socket, and the
+    //   caller is not privileged (Linux: does not have the
+    //   CAP_MKNOD capability); also returned if the filesystem
+    //   containing pathname does not support the type of node
+    //   requested.
+    auto creds = current_task->creds();
+    if (!creds.has_capability(kCapMknod)) {
+      auto fmt = mode.fmt();
+      if (fmt != FileMode::IFREG && fmt != FileMode::IFIFO && fmt != FileMode::IFSOCK) {
+        return fit::error(errno(EPERM));
+      }
     }
-    let mut locked = locked.cast_locked::<FileOpsCore>();
-  */
-  return ops_->mknod(*this, current_task, name, mode, dev, owner);
+    auto result = ops_->mknod(*this, current_task, name, mode, dev, owner) _EP(result);
+    new_node = result.value();
+  }
+
+  // self.init_new_node_security_on_create(locked, current_task, &new_node)?;
+
+  return fit::ok(new_node);
 }
 
 fit::result<Errno, FsNodeHandle> FsNode::create_symlink(const CurrentTask& current_task,

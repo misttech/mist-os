@@ -214,7 +214,7 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
 
   fit::result<Errno, ktl::unique_ptr<FileOps>> open(const CurrentTask& current_task,
                                                     const MountInfo& mount, OpenFlags flags,
-                                                    bool check_access) const;
+                                                    AccessCheck access_check) const;
 
   fit::result<Errno, FsNodeHandle> lookup(const CurrentTask& current_task, const MountInfo& mount,
                                           const FsStr& name) const;

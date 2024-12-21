@@ -98,7 +98,7 @@ bool test_permissions() {
   auto file = (*current_task)
                   .open_file_at(FdNumber::AT_FDCWD_, path,
                                 OpenFlags(OpenFlagsEnum::CREAT) | OpenFlags(OpenFlagsEnum::RDONLY),
-                                FileMode::from_bits(0777), ResolveFlags::empty());
+                                FileMode::from_bits(0777), ResolveFlags::empty(), AccessCheck());
 
   ASSERT_TRUE(file.is_ok(), "failed to create file");
 
@@ -130,7 +130,7 @@ bool test_persistence() {
   auto _txt = (*current_task)
                   .open_file_at(FdNumber::AT_FDCWD_, "/usr/bin/test.txt",
                                 OpenFlags(OpenFlagsEnum::RDWR) | OpenFlags(OpenFlagsEnum::CREAT),
-                                FileMode::from_bits(0777), ResolveFlags::empty());
+                                FileMode::from_bits(0777), ResolveFlags::empty(), AccessCheck());
   auto txt = (*current_task).open_file("/usr/bin/test.txt", OpenFlags(OpenFlagsEnum::RDWR));
   ASSERT_TRUE(txt.is_ok(), "failed to open test.txt");
 
