@@ -7,10 +7,10 @@ use assembly_config_schema::BoardDriverArguments;
 use assembly_constants::BootfsDestination;
 use assembly_tool::Tool;
 use camino::{Utf8Path, Utf8PathBuf};
+use log::debug;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Write;
-use tracing::debug;
 use zerocopy::IntoBytes;
 
 use crate::zbi_items::{ZbiBoardInfo, ZbiPlatformId};

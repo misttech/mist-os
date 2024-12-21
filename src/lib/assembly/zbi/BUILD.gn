@@ -17,7 +17,7 @@ rustc_library("zbi") {
     "//src/lib/assembly/tool",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:zerocopy",
   ]
   sources = [
