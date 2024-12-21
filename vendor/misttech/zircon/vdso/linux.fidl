@@ -12,7 +12,13 @@ alias NewUtsname = byte;
 alias Statx = byte;
 alias Stat = byte;
 alias Rusage = byte;
+alias FdSet = byte;
+alias OldTimeVal = byte;
 alias Rlimit64 = byte;
+alias TimeZone = byte;
+alias PollFd = byte;
+alias TimeSpec = byte;
+alias SigSet = byte;
 
 //alias Pid = int32;
 @no_protocol_prefix
@@ -172,8 +178,23 @@ closed protocol Linux {
     // STUB 22
     strict A0022Pipe() -> () error int64;
 
-    // STUB 23
-    strict A0023Select() -> () error int64;
+    // #23, SYSCALL_DEFINE5(select, int, n, fd_set __user *, inp, fd_set __user *, outp, 
+    // fd_set __user *, exp, struct __kernel_old_timeval __user *, tvp)
+    strict A0023Select(resource struct {
+        n int32;
+        @voidptr
+        @inout
+        inp experimental_pointer<FdSet>;
+        @voidptr
+        @inout
+        outp experimental_pointer<FdSet>;
+        @voidptr
+        @inout
+        exp experimental_pointer<FdSet>;
+        @voidptr
+        @inout
+        tvp experimental_pointer<OldTimeVal>;
+    }) -> () error int64;
 
     // #24, SYSCALL_DEFINE0(sched_yield)
     strict A0024SchedYield() -> () error int64;
@@ -468,8 +489,15 @@ closed protocol Linux {
     // STUB 95
     strict A0095Umask() -> () error int64;
 
-    // STUB 96
-    strict A0096Gettimeofday() -> () error int64;
+    // #96, SYSCALL_DEFINE2(gettimeofday, struct __kernel_old_timeval __user *, tv, struct timezone __user *, tz)
+    strict A0096Gettimeofday(resource struct {
+        @voidptr
+        @out
+        tv experimental_pointer<OldTimeVal>;
+        @voidptr
+        @out
+        tz experimental_pointer<TimeZone>;
+    }) -> () error int64;
 
     // STUB 97
     strict A0097Getrlimit() -> () error int64;
@@ -713,8 +741,12 @@ closed protocol Linux {
     // STUB 172
     strict A0172Iopl() -> () error int64;
 
-    // STUB 173
-    strict A0173Ioperm() -> () error int64;
+    // #173, SYSCALL_DEFINE3(ioperm, unsigned long, from, unsigned long, num, int, turn_on)
+    strict A0173Ioperm(resource struct {
+        from uint64;
+        num uint64;
+        turn_on int32;
+    }) -> () error int64;
 
     // STUB (Not entry point) 174
     strict A0174CreateModule() -> () error int64;
@@ -1053,8 +1085,22 @@ closed protocol Linux {
     // STUB 270
     strict A0270Pselect6() -> () error int64;
 
-    // STUB 271
-    strict A0271Ppoll() -> () error int64;
+    // #271, SYSCALL_DEFINE5(ppoll, struct pollfd __user *, ufds, unsigned int, nfds, 
+    // struct __kernel_timespec __user *, tsp, const sigset_t __user *, sigmask,
+    // size_t, sigsetsize)
+    strict A0271Ppoll(resource struct {
+        @voidptr
+        @inout
+        ufds experimental_pointer<PollFd>;
+        nfds uint32;
+        @voidptr
+        @inout
+        tsp experimental_pointer<TimeSpec>;
+        @voidptr
+        @in
+        sigmask experimental_pointer<SigSet>;
+        sigsetsize uint64;
+    }) -> () error int64;
 
     // STUB 272
     strict A0272Unshare() -> () error int64;
@@ -1123,8 +1169,12 @@ closed protocol Linux {
         flags int32;
     }) -> () error int64;
 
-    // STUB 293
-    strict A0293Pipe2() -> () error int64;
+    // #293, SYSCALL_DEFINE2(pipe2, int __user *, fildes, int, flags)
+    strict A0293Pipe2(resource struct {
+        @inout
+        fildes int32;
+        flags int32;
+    }) -> () error int64;
 
     // STUB 294
     strict A0294InotifyInit1() -> () error int64;
