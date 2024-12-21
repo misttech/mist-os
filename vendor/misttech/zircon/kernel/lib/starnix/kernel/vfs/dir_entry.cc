@@ -93,8 +93,8 @@ DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> pa
 DirEntryHandle DirEntry::new_unrooted(FsNodeHandle node) { return New(ktl::move(node), {}, {}); }
 
 DirEntry::DirEntryLockedChildren DirEntry::lock_children() {
-  return DirEntry::DirEntryLockedChildren(fbl::RefPtr<DirEntry>(this),
-                                          ktl::move(children_.Write()));
+  fbl::RefPtr<DirEntry> self(this);
+  return DirEntry::DirEntryLockedChildren(self, ktl::move(children_.Write()));
 }
 
 FsString DirEntry::local_name() const { return state_.Read()->local_name; }
@@ -234,7 +234,7 @@ bool DirEntry::is_descendant_of(const DirEntryHandle& other) const {
   }
 }
 
-fbl::Vector<FsString> DirEntry::copy_child_names() {
+fbl::Vector<FsString> DirEntry::copy_child_names() const {
   fbl::Vector<FsString> child_names;
   auto c = children_.Read();
   for (auto iter = c->begin(); iter != c->end(); ++iter) {
@@ -248,7 +248,7 @@ fbl::Vector<FsString> DirEntry::copy_child_names() {
   return child_names;
 }
 
-void DirEntry::internal_remove_child(DirEntry* child) {
+void DirEntry::internal_remove_child(DirEntry* child) const {
   auto local_name = child->local_name();
 
   LTRACEF_LEVEL(2, "local_name=[%.*s]\n", static_cast<int>(local_name.length()), local_name.data());

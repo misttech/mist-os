@@ -8,6 +8,8 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/memory/weak_ptr.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+// #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/mount_info.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
@@ -94,39 +96,41 @@ class DefaultDirEntryOps : public DirEntryOps {
   virtual ~DefaultDirEntryOps();
 };
 
-struct Created {};
-
-template <typename CreateFn>
-struct Existed {
+template <typename F>
+class CreationResult {
  public:
-  explicit Existed(CreateFn&& fn) : create_fn(std::forward<CreateFn>(fn)) {}
+  class Inner {
+   public:
+    struct Created {};
+    struct Existed {
+      F create_fn;
+    };
+  };
 
-  CreateFn create_fn;
-};
+  using Variant = ktl::variant<typename Inner::Created, typename Inner::Existed>;
 
-template <typename CreateFn>
-struct CreationResult {
- public:
-  explicit CreationResult(const Created& c) : variant_(c) {}
-  explicit CreationResult(CreateFn&& fn)
-      : variant_(Existed<CreateFn>(std::forward<CreateFn>(fn))) {}
+  static CreationResult Created() { return CreationResult(typename Inner::Created{}); }
+  static CreationResult Existed(F&& fn) {
+    return CreationResult(typename Inner::Existed{.create_fn = std::forward<F>(fn)});
+  }
 
  private:
+  // Helpers from the reference documentation for std::visit<>, to allow
+  // visit-by-overload of the std::variant<>:
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
   friend class DirEntry;
 
-  ktl::variant<Created, Existed<CreateFn>> variant_;
-};
+  explicit CreationResult(Variant variant) : variant_(ktl::move(variant)) {}
 
-// Helpers from the reference documentation for std::visit<>, to allow
-// visit-by-overload of the std::variant<>
-template <class... Ts>
-struct overloaded : Ts... {
-  using Ts::operator()...;
+  Variant variant_;
 };
-
-// explicit deduction guide (not needed as of C++20)
-template <class... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
 
 /// An entry in a directory.
 ///
@@ -220,11 +224,12 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
           auto lookup_result = entry_->node_->lookup(current_task, mount, name);
           if (lookup_result.is_ok()) {
             return fit::ok(
-                ktl::pair(lookup_result.value(), CreationResult<CreateNodeFn>(create_fn)));
+                ktl::pair(lookup_result.value(), CreationResult<CreateNodeFn>::Existed(create_fn)));
           }
           if (lookup_result.error_value().error_code() == ENOENT) {
             auto create_fn_result = create_fn(entry_->node_, mount, name) _EP(create_fn_result);
-            return fit::ok(ktl::pair(create_fn_result.value(), Created()));
+            return fit::ok(
+                ktl::pair(create_fn_result.value(), CreationResult<CreateNodeFn>::Created()));
           }
           return lookup_result.take_error();
         }() _EP(node_and_create_result);
@@ -233,7 +238,7 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
         ASSERT_MSG((node->info()->mode_ & FileMode::IFMT) != FileMode::EMPTY,
                    "FsNode initialization did not populate the FileMode in FsNodeInfo.");
 
-        auto entry = DirEntry::New(node, {entry_}, name);
+        auto entry = DirEntry::New(node, entry_, name);
 
         // #[cfg(any(test, debug_assertions))]
         {
@@ -252,7 +257,9 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
           // Vacant
           auto result = create_child(create_fn) _EP(result);
           auto [child, create_result] = result.value();
-          children_->emplace(child->local_name(), child->weak_factory_.GetWeakPtr());
+          auto [iter, inserted] =
+              children_->emplace(child->local_name(), child->weak_factory_.GetWeakPtr());
+          ZX_ASSERT_MSG(inserted, "Failed to insert child into directory entry");
           return fit::ok(ktl::pair(child, create_result));
         }
         // Occupied
@@ -262,14 +269,18 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
         auto child = it->second.Lock();
         if (child) {
           child->node_->fs()->did_access_dir_entry(child);
-          return fit::ok(ktl::pair(child, CreationResult<CreateNodeFn>(create_fn)));
+          return fit::ok(ktl::pair(child, CreationResult<CreateNodeFn>::Existed(create_fn)));
         }
 
         auto result = create_child(create_fn) _EP(result);
         auto [new_child, create_result] = result.value();
-        children_->emplace(new_child->local_name(), new_child->weak_factory_.GetWeakPtr());
+        auto [iter, inserted] =
+            children_->emplace(new_child->local_name(), new_child->weak_factory_.GetWeakPtr());
+        ZX_ASSERT_MSG(inserted, "Failed to insert child into directory entry");
         return fit::ok(ktl::pair(new_child, create_result));
       }() _EP(result);
+
+      // security::fs_node_init_with_dentry(locked, current_task, &child)?;
 
       auto [child, create_result] = result.value();
       child->node_->fs()->did_create_dir_entry(child);
@@ -407,7 +418,7 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
   /// Used by O_TMPFILE.
   fit::result<Errno, DirEntryHandle> create_tmpfile(const CurrentTask& current_task,
                                                     const MountInfo& mount, FileMode mode,
-                                                    FsCred owner, OpenFlags flags);
+                                                    FsCred owner, OpenFlags flags) const;
 
   fit::result<Errno> unlink(const CurrentTask& current_task, const MountInfo& mount,
                             const FsStr& name, UnlinkKind kind, bool must_be_directory);
@@ -458,7 +469,7 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
       if (child.has_value()) {
         auto c = child.value();
         c->node_->fs()->did_access_dir_entry(c);
-        return fit::ok(ktl::pair(c, CreationResult<CreateNodeFn>(create_fn)));
+        return fit::ok(ktl::pair(c, CreationResult<CreateNodeFn>::Existed(create_fn)));
       }
       auto result =
           lock_children().get_or_create_child(current_task, mount, name, create_fn) _EP(result);
@@ -470,11 +481,12 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
     auto [new_child, create_result] = child_and_create_result.value();
     auto new_result = [&]() -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
       return ktl::visit(
-          overloaded{
-              [&](const Created&) -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
+          typename CreationResult<CreateNodeFn>::overloaded{
+              [&](const typename CreationResult<CreateNodeFn>::Inner::Created&)
+                  -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
                 return fit::ok(ktl::pair(new_child, false));
               },
-              [&](const Existed<CreateNodeFn>& e)
+              [&](const typename CreationResult<CreateNodeFn>::Inner::Existed& e)
                   -> fit::result<Errno, ktl::pair<DirEntryHandle, bool>> {
                 auto revalidate_result =
                     new_child->ops_->revalidate(current_task, *new_child) _EP(revalidate_result);
@@ -483,7 +495,7 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
                   return fit::ok(ktl::pair(new_child, true));
                 }
                 this->internal_remove_child(new_child.get());
-                // child.destroy(&current_task.kernel().mounts);
+                // new_child->destroy(current_task->kernel()->mounts_);
                 auto result = lock_children().get_or_create_child(current_task, mount, name,
                                                                   e.create_fn) _EP(result);
                 auto [local_child, local_create_result] = result.value();
@@ -491,8 +503,11 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
 
                 return fit::ok(ktl::pair(
                     local_child,
-                    ktl::visit(overloaded{[](const Created&) -> bool { return false; },
-                                          [](const Existed<CreateNodeFn>) -> bool { return true; }},
+                    ktl::visit(typename CreationResult<CreateNodeFn>::overloaded{
+                                   [](const typename CreationResult<CreateNodeFn>::Inner::Created&)
+                                       -> bool { return false; },
+                                   [](const typename CreationResult<CreateNodeFn>::Inner::Existed&)
+                                       -> bool { return true; }},
                                local_create_result.variant_)));
               },
           },
@@ -510,10 +525,10 @@ class DirEntry : public fbl::SinglyLinkedListable<fbl::RefPtr<DirEntry>>,
   ///
   /// Also, the vector might have "extra" names that are in the process of
   /// being looked up. If the lookup fails, they'll be removed.
-  fbl::Vector<FsString> copy_child_names();
+  fbl::Vector<FsString> copy_child_names() const;
 
  private:
-  void internal_remove_child(DirEntry* child);
+  void internal_remove_child(DirEntry* child) const;
 
 #if 0
   /// Notifies watchers on the current node and its parent about an event.
