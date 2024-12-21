@@ -87,16 +87,16 @@ class FileMode {
   FileMode fmt() const { return FileMode(bits() & S_IFMT); }
 
   FileMode with_type(const FileMode& file_type) const {
-    return FileMode((mode_ & PERMISSIONS.bits()) | (file_type.bits() & S_IFMT));
+    return FileMode((bits() & PERMISSIONS.bits()) | (file_type.bits() & S_IFMT));
   }
 
-  bool is_lnk() const { return (mode_ & S_IFMT) == S_IFLNK; }
-  bool is_reg() const { return (mode_ & S_IFMT) == S_IFREG; }
-  bool is_dir() const { return (mode_ & S_IFMT) == S_IFDIR; }
-  bool is_chr() const { return (mode_ & S_IFMT) == S_IFCHR; }
-  bool is_blk() const { return (mode_ & S_IFMT) == S_IFBLK; }
-  bool is_fifo() const { return (mode_ & S_IFMT) == S_IFIFO; }
-  bool is_sock() const { return (mode_ & S_IFMT) == S_IFSOCK; }
+  bool is_lnk() const { return (bits() & S_IFMT) == S_IFLNK; }
+  bool is_reg() const { return (bits() & S_IFMT) == S_IFREG; }
+  bool is_dir() const { return (bits() & S_IFMT) == S_IFDIR; }
+  bool is_chr() const { return (bits() & S_IFMT) == S_IFCHR; }
+  bool is_blk() const { return (bits() & S_IFMT) == S_IFBLK; }
+  bool is_fifo() const { return (bits() & S_IFMT) == S_IFIFO; }
+  bool is_sock() const { return (bits() & S_IFMT) == S_IFSOCK; }
 
   bool operator!=(const FileMode& other) const { return mode_ != other.mode_; }
   bool operator==(const FileMode& other) const { return mode_ == other.mode_; }
