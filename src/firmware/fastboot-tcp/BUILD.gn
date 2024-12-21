@@ -40,7 +40,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:byteorder",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [
