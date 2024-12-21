@@ -143,6 +143,31 @@ fit::result<Errno, DirEntryHandle> DirEntry::create_dir_for_testing(const Curren
                       });
 }
 
+fit::result<Errno, DirEntryHandle> DirEntry::create_tmpfile(const CurrentTask& current_task,
+                                                            const MountInfo& mount, FileMode mode,
+                                                            FsCred owner, OpenFlags flags) const {
+  // Only directories can have children
+  if (!node_->is_dir()) {
+    return fit::error(errno(ENOTDIR));
+  }
+  ASSERT(mode.is_reg());
+
+  // From <https://man7.org/linux/man-pages/man2/open.2.html>:
+  //
+  //   Specifying O_EXCL in conjunction with O_TMPFILE prevents a
+  //   temporary file from being linked into the filesystem in
+  //   the above manner.  (Note that the meaning of O_EXCL in
+  //   this case is different from the meaning of O_EXCL
+  //   otherwise.)
+  auto link_behavior = flags.contains(OpenFlagsEnum::EXCL) ? FsNodeLinkBehavior::kDisallowed
+                                                           : FsNodeLinkBehavior::kAllowed;
+
+  auto node_result =
+      node_->create_tmpfile(current_task, mount, mode, owner, link_behavior) _EP(node_result);
+
+  return fit::ok(DirEntry::new_unrooted(node_result.value()));
+}
+
 fit::result<Errno> DirEntry::unlink(const CurrentTask& current_task, const MountInfo& mount,
                                     const FsStr& name, UnlinkKind kind, bool must_be_directory) {
   LTRACEF_LEVEL(2, "name=[%.*s]\n", static_cast<int>(name.length()), name.data());

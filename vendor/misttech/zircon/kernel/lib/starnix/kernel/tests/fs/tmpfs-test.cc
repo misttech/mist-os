@@ -69,7 +69,7 @@ bool test_write_read() {
   ASSERT(ac.check());
 
   ktl::span<uint16_t> tmp(test_vec.data(), test_vec.capacity());
-  ktl::span<uint8_t> test_bytes(reinterpret_cast<uint8_t*>(tmp.data()), tmp.size_bytes());
+  ktl::span<uint8_t> test_bytes(reinterpret_cast<uint8_t *>(tmp.data()), tmp.size_bytes());
 
   auto buffer = VecInputBuffer::New(test_bytes);
   auto write_result = wr_file->write(*current_task, &buffer);

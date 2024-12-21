@@ -199,6 +199,7 @@ fit::result<Errno, FsNodeHandle> FsNode::mknod(const CurrentTask& current_task,
     //_EP(security::check_fs_node_mknod_access(current_task, *this, mode, dev));
   }
 
+  update_metadata_for_child(current_task, mode, owner);
 
   FsNodeHandle new_node;
   if (mode.is_dir()) {
@@ -243,8 +244,23 @@ fit::result<Errno, FsNodeHandle> FsNode::create_symlink(const CurrentTask& curre
   return fit::ok(new_node.value());
 }
 
+fit::result<Errno, FsNodeHandle> FsNode::create_tmpfile(const CurrentTask& current_task,
+                                                        const MountInfo& mount, FileMode& mode,
+                                                        FsCred& owner,
+                                                        FsNodeLinkBehavior link_behavior) const {
+  _EP(check_access(current_task, mount, Access(AccessEnum::WRITE),
+                   CheckAccessReason::InternalPermissionChecks));
+  update_metadata_for_child(current_task, mode, owner);
+
+  auto node = ops_->create_tmpfile(*this, current_task, mode, owner) _EP(node);
+  // security::fs_node_init_on_create(current_task, &node, self)?;
+  (*node)->link_behavior_.set(link_behavior);
+  return fit::ok(node.value());
+}
+
 fit::result<Errno, SymlinkTarget> FsNode::readlink(const CurrentTask& current_task) const {
-  // TODO(qsr): Is there a permission check here?
+  // TODO: 378864856 - Is there a permission check here other than security checks?
+  // security::check_fs_node_read_link_access(current_task, self)?;
   return ops_->readlink(*this, current_task);
 }
 
@@ -333,9 +349,37 @@ fit::result<Errno> FsNode::default_check_access_impl(
   return current_task->creds().check_access(access, node_uid, node_gid, mode);
 }
 
-/// Check whether the node can be accessed in the current context with the specified access
-/// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
-/// owner or is in the file's group.
+void FsNode::update_metadata_for_child(const CurrentTask& current_task, FileMode& mode,
+                                       FsCred& owner) const {
+  // The setgid bit on a directory causes the gid to be inherited by new children and the
+  // setgid bit to be inherited by new child directories. See SetgidDirTest in gvisor.
+  {
+    auto self_info = info();
+    if (self_info->mode_.contains(FileMode::ISGID)) {
+      owner.gid_ = self_info->gid_;
+      if (mode.is_dir()) {
+        mode |= FileMode::ISGID;
+      }
+    }
+  }
+
+  if (!mode.is_dir()) {
+    // https://man7.org/linux/man-pages/man7/inode.7.html says:
+    //
+    //   For an executable file, the set-group-ID bit causes the
+    //   effective group ID of a process that executes the file to change
+    //   as described in execve(2).
+    //
+    // We need to check whether the current task has permission to create such a file.
+    // See a similar check in `FsNode::chmod`.
+    auto creds = current_task->creds();
+    if (!creds.has_capability(kCapFowner) && owner.gid_ != creds.fsgid_ &&
+        !creds.is_in_group(owner.gid_)) {
+      mode &= ~FileMode::ISGID;
+    }
+  }
+}
+
 fit::result<Errno> FsNode::check_access(const CurrentTask& current_task, const MountInfo& mount,
                                         Access access, CheckAccessReason reason) const {
   if (access.contains(AccessEnum::WRITE)) {

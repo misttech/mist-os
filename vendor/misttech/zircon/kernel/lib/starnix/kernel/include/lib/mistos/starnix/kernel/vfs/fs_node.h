@@ -189,11 +189,9 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   void set_id(ino_t node_id) {
     DEBUG_ASSERT(node_id_ == 0);
     node_id_ = node_id;
-    /*
-      if self.info.get_mut().ino == 0 {
-          self.info.get_mut().ino = node_id;
-      }
-    */
+    if (info_.Write()->ino_ == 0) {
+      info_.Write()->ino_ = node_id;
+    }
   }
 
   FileSystemHandle fs() const {
@@ -203,6 +201,7 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   }
 
   void set_fs(const FileSystemHandle& fs) {
+    DEBUG_ASSERT(fs_.get() == nullptr);
     fs_ = fs->weak_factory_.GetWeakPtr();
     kernel_ = fs->kernel_;
   }
@@ -233,6 +232,11 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
                                                   const MountInfo& mount, const FsStr& name,
                                                   const FsStr& target, FsCred owner) const;
 
+  fit::result<Errno, FsNodeHandle> create_tmpfile(const CurrentTask& current_task,
+                                                  const MountInfo& mount, FileMode& mode,
+                                                  FsCred& owner,
+                                                  FsNodeLinkBehavior link_behavior) const;
+
   /// This method does not attempt to update the atime of the node.
   /// Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
   fit::result<Errno, SymlinkTarget> readlink(const CurrentTask& current_task) const;
@@ -246,6 +250,9 @@ class FsNode final : public fbl::SinglyLinkedListable<mtl::WeakPtr<FsNode>>,
   static fit::result<Errno> default_check_access_impl(
       const CurrentTask& current_task, Access access,
       starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info);
+
+  void update_metadata_for_child(const CurrentTask& current_task, FileMode& mode,
+                                 FsCred& owner) const;
 
   /// Check whether the node can be accessed in the current context with the specified access
   /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the

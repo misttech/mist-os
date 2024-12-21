@@ -123,9 +123,13 @@ fit::result<Errno, NamespaceNode> NamespaceNode::create_symlink(const CurrentTas
 fit::result<Errno, NamespaceNode> NamespaceNode::create_tmpfile(const CurrentTask& current_task,
                                                                 FileMode mode,
                                                                 OpenFlags flags) const {
-  // auto owner = current_task->as_fscred();
-  // auto _mode = current_task->fs()->apply_umask(mode);
-  return fit::error(errno(ENOTSUP));
+  LTRACEF_LEVEL(2, "mode=0x%x\n", mode.bits());
+
+  auto owner = current_task->as_fscred();
+  auto mask_mode = current_task->fs()->apply_umask(mode);
+  auto result = entry_->create_tmpfile(current_task, mount_, mask_mode, owner, flags) _EP(result);
+
+  return fit::ok(NamespaceNode::with_new_entry(result.value()));
 }
 
 fit::result<Errno, NamespaceNode> NamespaceNode::link(const CurrentTask& current_task,
