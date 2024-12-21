@@ -8,7 +8,9 @@ use crate::service_watcher::*;
 use crate::utils::*;
 use anyhow::{Context as _, Error};
 use fidl::endpoints::RequestStream;
-use fidl_fuchsia_hardware_sensors::{self as driver_fidl};
+use fidl_fuchsia_hardware_sensors::{
+    PlaybackSourceConfig, {self as driver_fidl},
+};
 use fidl_fuchsia_sensors::*;
 use fidl_fuchsia_sensors_types::*;
 use fuchsia_component::client as fclient;
@@ -49,136 +51,19 @@ async fn handle_sensors_request(
     let mut manager = manager.lock().await;
     match request {
         ManagerRequest::GetSensorsList { responder } => {
-            manager.populate_sensors().await;
-
-            if manager.sensors.len() > 0 {
-                let mut fidl_sensors = Vec::<SensorInfo>::new();
-                for sensor in manager.sensors.values().map(|sensor| sensor.info.clone()) {
-                    fidl_sensors.push(sensor);
-                }
-                let _ = responder.send(&fidl_sensors);
-            } else {
-                tracing::warn!("Failed to get any sensors from driver. Sending empty list");
-                let _ = responder.send(Vec::<SensorInfo>::new().as_slice());
-            }
+            let _ = responder.send(&manager.get_sensors_list().await);
         }
         ManagerRequest::ConfigureSensorRates { id, sensor_rate_config, responder } => {
-            if let Some(sensor) = manager.sensors.get(&id) {
-                match sensor.driver.configure_sensor_rate(id, &sensor_rate_config).await {
-                    Ok(Ok(())) => {
-                        let _ = responder.send(Ok(()));
-                    }
-                    Ok(Err(driver_fidl::ConfigureSensorRateError::InvalidSensorId)) => {
-                        tracing::warn!(
-                            "Received ConfigureSensorRates request for unknown sensor id: {}",
-                            id
-                        );
-                        let _ = responder.send(Err(ConfigureSensorRateError::InvalidSensorId));
-                    }
-                    Ok(Err(driver_fidl::ConfigureSensorRateError::InvalidConfig)) => {
-                        tracing::warn!(
-                            "Received ConfigureSensorRates request for invalid config: {:#?}",
-                            sensor_rate_config
-                        );
-                        let _ = responder.send(Err(ConfigureSensorRateError::InvalidConfig));
-                    }
-                    Err(e) => {
-                        tracing::warn!("Error while configuring sensor rates: {:#?}", e);
-                        let _ = responder.send(Err(ConfigureSensorRateError::DriverUnavailable));
-                    }
-                    Ok(Err(_)) => unreachable!(),
-                }
-            } else {
-                tracing::warn!(
-                    "Received ConfigureSensorRates request for unknown sensor id: {}",
-                    id
-                );
-                let _ = responder.send(Err(ConfigureSensorRateError::InvalidSensorId));
-            }
+            let _ = responder.send(manager.configure_sensor_rates(id, sensor_rate_config).await);
         }
         ManagerRequest::Activate { id, responder } => {
-            if let Some(sensor) = manager.sensors.get_mut(&id) {
-                // Activating an already active sensor is a valid operation, so the manager does
-                // not need to check if this is the first time the sensor is activated.
-                let res = sensor.driver.activate_sensor(id).await;
-                if let Err(e) = res {
-                    tracing::warn!("Error while activating sensor: {:#?}", e);
-                    let _ = responder.send(Err(ActivateSensorError::DriverUnavailable));
-                } else {
-                    sensor.clients.insert(client.clone());
-                    let _ = responder.send(Ok(()));
-                }
-            } else {
-                tracing::warn!("Received request to activate unknown sensor id: {}", id);
-                let _ = responder.send(Err(ActivateSensorError::InvalidSensorId));
-            }
+            let _ = responder.send(manager.activate(id, client.clone()).await);
         }
         ManagerRequest::Deactivate { id, responder } => {
-            let mut response: Result<(), DeactivateSensorError> = Ok(());
-            if let Some(sensor) = manager.sensors.get_mut(&id) {
-                // If this is the last subscriber for this sensor, deactivate it.
-                if sensor.clients.len() == 1 {
-                    if let Err(e) = sensor.driver.deactivate_sensor(id).await {
-                        tracing::warn!("Error while deactivating sensor: {:#?}", e);
-                        response = Err(DeactivateSensorError::DriverUnavailable);
-                    }
-                } else {
-                    tracing::info!(
-                        "Unsubscribing client from sensor {:#?}, but there are other subscribers.",
-                        id,
-                    );
-                }
-                sensor.clients.remove(client);
-            } else {
-                tracing::warn!("Received request to deactivate unknown sensor id: {}", id);
-                response = Err(DeactivateSensorError::InvalidSensorId);
-            }
-            let _ = responder.send(response);
+            let _ = responder.send(manager.deactivate(id, client).await);
         }
         ManagerRequest::ConfigurePlayback { source_config, responder } => {
-            let mut response: Result<(), ConfigurePlaybackError> = Ok(());
-
-            if let Some(mut playback) = manager.playback.clone() {
-                let res = playback.playback_proxy.configure_playback(&source_config).await;
-
-                match res {
-                    Ok(Ok(())) => {
-                        manager
-                            .sensors
-                            .extend(playback.get_sensors_from_config(source_config).await);
-
-                        // Don't add the playback driver proxy if playback was previously
-                        // configured.
-                        if !manager
-                            .driver_proxies
-                            .iter()
-                            .any(|x| playback.is_playback_driver_proxy(x))
-                        {
-                            manager.driver_proxies.push(playback.driver_proxy.clone());
-                        }
-                        response = Ok(());
-                    }
-                    Err(e) => {
-                        tracing::warn!("Error while configuring sensor playback: {:#?}", e);
-                        response = Err(ConfigurePlaybackError::PlaybackUnavailable);
-                    }
-                    Ok(Err(e)) => {
-                        response = Err(from_driver_playback_error(e));
-                    }
-                }
-
-                if !response.is_ok() {
-                    // Remove the playback driver proxy and its sensors.
-                    manager.driver_proxies.retain(|x| !playback.is_playback_driver_proxy(&x));
-                    manager.sensors.retain(|id, _| !playback.playback_sensor_ids.contains(id));
-                    playback.playback_sensor_ids.clear();
-                } else {
-                    playback.configured = response.is_ok();
-                    manager.playback = Some(playback);
-                }
-            }
-
-            let _ = responder.send(response);
+            let _ = responder.send(manager.configure_playback(source_config).await);
         }
         ManagerRequest::_UnknownMethod { ordinal, .. } => {
             tracing::warn!("ManagerRequest::_UnknownMethod with ordinal {}", ordinal);
@@ -212,6 +97,140 @@ impl SensorManager {
         let driver_proxies = Vec::new();
 
         Self { sensors, driver_proxies, playback, clients, update_sender }
+    }
+
+    async fn get_sensors_list(&mut self) -> Vec<SensorInfo> {
+        self.populate_sensors().await;
+        let fidl_sensors: Vec<SensorInfo> =
+            self.sensors.values().into_iter().map(|x| x.info.clone()).collect();
+        if fidl_sensors.is_empty() {
+            tracing::warn!("Failed to get any sensors from driver. Sending empty list");
+        }
+
+        fidl_sensors
+    }
+
+    async fn activate(&mut self, id: SensorId, client: Client) -> Result<(), ActivateSensorError> {
+        if let Some(sensor) = self.sensors.get_mut(&id) {
+            let res = sensor.driver.activate_sensor(id).await;
+            if let Err(e) = res {
+                tracing::warn!("Error while activating sensor: {:#?}", e);
+                Err(ActivateSensorError::DriverUnavailable)
+            } else {
+                sensor.clients.insert(client);
+                Ok(())
+            }
+        } else {
+            tracing::warn!("Received request to activate unknown sensor id: {}", id);
+            Err(ActivateSensorError::InvalidSensorId)
+        }
+    }
+
+    async fn deactivate(
+        &mut self,
+        id: SensorId,
+        client: &Client,
+    ) -> Result<(), DeactivateSensorError> {
+        let mut response: Result<(), DeactivateSensorError> = Ok(());
+        if let Some(sensor) = self.sensors.get_mut(&id) {
+            // If this is the last subscriber for this sensor, deactivate it.
+            if sensor.clients.len() == 1 {
+                if let Err(e) = sensor.driver.deactivate_sensor(id).await {
+                    tracing::warn!("Error while deactivating sensor: {:#?}", e);
+                    response = Err(DeactivateSensorError::DriverUnavailable);
+                }
+            } else {
+                if !sensor.clients.is_empty() {
+                    tracing::info!(
+                        "Unsubscribing client from sensor {:#?}, but there are other subscribers.",
+                        id,
+                    );
+                }
+            }
+            sensor.clients.remove(&client);
+        } else {
+            tracing::warn!("Received request to deactivate unknown sensor id: {}", id);
+            response = Err(DeactivateSensorError::InvalidSensorId);
+        }
+
+        response
+    }
+
+    async fn configure_sensor_rates(
+        &mut self,
+        id: SensorId,
+        sensor_rate_config: SensorRateConfig,
+    ) -> Result<(), ConfigureSensorRateError> {
+        if let Some(sensor) = self.sensors.get(&id) {
+            match sensor.driver.configure_sensor_rate(id, &sensor_rate_config).await {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(driver_fidl::ConfigureSensorRateError::InvalidSensorId)) => {
+                    tracing::warn!(
+                        "Received ConfigureSensorRates request for unknown sensor id: {}",
+                        id
+                    );
+                    Err(ConfigureSensorRateError::InvalidSensorId)
+                }
+                Ok(Err(driver_fidl::ConfigureSensorRateError::InvalidConfig)) => {
+                    tracing::warn!(
+                        "Received ConfigureSensorRates request for invalid config: {:#?}",
+                        sensor_rate_config
+                    );
+                    Err(ConfigureSensorRateError::InvalidConfig)
+                }
+                Err(e) => {
+                    tracing::warn!("Error while configuring sensor rates: {:#?}", e);
+                    Err(ConfigureSensorRateError::DriverUnavailable)
+                }
+                Ok(Err(_)) => unreachable!(),
+            }
+        } else {
+            tracing::warn!("Received ConfigureSensorRates request for unknown sensor id: {}", id);
+            Err(ConfigureSensorRateError::InvalidSensorId)
+        }
+    }
+
+    async fn configure_playback(
+        &mut self,
+        source_config: PlaybackSourceConfig,
+    ) -> Result<(), ConfigurePlaybackError> {
+        let mut response: Result<(), ConfigurePlaybackError> = Ok(());
+
+        if let Some(mut playback) = self.playback.clone() {
+            let res = playback.playback_proxy.configure_playback(&source_config).await;
+
+            match res {
+                Ok(Ok(())) => {
+                    self.sensors.extend(playback.get_sensors_from_config(source_config).await);
+
+                    // Don't add the playback driver proxy if playback was previously
+                    // configured.
+                    if !self.driver_proxies.iter().any(|x| playback.is_playback_driver_proxy(x)) {
+                        self.driver_proxies.push(playback.driver_proxy.clone());
+                    }
+                    response = Ok(());
+                }
+                Err(e) => {
+                    tracing::warn!("Error while configuring sensor playback: {:#?}", e);
+                    response = Err(ConfigurePlaybackError::PlaybackUnavailable);
+                }
+                Ok(Err(e)) => {
+                    response = Err(from_driver_playback_error(e));
+                }
+            }
+
+            if !response.is_ok() {
+                // Remove the playback driver proxy and its sensors.
+                self.driver_proxies.retain(|x| !playback.is_playback_driver_proxy(&x));
+                self.sensors.retain(|id, _| !playback.playback_sensor_ids.contains(id));
+                playback.playback_sensor_ids.clear();
+            } else {
+                playback.configured = response.is_ok();
+                self.playback = Some(playback);
+            }
+        }
+
+        response
     }
 
     pub(crate) async fn add_instance(&mut self, driver_proxy: driver_fidl::DriverProxy) {
