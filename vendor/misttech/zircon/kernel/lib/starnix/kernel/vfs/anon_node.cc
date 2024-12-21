@@ -12,12 +12,18 @@
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>
 #include <zircon/assert.h>
 
-// #include <ktl/enforce.h>
+namespace ktl {
+
+using std::function;
+
+}  // namespace ktl
+
+#include <ktl/enforce.h>
 
 namespace starnix {
 
 FileHandle Anon::new_file_extended(const CurrentTask& current_task, ktl::unique_ptr<FileOps> ops,
-                                   OpenFlags flags, std::function<FsNodeInfo(ino_t)> info) {
+                                   OpenFlags flags, ktl::function<FsNodeInfo(ino_t)> info) {
   fbl::AllocChecker ac;
   auto anon = new (&ac) Anon();
   ZX_ASSERT(ac.check());
