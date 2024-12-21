@@ -418,8 +418,13 @@ closed protocol Linux {
     // STUB 81
     strict A0081Fchdir() -> () error int64;
 
-    // STUB 82
-    strict A0082Rename() -> () error int64;
+    // #82, SYSCALL_DEFINE2(rename, const char __user *, oldname, const char __user *, newname)
+    strict A0082Rename(resource struct {
+        @in
+        oldname experimental_pointer<uchar>;
+        @in
+        newname experimental_pointer<uchar>;
+    }) -> () error int64;
 
     // STUB 83
     strict A0083Mkdir() -> () error int64;
@@ -1037,8 +1042,16 @@ closed protocol Linux {
         flag int32;
     }) -> () error int64;
 
-    // STUB 264
-    strict A0264Renameat() -> () error int64;
+    // #264 SYSCALL_DEFINE4(renameat, int, olddfd, const char __user *, oldname,
+    // int, newdfd, const char __user *, newname)
+    strict A0264Renameat(resource struct {
+        olddfd int32;
+        @in
+        oldname experimental_pointer<uchar>;
+        newdfd int32;
+        @in
+        newname experimental_pointer<uchar>;
+    }) -> () error int64;
 
     // #265, SYSCALL_DEFINE5(linkat, int, olddfd, const char __user *, oldname,
     // int, newdfd, const char __user *, newname, int, flags)
@@ -1252,8 +1265,17 @@ closed protocol Linux {
     // STUB 315
     strict A0315SchedGetattr() -> () error int64;
 
-    // STUB 316
-    strict A0316Renameat2() -> () error int64;
+    // #316, SYSCALL_DEFINE5(renameat2, int, olddfd, const char __user *, oldname,
+    // int, newdfd, const char __user *, newname, unsigned int, flags)
+    strict A0316Renameat2(resource struct {
+        olddfd int32;
+        @in
+        oldname experimental_pointer<uchar>;
+        newdfd int32;
+        @in
+        newname experimental_pointer<uchar>;
+        flags int32;
+    }) -> () error int64;
 
     // STUB 317
     strict A0317Seccomp() -> () error int64;
