@@ -32,5 +32,3 @@ toc:
   path: /docs/reference/platform-spec/diagnostics/inspect-vmo-format.md
 - title: "Log message encoding"
   path: /docs/reference/platform-spec/diagnostics/logs-encoding.md
-- title: "Bitfields diagrams"
-  path: /docs/reference/platform-spec/diagnostics/bitfield-diagram.md
