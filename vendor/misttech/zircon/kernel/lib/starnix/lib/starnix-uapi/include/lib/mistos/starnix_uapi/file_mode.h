@@ -167,6 +167,35 @@ class Access : public AccessFlags {
 using Access = inner_access::Access;
 using AccessEnum = inner_access::AccessEnum;
 
+class AccessCheck {
+ public:
+  // Perform the default access checks.
+  AccessCheck() : access_(std::nullopt) {}
+
+  // Skip access checks.
+  static AccessCheck skip() { return AccessCheck(Access(AccessEnum::EXIST)); }
+
+  // Check for the given access values.
+  static AccessCheck check_for(Access access) { return AccessCheck(access); }
+
+  // The actual access bits to check for given the open flags.
+  //
+  // If the access check is the default, then this function will return
+  // the access bits needed to open the file with the rights specified in
+  // open flags.
+  Access resolve(OpenFlags flags) const {
+    if (access_.has_value()) {
+      return access_.value();
+    }
+    return Access::from_open_flags(flags);
+  }
+
+ private:
+  explicit AccessCheck(Access access) : access_(access) {}
+
+  std::optional<Access> access_;
+};
+
 }  // namespace starnix_uapi
 
 template <>
