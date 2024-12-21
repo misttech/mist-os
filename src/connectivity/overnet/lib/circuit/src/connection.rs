@@ -289,10 +289,7 @@ fn conn_stream(
                 Ok(got) => got,
                 Err(Error::ConnectionClosed(reason)) => {
                     let reason = reason.as_deref().unwrap_or("(No reason given)");
-                    tracing::warn!(
-                        reason,
-                        "New stream closed without associating with a connection"
-                    );
+                    log::warn!(reason; "New stream closed without associating with a connection");
                     return None;
                 }
                 _ => unreachable!("Deserializing the connection ID should never fail!"),
@@ -310,7 +307,7 @@ fn conn_stream(
                             }
                         }
                     } else {
-                        tracing::warn!(stream_id, end = ?client_or_server.is_server(),
+                        log::warn!(stream_id, end:? = client_or_server.is_server();
                         "Peer initiated stream ID which does not match role");
                     }
                 }
@@ -328,7 +325,7 @@ fn conn_stream(
                     next_stream_id: Arc::new(AtomicU64::new(1)),
                 })
             } else {
-                tracing::warn!(conn_id, stream_id, "Connection does not exist");
+                log::warn!(conn_id, stream_id; "Connection does not exist");
                 None
             }
         }

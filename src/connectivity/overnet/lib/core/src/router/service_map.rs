@@ -82,10 +82,10 @@ impl ServiceMap {
         service_name: String,
         provider: impl Fn(fidl::Channel) -> Result<(), Error> + Send + 'static,
     ) {
-        tracing::trace!("Request register_service '{}'", service_name);
+        log::trace!("Request register_service '{}'", service_name);
         let mut inner = self.inner.lock().await;
         if inner.local_services.insert(service_name.clone(), Box::new(provider)).is_none() {
-            tracing::trace!("Publish new service '{}'", service_name);
+            log::trace!("Publish new service '{}'", service_name);
             let services: Vec<String> = inner.local_services.keys().cloned().collect();
             inner.local_service_list.maybe_push(services).await;
         }

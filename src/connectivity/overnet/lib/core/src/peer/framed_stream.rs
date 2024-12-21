@@ -110,7 +110,7 @@ impl FramedStreamWriter {
         let frame_len = bytes.len();
         assert!(frame_len <= 0xffff_ffff);
         let header = FrameHeader { frame_type, length: frame_len }.to_bytes()?;
-        tracing::trace!(?header);
+        log::trace!(header:?; "");
         self.writer.write(header.len(), |buf| {
             buf[..header.len()].copy_from_slice(&header);
             Ok(header.len())
@@ -212,7 +212,7 @@ async fn read_exact(reader: &circuit::stream::Reader, buf: &mut [u8]) -> Result<
         .or_else(|x| match x {
             circuit::Error::ConnectionClosed(reason) => {
                 if let Some(reason) = reason {
-                    tracing::debug!(?reason);
+                    log::debug!(reason:?; "");
                 }
                 Ok(false)
             }
