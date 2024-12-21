@@ -66,10 +66,39 @@ bool test_sys_creat() {
   END_TEST;
 }
 
+#if 0
+bool test_time() {
+  BEGIN_TEST;
+  auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
+  auto time1_or_error = sys_time(*current_task, mtl::DefaultConstruct<UserRef<__kernel_time_t>>());
+  ASSERT_TRUE(time1_or_error.is_ok());
+  auto time1 = time1_or_error.value();
+  ASSERT_GT(time1, 0);
+
+  auto address =
+      map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), sizeof(__kernel_time_t));
+
+  zx::MonotonicDuration::from_seconds(2).sleep();
+
+  auto time2_or_error = sys_time(*current_task, UserRef<__kernel_time_t>::New(address));
+  ASSERT_TRUE(time2_or_error.is_ok());
+  auto time2 = time2_or_error.value();
+  ASSERT_GE(time2, time1 + 2);
+  ASSERT_LT(time2, time1 + 10);
+
+  auto time3_or_error = (*current_task).read_object<__kernel_time_t>(address);
+  ASSERT_TRUE(time3_or_error.is_ok());
+  ASSERT_EQ(time2, time3_or_error.value());
+
+  END_TEST;
+}
+#endif
+
 }  // namespace
 }  // namespace testing
 
 UNITTEST_START_TESTCASE(starnix_arch_syscalls)
 UNITTEST("test sys dup2", testing::test_sys_dup2)
 UNITTEST("test sys creat", testing::test_sys_creat)
+// UNITTEST("test time", testing::test_time)
 UNITTEST_END_TESTCASE(starnix_arch_syscalls, "starnix_arch_syscalls", "Tests for Tasks Syscalls")

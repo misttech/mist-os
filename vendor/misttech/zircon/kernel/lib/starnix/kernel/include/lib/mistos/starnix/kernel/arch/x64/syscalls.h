@@ -75,6 +75,8 @@ fit::result<Errno> sys_symlink(const CurrentTask& current_task,
                                starnix_uapi::UserCString user_target,
                                starnix_uapi::UserCString user_path);
 
+fit::result<Errno, __kernel_time_t> sys_time(const CurrentTask& current_task,
+                                             starnix_uapi::UserRef<__kernel_time_t> time_addr);
 
 fit::result<Errno, pid_t> sys_vfork(CurrentTask& current_task);
 

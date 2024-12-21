@@ -122,6 +122,11 @@ fit::result<Errno> sys_symlink(const CurrentTask& current_task,
   return sys_symlinkat(current_task, user_target, FdNumber::AT_FDCWD_, user_path);
 }
 
+fit::result<Errno, __kernel_time_t> sys_time(const CurrentTask& current_task,
+                                             starnix_uapi::UserRef<__kernel_time_t> time_addr) {
+  return fit::error(errno(ENOSYS));
+}
+
 fit::result<Errno, pid_t> sys_vfork(CurrentTask& current_task) {
   return do_clone(current_task, {
                                     .flags = (CLONE_VFORK | CLONE_VM),
