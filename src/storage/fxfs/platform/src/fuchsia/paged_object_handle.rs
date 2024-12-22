@@ -181,7 +181,7 @@ impl Inner {
 
     /// Takes all the dirty pages and returns a (<count of dirty pages>, <reservation>).
     fn take(&mut self, allocator: Arc<Allocator>, store_object_id: u64) -> (u64, Reservation) {
-        let reservation = allocator.reserve_at_most(Some(store_object_id), 0);
+        let reservation = allocator.reserve_with(Some(store_object_id), |_| 0);
         reservation.add(self.reservation());
         self.spare = 0;
         (std::mem::take(&mut self.dirty_page_count), reservation)

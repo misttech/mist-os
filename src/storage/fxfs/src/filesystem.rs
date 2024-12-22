@@ -494,8 +494,12 @@ impl FxFilesystem {
             self.journal.sync(SyncOptions { flush_device: true, ..Default::default() }).await;
         match &sync_status {
             Ok(checkpoint) => info!(
-                "Filesystem closed (checkpoint: {})",
-                checkpoint.as_ref().unwrap().0.file_offset
+                "Filesystem closed (checkpoint={}, metadata_reservation={:?}, \
+                 reservation_required={}, borrowed={})",
+                checkpoint.as_ref().unwrap().0.file_offset,
+                self.object_manager().metadata_reservation(),
+                self.object_manager().required_reservation(),
+                self.object_manager().borrowed_metadata_space(),
             ),
             Err(e) => error!(error = ?e, "Failed to sync filesystem; data may be lost"),
         }
