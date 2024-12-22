@@ -7,11 +7,13 @@ use diagnostics_log_types::Severity;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_logger::{LogSinkProxy, LogSinkSynchronousProxy};
+use std::cmp;
 use std::future::Future;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::{Arc, Mutex};
 
 pub(crate) struct InterestFilter {
-    min_severity: Arc<RwLock<Severity>>,
+    min_severity: Arc<AtomicSeverity>,
     listener: Arc<Mutex<Option<Box<dyn OnInterestChanged + Send + Sync + 'static>>>>,
 }
 
@@ -46,15 +48,14 @@ impl InterestFilter {
         log::set_max_level(level_filter_from_severity(&min_severity));
 
         let listener = Arc::new(Mutex::new(None));
-        let min_severity = Arc::new(RwLock::new(min_severity));
+        let min_severity = Arc::new(AtomicSeverity::from(min_severity));
         let filter = Self { min_severity: min_severity.clone(), listener: listener.clone() };
         (filter, Self::listen_to_interest_changes(listener, default_severity, min_severity, proxy))
     }
 
     /// Sets the minimum severity.
     pub fn set_minimum_severity(&self, severity: Severity) {
-        let mut min_severity = self.min_severity.write().unwrap();
-        *min_severity = severity;
+        self.min_severity.set(severity);
     }
 
     /// Sets the interest listener.
@@ -69,15 +70,14 @@ impl InterestFilter {
     async fn listen_to_interest_changes(
         listener: Arc<Mutex<Option<Box<dyn OnInterestChanged + Send + Sync>>>>,
         default_severity: Severity,
-        min_severity: Arc<RwLock<Severity>>,
+        min_severity: Arc<AtomicSeverity>,
         proxy: LogSinkProxy,
     ) {
         while let Ok(Ok(interest)) = proxy.wait_for_interest_change().await {
             let new_min_severity = {
-                let mut min_severity_guard = min_severity.write().unwrap();
                 let severity =
                     interest.min_severity.map(Severity::from).unwrap_or(default_severity);
-                *min_severity_guard = severity;
+                min_severity.set(severity);
                 severity
             };
             log::set_max_level(level_filter_from_severity(&new_min_severity));
@@ -89,13 +89,11 @@ impl InterestFilter {
     }
 
     pub fn enabled(&self, severity: Severity) -> bool {
-        let min_severity = self.min_severity.read().unwrap();
-        severity >= *min_severity
+        *self.min_severity <= severity
     }
 
     pub fn enabled_for_testing(&self, record: &TestRecord<'_>) -> bool {
-        let min_severity = self.min_severity.read().unwrap();
-        record.severity >= (*min_severity as u8)
+        *self.min_severity <= record.severity
     }
 }
 
@@ -108,6 +106,47 @@ fn level_filter_from_severity(severity: &Severity) -> log::LevelFilter {
         Severity::Trace => log::LevelFilter::Trace,
         // NB: Not a clean mapping.
         Severity::Fatal => log::LevelFilter::Error,
+    }
+}
+
+#[derive(Debug)]
+struct AtomicSeverity {
+    value: AtomicU8,
+}
+
+impl AtomicSeverity {
+    fn set(&self, value: Severity) {
+        self.value.store(value as u8, Ordering::Relaxed);
+    }
+}
+
+impl From<Severity> for AtomicSeverity {
+    fn from(severity: Severity) -> Self {
+        Self { value: AtomicU8::new(severity as u8) }
+    }
+}
+
+impl PartialOrd<u8> for AtomicSeverity {
+    fn partial_cmp(&self, other: &u8) -> Option<cmp::Ordering> {
+        self.value.load(Ordering::Relaxed).partial_cmp(other)
+    }
+}
+
+impl PartialEq<u8> for AtomicSeverity {
+    fn eq(&self, other: &u8) -> bool {
+        self.value.load(Ordering::Relaxed).eq(other)
+    }
+}
+
+impl PartialOrd<Severity> for AtomicSeverity {
+    fn partial_cmp(&self, other: &Severity) -> Option<cmp::Ordering> {
+        self.value.load(Ordering::Relaxed).partial_cmp(&(*other as u8))
+    }
+}
+
+impl PartialEq<Severity> for AtomicSeverity {
+    fn eq(&self, other: &Severity) -> bool {
+        self.value.load(Ordering::Relaxed).eq(&(*other as u8))
     }
 }
 
@@ -308,7 +347,7 @@ mod tests {
             };
         }
         let filter = t.join().unwrap();
-        assert_eq!(*filter.min_severity.read().unwrap(), Severity::Trace);
+        assert_eq!(*filter.min_severity, Severity::Trace);
     }
 
     #[fuchsia::test(logging = false)]
