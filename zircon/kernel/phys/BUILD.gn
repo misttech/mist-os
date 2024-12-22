@@ -777,6 +777,7 @@ zbi_executable("physload") {
     ":physload.header",
     ":stdio",
     ":symbolize",
+    "$arch_phys:arch-physload",
     "//src/lib/elfldltl",
     "//src/lib/zbitl",
     "//zircon/kernel/lib/boot-options",
@@ -793,6 +794,7 @@ if (is_kernel) {
     visibility = [
       ":*",
       "$arch_phys:arch-on-physload-handoff",
+      "$arch_phys:arch-physload",
     ]
     public = [ "physload.h" ]
     public_deps = [
