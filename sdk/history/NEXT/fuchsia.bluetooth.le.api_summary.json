@@ -908,6 +908,12 @@
         "type": "fuchsia.bluetooth/Uuid"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/Filter.solicitation_uuid",
+        "ordinal": "7",
+        "type": "fuchsia.bluetooth/Uuid"
+    },
+    {
         "kind": "table",
         "name": "fuchsia.bluetooth.le/Filter"
     },

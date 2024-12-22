@@ -58,6 +58,12 @@ type Filter = table {
     /// It should NOT be confused with information for an active connection
     /// obtained using the "Path Loss Reporting" feature.
     6: max_path_loss int8;
+
+    /// Filter based on a service solicitation by service UUID.
+    /// Service solicitation is an invitation to a peer to connect if they
+    /// provide a service we want to use.
+    @available(added=NEXT)
+    7: solicitation_uuid bt.Uuid;
 };
 
 /// Parameters used during a scan.
