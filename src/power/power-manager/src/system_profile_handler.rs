@@ -12,10 +12,10 @@ use fidl_fuchsia_power_profile::{self as fprofile, Profile};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, Property};
 use futures::prelude::*;
+use log::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tracing::*;
 use {fuchsia_async as fasync, serde_json as json};
 
 /// Node: SystemProfileHandler

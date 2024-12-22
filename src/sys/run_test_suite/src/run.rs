@@ -18,10 +18,10 @@ use futures::future::Either;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::{error, warn};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
-use tracing::{error, warn};
 
 // Will invoke the WithSchedulingOptions FIDL method if a client indicates
 // that they want to use experimental parallel execution.

@@ -22,7 +22,7 @@ pub async fn run_usb_links(router: Weak<Router>) -> Result<()> {
     while let Some(msg) = watcher.try_next().await? {
         if msg.event == WatchEvent::ADD_FILE || msg.event == WatchEvent::EXISTING {
             let Some(filename) = msg.filename.as_os_str().to_str() else {
-                tracing::warn!(filename = ?msg.filename, "skipping device with bad character in name");
+                log::warn!(filename:? = msg.filename; "skipping device with bad character in name");
                 continue;
             };
             if filename == "." {
@@ -44,8 +44,8 @@ pub async fn run_usb_links(router: Weak<Router>) -> Result<()> {
                             let (callback_client, callback) =
                                 fidl::endpoints::create_endpoints::<overnet_usb::CallbackMarker>();
                             if let Err(error) = proxy.set_callback(callback_client).await {
-                                tracing::warn!(
-                                    error = ?error,
+                                log::warn!(
+                                    error:? = error;
                                     "Could not communicate with USB driver"
                                 );
                                 break;
@@ -64,16 +64,16 @@ pub async fn run_usb_links(router: Weak<Router>) -> Result<()> {
                                                 responder,
                                             }) => {
                                                 if let Err(error) = responder.send() {
-                                                    tracing::warn!(
-                                                        error = ?error,
+                                                    log::warn!(
+                                                        error:? = error;
                                                         "USB driver callback responder error"
                                                     );
                                                 }
                                                 socket
                                             }
                                             Err(error) => {
-                                                tracing::warn!(
-                                                    error = ?error,
+                                                log::warn!(
+                                                    error:? = error;
                                                     "USB driver callback error"
                                                 );
                                                 return;
@@ -92,8 +92,8 @@ pub async fn run_usb_links(router: Weak<Router>) -> Result<()> {
 
                                         fasync::Task::spawn(async move {
                                             while let Some(error) = err_receiver.next().await {
-                                                tracing::debug!(
-                                                    error = ?error,
+                                                log::debug!(
+                                                    error:? = error;
                                                     "Stream error for USB link"
                                                 )
                                             }
@@ -111,9 +111,9 @@ pub async fn run_usb_links(router: Weak<Router>) -> Result<()> {
                                         )
                                         .await
                                         {
-                                            tracing::info!(
+                                            log::info!(
                                                 device = debug_path,
-                                                error = ?error,
+                                                error:? = error;
                                                 "USB link terminated",
                                             );
                                         }
@@ -122,9 +122,9 @@ pub async fn run_usb_links(router: Weak<Router>) -> Result<()> {
                                 .await;
                         }
                         Err(error) => {
-                            tracing::info!(
+                            log::info!(
                                 device = debug_path,
-                                error = ?error,
+                                error:? = error;
                                 "USB node could not be opened",
                             );
                             break;

@@ -162,26 +162,15 @@ class PowerSampler:
     ```
     sampler:PowerSampler = create_power_sampler(...)
     sampler.start()
-    ... interact with the device, also gather traces ...
-    sampler.stop()
-
-    sampler.metrics_processor().process_and_save(model, output_path="my_test.fuchsiaperf.json")
-    ```
-
-    Alternatively, the sampler can be combined with the results of other metric processors like this:
-    ```
-    power_sampler = PowerSampler(...)
-
-    processor = MetricsProcessorSet([
-      CpuMetricsProcessor(aggregates_only=True),
-      FpsMetricsProcessor(aggregates_only=False),
-      MyCustomProcessor(...),
-      power_sampler.metrics_processor(),
-    ])
 
     ... gather traces, start and stop the power sampler, create the model ...
 
-    processor.process_and_save(model, output_path="my_test.fuchsiaperf.json")
+    sampler.stop()
+
+    trace_model_with_power =
+        power_test_utils.merge_power_data(model, sampler.extract_samples(), outpath)
+    processor = PowerMetricsProcessor()
+    processor.process_metrics(trace_model_with_power)
     ```
     """
 
@@ -566,6 +555,15 @@ def _append_power_data(
         )
         merged_trace.write(fake_thread_koid.to_bytes(8, "little"))
         merged_trace.write(thread_name.data)
+
+        # Initialization record sets the expected ticks per second.
+        init_record_type = 1
+        init_record_size = 2
+        init_record_header = (init_record_size << 4) | init_record_type
+        merged_trace.write(init_record_header.to_bytes(8, "little"))
+        merged_trace.write(
+            int(TICKS_PER_NS * 1000 * 1000 * 1000).to_bytes(8, "little")
+        )
 
         def counter_event_header(
             name_id: int,
@@ -1089,4 +1087,27 @@ def merge_gonk_data(
             )
 
     # Insert gonk samples with the modified timestamp into the existing trace.
+    _append_power_data(fxt_path, power_samples_for_trace, starting_ticks=0)
+
+
+def merge_gonk_data_without_gpio(
+    gonk_samples: Iterable[GonkSample],
+    fxt_path: str,
+    rail_names: list[str],
+) -> None:
+    power_samples_for_trace = []
+    for s in gonk_samples:
+        n_rails = len(s.voltages)
+        for i in range(n_rails):
+            power_samples_for_trace.append(
+                Sample(
+                    s.gonk_time.to_epoch_delta().to_nanoseconds(),
+                    s.currents[i],
+                    s.voltages[i],
+                    aux_current=None,
+                    power=s.powers[i],
+                    rail_id=(i + 1),
+                    rail_name=rail_names[i],
+                )
+            )
     _append_power_data(fxt_path, power_samples_for_trace, starting_ticks=0)

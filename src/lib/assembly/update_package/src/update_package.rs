@@ -90,9 +90,12 @@ impl Slot {
 
     /// Get the (preferably signed) zbi and optional vbmeta, or None if no zbi image is present in
     /// this manifest.
-    fn zbi_and_vbmeta(&self) -> Option<(ImageMapping, Option<ImageMapping>)> {
+    fn zbi_vbmeta_dtbo(
+        &self,
+    ) -> Option<(ImageMapping, Option<ImageMapping>, Option<ImageMapping>)> {
         let mut zbi = None;
         let mut vbmeta = None;
+        let mut dtbo = None;
 
         for image in &self.manifest().images {
             match image {
@@ -104,12 +107,15 @@ impl Slot {
                 Image::VBMeta(_) => {
                     vbmeta = Some(ImageMapping::new(image.source(), "vbmeta"));
                 }
+                Image::Dtbo(_) => {
+                    dtbo = Some(ImageMapping::new(image.source(), "dtbo"));
+                }
                 _ => {}
             }
         }
 
         match zbi {
-            Some(zbi) => Some((zbi, vbmeta)),
+            Some(zbi) => Some((zbi, vbmeta, dtbo)),
             None => None,
         }
     }
@@ -280,18 +286,34 @@ impl UpdatePackageBuilder {
         // Keep track of all the packages that were built, so that they can be returned.
         let mut package_manifests = vec![];
 
+        // Keep track of the firmware images.
+        struct FirmwareImage {
+            source: Utf8PathBuf,
+            destination: String,
+            firmware_type: String,
+        }
+        let mut firmware_images = Vec::<FirmwareImage>::new();
+
         let mut assembly_manifest = ImagePackagesManifest::builder();
 
         // Generate the update_images_fuchsia package.
         let mut builder = self.make_subpackage_builder("images_fuchsia")?;
         if let Some(slot) = &self.slot_primary {
-            let (zbi, vbmeta) =
-                slot.zbi_and_vbmeta().ok_or_else(|| anyhow!("primary slot missing a zbi image"))?;
+            let (zbi, vbmeta, dtbo) = slot
+                .zbi_vbmeta_dtbo()
+                .ok_or_else(|| anyhow!("primary slot missing a zbi image"))?;
 
             builder.package.add_file_as_blob(&zbi.destination, &zbi.source)?;
 
             if let Some(vbmeta) = &vbmeta {
                 builder.package.add_file_as_blob(&vbmeta.destination, &vbmeta.source)?;
+            }
+            if let Some(dtbo) = &dtbo {
+                firmware_images.push(FirmwareImage {
+                    source: dtbo.source.clone(),
+                    destination: dtbo.destination.clone(),
+                    firmware_type: dtbo.destination.clone(),
+                });
             }
 
             let (url, manifest) = builder.build()?;
@@ -308,8 +330,8 @@ impl UpdatePackageBuilder {
         // Generate the update_images_recovery package.
         let mut builder = self.make_subpackage_builder("images_recovery")?;
         if let Some(slot) = &self.slot_recovery {
-            let (zbi, vbmeta) = slot
-                .zbi_and_vbmeta()
+            let (zbi, vbmeta, _) = slot
+                .zbi_vbmeta_dtbo()
                 .ok_or_else(|| anyhow!("recovery slot missing a zbi image"))?;
 
             builder.package.add_file_as_blob(&zbi.destination, &zbi.source)?;
@@ -330,31 +352,35 @@ impl UpdatePackageBuilder {
             package_manifests.push(manifest);
         }
 
+        for bootloader in &self.partitions.bootloader_partitions {
+            let destination = match bootloader.partition_type.as_str() {
+                "" => "firmware".to_string(),
+                t => format!("firmware_{}", t),
+            };
+            firmware_images.push(FirmwareImage {
+                source: bootloader.image.clone(),
+                destination,
+                firmware_type: bootloader.partition_type.clone(),
+            });
+        }
+
         // Generate the update_images_firmware package.
         let mut builder = self.make_subpackage_builder("images_firmware")?;
-        if !self.partitions.bootloader_partitions.is_empty() {
+        if !firmware_images.is_empty() {
             let mut firmware = BTreeMap::new();
 
-            for bootloader in &self.partitions.bootloader_partitions {
-                let destination = match bootloader.partition_type.as_str() {
-                    "" => "firmware".to_string(),
-                    t => format!("firmware_{}", t),
-                };
-                builder.package.add_file_as_blob(destination, &bootloader.image)?;
+            for FirmwareImage { source, destination, .. } in &firmware_images {
+                builder.package.add_file_as_blob(destination, source)?;
             }
 
             let (url, manifest) = builder.build()?;
             package_manifests.push(manifest);
 
-            for bootloader in &self.partitions.bootloader_partitions {
-                let destination = match bootloader.partition_type.as_str() {
-                    "" => "firmware".to_string(),
-                    t => format!("firmware_{}", t),
-                };
+            for FirmwareImage { source, destination, firmware_type } in &firmware_images {
                 firmware.insert(
-                    bootloader.partition_type.clone(),
-                    ImageMetadata::for_path(&bootloader.image, url.clone(), destination)
-                        .with_context(|| format!("Failed to read/hash {:?}", &bootloader.image))?,
+                    firmware_type.clone(),
+                    ImageMetadata::for_path(&source, url.clone(), destination.clone())
+                        .with_context(|| format!("Failed to read/hash {:?}", &source))?,
                 );
             }
 
@@ -597,11 +623,10 @@ mod tests {
                 name: Some("firmware_tpl".into()),
                 image: fake_bootloader.to_path_buf(),
             }],
-            partitions: vec![Partition::ZBI {
-                name: "zircon_a".into(),
-                slot: PartitionSlot::A,
-                size: None,
-            }],
+            partitions: vec![
+                Partition::ZBI { name: "zircon_a".into(), slot: PartitionSlot::A, size: None },
+                Partition::Dtbo { name: "dtbo_a".into(), slot: PartitionSlot::A, size: None },
+            ],
             hardware_revision: "hw".into(),
         };
         let epoch = EpochFile::Version1 { epoch: 0 };
@@ -617,10 +642,15 @@ mod tests {
 
         // Add a ZBI to the update.
         let fake_zbi_tmp = NamedTempFile::new().unwrap();
+        let fake_dtbo_tmp = NamedTempFile::new().unwrap();
         let fake_zbi = Utf8Path::from_path(fake_zbi_tmp.path()).unwrap();
+        let fake_dtbo = Utf8Path::from_path(fake_dtbo_tmp.path()).unwrap();
 
         builder.add_slot_images(Slot::Primary(AssemblyManifest {
-            images: vec![Image::ZBI { path: fake_zbi.to_path_buf(), signed: true }],
+            images: vec![
+                Image::ZBI { path: fake_zbi.to_path_buf(), signed: true },
+                Image::Dtbo(fake_dtbo.to_path_buf()),
+            ],
             board_name: "my_board".into(),
         }));
 
@@ -645,7 +675,7 @@ mod tests {
         let update_package = builder.build(tool_provider).unwrap();
         assert_eq!(
             update_package.merkle,
-            "128778df19f0f5d903c3d9ee291d367b8842830e05b90f48461c8005b815251a".parse().unwrap()
+            "c467965e232bc9aa1bfe3ab20a46c19602848484b817443b1181095f1e3932bd".parse().unwrap()
         );
         assert_eq!(update_package.package_manifests.len(), 4);
 
@@ -682,11 +712,17 @@ mod tests {
                             },
                     ],
                     "firmware": [
-                             {
+                            {
+                                "type" : "dtbo",
+                                "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                                "size": 0,
+                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=7a96bbeb770fe8b25d6337b7403ef752b87291f570731c6f5199af4c22e1fea1#dtbo",
+                            },
+                            {
                                 "type" : "tpl",
                                 "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                                 "size": 0,
-                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=97ae32f0e5edfb0688f1a8bee3cab63d3de82b6c9fdb888f050da8eab17a18b2#firmware_tpl",
+                                "url": "fuchsia-pkg://test.com/update_images_firmware/0?hash=7a96bbeb770fe8b25d6337b7403ef752b87291f570731c6f5199af4c22e1fea1#firmware_tpl",
                             },
                     ],
                 },
@@ -717,7 +753,7 @@ mod tests {
         let expected_contents = "\
             board=9c579992f6e9f8cbd4ba81af6e23b1d5741e280af60f795e9c2bbcc76c4b7065\n\
             epoch.json=0362de83c084397826800778a1cf927280a5d5388cb1f828d77f74108726ad69\n\
-            images.json=13893c40dd7b244cb289dddc2d06dea49c61462830e1b33765874dcff5581096\n\
+            images.json=a493e6aa6a5a68d2342657bac3e3a22299d13ad9ca868bac32fc6d1aac89790d\n\
             packages.json=85a3911ff39c118ee1a4be5f7a117f58a5928a559f456b6874440a7fb8c47a9a\n\
             version=d2ff44655653e2cbbecaf89dbf33a8daa8867e41dade2c6b4f127c3f0450c96b\n\
         "
@@ -756,6 +792,7 @@ mod tests {
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
         let expected_contents = "\
+            dtbo=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
             firmware_tpl=15ec7bf0b50732b49f8228e07d24365338f9e3ab994b00af08e5a3bffe55fd8b\n\
         "
         .to_string();

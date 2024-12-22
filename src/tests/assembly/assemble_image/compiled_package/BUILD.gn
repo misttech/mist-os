@@ -52,7 +52,6 @@ if (is_host) {
   }
 
   python_host_test("compiled_package_test") {
-    enable_mypy = true
     main_source = "compiled_package_test.py"
     extra_args =
         [ rebase_path(get_label_info(":${target_name}($default_toolchain)",

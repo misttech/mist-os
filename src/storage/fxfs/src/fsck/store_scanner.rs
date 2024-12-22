@@ -613,16 +613,9 @@ impl<'a> ScannedStore<'a> {
                         ))?;
                     }
                 }
-                ObjectKeyData::EncryptedChild { casefold_hash, .. } => {
+                ObjectKeyData::EncryptedChild { .. } => {
                     if dir.wrapping_key_id.is_none() {
                         self.fsck.error(FsckError::UnencryptedDirectoryHasEncryptedChild(
-                            self.store_id,
-                            parent_id,
-                            child_id,
-                        ))?;
-                    }
-                    if !dir.casefold && *casefold_hash != 0 {
-                        self.fsck.error(FsckError::CasefoldInconsistency(
                             self.store_id,
                             parent_id,
                             child_id,

@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaPartitionsConfigInfo")
+load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaPartitionsConfigInfo")
 load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script_provider")
 
 def _fuchsia_partitions_configuration_test_impl(ctx):

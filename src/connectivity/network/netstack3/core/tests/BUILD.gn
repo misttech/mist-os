@@ -25,7 +25,6 @@ rustc_test("netstack3_core_threading_test") {
     "//src/connectivity/network/netstack3/core:netstack3-core-loom",
     "//src/connectivity/network/netstack3/core/ip:netstack3-ip-loom",
     "//src/connectivity/network/netstack3/core/tcp:netstack3-tcp-loom",
-    "//src/lib/const-unwrap",
     "//src/lib/network/packet",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:loom",

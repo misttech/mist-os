@@ -151,29 +151,35 @@ pub fn dispatch_syscall(
 
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
     mod aarch64_arch32 {
-        pub use crate::arch::syscalls::{
-            sys_arch32_ARM_set_tls, sys_arch32_access, sys_arch32_fstat64, sys_arch32_mmap2,
-            sys_arch32_munmap, sys_arch32_open, sys_arch32_readlink, sys_arch32_set_robust_list,
-            sys_arch32_stat64, sys_arch32_ugetrlimit, sys_arch32_uname,
-        };
+        pub use crate::arch::syscalls::sys_arch32_ARM_set_tls;
         pub use crate::mm::syscalls::{
+            sys_arch32_mmap2, sys_arch32_munmap, sys_arch32_set_robust_list,
             sys_brk as sys_arch32_brk, sys_mprotect as sys_arch32_mprotect,
         };
         pub use crate::signals::syscalls::{
             sys_rt_sigaction as sys_arch32_rt_sigaction,
-            sys_rt_sigprocmask as sys_arch32_rt_sigprocmask,
+            sys_rt_sigprocmask as sys_arch32_rt_sigprocmask, sys_tgkill as sys_arch32_tgkill,
         };
-        pub use crate::syscalls::time::sys_clock_gettime as sys_arch32_clock_gettime;
+        pub use crate::syscalls::misc::{sys_arch32_uname, sys_getrandom as sys_arch32_getrandom};
+        pub use crate::syscalls::time::{
+            sys_arch32_clock_getres, sys_arch32_clock_gettime, sys_arch32_gettimeofday,
+            sys_clock_gettime as sys_arch32_clock_gettime64,
+            sys_timer_gettime as sys_arch32_timer_gettime64,
+        };
         pub use crate::task::syscalls::{
-            sys_exit as sys_arch32_exit, sys_exit_group as sys_arch32_exit_group,
-            sys_getpid as sys_arch32_getpid, sys_set_tid_address as sys_arch32_set_tid_address,
+            sys_arch32_ugetrlimit, sys_exit as sys_arch32_exit,
+            sys_exit_group as sys_arch32_exit_group, sys_getpid as sys_arch32_getpid,
+            sys_gettid as sys_arch32_gettid, sys_set_tid_address as sys_arch32_set_tid_address,
             sys_setuid as sys_arch32_setuid,
         };
         pub use crate::vfs::syscalls::{
-            sys_close as sys_arch32_close, sys_lseek as sys_arch32_lseek,
+            sys_arch32_access, sys_arch32_fstat64, sys_arch32_open, sys_arch32_readlink,
+            sys_arch32_stat64, sys_close as sys_arch32_close, sys_getcwd as sys_arch32_getcwd,
+            sys_ioctl as sys_arch32_ioctl, sys_lseek as sys_arch32_lseek,
             sys_newfstatat as sys_arch32_fstatat64, sys_openat as sys_arch32_openat,
             sys_pwritev as sys_arch32_pwritev, sys_read as sys_arch32_read,
             sys_readlinkat as sys_arch32_readlinkat, sys_write as sys_arch32_write,
+            sys_writev as sys_arch32_writev,
         };
     }
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
@@ -202,13 +208,20 @@ pub fn dispatch_syscall(
             ARM_set_tls[1],
             access[2],
             brk[1],
+            clock_getres[2],
             clock_gettime[2],
+            clock_gettime64[2],
             close[1],
             exit[1],
             exit_group[1],
             fstat64[2],
             fstatat64[4],
+            getcwd[2],
             getpid[0],
+            getrandom[3],
+            gettid[0],
+            gettimeofday[2],
+            ioctl[3],
             lseek[3],
             mmap2[6],
             mprotect[3],
@@ -225,9 +238,12 @@ pub fn dispatch_syscall(
             set_tid_address[1],
             setuid[1],
             stat64[2],
+            tgkill[3],
+            timer_gettime64[2],
             ugetrlimit[2],
             uname[1],
             write[3],
+            writev[3],
         };
     }
 

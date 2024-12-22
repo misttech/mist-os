@@ -117,7 +117,7 @@ pub async fn apply_new_routers(
             .map_err(Error::Fidl)?
             .map_err(Error::RouteSet)?;
         if !removed {
-            tracing::warn!("attempt to remove {router} from RouteSet was no-op");
+            log::warn!("attempt to remove {router} from RouteSet was no-op");
         }
     }
 
@@ -132,7 +132,7 @@ pub async fn apply_new_routers(
             .map_err(Error::Fidl)?
             .map_err(Error::RouteSet)?;
         if !added {
-            tracing::warn!("attempt to add {router} to RouteSet was no-op");
+            log::warn!("attempt to add {router} to RouteSet was no-op");
         }
     }
 
@@ -744,7 +744,7 @@ mod test {
             .map(|addr| SpecifiedAddr::new(addr).unwrap())
             .collect::<HashSet<_>>();
 
-        let device_id = const_unwrap::const_unwrap_option(NonZeroU64::new(5));
+        let device_id = NonZeroU64::new(5).unwrap();
 
         let apply_fut = crate::apply_new_routers(
             device_id,

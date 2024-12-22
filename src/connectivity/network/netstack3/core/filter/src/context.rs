@@ -135,8 +135,8 @@ pub(crate) mod testutil {
         WithFakeTimerContext,
     };
     use netstack3_base::{
-        AnyDevice, AssignedAddrIpExt, DeviceIdContext, InstantContext, IntoCoreTimerCtx,
-        IpAddressId, WeakIpAddressId,
+        AnyDevice, AssignedAddrIpExt, DeviceIdContext, InspectableValue, InstantContext,
+        IntoCoreTimerCtx, IpAddressId, WeakIpAddressId,
     };
 
     use super::*;
@@ -192,6 +192,16 @@ pub(crate) mod testutil {
         fn is_assigned(&self) -> bool {
             let Self(inner) = self;
             inner.strong_count() != 0
+        }
+    }
+
+    impl<I: AssignedAddrIpExt> InspectableValue for FakeWeakAddressId<I> {
+        fn record<Inspector: netstack3_base::Inspector>(
+            &self,
+            _name: &str,
+            _inspector: &mut Inspector,
+        ) {
+            unimplemented!()
         }
     }
 

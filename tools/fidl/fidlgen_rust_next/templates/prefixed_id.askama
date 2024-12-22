@@ -1,0 +1,34 @@
+{% let (lib, ty) = id.split() %}
+
+{% if lib == "zx" && ty.non_canonical() == "ObjType" %}
+    fidl_next::zx::ObjectType
+{% else %}
+    {% if lib == context.schema.name %}
+        crate::
+    {% else if lib == "zx" %}
+        fidl_next::zx::
+    {% else %}
+        {% let escaped = lib.replace(".", "_") %}
+        fidl_next_{{ escaped }}::
+    {% endif %}
+
+    {% let ty_name %}
+    {% match context.schema.get_decl_type(id).unwrap() %}
+        {% when DeclType::Alias %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Bits %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Enum %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Struct %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Table %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Union %} {% let ty_name = ty.camel() %}
+        {% when DeclType::Const %} {% let ty_name = ty.screaming_snake() %}
+        {% when DeclType::Protocol %} {% let ty_name = ty.camel() %}
+        {% else %}
+            {{ todo!() }}
+    {% endmatch %}
+
+    {% if prefix == "" %}
+        {{ ty_name|ident }}
+    {% else %}
+        {{ prefix }}{{ ty_name }}
+    {% endif %}
+{% endif %}

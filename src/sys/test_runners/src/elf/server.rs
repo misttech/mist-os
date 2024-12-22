@@ -12,11 +12,11 @@ use async_trait::async_trait;
 use futures::future::{AbortHandle, Shared};
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::{error, warn};
 use rust_measure_tape_for_case::Measurable as _;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
-use tracing::{error, warn};
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {fidl_fuchsia_test as ftest, fuchsia_async as fasync};
 

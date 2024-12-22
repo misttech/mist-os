@@ -113,7 +113,7 @@ func (s *Service) DeprecatedClone(ctx fidl.Context, flags io.OpenFlags, req io.N
 	return s.addConnectionDeprecated(flags, 0, req)
 }
 
-func (s *Service) Clone2(ctx fidl.Context, req unknown.CloneableWithCtxInterfaceRequest) error {
+func (s *Service) Clone(ctx fidl.Context, req unknown.CloneableWithCtxInterfaceRequest) error {
 	return s.addConnection(io.Flags(0), req.Channel)
 }
 
@@ -306,7 +306,7 @@ func (dirState *directoryState) DeprecatedClone(ctx fidl.Context, flags io.OpenF
 	return dirState.addConnectionDeprecated(flags, 0, req)
 }
 
-func (dirState *directoryState) Clone2(ctx fidl.Context, req unknown.CloneableWithCtxInterfaceRequest) error {
+func (dirState *directoryState) Clone(ctx fidl.Context, req unknown.CloneableWithCtxInterfaceRequest) error {
 	return dirState.addConnection(io.Flags(0), req.Channel)
 }
 
@@ -709,7 +709,7 @@ func (fState *fileState) DeprecatedClone(ctx fidl.Context, flags io.OpenFlags, r
 	return fState.addConnectionDeprecated(flags, 0, req)
 }
 
-func (fState *fileState) Clone2(ctx fidl.Context, req unknown.CloneableWithCtxInterfaceRequest) error {
+func (fState *fileState) Clone(ctx fidl.Context, req unknown.CloneableWithCtxInterfaceRequest) error {
 	return fState.addConnection(io.Flags(0), req.Channel)
 }
 

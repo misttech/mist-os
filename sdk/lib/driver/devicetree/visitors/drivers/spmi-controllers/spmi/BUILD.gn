@@ -59,16 +59,6 @@ resource("spmi-dtb-file") {
   deps = [ ":spmi-dtb" ]
 }
 
-dtb("spmi-duplicate-target-id-dtb") {
-  sources = [ "test/dts/spmi-duplicate-target-id.dts.S" ]
-}
-
-resource("spmi-duplicate-target-id-dtb-file") {
-  sources = get_target_outputs(":spmi-duplicate-target-id-dtb")
-  outputs = [ "test-data/{{source_file_part}}" ]
-  deps = [ ":spmi-duplicate-target-id-dtb" ]
-}
-
 dtb("spmi-sub-target-spmi-address-out-of-range-dtb") {
   sources = [ "test/dts/spmi-sub-target-spmi-address-out-of-range.dts.S" ]
 }
@@ -113,7 +103,6 @@ fuchsia_unittest_package("spmi-visitor-test") {
   component_name = "spmi-visitor-test"
   deps = [
     ":spmi-dtb-file",
-    ":spmi-duplicate-target-id-dtb-file",
     ":spmi-reference-has-compatible-property-dtb-file",
     ":spmi-reference-target-dtb-file",
     ":spmi-sub-target-spmi-address-out-of-range-dtb-file",

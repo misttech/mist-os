@@ -33,6 +33,10 @@ RAW_LINES = (
 use zerocopy::{IntoBytes, FromBytes, KnownLayout, Immutable};
 use crate::fscrypt_key_specifier;
 
+"""
+)
+
+PTR_TYPES = """
 #[repr(transparent)]
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct uaddr {
@@ -98,7 +102,6 @@ impl<T> From<uref32<T>> for uref<T> {
 }
 
 """
-)
 
 # Tell bindgen not to produce records for these types.
 OPAQUE_TYPES = [
@@ -278,12 +281,12 @@ ARCH32_REPLACEMENTS_PTR = [
     # pointer is harmless.
     # For arch32, we only use 64-bit width when dealing with AsBytes union
     # padding.
-    (r"\*mut crate::types::arch32::c_void", "uaddr32"),
+    (r"\*mut crate::types::arch32::c_void", "crate::uaddr32"),
     (
         r'::std::option::Option<unsafe extern "C" fn\([a-zA-Z_0-9: ]*\)>',
-        "uaddr32",
+        "crate::uaddr32",
     ),
-    (r"([:=]) \*(const|mut) ([a-z_][a-zA-Z_0-9:]*)", "\\1 uref32<\\3>"),
+    (r"([:=]) \*(const|mut) ([a-z_][a-zA-Z_0-9:]*)", "\\1 crate::uref32<\\3>"),
 ]
 
 
@@ -354,14 +357,15 @@ bindgen.no_copy_types = NO_COPY_TYPES
 bindgen.enable_stdlib_include_dirs = False
 
 for arch in ARCH_INFO:
+    bindgen.raw_lines = RAW_LINES
     if arch.name == "arm":
         bindgen.c_types_prefix = "crate::types::arch32"
         bindgen.set_replacements(REPLACEMENTS + ARCH32_REPLACEMENTS_PTR)
     else:
         bindgen.c_types_prefix = "crate::types"
         bindgen.set_replacements(REPLACEMENTS + REPLACEMENTS_PTR)
+        bindgen.raw_lines += PTR_TYPES
     bindgen.clang_target = arch.clang_target
-    bindgen.raw_lines = RAW_LINES
     bindgen.include_dirs = INCLUDE_DIRS + [arch.include]
     rust_file = "src/starnix/lib/linux_uapi/src/" + arch.name + ".rs"
     bindgen.run(INPUT_FILE, rust_file)

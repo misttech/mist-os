@@ -37,7 +37,10 @@ zx_status_t Dwc3::Fifo::Init(zx::bti& bti) {
   return ZX_OK;
 }
 
-void Dwc3::Fifo::Release() { first = next = current = last = nullptr; }
+void Dwc3::Fifo::Release() {
+  first = next = current = last = nullptr;
+  buffer.reset();
+}
 
 void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
   std::lock_guard<std::mutex> lock(lock_);

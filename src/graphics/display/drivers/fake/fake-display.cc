@@ -360,10 +360,10 @@ config_check_result_t FakeDisplay::DisplayEngineCheckConfiguration(
     if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
-    if (layer.image_metadata.width != kWidth) {
+    if (layer.image_metadata.dimensions.width != kWidth) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
-    if (layer.image_metadata.height != kHeight) {
+    if (layer.image_metadata.dimensions.height != kHeight) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {

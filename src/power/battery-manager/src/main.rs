@@ -12,8 +12,8 @@ use anyhow::Error;
 use fidl_fuchsia_power_battery::BatteryManagerRequestStream;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
+use log::{error, info};
 use std::sync::{Arc, Weak};
-use tracing::{error, info};
 use {fidl_fuchsia_power_battery_test as spower, fuchsia_async as fasync};
 
 enum IncomingService {

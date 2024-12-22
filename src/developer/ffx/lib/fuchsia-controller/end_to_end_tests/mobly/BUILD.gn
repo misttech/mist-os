@@ -34,7 +34,6 @@ if (is_host) {
   ]
 
   python_mobly_test("x64_target_identity_tests") {
-    enable_mypy = true
     main_source = "target_identity_tests.py"
     libraries = [
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
@@ -46,7 +45,6 @@ if (is_host) {
   }
 
   python_mobly_test("vim3_target_identity_tests") {
-    enable_mypy = true
     main_source = "target_identity_tests.py"
     libraries = [
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
@@ -58,7 +56,6 @@ if (is_host) {
   }
 
   python_mobly_test("nuc_target_identity_tests") {
-    enable_mypy = true
     main_source = "target_identity_tests.py"
     libraries = [
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
@@ -73,7 +70,6 @@ if (is_host) {
   }
 
   python_mobly_test("echo_stress_test") {
-    enable_mypy = true
     main_source = "echo_stress_test.py"
     libraries = [
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",

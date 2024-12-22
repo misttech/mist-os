@@ -8,13 +8,13 @@ use fidl_fuchsia_net_dhcp_ext::{self as fnet_dhcp_ext, ClientProviderExt};
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use futures_lite::FutureExt as _;
+use log::{error, info, warn};
 use net_types::ip::{Ipv4, Ipv6};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::convert::TryFrom as _;
 use std::num::NonZeroU64;
 use std::pin::pin;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,

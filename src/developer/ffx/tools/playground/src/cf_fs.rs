@@ -618,7 +618,7 @@ mod test {
                         eprintln!("OpenDirectory call for {moniker} for {dir_type:?}");
                         let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
                         if let Some(dir) = dirs.get(&(moniker, dir_type)) {
-                            dir.clone2(object.into_channel().into()).unwrap();
+                            dir.clone(object.into_channel().into()).unwrap();
                             responder.send(Ok(())).unwrap();
                         } else {
                             responder.send(Err(sys2::OpenError::NoSuchDir)).unwrap();

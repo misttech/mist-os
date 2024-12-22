@@ -873,6 +873,34 @@ func (i *Instance) WaitForLogMessageAssertNotSeen(msg string, notSeen string) er
 	}
 }
 
+// WaitForLogMessageAssertNotSeenPrintUntil is the same as WaitForLogMessageAssertNotSeen but with
+// the addition that when it encounters |notSeen| it will continue printing the logs until the
+// |printUntil| string is encountered instead of immediately returning an error.
+func (i *Instance) WaitForLogMessageAssertNotSeenPrintUntil(msg string, notSeen string,
+	printUntil string) error {
+	var foundNotSeenString bool = false
+	for {
+		line, err := i.stdout.ReadString('\n')
+		if err != nil {
+			i.printStderr()
+			return fmt.Errorf("failed to find: %q: %w", msg, err)
+		}
+		fmt.Print(line)
+		if foundNotSeenString && strings.Contains(line, printUntil) {
+			return fmt.Errorf("found in output: %q", notSeen)
+		}
+		if strings.Contains(line, msg) {
+			if foundNotSeenString {
+				return fmt.Errorf("found in output: %q", notSeen)
+			}
+			return nil
+		}
+		if strings.Contains(line, notSeen) {
+			foundNotSeenString = true
+		}
+	}
+}
+
 // AssertLogMessageNotSeenWithinTimeout will fail if |notSeen| is seen within the
 // |timeout| period. This function will timeout as success if more than |timeout| has
 // passed without seeing |notSeen|.

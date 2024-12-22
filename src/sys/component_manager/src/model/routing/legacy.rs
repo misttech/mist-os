@@ -57,9 +57,8 @@ impl RouteRequestExt for RouteRequest {
             Self::UseProtocol(_) => {
                 panic!("Protocols should use bedrock instead");
             }
-            Self::ExposeProtocol(ref e) => {
-                let cap = ComponentCapability::Expose(ExposeDecl::Protocol(e.clone()));
-                expose_any(self, target, cap.type_name())
+            Self::ExposeProtocol(_) => {
+                panic!("Protocols should use bedrock instead");
             }
             Self::ExposeService(ref e) => {
                 let cap = ComponentCapability::Expose(ExposeDecl::Service(

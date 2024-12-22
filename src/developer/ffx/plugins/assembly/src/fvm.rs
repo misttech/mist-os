@@ -346,7 +346,6 @@ mod tests {
     use assembly_tool::{ToolCommandLog, ToolProvider};
     use camino::{Utf8Path, Utf8PathBuf};
     use serde_json::json;
-    use std::collections::BTreeMap;
     use std::fs::File;
     use std::io::Write;
     use tempfile::tempdir;
@@ -360,12 +359,8 @@ mod tests {
 
         let mut assembly_manifest =
             AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        let base_package = BasePackage {
-            merkle: [0u8; 32].into(),
-            contents: BTreeMap::new(),
-            path: "path/to/base_package".into(),
-            manifest_path: Utf8PathBuf::default(),
-        };
+        let base_package =
+            BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
         let include_account = false;
         let compress_blobfs = true;
         let slice_size = 0;
@@ -398,12 +393,8 @@ mod tests {
 
         let mut assembly_manifest =
             AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        let base_package = BasePackage {
-            merkle: [0u8; 32].into(),
-            contents: BTreeMap::new(),
-            path: "path/to/base_package".into(),
-            manifest_path: Utf8PathBuf::default(),
-        };
+        let base_package =
+            BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
         let include_account = false;
         let compress_blobfs = true;
         let slice_size = 0;
@@ -454,12 +445,8 @@ mod tests {
 
         let mut assembly_manifest =
             AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        let base_package = BasePackage {
-            merkle: [0u8; 32].into(),
-            contents: BTreeMap::new(),
-            path: "path/to/base_package".into(),
-            manifest_path: Utf8PathBuf::default(),
-        };
+        let base_package =
+            BasePackage { merkle: [0u8; 32].into(), manifest_path: Utf8PathBuf::default() };
         let include_account = false;
         let compress_blobfs = true;
         let slice_size = 0;
@@ -583,12 +570,8 @@ mod tests {
         }
         "#;
         write!(base_package_manifest_file, "{contents}").unwrap();
-        let base_package = BasePackage {
-            merkle: [0u8; 32].into(),
-            contents: BTreeMap::new(),
-            path: base_package_path,
-            manifest_path: base_package_manifest_path,
-        };
+        let base_package =
+            BasePackage { merkle: [0u8; 32].into(), manifest_path: base_package_manifest_path };
 
         let include_account = true;
         let compress_blobfs = false;
@@ -687,12 +670,8 @@ mod tests {
         }
         "#;
         write!(base_package_manifest_file, "{contents}").unwrap();
-        let base_package = BasePackage {
-            merkle: [0u8; 32].into(),
-            contents: BTreeMap::new(),
-            path: base_package_path,
-            manifest_path: base_package_manifest_path,
-        };
+        let base_package =
+            BasePackage { merkle: [0u8; 32].into(), manifest_path: base_package_manifest_path };
 
         let include_account = false;
         let compress_blobfs = false;

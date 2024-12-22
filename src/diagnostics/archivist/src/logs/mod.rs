@@ -22,7 +22,8 @@ mod tests {
     use crate::identity::ComponentIdentity;
     use crate::logs::testing::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use diagnostics_log_encoding::{Argument, Record, Severity};
+    use diagnostics_log_encoding::{Argument, Record};
+    use diagnostics_log_types::Severity;
     use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMessage};
     use fuchsia_async as fasync;
     use moniker::ExtendedMoniker;
@@ -500,17 +501,17 @@ mod tests {
         let logs = vec![
             Record {
                 timestamp: zx::BootInstant::from_nanos(6),
-                severity: Severity::Info.into_primitive(),
+                severity: Severity::Info as u8,
                 arguments: vec![Argument::message("hi")],
             },
             Record {
                 timestamp: zx::BootInstant::from_nanos(13),
-                severity: Severity::Error.into_primitive(),
+                severity: Severity::Error as u8,
                 arguments: vec![],
             },
             Record {
                 timestamp: zx::BootInstant::from_nanos(19),
-                severity: Severity::Warn.into_primitive(),
+                severity: Severity::Warn as u8,
                 arguments: vec![
                     Argument::pid(zx::Koid::from_raw(0x1d1)),
                     Argument::tid(zx::Koid::from_raw(0x1d2)),
@@ -521,7 +522,7 @@ mod tests {
             },
             Record {
                 timestamp: zx::BootInstant::from_nanos(21),
-                severity: Severity::Warn.into_primitive(),
+                severity: Severity::Warn as u8,
                 arguments: vec![Argument::tag("tag-1"), Argument::tag("tag-2")],
             },
         ];

@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use log::*;
 use structopt::StructOpt;
-use tracing::*;
 use triage_app_lib::app::App;
 use triage_app_lib::Options;
 

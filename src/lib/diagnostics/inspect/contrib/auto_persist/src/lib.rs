@@ -6,10 +6,10 @@ use fidl_fuchsia_diagnostics_persist::PersistResult;
 use futures::channel::mpsc;
 use futures::{Future, StreamExt};
 use injectable_time::{MonotonicInstant, TimeSource};
+use log::{error, info};
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tracing::{error, info};
 
 pub type PersistenceReqSender = mpsc::Sender<String>;
 

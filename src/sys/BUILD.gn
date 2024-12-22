@@ -22,6 +22,7 @@ group("tests") {
     "early_boot_instrumentation:tests",
     "full-resolver:tests",
     "fuzzing:tests",
+    "instrumentation_data_processor:tests",
     "lib:tests",
     "pkg:tests",
     "process-resolver:tests",

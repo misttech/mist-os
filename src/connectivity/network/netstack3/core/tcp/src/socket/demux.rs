@@ -24,7 +24,8 @@ use netstack3_base::{
 use netstack3_filter::TransportPacketSerializer;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
-    IpTransportContext, ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
+    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
+    TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, Serializer as _};
 use packet_formats::error::ParseError;
@@ -107,16 +108,17 @@ where
         );
     }
 
-    fn receive_ip_packet<B: BufferMut>(
+    fn receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
         remote_ip: I::RecvSrcAddr,
         local_ip: SpecifiedAddr<I::Addr>,
         mut buffer: B,
-        meta: ReceiveIpPacketMeta<I>,
+        info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let ReceiveIpPacketMeta { broadcast, transparent_override, dscp_and_ecn: _ } = meta;
+        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let ReceiveIpPacketMeta { broadcast, transparent_override } = meta;
         if let Some(delivery) = transparent_override {
             warn!(
                 "TODO(https://fxbug.dev/337009139): transparent proxy not supported for TCP \
@@ -1118,7 +1120,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use netstack3_base::testutil::TestIpExt;
     use netstack3_base::{Options, UnscaledWindowSize};
@@ -1133,12 +1134,12 @@ mod test {
 
     #[ip_test(I)]
     #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: None, window_scale: None }), &[]; "syn")]
-    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(const_unwrap_option(NonZeroU16::new(1440 as u16)))), window_scale: None }), &[]; "syn with mss")]
+    #[test_case(Segment::syn(SEQ, UnscaledWindowSize::from(u16::MAX), Options { mss: Some(Mss(NonZeroU16::new(1440 as u16).unwrap())), window_scale: None }), &[]; "syn with mss")]
     #[test_case(Segment::ack(SEQ, ACK, UnscaledWindowSize::from(u16::MAX)), &[]; "ack")]
     #[test_case(Segment::with_fake_data(SEQ, ACK, FAKE_DATA), FAKE_DATA; "data")]
     fn tcp_serialize_segment<I: TestIpExt>(segment: Segment<&[u8]>, expected_body: &[u8]) {
-        const SOURCE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1111));
-        const DEST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2222));
+        const SOURCE_PORT: NonZeroU16 = NonZeroU16::new(1111).unwrap();
+        const DEST_PORT: NonZeroU16 = NonZeroU16::new(2222).unwrap();
 
         let options = segment.header.options;
         let serializer = super::tcp_serialize_segment::<I, _>(

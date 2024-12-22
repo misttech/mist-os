@@ -117,11 +117,10 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // Must be called exactly once in production code.
   //
   // `coordinator_server_end` and `coordinator_listener_client_end` must be valid.
-  fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Bind(
-      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
-      fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
-          coordinator_listener_client_end,
-      fidl::OnUnboundFn<Client> unbound_callback);
+  void Bind(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
+            fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
+                coordinator_listener_client_end,
+            fidl::OnUnboundFn<Client> unbound_callback);
 
   void OnDisplaysChanged(cpp20::span<const display::DisplayId> added_display_ids,
                          cpp20::span<const display::DisplayId> removed_display_ids);
@@ -139,11 +138,10 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   void OnFenceFired(FenceReference* fence);
 
-  void TearDown();
-  // This is used for testing
-  void TearDownTest();
+  void TearDown(zx_status_t epitaph);
+  void TearDownForTesting();
 
-  bool IsValid() const { return running_; }
+  bool IsValid() const { return valid_; }
   ClientId id() const { return id_; }
   ClientPriority priority() const { return priority_; }
   void CaptureCompleted();
@@ -260,7 +258,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   ClientProxy* const proxy_;
   const ClientPriority priority_;
   const ClientId id_;
-  bool running_ = false;
+  bool valid_ = false;
 
   Image::Map images_;
   CaptureImage::Map capture_images_;
@@ -386,8 +384,7 @@ class ClientProxy {
   // greater than existing pending controller stamps.
   void UpdateConfigStampMapping(ConfigStampPair stamps);
 
-  // This is used for testing
-  void CloseTest();
+  void CloseForTesting();
 
   // Test helpers
   size_t TEST_imported_images_count() const { return handler_.TEST_imported_images_count(); }

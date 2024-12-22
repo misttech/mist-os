@@ -14,7 +14,7 @@ use fidl_fuchsia_settings::{
     IntlMarker, SetupMarker, SetupSettings, Volume,
 };
 use fuchsia_component::client::connect_to_protocol;
-use tracing::info;
+use log::info;
 
 /// Facade providing access to SetUi interfaces.
 #[derive(Debug)]

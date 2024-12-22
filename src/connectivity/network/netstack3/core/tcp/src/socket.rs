@@ -5455,7 +5455,6 @@ mod tests {
     use core::num::NonZeroU16;
     use core::time::Duration;
 
-    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use net_declare::net_ip_v6;
     use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6SourceAddr, Mtu};
@@ -5480,7 +5479,7 @@ mod tests {
     use netstack3_ip::socket::{IpSockSendError, MmsError, RouteResolutionOptions, SendOptions};
     use netstack3_ip::testutil::DualStackSendIpPacketMeta;
     use netstack3_ip::{
-        BaseTransportIpContext, HopLimits, IpTransportContext, ReceiveIpPacketMeta,
+        BaseTransportIpContext, HopLimits, IpTransportContext, LocalDeliveryPacketInfo,
     };
     use packet::{Buf, BufferMut, ParseBuffer as _};
     use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
@@ -5616,7 +5615,7 @@ mod tests {
                         Ipv4::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
-                        ReceiveIpPacketMeta::default(),
+                        &LocalDeliveryPacketInfo::default(),
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -5628,7 +5627,7 @@ mod tests {
                         Ipv6::recv_src_addr(*meta.src_ip),
                         meta.dst_ip,
                         buffer,
-                        ReceiveIpPacketMeta::default(),
+                        &LocalDeliveryPacketInfo::default(),
                     )
                     .expect("failed to deliver bytes");
                 }
@@ -6163,8 +6162,8 @@ mod tests {
 
     const LOCAL: &'static str = "local";
     const REMOTE: &'static str = "remote";
-    const PORT_1: NonZeroU16 = const_unwrap_option(NonZeroU16::new(42));
-    const PORT_2: NonZeroU16 = const_unwrap_option(NonZeroU16::new(43));
+    const PORT_1: NonZeroU16 = NonZeroU16::new(42).unwrap();
+    const PORT_2: NonZeroU16 = NonZeroU16::new(43).unwrap();
 
     impl TcpTestIpExt for Ipv4 {
         type SingleStackConverter = ();
@@ -6631,8 +6630,8 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(const_unwrap_option(NonZeroU16::new(u16::MAX)), Ok(const_unwrap_option(NonZeroU16::new(u16::MAX))); "ephemeral available")]
-    #[test_case(const_unwrap_option(NonZeroU16::new(100)), Err(LocalAddressError::FailedToAllocateLocalPort);
+    #[test_case(NonZeroU16::new(u16::MAX).unwrap(), Ok(NonZeroU16::new(u16::MAX).unwrap()); "ephemeral available")]
+    #[test_case(NonZeroU16::new(100).unwrap(), Err(LocalAddressError::FailedToAllocateLocalPort);
                 "no ephemeral available")]
     fn bind_picked_port_all_others_taken<I: TcpTestIpExt>(
         available_port: NonZeroU16,
@@ -6655,7 +6654,7 @@ mod tests {
             let socket = api.create(Default::default());
 
             api.bind(&socket, None, Some(port)).expect("uncontested bind");
-            api.listen(&socket, const_unwrap_option(NonZeroUsize::new(1))).expect("can listen");
+            api.listen(&socket, NonZeroUsize::new(1).unwrap()).expect("can listen");
         }
 
         // Now that all but the LOCAL_PORT are occupied, ask the stack to
@@ -6825,7 +6824,7 @@ mod tests {
                 }
             },
         );
-        const PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
+        const PORT: NonZeroU16 = NonZeroU16::new(100).unwrap();
         let client_connection = net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api();
             let socket: TcpSocketId<Ipv6, _, _> = api.create(Default::default());
@@ -6899,7 +6898,7 @@ mod tests {
                 }
             },
         );
-        const PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
+        const PORT: NonZeroU16 = NonZeroU16::new(100).unwrap();
         let server_listener = net.with_context(LOCAL, |ctx| {
             let mut api = ctx.tcp_api::<Ipv6>();
             let socket: TcpSocketId<Ipv6, _, _> = api.create(Default::default());
@@ -7084,7 +7083,7 @@ mod tests {
         });
     }
 
-    const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1845));
+    const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(1845).unwrap();
 
     #[ip_test(I)]
     fn listener_with_bound_device_conflict<I: TcpTestIpExt>()
@@ -7098,7 +7097,7 @@ mod tests {
         let sock_a = api.create(Default::default());
         assert_matches!(api.set_device(&sock_a, Some(MultipleDevicesId::A),), Ok(()));
         api.bind(&sock_a, None, Some(LOCAL_PORT)).expect("bind should succeed");
-        api.listen(&sock_a, const_unwrap_option(NonZeroUsize::new(10))).expect("can listen");
+        api.listen(&sock_a, NonZeroUsize::new(10).unwrap()).expect("can listen");
 
         let socket = api.create(Default::default());
         // Binding `socket` to the unspecified address should fail since the address
@@ -7194,7 +7193,7 @@ mod tests {
 
         api.bind(&socket, addr, Some(port)).expect("bind should succeed");
         if listen {
-            api.listen(&socket, const_unwrap_option(NonZeroUsize::new(25))).expect("can listen");
+            api.listen(&socket, NonZeroUsize::new(25).unwrap()).expect("can listen");
         }
         let info = api.get_info(&socket);
         assert_eq!(
@@ -7281,7 +7280,7 @@ mod tests {
             };
 
             api.bind(&socket, bind_addr, Some(PORT_1)).expect("failed to bind the client socket");
-            api.listen(&socket, const_unwrap_option(NonZeroUsize::new(1))).expect("can listen");
+            api.listen(&socket, NonZeroUsize::new(1).unwrap()).expect("can listen");
             socket
         });
 
@@ -7819,7 +7818,7 @@ mod tests {
             socket
         };
 
-        api.listen(&first_bound, const_unwrap_option(NonZeroUsize::new(10))).expect("can listen");
+        api.listen(&first_bound, NonZeroUsize::new(10).unwrap()).expect("can listen");
     }
 
     #[ip_test(I)]
@@ -7920,7 +7919,7 @@ mod tests {
             api.set_reuseaddr(&server, true).expect("can set");
             api.bind(&server, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(PORT_1))
                 .expect("failed to bind the client socket");
-            api.listen(&server, const_unwrap_option(NonZeroUsize::new(10))).expect("can listen");
+            api.listen(&server, NonZeroUsize::new(10).unwrap()).expect("can listen");
             server
         });
 
@@ -8038,7 +8037,7 @@ mod tests {
             api.set_reuseaddr(&socket, true).expect("can set");
 
             api.bind(&socket, None, Some(PORT_1)).expect("bind succeeds");
-            api.listen(&socket, const_unwrap_option(NonZeroUsize::new(5))).expect("can listen");
+            api.listen(&socket, NonZeroUsize::new(5).unwrap()).expect("can listen");
             socket
         };
 
@@ -8348,8 +8347,8 @@ mod tests {
         >,
     {
         set_logger_for_test();
-        const CLIENT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2));
-        const SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(1));
+        const CLIENT_PORT: NonZeroU16 = NonZeroU16::new(2).unwrap();
+        const SERVER_PORT: NonZeroU16 = NonZeroU16::new(1).unwrap();
         let (mut net, local, _local_snd_end, remote) = bind_listen_connect_accept_inner::<I>(
             I::UNSPECIFIED_ADDRESS,
             BindConfig {

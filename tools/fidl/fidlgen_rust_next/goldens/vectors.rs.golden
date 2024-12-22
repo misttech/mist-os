@@ -5,6 +5,7 @@
 #[derive(Clone, Debug)]
 pub struct ExampleUseOfVectors {
     pub vector_of_uint8: Vec<u8>,
+
     pub vector_of_vector_of_bool: Vec<Vec<bool>>,
 }
 
@@ -15,6 +16,7 @@ impl ::fidl_next::Encodable for ExampleUseOfVectors {
 impl<___E> ::fidl_next::Encode<___E> for ExampleUseOfVectors
 where
     Vec<u8>: ::fidl_next::Encode<___E>,
+
     Vec<Vec<bool>>: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -26,14 +28,18 @@ where
             let Self::Encoded {
                 vector_of_uint8,
                 vector_of_vector_of_bool,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.vector_of_uint8, encoder, vector_of_uint8)?;
+
         ::fidl_next::Encode::encode(
             &mut self.vector_of_vector_of_bool,
             encoder,
             vector_of_vector_of_bool,
         )?;
+
         Ok(())
     }
 }
@@ -67,6 +73,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireExampleUseOfVectors<'buf>> for ExampleUseOf
     fn take_from(from: &mut WireExampleUseOfVectors<'buf>) -> Self {
         Self {
             vector_of_uint8: ::fidl_next::TakeFrom::take_from(&mut from.vector_of_uint8),
+
             vector_of_vector_of_bool: ::fidl_next::TakeFrom::take_from(
                 &mut from.vector_of_vector_of_bool,
             ),
@@ -74,10 +81,12 @@ impl<'buf> ::fidl_next::TakeFrom<WireExampleUseOfVectors<'buf>> for ExampleUseOf
     }
 }
 
+/// The wire type corersponding to [`ExampleUseOfVectors`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireExampleUseOfVectors<'buf> {
     pub vector_of_uint8: ::fidl_next::WireVector<'buf, u8>,
+
     pub vector_of_vector_of_bool:
         ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, bool>>,
 }
@@ -87,6 +96,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::WireVector<'buf, u8>: ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireVector<'buf, ::fidl_next::WireVector<'buf, bool>>: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -97,10 +107,14 @@ where
             let Self {
                 mut vector_of_uint8,
                 mut vector_of_vector_of_bool,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(vector_of_uint8.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(vector_of_vector_of_bool.as_mut(), decoder)?;
+
         Ok(())
     }
 }

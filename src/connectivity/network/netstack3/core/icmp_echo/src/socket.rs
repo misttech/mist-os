@@ -40,8 +40,8 @@ use netstack3_datagram::{
 use netstack3_ip::icmp::{EchoTransportContextMarker, IcmpRxCounters};
 use netstack3_ip::socket::SocketHopLimits;
 use netstack3_ip::{
-    IpTransportContext, Mark, MarkDomain, MulticastMembershipHandler, ReceiveIpPacketMeta,
-    TransportIpContext, TransportReceiveError,
+    IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, Mark, MarkDomain,
+    MulticastMembershipHandler, ReceiveIpPacketMeta, TransportIpContext, TransportReceiveError,
 };
 use packet::{BufferMut, ParsablePacket as _, ParseBuffer as _, Serializer};
 use packet_formats::icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw};
@@ -383,7 +383,7 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
         let icmp_builder = IcmpPacketBuilder::<I, _>::new(
             local_ip.addr(),
             remote_ip.addr(),
-            packet_formats::icmp::IcmpUnusedCode,
+            packet_formats::icmp::IcmpZeroCode,
             IcmpEchoRequest::new(id.get(), icmp_echo.message().seq()),
         );
         Ok(body.encapsulate(icmp_builder))
@@ -1046,16 +1046,18 @@ impl<
         })
     }
 
-    fn receive_ip_packet<B: BufferMut>(
+    fn receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
         mut buffer: B,
-        meta: ReceiveIpPacketMeta<I>,
+        info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        if let Some(delivery) = meta.transparent_override {
+        let LocalDeliveryPacketInfo { meta, header_info: _ } = info;
+        let ReceiveIpPacketMeta { broadcast: _, transparent_override } = meta;
+        if let Some(delivery) = transparent_override.as_ref() {
             unreachable!(
                 "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
                 transparent proxy rules can only be configured for TCP and UDP packets"
@@ -1170,14 +1172,14 @@ mod tests {
     };
     use netstack3_base::CtxPair;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx, InnerFakeIpSocketCtx};
-    use netstack3_ip::{ReceiveIpPacketMeta, SendIpPacketMeta};
+    use netstack3_ip::{LocalDeliveryPacketInfo, SendIpPacketMeta};
     use packet::Buf;
-    use packet_formats::icmp::{IcmpPacket, IcmpParseArgs, IcmpUnusedCode};
+    use packet_formats::icmp::{IcmpPacket, IcmpParseArgs, IcmpZeroCode};
 
     use super::*;
 
     const REMOTE_ID: u16 = 27;
-    const ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(10));
+    const ICMP_ID: NonZeroU16 = NonZeroU16::new(10).unwrap();
     const SEQ_NUM: u16 = 0xF0;
 
     /// Utilities for accessing locked internal state in tests.
@@ -1403,7 +1405,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 I::TEST_ADDRS.local_ip.get(),
                 I::TEST_ADDRS.remote_ip.get(),
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 packet_formats::icmp::IcmpEchoReply::new(0, 1),
             ))
             .serialize_vec_outer()
@@ -1459,7 +1461,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 I::UNSPECIFIED_ADDRESS,
                 I::UNSPECIFIED_ADDRESS,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 // Use 0 here to show that this is filled by the API.
                 IcmpEchoRequest::new(0, SEQ_NUM),
             ))
@@ -1492,7 +1494,7 @@ mod tests {
                 // Use whatever here this is not validated by this module.
                 I::UNSPECIFIED_ADDRESS,
                 I::UNSPECIFIED_ADDRESS,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 IcmpEchoReply::new(ICMP_ID.get(), SEQ_NUM),
             ))
             .serialize_vec_outer()
@@ -1508,7 +1510,7 @@ mod tests {
             src_ip.get().try_into().unwrap(),
             dst_ip,
             reply.clone(),
-            ReceiveIpPacketMeta::default(),
+            &LocalDeliveryPacketInfo::default(),
         )
         .unwrap();
 
@@ -1533,8 +1535,8 @@ mod tests {
         let mut api = IcmpEchoSocketApi::<I, _>::new(ctx.as_mut());
         let sock = api.create();
 
-        const BIND_ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(10));
-        const OTHER_ICMP_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(16));
+        const BIND_ICMP_ID: NonZeroU16 = NonZeroU16::new(10).unwrap();
+        const OTHER_ICMP_ID: NonZeroU16 = NonZeroU16::new(16).unwrap();
 
         api.bind(&sock, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(BIND_ICMP_ID))
             .unwrap();
@@ -1544,7 +1546,7 @@ mod tests {
                 // Use whatever here this is not validated by this module.
                 I::UNSPECIFIED_ADDRESS,
                 I::UNSPECIFIED_ADDRESS,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 IcmpEchoReply::new(OTHER_ICMP_ID.get(), SEQ_NUM),
             ))
             .serialize_vec_outer()
@@ -1558,7 +1560,7 @@ mod tests {
             I::TEST_ADDRS.remote_ip.get().try_into().unwrap(),
             I::TEST_ADDRS.local_ip,
             reply,
-            ReceiveIpPacketMeta::default(),
+            &LocalDeliveryPacketInfo::default(),
         )
         .unwrap();
         assert_matches!(&bindings_ctx.state.received[..], []);

@@ -6,7 +6,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::bpf::fs::{get_bpf_object, BpfFsDir, BpfFsObject, BpfHandle};
-use crate::bpf::map::Map;
+use crate::bpf::map::{Map, MapKey};
 use crate::bpf::program::{Program, ProgramInfo};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::task::CurrentTask;
@@ -91,8 +91,10 @@ fn install_bpf_fd(
     obj: impl Into<BpfHandle>,
 ) -> Result<SyscallResult, Errno> {
     let handle: BpfHandle = obj.into();
+    let name = handle.type_name();
     // All BPF FDs have the CLOEXEC flag turned on by default.
-    let file = Anon::new_file(current_task, Box::new(handle), OpenFlags::RDWR | OpenFlags::CLOEXEC);
+    let file =
+        Anon::new_file(current_task, Box::new(handle), OpenFlags::RDWR | OpenFlags::CLOEXEC, name);
     Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
 }
 
@@ -100,6 +102,15 @@ fn install_bpf_fd(
 pub struct BpfTypeFormat {
     #[allow(dead_code)]
     data: Vec<u8>,
+}
+
+fn read_map_key(
+    current_task: &CurrentTask,
+    addr: UserAddress,
+    key_size: u32,
+) -> Result<MapKey, Errno> {
+    let key_size = key_size as usize;
+    current_task.read_objects_to_smallvec(UserRef::<u8>::new(addr), key_size as usize)
 }
 
 pub fn sys_bpf(
@@ -152,14 +163,15 @@ pub fn sys_bpf(
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
 
-            let key = current_task.read_memory_to_vec(
-                UserAddress::from(elem_attr.key),
-                map.schema.key_size as usize,
-            )?;
+            let key =
+                read_map_key(current_task, UserAddress::from(elem_attr.key), map.schema.key_size)?;
+
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant because all variants must be valid with all bit patterns.
             let user_value = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.value });
-            map.lookup(locked, current_task, &key, user_value)?;
+            let value = map.lookup(&key)?;
+            current_task.write_memory(user_value, &value)?;
+
             Ok(SUCCESS)
         }
 
@@ -172,17 +184,16 @@ pub fn sys_bpf(
             let map = map.as_map()?;
 
             let flags = elem_attr.flags;
-            let key = current_task.read_memory_to_vec(
-                UserAddress::from(elem_attr.key),
-                map.schema.key_size as usize,
-            )?;
+            let key =
+                read_map_key(current_task, UserAddress::from(elem_attr.key), map.schema.key_size)?;
+
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant because all variants must be valid with all bit patterns.
             let user_value = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.value });
             let value =
                 current_task.read_memory_to_vec(user_value, map.schema.value_size as usize)?;
 
-            map.update(locked, key, &value, flags)?;
+            map.update(key, &value, flags)?;
             Ok(SUCCESS)
         }
 
@@ -193,12 +204,10 @@ pub fn sys_bpf(
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
 
-            let key = current_task.read_memory_to_vec(
-                UserAddress::from(elem_attr.key),
-                map.schema.key_size as usize,
-            )?;
+            let key =
+                read_map_key(current_task, UserAddress::from(elem_attr.key), map.schema.key_size)?;
 
-            map.delete(locked, &key)?;
+            map.delete(&key)?;
             Ok(SUCCESS)
         }
 
@@ -211,18 +220,21 @@ pub fn sys_bpf(
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
             let key = if elem_attr.key != 0 {
-                let key = current_task.read_memory_to_vec(
+                Some(read_map_key(
+                    current_task,
                     UserAddress::from(elem_attr.key),
-                    map.schema.key_size as usize,
-                )?;
-                Some(key)
+                    map.schema.key_size,
+                )?)
             } else {
                 None
             };
+
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant (right?)
             let user_next_key = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.next_key });
-            map.get_next_key(locked, current_task, key, user_next_key)?;
+            current_task
+                .write_memory(user_next_key, &map.get_next_key(key.as_ref().map(|k| &k[..]))?)?;
+
             Ok(SUCCESS)
         }
 
@@ -280,7 +292,7 @@ pub fn sys_bpf(
             log_trace!("BPF_PROG_QUERY");
             track_stub!(TODO("https://fxbug.dev/322873416"), "Bpf::BPF_PROG_QUERY");
             current_task.write_memory(UserAddress::from(prog_attr.prog_ids), 1.as_bytes())?;
-            prog_attr.prog_cnt = std::mem::size_of::<u64>() as u32;
+            prog_attr.__bindgen_anon_2.prog_cnt = std::mem::size_of::<u64>() as u32;
             current_task.write_memory(attr_addr, prog_attr.as_bytes())?;
             Ok(SUCCESS)
         }

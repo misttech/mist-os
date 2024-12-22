@@ -64,11 +64,7 @@ impl OutDir {
             tree.add_entry(&path, entry.clone())?;
         }
 
-        let dir = tree.build();
-        dir.clone().set_not_found_handler(Box::new(|path| {
-            tracing::error!("out dir cannot serve path {:?}", path)
-        }));
-        Ok(dir)
+        Ok(tree.build())
     }
 
     /// Returns a function that will host this outgoing directory on the given ServerEnd.

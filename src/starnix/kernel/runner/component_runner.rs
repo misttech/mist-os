@@ -495,7 +495,7 @@ impl MountRecord {
         let rights = fio::Flags::from_bits(info.rights.unwrap().bits()).unwrap();
 
         let (client_end, server_end) = zx::Channel::create();
-        directory.clone2(ServerEnd::new(server_end)).context("cloning directory")?;
+        directory.clone(ServerEnd::new(server_end)).context("cloning directory")?;
 
         // If a filesystem security label argument was provided then apply it to all files via
         // mountpoint-labeling, with a "context=..." mount option.

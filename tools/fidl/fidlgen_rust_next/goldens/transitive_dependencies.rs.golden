@@ -4,7 +4,7 @@
 
 #[derive(Clone, Debug)]
 pub struct Baz {
-    pub g: fidl_test_middle::Bar,
+    pub g: fidl_next_test_middle::Bar,
 }
 
 impl ::fidl_next::Encodable for Baz {
@@ -13,7 +13,7 @@ impl ::fidl_next::Encodable for Baz {
 
 impl<___E> ::fidl_next::Encode<___E> for Baz
 where
-    fidl_test_middle::Bar: ::fidl_next::Encode<___E>,
+    fidl_next_test_middle::Bar: ::fidl_next::Encode<___E>,
 {
     fn encode(
         &mut self,
@@ -23,9 +23,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 g,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.g, encoder, g)?;
+
         Ok(())
     }
 }
@@ -61,17 +64,18 @@ impl ::fidl_next::TakeFrom<WireBaz> for Baz {
     }
 }
 
+/// The wire type corersponding to [`Baz`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireBaz {
-    pub g: fidl_test_middle::WireBar,
+    pub g: fidl_next_test_middle::WireBar,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireBaz
 where
     ___D: ?Sized,
 
-    fidl_test_middle::WireBar: ::fidl_next::Decode<___D>,
+    fidl_next_test_middle::WireBar: ::fidl_next::Decode<___D>,
 {
     fn decode(
         slot: ::fidl_next::Slot<'_, Self>,
@@ -80,9 +84,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut g,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(g.as_mut(), decoder)?;
+
         Ok(())
     }
 }

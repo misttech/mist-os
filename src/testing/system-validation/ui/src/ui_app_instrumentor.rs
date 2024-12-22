@@ -4,10 +4,10 @@
 
 use argh::FromArgs;
 use fuchsia_component::client::connect_to_protocol;
+use log::info;
 use system_validation_lib::app_monitor::AppMonitor;
 use system_validation_lib::screencapture::take_screenshot;
 use system_validation_lib::single_session_trace::SingleSessionTrace;
-use tracing::info;
 use {
     fidl_fuchsia_session_scene as scene, fidl_fuchsia_ui_app as ui_app, fuchsia_async as fasync,
     fuchsia_scenic as scenic,

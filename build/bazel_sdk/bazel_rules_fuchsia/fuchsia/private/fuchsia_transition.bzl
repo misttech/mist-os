@@ -6,7 +6,7 @@
 
 load("//common:transition_utils.bzl", "set_command_line_option_value")
 load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
-load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "fail_missing_api_level", "u32_for_fuchsia_api_level_or_none")
+load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "u32_for_fuchsia_api_level_or_none")
 
 NATIVE_CPU_ALIASES = {
     "darwin": "x86_64",
@@ -30,14 +30,7 @@ CPU_MAP = {
     fuchsia_platforms.riscv64: "riscv64",
 }
 
-_REPO_DEFAULT_API_LEVEL_TARGET_NAME = "//fuchsia:repository_default_fuchsia_api_level"
-
-def _name_for_error(attr):
-    return (
-        getattr(attr, "package_name", None)
-    ) or (
-        getattr(attr, "name", None)
-    ) or "NAME NOT FOUND"
+_REPO_DEFAULT_API_LEVEL_TARGET_NAME = "@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level"
 
 def _fuchsia_api_level_in_effect(settings, attr):
     # The logic for determining what API level to use.
@@ -60,7 +53,11 @@ def _fuchsia_api_level_in_effect(settings, attr):
         target_specified_api_level
     ) or (
         repo_default_api_level
-    ) or fail_missing_api_level(_name_for_error(attr))
+    ) or (
+        # No API level has been specified. This will be handled by
+        # `fuchsia_api_level`, which is cleaner than failing in the transition.
+        ""
+    )
 
 def _package_supplied_platform(attr):
     # We should be pulling the platform off of the package but we need to clean

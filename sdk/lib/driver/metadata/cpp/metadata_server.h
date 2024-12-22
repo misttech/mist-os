@@ -20,29 +20,19 @@
 namespace fdf_metadata {
 
 // Serves metadata that can be retrieved using `fdf_metadata::GetMetadata<|FidlType|>()`.
-// `fdf_metadata::ObjectDetails<|FidlType|>::Name` must be defined. Expected to be used by driver
-// components.
-//
-// As an example, lets say there exists a FIDl type `fuchsia.hardware.test/Metadata` to be sent from
+// As an example, lets say there exists a FIDL type `fuchsia.hardware.test/Metadata` to be sent from
 // a driver to its child driver:
 //
 //   library fuchsia.hardware.test;
 //
+//   // Make sure to annotate the type with `@serializable`.
+//   @serializable
 //   type Metadata = table {
 //       1: test_property string:MAX;
 //   };
 //
 // The parent driver can define a `MetadataServer<fuchsia_hardware_test::Metadata>` server
 // instance as one its members:
-//
-//   namespace fdf_metadata {
-//
-//     template <>
-//     struct ObjectDetails<fuchsia_hardware_test::Metadata> {
-//       inline static const char* Name = "fuchsia.hardware.test.Metadata";
-//     };
-//
-//   }  // namespace fdf_metadata
 //
 //   class ParentDriver : public fdf::DriverBase {
 //    private:
@@ -68,7 +58,6 @@ namespace fdf_metadata {
 //     },
 //   ],
 //
-// See `fdf_metadata::ObjectDetails` for more details about the name of the service.
 template <typename FidlType>
 class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Metadata> {
  public:
@@ -79,11 +68,11 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
       std::string instance_name = component::OutgoingDirectory::kDefaultServiceInstance)
       : instance_name_(std::move(instance_name)), service_name_(std::move(service_name)) {}
 
-  // Uses `ObjectDetails<|FidlType|>::Name` as the service name. Make sure that
-  // `ObjectDetails<|FidlType|>::Name` is defined. See `fdf_metadata::ObjectDetails` for more info.
+  // Uses `FidlType::kSerializableName` as the service name. Make sure that `FidlType` is annotated
+  // with `@serializable`.
   explicit MetadataServer(
       std::string instance_name = component::OutgoingDirectory::kDefaultServiceInstance)
-      : MetadataServer(ObjectDetails<FidlType>::Name, std::move(instance_name)) {}
+      : MetadataServer(FidlType::kSerializableName, std::move(instance_name)) {}
 
   // Set the metadata to be served to |metadata|. |metadata| must be persistable.
   zx::result<> SetMetadata(const FidlType& metadata) {
@@ -107,8 +96,8 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   // If the metadata found in |incoming| changes after this function has been called then those
   // changes will not be reflected in the metadata to be served.
   //
-  // Make sure that the component manifest specifies that is uses the
-  // `fdf_metadata::ObjectDetails<|FidlType|>::Name` FIDL service
+  // Make sure that the component manifest specifies that is uses the `FidlType::kSerializableName`
+  // FIDL service
   zx::result<> ForwardMetadata(
       const std::shared_ptr<fdf::Namespace>& incoming,
       std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {

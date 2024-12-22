@@ -10,7 +10,7 @@ use starnix_logging::log_debug;
 use starnix_uapi::errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    self as uapi, __NR_restart_syscall, error, sigaction, sigaltstack, sigcontext, siginfo_t,
+    self as uapi, __NR_restart_syscall, error, sigaction_t, sigaltstack, sigcontext, siginfo_t,
     ucontext,
 };
 use static_assertions::const_assert_eq;
@@ -83,7 +83,7 @@ impl SignalStackFrame {
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
-        action: sigaction,
+        action: sigaction_t,
         stack_pointer: UserAddress,
     ) -> Result<SignalStackFrame, Errno> {
         let fpstate_addr = (uapi::uaddr {
@@ -245,7 +245,7 @@ mod tests {
     use crate::mm::memory::MemoryObject;
     use crate::mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags};
     use crate::signals::testing::dequeue_signal_for_test;
-    use crate::signals::{restore_from_signal_handler, KernelSignal, SignalDetail};
+    use crate::signals::{restore_from_signal_handler, SignalDetail};
     use crate::task::Kernel;
     use crate::testing::*;
     use crate::vfs::FileWriteGuardRef;
@@ -274,11 +274,11 @@ mod tests {
         // Register the signal action.
         current_task.thread_group.signal_actions.set(
             SIGUSR1,
-            sigaction {
+            sigaction_t {
                 sa_flags: (SA_RESTORER | SA_RESTART | SA_SIGINFO) as u64,
                 sa_handler: SA_HANDLER_ADDRESS.into(),
                 sa_restorer: SA_RESTORER_ADDRESS.into(),
-                ..sigaction::default()
+                ..sigaction_t::default()
             },
         );
 
@@ -345,20 +345,20 @@ mod tests {
         // Register the signal actions.
         current_task.thread_group.signal_actions.set(
             SIGUSR1,
-            sigaction {
+            sigaction_t {
                 sa_flags: (SA_RESTORER | SA_RESTART | SA_SIGINFO) as u64,
                 sa_handler: SA_HANDLER_ADDRESS.into(),
                 sa_restorer: SA_RESTORER_ADDRESS.into(),
-                ..sigaction::default()
+                ..sigaction_t::default()
             },
         );
         current_task.thread_group.signal_actions.set(
             SIGUSR2,
-            sigaction {
+            sigaction_t {
                 sa_flags: (SA_RESTORER | SA_RESTART | SA_SIGINFO) as u64,
                 sa_handler: SA_HANDLER2_ADDRESS.into(),
                 sa_restorer: SA_RESTORER_ADDRESS.into(),
-                ..sigaction::default()
+                ..sigaction_t::default()
             },
         );
 
@@ -477,11 +477,11 @@ mod tests {
         // Register the signal action.
         current_task.thread_group.signal_actions.set(
             SIGUSR1,
-            sigaction {
+            sigaction_t {
                 sa_flags: (SA_RESTORER | SA_SIGINFO) as u64,
                 sa_handler: SA_HANDLER_ADDRESS.into(),
                 sa_restorer: SA_RESTORER_ADDRESS.into(),
-                ..sigaction::default()
+                ..sigaction_t::default()
             },
         );
 
@@ -533,25 +533,6 @@ mod tests {
             current_task.thread_state.registers.rip,
             (SYSCALL_INSTRUCTION_ADDRESS + 2u64).ptr() as u64
         );
-    }
-
-    #[::fuchsia::test]
-    async fn kernel_signal_handling() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
-
-        current_task.write().enqueue_kernel_signal(KernelSignal::Freeze);
-
-        // Queue another user signal to make sure the kernel signal has the priority.
-        current_task.write().enqueue_signal(SignalInfo::new(
-            SIGUSR1,
-            SI_USER as i32,
-            SignalDetail::None,
-        ));
-
-        // Process the signal.
-        dequeue_signal_for_test(&mut locked, &mut current_task);
-
-        assert!(current_task.read().frozen);
     }
 
     /// Creates a kernel and initial task, giving the task a stack.

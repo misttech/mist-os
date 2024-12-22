@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("mac_address_test") {
-    enable_mypy = true
     main_source = "mac_address_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"

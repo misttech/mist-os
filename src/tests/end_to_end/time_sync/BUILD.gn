@@ -7,7 +7,6 @@ import("//build/testing/environments.gni")
 
 if (is_host) {
   python_host_test("time_sync_e2e_tests") {
-    enable_mypy = true
     main_source = "test/time_sync_e2e_tests.py"
     extra_args = [ "-v" ]
 

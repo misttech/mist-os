@@ -52,12 +52,12 @@ use netstack3_core::device::{
     NdpConfiguration, NdpConfigurationUpdate,
 };
 use netstack3_core::ip::{
-    AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, CommonAddressProperties,
-    IpDeviceConfiguration, IpDeviceConfigurationUpdate, Ipv4AddrConfig,
-    Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationAndFlags, Ipv6DeviceConfigurationUpdate, Lifetime, PreferredLifetime,
-    SetIpAddressPropertiesError, SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration,
-    UpdateIpConfigurationError,
+    AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, CommonAddressProperties, IgmpConfigMode,
+    IpDeviceConfiguration, IpDeviceConfigurationAndFlags, IpDeviceConfigurationUpdate,
+    Ipv4AddrConfig, Ipv4DeviceConfiguration, Ipv4DeviceConfigurationUpdate, Ipv6AddrManualConfig,
+    Ipv6DeviceConfiguration, Ipv6DeviceConfigurationUpdate, Lifetime, MldConfigMode,
+    PreferredLifetime, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
+    TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
 };
 use zx::{self as zx, HandleBased, Rights};
 
@@ -863,9 +863,23 @@ fn set_configuration(
             arp,
             __source_breaking,
         }) => {
-            if let Some(_) = igmp {
-                warn!("TODO(https://fxbug.dev/42071006): support IGMP configuration changes")
-            }
+            let fnet_interfaces_admin::IgmpConfiguration {
+                version: igmp_version,
+                __source_breaking,
+            } = igmp.unwrap_or_default();
+            let igmp_mode = igmp_version.map(|v|{
+                match v {
+                    fnet_interfaces_admin::IgmpVersion::V1 => {
+                        Ok(IgmpConfigMode::V1)
+                    },
+                    fnet_interfaces_admin::IgmpVersion::V2 => Ok(IgmpConfigMode::V2),
+                    fnet_interfaces_admin::IgmpVersion::V3 => Ok(IgmpConfigMode::V3),
+                    fnet_interfaces_admin::IgmpVersion::__SourceBreaking { .. } => {
+                        Err(fnet_interfaces_admin::ControlSetConfigurationError::Ipv4IgmpVersionUnsupported)
+                    },
+                }
+            }).transpose()?;
+
             if let Some(forwarding) = unicast_forwarding {
                 info!("updating IPv4 unicast forwarding on {core_id:?} to enabled={forwarding}");
             }
@@ -880,7 +894,7 @@ fn set_configuration(
                         multicast_forwarding_enabled: multicast_forwarding,
                         ..Default::default()
                     },
-                    ..Default::default()
+                    igmp_mode,
                 }),
                 arp.map(TryIntoCore::try_into_core).transpose().map_err(|e| match e {
                     IllegalNonPositiveValueError::Zero => {
@@ -903,9 +917,20 @@ fn set_configuration(
             ndp,
             __source_breaking,
         }) => {
-            if let Some(_) = mld {
-                warn!("TODO(https://fxbug.dev/42071006): support MLD configuration changes")
-            }
+            let fnet_interfaces_admin::MldConfiguration { version: mld_version, __source_breaking } =
+                mld.unwrap_or_default();
+            let mld_mode = mld_version.map(|v|{
+                match v {
+                    fnet_interfaces_admin::MldVersion::V1 => {
+                        Ok(MldConfigMode::V1)
+                    },
+                    fnet_interfaces_admin::MldVersion::V2 => Ok(MldConfigMode::V2),
+                    fnet_interfaces_admin::MldVersion::__SourceBreaking { .. } => {
+                        Err(fnet_interfaces_admin::ControlSetConfigurationError::Ipv6MldVersionUnsupported)
+                    },
+                }
+            }).transpose()?;
+
             if let Some(forwarding) = unicast_forwarding {
                 info!("updating IPv6 unicast forwarding on {core_id:?} to enabled={forwarding}");
             }
@@ -946,6 +971,7 @@ fn set_configuration(
                         enable_stable_addresses: None,
                     },
                     max_router_solicitations: None,
+                    mld_mode,
                 }),
                 nud.map(|nud| Ok(NdpConfigurationUpdate { nud: Some(nud.try_into_core()?) }))
                     .transpose()
@@ -1009,7 +1035,7 @@ fn set_configuration(
     // back. If we didn't apply updates, use the default struct to construct the
     // delta responses.
     let ipv4 = ipv4_update.map(|u| {
-        let Ipv4DeviceConfigurationUpdate { ip_config } =
+        let Ipv4DeviceConfigurationUpdate { ip_config, igmp_mode } =
             ctx.api().device_ip::<Ipv4>().apply_configuration(u);
         let IpDeviceConfigurationUpdate {
             unicast_forwarding_enabled,
@@ -1017,10 +1043,17 @@ fn set_configuration(
             ip_enabled: _,
             gmp_enabled: _,
         } = ip_config;
+
+        let igmp = fnet_interfaces_admin::IgmpConfiguration {
+            version: igmp_mode.map(IntoFidl::into_fidl),
+            __source_breaking: fidl::marker::SourceBreaking,
+        };
+        let igmp = (igmp != Default::default()).then_some(igmp);
+
         fnet_interfaces_admin::Ipv4Configuration {
             unicast_forwarding: unicast_forwarding_enabled,
             multicast_forwarding: multicast_forwarding_enabled,
-            igmp: None,
+            igmp,
             arp: arp.map(IntoFidl::into_fidl),
             __source_breaking: fidl::marker::SourceBreaking,
         }
@@ -1032,6 +1065,7 @@ fn set_configuration(
             dad_transmits,
             slaac_config,
             max_router_solicitations: _,
+            mld_mode,
         } = ctx.api().device_ip::<Ipv6>().apply_configuration(u);
 
         let dad = dad_transmits.map(|transmits| fnet_interfaces_admin::DadConfiguration {
@@ -1048,6 +1082,13 @@ fn set_configuration(
         };
         let ndp = (ndp != Default::default()).then_some(ndp);
 
+        let mld = fnet_interfaces_admin::MldConfiguration {
+            version: mld_mode.map(IntoFidl::into_fidl),
+            __source_breaking: fidl::marker::SourceBreaking,
+        };
+        let mld: Option<fidl_fuchsia_net_interfaces_admin::MldConfiguration> =
+            (mld != Default::default()).then_some(mld);
+
         let IpDeviceConfigurationUpdate {
             unicast_forwarding_enabled,
             multicast_forwarding_enabled,
@@ -1057,7 +1098,7 @@ fn set_configuration(
         fnet_interfaces_admin::Ipv6Configuration {
             unicast_forwarding: unicast_forwarding_enabled,
             multicast_forwarding: multicast_forwarding_enabled,
-            mld: None,
+            mld,
             ndp,
             __source_breaking: fidl::marker::SourceBreaking,
         }
@@ -1079,22 +1120,33 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
 
     let DeviceConfiguration { arp, ndp } = ctx.api().device_any().get_configuration(&core_id);
 
-    let IpDeviceConfiguration {
-        unicast_forwarding_enabled,
-        multicast_forwarding_enabled,
-        gmp_enabled: _,
-    } = ctx.api().device_ip::<Ipv4>().get_configuration(&core_id).config.ip_config;
+    let IpDeviceConfigurationAndFlags {
+        config:
+            Ipv4DeviceConfiguration {
+                ip_config:
+                    IpDeviceConfiguration {
+                        unicast_forwarding_enabled,
+                        multicast_forwarding_enabled,
+                        gmp_enabled: _,
+                    },
+            },
+        flags: _,
+        gmp_mode,
+    } = ctx.api().device_ip::<Ipv4>().get_configuration(&core_id);
+    let igmp = fnet_interfaces_admin::IgmpConfiguration {
+        version: Some(gmp_mode.into_fidl()),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+
     let ipv4 = Some(fnet_interfaces_admin::Ipv4Configuration {
         unicast_forwarding: Some(unicast_forwarding_enabled),
-        // TODO(https://fxbug.dev/42071006): Support IGMP configuration
-        // changes.
-        igmp: None,
+        igmp: Some(igmp),
         multicast_forwarding: Some(multicast_forwarding_enabled),
         arp: arp.map(IntoFidl::into_fidl),
         __source_breaking: fidl::marker::SourceBreaking,
     });
 
-    let Ipv6DeviceConfigurationAndFlags {
+    let IpDeviceConfigurationAndFlags {
         config:
             Ipv6DeviceConfiguration {
                 dad_transmits,
@@ -1108,6 +1160,7 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
                     },
             },
         flags: _,
+        gmp_mode,
     } = ctx.api().device_ip::<Ipv6>().get_configuration(&core_id);
 
     let nud = ndp.map(|NdpConfiguration { nud }| nud);
@@ -1122,11 +1175,14 @@ fn get_configuration(ctx: &mut Ctx, id: BindingId) -> fnet_interfaces_admin::Con
         __source_breaking: fidl::marker::SourceBreaking,
     });
 
+    let mld = fnet_interfaces_admin::MldConfiguration {
+        version: Some(gmp_mode.into_fidl()),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+
     let ipv6 = Some(fnet_interfaces_admin::Ipv6Configuration {
         unicast_forwarding: Some(unicast_forwarding_enabled),
-        // TODO(https://fxbug.dev/42071006): Support MLD configuration
-        // changes.
-        mld: None,
+        mld: Some(mld),
         multicast_forwarding: Some(multicast_forwarding_enabled),
         ndp,
         __source_breaking: fidl::marker::SourceBreaking,

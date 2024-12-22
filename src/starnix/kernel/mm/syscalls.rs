@@ -592,7 +592,7 @@ pub fn sys_get_robust_list(
     }
     let task = if pid == 0 { current_task.weak_task() } else { current_task.get_task(pid) };
     let task = Task::from_weak(&task)?;
-    current_task.write_object(user_head_ptr, &task.read().robust_list_head)?;
+    current_task.write_object(user_head_ptr, &task.read().robust_list_head.addr())?;
     current_task.write_object(user_len_ptr, &std::mem::size_of::<robust_list_head>())?;
     Ok(())
 }
@@ -606,7 +606,7 @@ pub fn sys_set_robust_list(
     if len != std::mem::size_of::<robust_list_head>() {
         return error!(EINVAL);
     }
-    current_task.write().robust_list_head = user_head;
+    current_task.write().robust_list_head = user_head.into();
     Ok(())
 }
 
@@ -649,6 +649,61 @@ pub fn sys_mincore(
     track_stub!(TODO("https://fxbug.dev/297372240"), "mincore()");
     error!(ENOSYS)
 }
+
+// Syscalls for arch32 usage
+#[cfg(feature = "arch32")]
+mod arch32 {
+    use crate::mm::syscalls::{sys_mmap, UserAddress};
+    use crate::mm::PAGE_SIZE;
+    use crate::task::{CurrentTask, RobustListHeadPtr};
+    use crate::vfs::FdNumber;
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::user_address::UserRef;
+    use starnix_uapi::{errno, error, uapi};
+
+    pub fn sys_arch32_set_robust_list(
+        _locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_head: UserRef<uapi::arch32::robust_list_head>,
+        len: usize,
+    ) -> Result<(), Errno> {
+        if len != std::mem::size_of::<uapi::arch32::robust_list_head>() {
+            return error!(EINVAL);
+        }
+        current_task.write().robust_list_head = RobustListHeadPtr::from_32(user_head);
+        Ok(())
+    }
+
+    pub fn sys_arch32_mmap2(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &mut CurrentTask,
+        addr: UserAddress,
+        length: usize,
+        prot: u32,
+        flags: u32,
+        fd: FdNumber,
+        offset: u64,
+    ) -> Result<UserAddress, Errno> {
+        sys_mmap(locked, current_task, addr, length, prot, flags, fd, offset * *PAGE_SIZE)
+    }
+
+    pub fn sys_arch32_munmap(
+        _locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+        length: usize,
+    ) -> Result<(), Errno> {
+        if !addr.is_lower_32bit() || length >= (1 << 32) {
+            return error!(EINVAL);
+        }
+        current_task.mm().ok_or_else(|| errno!(EINVAL))?.unmap(addr, length)?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "arch32")]
+pub use arch32::*;
 
 #[cfg(test)]
 mod tests {

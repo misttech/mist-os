@@ -65,6 +65,9 @@ class DlLoadTestsBase : public DlTestsBase {
   // This is called when a test fixture DlCloses a file module.
   void UntrackModule(void* file);
 
+  // Run any set up logic needed at the beginning of each test.
+  void SetUp() override;
+
   // At the end of the test, check that all files that were dlopened in the test
   // were also dlclosed.
   void TearDown() override;

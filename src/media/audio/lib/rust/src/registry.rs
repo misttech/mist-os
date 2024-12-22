@@ -10,17 +10,30 @@ use async_utils::hanging_get::client::HangingGetStream;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_audio_device as fadevice;
 use fuchsia_async::Task;
+use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::lock::Mutex;
 use futures::StreamExt;
+use log::error;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use tracing::error;
 use zx_status::Status;
+
+#[derive(Debug, Clone)]
+pub enum DeviceEvent {
+    /// A device was added to the registry.
+    Added(Box<DeviceInfo>),
+    /// A device was removed from the registry.
+    Removed(fadevice::TokenId),
+}
+
+pub type DeviceEventSender = UnboundedSender<DeviceEvent>;
+pub type DeviceEventReceiver = UnboundedReceiver<DeviceEvent>;
 
 pub struct Registry {
     proxy: fadevice::RegistryProxy,
     devices: Arc<Mutex<BTreeMap<fadevice::TokenId, DeviceInfo>>>,
     devices_initialized: AsyncEvent,
+    event_senders: Arc<Mutex<Vec<DeviceEventSender>>>,
     _watch_devices_task: Task<()>,
 }
 
@@ -28,17 +41,29 @@ impl Registry {
     pub fn new(proxy: fadevice::RegistryProxy) -> Self {
         let devices = Arc::new(Mutex::new(BTreeMap::new()));
         let devices_initialized = AsyncEvent::new();
+        let event_senders = Arc::new(Mutex::new(vec![]));
+
         let watch_devices_task = Task::spawn({
+            let proxy = proxy.clone();
             let devices = devices.clone();
             let devices_initialized = devices_initialized.clone();
-            let proxy = proxy.clone();
+            let event_senders = event_senders.clone();
             async {
-                if let Err(err) = watch_devices(proxy, devices, devices_initialized).await {
-                    error!(%err, "Failed to watch Registry devices");
+                if let Err(err) =
+                    watch_devices(proxy, devices, devices_initialized, event_senders).await
+                {
+                    error!(err:%; "Failed to watch Registry devices");
                 }
             }
         });
-        Self { proxy, devices, devices_initialized, _watch_devices_task: watch_devices_task }
+
+        Self {
+            proxy,
+            devices,
+            devices_initialized,
+            event_senders,
+            _watch_devices_task: watch_devices_task,
+        }
     }
 
     /// Returns information about the device with the given `token_id`.
@@ -84,6 +109,13 @@ impl Registry {
 
         Ok(RegistryDevice::new(info, observer_proxy))
     }
+
+    /// Returns a channel of device events.
+    pub async fn subscribe(&self) -> DeviceEventReceiver {
+        let (sender, receiver) = mpsc::unbounded::<DeviceEvent>();
+        self.event_senders.lock().await.push(sender);
+        receiver
+    }
 }
 
 /// Watches devices added to and removed from the registry and updates
@@ -95,6 +127,7 @@ async fn watch_devices(
     proxy: fadevice::RegistryProxy,
     devices: Arc<Mutex<BTreeMap<fadevice::TokenId, DeviceInfo>>>,
     devices_initialized: AsyncEvent,
+    event_senders: Arc<Mutex<Vec<DeviceEventSender>>>,
 ) -> Result<(), Error> {
     let mut devices_initialized = Some(devices_initialized);
 
@@ -112,9 +145,15 @@ async fn watch_devices(
                 let added_devices = response.devices.ok_or_else(|| anyhow!("missing devices"))?;
 
                 let mut devices = devices.lock().await;
+                let mut event_senders = event_senders.lock().await;
+
                 for new_device in added_devices.into_iter() {
                     let token_id = new_device.token_id.ok_or_else(|| anyhow!("device info missing token_id"))?;
-                    let _ = devices.insert(token_id, DeviceInfo::from(new_device));
+                    let device_info = DeviceInfo::from(new_device);
+                    for sender in event_senders.iter_mut() {
+                        let _ = sender.unbounded_send(DeviceEvent::Added(Box::new(device_info.clone())));
+                    }
+                    let _ = devices.insert(token_id, device_info);
                 }
 
                 if let Some(devices_initialized) = devices_initialized.take() {
@@ -128,6 +167,9 @@ async fn watch_devices(
                 let token_id = response.token_id.ok_or_else(|| anyhow!("missing token_id"))?;
                 let mut devices = devices.lock().await;
                 let _ = devices.remove(&token_id);
+                for sender in event_senders.lock().await.iter_mut() {
+                    let _ = sender.unbounded_send(DeviceEvent::Removed(token_id));
+                }
             }
         }
     }
@@ -183,7 +225,7 @@ impl SignalProcessing {
                     watch_element_states(proxy, element_states, element_states_initialized.clone())
                         .await
                 {
-                    error!(%err, "Failed to watch Registry element states");
+                    error!(err:%; "Failed to watch Registry element states");
                     // Watching the element states will fail if the device does not support signal
                     // processing. In this case, mark the states as initialized so the getter can
                     // return the initial None value.
@@ -200,7 +242,7 @@ impl SignalProcessing {
                 if let Err(err) =
                     watch_topology(proxy, topology_id, topology_id_initialized.clone()).await
                 {
-                    error!(%err, "Failed to watch Registry topology");
+                    error!(err:%; "Failed to watch Registry topology");
                     // Watching the topology ID will fail if the device does not support signal
                     // processing. In this case, mark the ID as initialized so the getter can
                     // return the initial None value.
@@ -412,7 +454,7 @@ mod test {
                 responder.send(Ok(response)).expect("failed to send response");
                 true
             });
-        let added_broker = HangingGet::new(initial_added_response, watch_devices_added_notify);
+        let mut added_broker = HangingGet::new(initial_added_response, watch_devices_added_notify);
         let added_publisher = added_broker.new_publisher();
 
         let watch_device_removed_notify: RemovedNotifyFn =
@@ -420,24 +462,22 @@ mod test {
                 responder.send(Ok(response)).expect("failed to send response");
                 true
             });
-        let removed_broker = HangingGet::new_unknown_state(watch_device_removed_notify);
+        let mut removed_broker = HangingGet::new_unknown_state(watch_device_removed_notify);
         let removed_publisher = removed_broker.new_publisher();
 
-        let added_broker = Arc::new(Mutex::new(added_broker));
-        let removed_broker = Arc::new(Mutex::new(removed_broker));
+        let added_subscriber = Arc::new(Mutex::new(added_broker.new_subscriber()));
+        let removed_subscriber = Arc::new(Mutex::new(removed_broker.new_subscriber()));
 
         let proxy = spawn_local_stream_handler(move |request| {
-            let added_broker = added_broker.clone();
-            let removed_broker = removed_broker.clone();
+            let added_subscriber = added_subscriber.clone();
+            let removed_subscriber = removed_subscriber.clone();
             async move {
-                let added_subscriber = added_broker.lock().await.new_subscriber();
-                let removed_subscriber = removed_broker.lock().await.new_subscriber();
                 match request {
                     fadevice::RegistryRequest::WatchDevicesAdded { responder } => {
-                        added_subscriber.register(responder).unwrap()
+                        added_subscriber.lock().await.register(responder).unwrap()
                     }
                     fadevice::RegistryRequest::WatchDeviceRemoved { responder } => {
-                        removed_subscriber.register(responder).unwrap()
+                        removed_subscriber.lock().await.register(responder).unwrap()
                     }
                     _ => unimplemented!(),
                 }
@@ -447,13 +487,73 @@ mod test {
         (proxy, added_publisher, removed_publisher)
     }
 
+    fn added_response(devices: Vec<fadevice::Info>) -> fadevice::RegistryWatchDevicesAddedResponse {
+        fadevice::RegistryWatchDevicesAddedResponse { devices: Some(devices), ..Default::default() }
+    }
+
+    fn removed_response(
+        token_id: fadevice::TokenId,
+    ) -> fadevice::RegistryWatchDeviceRemovedResponse {
+        fadevice::RegistryWatchDeviceRemovedResponse {
+            token_id: Some(token_id),
+            ..Default::default()
+        }
+    }
+
     #[fuchsia::test]
     async fn test_device_info() {
-        let devices = vec![fadevice::Info { token_id: Some(1), ..Default::default() }];
-        let (registry_proxy, _added_publisher, _removed_publisher) = serve_registry(devices);
+        let initial_devices = vec![fadevice::Info { token_id: Some(1), ..Default::default() }];
+        let (registry_proxy, _added_publisher, _removed_publisher) =
+            serve_registry(initial_devices);
         let registry = Registry::new(registry_proxy);
 
         assert!(registry.device_info(1).await.is_some());
         assert!(registry.device_info(2).await.is_none());
+    }
+
+    #[fuchsia::test]
+    async fn test_subscribe() {
+        let initial_devices = vec![];
+        let (registry_proxy, added_publisher, removed_publisher) = serve_registry(initial_devices);
+        let registry = Registry::new(registry_proxy);
+
+        registry.devices_initialized.wait().await;
+
+        let mut events_receiver = registry.subscribe().await;
+
+        // Publish a WatchDevicesAdded response with two devices and verify that we receive it.
+        added_publisher.set(added_response(vec![
+            fadevice::Info { token_id: Some(1), ..Default::default() },
+            fadevice::Info { token_id: Some(2), ..Default::default() },
+        ]));
+
+        // There should be two events, one for each device.
+        let events: Vec<_> = events_receiver.by_ref().take(2).collect().await;
+
+        let mut added_token_ids: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event {
+                DeviceEvent::Added(info) => Some(info.token_id()),
+                _ => None,
+            })
+            .collect();
+        added_token_ids.sort();
+        assert_eq!(added_token_ids, vec![1, 2]);
+
+        // Publish a WatchDeviceRemoved response and verify that we receive it.
+        removed_publisher.set(removed_response(2));
+
+        // There should be one event.
+        let events: Vec<_> = events_receiver.take(1).collect().await;
+
+        let mut removed_token_ids: Vec<_> = events
+            .iter()
+            .filter_map(|event| match event {
+                DeviceEvent::Removed(token_id) => Some(*token_id),
+                _ => None,
+            })
+            .collect();
+        removed_token_ids.sort();
+        assert_eq!(removed_token_ids, vec![2]);
     }
 }

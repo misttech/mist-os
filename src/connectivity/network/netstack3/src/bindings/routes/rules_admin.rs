@@ -216,7 +216,7 @@ impl<I: Ip> RuleTable<I> {
                     RuleAction::Lookup(id) => Some(*id),
                 };
 
-                if table_id.is_some_and(|id| id == u32::from(removed_table_id)) {
+                if table_id.is_some_and(|id| id.get() == u32::from(removed_table_id)) {
                     removed.push(InstalledRule {
                         priority: *priority,
                         index: *index,
@@ -282,7 +282,7 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
     ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::RuleSetError>> {
         let matcher = AddableMatcher::try_from(matcher)?;
         if let RuleAction::Lookup(table_id) = action {
-            let table_id = routes::TableId::new(table_id)
+            let table_id = routes::TableId::new(table_id.get())
                 .ok_or(fnet_routes_admin::RuleSetError::Unauthenticated)?;
             if !self.route_table_authorization_set.contains(&table_id) {
                 Err(fnet_routes_admin::RuleSetError::Unauthenticated)?;

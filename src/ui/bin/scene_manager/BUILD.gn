@@ -127,5 +127,6 @@ fuchsia_structured_config_values2("config_for_test") {
     display_pixel_density = "4.1668"
     viewing_distance = "near"
     suspend_enabled = false
+    attach_a11y_view = true
   }
 }

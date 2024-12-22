@@ -146,14 +146,14 @@ impl InputSettingsHandler {
                                 );
                             }
                         }
-                        Err(e) => tracing::error!("Failed to parse mic settings: {:?}", e),
+                        Err(e) => log::error!("Failed to parse mic settings: {:?}", e),
                     },
 
                     // Stream gave an unexpected error. This should only happen if the InputSettings
                     // service is not available (likely because it isn't running on this build
                     // variant), so exit the loop.
                     Some(Err(e)) => {
-                        tracing::error!("Failed to monitor fuchsia.settings.Input ({:?})", e);
+                        log::error!("Failed to monitor fuchsia.settings.Input ({:?})", e);
                         break;
                     }
 
@@ -163,7 +163,7 @@ impl InputSettingsHandler {
                 }
             }
 
-            tracing::error!("InputSettingsHandler is disabled");
+            log::error!("InputSettingsHandler is disabled");
             self.inspect.set_handler_enabled(false);
         }
         .boxed_local())

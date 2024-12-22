@@ -20,6 +20,9 @@ class {{ .Name }} {
 {{- range .AnonymousChildren }}
   using {{ .ScopedName }} = {{ .FlattenedName }};
 {{- end }}
+  {{- if .Serializable.IsSerializable }}
+  static constexpr char kSerializableName[] = "{{ .Serializable.Name }}";
+  {{- end }}
 
   {{ .Name }}() : ordinal_({{ .WireInvalidOrdinal }}), envelope_{} {}
 

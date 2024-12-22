@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{fmt, thread, usize};
 
-/// A multi-threaded port-based executor for Fuchsia OS. Requires that tasks scheduled on it
+/// A multi-threaded port-based executor for Fuchsia. Requires that tasks scheduled on it
 /// implement `Send` so they can be load balanced between worker threads.
 ///
 /// Having a `SendExecutor` in scope allows the creation and polling of zircon objects, such as

@@ -5159,7 +5159,6 @@ mod test {
 
     use alloc::vec;
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
     use net_declare::{net_ip_v4, net_ip_v6};
@@ -5911,8 +5910,8 @@ mod test {
 
         let unbound = api.create(());
         const EXPECTED_HOP_LIMITS: HopLimits = HopLimits {
-            unicast: const_unwrap_option(NonZeroU8::new(45)),
-            multicast: const_unwrap_option(NonZeroU8::new(23)),
+            unicast: NonZeroU8::new(45).unwrap(),
+            multicast: NonZeroU8::new(23).unwrap(),
         };
 
         api.update_ip_hop_limit(&unbound, |limits| {
@@ -5965,8 +5964,8 @@ mod test {
 
         api.update_ip_hop_limit(&unbound, |limits| {
             *limits = SocketHopLimits {
-                unicast: Some(const_unwrap_option(NonZeroU8::new(1))),
-                multicast: Some(const_unwrap_option(NonZeroU8::new(1))),
+                unicast: Some(NonZeroU8::new(1).unwrap()),
+                multicast: Some(NonZeroU8::new(1).unwrap()),
                 version: IpVersionMarker::default(),
             }
         });
@@ -6149,7 +6148,7 @@ mod test {
         let socket = api.create(());
         api.set_ip_transparent(&socket, true);
 
-        const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(10));
+        const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(10).unwrap();
         const REMOTE_PORT: u16 = 1234;
 
         // Binding to `local_ip` should succeed even though it is not assigned
@@ -6229,7 +6228,7 @@ mod test {
         );
         let mut api = ctx.datagram_api::<I>();
         let socket = api.create(());
-        const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(10));
+        const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(10).unwrap();
         const ORIGINAL_REMOTE_PORT: u16 = 1234;
         const NEW_REMOTE_PORT: u16 = 5678;
 
@@ -6389,7 +6388,7 @@ mod test {
             },
         );
 
-        const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(10));
+        const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(10).unwrap();
         const REMOTE_PORT: u16 = 1234;
 
         let mut api = ctx.datagram_api::<I>();

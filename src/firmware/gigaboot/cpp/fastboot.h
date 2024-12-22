@@ -91,6 +91,8 @@ class Fastboot : public fastboot::FastbootBase {
   zx::result<> GetVarSlotRetryCount(const CommandArgs &, fastboot::Transport *, const Responder &);
   zx::result<> GetVarSlotSuccessful(const CommandArgs &, fastboot::Transport *, const Responder &);
   zx::result<> GetVarSlotUnbootable(const CommandArgs &, fastboot::Transport *, const Responder &);
+  zx::result<> GetVarSlotUnbootableReason(const CommandArgs &, fastboot::Transport *,
+                                          const Responder &);
 
   zx::result<> GetVar(std::string_view cmd, fastboot::Transport *transport);
   zx::result<> Flash(std::string_view cmd, fastboot::Transport *transport);

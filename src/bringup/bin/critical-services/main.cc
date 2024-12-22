@@ -215,7 +215,7 @@ void ProcessPowerEvent(zx::event* report_event, pwrbtn::PowerButtonMonitor* moni
   }
 
   // Ignore reports from different report IDs
-  const fidl::VectorView<uint8_t>& report = result.value()->report.buf();
+  const fidl::VectorView<uint8_t>& report = result.value()->buf();
   if (info->has_report_id_byte && report[0] != info->report_id) {
     printf("critical-services: input-watcher: wrong id\n");
     return;

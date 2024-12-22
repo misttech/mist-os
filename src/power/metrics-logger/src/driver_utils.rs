@@ -4,8 +4,8 @@
 
 use anyhow::{format_err, Result};
 use fidl_fuchsia_device as fdevice;
+use log::{error, info};
 use serde_derive::Deserialize;
-use tracing::{error, info};
 
 #[derive(Deserialize)]
 pub struct DriverAlias {
@@ -46,14 +46,14 @@ pub async fn list_drivers(path: &str) -> Vec<String> {
     let dir = match fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::PERM_READABLE) {
         Ok(s) => s,
         Err(err) => {
-            info!(%path, %err, "Service directory doesn't exist or NodeProxy failed with error");
+            info!(path:%, err:%; "Service directory doesn't exist or NodeProxy failed with error");
             return Vec::new();
         }
     };
     match fuchsia_fs::directory::readdir(&dir).await {
         Ok(s) => s.iter().map(|dir_entry| dir_entry.name.clone()).collect(),
         Err(err) => {
-            error!(%path, %err, "Read service directory failed with error");
+            error!(path:%, err:%; "Read service directory failed with error");
             Vec::new()
         }
     }

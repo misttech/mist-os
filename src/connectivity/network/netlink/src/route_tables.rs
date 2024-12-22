@@ -84,6 +84,14 @@ impl From<NonZeroNetlinkRouteTableIndex> for NetlinkRouteTableIndex {
     }
 }
 
+/// Indicates that a given table should be considered for cleanup.
+/// It should only be deleted if there are no longer any rules or routes referencing it.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) struct TableNeedsCleanup(
+    pub(crate) fnet_routes_ext::TableId,
+    pub(crate) NetlinkRouteTableIndex,
+);
+
 // A `RouteTable` identifier.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub(crate) enum RouteTableKey {
@@ -119,10 +127,8 @@ pub(crate) struct RouteTable<
     I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 > {
     /// The route table FIDL proxy backing this route table.
-    // NOTE: this field is currently never read, but must still be retained in order to keep
-    // alive the corresponding route table.
     #[derivative(Debug = "ignore")]
-    pub(crate) _route_table_proxy: <I::RouteTableMarker as ProtocolMarker>::Proxy,
+    pub(crate) route_table_proxy: <I::RouteTableMarker as ProtocolMarker>::Proxy,
 
     /// A route set derived from the corresponding FIDL route table.
     #[derivative(Debug = "ignore")]
@@ -136,6 +142,32 @@ pub(crate) struct RouteTable<
 
     /// The ID of the corresponding FIDL route table.
     pub(crate) fidl_table_id: fnet_routes_ext::TableId,
+
+    /// Whether the netlink worker's fuchsia.net.routes.admin.RuleSet has been authenticated
+    /// to install rules referencing this table.
+    pub(crate) rule_set_authenticated: bool,
+}
+
+/// A reference to the main route table.
+#[derive(derivative::Derivative)]
+#[derivative(Debug(bound = ""))]
+pub(crate) struct MainRouteTable<
+    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+> {
+    /// The route table FIDL proxy for the main route table.
+    #[derivative(Debug = "ignore")]
+    pub(crate) route_table_proxy: <I::RouteTableMarker as ProtocolMarker>::Proxy,
+
+    /// A route set derived from the main FIDL route table.
+    #[derivative(Debug = "ignore")]
+    pub(crate) route_set_proxy: <I::RouteSetMarker as ProtocolMarker>::Proxy,
+
+    /// The ID of the main FIDL route table.
+    pub(crate) fidl_table_id: fnet_routes_ext::TableId,
+
+    /// Whether the netlink worker's fuchsia.net.routes.admin.RuleSet has been authenticated
+    /// to install rules referencing this table.
+    pub(crate) rule_set_authenticated: bool,
 }
 
 /// The result of looking up a route table by [`NetlinkRouteTableIndex`].
@@ -146,7 +178,18 @@ pub(crate) enum RouteTableLookup<
     I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 > {
     Managed(&'a RouteTable<I>),
-    Unmanaged(#[derivative(Debug = "ignore")] &'a <I::RouteSetMarker as ProtocolMarker>::Proxy),
+    Unmanaged(&'a MainRouteTable<I>),
+}
+
+/// The result of looking up a route table by [`NetlinkRouteTableIndex`].
+#[derive(derivative::Derivative)]
+#[derivative(Debug(bound = ""))]
+pub(crate) enum RouteTableLookupMut<
+    'a,
+    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
+> {
+    Managed(&'a mut RouteTable<I>),
+    Unmanaged(&'a mut MainRouteTable<I>),
 }
 
 /// Contains the route tables tracked by the netlink worker.
@@ -157,12 +200,8 @@ pub(crate) struct RouteTableMap<
 > {
     route_tables: HashMap<ManagedNetlinkRouteTableIndex, RouteTable<I>>,
     fidl_table_ids: HashMap<fnet_routes_ext::TableId, ManagedNetlinkRouteTableIndex>,
-
     route_table_provider: <I::RouteTableProviderMarker as ProtocolMarker>::Proxy,
-    main_route_table_proxy: <I::RouteTableMarker as ProtocolMarker>::Proxy,
-    unmanaged_route_set_proxy: <I::RouteSetMarker as ProtocolMarker>::Proxy,
-
-    pub(crate) main_route_table_id: fnet_routes_ext::TableId,
+    pub(crate) main_route_table: MainRouteTable<I>,
 }
 
 impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>
@@ -177,9 +216,12 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         Self {
             route_tables: HashMap::new(),
             fidl_table_ids: HashMap::new(),
-            main_route_table_proxy,
-            main_route_table_id,
-            unmanaged_route_set_proxy,
+            main_route_table: MainRouteTable {
+                route_table_proxy: main_route_table_proxy,
+                fidl_table_id: main_route_table_id,
+                route_set_proxy: unmanaged_route_set_proxy,
+                rule_set_authenticated: false,
+            },
             route_table_provider,
         }
     }
@@ -189,7 +231,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         &self,
         fidl_table_id: fnet_routes_ext::TableId,
     ) -> Option<RouteTableKey> {
-        if fidl_table_id == self.main_route_table_id {
+        if fidl_table_id == self.main_route_table.fidl_table_id {
             Some(RouteTableKey::Unmanaged)
         } else {
             Some(RouteTableKey::NetlinkManaged {
@@ -201,11 +243,24 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
     /// Looks up a route table.
     pub(crate) fn get(&self, key: &NetlinkRouteTableIndex) -> Option<RouteTableLookup<'_, I>> {
         match RouteTableKey::from(*key) {
-            RouteTableKey::Unmanaged => {
-                Some(RouteTableLookup::Unmanaged(&self.unmanaged_route_set_proxy))
-            }
+            RouteTableKey::Unmanaged => Some(RouteTableLookup::Unmanaged(&self.main_route_table)),
             RouteTableKey::NetlinkManaged { table_id } => {
                 self.route_tables.get(&table_id).map(RouteTableLookup::Managed)
+            }
+        }
+    }
+
+    /// Looks up a route table.
+    pub(crate) fn get_mut(
+        &mut self,
+        key: &NetlinkRouteTableIndex,
+    ) -> Option<RouteTableLookupMut<'_, I>> {
+        match RouteTableKey::from(*key) {
+            RouteTableKey::Unmanaged => {
+                Some(RouteTableLookupMut::Unmanaged(&mut self.main_route_table))
+            }
+            RouteTableKey::NetlinkManaged { table_id } => {
+                self.route_tables.get_mut(&table_id).map(RouteTableLookupMut::Managed)
             }
         }
     }
@@ -216,7 +271,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         key: &NetlinkRouteTableIndex,
     ) -> Option<fnet_routes_ext::TableId> {
         match self.get(key)? {
-            RouteTableLookup::Unmanaged(_) => Some(self.main_route_table_id),
+            RouteTableLookup::Unmanaged(main_route_table) => Some(main_route_table.fidl_table_id),
             RouteTableLookup::Managed(route_table) => Some(route_table.fidl_table_id),
         }
     }
@@ -288,16 +343,18 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                 .expect("error getting table ID");
             let route_set_proxy = fnet_routes_ext::admin::new_route_set::<I>(&route_table_proxy)
                 .expect("error creating new route set");
-            let route_set_from_main_table_proxy =
-                fnet_routes_ext::admin::new_route_set::<I>(&self.main_route_table_proxy)
-                    .expect("error creating new route set");
+            let route_set_from_main_table_proxy = fnet_routes_ext::admin::new_route_set::<I>(
+                &self.main_route_table.route_table_proxy,
+            )
+            .expect("error creating new route set");
             self.insert(
                 key,
                 RouteTable {
-                    _route_table_proxy: route_table_proxy,
+                    route_table_proxy,
                     route_set_from_main_table_proxy,
                     route_set_proxy,
                     fidl_table_id,
+                    rule_set_authenticated: false,
                 },
             );
         }
@@ -342,6 +399,10 @@ pub(crate) enum RouteRemoveResult {
 impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>
     FidlRouteMap<I>
 {
+    pub(crate) fn table_is_present(&self, table: fnet_routes_ext::TableId) -> bool {
+        self.by_tables.contains_key(&table)
+    }
+
     /// Returns whether the given route is installed in all of the specified FIDL tables.
     pub(crate) fn route_is_installed_in_tables<'a>(
         &'a self,
@@ -646,14 +707,14 @@ mod test {
                     map.fidl_table_ids
                         .keys()
                         .copied()
-                        .chain(std::iter::once(route_table_map.main_route_table_id)),
+                        .chain(std::iter::once(route_table_map.main_route_table.fidl_table_id)),
                 );
 
                 let used_fidl_ids_according_to_route_tables = collect_and_assert_all_unique(
                     map.route_tables
                         .values()
                         .map(|table| table.fidl_table_id)
-                        .chain(std::iter::once(route_table_map.main_route_table_id)),
+                        .chain(std::iter::once(route_table_map.main_route_table.fidl_table_id)),
                 );
 
                 assert_eq!(
@@ -716,10 +777,11 @@ mod test {
                     map.insert(
                         netlink_id,
                         RouteTable::<Ipv6> {
-                            _route_table_proxy: route_table_proxy,
+                            route_table_proxy,
                             route_set_proxy,
                             route_set_from_main_table_proxy,
                             fidl_table_id,
+                            rule_set_authenticated: false,
                         },
                     );
 

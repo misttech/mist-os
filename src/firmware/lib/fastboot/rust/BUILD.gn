@@ -18,7 +18,7 @@ rustc_staticlib("fastboot-c") {
     "//src/recovery/lib/installer",
     "//src/recovery/lib/recovery-util-block",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]

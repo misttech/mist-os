@@ -87,16 +87,17 @@
             to: [ "#scene_manager" ],
         },
         {
-            from: "parent",
-            to: [ "#scene_manager" ],
             config: [
                 "fuchsia.power.SuspendEnabled",
                 "fuchsia.scenic.DisplayRotation",
+                "fuchsia.ui.AttachA11yView",
                 "fuchsia.ui.DisplayPixelDensity",
                 "fuchsia.ui.IdleThresholdMs",
                 "fuchsia.ui.SupportedInputDevices",
                 "fuchsia.ui.ViewingDistance",
             ],
+            from: "parent",
+            to: [ "#scene_manager" ],
         },
 
         // Routes below may only be present on certain products.

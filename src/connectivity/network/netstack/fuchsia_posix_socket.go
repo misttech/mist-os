@@ -2900,7 +2900,7 @@ func (s *datagramSocketImpl) GetIpv6ReceivePacketInfo(fidl.Context) (socket.Base
 	return socket.BaseNetworkSocketGetIpv6ReceivePacketInfoResultWithResponse(socket.BaseNetworkSocketGetIpv6ReceivePacketInfoResponse{Value: s.sharedState.cmsgCacheMu.cmsgCache.ipv6PktInfo}), nil
 }
 
-func (s *datagramSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
+func (s *datagramSocketImpl) Clone(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithSocket)
@@ -3275,7 +3275,7 @@ func (s *synchronousDatagramSocket) addConnection(prefix string, channel zx.Chan
 	}()
 }
 
-func (s *synchronousDatagramSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
+func (s *synchronousDatagramSocketImpl) Clone(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithEvent)
@@ -3632,7 +3632,7 @@ func (s *streamSocketImpl) addConnection(_ fidl.Context, channel zx.Channel) {
 	}
 }
 
-func (s *streamSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
+func (s *streamSocketImpl) Clone(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithSocket)
@@ -4431,7 +4431,7 @@ func (s *rawSocketImpl) addConnection(_ fidl.Context, channel zx.Channel) {
 	}
 }
 
-func (s *rawSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
+func (s *rawSocketImpl) Clone(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithEvent)
@@ -4754,7 +4754,7 @@ func (s *packetSocketImpl) Describe(fidl.Context) (packetsocket.SocketDescribeRe
 	return response, nil
 }
 
-func (s *packetSocketImpl) Clone2(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
+func (s *packetSocketImpl) Clone(ctx fidl.Context, object unknown.CloneableWithCtxInterfaceRequest) error {
 	s.addConnection(ctx, object.Channel)
 
 	_ = syslog.DebugTf("Clone", "%p", s.endpointWithEvent)

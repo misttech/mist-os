@@ -127,9 +127,6 @@ template("hermetic_code_blob") {
                            ])
     deps = [ ":$executable_target" ]
     output_dir = target_out_dir
-
-    # We expect no dynamic relocations.
-    pure = true
   }
 
   if (public_target_deps != []) {

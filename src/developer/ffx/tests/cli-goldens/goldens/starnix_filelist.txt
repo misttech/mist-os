@@ -3,6 +3,4 @@ ffx/starnix/adb.golden
 ffx/starnix/adb/connect.golden
 ffx/starnix/adb/proxy.golden
 ffx/starnix/console.golden
-ffx/starnix/resume.golden
-ffx/starnix/suspend.golden
 ffx/starnix/vmo.golden

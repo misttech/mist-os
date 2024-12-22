@@ -14,10 +14,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.process.Launcher",
-            ],
+            protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
             to: "#elf_runner",
         },

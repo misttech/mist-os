@@ -23,6 +23,7 @@
 #include <lib/magma/platform/platform_trace_provider.h>   // nogncheck
 #include <lib/zx/channel.h>
 #include <lib/zx/vmar.h>
+#include <zircon/availability.h>
 
 #include <filesystem>
 
@@ -106,14 +107,18 @@ class FakeLogSink : public fidl::WireServer<fuchsia_logger::LogSink> {
  public:
   explicit FakeLogSink(async::Loop& loop) : loop_(loop) {}
 
-  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
-    fprintf(stderr, "Unexpected Connect\n");
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
   void WaitForInterestChange(WaitForInterestChangeCompleter::Sync& completer) override {
     fprintf(stderr, "Unexpected WaitForInterestChange\n");
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
+
+#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT) || FUCHSIA_API_LEVEL_AT_LEAST(PLATFORM)
+  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
+    fprintf(stderr, "Unexpected Connect\n");
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+#endif
+
   void ConnectStructured(ConnectStructuredRequestView request,
                          ConnectStructuredCompleter::Sync& _completer) override {
     loop_.Quit();

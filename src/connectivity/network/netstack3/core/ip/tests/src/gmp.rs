@@ -10,7 +10,7 @@ use net_types::{MulticastAddr, SpecifiedAddr, Witness as _};
 use packet::ParsablePacket as _;
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::mld::{MulticastListenerDone, MulticastListenerReport};
-use packet_formats::icmp::IcmpUnusedCode;
+use packet_formats::icmp::IcmpSenderZeroCode;
 use packet_formats::igmp::messages::IgmpPacket;
 use packet_formats::ip::Ipv4Proto;
 use packet_formats::testutil::{
@@ -31,8 +31,8 @@ use netstack3_ip::device::{
     Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId, SlaacConfigurationUpdate,
 };
 use netstack3_ip::gmp::{
-    IgmpTimerId, MldTimerId, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
-    MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+    IgmpConfigMode, IgmpTimerId, MldConfigMode, MldTimerId,
+    IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL, MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
 };
 
 const V4_HOST_ADDR: SpecifiedAddr<Ipv4Addr> =
@@ -40,7 +40,7 @@ const V4_HOST_ADDR: SpecifiedAddr<Ipv4Addr> =
 const V4_GROUP_ADDR: MulticastAddr<Ipv4Addr> = Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS;
 
 #[test]
-fn test_igmp_enable_disable_integration() {
+fn test_igmpv2_enable_disable_integration() {
     let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
         Ipv4::TEST_ADDRS;
 
@@ -67,8 +67,7 @@ fn test_igmp_enable_disable_integration() {
     // the timer ID in bindings matches the state of the single timer id in
     // the local timer heap in GMP.
     let timer_id = TimerId::from(
-        Ipv4DeviceTimerId::from(IgmpTimerId::new_delayed_report(device_id.downgrade()))
-            .into_common(),
+        Ipv4DeviceTimerId::from(IgmpTimerId::new(device_id.downgrade())).into_common(),
     );
     let range = now..=(now + IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL);
     struct TestConfig {
@@ -88,6 +87,7 @@ fn test_igmp_enable_disable_integration() {
                         gmp_enabled: Some(gmp_enabled),
                         ..Default::default()
                     },
+                    igmp_mode: Some(IgmpConfigMode::V2),
                     ..Default::default()
                 },
             )
@@ -182,7 +182,7 @@ fn test_igmp_enable_disable_integration() {
 }
 
 #[test]
-fn test_mld_enable_disable_integration() {
+fn test_mldv1_enable_disable_integration() {
     let TestAddrs { local_mac, remote_mac: _, local_ip: _, remote_ip: _, subnet: _ } =
         Ipv6::TEST_ADDRS;
 
@@ -206,9 +206,8 @@ fn test_mld_enable_disable_integration() {
     // ever join a single group for the duration of the test. Given that,
     // the timer ID in bindings matches the state of the single timer id in
     // the local timer heap in GMP.
-    let snmc_timer_id = TimerId::from(
-        Ipv6DeviceTimerId::Mld(MldTimerId::new_delayed_report(device_id.downgrade())).into_common(),
-    );
+    let snmc_timer_id =
+        TimerId::from(Ipv6DeviceTimerId::Mld(MldTimerId::new(device_id.downgrade())).into_common());
     let range = now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL);
     struct TestConfig {
         ip_enabled: bool,
@@ -236,6 +235,7 @@ fn test_mld_enable_disable_integration() {
                         gmp_enabled: Some(gmp_enabled),
                         ..Default::default()
                     },
+                    mld_mode: Some(MldConfigMode::V1),
                     ..Default::default()
                 },
             )
@@ -263,10 +263,10 @@ fn test_mld_enable_disable_integration() {
         );
         assert_eq!(dst_ip, snmc_addr.get());
         assert_eq!(ttl, 1);
-        assert_eq!(code, IcmpUnusedCode);
+        assert_eq!(code, IcmpSenderZeroCode);
         assert_eq!(dst_ip, snmc_addr.get());
         assert_eq!(ttl, 1);
-        assert_eq!(code, IcmpUnusedCode);
+        assert_eq!(code, IcmpSenderZeroCode);
     };
     let check_sent_done = |bindings_ctx: &mut FakeBindingsCtx, specified_source: bool| {
         let frames = bindings_ctx.take_ethernet_frames();
@@ -289,7 +289,7 @@ fn test_mld_enable_disable_integration() {
         );
         assert_eq!(dst_ip, Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.get());
         assert_eq!(ttl, 1);
-        assert_eq!(code, IcmpUnusedCode);
+        assert_eq!(code, IcmpSenderZeroCode);
     };
 
     // Enable IPv6 and MLD.

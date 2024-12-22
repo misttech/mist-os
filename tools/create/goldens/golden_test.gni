@@ -112,7 +112,6 @@ template("golden_test") {
   ]
 
   python_host_test(target_name) {
-    enable_mypy = true
     main_source = "test_script.py"
     extra_args = test_args
     deps = [ ":${target_goldens_json}" ]

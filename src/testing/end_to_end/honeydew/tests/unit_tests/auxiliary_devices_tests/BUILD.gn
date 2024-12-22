@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("power_switch_dmc_test") {
-    enable_mypy = true
     main_source = "power_switch_dmc_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

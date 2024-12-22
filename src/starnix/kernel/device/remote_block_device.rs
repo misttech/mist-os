@@ -266,7 +266,8 @@ impl RemoteBlockDeviceRegistry {
             return Ok(());
         }
 
-        let backing_memory = MemoryObject::from(zx::Vmo::create(initial_size)?);
+        let backing_memory = MemoryObject::from(zx::Vmo::create(initial_size)?)
+            .with_zx_name(b"starnix:remote_block_device");
         let minor = self.next_minor.fetch_add(1, Ordering::Relaxed);
         let device = RemoteBlockDevice::new(locked, current_task, minor, name, backing_memory);
         if let Some(callback) = self.device_added_fn.get() {
@@ -285,8 +286,8 @@ impl RemoteBlockDeviceRegistry {
 mod tests {
     use super::remote_block_device_init;
     use crate::mm::MemoryAccessor as _;
-    use crate::testing::{create_kernel_task_and_unlocked, map_object_anywhere};
-    use crate::vfs::{Anon, SeekTarget, VecInputBuffer, VecOutputBuffer};
+    use crate::testing::{anon_test_file, create_kernel_task_and_unlocked, map_object_anywhere};
+    use crate::vfs::{SeekTarget, VecInputBuffer, VecOutputBuffer};
     use starnix_uapi::open_flags::OpenFlags;
     use starnix_uapi::{BLKGETSIZE, BLKGETSIZE64};
     use std::mem::MaybeUninit;
@@ -303,7 +304,7 @@ mod tests {
             .expect("create_remote_block_device_if_absent failed.");
 
         let device = registry.open(0).expect("open failed.");
-        let file = Anon::new_file(&current_task, device.create_file_ops(), OpenFlags::RDWR);
+        let file = anon_test_file(&current_task, device.create_file_ops(), OpenFlags::RDWR);
 
         let arg_addr = map_object_anywhere(&mut locked, &current_task, &0u64);
         // TODO(https://fxbug.dev/129314): replace with MaybeUninit::uninit_array.
@@ -349,7 +350,7 @@ mod tests {
             .expect("create_remote_block_device_if_absent failed.");
 
         let device = registry.open(0).expect("open failed.");
-        let file = Anon::new_file(&current_task, device.create_file_ops(), OpenFlags::RDWR);
+        let file = anon_test_file(&current_task, device.create_file_ops(), OpenFlags::RDWR);
 
         file.seek(&mut locked, &current_task, SeekTarget::End(0)).expect("seek failed");
         let mut buf = VecOutputBuffer::new(512);

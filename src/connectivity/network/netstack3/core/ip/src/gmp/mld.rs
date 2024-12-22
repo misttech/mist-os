@@ -8,26 +8,28 @@
 //! IGMPv2. One important difference to note is that MLD uses ICMPv6 (IP
 //! Protocol 58) message types, rather than IGMP (IP Protocol 2) message types.
 
-use core::convert::Infallible as Never;
 use core::time::Duration;
 
 use log::{debug, error};
 use net_declare::net_ip_v6;
 use net_types::ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr};
-use net_types::{LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness};
+use net_types::{
+    LinkLocalAddress as _, LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr,
+    Witness,
+};
 use netstack3_base::{
-    AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, WeakDeviceIdentifier,
+    AnyDevice, DeviceIdContext, ErrorAndSerializer, HandleableTimer, InspectableValue, Inspector,
+    WeakDeviceIdentifier,
 };
 use netstack3_filter as filter;
 use packet::serialize::{PacketBuilder, Serializer};
 use packet::InnerPacketBuilder;
-use packet_formats::gmp::GmpReportGroupRecord;
 use packet_formats::icmp::mld::{
     IcmpMldv1MessageType, MldPacket, Mldv1Body, Mldv1MessageBuilder, Mldv2QueryBody,
     Mldv2ReportMessageBuilder, MulticastListenerDone, MulticastListenerReport,
     MulticastListenerReportV2,
 };
-use packet_formats::icmp::{IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpMessage, IcmpPacketBuilder, IcmpSenderZeroCode};
 use packet_formats::ip::Ipv6Proto;
 use packet_formats::ipv6::ext_hdrs::{
     ExtensionHeaderOptionAction, HopByHopOption, HopByHopOptionData,
@@ -39,9 +41,9 @@ use zerocopy::SplitByteSlice;
 
 use crate::internal::base::{IpDeviceMtuContext, IpLayerHandler, IpPacketDestination};
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpGroupState,
-    GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
-    NotAMemberErr,
+    self, GmpBindingsContext, GmpBindingsTypes, GmpContext, GmpContextInner, GmpEnabledGroup,
+    GmpGroupState, GmpMode, GmpState, GmpStateContext, GmpStateRef, GmpTimerId, GmpTypeLayout,
+    IpExt, MulticastGroupSet, NotAMemberErr,
 };
 
 /// The destination address for all MLDv2 reports.
@@ -67,7 +69,13 @@ pub trait MldStateContext<BT: MldBindingsTypes>:
 {
     /// Calls the function with an immutable reference to the device's MLD
     /// state.
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>) -> O>(
+    fn with_mld_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>,
+            &GmpState<Ipv6, MldTypeLayout, BT>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -97,7 +105,7 @@ pub trait MldContext<BT: MldBindingsTypes>: DeviceIdContext<AnyDevice> + MldCont
     /// and whether or not MLD is enabled for the `device`.
     fn with_mld_state_mut<
         O,
-        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, BT>) -> O,
+        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, MldTypeLayout, BT>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -120,44 +128,86 @@ pub trait MldPacketHandler<BC, DeviceId> {
     );
 }
 
+fn receive_mld_packet<B: SplitByteSlice, CC: MldContext<BC>, BC: MldBindingsContext>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    src_ip: Ipv6SourceAddr,
+    packet: MldPacket<B>,
+) -> Result<(), MldError> {
+    match packet {
+        MldPacket::MulticastListenerQuery(msg) => {
+            // From RFC 2710 section 5:
+            //
+            //  - To be valid, the Query message MUST come from a link-
+            //  local IPv6 Source Address [...]
+            if !src_ip.is_link_local() {
+                return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
+            }
+            gmp::v1::handle_query_message(core_ctx, bindings_ctx, device, msg.body())
+                .map_err(Into::into)
+        }
+        MldPacket::MulticastListenerQueryV2(msg) => {
+            // From RFC 3810 section 5.1.14:
+            //
+            // If a node (router or host) receives a Query message with
+            // the IPv6 Source Address set to the unspecified address (::), or any
+            // other address that is not a valid IPv6 link-local address, it MUST
+            // silently discard the message.
+            if !src_ip.is_link_local() {
+                return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
+            }
+            gmp::v2::handle_query_message(core_ctx, bindings_ctx, device, msg.body())
+                .map_err(Into::into)
+        }
+        MldPacket::MulticastListenerReport(msg) => {
+            // From RFC 2710 section 5:
+            //
+            //  - To be valid, the Report message MUST come from a link-
+            //   local IPv6 Source Address [...]
+            //
+            // However, RFC 3810 allows MLD reports to be sent from
+            // unspecified addresses and we in fact send those, so we relax
+            // to allow accepting from unspecified addresses as well.
+            match src_ip {
+                Ipv6SourceAddr::Unspecified => {}
+                Ipv6SourceAddr::Unicast(src_ip) => {
+                    if !src_ip.is_link_local() {
+                        return Err(MldError::BadSourceAddress { addr: src_ip.into_addr() });
+                    }
+                }
+            }
+            let addr = msg.body().group_addr;
+            MulticastAddr::new(msg.body().group_addr).map_or(
+                Err(MldError::NotAMember { addr }),
+                |group_addr| {
+                    gmp::v1::handle_report_message(core_ctx, bindings_ctx, device, group_addr)
+                        .map_err(Into::into)
+                },
+            )
+        }
+        MldPacket::MulticastListenerReportV2(_) => {
+            debug!("Hosts are not interested in MLDv2 report messages");
+            Ok(())
+        }
+        MldPacket::MulticastListenerDone(_) => {
+            debug!("Hosts are not interested in Done messages");
+            Ok(())
+        }
+    }
+}
+
 impl<BC: MldBindingsContext, CC: MldContext<BC>> MldPacketHandler<BC, CC::DeviceId> for CC {
     fn receive_mld_packet<B: SplitByteSlice>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
-        _src_ip: Ipv6SourceAddr,
+        src_ip: Ipv6SourceAddr,
         _dst_ip: SpecifiedAddr<Ipv6Addr>,
         packet: MldPacket<B>,
     ) {
-        let result = match packet {
-            MldPacket::MulticastListenerQuery(msg) => {
-                gmp::v1::handle_query_message(self, bindings_ctx, device, msg.body())
-                    .map_err(Into::into)
-            }
-            MldPacket::MulticastListenerQueryV2(msg) => {
-                gmp::v2::handle_query_message(self, bindings_ctx, device, msg.body())
-                    .map_err(Into::into)
-            }
-            MldPacket::MulticastListenerReport(msg) => {
-                let addr = msg.body().group_addr;
-                MulticastAddr::new(msg.body().group_addr).map_or(
-                    Err(MldError::NotAMember { addr }),
-                    |group_addr| {
-                        gmp::v1::handle_report_message(self, bindings_ctx, device, group_addr)
-                            .map_err(Into::into)
-                    },
-                )
-            }
-            MldPacket::MulticastListenerReportV2(_) => {
-                debug!("Hosts are not interested in MLDv2 report messages");
-                return;
-            }
-            MldPacket::MulticastListenerDone(_) => {
-                debug!("Hosts are not interested in Done messages");
-                return;
-            }
-        };
-        result.unwrap_or_else(|e| debug!("Error occurred when handling MLD message: {}", e));
+        receive_mld_packet(self, bindings_ctx, device, src_ip, packet)
+            .unwrap_or_else(|e| debug!("Error occurred when handling MLD message: {}", e));
     }
 }
 
@@ -197,7 +247,17 @@ impl<B: SplitByteSlice> gmp::v2::QueryMessage<Ipv6> for Mldv2QueryBody<B> {
     }
 }
 
+/// The MLD mode controllable by the user.
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[allow(missing_docs)]
+pub enum MldConfigMode {
+    V1,
+    V2,
+}
+
 impl IpExt for Ipv6 {
+    type GmpProtoConfigMode = MldConfigMode;
+
     fn should_perform_gmp(group_addr: MulticastAddr<Ipv6Addr>) -> bool {
         // Per [RFC 3810 Section 6]:
         //
@@ -217,15 +277,54 @@ impl IpExt for Ipv6 {
     }
 }
 
-impl<BT: MldBindingsTypes, CC: DeviceIdContext<AnyDevice> + MldContextMarker>
-    GmpTypeLayout<Ipv6, BT> for CC
-{
-    type Actions = Never;
+/// Newtype over [`GmpMode`] to tailor it to GMP.
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct MldMode(GmpMode);
+
+impl From<MldMode> for GmpMode {
+    fn from(MldMode(v): MldMode) -> Self {
+        v
+    }
+}
+
+// NB: This could be derived, but it feels better to have it called out
+// explicitly in MLD.
+impl Default for MldMode {
+    fn default() -> Self {
+        Self(GmpMode::V2)
+    }
+}
+
+impl InspectableValue for MldMode {
+    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
+        let Self(gmp_mode) = self;
+        let v = match gmp_mode {
+            GmpMode::V1 { compat: false } => "MLDv1(compat)",
+            GmpMode::V1 { compat: true } => "MLDv1",
+            GmpMode::V2 => "MLDv2",
+        };
+        inspector.record_str(name, v);
+    }
+}
+
+/// Uninstantiable type marking a [`GmpState`] as having MLD types.
+pub enum MldTypeLayout {}
+
+impl<BT: MldBindingsTypes> GmpTypeLayout<Ipv6, BT> for MldTypeLayout {
     type Config = MldConfig;
+    type ProtoMode = MldMode;
 }
 
 impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> for CC {
-    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>) -> O>(
+    type TypeLayout = MldTypeLayout;
+
+    fn with_gmp_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BT>>,
+            &GmpState<Ipv6, MldTypeLayout, BT>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
@@ -235,11 +334,12 @@ impl<BT: MldBindingsTypes, CC: MldStateContext<BT>> GmpStateContext<Ipv6, BT> fo
 }
 
 impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
+    type TypeLayout = MldTypeLayout;
     type Inner<'a> = CC::SendContext<'a>;
 
     fn with_gmp_state_mut_and_ctx<
         O,
-        F: FnOnce(Self::Inner<'_>, GmpStateRef<'_, Ipv6, Self, BC>) -> O,
+        F: FnOnce(Self::Inner<'_>, GmpStateRef<'_, Ipv6, Self::TypeLayout, BC>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -250,13 +350,16 @@ impl<BC: MldBindingsContext, CC: MldContext<BC>> GmpContext<Ipv6, BC> for CC {
 }
 
 impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> for CC {
+    type TypeLayout = MldTypeLayout;
     fn send_message_v1(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        group_addr: MulticastAddr<Ipv6Addr>,
+        _cur_mode: &MldMode,
+        group_addr: GmpEnabledGroup<Ipv6Addr>,
         msg_type: gmp::v1::GmpMessageType,
     ) {
+        let group_addr = group_addr.into_multicast_addr();
         let result = match msg_type {
             gmp::v1::GmpMessageType::Report => send_mld_v1_packet::<_, _, _>(
                 self,
@@ -291,7 +394,7 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
-        groups: impl Iterator<Item: GmpReportGroupRecord<Ipv6Addr> + Clone> + Clone,
+        groups: impl Iterator<Item: gmp::v2::VerifiedReportGroupRecord<Ipv6Addr> + Clone> + Clone,
     ) {
         let dst_ip = ALL_MLDV2_CAPABLE_ROUTERS;
         let (ipv6, icmp) =
@@ -322,33 +425,72 @@ impl<BC: MldBindingsContext, CC: MldSendContext<BC>> GmpContextInner<Ipv6, BC> f
         }
     }
 
-    fn run_actions(&mut self, _bindings_ctx: &mut BC, _device: &CC::DeviceId, actions: Never) {
-        match actions {}
-    }
-
-    fn handle_mode_change(
+    fn mode_update_from_v1_query<Q: gmp::v1::QueryMessage<Ipv6>>(
         &mut self,
         _bindings_ctx: &mut BC,
-        _device: &Self::DeviceId,
-        _new_mode: gmp::GmpMode,
-    ) {
+        _query: &Q,
+        gmp_state: &GmpState<Ipv6, MldTypeLayout, BC>,
+        _config: &MldConfig,
+    ) -> MldMode {
+        let MldMode(gmp) = &gmp_state.mode;
+        MldMode(gmp.maybe_enter_v1_compat())
+    }
+
+    fn mode_to_config(MldMode(gmp_mode): &MldMode) -> MldConfigMode {
+        match gmp_mode {
+            GmpMode::V2 | GmpMode::V1 { compat: true } => MldConfigMode::V2,
+            GmpMode::V1 { compat: false } => MldConfigMode::V1,
+        }
+    }
+
+    fn config_to_mode(MldMode(cur_mode): &MldMode, config: MldConfigMode) -> MldMode {
+        MldMode(match config {
+            MldConfigMode::V1 => GmpMode::V1 { compat: false },
+            MldConfigMode::V2 => match cur_mode {
+                GmpMode::V1 { compat: true } => *cur_mode,
+                GmpMode::V1 { compat: false } | GmpMode::V2 => GmpMode::V2,
+            },
+        })
+    }
+
+    fn mode_on_disable(MldMode(cur_mode): &MldMode) -> MldMode {
+        MldMode(cur_mode.maybe_exit_v1_compat())
+    }
+
+    fn mode_on_exit_compat() -> MldMode {
+        MldMode(GmpMode::V2)
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Eq, PartialEq)]
 pub(crate) enum MldError {
     /// The host is trying to operate on an group address of which the host is
     /// not a member.
     #[error("the host has not already been a member of the address: {}", addr)]
     NotAMember { addr: Ipv6Addr },
     /// Failed to send an IGMP packet.
-    #[error("failed to send out an IGMP packet to address: {}", addr)]
+    #[error("failed to send out an MLD packet to address: {}", addr)]
     SendFailure { addr: Ipv6Addr },
+    /// Message ignored because of bad source address.
+    #[error("bad source address: {}", addr)]
+    BadSourceAddress { addr: Ipv6Addr },
+    /// MLD is disabled
+    #[error("MLD is disabled on interface")]
+    Disabled,
 }
 
 impl From<NotAMemberErr<Ipv6>> for MldError {
     fn from(NotAMemberErr(addr): NotAMemberErr<Ipv6>) -> Self {
         Self::NotAMember { addr }
+    }
+}
+
+impl From<gmp::v2::QueryError<Ipv6>> for MldError {
+    fn from(err: gmp::v2::QueryError<Ipv6>) -> Self {
+        match err {
+            gmp::v2::QueryError::NotAMember(addr) => Self::NotAMember { addr },
+            gmp::v2::QueryError::Disabled => Self::Disabled,
+        }
     }
 }
 
@@ -386,11 +528,6 @@ impl gmp::v1::ProtocolConfig for MldConfig {
     fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration> {
         NonZeroDuration::new(resp_time)
     }
-
-    type QuerySpecificActions = Never;
-    fn do_query_received_specific(&self, _max_resp_time: Duration) -> Option<Never> {
-        None
-    }
 }
 
 impl gmp::v2::ProtocolConfig for MldConfig {
@@ -415,7 +552,7 @@ impl<D: WeakDeviceIdentifier> MldTimerId<D> {
 
     /// Creates a new [`MldTimerId`] for a GMP delayed report on `device`.
     #[cfg(any(test, feature = "testutils"))]
-    pub fn new_delayed_report(device: D) -> Self {
+    pub fn new(device: D) -> Self {
         Self(GmpTimerId { device, _marker: Default::default() })
     }
 }
@@ -480,7 +617,7 @@ const MLD_IP_HOP_LIMIT: u8 = 1;
 fn new_ip_and_icmp_builders<
     BC: MldBindingsContext,
     CC: MldSendContext<BC>,
-    M: IcmpMessage<Ipv6, Code = IcmpUnusedCode> + filter::IcmpMessage<Ipv6>,
+    M: IcmpMessage<Ipv6, Code = IcmpSenderZeroCode> + filter::IcmpMessage<Ipv6>,
 >(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
@@ -502,7 +639,7 @@ fn new_ip_and_icmp_builders<
         MldIpOptions::default(),
     )
     .unwrap();
-    let icmp = IcmpPacketBuilder::new(src_ip, dst_ip.get(), IcmpUnusedCode, msg);
+    let icmp = IcmpPacketBuilder::new(src_ip, dst_ip.get(), IcmpSenderZeroCode, msg);
     (ipv6, icmp)
 }
 
@@ -549,9 +686,11 @@ mod tests {
         FakeWeakDeviceId, TestIpExt,
     };
     use netstack3_base::{CtxPair, InstantContext as _, IntoCoreTimerCtx, SendFrameContext};
-    use packet::{BufferMut, ParseBuffer};
+    use packet::{Buf, BufferMut, ParseBuffer};
     use packet_formats::gmp::GroupRecordType;
-    use packet_formats::icmp::mld::MulticastListenerQuery;
+    use packet_formats::icmp::mld::{
+        Mldv2QueryMessageBuilder, MulticastListenerQuery, MulticastListenerQueryV2,
+    };
     use packet_formats::icmp::{IcmpParseArgs, Icmpv6MessageType, Icmpv6Packet};
     use packet_formats::ip::IpPacket;
     use packet_formats::ipv6::ext_hdrs::Ipv6ExtensionHeaderData;
@@ -560,7 +699,9 @@ mod tests {
     use super::*;
     use crate::internal::base::{IpPacketDestination, IpSendFrameError, SendIpPacketMeta};
     use crate::internal::fragmentation::FragmentableIpSerializer;
-    use crate::internal::gmp::{GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult};
+    use crate::internal::gmp::{
+        GmpEnabledGroup, GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult,
+    };
 
     /// Metadata for sending an MLD packet in an IP packet.
     #[derive(Debug, PartialEq)]
@@ -585,7 +726,7 @@ mod tests {
     }
 
     impl FakeMldCtx {
-        fn gmp_state(&mut self) -> &mut GmpState<Ipv6, FakeBindingsCtxImpl> {
+        fn gmp_state(&mut self) -> &mut GmpState<Ipv6, MldTypeLayout, FakeBindingsCtxImpl> {
             &mut Rc::get_mut(&mut self.shared).unwrap().get_mut().gmp_state
         }
 
@@ -599,22 +740,30 @@ mod tests {
     /// The parts of `FakeMldCtx` that are behind a RefCell, mocking a lock.
     struct Shared {
         groups: MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, FakeBindingsCtxImpl>>,
-        gmp_state: GmpState<Ipv6, FakeBindingsCtxImpl>,
+        gmp_state: GmpState<Ipv6, MldTypeLayout, FakeBindingsCtxImpl>,
         config: MldConfig,
     }
 
-    fn new_context() -> FakeCtxImpl {
+    /// Creates a new test context in MLDv1.
+    ///
+    /// A historical note: a number of tests were originally written when only
+    /// MLDv1 was supported.
+    fn new_mldv1_context() -> FakeCtxImpl {
         FakeCtxImpl::with_default_bindings_ctx(|bindings_ctx| {
+            // We start with enabled true to make tests easier to write.
+            let mld_enabled = true;
             FakeCoreCtxImpl::with_state(FakeMldCtx {
                 shared: Rc::new(RefCell::new(Shared {
                     groups: MulticastGroupSet::default(),
-                    gmp_state: GmpState::new::<_, IntoCoreTimerCtx>(
+                    gmp_state: GmpState::new_with_enabled_and_mode::<_, IntoCoreTimerCtx>(
                         bindings_ctx,
                         FakeWeakDeviceId(FakeDeviceId),
+                        mld_enabled,
+                        MldMode(GmpMode::V1 { compat: false }),
                     ),
                     config: Default::default(),
                 })),
-                mld_enabled: true,
+                mld_enabled,
                 ipv6_link_local: None,
             })
         })
@@ -639,13 +788,17 @@ mod tests {
     impl MldStateContext<FakeBindingsCtxImpl> for FakeCoreCtxImpl {
         fn with_mld_state<
             O,
-            F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, FakeBindingsCtxImpl>>) -> O,
+            F: FnOnce(
+                &MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, FakeBindingsCtxImpl>>,
+                &GmpState<Ipv6, MldTypeLayout, FakeBindingsCtxImpl>,
+            ) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
-            cb(&self.state.shared.borrow().groups)
+            let state = self.state.shared.borrow();
+            cb(&state.groups, &state.gmp_state)
         }
     }
 
@@ -653,7 +806,10 @@ mod tests {
         type SendContext<'a> = &'a mut Self;
         fn with_mld_state_mut<
             O,
-            F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, FakeBindingsCtxImpl>) -> O,
+            F: FnOnce(
+                Self::SendContext<'_>,
+                GmpStateRef<'_, Ipv6, MldTypeLayout, FakeBindingsCtxImpl>,
+            ) -> O,
         >(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
@@ -736,10 +892,7 @@ mod tests {
                 gmp::v1::GmpStateMachine::join_group(&mut rng, FakeInstant::default(), false, &cfg);
             assert_eq!(
                 s.query_received(&mut rng, Duration::from_secs(0), FakeInstant::default(), &cfg),
-                gmp::v1::QueryReceivedActions {
-                    generic: Some(gmp::v1::QueryReceivedGenericAction::StopTimerAndSendReport),
-                    protocol_specific: None
-                }
+                gmp::v1::QueryReceivedActions::StopTimerAndSendReport,
             );
         });
     }
@@ -757,14 +910,9 @@ mod tests {
         _marker: IpVersionMarker::new(),
     });
 
-    fn receive_mld_query(
-        core_ctx: &mut FakeCoreCtxImpl,
-        bindings_ctx: &mut FakeBindingsCtxImpl,
-        resp_time: Duration,
-        group_addr: MulticastAddr<Ipv6Addr>,
-    ) {
+    fn new_v1_query(resp_time: Duration, group_addr: MulticastAddr<Ipv6Addr>) -> Buf<Vec<u8>> {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
-        let mut buffer = Mldv1MessageBuilder::<MulticastListenerQuery>::new_with_max_resp_delay(
+        Mldv1MessageBuilder::<MulticastListenerQuery>::new_with_max_resp_delay(
             group_addr.get(),
             resp_time.try_into().unwrap(),
         )
@@ -772,56 +920,95 @@ mod tests {
         .encapsulate(IcmpPacketBuilder::<_, _>::new(
             router_addr,
             MY_IP,
-            IcmpUnusedCode,
+            IcmpSenderZeroCode,
             MulticastListenerQuery,
         ))
         .serialize_vec_outer()
-        .unwrap();
+        .unwrap()
+        .unwrap_b()
+    }
+
+    fn new_v1_report(group_addr: MulticastAddr<Ipv6Addr>) -> Buf<Vec<u8>> {
+        let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
+        Mldv1MessageBuilder::<MulticastListenerReport>::new(group_addr)
+            .into_serializer()
+            .encapsulate(IcmpPacketBuilder::<_, _>::new(
+                router_addr,
+                MY_IP,
+                IcmpSenderZeroCode,
+                MulticastListenerReport,
+            ))
+            .serialize_vec_outer()
+            .unwrap()
+            .unwrap_b()
+    }
+
+    fn new_v2_general_query() -> Buf<Vec<u8>> {
+        let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
+        Mldv2QueryMessageBuilder::new(
+            Default::default(),
+            None,
+            false,
+            Default::default(),
+            Default::default(),
+            core::iter::empty::<Ipv6Addr>(),
+        )
+        .into_serializer()
+        .encapsulate(IcmpPacketBuilder::<_, _>::new(
+            router_addr,
+            MY_IP,
+            IcmpSenderZeroCode,
+            MulticastListenerQueryV2,
+        ))
+        .serialize_vec_outer()
+        .unwrap()
+        .unwrap_b()
+    }
+
+    fn parse_mld_packet<B: ParseBuffer>(buffer: &mut B) -> MldPacket<&[u8]> {
+        let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
         match buffer
             .parse_with::<_, Icmpv6Packet<_>>(IcmpParseArgs::new(router_addr, MY_IP))
             .unwrap()
         {
-            Icmpv6Packet::Mld(packet) => core_ctx.receive_mld_packet(
-                bindings_ctx,
-                &FakeDeviceId,
-                router_addr.try_into().unwrap(),
-                MY_IP,
-                packet,
-            ),
+            Icmpv6Packet::Mld(packet) => packet,
             _ => panic!("serialized icmpv6 message is not an mld message"),
         }
     }
 
-    fn receive_mld_report(
+    fn receive_mldv1_query(
+        core_ctx: &mut FakeCoreCtxImpl,
+        bindings_ctx: &mut FakeBindingsCtxImpl,
+        resp_time: Duration,
+        group_addr: MulticastAddr<Ipv6Addr>,
+    ) {
+        let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
+        let mut buffer = new_v1_query(resp_time, group_addr);
+        let packet = parse_mld_packet(&mut buffer);
+        core_ctx.receive_mld_packet(
+            bindings_ctx,
+            &FakeDeviceId,
+            router_addr.try_into().unwrap(),
+            MY_IP,
+            packet,
+        )
+    }
+
+    fn receive_mldv1_report(
         core_ctx: &mut FakeCoreCtxImpl,
         bindings_ctx: &mut FakeBindingsCtxImpl,
         group_addr: MulticastAddr<Ipv6Addr>,
     ) {
         let router_addr: Ipv6Addr = ROUTER_MAC.to_ipv6_link_local().addr().get();
-        let mut buffer = Mldv1MessageBuilder::<MulticastListenerReport>::new(group_addr)
-            .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<_, _>::new(
-                router_addr,
-                MY_IP,
-                IcmpUnusedCode,
-                MulticastListenerReport,
-            ))
-            .serialize_vec_outer()
-            .unwrap()
-            .unwrap_b();
-        match buffer
-            .parse_with::<_, Icmpv6Packet<_>>(IcmpParseArgs::new(router_addr, MY_IP))
-            .unwrap()
-        {
-            Icmpv6Packet::Mld(packet) => core_ctx.receive_mld_packet(
-                bindings_ctx,
-                &FakeDeviceId,
-                router_addr.try_into().unwrap(),
-                MY_IP,
-                packet,
-            ),
-            _ => panic!("serialized icmpv6 message is not an mld message"),
-        }
+        let mut buffer = new_v1_report(group_addr);
+        let packet = parse_mld_packet(&mut buffer);
+        core_ctx.receive_mld_packet(
+            bindings_ctx,
+            &FakeDeviceId,
+            router_addr.try_into().unwrap(),
+            MY_IP,
+            packet,
+        )
     }
 
     // Ensure the ttl is 1.
@@ -868,7 +1055,7 @@ mod tests {
     #[test]
     fn test_mld_simple_integration() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -876,7 +1063,7 @@ mod tests {
                 GroupJoinResult::Joined(())
             );
 
-            receive_mld_query(
+            receive_mldv1_query(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 Duration::from_secs(10),
@@ -886,7 +1073,7 @@ mod tests {
                 .state
                 .gmp_state()
                 .timers
-                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
+                .assert_top(&gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
 
             // We should get two MLD reports - one for the unsolicited one for
@@ -904,7 +1091,7 @@ mod tests {
     #[test]
     fn test_mld_immediate_query() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -913,7 +1100,12 @@ mod tests {
             );
             assert_eq!(core_ctx.frames().len(), 1);
 
-            receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
+            receive_mldv1_query(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                Duration::from_secs(0),
+                GROUP_ADDR,
+            );
             // The query says that it wants to hear from us immediately.
             assert_eq!(core_ctx.frames().len(), 2);
             // There should be no timers set.
@@ -929,7 +1121,7 @@ mod tests {
     #[test]
     fn test_mld_integration_fallback_from_idle() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -942,11 +1134,11 @@ mod tests {
                 .state
                 .gmp_state()
                 .timers
-                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
+                .assert_top(&gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
-            receive_mld_query(
+            receive_mldv1_query(
                 &mut core_ctx,
                 &mut bindings_ctx,
                 Duration::from_secs(10),
@@ -965,7 +1157,7 @@ mod tests {
                 .state
                 .gmp_state()
                 .timers
-                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
+                .assert_top(&gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 3);
             // The frames are all reports.
@@ -979,7 +1171,7 @@ mod tests {
     #[test]
     fn test_mld_integration_immediate_query_wont_fallback() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -992,11 +1184,16 @@ mod tests {
                 .state
                 .gmp_state()
                 .timers
-                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
+                .assert_top(&gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             assert_eq!(core_ctx.frames().len(), 2);
 
-            receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
+            receive_mldv1_query(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                Duration::from_secs(0),
+                GROUP_ADDR,
+            );
 
             // Since it is an immediate query, we will send a report immediately
             // and turn into Idle state again.
@@ -1019,7 +1216,7 @@ mod tests {
 
     #[test]
     fn test_mld_integration_delay_reset_timer() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
         // This seed was carefully chosen to produce a substantial duration
         // value below.
         bindings_ctx.seed_rng(123456);
@@ -1029,7 +1226,7 @@ mod tests {
         );
 
         core_ctx.state.gmp_state().timers.assert_timers([(
-            gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(),
+            gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
             (),
             FakeInstant::from(Duration::from_micros(590_354)),
         )]);
@@ -1037,10 +1234,10 @@ mod tests {
         let start = bindings_ctx.now();
         let duration = instant1 - start;
 
-        receive_mld_query(&mut core_ctx, &mut bindings_ctx, duration, GROUP_ADDR);
+        receive_mldv1_query(&mut core_ctx, &mut bindings_ctx, duration, GROUP_ADDR);
         assert_eq!(core_ctx.frames().len(), 1);
         core_ctx.state.gmp_state().timers.assert_timers([(
-            gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(),
+            gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
             (),
             FakeInstant::from(Duration::from_micros(34_751)),
         )]);
@@ -1060,7 +1257,7 @@ mod tests {
     #[test]
     fn test_mld_integration_last_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1070,7 +1267,7 @@ mod tests {
             let now = bindings_ctx.now();
 
             core_ctx.state.gmp_state().timers.assert_range([(
-                &gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(),
+                &gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
                 now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
             // The initial unsolicited report.
@@ -1104,7 +1301,7 @@ mod tests {
     #[test]
     fn test_mld_integration_not_last_does_not_send_leave() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1113,11 +1310,11 @@ mod tests {
             );
             let now = bindings_ctx.now();
             core_ctx.state.gmp_state().timers.assert_range([(
-                &gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(),
+                &gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
                 now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL),
             )]);
             assert_eq!(core_ctx.frames().len(), 1);
-            receive_mld_report(&mut core_ctx, &mut bindings_ctx, GROUP_ADDR);
+            receive_mldv1_report(&mut core_ctx, &mut bindings_ctx, GROUP_ADDR);
             bindings_ctx.timers.assert_no_timers_installed();
             // The report should be discarded because we have received from someone
             // else.
@@ -1139,7 +1336,7 @@ mod tests {
     #[test]
     fn test_mld_with_link_local() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             core_ctx.state.ipv6_link_local = Some(MY_MAC.to_ipv6_link_local().addr());
@@ -1151,7 +1348,7 @@ mod tests {
                 .state
                 .gmp_state()
                 .timers
-                .assert_top(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), &());
+                .assert_top(&gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(), &());
             assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(TIMER_ID));
             for (_, frame) in core_ctx.frames() {
                 ensure_frame(&frame, 131, GROUP_ADDR, GROUP_ADDR);
@@ -1184,12 +1381,17 @@ mod tests {
                 assert_gmp_state!(core_ctx, &group, NonMember);
                 assert_no_effect(&core_ctx, &bindings_ctx);
 
-                receive_mld_report(&mut core_ctx, &mut bindings_ctx, group);
+                receive_mldv1_report(&mut core_ctx, &mut bindings_ctx, group);
                 // We should have done no state transitions/work.
                 assert_gmp_state!(core_ctx, &group, NonMember);
                 assert_no_effect(&core_ctx, &bindings_ctx);
 
-                receive_mld_query(&mut core_ctx, &mut bindings_ctx, Duration::from_secs(10), group);
+                receive_mldv1_query(
+                    &mut core_ctx,
+                    &mut bindings_ctx,
+                    Duration::from_secs(10),
+                    group,
+                );
                 // We should have done no state transitions/work.
                 assert_gmp_state!(core_ctx, &group, NonMember);
                 assert_no_effect(&core_ctx, &bindings_ctx);
@@ -1204,7 +1406,7 @@ mod tests {
             };
 
             let new_ctx = || {
-                let mut ctx = new_context();
+                let mut ctx = new_mldv1_context();
                 ctx.bindings_ctx.seed_rng(seed);
                 ctx
             };
@@ -1226,6 +1428,7 @@ mod tests {
             // device.
             let mut ctx = new_ctx();
             ctx.core_ctx.state.mld_enabled = false;
+            ctx.core_ctx.gmp_handle_disabled(&mut ctx.bindings_ctx, &FakeDeviceId);
             test(ctx, GROUP_ADDR);
         });
     }
@@ -1235,7 +1438,7 @@ mod tests {
         run_with_many_seeds(|seed| {
             // Simple MLD integration test to check that when we call top-level
             // multicast join and leave functions, MLD is performed.
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
 
             assert_eq!(
@@ -1247,11 +1450,10 @@ mod tests {
             let now = bindings_ctx.now();
             let range = now..=(now + MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL);
 
-            core_ctx
-                .state
-                .gmp_state()
-                .timers
-                .assert_range([(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), range.clone())]);
+            core_ctx.state.gmp_state().timers.assert_range([(
+                &gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
+                range.clone(),
+            )]);
             let frame = &core_ctx.frames().last().unwrap().1;
             ensure_frame(frame, 131, GROUP_ADDR, GROUP_ADDR);
             ensure_slice_addr(frame, 8, 24, Ipv6::UNSPECIFIED_ADDRESS);
@@ -1262,11 +1464,10 @@ mod tests {
             );
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
-            core_ctx
-                .state
-                .gmp_state()
-                .timers
-                .assert_range([(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), range.clone())]);
+            core_ctx.state.gmp_state().timers.assert_range([(
+                &gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
+                range.clone(),
+            )]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1275,11 +1476,10 @@ mod tests {
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
             assert_eq!(core_ctx.frames().len(), 1);
 
-            core_ctx
-                .state
-                .gmp_state()
-                .timers
-                .assert_range([(&gmp::v1::DelayedReportTimerId(GROUP_ADDR).into(), range)]);
+            core_ctx.state.gmp_state().timers.assert_range([(
+                &gmp::v1::DelayedReportTimerId::new_multicast(GROUP_ADDR).into(),
+                range,
+            )]);
 
             assert_eq!(
                 core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, GROUP_ADDR),
@@ -1296,7 +1496,7 @@ mod tests {
     #[test]
     fn test_mld_enable_disable() {
         run_with_many_seeds(|seed| {
-            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+            let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
             bindings_ctx.seed_rng(seed);
             assert_eq!(core_ctx.take_frames(), []);
 
@@ -1342,6 +1542,7 @@ mod tests {
             assert_eq!(core_ctx.take_frames(), []);
 
             // Should send done message.
+            core_ctx.state.mld_enabled = false;
             core_ctx.gmp_handle_disabled(&mut bindings_ctx, &FakeDeviceId);
             assert_gmp_state!(core_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
             assert_gmp_state!(core_ctx, &GROUP_ADDR, NonMember);
@@ -1366,6 +1567,7 @@ mod tests {
             assert_eq!(core_ctx.take_frames(), []);
 
             // Should send report message.
+            core_ctx.state.mld_enabled = true;
             core_ctx.gmp_handle_maybe_enabled(&mut bindings_ctx, &FakeDeviceId);
             assert_gmp_state!(core_ctx, &Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS, NonMember);
             assert_gmp_state!(core_ctx, &GROUP_ADDR, Delaying);
@@ -1386,14 +1588,19 @@ mod tests {
     /// Test the basics of MLDv2 report sending.
     #[test]
     fn send_gmpv2_report() {
-        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_context();
+        let FakeCtxImpl { mut core_ctx, mut bindings_ctx } = new_mldv1_context();
         let sent_report_addr = Ipv6::get_multicast_addr(130);
         let sent_report_mode = GroupRecordType::ModeIsExclude;
         let sent_report_sources = Vec::<Ipv6Addr>::new();
         (&mut core_ctx).send_report_v2(
             &mut bindings_ctx,
             &FakeDeviceId,
-            [(sent_report_addr, sent_report_mode, sent_report_sources.iter())].into_iter(),
+            [gmp::v2::GroupRecord::new_with_sources(
+                GmpEnabledGroup::new(sent_report_addr).unwrap(),
+                sent_report_mode,
+                sent_report_sources.iter(),
+            )]
+            .into_iter(),
         );
         let frames = core_ctx.take_frames();
         let (MldFrameMetadata { device: FakeDeviceId, dst_ip }, frame) =
@@ -1446,5 +1653,111 @@ mod tests {
             })
             .collect::<Vec<_>>();
         assert_eq!(report, vec![(sent_report_addr.get(), sent_report_mode, sent_report_sources)]);
+    }
+
+    #[test]
+    fn v1_query_reject_bad_ipv6_source_addr() {
+        let mut ctx = new_mldv1_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+
+        let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
+        for addr in
+            [Ipv6SourceAddr::Unspecified, Ipv6SourceAddr::new(net_ip_v6!("2001::1")).unwrap()]
+        {
+            let mut buffer = &buffer[..];
+            let packet = parse_mld_packet(&mut buffer);
+            assert_eq!(
+                receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+                Err(MldError::BadSourceAddress { addr: addr.into_addr() })
+            );
+        }
+    }
+
+    #[test]
+    fn v2_query_reject_bad_ipv6_source_addr() {
+        let mut ctx = new_mldv1_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+
+        let buffer = new_v2_general_query().into_inner();
+        for addr in
+            [Ipv6SourceAddr::Unspecified, Ipv6SourceAddr::new(net_ip_v6!("2001::1")).unwrap()]
+        {
+            let mut buffer = &buffer[..];
+            let packet = parse_mld_packet(&mut buffer);
+            assert_eq!(
+                receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+                Err(MldError::BadSourceAddress { addr: addr.into_addr() })
+            );
+        }
+    }
+
+    #[test]
+    fn v1_report_reject_bad_ipv6_source_addr() {
+        let mut ctx = new_mldv1_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+
+        let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
+        let addr = Ipv6SourceAddr::new(net_ip_v6!("2001::1")).unwrap();
+        let mut buffer = &buffer[..];
+        let packet = parse_mld_packet(&mut buffer);
+        assert_eq!(
+            receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+            Err(MldError::BadSourceAddress { addr: addr.into_addr() })
+        );
+
+        // Unspecified is okay however.
+        let buffer = new_v1_query(Duration::from_secs(1), GROUP_ADDR).into_inner();
+        let addr = Ipv6SourceAddr::Unspecified;
+        let mut buffer = &buffer[..];
+        let packet = parse_mld_packet(&mut buffer);
+        assert_eq!(
+            receive_mld_packet(core_ctx, bindings_ctx, &FakeDeviceId, addr, packet),
+            Err(MldError::BadSourceAddress { addr: addr.into_addr() })
+        );
+    }
+
+    #[test]
+    fn user_mode_change() {
+        let mut ctx = new_mldv1_context();
+        let FakeCtxImpl { core_ctx, bindings_ctx } = &mut ctx;
+        assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), MldConfigMode::V1);
+        assert_eq!(
+            core_ctx.gmp_join_group(bindings_ctx, &FakeDeviceId, GROUP_ADDR),
+            GroupJoinResult::Joined(())
+        );
+        // Ignore first reports.
+        let _ = core_ctx.take_frames();
+        assert_eq!(
+            core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, MldConfigMode::V2),
+            MldConfigMode::V1
+        );
+        assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), MldConfigMode::V2);
+        assert_eq!(core_ctx.state.gmp_state().mode, MldMode(GmpMode::V2));
+        // No side-effects.
+        assert_eq!(core_ctx.take_frames(), Vec::new());
+
+        // If we receive a v1 query, we'll go into compat mode but still report
+        // v2 to the user.
+        receive_mldv1_query(core_ctx, bindings_ctx, Duration::from_secs(0), GROUP_ADDR);
+        assert_eq!(core_ctx.state.gmp_state().mode, MldMode(GmpMode::V1 { compat: true }));
+        // Acknowledge query response.
+        assert_eq!(core_ctx.take_frames().len(), 1);
+        assert_eq!(core_ctx.gmp_get_mode(&FakeDeviceId), MldConfigMode::V2);
+
+        // Even if user attempts to set V2 again we'll keep it in compat.
+        assert_eq!(
+            core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, MldConfigMode::V2),
+            MldConfigMode::V2
+        );
+        assert_eq!(core_ctx.take_frames(), Vec::new());
+        assert_eq!(core_ctx.state.gmp_state().mode, MldMode(GmpMode::V1 { compat: true }));
+
+        // Forcing V1 mode, however, exits compat.
+        assert_eq!(
+            core_ctx.gmp_set_mode(bindings_ctx, &FakeDeviceId, MldConfigMode::V1),
+            MldConfigMode::V2
+        );
+        assert_eq!(core_ctx.take_frames(), Vec::new());
+        assert_eq!(core_ctx.state.gmp_state().mode, MldMode(GmpMode::V1 { compat: false }));
     }
 }

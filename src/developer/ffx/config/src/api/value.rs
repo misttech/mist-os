@@ -15,7 +15,7 @@ const ADDITIVE_RETURN_ERR: &str =
 const _ADDITIVE_LEVEL_ERR: &str =
     "Additive mode can only be used if config level is not specified.";
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConfigValue(pub(crate) Option<Value>);
 
 // See RecursiveMap for why the value version is the main implementation.
@@ -37,7 +37,7 @@ pub trait ValueStrategy {
         flatten(value)
     }
 
-    fn validate_query(query: &ConfigQuery<'_>) -> std::result::Result<(), ConfigError> {
+    fn validate_query(query: &ConfigQuery<'_>) -> Result<(), ConfigError> {
         match query.select {
             SelectMode::First => Ok(()),
             SelectMode::All => Err(anyhow!(ADDITIVE_RETURN_ERR).into()),
@@ -62,15 +62,26 @@ impl ValueStrategy for Value {
         Some(value)
     }
 
-    fn validate_query(_query: &ConfigQuery<'_>) -> std::result::Result<(), ConfigError> {
+    fn validate_query(_query: &ConfigQuery<'_>) -> Result<(), ConfigError> {
         Ok(())
     }
 }
 
-impl TryFrom<ConfigValue> for Value {
-    type Error = ConfigError;
+pub trait TryConvert: Sized {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError>;
+}
 
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl<T> TryConvert for T
+where
+    T: From<ConfigValue>,
+{
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
+        Ok(value.into())
+    }
+}
+
+impl TryConvert for Value {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value.0.ok_or_else(|| anyhow!("no value").into())
     }
 }
@@ -80,17 +91,15 @@ impl ValueStrategy for Option<Value> {
         Some(value)
     }
 
-    fn validate_query(_query: &ConfigQuery<'_>) -> std::result::Result<(), ConfigError> {
+    fn validate_query(_query: &ConfigQuery<'_>) -> Result<(), ConfigError> {
         Ok(())
     }
 }
 
 impl ValueStrategy for String {}
 
-impl TryFrom<ConfigValue> for String {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for String {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value
             .0
             .and_then(|v| v.as_str().map(|s| s.to_string()))
@@ -100,20 +109,16 @@ impl TryFrom<ConfigValue> for String {
 
 impl ValueStrategy for Option<String> {}
 
-impl TryFrom<ConfigValue> for Option<String> {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for Option<String> {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         Ok(value.0.and_then(|v| v.as_str().map(|s| s.to_string())))
     }
 }
 
 impl ValueStrategy for usize {}
 
-impl TryFrom<ConfigValue> for usize {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for usize {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value
             .0
             .and_then(|v| {
@@ -131,10 +136,8 @@ impl TryFrom<ConfigValue> for usize {
 
 impl ValueStrategy for u64 {}
 
-impl TryFrom<ConfigValue> for u64 {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for u64 {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value
             .0
             .and_then(|v| {
@@ -146,10 +149,8 @@ impl TryFrom<ConfigValue> for u64 {
 
 impl ValueStrategy for Option<u64> {}
 
-impl TryFrom<ConfigValue> for Option<u64> {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for Option<u64> {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         Ok(value.0.and_then(|v| {
             v.as_u64().or_else(|| if let Value::String(s) = v { s.parse().ok() } else { None })
         }))
@@ -158,10 +159,8 @@ impl TryFrom<ConfigValue> for Option<u64> {
 
 impl ValueStrategy for u16 {}
 
-impl TryFrom<ConfigValue> for u16 {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for u16 {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value
             .0
             .and_then(|v| {
@@ -174,10 +173,8 @@ impl TryFrom<ConfigValue> for u16 {
 
 impl ValueStrategy for i64 {}
 
-impl TryFrom<ConfigValue> for i64 {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for i64 {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value
             .0
             .and_then(|v| {
@@ -189,10 +186,8 @@ impl TryFrom<ConfigValue> for i64 {
 
 impl ValueStrategy for bool {}
 
-impl TryFrom<ConfigValue> for bool {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for bool {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value
             .0
             .and_then(|v| {
@@ -204,10 +199,8 @@ impl TryFrom<ConfigValue> for bool {
 
 impl ValueStrategy for Option<bool> {}
 
-impl TryFrom<ConfigValue> for Option<bool> {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for Option<bool> {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         Ok(value.0.and_then(|v| {
             v.as_bool().or_else(|| if let Value::String(s) = v { s.parse().ok() } else { None })
         }))
@@ -216,48 +209,42 @@ impl TryFrom<ConfigValue> for Option<bool> {
 
 impl ValueStrategy for PathBuf {}
 
-impl TryFrom<ConfigValue> for PathBuf {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for PathBuf {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value
             .0
             .and_then(|v| v.as_str().map(|s| PathBuf::from(s.to_string())))
-            .ok_or_else(|| anyhow!("no configuration value found").into())
+            .ok_or_else(|| anyhow!("no configuration PathBuf value found").into())
     }
 }
 
 impl ValueStrategy for Option<PathBuf> {}
 
-impl TryFrom<ConfigValue> for Option<PathBuf> {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for Option<PathBuf> {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         Ok(value.0.and_then(|v| v.as_str().map(|s| PathBuf::from(s.to_string()))))
     }
 }
 
-impl<T: TryFrom<ConfigValue>> ValueStrategy for Vec<T> {
+impl<T> ValueStrategy for Vec<T> {
     fn handle_arrays(value: Value) -> Option<Value> {
         filter(value)
     }
 
-    fn validate_query(_query: &ConfigQuery<'_>) -> std::result::Result<(), ConfigError> {
+    fn validate_query(_query: &ConfigQuery<'_>) -> Result<(), ConfigError> {
         Ok(())
     }
 }
 
-impl<T: TryFrom<ConfigValue>> TryFrom<ConfigValue> for Vec<T> {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl<T: TryConvert> TryConvert for Vec<T> {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value
             .0
             .and_then(|val| match val.as_array() {
                 Some(v) => {
                     let result: Vec<T> = v
                         .iter()
-                        .filter_map(|i| ConfigValue(Some(i.clone())).try_into().ok())
+                        .filter_map(|i| T::try_convert(ConfigValue(Some(i.clone()))).ok())
                         .collect();
                     if result.len() > 0 {
                         Some(result)
@@ -265,18 +252,16 @@ impl<T: TryFrom<ConfigValue>> TryFrom<ConfigValue> for Vec<T> {
                         None
                     }
                 }
-                None => ConfigValue(Some(val)).try_into().map(|x| vec![x]).ok(),
+                None => T::try_convert(ConfigValue(Some(val))).map(|x| vec![x]).ok(),
             })
-            .ok_or_else(|| anyhow!("no configuration value found").into())
+            .ok_or_else(|| anyhow!("no configuration Vec<> value found").into())
     }
 }
 
 impl ValueStrategy for f64 {}
 
-impl TryFrom<ConfigValue> for f64 {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for f64 {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         value
             .0
             .and_then(|v| {
@@ -288,10 +273,8 @@ impl TryFrom<ConfigValue> for f64 {
 
 impl ValueStrategy for Option<f64> {}
 
-impl TryFrom<ConfigValue> for Option<f64> {
-    type Error = ConfigError;
-
-    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+impl TryConvert for Option<f64> {
+    fn try_convert(value: ConfigValue) -> Result<Self, ConfigError> {
         Ok(value.0.and_then(|v| {
             v.as_f64().or_else(|| if let Value::String(s) = v { s.parse().ok() } else { None })
         }))

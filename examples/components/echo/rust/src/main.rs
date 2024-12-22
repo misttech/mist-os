@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 // [START imports]
-use tracing::info;
+use log::info;
 // [END imports]
 
 // [START main]

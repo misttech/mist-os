@@ -56,7 +56,11 @@ class Pty : public HasIo {
 
   zx_status_t Clone(zx_handle_t* out_handle) {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    const fidl::Status result = client_->Clone(std::move(server_end));
+#else
     const fidl::Status result = client_->Clone2(std::move(server_end));
+#endif
     if (!result.ok()) {
       return result.status();
     }

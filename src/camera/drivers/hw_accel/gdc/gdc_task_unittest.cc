@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/ddk/debug.h>
+#include <lib/driver/mock-mmio-reg/cpp/mock-mmio-reg.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zbi-format/graphics.h>
@@ -14,7 +15,6 @@
 #include <utility>
 #include <vector>
 
-#include <mock-mmio-reg/mock-mmio-reg.h>
 #include <zxtest/zxtest.h>
 
 #include "src/camera/drivers/hw_accel/gdc/gdc.h"
@@ -35,7 +35,7 @@ constexpr uint32_t kMaxTasks = 10;
 constexpr uint32_t kImageFormatTableSize = 8;
 
 template <typename T>
-ddk_mock::MockMmioReg& GetMockReg(ddk_mock::MockMmioRegRegion& registers) {
+mock_mmio::MockMmioReg& GetMockReg(mock_mmio::MockMmioRegRegion& registers) {
   return registers[T::Get().addr()];
 }
 
@@ -150,7 +150,7 @@ class TaskTest : public zxtest::Test {
 
   // Sets up GdcDevice, initialize a task.
   // Returns a task id.
-  uint32_t SetupForFrameProcessing(ddk_mock::MockMmioRegRegion& fake_regs) {
+  uint32_t SetupForFrameProcessing(mock_mmio::MockMmioRegRegion& fake_regs) {
     SetUpBufferCollections(kNumberOfBuffers);
 
     zx::port port;
@@ -211,7 +211,7 @@ class TaskTest : public zxtest::Test {
     return task_id;
   }
 
-  void SetExpectations(ddk_mock::MockMmioRegRegion& fake_regs) {
+  void SetExpectations(mock_mmio::MockMmioRegRegion& fake_regs) {
     GetMockReg<Config>(fake_regs).ExpectWrite(0).ExpectWrite(0).ExpectWrite(1);
 
     GetMockReg<ConfigAddr>(fake_regs).ExpectWrite();
@@ -334,7 +334,7 @@ TEST_F(TaskTest, InvalidVmoTest) {
 }
 
 TEST_F(TaskTest, InitTaskTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   [[maybe_unused]] auto task_id = SetupForFrameProcessing(fake_regs);
 
@@ -354,7 +354,7 @@ TEST_F(TaskTest, InitTaskTest) {
 }
 
 TEST_F(TaskTest, RemoveTaskTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   auto task_id = SetupForFrameProcessing(fake_regs);
 
@@ -380,7 +380,7 @@ TEST_F(TaskTest, RemoveTaskTest) {
 }
 
 TEST_F(TaskTest, ProcessInvalidFrameTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   [[maybe_unused]] auto task_id = SetupForFrameProcessing(fake_regs);
 
@@ -390,7 +390,7 @@ TEST_F(TaskTest, ProcessInvalidFrameTest) {
 }
 
 TEST_F(TaskTest, InvalidBufferProcessFrameTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   [[maybe_unused]] auto task_id = SetupForFrameProcessing(fake_regs);
 
@@ -400,7 +400,7 @@ TEST_F(TaskTest, InvalidBufferProcessFrameTest) {
 }
 
 TEST_F(TaskTest, ProcessFrameTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   auto task_id = SetupForFrameProcessing(fake_regs);
 
@@ -425,7 +425,7 @@ TEST_F(TaskTest, ProcessFrameTest) {
 }
 
 TEST_F(TaskTest, SetOutputResTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   auto task_id = SetupForFrameProcessing(fake_regs);
 
@@ -455,7 +455,7 @@ TEST_F(TaskTest, SetOutputResTest) {
 }
 
 TEST_F(TaskTest, ReleaseValidFrameTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   auto task_id = SetupForFrameProcessing(fake_regs);
 
@@ -479,7 +479,7 @@ TEST_F(TaskTest, ReleaseValidFrameTest) {
 }
 
 TEST_F(TaskTest, ReleaseInValidFrameTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   auto task_id = SetupForFrameProcessing(fake_regs);
 
@@ -498,7 +498,7 @@ TEST_F(TaskTest, ReleaseInValidFrameTest) {
 }
 
 TEST_F(TaskTest, MultipleProcessFrameTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   auto task_id = SetupForFrameProcessing(fake_regs);
 
@@ -556,7 +556,7 @@ TEST_F(TaskTest, MultipleProcessFrameTest) {
 }
 
 TEST_F(TaskTest, DropFrameTest) {
-  ddk_mock::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
+  mock_mmio::MockMmioRegRegion fake_regs(sizeof(uint32_t), kNumberOfMmios);
 
   auto task_id = SetupForFrameProcessing(fake_regs);
 

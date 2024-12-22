@@ -15,7 +15,7 @@ import os
 import shutil
 import sys
 
-from pylib import elf_info
+from fuchsia.tools.pylib import elf_info
 
 _STAMP_FILE_NAME = ".stamp"
 

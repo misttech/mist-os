@@ -112,7 +112,6 @@ if (is_host) {
   import("//src/sys/pkg/repositories/devhost/devhost.gni")
 
   python_binary("populate_fx_publish_working_dir") {
-    enable_mypy = true
     main_source = "populate_fx_publish_working_dir.py"
   }
 
@@ -225,7 +224,6 @@ if (is_host) {
   }
 
   python_host_test("fx_publish_gn_assembled_test") {
-    enable_mypy = true
     main_source = "//tools/devshell/tests/subcommands/fx_publish_test.py"
     sources = [
       "//tools/devshell/contrib/__init__.py",
@@ -249,7 +247,6 @@ if (is_host) {
   }
 
   python_host_test("fx_publish_bazel_assembled_test") {
-    enable_mypy = true
     main_source = "//tools/devshell/tests/subcommands/fx_publish_test.py"
     sources = [
       "//tools/devshell/contrib/__init__.py",

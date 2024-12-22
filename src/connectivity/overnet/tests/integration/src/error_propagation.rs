@@ -28,7 +28,7 @@ async fn error_propagation(run: usize) {
             let chan =
                 receiver.next().await.ok_or_else(|| format_err!("No test request received"))?;
             let chan = fidl::AsyncChannel::from_channel(chan);
-            tracing::info!(node_id = b.node_id().0, "CLIENT CONNECTED TO SERVER");
+            log::info!(node_id = b.node_id().0; "CLIENT CONNECTED TO SERVER");
             assert_eq!(
                 chan.recv_msg(&mut Default::default()).await,
                 Err(fidl::Status::PEER_CLOSED)
@@ -115,7 +115,7 @@ async fn error_propagation_link_fail(run: usize) {
             let chan =
                 receiver.next().await.ok_or_else(|| format_err!("No test request received"))?;
             let chan = fidl::AsyncChannel::from_channel(chan);
-            tracing::info!(node_id = b.node_id().0, "CLIENT CONNECTED TO SERVER");
+            log::info!(node_id = b.node_id().0; "CLIENT CONNECTED TO SERVER");
             assert_eq!(
                 chan.recv_msg(&mut Default::default()).await,
                 Err(fidl::Status::PEER_CLOSED)

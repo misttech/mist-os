@@ -531,13 +531,6 @@ if (current_toolchain != default_toolchain) {
     ]
   }
 
-  zbi_test("physboot-zbi-kernel-core-tests") {
-    deps = [
-      ":physboot-zbi-kernel-test-zircon",
-      "//zircon/system/utest/core:core-tests-standalone($default_toolchain)",
-    ]
-  }
-
   kernel_elf_binary("physboot-elf-kernel-hello-world-test") {
     testonly = true
     output_name = "physzircon"
@@ -616,6 +609,7 @@ if (current_toolchain != default_toolchain) {
       ":trampoline-boot-zbi-test",
       ":turducken-boot-next-zbi-test",
       ":turducken-zbi-test",
+      ":zbi-chain-load-core-tests",
       ":zbi-chain-load-hello-world-test",
       ":zbi-decompress-test",
       ":zbi-handoff-entropy-test",
@@ -625,18 +619,12 @@ if (current_toolchain != default_toolchain) {
       "elf-loading",
       "//zircon/kernel/arch/$zircon_cpu/phys:tests",
     ]
+
     if (have_efi) {
       deps += [
         ":efi-memory-test",
         ":efi-shell-smoke-test",
       ]
-    }
-    if (current_cpu != "riscv64") {  # TODO(mcgrathr): kernel not ready
-      deps += [ ":zbi-chain-load-core-tests" ]
-    }
-
-    if (!use_elf_kernel) {
-      deps += [ ":physboot-zbi-kernel-core-tests" ]
     }
 
     if (have_devicetree) {

@@ -1,0 +1,25 @@
+# Copyright 2024 The Fuchsia Authors
+#
+# Use of this source code is governed by a MIT-style
+# license that can be found in the LICENSE file or at
+# https://opensource.org/licenses/MIT
+import("//build/cpp/library_headers.gni")
+
+library_headers("headers") {
+  headers = [ "dev/power/moonflower/init.h" ]
+}
+
+source_set("moonflower") {
+  sources = [ "moonflower-power.cc" ]
+  public_deps = [ ":headers" ]
+  deps = [
+    "//zircon/kernel/dev/pdev/power",
+    "//zircon/kernel/dev/psci",
+    "//zircon/kernel/lib/arch",
+    "//zircon/kernel/lib/counters",
+    "//zircon/kernel/lib/debuglog",
+    "//zircon/kernel/lib/init",
+    "//zircon/kernel/phys:handoff",
+    "//zircon/system/ulib/ddk-platform-defs",
+  ]
+}

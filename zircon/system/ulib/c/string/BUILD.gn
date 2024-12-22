@@ -6,7 +6,6 @@ import("../libc.gni")
 
 llvm_libc_group("string") {
   deps = [
-    ":compat",
     ":mem",
     ":str",
   ]
@@ -176,12 +175,10 @@ llvm_libc_source_set("minimal-str") {
 
 llvm_libc_source_set("str") {
   functions = [
-    "strcasecmp",
     "strcasestr",
     "strcoll",
     "strxfrm",
     "strdup",
-    "strncasecmp",
     "strndup",
     "strtok",
     "strtok_r",
@@ -239,32 +236,10 @@ llvm_libc_source_set("StringUtil") {
   ]
 }
 
-llvm_libc_source_set("compat") {
-  functions = [
-    "bcmp",
-    "bcopy",
-    "bzero",
-    "index",
-    "rindex",
-  ]
-
-  deps = [ ":swab" ]
-}
-
-# This lives in libc/src/unistd upstream because it's declared in <unistd.h>
-# but it's really a compat string function, so we include it here instead.
-llvm_libc_source_set("swab") {
-  dir = "unistd"
-  functions = [ "swab" ]
-}
-
 # This provides an archive library of the universally safe string functions.
 # When built outside the "user.libc" environment, these always define only
 # hidden-visibility symbols and should be safe in any build environment.
 static_library("hermetic") {
   complete_static_lib = true
-  deps = [
-    ":compat",
-    ":minimal-str",
-  ]
+  deps = [ ":minimal-str" ]
 }

@@ -6,8 +6,8 @@
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
-load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
+load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 
 # buildifier: disable=module-docstring
 load(
@@ -328,7 +328,6 @@ def fuchsia_hybrid_product_configuration_impl(ctx):
     product_dir = ctx.actions.declare_directory(product_dir_name)
     product_configuration = ctx.attr.product_configuration[FuchsiaProductConfigInfo].config.split("/")[-1]
 
-    product_config_outputs = []
     src_config_dirname = "/".join(ctx.attr.product_configuration[FuchsiaProductConfigInfo].config.split("/")[:-1])
 
     subdirectories_to_overwrite = {}

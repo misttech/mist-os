@@ -41,7 +41,7 @@ TEST(Counters, Basic) {
     ASSERT_OK(fdio_get_vmo_exact(desc_fd.get(), vmo.reset_and_get_address()));
     uint64_t size;
     ASSERT_OK(vmo.get_size(&size));
-    ASSERT_OK(desc_mapper.Map(std::move(vmo), size, ZX_VM_PERM_READ));
+    ASSERT_OK(desc_mapper.Map(std::move(vmo), 0, size, ZX_VM_PERM_READ));
     desc = reinterpret_cast<counters::DescriptorVmo*>(desc_mapper.start());
     EXPECT_EQ(desc->magic, counters::DescriptorVmo::kMagic, "descriptor VMO magic number");
     EXPECT_GE(size, sizeof(*desc) + desc->descriptor_table_size, "descriptor table size");
@@ -60,7 +60,7 @@ TEST(Counters, Basic) {
     uint64_t size;
     ASSERT_OK(vmo.get_size(&size));
     EXPECT_GE(size, desc->max_cpus * desc->num_counters() * sizeof(int64_t), "arena VMO size");
-    ASSERT_OK(arena_mapper.Map(std::move(vmo), size, ZX_VM_PERM_READ));
+    ASSERT_OK(arena_mapper.Map(std::move(vmo), 0, size, ZX_VM_PERM_READ));
     arena = reinterpret_cast<int64_t*>(arena_mapper.start());
   }
 

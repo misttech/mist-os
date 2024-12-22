@@ -11,7 +11,6 @@ import("//build/testing/host_test_data.gni")
 
 if (is_host) {
   python_host_test("fidlcat_e2e_tests") {
-    enable_mypy = true
     main_source = "fidlcat_e2e_tests.py"
     extra_args = [ "-v" ]
 

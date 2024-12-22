@@ -181,10 +181,14 @@ pub struct LogCommand {
     #[argh(option)]
     pub filter: Vec<String>,
 
-    /// filter for a component moniker.
-    /// May be repeated.
+    /// DEPRECATED: use --component
     #[argh(option)]
     pub moniker: Vec<String>,
+
+    /// fuzzy search for a component by moniker or url.
+    /// May be repeated.
+    #[argh(option)]
+    pub component: Vec<String>,
 
     /// exclude a string in either the message, component or url.
     /// May be repeated.
@@ -204,7 +208,7 @@ pub struct LogCommand {
     #[argh(option, default = "Severity::Info")]
     pub severity: Severity,
 
-    /// outputs only kernel logs. Overrides any other moniker specified.
+    /// outputs only kernel logs, unless combined with --component.
     #[argh(switch)]
     pub kernel: bool,
 
@@ -263,10 +267,6 @@ pub struct LogCommand {
     #[argh(option, default = "SymbolizeMode::Pretty")]
     pub symbolize: SymbolizeMode,
 
-    /// DEPRECATED: use --set-severity
-    #[argh(option, from_str_fn(log_interest_selector))]
-    pub select: Vec<LogInterestSelector>,
-
     /// configure the log settings on the target device for components matching
     /// the given selector. This modifies the minimum log severity level emitted
     /// by components during the logging session.
@@ -283,10 +283,6 @@ pub struct LogCommand {
     /// filters by tid
     #[argh(option)]
     pub tid: Option<u64>,
-
-    /// DEPRECATED: use --force-set-severity
-    #[argh(switch)]
-    pub force_select: bool,
 
     /// if enabled, selectors will be passed directly to Archivist without any filtering.
     /// If disabled and no matching components are found, the user will be prompted to
@@ -305,6 +301,7 @@ impl Default for LogCommand {
         LogCommand {
             filter: vec![],
             moniker: vec![],
+            component: vec![],
             exclude: vec![],
             tag: vec![],
             exclude_tags: vec![],
@@ -315,14 +312,12 @@ impl Default for LogCommand {
             kernel: false,
             severity: Severity::Info,
             show_metadata: false,
-            force_select: false,
             force_set_severity: false,
             since: None,
             since_boot: None,
             until: None,
             until_boot: None,
             sub_command: None,
-            select: vec![],
             set_severity: vec![],
             show_full_moniker: false,
             pid: None,
@@ -380,6 +375,24 @@ pub enum LogError {
     FormatterError(#[from] FormatterError),
     #[error("Deprecated flag: `{flag}`, use: `{new_flag}`")]
     DeprecatedFlag { flag: &'static str, new_flag: &'static str },
+    #[error(
+        "Fuzzy matching failed due to too many matches, please re-try with one of these:\n{0}"
+    )]
+    FuzzyMatchTooManyMatches(String),
+    #[error("No running components were found matching {0}")]
+    SearchParameterNotFound(String),
+}
+
+impl LogError {
+    fn too_many_fuzzy_matches(matches: impl Iterator<Item = String>) -> Self {
+        let mut result = String::new();
+        for component in matches {
+            result.push_str(&component);
+            result.push('\n');
+        }
+
+        Self::FuzzyMatchTooManyMatches(result)
+    }
 }
 
 /// Trait used to get available instances given a moniker query.
@@ -403,7 +416,7 @@ impl LogCommand {
     async fn map_interest_selectors<'a>(
         realm_query: &impl InstanceGetter,
         interest_selectors: impl Iterator<Item = &'a LogInterestSelector>,
-    ) -> Result<Vec<Cow<'a, LogInterestSelector>>, LogError> {
+    ) -> Result<impl Iterator<Item = Cow<'a, LogInterestSelector>>, LogError> {
         let selectors = Self::get_selectors_and_monikers(interest_selectors);
         let mut translated_selectors = vec![];
         for (moniker, selector) in selectors {
@@ -454,7 +467,22 @@ impl LogCommand {
 
             ffx_bail!("{}", String::from_utf8(err_output)?);
         }
-        Ok(translated_selectors.into_iter().map(|(selector, _)| selector).collect())
+        Ok(translated_selectors.into_iter().map(|(selector, _)| selector))
+    }
+
+    pub fn validate_cmd_flags_with_warnings(&mut self) -> Result<Vec<&'static str>, LogError> {
+        let mut warnings = vec![];
+
+        if !self.moniker.is_empty() {
+            warnings.push("WARNING: --moniker is deprecated, use --component instead");
+            if self.component.is_empty() {
+                self.component = std::mem::take(&mut self.moniker);
+            } else {
+                warnings.push("WARNING: ignoring --moniker arguments in favor of --component");
+            }
+        }
+
+        Ok(warnings)
     }
 
     /// Sets interest based on configured selectors.
@@ -465,33 +493,25 @@ impl LogCommand {
         log_settings_client: &LogSettingsProxy,
         realm_query: &impl InstanceGetter,
     ) -> Result<(), LogError> {
-        if !self.select.is_empty() {
-            return Err(LogError::DeprecatedFlag { flag: "--select", new_flag: "--set-severity" });
+        if !self.set_severity.is_empty() {
+            let selectors = if self.force_set_severity {
+                Cow::Borrowed(&self.set_severity)
+            } else {
+                let new_selectors =
+                    Self::map_interest_selectors(realm_query, self.set_severity.iter())
+                        .await?
+                        .map(|s| s.into_owned())
+                        .collect::<Vec<_>>();
+                if new_selectors.is_empty() {
+                    Cow::Borrowed(&self.set_severity)
+                } else {
+                    Cow::Owned(new_selectors)
+                }
+            };
+
+            log_settings_client.set_interest(&selectors).await?;
         }
-        if self.force_select {
-            return Err(LogError::DeprecatedFlag {
-                flag: "--force-select",
-                new_flag: "--force-set-severity",
-            });
-        }
-        let all_selectors = self
-            .select
-            .iter()
-            .cloned()
-            .chain(self.set_severity.iter().cloned())
-            .collect::<Vec<_>>();
-        let mut selectors: Cow<'_, Vec<_>> = Cow::Borrowed(&all_selectors);
-        if !(selectors.is_empty() || self.force_select || self.force_set_severity) {
-            let new_selectors = Self::map_interest_selectors(realm_query, selectors.iter()).await?;
-            if !new_selectors.is_empty() {
-                selectors = Cow::Owned(
-                    new_selectors.into_iter().map(|selector| selector.into_owned()).collect(),
-                );
-            }
-        }
-        if !all_selectors.is_empty() {
-            log_settings_client.set_interest(selectors.as_ref()).await?;
-        }
+
         Ok(())
     }
 
@@ -655,6 +675,47 @@ ffx log --force-set-severity.
         }));
         while scheduler.next().await.is_some() {}
         drop(scheduler);
+        assert_matches!(set_interest_result, Some(Ok(())));
+    }
+
+    #[fuchsia::test]
+    async fn logger_uses_specified_selectors_if_no_results_returned() {
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            set_severity: vec![parse_log_interest_selector(
+                "core/something/a:b/elements:main/otherstuff:*#DEBUG",
+            )
+            .unwrap()],
+            ..LogCommand::default()
+        };
+        let mut set_interest_result = None;
+        let getter = FakeInstanceGetter {
+            expected_selector: Some("core/something/a:b/elements:main/otherstuff:*#DEBUG".into()),
+            output: vec![],
+        };
+        let scheduler = FuturesUnordered::new();
+        let (settings_proxy, settings_server) = create_proxy::<LogSettingsMarker>();
+        scheduler.push(Either::Left(async {
+            set_interest_result = Some(cmd.maybe_set_interest(&settings_proxy, &getter).await);
+            drop(settings_proxy);
+        }));
+        scheduler.push(Either::Right(async {
+            let request = settings_server.into_stream().next().await;
+            let (selectors, responder) = assert_matches!(
+                request,
+                Some(Ok(LogSettingsRequest::SetInterest { selectors, responder })) =>
+                (selectors, responder)
+            );
+            responder.send().unwrap();
+            assert_eq!(
+                selectors,
+                vec![parse_log_interest_selector(
+                    "core/something/a:b/elements:main/otherstuff:*#DEBUG"
+                )
+                .unwrap()]
+            );
+        }));
+        scheduler.map(|_| Ok(())).forward(futures::sink::drain()).await.unwrap();
         assert_matches!(set_interest_result, Some(Ok(())));
     }
 

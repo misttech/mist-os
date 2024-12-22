@@ -136,7 +136,7 @@ impl PeerTask {
     async fn handle_procedure_output(&mut self, procedure_output: ProcedureOutput) -> Result<()> {
         match procedure_output {
             ProcedureOutput::AtCommandToAg(command) => {
-                self.at_connection.write_commands(&vec![command]).await?
+                self.at_connection.write_commands(&[command]).await?
             }
             ProcedureOutput::CommandToHf(CommandToHf::SetAgIndicatorIndex { indicator, index }) => {
                 self.ag_indicator_translator.set_index(indicator, index)?

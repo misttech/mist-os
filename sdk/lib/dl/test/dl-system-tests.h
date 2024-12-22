@@ -33,6 +33,8 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // Musl will emit a "symbol not found" error for scenarios where glibc or
   // libdl will emit an "undefined symbol" error.
   static constexpr bool kEmitsSymbolNotFound = true;
+  // Fuchsia's dlclose is a no-op.
+  static constexpr bool kDlCloseCanRunFinalizers = false;
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);

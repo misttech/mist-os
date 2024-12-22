@@ -198,7 +198,6 @@ mod tests {
     use fuchsia_hash::Hash;
     use regex::Regex;
     use serde_json::json;
-    use std::collections::BTreeMap;
     use std::fs::File;
     use std::io::Write;
     use std::str::FromStr;
@@ -243,8 +242,6 @@ mod tests {
                 "0000000000000000000000000000000000000000000000000000000000000000",
             )
             .unwrap(),
-            contents: BTreeMap::default(),
-            path: base_path,
             manifest_path: Utf8PathBuf::default(),
         };
 

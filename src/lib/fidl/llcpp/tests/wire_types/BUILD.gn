@@ -20,6 +20,7 @@ test("fidl_llcpp_wire_type_api_tests_bin") {
   sources = [
     "bits_test.cc",
     "enum_test.cc",
+    "serializable_test.cc",
   ]
   deps = [
     "//sdk/testing/fidl/types_tests:test.types_cpp",

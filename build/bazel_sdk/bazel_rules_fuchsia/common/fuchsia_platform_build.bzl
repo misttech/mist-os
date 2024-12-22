@@ -142,7 +142,7 @@ def _get_formatted_starlark_dict(dict_value, margin):
     Returns:
         A string holding a formatted Starlark expression for the input
         dictionary. If not empty, this will use multiple lines (one per key)
-        with identation of |len(margin) + 4| spaces.
+        with indentation of |len(margin) + 4| spaces.
     """
     return json.encode_indent(dict_value, prefix = margin, indent = margin + "   ")
 

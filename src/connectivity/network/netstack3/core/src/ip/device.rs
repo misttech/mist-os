@@ -40,9 +40,9 @@ use netstack3_ip::device::{
     SlaacContext, SlaacCounters, SlaacState, WeakAddressId,
 };
 use netstack3_ip::gmp::{
-    GmpGroupState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpState,
-    IgmpStateContext, MldContext, MldContextMarker, MldSendContext, MldStateContext,
-    MulticastGroupSet,
+    GmpGroupState, GmpState, GmpStateRef, IgmpContext, IgmpContextMarker, IgmpSendContext,
+    IgmpStateContext, IgmpTypeLayout, MldContext, MldContextMarker, MldSendContext,
+    MldStateContext, MldTypeLayout, MulticastGroupSet,
 };
 use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::{
@@ -53,7 +53,7 @@ use netstack3_ip::{
 use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
 use packet_formats::icmp::ndp::{NeighborSolicitation, OptionSequenceBuilder, RouterSolicitation};
-use packet_formats::icmp::IcmpUnusedCode;
+use packet_formats::icmp::IcmpZeroCode;
 
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
@@ -218,15 +218,21 @@ impl<BT: BindingsTypes, L> IgmpContextMarker for CoreCtx<'_, BT, L> {}
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>>
     IgmpStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_igmp_state<O, F: FnOnce(&MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BC>>) -> O>(
+    fn with_igmp_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv4Addr, GmpGroupState<Ipv4, BC>>,
+            &GmpState<Ipv4, IgmpTypeLayout, BC>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
         let mut state = crate::device::integration::ip_device_state(self, device);
         let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
-        let IpDeviceMulticastGroups { groups, .. } = &*state;
-        cb(groups)
+        let IpDeviceMulticastGroups { groups, gmp, .. } = &*state;
+        cb(groups, gmp)
     }
 }
 
@@ -235,15 +241,21 @@ impl<BT: BindingsTypes, L> MldContextMarker for CoreCtx<'_, BT, L> {}
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>>
     MldStateContext<BC> for CoreCtx<'_, BC, L>
 {
-    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BC>>) -> O>(
+    fn with_mld_state<
+        O,
+        F: FnOnce(
+            &MulticastGroupSet<Ipv6Addr, GmpGroupState<Ipv6, BC>>,
+            &GmpState<Ipv6, MldTypeLayout, BC>,
+        ) -> O,
+    >(
         &mut self,
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
         let mut state = crate::device::integration::ip_device_state(self, device);
         let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
-        let IpDeviceMulticastGroups { groups, .. } = &*state;
-        cb(&groups)
+        let IpDeviceMulticastGroups { groups, gmp, .. } = &*state;
+        cb(groups, gmp)
     }
 }
 
@@ -802,7 +814,7 @@ impl<
             None,
             dst_ip.into_specified(),
             OptionSequenceBuilder::new(options.iter()).into_serializer(),
-            IcmpUnusedCode,
+            IcmpZeroCode,
             message,
         )
         .map_err(|IpSendFrameError { serializer: _, error }| {
@@ -870,7 +882,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
             src_ip.map(UnicastAddr::into_specified),
             dst_ip,
             body(src_ip),
-            IcmpUnusedCode,
+            IcmpZeroCode,
             message,
         )
     }
@@ -1178,11 +1190,7 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
     /// and whether or not IGMP is enabled for the `device`.
     fn with_igmp_state_mut<
         O,
-        F: for<'b> FnOnce(
-            Self::SendContext<'b>,
-            GmpStateRef<'b, Ipv4, Self, BC>,
-            &'b mut IgmpState<BC>,
-        ) -> O,
+        F: for<'b> FnOnce(Self::SendContext<'b>, GmpStateRef<'b, Ipv4, IgmpTypeLayout, BC>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -1203,13 +1211,9 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, BC: BindingsContext> IgmpConte
             .ip_enabled;
         let (mut state, mut locked) =
             state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv4>, _>(|x| x.right());
-        let IpDeviceMulticastGroups { groups, gmp, gmp_proto, gmp_config } = &mut *state;
+        let IpDeviceMulticastGroups { groups, gmp, gmp_config } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
-        cb(
-            locked.cast_core_ctx(),
-            GmpStateRef { enabled, groups, gmp, config: gmp_config },
-            gmp_proto,
-        )
+        cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp, config: gmp_config })
     }
 }
 
@@ -1240,7 +1244,7 @@ impl<
 
     fn with_mld_state_mut<
         O,
-        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, Self, BC>) -> O,
+        F: FnOnce(Self::SendContext<'_>, GmpStateRef<'_, Ipv6, MldTypeLayout, BC>) -> O,
     >(
         &mut self,
         device: &Self::DeviceId,
@@ -1260,7 +1264,7 @@ impl<
             .ip_enabled;
         let (mut state, mut locked) =
             state.write_lock_with_and::<crate::lock_ordering::IpDeviceGmp<Ipv6>, _>(|x| x.right());
-        let IpDeviceMulticastGroups { groups, gmp, gmp_config, gmp_proto: _ } = &mut *state;
+        let IpDeviceMulticastGroups { groups, gmp, gmp_config } = &mut *state;
         let enabled = ip_enabled && *gmp_enabled;
         cb(locked.cast_core_ctx(), GmpStateRef { enabled, groups, gmp, config: gmp_config })
     }

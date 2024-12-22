@@ -50,8 +50,8 @@ type TimestampOption = strict enum {
 /// independently.
 @available(added=HEAD)
 type MarkDomain = strict enum {
-    MARK_1 = 0;
-    MARK_2 = 1;
+    MARK_1 = 1;
+    MARK_2 = 2;
 };
 
 /// A socket.

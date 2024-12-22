@@ -52,7 +52,7 @@ template("fidl_rust_next") {
                            "fidl_gen_dir",
                            "library_name",
                          ])
-  crate_name = "fidl_" + string_replace(library_name, ".", "_")
+  crate_name = "fidl_next_" + string_replace(library_name, ".", "_")
   file_stem = "$fidl_gen_dir/$crate_name"
 
   if (is_fidl_toolchain) {

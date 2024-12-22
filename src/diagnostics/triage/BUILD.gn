@@ -145,7 +145,7 @@ rustc_binary("triage_bin") {
 
   deps = lib_deps + [
            ":triage_app_lib",
-           "//third_party/rust_crates:tracing",
+           "//third_party/rust_crates:log",
          ]
 
   sources = [ "src/main.rs" ]

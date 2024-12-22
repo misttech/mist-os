@@ -9,7 +9,7 @@
 
 use anyhow::Error;
 use async_trait::async_trait;
-use ffx_writer::{Format, MachineWriter};
+use ffx_writer::{Format, MachineWriter, ToolIO};
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryMarker;
@@ -18,7 +18,7 @@ use log_command as log_utils;
 use log_command::log_formatter;
 use log_formatter::{
     dump_logs_from_socket as read_logs_from_socket, DefaultLogFormatter, LogEntry, Symbolize,
-    Timestamp,
+    Timestamp, WriterContainer,
 };
 use log_utils::log_formatter::BootTimeAccessor;
 use log_utils::{LogCommand, LogSubCommand};
@@ -49,7 +49,7 @@ async fn main() -> Result<(), Error> {
         connect_to_protocol_at_path::<RealmQueryMarker>("/svc/fuchsia.sys2.RealmQuery.root")
             .unwrap();
     let log_settings = connect_to_protocol::<LogSettingsMarker>().unwrap();
-    let cmd: LogCommand = argh::from_env();
+    let mut cmd: LogCommand = argh::from_env();
     let stream_mode = if matches!(cmd.sub_command, Some(LogSubCommand::Dump(..))) {
         fidl_fuchsia_diagnostics::StreamMode::Snapshot
     } else {
@@ -86,6 +86,10 @@ async fn main() -> Result<(), Error> {
         &cmd,
         MachineWriter::new(if cmd.json { Some(Format::Json) } else { None }),
     );
+    formatter.expand_monikers(&realm_proxy).await?;
+    for warning in cmd.validate_cmd_flags_with_warnings()? {
+        writeln!(formatter.writer().stderr(), "{warning}")?;
+    }
     cmd.maybe_set_interest(&log_settings, &realm_proxy).await?;
     formatter.set_boot_timestamp(boot_ts);
     let _ = read_logs_from_socket(

@@ -380,18 +380,22 @@ ktl::variant<PageQueues::AgeReason, zx_time_t> PageQueues::GetAgeReasonLocked() 
 }
 
 void PageQueues::MaybeTriggerLruProcessing() {
-  if (NeedsLruProcessing()) {
+  bool needs_lru_processing;
+  {
+    Guard<SpinLock, IrqSave> guard{&lock_};
+    needs_lru_processing = NeedsLruProcessingLocked();
+  }
+  if (needs_lru_processing) {
     DeferPendingSignals dps{*this};
     dps.Pend(PendingSignal::LruEvent);
   }
 }
 
-bool PageQueues::NeedsLruProcessing() const {
-  // Currently only reason to trigger lru processing is if the MRU needs space.
-  // Performing this unlocked is equivalently correct as grabbing the lock, reading, and dropping
-  // the lock. If a caller needs to know if the lru queue needs processing *and* then perform an
-  // action before that status could change, it should externally hold lock_ over this method and
-  // its action.
+bool PageQueues::NeedsLruProcessingLocked() const {
+  // Currently only reason to trigger lru processing is if the MRU needs space. This requires the
+  // lock since the typical use case wants an ordering of any changes to the generation counts with
+  // respect to this query. This works since the generation counts are also modified with the lock
+  // held.
   if (mru_gen_.load(ktl::memory_order_relaxed) - lru_gen_.load(ktl::memory_order_relaxed) ==
       kNumReclaim - 1) {
     return true;
@@ -624,19 +628,38 @@ void PageQueues::MruThread() {
 void PageQueues::LruThread() {
   while (!shutdown_threads_.load(ktl::memory_order_relaxed)) {
     lru_event_.WaitDeadline(ZX_TIME_INFINITE, Interruptible::No);
-    // Take the lock so we can calculate (race free) a target mru-gen
+
     uint64_t target_gen;
+    bool needs_processing;
+    // Take the lock so we can calculate (race free) a target mru-gen.
     {
       Guard<SpinLock, IrqSave> guard{&lock_};
-      if (!NeedsLruProcessing()) {
-        pq_lru_spurious_wakeup.Add(1);
-        continue;
-      }
+      needs_processing = NeedsLruProcessingLocked();
+      // If needs processing is false this will calculate an incorrect target_gen, but that's fine
+      // as we'll just discard it and it's simpler to just do it here unconditionally while the lock
+      // is already held.
       target_gen = lru_gen_.load(ktl::memory_order_relaxed) + 1;
     }
-    // With the lock dropped process the target. This is not racy as generations are monotonic, so
-    // worst case someone else already processed this generation and this call will be a no-op.
-    ProcessDontNeedAndLruQueues(target_gen, false);
+    if (!needs_processing) {
+      pq_lru_spurious_wakeup.Add(1);
+      continue;
+    }
+
+    // Keep processing until we have caught up to what is required. This ensures we are
+    // re-synchronized with the mru-thread and will not miss any signals on the lru_event_.
+    while (needs_processing) {
+      // With the lock dropped process the target. This is not racy as generations are monotonic, so
+      // worst case someone else already processed this generation and this call will be a no-op.
+      ProcessDontNeedAndLruQueues(target_gen, false);
+
+      // Take the lock so we can calculate (race free) a target mru-gen.
+      Guard<SpinLock, IrqSave> guard{&lock_};
+      needs_processing = NeedsLruProcessingLocked();
+      // If needs processing is false this will calculate an incorrect target_gen, but that's fine
+      // as we'll just discard it and it's simpler to just do it here unconditionally while the lock
+      // is already held.
+      target_gen = lru_gen_.load(ktl::memory_order_relaxed) + 1;
+    }
   }
 }
 
@@ -793,7 +816,10 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessLruQueueHelper(
     }
   }
   if (list_is_empty(operating_queue)) {
-    lru_gen_.store(lru + 1, ktl::memory_order_relaxed);
+    // Note that we held the lock the entire time, and lru_gen_ is always modified with the lock
+    // held, so this should always precisely set lru_gen_ to lru + 1.
+    [[maybe_unused]] uint64_t prev = lru_gen_.fetch_add(1, ktl::memory_order_relaxed);
+    DEBUG_ASSERT(prev == lru);
     mru_semaphore_.Post();
   }
 

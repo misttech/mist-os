@@ -17,10 +17,10 @@ async fn serve_config_user_protocol(config: &Config, mut stream: ConfigUserReque
             match request {
                 ConfigUserRequest::IsManagingPower { responder } => {
                     if config.should_manage_power {
-                        tracing::info!("Let's pretend that I'm doing something to manage power!");
+                        log::info!("Let's pretend that I'm doing something to manage power!");
                         responder.send(true)?;
                     } else {
-                        tracing::info!("I am not managing power, but I wish I were. :/");
+                        log::info!("I am not managing power, but I wish I were. :/");
                         responder.send(false)?;
                     }
                 }
@@ -33,13 +33,13 @@ async fn serve_config_user_protocol(config: &Config, mut stream: ConfigUserReque
     .await;
 
     if let Err(err) = result {
-        tracing::error!("{:?}", err);
+        log::error!("{:?}", err);
     }
 }
 
 #[fuchsia::main]
 async fn main() -> anyhow::Result<()> {
-    tracing::info!(
+    log::info!(
         "Reading structured configuration. I will determine whether to do power management based \
         on its `should_manage_power` field."
     );

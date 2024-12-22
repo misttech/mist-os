@@ -9,9 +9,9 @@ use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures_util::{StreamExt as _, TryStreamExt as _};
+use log::{error, info};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
-use tracing::{error, info};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces as fnet_interfaces,

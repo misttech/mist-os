@@ -866,7 +866,6 @@ mod tests {
     use core::cmp::PartialEq;
     use core::marker::PhantomData;
 
-    use const_unwrap::const_unwrap_option;
     use core::convert::Infallible as Never;
     use derivative::Derivative;
     use netstack3_base::sync::DynDebugReferences;
@@ -1234,7 +1233,7 @@ mod tests {
         type WeakDeviceId = FakeWeakDeviceId<D>;
     }
 
-    const SOME_PROTOCOL: NonZeroU16 = const_unwrap_option(NonZeroU16::new(2000));
+    const SOME_PROTOCOL: NonZeroU16 = NonZeroU16::new(2000).unwrap();
 
     #[test]
     fn create_remove() {
@@ -1382,7 +1381,7 @@ mod tests {
         const SRC_MAC: Mac = Mac::new([0, 1, 2, 3, 4, 5]);
         const DST_MAC: Mac = Mac::new([6, 7, 8, 9, 10, 11]);
         /// Arbitrary protocol number.
-        const PROTO: NonZeroU16 = const_unwrap_option(NonZeroU16::new(0x08AB));
+        const PROTO: NonZeroU16 = NonZeroU16::new(0x08AB).unwrap();
         const BODY: &'static [u8] = b"some pig";
         const BUFFER: &'static [u8] = &[
             6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 0x08, 0xAB, b's', b'o', b'm', b'e', b' ', b'p',
@@ -1400,7 +1399,7 @@ mod tests {
         }
     }
 
-    const WRONG_PROTO: NonZeroU16 = const_unwrap_option(NonZeroU16::new(0x08ff));
+    const WRONG_PROTO: NonZeroU16 = NonZeroU16::new(0x08ff).unwrap();
 
     fn make_bound<D: FakeStrongDeviceId>(
         ctx: &mut FakeCtx<D>,

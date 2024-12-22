@@ -32,7 +32,6 @@ specified.
 1. Add a `python_binary` to your BUILD.gn file:
     ```gn
     python_binary("my-new-fx-tool") {
-        enable_mypy = true
         main_source = "main.py"  # Reference main source here
         sources = [ "main.py" ]  # Sources here
         deps = []                # Deps here
@@ -42,7 +41,6 @@ specified.
     ```gn
     if (is_host) {
         python_host_test("my-new-fx-tool-test") {
-            enable_mypy = true
             main_source = "tests/test_my_new_fx_tool.py"  # Test path here
             sources = [
                 "main.py",                                # Allow import main.

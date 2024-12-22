@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use const_unwrap::const_unwrap_option;
+use log::debug;
 use net_types::ethernet::Mac as MacAddr;
 use net_types::ip::{Ipv4, NotSubnetMaskError, PrefixLength};
 use num_derive::FromPrimitive;
@@ -11,7 +11,6 @@ use std::fmt;
 use std::net::Ipv4Addr;
 use std::num::{NonZeroU16, NonZeroU8};
 use thiserror::Error;
-use tracing::debug;
 
 #[cfg(target_os = "fuchsia")]
 use std::convert::Infallible as Never;
@@ -30,7 +29,7 @@ use crate::size_of_contents::SizeOfContents as _;
 /// sent to the 'DHCP server' port (67)".
 ///
 /// [RFC 2131 section 4.1]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.1
-pub const SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(67));
+pub const SERVER_PORT: NonZeroU16 = NonZeroU16::new(67).unwrap();
 
 /// The port on which DHCP clients receive messages from DHCP servers.
 ///
@@ -38,7 +37,7 @@ pub const SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(67));
 /// sent to the 'DHCP client' port (68)".
 ///
 /// [RFC 2131 section 4.1]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.1
-pub const CLIENT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(68));
+pub const CLIENT_PORT: NonZeroU16 = NonZeroU16::new(68).unwrap();
 
 const OP_IDX: usize = 0;
 // currently unused

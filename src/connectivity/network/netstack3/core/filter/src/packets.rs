@@ -1520,7 +1520,9 @@ pub mod testutil {
 
         pub trait TestIpExt: IpExt {
             const SRC_IP: Self::Addr;
+            const SRC_PORT: u16 = 1234;
             const DST_IP: Self::Addr;
+            const DST_PORT: u16 = 9876;
             const SRC_IP_2: Self::Addr;
             const DST_IP_2: Self::Addr;
             const IP_OUTSIDE_SUBNET: Self::Addr;
@@ -1808,20 +1810,19 @@ mod tests {
     use core::fmt::Debug;
     use netstack3_base::{SeqNum, UnscaledWindowSize};
 
-    use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
     use packet::InnerPacketBuilder as _;
-    use packet_formats::icmp::IcmpUnusedCode;
+    use packet_formats::icmp::IcmpZeroCode;
     use packet_formats::tcp::TcpSegmentBuilder;
     use test_case::test_case;
 
     use super::testutil::internal::TestIpExt;
     use super::*;
 
-    const SRC_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(11111));
-    const DST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(22222));
-    const SRC_PORT_2: NonZeroU16 = const_unwrap_option(NonZeroU16::new(44444));
-    const DST_PORT_2: NonZeroU16 = const_unwrap_option(NonZeroU16::new(55555));
+    const SRC_PORT: NonZeroU16 = NonZeroU16::new(11111).unwrap();
+    const DST_PORT: NonZeroU16 = NonZeroU16::new(22222).unwrap();
+    const SRC_PORT_2: NonZeroU16 = NonZeroU16::new(44444).unwrap();
+    const DST_PORT_2: NonZeroU16 = NonZeroU16::new(55555).unwrap();
 
     const SEQ_NUM: u32 = 1;
     const ACK_NUM: Option<u32> = Some(2);
@@ -1988,7 +1989,7 @@ mod tests {
             [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 icmp::IcmpEchoRequest::new(/* id */ src_port.get(), /* seq */ 0),
             ))
         }
@@ -2013,7 +2014,7 @@ mod tests {
             [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 icmp::IcmpEchoReply::new(/* id */ dst_port.get(), /* seq */ 0),
             ))
         }
@@ -2176,7 +2177,7 @@ mod tests {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::IcmpEchoRequest::new(SRC_PORT.get(), /* seq */ 0),
         ));
         serializer
@@ -2187,7 +2188,7 @@ mod tests {
         let equivalent = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::IcmpEchoRequest::new(SRC_PORT_2.get(), /* seq */ 0),
         ));
 
@@ -2199,7 +2200,7 @@ mod tests {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::IcmpEchoReply::new(SRC_PORT.get(), /* seq */ 0),
         ));
         serializer
@@ -2210,7 +2211,7 @@ mod tests {
         let equivalent = [].into_serializer().encapsulate(IcmpPacketBuilder::<I, _>::new(
             I::SRC_IP,
             I::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::IcmpEchoReply::new(SRC_PORT_2.get(), /* seq */ 0),
         ));
 
@@ -2223,7 +2224,7 @@ mod tests {
         let mut serializer = [].into_serializer().encapsulate(IcmpPacketBuilder::new(
             Ipv4::SRC_IP,
             Ipv4::DST_IP,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             icmp::Icmpv4TimestampRequest::new(
                 /* origin_timestamp */ 0,
                 /* id */ SRC_PORT.get(),

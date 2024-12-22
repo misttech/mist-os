@@ -15,12 +15,12 @@ use fidl::Peered;
 use futures::future::{join_all, BoxFuture, FutureExt, TryFutureExt};
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
 use futures::AsyncReadExt;
+use log::{debug, warn};
 use std::borrow::Borrow;
 use std::collections::VecDeque;
 use std::io::Write;
 use std::path::PathBuf;
 use test_diagnostics::zstd_compress::Decoder;
-use tracing::{debug, warn};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 /// Given an |artifact| reported over fuchsia.test.manager, create the appropriate artifact in the

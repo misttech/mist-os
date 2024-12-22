@@ -75,6 +75,15 @@ rustc_binary("reboot_on_terminate_policy_bin") {
   sources = [ "src/reboot_on_terminate_policy.rs" ]
 }
 
+rustc_binary("crash_bin") {
+  testonly = true
+  edition = "2021"
+  deps = []
+
+  source_root = "src/crash.rs"
+  sources = [ "src/crash.rs" ]
+}
+
 fuchsia_component("reboot_on_terminate_success") {
   testonly = true
   manifest = "meta/reboot_on_terminate_success.cml"
@@ -85,6 +94,13 @@ fuchsia_component("reboot_on_terminate_policy") {
   testonly = true
   manifest = "meta/reboot_on_terminate_policy.cml"
   deps = [ ":reboot_on_terminate_policy_bin" ]
+}
+
+fuchsia_component("crash") {
+  testonly = true
+  deps = [ ":crash_bin" ]
+  component_name = "crash"
+  manifest = "meta/crash.cml"
 }
 
 component_config("component_manager_config") {
@@ -111,6 +127,7 @@ fuchsia_component("reboot_on_terminate_test_component") {
 
   deps = [
     ":component_manager",
+    ":crash",
     ":reboot_on_terminate_policy",
     ":reboot_on_terminate_success",
     ":reboot_on_terminate_test_bin",
@@ -133,7 +150,6 @@ fuchsia_test_package("reboot_on_terminate_test") {
   package_name = "reboot_on_terminate_test"
   test_components = [ ":reboot_on_terminate_test_component" ]
   deps = [
-    "//examples/hello_world/rust:hello-world-rust-component",
     "//src/power/shutdown-shim/tests:shutdown_shim_component",
     "//src/sys/component_manager/testing/echo_server",
   ]

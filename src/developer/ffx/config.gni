@@ -56,7 +56,6 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/package:ffx_package",
   "//src/developer/ffx/plugins/product:ffx_product",
   "//src/developer/ffx/plugins/repository:ffx_repository",
-  "//src/developer/ffx/plugins/session:ffx_session",
 ]
 
 # The full set of plugins you'd expect in a 'large', fully integrated ffx

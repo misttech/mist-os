@@ -212,7 +212,13 @@ impl FsNodeOps for ExtDirectory {
                 ops,
                 &fs,
                 inode_num,
-                FsNodeInfo { mode, uid: owner.uid, gid: owner.gid, ..Default::default() },
+                FsNodeInfo {
+                    ino: inode_num,
+                    mode,
+                    uid: owner.uid,
+                    gid: owner.gid,
+                    ..Default::default()
+                },
             );
             child.update_info(|info| {
                 info.size = size;

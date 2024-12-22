@@ -14,7 +14,6 @@ use core::ops::{Deref, DerefMut};
 use core::time::Duration;
 
 use assert_matches::assert_matches;
-use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use log::error;
@@ -38,15 +37,15 @@ use crate::internal::rtt::Estimator;
 ///       the internetwork system.  Arbitrarily defined to be 2 minutes.
 pub(super) const MSL: Duration = Duration::from_secs(2 * 60);
 
-const DEFAULT_MAX_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(12));
+const DEFAULT_MAX_RETRIES: NonZeroU8 = NonZeroU8::new(12).unwrap();
 /// Assuming a 200ms RTT, with 12 retries, the timeout should be at least 0.2 * (2 ^ 12 - 1) = 819s.
 /// Rounding it up to have some extra buffer.
 const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(900);
 
 /// Default maximum SYN's to send before giving up an attempt to connect.
 // TODO(https://fxbug.dev/42077087): Make these constants configurable.
-pub(super) const DEFAULT_MAX_SYN_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(6));
-const DEFAULT_MAX_SYNACK_RETRIES: NonZeroU8 = const_unwrap_option(NonZeroU8::new(5));
+pub(super) const DEFAULT_MAX_SYN_RETRIES: NonZeroU8 = NonZeroU8::new(6).unwrap();
+const DEFAULT_MAX_SYNACK_RETRIES: NonZeroU8 = NonZeroU8::new(5).unwrap();
 
 /// Per RFC 9293 (https://tools.ietf.org/html/rfc9293#section-3.8.6.3):
 ///  ... in particular, the delay MUST be less than 0.5 seconds.
@@ -3143,7 +3142,7 @@ mod test {
 
     const RTT: Duration = Duration::from_millis(500);
 
-    const DEVICE_MAXIMUM_SEGMENT_SIZE: Mss = Mss(const_unwrap_option(NonZeroU16::new(1400 as u16)));
+    const DEVICE_MAXIMUM_SEGMENT_SIZE: Mss = Mss(NonZeroU16::new(1400 as u16).unwrap());
 
     /// A buffer provider that doesn't need extra information to construct
     /// buffers as this is only used in unit tests for the state machine only.
@@ -5855,7 +5854,7 @@ mod test {
             clock.now(),
             (),
             Default::default(),
-            Mss(const_unwrap_option(NonZeroU16::new(1))),
+            Mss(NonZeroU16::new(1).unwrap()),
             DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             &SocketOptions::default(),
         );
@@ -5914,8 +5913,7 @@ mod test {
         );
     }
 
-    const TEST_USER_TIMEOUT: NonZeroDuration =
-        const_unwrap_option(NonZeroDuration::from_secs(2 * 60));
+    const TEST_USER_TIMEOUT: NonZeroDuration = NonZeroDuration::from_secs(2 * 60).unwrap();
 
     // We can use a smaller and a larger RTT so that when using the smaller one,
     // we can reach maximum retransmit retires and when using the larger one, we
@@ -7214,7 +7212,7 @@ mod test {
     fn poll_receive_data_dequeued_state(dequeue_more_than_mss: bool) {
         // NOTE: Just enough room to hold TEST_BYTES, but will end up below the MSS when full.
         const BUFFER_SIZE: usize = 5;
-        const MSS: Mss = Mss(const_unwrap_option(NonZeroU16::new(5)));
+        const MSS: Mss = Mss(NonZeroU16::new(5).unwrap());
         const TEST_BYTES: &[u8] = "Hello".as_bytes();
 
         let new_snd = || Send {

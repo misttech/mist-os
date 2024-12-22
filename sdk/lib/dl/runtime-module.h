@@ -111,6 +111,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   void SetStartupModule(const AbiModule& abi_module, const ld::abi::Abi<>& abi) {
     abi_module_ = abi_module;
     can_unload_ = false;
+    initialized_ = true;
 
     size_t tls_modid = abi_module_.tls_modid;
     if (tls_modid > 0) {
@@ -181,6 +182,14 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   constexpr void set_global() { abi_module_.symbols_visible = true; }
   constexpr bool is_local() const { return !is_global(); }
 
+  // Run the init functions for this module (as the root module) and the init
+  // functions for all its dependencies.
+  void InitializeModuleTree();
+
+  // Run only this module's init functions. This is called if this module is
+  // loaded as a dependency to another module.
+  void Initialize();
+
  private:
   // A RuntimeModule can only be created with Module::Create...).
   RuntimeModule() = default;
@@ -194,6 +203,7 @@ class RuntimeModule : public fbl::DoublyLinkedListable<std::unique_ptr<RuntimeMo
   bool can_unload_ = true;
   ModuleRefList direct_deps_;
   ModuleRefList module_tree_;
+  bool initialized_ = false;
 };
 
 // This is the module tree view type returned by RuntimeModule::module_tree.

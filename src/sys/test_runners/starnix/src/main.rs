@@ -16,7 +16,7 @@ use anyhow::Error;
 use fidl_fuchsia_component_runner as frunner;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
-use tracing::debug;
+use log::debug;
 
 enum Services {
     ComponentRunner(frunner::ComponentRunnerRequestStream),

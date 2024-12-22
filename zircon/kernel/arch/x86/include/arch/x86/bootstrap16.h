@@ -14,11 +14,12 @@
 #define BCD_PHYS_GDTR_OFFSET 10
 #define BCD_PHYS_LM_ENTRY_OFFSET 16
 #define BCD_LM_CS_OFFSET 20
-#define BCD_CPU_COUNTER_OFFSET 24
-#define BCD_CPU_WAITING_OFFSET 28
-#define BCD_PER_CPU_BASE_OFFSET 36
+#define BCD_VIRT_LM_HIGH_ENTRY_OFFSET 24
+#define BCD_CPU_COUNTER_OFFSET 32
+#define BCD_CPU_WAITING_OFFSET 36
+#define BCD_PER_CPU_BASE_OFFSET 44
 
-#define RED_REGISTERS_OFFSET 24
+#define RED_REGISTERS_OFFSET 32
 
 #ifndef __ASSEMBLER__
 #include <assert.h>
@@ -39,6 +40,9 @@ extern void x86_bootstrap16_end();
 // Entry point used for secondary CPU initialization
 extern void _x86_secondary_cpu_long_mode_entry();
 
+// High entry point in the above routine.
+extern void _x86_secondary_cpu_long_mode_high_entry();
+
 }  // extern "C"
 
 struct x86_bootstrap16_data {
@@ -47,7 +51,7 @@ struct x86_bootstrap16_data {
   // Physical address of the kernel PML4
   uint32_t phys_kernel_pml4;
   // Physical address of GDT, aligned such that it can be treated as a LGDT descriptor.
-  uint16_t __pad;
+  uint16_t padding1;
   uint16_t phys_gdtr_limit;
   uint32_t phys_gdtr_base;
 
@@ -56,6 +60,10 @@ struct x86_bootstrap16_data {
   uint32_t phys_long_mode_entry;
   // 64-bit code segment to use
   uint32_t long_mode_cs;
+
+  // The virtual address of the high-addressed entry point after the long mode
+  // entry point.
+  uint64_t virt_long_mode_high_entry;
 };
 
 struct __PACKED x86_realmode_entry_data {
@@ -122,6 +130,10 @@ static_assert(__offsetof(struct x86_bootstrap16_data, phys_long_mode_entry) ==
                   BCD_PHYS_LM_ENTRY_OFFSET,
               "");
 static_assert(__offsetof(struct x86_bootstrap16_data, long_mode_cs) == BCD_LM_CS_OFFSET, "");
+
+static_assert(offsetof(struct x86_bootstrap16_data, virt_long_mode_high_entry) ==
+                  BCD_VIRT_LM_HIGH_ENTRY_OFFSET,
+              "");
 
 static_assert(__offsetof(struct x86_ap_bootstrap_data, hdr) == 0, "");
 static_assert(__offsetof(struct x86_ap_bootstrap_data, cpu_id_counter) == BCD_CPU_COUNTER_OFFSET,

@@ -5,17 +5,17 @@
 //! FIDL protocols.
 
 mod buffer;
-pub mod client;
+mod client;
 mod error;
 mod lockers;
 pub mod mpsc;
-pub mod server;
+mod server;
 mod transport;
 mod wire;
 
 pub use self::buffer::*;
-pub use self::client::make_client;
+pub use self::client::*;
 pub use self::error::*;
-pub use self::server::make_server;
+pub use self::server::*;
 pub use self::transport::*;
 pub use self::wire::*;

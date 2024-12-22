@@ -190,6 +190,23 @@ fuchsia_package(
     visibility = ["//visibility:public"],
 )
 
+# Same as `pkg_at_retired_api_level` but without `cc_component`.
+# TODO(https://fxbug.dev/382773036): Remove once the test can use `pkg_at_retired_api_level`.
+fuchsia_package(
+    name = "pkg_at_retired_api_level_without_cc_component",
+    package_name = "pkg_at_retired_api_level_without_cc_component_for_test",
+    components = [
+        ":empty_component",
+    ],
+    fuchsia_api_level = "21",
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
 # Package with an API level that is not known in version_history.json.
 fuchsia_package(
     name = "pkg_at_unknown_numerical_api_level",
@@ -253,6 +270,23 @@ fuchsia_package(
         ":simple_file_resource",
     ],
     tags = ["manual"],
+    visibility = ["//visibility:public"],
+)
+
+# A package that includes a component that has a binary whose definition will
+# only link when targeting "HEAD", which this package does.
+fuchsia_package(
+    name = "package_with_binary_linkable_only_at_head_api_level",
+    package_name = "package_with_binary_linkable_only_at_head_api_level_for_test",
+    components = [
+        ":cc_component_with_binary_linkable_only_at_head",
+        ":empty_component",
+    ],
+    fuchsia_api_level = "HEAD",
+    resources = [
+        ":sc-values",
+        ":simple_file_resource",
+    ],
     visibility = ["//visibility:public"],
 )
 
@@ -352,6 +386,30 @@ fuchsia_structured_config_values(
         "enable_suspend": False,
         "device_path": "/dev/class/bt-hci/000",
     },
+)
+
+# A C++ binary where `main()` is only defined when building at "HEAD"`. When
+# targeting any other level, linking would fail due to the missing symbol.
+fuchsia_cc_binary(
+    name = "cc_bin_with_main_only_at_head",
+
+    # Test that various constraints, including for a no longer supported API
+    # level, are supported and do not cause analysis errors.
+    srcs = select({
+        "@fuchsia_sdk//fuchsia/constraints:api_level_4": [],  # Oldest "known."
+        "@fuchsia_sdk//fuchsia/constraints:api_level_21": [],  # Retired.
+        "@fuchsia_sdk//fuchsia/constraints:api_level_NEXT": [],
+        "@fuchsia_sdk//fuchsia/constraints:api_level_HEAD": [":cc_main"],
+        "//conditions:default": [],
+    }),
+)
+
+fuchsia_component(
+    name = "cc_component_with_binary_linkable_only_at_head",
+    manifest = ":manifest",
+    deps = [
+        ":cc_bin_with_main_only_at_head",
+    ],
 )
 
 # Note: the test package contains a fuchsia_cc_test()

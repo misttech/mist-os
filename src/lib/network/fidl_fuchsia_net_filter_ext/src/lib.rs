@@ -1767,7 +1767,6 @@ pub(crate) fn handle_commit_result(
 mod tests {
 
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use futures::channel::mpsc;
     use futures::task::Poll;
     use futures::{FutureExt as _, SinkExt as _};
@@ -1837,7 +1836,7 @@ mod tests {
     )]
     #[test_case(
         fnet_filter::InterfaceMatcher::Id(1),
-        InterfaceMatcher::Id(const_unwrap_option(NonZeroU64::new(1)));
+        InterfaceMatcher::Id(NonZeroU64::new(1).unwrap());
         "InterfaceMatcher"
     )]
     #[test_case(

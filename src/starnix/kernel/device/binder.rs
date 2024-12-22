@@ -31,7 +31,7 @@ use fidl::endpoints::ClientEnd;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
-    log_error, log_trace, log_warn, trace_duration, track_stub, CATEGORY_STARNIX,
+    log_error, log_trace, log_warn, trace_duration, track_stub, with_zx_name, CATEGORY_STARNIX,
 };
 use starnix_sync::{
     DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex, MutexGuard,
@@ -2904,7 +2904,10 @@ impl MemoryAccessor for RemoteResourceAccessor {
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         profile_duration!("RemoteWriteMemory");
-        let vmo = zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?;
+        let vmo = with_zx_name(
+            zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?,
+            b"starnix:device_binder",
+        );
         vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
         vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
         self.process_accessor
@@ -4228,9 +4231,11 @@ impl BinderDriver {
         }
 
         // Create a VMO that will be shared between the driver and the client process.
-        let memory = Arc::new(MemoryObject::from(
+        let vmo = with_zx_name(
             zx::Vmo::create(length as u64).map_err(|_| errno!(ENOMEM))?,
-        ));
+            b"starnix:device_binder",
+        );
+        let memory = Arc::new(MemoryObject::from(vmo));
 
         // Map the VMO into the binder process' address space.
         let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
@@ -7085,19 +7090,21 @@ pub mod tests {
         current_task: &CurrentTask,
         binder_driver: &BinderDevice,
     ) -> FileHandle {
+        // `open()` requires an `FsNode` so create one in `AnonFs`.
         let fs = anon_fs(current_task.kernel());
         let node = fs.create_node(
             &current_task,
-            Anon,
+            Anon::default(),
             FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
         );
+
         let mut locked = locked.cast_locked::<DeviceOpen>();
         FileObject::new_anonymous(
             current_task,
             binder_driver
                 .open(&mut locked, &current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
                 .expect("binder dev open failed"),
-            Arc::clone(&node),
+            node,
             OpenFlags::RDWR,
         )
     }

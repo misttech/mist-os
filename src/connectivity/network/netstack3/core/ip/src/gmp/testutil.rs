@@ -7,7 +7,6 @@
 
 use alloc::vec::Vec;
 use core::borrow::Borrow;
-use core::convert::Infallible as Never;
 use core::time::Duration;
 use packet_formats::gmp::{GmpReportGroupRecord, GroupRecordType};
 use rand::SeedableRng as _;
@@ -17,20 +16,21 @@ use net_types::ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
 use net_types::MulticastAddr;
 use netstack3_base::testutil::{FakeBindingsCtx, FakeDeviceId, FakeWeakDeviceId};
 use netstack3_base::{
-    AnyDevice, CtxPair, DeviceIdContext, HandleableTimer, IntoCoreTimerCtx, TimerBindingsTypes,
+    AnyDevice, CtxPair, DeviceIdContext, HandleableTimer, InspectableValue, Inspector,
+    IntoCoreTimerCtx, TimerBindingsTypes,
 };
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::gmp::{
-    self, GmpContext, GmpContextInner, GmpGroupState, GmpMode, GmpState, GmpStateRef, GmpTimerId,
-    GmpTypeLayout, IpExt, MulticastGroupSet,
+    self, GmpContext, GmpContextInner, GmpEnabledGroup, GmpGroupState, GmpMode, GmpState,
+    GmpStateRef, GmpTimerId, GmpTypeLayout, IpExt, MulticastGroupSet,
 };
 
 pub(super) struct FakeGmpContext<I: IpExt> {
     pub inner: FakeGmpContextInner<I>,
     pub enabled: bool,
     pub groups: MulticastGroupSet<I::Addr, GmpGroupState<I, FakeGmpBindingsContext<I>>>,
-    pub gmp: GmpState<I, FakeGmpBindingsContext<I>>,
+    pub gmp: GmpState<I, FakeGmpTypeLayout, FakeGmpBindingsContext<I>>,
     pub config: FakeGmpConfig,
 }
 
@@ -44,17 +44,23 @@ impl<I: IpExt> DeviceIdContext<AnyDevice> for FakeGmpContext<I> {
 pub(super) type FakeGmpBindingsContext<I> =
     FakeBindingsCtx<GmpTimerId<I, FakeWeakDeviceId<FakeDeviceId>>, (), (), ()>;
 
-impl<I: IpExt> GmpTypeLayout<I, FakeGmpBindingsContext<I>> for FakeGmpContext<I> {
-    type Actions = Never;
+pub(super) enum FakeGmpTypeLayout {}
+
+impl<I: IpExt> GmpTypeLayout<I, FakeGmpBindingsContext<I>> for FakeGmpTypeLayout {
     type Config = FakeGmpConfig;
+    type ProtoMode = GmpMode;
 }
 
 impl<I: IpExt> GmpContext<I, FakeGmpBindingsContext<I>> for FakeGmpContext<I> {
+    type TypeLayout = FakeGmpTypeLayout;
     type Inner<'a> = &'a mut FakeGmpContextInner<I>;
 
     fn with_gmp_state_mut_and_ctx<
         O,
-        F: FnOnce(Self::Inner<'_>, GmpStateRef<'_, I, Self, FakeGmpBindingsContext<I>>) -> O,
+        F: FnOnce(
+            Self::Inner<'_>,
+            GmpStateRef<'_, I, FakeGmpTypeLayout, FakeGmpBindingsContext<I>>,
+        ) -> O,
     >(
         &mut self,
         _device: &Self::DeviceId,
@@ -89,20 +95,18 @@ impl<I: IpExt> DeviceIdContext<AnyDevice> for &'_ mut FakeGmpContextInner<I> {
     type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
 }
 
-impl<I: IpExt> GmpTypeLayout<I, FakeGmpBindingsContext<I>> for &'_ mut FakeGmpContextInner<I> {
-    type Actions = Never;
-    type Config = FakeGmpConfig;
-}
-
 impl<I: IpExt> GmpContextInner<I, FakeGmpBindingsContext<I>> for &'_ mut FakeGmpContextInner<I> {
+    type TypeLayout = FakeGmpTypeLayout;
+
     fn send_message_v1(
         &mut self,
         _bindings_ctx: &mut FakeGmpBindingsContext<I>,
         _device: &Self::DeviceId,
-        group_addr: MulticastAddr<I::Addr>,
+        _cur_mode: &GmpMode,
+        group_addr: GmpEnabledGroup<I::Addr>,
         msg_type: gmp::v1::GmpMessageType,
     ) {
-        self.v1_messages.push((group_addr, msg_type));
+        self.v1_messages.push((group_addr.into_multicast_addr(), msg_type));
     }
 
     fn send_report_v2(
@@ -124,21 +128,35 @@ impl<I: IpExt> GmpContextInner<I, FakeGmpBindingsContext<I>> for &'_ mut FakeGmp
         self.v2_messages.push(groups)
     }
 
-    fn run_actions(
+    fn mode_update_from_v1_query<Q: gmp::v1::QueryMessage<I>>(
         &mut self,
         _bindings_ctx: &mut FakeGmpBindingsContext<I>,
-        _device: &Self::DeviceId,
-        actions: Never,
-    ) {
-        match actions {}
+        _query: &Q,
+        gmp_state: &GmpState<I, Self::TypeLayout, FakeGmpBindingsContext<I>>,
+        _config: &FakeGmpConfig,
+    ) -> GmpMode {
+        gmp_state.mode.maybe_enter_v1_compat()
     }
 
-    fn handle_mode_change(
-        &mut self,
-        _bindings_ctx: &mut FakeGmpBindingsContext<I>,
-        _device: &Self::DeviceId,
-        _new_mode: GmpMode,
-    ) {
+    fn mode_to_config(
+        _mode: &<Self::TypeLayout as GmpTypeLayout<I, FakeGmpBindingsContext<I>>>::ProtoMode,
+    ) -> I::GmpProtoConfigMode {
+        unimplemented!()
+    }
+
+    fn config_to_mode(
+        _cur_mode: &<Self::TypeLayout as GmpTypeLayout<I, FakeGmpBindingsContext<I>>>::ProtoMode,
+        _config: I::GmpProtoConfigMode,
+    ) -> GmpMode {
+        unimplemented!()
+    }
+
+    fn mode_on_disable(cur_mode: &GmpMode) -> GmpMode {
+        cur_mode.maybe_exit_v1_compat()
+    }
+
+    fn mode_on_exit_compat() -> GmpMode {
+        GmpMode::V2
     }
 }
 
@@ -156,15 +174,6 @@ impl gmp::v1::ProtocolConfig for FakeGmpConfig {
 
     fn get_max_resp_time(&self, resp_time: Duration) -> Option<NonZeroDuration> {
         NonZeroDuration::new(resp_time)
-    }
-
-    type QuerySpecificActions = Never;
-
-    fn do_query_received_specific(
-        &self,
-        _max_resp_time: Duration,
-    ) -> Option<Self::QuerySpecificActions> {
-        None
     }
 }
 
@@ -185,16 +194,22 @@ pub(super) fn new_context_with_mode<I: IpExt>(mode: GmpMode) -> FakeCtx<I> {
         // Use "true" random numbers. This drives better coverage over time of
         // all the randomized delays in GMP, preventing a fixed seed from hiding
         // subtle bugs.
+
+        // We start with enabled true to make tests easier to write.
+        let enabled = true;
         bindings_ctx.rng = netstack3_base::testutil::FakeCryptoRng::from_entropy();
-        let mut core_ctx = FakeGmpContext {
+        FakeGmpContext {
             inner: FakeGmpContextInner::default(),
-            enabled: true,
+            enabled,
             groups: Default::default(),
-            gmp: GmpState::new::<_, IntoCoreTimerCtx>(bindings_ctx, FakeWeakDeviceId(FakeDeviceId)),
+            gmp: GmpState::new_with_enabled_and_mode::<_, IntoCoreTimerCtx>(
+                bindings_ctx,
+                FakeWeakDeviceId(FakeDeviceId),
+                enabled,
+                mode,
+            ),
             config: Default::default(),
-        };
-        core_ctx.gmp.mode = mode;
-        core_ctx
+        }
     })
 }
 
@@ -256,6 +271,14 @@ impl<I: Ip> gmp::v2::QueryMessage<I> for FakeV2Query<I> {
 
     fn sources(&self) -> impl Iterator<Item = I::Addr> + '_ {
         self.sources.iter().copied()
+    }
+}
+
+// Required to satisfy trait bounds and use GmpMode directly as our protocol
+// mode.
+impl InspectableValue for GmpMode {
+    fn record<I: Inspector>(&self, _name: &str, _inspector: &mut I) {
+        unimplemented!()
     }
 }
 

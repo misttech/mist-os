@@ -1921,6 +1921,39 @@ pub fn sys_vhangup(
     Ok(())
 }
 
+// Syscalls for arch32 usage
+#[cfg(feature = "arch32")]
+mod arch32 {
+    use crate::mm::MemoryAccessorExt;
+    use crate::task::syscalls::do_prlimit64;
+    use crate::task::CurrentTask;
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::uapi;
+    use starnix_uapi::user_address::UserRef;
+
+    pub fn sys_arch32_ugetrlimit(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        resource: u32,
+        user_rlimit: UserRef<uapi::arch32::rlimit>,
+    ) -> Result<(), Errno> {
+        let mut limit: uapi::rlimit = Default::default();
+        do_prlimit64(locked, current_task, 0, resource, None, &mut limit, !user_rlimit.is_null())?;
+        if !user_rlimit.is_null() {
+            let arch32_rlimit = uapi::arch32::rlimit {
+                rlim_cur: u32::try_from(limit.rlim_cur).unwrap_or(u32::MAX),
+                rlim_max: u32::try_from(limit.rlim_max).unwrap_or(u32::MAX),
+            };
+            current_task.write_object(user_rlimit, &arch32_rlimit)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(feature = "arch32")]
+pub use arch32::*;
+
 #[cfg(test)]
 mod tests {
     use super::*;

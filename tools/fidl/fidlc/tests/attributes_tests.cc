@@ -1968,5 +1968,79 @@ type Foo = union {
   ASSERT_COMPILED(library);
 }
 
+TEST(AttributeTests, GoodNoResource) {
+  TestLibrary library;
+  library.experimental_flags().Enable(ExperimentalFlag::kNoResourceAttribute);
+  library.AddSource("example.fidl", R"FIDL(
+library example;
+
+@no_resource
+protocol P{
+  compose Q;
+  Method(struct { i int32; }) -> ();
+};
+
+@no_resource
+protocol Q{};
+)FIDL");
+  ASSERT_COMPILED(library);
+}
+
+TEST(AttributeTests, BadNoResourceUsesResource) {
+  TestLibrary library;
+  library.experimental_flags().Enable(ExperimentalFlag::kNoResourceAttribute);
+  library.AddSource("example.fidl", R"FIDL(
+library example;
+
+@no_resource
+protocol P{
+  compose Q;
+  Method(resource struct { i int32; }) -> ();
+};
+
+@no_resource
+protocol Q{};
+)FIDL");
+  library.ExpectFail(ErrResourceForbiddenHere);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(AttributeTests, BadNoResourceComposition) {
+  TestLibrary library;
+  library.experimental_flags().Enable(ExperimentalFlag::kNoResourceAttribute);
+  library.AddSource("example.fidl", R"FIDL(
+library example;
+
+@no_resource
+protocol P{
+  compose Q;
+  Method( struct { i int32; }) -> ();
+};
+
+protocol Q{};
+)FIDL");
+  library.ExpectFail(ErrNoResourceForbidsCompose, "P", "Q");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(AttributeTests, BadNoResourceIsExperimental) {
+  TestLibrary library;
+  library.AddSource("example.fidl", R"FIDL(
+library example;
+
+@no_resource
+protocol P{
+  compose Q;
+  Method(struct { i int32; }) -> ();
+};
+
+@no_resource
+protocol Q{};
+)FIDL");
+  library.ExpectFail(ErrExperimentalNoResource);
+  library.ExpectFail(ErrExperimentalNoResource);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 }  // namespace
 }  // namespace fidlc

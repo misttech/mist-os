@@ -77,7 +77,7 @@ impl Overnet {
 
     fn from_router(node: Arc<Router>) -> Result<Arc<Overnet>, Error> {
         let (tx, rx) = unbounded();
-        tracing::info!(node_id = node.node_id().0, "SPAWN OVERNET");
+        log::info!(node_id = node.node_id().0; "SPAWN OVERNET");
         let tx = Mutex::new(tx);
         Ok(Arc::new(Overnet {
             tx,
@@ -193,29 +193,23 @@ async fn run_overnet(
     rx: futures::channel::mpsc::UnboundedReceiver<OvernetCommand>,
 ) -> Result<(), Error> {
     let node_id = node.node_id();
-    tracing::info!(?node_id, "RUN OVERNET");
+    log::info!(node_id:?; "RUN OVERNET");
     // Run application loop
     rx.for_each_concurrent(None, move |cmd| {
         let node = node.clone();
         async move {
             let cmd_text = format!("{:?}", cmd);
             let cmd_id = NEXT_CMD_ID.fetch_add(1, Ordering::Relaxed);
-            tracing::info!(node_id = node_id.0, cmd = cmd_id, "START: {}", cmd_text);
+            log::info!(node_id = node_id.0, cmd = cmd_id; "START: {}", cmd_text);
             if let Err(e) = run_overnet_command(node, cmd).await {
-                tracing::info!(
-                    node_id = node_id.0,
-                    cmd = cmd_id,
-                    "{} with error: {:?}",
-                    cmd_text,
-                    e
-                );
+                log::info!(node_id = node_id.0, cmd = cmd_id; "{} with error: {:?}", cmd_text, e);
             } else {
-                tracing::info!(node_id = node_id.0, cmd = cmd_id, "SUCCEEDED: {}", cmd_text);
+                log::info!(node_id = node_id.0, cmd = cmd_id; "SUCCEEDED: {}", cmd_text);
             }
         }
     })
     .await;
-    tracing::info!(node_id = node_id.0, "DONE OVERNET");
+    log::info!(node_id = node_id.0; "DONE OVERNET");
     Ok(())
 }
 
@@ -224,7 +218,7 @@ async fn run_overnet(
 
 /// Connect two test overnet instances with a stream socket.
 pub fn connect(a: &Arc<Overnet>, b: &Arc<Overnet>) -> Result<(), Error> {
-    tracing::info!(a = a.node_id().0, b = b.node_id().0, "Connect nodes");
+    log::info!(a = a.node_id().0, b = b.node_id().0; "Connect nodes");
     let (sa, sb) = fidl::Socket::create_stream();
     a.attach_circuit_socket_link(sa, true)?;
     b.attach_circuit_socket_link(sb, false)?;

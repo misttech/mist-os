@@ -10,6 +10,7 @@ fidl("fuchsia.hardware.display.types") {
     "display.fidl",
     "image.fidl",
     "layer.fidl",
+    "mode.fidl",
     "overview.fidl",
   ]
   public_deps = [

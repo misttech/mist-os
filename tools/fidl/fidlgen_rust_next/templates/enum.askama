@@ -1,0 +1,140 @@
+{% let base_name = enm.name.decl_name().camel() %}
+{% let name = filters::ident(base_name)? %}
+{% let wire_name = format!("Wire{base_name}") %}
+{% let natural_int = context.natural_int(enm.ty) %}
+{% let wire_int = context.wire_int(enm.ty) %}
+
+{% if let Some(doc) = enm.attributes.doc_string() %}
+    #[doc = "{{ doc.escape_default() }}"]
+{% endif %}
+#[derive(
+    Clone,
+    Copy,
+    {% if context.config.emit_debug_impls -%}
+        Debug,
+    {%- endif %}
+)]
+#[repr({{ natural_int }})]
+pub enum {{ name }} {
+    {% for member in enm.members -%}
+        {{ member.name.camel()|ident }} = {{ member.value.value }},
+    {%- endfor %}
+    {%- if !enm.is_strict -%}
+        UnknownOrdinal({{ natural_int }}),
+    {%- endif %}
+}
+
+impl ::fidl_next::Encodable for {{ name }} {
+    type Encoded<'buf> = {{ wire_name }};
+}
+
+impl<___E> ::fidl_next::Encode<___E> for {{ name }}
+where
+    ___E: ?Sized,
+{
+    fn encode(
+        &mut self,
+        _: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let {{ wire_name }} { mut value } = slot);
+        *value = {{ wire_int }}::from(match *self {
+            {% for member in enm.members %}
+                Self::{{ member.name.camel()|ident }} => {{ member.value.value }},
+            {% endfor %}
+            {% if !enm.is_strict %}
+                Self::UnknownOrdinal(value) => value,
+            {% endif %}
+        });
+
+        Ok(())
+    }
+}
+
+impl ::core::convert::From<{{ wire_name }}> for {{ name }} {
+    fn from(wire: {{ wire_name }}) -> Self {
+        match {{ natural_int }}::from(wire.value) {
+            {% for member in enm.members %}
+                {{ member.value.value }} => Self::{{ member.name.camel()|ident }},
+            {% endfor %}
+            {% if enm.is_strict %}
+                _ => unsafe { ::core::hint::unreachable_unchecked() },
+            {% else %}
+                value => Self::UnknownOrdinal(value),
+            {% endif %}
+        }
+    }
+}
+
+impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    fn take_from(from: &mut {{ wire_name }}) -> Self {
+        Self::from(*from)
+    }
+}
+
+/// The wire type corresponding to [`{{ name }}`].
+#[derive(
+    Clone,
+    Copy,
+    {% if context.config.emit_debug_impls -%}
+        Debug,
+    {%- endif %}
+)]
+#[repr(transparent)]
+pub struct {{ wire_name }} {
+    value: {{ wire_int }},
+}
+
+impl {{ wire_name }} {
+    {% for member in enm.members %}
+        pub const {{ member.name.screaming_snake()|ident }}: {{ wire_name }} = {{ wire_name }} {
+            value:
+            {% match enm.ty %}
+                {% when IntType::Int8 %} {{ member.value.value }}
+                {% when IntType::Uint8 %} {{ member.value.value }}
+                {% else %} {{ wire_int }}::from_native({{ member.value.value }})
+            {% endmatch %}
+        };
+    {% endfor %}
+}
+
+unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
+where
+    ___D: ?Sized,
+{
+    fn decode(
+        slot: ::fidl_next::Slot<'_, Self>,
+        _ : &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        {% if enm.is_strict %}
+            ::fidl_next::munge!(let Self { value } = slot);
+
+            match {{ natural_int }}::from(*value) {
+                {% for member in enm.members %}
+                    | {{ member.value.value }}
+                {% endfor %}
+                => (),
+                unknown => return Err(::fidl_next::DecodeError::InvalidEnumOrdinal(
+                    unknown as i128,
+                )),
+            }
+        {% endif %}
+
+        Ok(())
+    }
+}
+
+impl ::core::convert::From<{{ name }}> for {{ wire_name }} {
+    fn from(natural: {{ name }}) -> Self {
+        match natural {
+            {% for member in enm.members %}
+                {{ name }}::{{ member.name.camel()|ident }} => {{ wire_name }}::{{ member.name.screaming_snake()|ident }},
+            {% endfor %}
+            {% if !enm.is_strict %}
+                {{ name }}::UnknownOrdinal(value) => {{ wire_name }} {
+                    value: {{ wire_int }}::from(value),
+                }
+            {% endif %}
+        }
+    }
+}

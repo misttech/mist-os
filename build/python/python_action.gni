@@ -40,24 +40,48 @@ template("_python_action") {
   }
 }
 
-# Declares an action() that uses a python_binary for the script
+# Declares an action() that uses a python_binary() target as its script
 #
 # This sets up the python module search path using the GN paths specified, and
-# otherwise is the same as an action(), forwarding all invoker vars to the
-# action()
+# otherwise is the same as an action(), forwarding all other parameters to the
+# action().
 #
-# Parameters:
+# Parameters
 #
-#   binary_label
-#    [label] Label (without host toolchain), to python binary that is to be
-#    executed by the action.
+#   * binary_label
+#     - Required: Label (without toolchain), to python_binary() target that is
+#       to be executed by the action.
+#     - Type: label_no_toolchain
 #
-#   all others are passed to action() as expected,
+# See action() for others, except for `script`.
 #
 template("python_action") {
   _python_action(target_name) {
-    forward_variables_from(invoker, "*")
+    forward_variables_from(invoker, "*", [ "target_type" ])
     target_type = "action"
+  }
+}
+
+# Declares an action_foreach() that uses a python_binary() target as its script
+#
+# This sets up the python module search path using the GN paths specified, and
+# otherwise is the same as an action_foreach(), forwarding all other parameters
+# to the action_foreach().  python_action_foreach() is to action_foreach() as
+# python_action() is to action().
+#
+# Parameters
+#
+#   * binary_label
+#     - Required: Label (without toolchain), to python_binary() target that is
+#       to be executed by the action.
+#     - Type: label_no_toolchain
+#
+# See action_foreach() for others, except for `script`.
+#
+template("python_action_foreach") {
+  _python_action(target_name) {
+    forward_variables_from(invoker, "*", [ "target_type" ])
+    target_type = "action_foreach"
   }
 }
 

@@ -11,15 +11,14 @@ rustc_library("protocol") {
   edition = "2021"
   deps = [
     "//src/connectivity/lib/net-types",
-    "//src/lib/const-unwrap",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
   if (is_fuchsia || is_mistos) {

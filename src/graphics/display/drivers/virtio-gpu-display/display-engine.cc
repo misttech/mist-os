@@ -32,10 +32,10 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
-#include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
@@ -43,6 +43,10 @@
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
@@ -51,55 +55,26 @@ namespace virtio_display {
 namespace {
 
 // TODO(https://fxbug.dev/42073721): Support more formats.
-constexpr std::array<fuchsia_images2_pixel_format_enum_value_t, 1> kSupportedFormats = {
-    static_cast<fuchsia_images2_pixel_format_enum_value_t>(
-        fuchsia_images2::wire::PixelFormat::kB8G8R8A8),
-};
-
+constexpr display::PixelFormat kSupportedPixelFormat = display::PixelFormat::kB8G8R8A8;
 constexpr uint32_t kRefreshRateHz = 30;
-constexpr display::DisplayId kDisplayId{1};
+constexpr display::DisplayId kDisplayId(1);
+constexpr display::ModeId kDisplayModeId(1);
 
 }  // namespace
 
 void DisplayEngine::OnCoordinatorConnected() {
-  const uint32_t width = current_display_.scanout_info.geometry.width;
-  const uint32_t height = current_display_.scanout_info.geometry.height;
+  const display::ModeAndId mode_and_id({
+      .id = kDisplayModeId,
+      .mode = display::Mode({
+          .active_width = static_cast<int32_t>(current_display_.scanout_info.geometry.width),
+          .active_height = static_cast<int32_t>(current_display_.scanout_info.geometry.height),
+          .refresh_rate_millihertz = kRefreshRateHz * 1'000,
+      }),
+  });
 
-  const int64_t pixel_clock_hz = int64_t{width} * height * kRefreshRateHz;
-  ZX_DEBUG_ASSERT(pixel_clock_hz >= 0);
-  ZX_DEBUG_ASSERT(pixel_clock_hz <= display::kMaxPixelClockHz);
-
-  const display::DisplayTiming timing = {
-      .horizontal_active_px = static_cast<int32_t>(width),
-      .horizontal_front_porch_px = 0,
-      .horizontal_sync_width_px = 0,
-      .horizontal_back_porch_px = 0,
-      .vertical_active_lines = static_cast<int32_t>(height),
-      .vertical_front_porch_lines = 0,
-      .vertical_sync_width_lines = 0,
-      .vertical_back_porch_lines = 0,
-      .pixel_clock_frequency_hz = pixel_clock_hz,
-      .fields_per_frame = display::FieldsPerFrame::kProgressive,
-      .hsync_polarity = display::SyncPolarity::kNegative,
-      .vsync_polarity = display::SyncPolarity::kNegative,
-      .vblank_alternates = false,
-      .pixel_repetition = 0,
-  };
-
-  const display_mode_t banjo_display_mode = display::ToBanjoDisplayMode(timing);
-
-  const raw_display_info_t banjo_display_info = {
-      .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .preferred_modes_list = &banjo_display_mode,
-      .preferred_modes_count = 1,
-      .edid_bytes_list = nullptr,
-      .edid_bytes_count = 0,
-      .eddc_client = {.ops = nullptr, .ctx = nullptr},
-      .pixel_formats_list = kSupportedFormats.data(),
-      .pixel_formats_count = kSupportedFormats.size(),
-  };
-
-  engine_events_.OnDisplayAdded(banjo_display_info);
+  const cpp20::span<const display::ModeAndId> preferred_modes(&mode_and_id, 1);
+  const cpp20::span<const display::PixelFormat> pixel_formats(&kSupportedPixelFormat, 1);
+  engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, pixel_formats);
 }
 
 zx::result<> DisplayEngine::ImportBufferCollection(
@@ -132,8 +107,7 @@ zx::result<display::DriverImageId> DisplayEngine::ImportImage(
   SysmemBufferInfo* sysmem_buffer_info = imported_images_.FindSysmemInfoById(image_id);
   ZX_DEBUG_ASSERT(sysmem_buffer_info != nullptr);
 
-  ZX_DEBUG_ASSERT(sysmem_buffer_info->pixel_format ==
-                  fuchsia_images2::wire::PixelFormat::kB8G8R8A8);
+  ZX_DEBUG_ASSERT(sysmem_buffer_info->pixel_format == kSupportedPixelFormat);
   static constexpr int kBytesPerPixel = 4;
 
   ZX_DEBUG_ASSERT(sysmem_buffer_info->pixel_format_modifier ==
@@ -186,13 +160,18 @@ void DisplayEngine::ReleaseImage(display::DriverImageId image_id) {
   }
 }
 
-bool DisplayEngine::CheckConfiguration(
-    display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
+display::ConfigCheckResult DisplayEngine::CheckConfiguration(
+    display::DisplayId display_id, display::ModeId display_mode_id,
+    cpp20::span<const display::DriverLayer> layers,
     cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
 
   ZX_DEBUG_ASSERT(layer_composition_operations.size() == layers.size());
   ZX_DEBUG_ASSERT(layers.size() == 1);
+
+  if (display_mode_id != kDisplayModeId) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
+  }
 
   const display::DriverLayer& layer = layers[0];
   const display::Rectangle display_area({
@@ -202,34 +181,38 @@ bool DisplayEngine::CheckConfiguration(
       .height = static_cast<int32_t>(current_display_.scanout_info.geometry.height),
   });
 
-  bool is_supported_configuration = true;
+  display::ConfigCheckResult result = display::ConfigCheckResult::kOk;
   if (layer.display_destination() != display_area) {
     // TODO(costan): Doesn't seem right?
     layer_composition_operations[0] = layer_composition_operations[0].WithMergeBase();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_source() != layer.display_destination()) {
     layer_composition_operations[0] = layer_composition_operations[0].WithFrameScale();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_metadata().dimensions() != layer.image_source().dimensions()) {
     layer_composition_operations[0] = layer_composition_operations[0].WithSrcFrame();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.alpha_mode() != display::AlphaMode::kDisable) {
     layer_composition_operations[0] = layer_composition_operations[0].WithAlpha();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
     layer_composition_operations[0] = layer_composition_operations[0].WithTransform();
-    is_supported_configuration = false;
+    result = display::ConfigCheckResult::kUnsupportedConfig;
   }
-  return is_supported_configuration;
+  return result;
 }
 
 void DisplayEngine::ApplyConfiguration(display::DisplayId display_id,
+                                       display::ModeId display_mode_id,
                                        cpp20::span<const display::DriverLayer> layers,
                                        display::ConfigStamp config_stamp) {
+  ZX_DEBUG_ASSERT(display_id == kDisplayId);
+  ZX_DEBUG_ASSERT(display_mode_id == kDisplayModeId);
+
   ZX_DEBUG_ASSERT(layers.size() == 1);
   const display::DriverImageId image_id = layers[0].image_id();
   const ImportedImage* imported_image = imported_images_.FindImageById(image_id);
@@ -276,7 +259,7 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
 
   constraints.image_format_constraints(
       std::vector{fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
-                      .pixel_format(fuchsia_images2::wire::PixelFormat::kB8G8R8A8)
+                      .pixel_format(kSupportedPixelFormat.ToFidl())
                       .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
                       .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
                       .bytes_per_row_divisor(4)

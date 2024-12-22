@@ -39,7 +39,7 @@ zx_status_t MapStructure(const zx::resource& resource, zx_paddr_t paddr, size_t 
   }
 
   fzl::OwnedVmoMapper new_mapping;
-  status = new_mapping.Map(std::move(vmo), mapping_size, ZX_VM_PERM_READ);
+  status = new_mapping.Map(std::move(vmo), 0, mapping_size, ZX_VM_PERM_READ);
   if (status != ZX_OK) {
     return status;
   }

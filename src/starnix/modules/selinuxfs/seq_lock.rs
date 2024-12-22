@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_logging::with_zx_name;
 use std::marker::PhantomData;
 use std::mem::{align_of, size_of};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -48,7 +49,8 @@ impl<H: IntoBytes + Immutable, T: IntoBytes + Immutable> SeqLock<H, T> {
     /// read-only, or mapped.
     pub fn new(header: H, value: T) -> Result<Self, zx::Status> {
         // Create a VMO sized to hold the header, value, and sequence number.
-        let writable_vmo = zx::Vmo::create(vmo_size::<H, T>() as u64)?;
+        let writable_vmo =
+            with_zx_name(zx::Vmo::create(vmo_size::<H, T>() as u64)?, b"starnix:selinux");
 
         // Populate the initial default values.
         writable_vmo.write(header.as_bytes(), 0)?;

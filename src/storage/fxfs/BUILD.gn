@@ -298,8 +298,8 @@ fs_test_suite("fxfs") {
   deps = [
     ":fxfs_component",
     ":fxfs_fs_test_config",
+    "//src/storage/crypt/fxfs",
     "//src/storage/fxfs",
-    "//src/storage/fxfs-crypt",
   ]
   extra_components = [ ":fxfs-interop-fs-tests" ]
   component_deps = [
@@ -312,8 +312,8 @@ slow_fs_test_suite("fxfs") {
   deps = [
     ":fxfs_component",
     ":fxfs_fs_test_config",
+    "//src/storage/crypt/fxfs",
     "//src/storage/fxfs",
-    "//src/storage/fxfs-crypt",
   ]
   component_deps = [
     ":test_fxfs_component_manifest_shard",

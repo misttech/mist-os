@@ -273,43 +273,17 @@ def generate_fuchsia_build_config(fuchsia_dir: str) -> dict[str, str]:
     }
 
 
-def md5_all_files(paths: list[str]) -> str:
-    return compute_content_hash.content_hash_for_files(paths)
-
-
-def all_sdk_metas(sdk_root: str) -> list[str]:
-    """Collect all SDK metadata files from a given exported SDK.
-
-    Args:
-        sdk_root: Path to an exported SDK directory, e.g.
-            $NINJA_OUTPUT_DIR/sdk/exported/core.
-
-    Returns:
-        A list of file paths for all metadata files that belong
-        to this SDK instance.
-    """
-    sdk_manifest_path = os.path.join(sdk_root, "meta", "manifest.json")
-    if not os.path.exists(sdk_manifest_path):
-        # The manifest does not exist yet, which happens when this script
-        # is called before the SDK has been built.
-        return []
-    with open(sdk_manifest_path, "r") as f:
-        sdk_manifest = json.load(f)
-    part_metas = [
-        os.path.join(sdk_root, part["meta"]) for part in sdk_manifest["parts"]
-    ]
-    # Important: resolve symlinks now to ensure that the content hash
-    # computed from these files reflect their content, not the symlink
-    # target paths they point to.
-    # See https://fxbug.dev/323590606
-    return [os.path.realpath(p) for p in [sdk_manifest_path] + part_metas]
+def content_hash_all_files(paths: list[str]) -> str:
+    fstate = compute_content_hash.FileState()
+    for path in paths:
+        fstate.hash_source_path(Path(path))
+    return fstate.content_hash
 
 
 def find_clang_content_files(clang_install_dir: str) -> Sequence[Path]:
     """Return a list of content hashing input files for Clang."""
-    return compute_content_hash.find_content_files(
-        clang_install_dir, cipd_name="clang"
-    )
+    fstate = compute_content_hash.FileState(cipd_names=["clang"])
+    return sorted(fstate.find_directory_files(Path(clang_install_dir)))
 
 
 class GeneratedFiles(object):
@@ -345,8 +319,8 @@ class GeneratedFiles(object):
     def add_file_hash(self, dst_path: str) -> None:
         self._check_new_path(dst_path)
         self._files[dst_path] = {
-            "type": "md5",
-            "hash": md5_all_files([dst_path]),
+            "type": "content_hash",
+            "hash": content_hash_all_files([dst_path]),
         }
 
     def add_top_entries(
@@ -380,7 +354,7 @@ class GeneratedFiles(object):
                     f.write(entry["content"])
                 if entry.get("executable", False):
                     os.chmod(file_path, 0o755)
-            elif type == "md5":
+            elif type == "content_hash":
                 # Nothing to do here.
                 pass
             else:
@@ -909,17 +883,6 @@ common --enable_bzlmod=false
     #
     generated_repositories_inputs = {}
 
-    # Content hash file for @fuchsia_sdk.
-    sdk_root = os.path.join(gn_output_dir, "sdk", "exported")
-    all_in_tree_idk_metas = all_sdk_metas(
-        os.path.join(sdk_root, "bazel_in_tree_idk")
-    )
-
-    # Content hash file for @internal_sdk
-    all_internal_only_idk_metas = all_sdk_metas(
-        os.path.join(sdk_root, "bazel_internal_only_idk")
-    )
-
     # Content hash file for @prebuilt_clang, fuchsia_clang, keep in sync with
     # generate_prebuilt_clang_toolchain_repository() in
     # //build/bazel_sdk/bazel_rules_fuchsia/fuchsia/workspace/fuchsia_clang_repository.bzl
@@ -1062,16 +1025,6 @@ common --enable_bzlmod=false
     # LINT.ThenChange(//build/info/info.gni)
 
     # LINT.IfChange
-    generated_repositories_inputs["fuchsia_in_tree_idk"] = all_in_tree_idk_metas
-    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-
-    # LINT.IfChange
-    generated_repositories_inputs[
-        "fuchsia_internal_only_idk"
-    ] = all_internal_only_idk_metas
-    # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-
-    # LINT.IfChange
     generated_repositories_inputs["bazel_rules_fuchsia"] = list(
         rules_fuchsia_files
     )
@@ -1119,7 +1072,7 @@ common --enable_bzlmod=false
     for repo_name in sorted(generated_repositories_inputs.keys()):
         repo_inputs = generated_repositories_inputs[repo_name]
         repo_hash_file = _get_repo_hash_file_path(repo_name)
-        generated.add_file(repo_hash_file, md5_all_files(repo_inputs))
+        generated.add_file(repo_hash_file, content_hash_all_files(repo_inputs))
         if args.depfile:
             # Important: quote file paths because some of them may contain spaces!
             out = depfile_quote(
@@ -1132,24 +1085,6 @@ common --enable_bzlmod=false
                 for p in repo_inputs
             )
             args.depfile.write(f"{out}: {ins}\n")
-
-    # The following hash content files are aliases of other ones.
-    # Use a symlink to represent them in order to avoid re-hash the
-    # corresponding input files twice.
-    aliased_repositories = {
-        # LINT.IfChange
-        "internal_sdk": "fuchsia_internal_only_idk",
-        # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-        # LINT.IfChange
-        "fuchsia_sdk": "fuchsia_in_tree_idk",
-        # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
-    }
-    for repo_name, alias_name in aliased_repositories.items():
-        repo_hash_file = _get_repo_hash_file_path(repo_name)
-        alias_hash_file = os.path.join(
-            topdir, _get_repo_hash_file_path(alias_name)
-        )
-        generated.add_symlink(repo_hash_file, alias_hash_file)
 
     force = args.force
     generated_json = generated.to_json()

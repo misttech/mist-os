@@ -24,6 +24,7 @@ mod internal {
     pub(super) mod gmp;
     pub(super) mod icmp;
     pub(super) mod ipv6;
+    pub(super) mod local_delivery;
     pub(super) mod multicast_forwarding;
     pub(super) mod raw;
     pub(super) mod reassembly;
@@ -41,8 +42,8 @@ pub mod device {
         SetIpAddressPropertiesError,
     };
     pub use crate::internal::device::config::{
-        IpDeviceConfigurationHandler, IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate,
-        Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
+        IpDeviceConfigurationAndFlags, IpDeviceConfigurationHandler, IpDeviceConfigurationUpdate,
+        Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, UpdateIpConfigurationError,
     };
     pub use crate::internal::device::dad::{
         DadAddressContext, DadAddressStateRef, DadContext, DadEvent, DadHandler, DadStateRef,
@@ -67,10 +68,9 @@ pub mod device {
         AddressId, AddressIdIter, AssignedAddressState, CommonAddressProperties, DefaultHopLimit,
         DualStackIpDeviceState, IpDeviceAddresses, IpDeviceConfiguration, IpDeviceFlags,
         IpDeviceMulticastGroups, IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv4AddrConfig,
-        Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration,
-        Ipv4DeviceConfigurationAndFlags, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6AddrSlaacConfig,
-        Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState, Ipv6DadState,
-        Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6NetworkLearnedParameters,
+        Ipv4AddressEntry, Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddrConfig,
+        Ipv6AddrManualConfig, Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags,
+        Ipv6AddressState, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6NetworkLearnedParameters,
         Lifetime, PreferredLifetime, PrimaryAddressId, SlaacConfig, TemporarySlaacConfig,
         WeakAddressId,
     };
@@ -102,15 +102,15 @@ pub mod device {
 /// Group management protocols.
 pub mod gmp {
     pub use crate::internal::gmp::igmp::{
-        IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpState, IgmpStateContext, IgmpTimerId,
-        IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+        IgmpConfigMode, IgmpContext, IgmpContextMarker, IgmpSendContext, IgmpStateContext,
+        IgmpTimerId, IgmpTypeLayout, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::mld::{
-        MldContext, MldContextMarker, MldSendContext, MldStateContext, MldTimerId,
-        MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
+        MldConfigMode, MldContext, MldContextMarker, MldSendContext, MldStateContext, MldTimerId,
+        MldTypeLayout, MLD_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
     };
     pub use crate::internal::gmp::{
-        GmpGroupState, GmpHandler, GmpQueryHandler, GmpStateRef, GmpTimerId, IpExt,
+        GmpGroupState, GmpHandler, GmpQueryHandler, GmpState, GmpStateRef, GmpTimerId, IpExt,
         MulticastGroupSet,
     };
 }
@@ -233,12 +233,14 @@ pub use internal::base::{
     IpRouteTableContext, IpRouteTablesContext, IpSendFrameError, IpSendFrameErrorReason,
     IpStateContext, IpStateInner, IpTransportContext, IpTransportDispatchContext,
     Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder, Ipv6PresentAddressStatus, Ipv6State,
-    Ipv6StateBuilder, MulticastMembershipHandler, ReceiveIpPacketMeta, ReceivePacketAction,
-    ResolveRouteError, RoutingTableId, SendIpPacketMeta, TransparentLocalDelivery,
-    TransportIpContext, TransportReceiveError, DEFAULT_HOP_LIMITS, DEFAULT_TTL,
-    IPV6_DEFAULT_SUBNET,
+    Ipv6StateBuilder, MulticastMembershipHandler, ReceivePacketAction, ResolveRouteError,
+    RoutingTableId, SendIpPacketMeta, TransportIpContext, TransportReceiveError,
+    DEFAULT_HOP_LIMITS, DEFAULT_TTL, IPV6_DEFAULT_SUBNET,
 };
 pub use internal::fragmentation::FragmentationCounters;
+pub use internal::local_delivery::{
+    IpHeaderInfo, LocalDeliveryPacketInfo, ReceiveIpPacketMeta, TransparentLocalDelivery,
+};
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
 pub use internal::routing::rules::{
@@ -259,6 +261,7 @@ pub use internal::types::{
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     pub use crate::internal::base::testutil::DualStackSendIpPacketMeta;
+    pub use crate::internal::local_delivery::testutil::FakeIpHeaderInfo;
     pub use crate::internal::routing::testutil::{
         add_route, del_device_routes, del_routes_to_subnet, set_rules,
     };

@@ -5,7 +5,7 @@
 use crate::TestEnv;
 use futures::channel::mpsc;
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 use {fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_async as fasync};
 
 /// Convenience type for interacting with the Power Manager's RebootWatcher service.

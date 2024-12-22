@@ -15,11 +15,11 @@
 #include <zircon/listnode.h>
 
 #include <atomic>
+#include <mutex>
 #include <optional>
 #include <thread>
 
 #include <ddktl/device.h>
-#include <fbl/mutex.h>
 #include <usb-endpoint/usb-endpoint-client.h>
 #include <usb/cdc.h>
 #include <usb/request-fidl.h>
@@ -113,15 +113,15 @@ class UsbCdc : public UsbCdcType,
   uint8_t mac_addr_[ETH_MAC_SIZE] = {};
   // Ethernet lock -- must be acquired after tx_mutex
   // when both locks are held.
-  mtx_t ethernet_mutex_ __TA_ACQUIRED_AFTER(tx_mutex_) = {};
+  std::mutex ethernet_mutex_ __TA_ACQUIRED_AFTER(tx_mutex_);
   ddk::EthernetIfcProtocolClient ethernet_ifc_ __TA_GUARDED(ethernet_mutex_);
   bool online_ __TA_GUARDED(ethernet_mutex_) = false;
   usb_speed_t speed_ = 0;
   // TX lock -- Must be acquired before ethernet_mutex
   // when both locks are held.
-  mtx_t* tx_mutex_ = bulk_in_ep_.mutex_.GetInternal();
-  mtx_t* rx_mutex_ = bulk_out_ep_.mutex_.GetInternal();
-  mtx_t* intr_mutex_ = intr_ep_.mutex_.GetInternal();
+  std::mutex* tx_mutex_ = &bulk_in_ep_.mutex_;
+  std::mutex* rx_mutex_ = &bulk_out_ep_.mutex_;
+  std::mutex* intr_mutex_ = &intr_ep_.mutex_;
 
   uint8_t bulk_out_addr_ = 0;
   uint8_t bulk_in_addr_ = 0;

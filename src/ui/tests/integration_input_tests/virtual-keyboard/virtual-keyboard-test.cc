@@ -41,6 +41,7 @@
 
 #include <gtest/gtest.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
+#include <src/lib/timekeeper/clock.h>
 #include <src/ui/testing/util/fidl_cpp_helpers.h>
 #include <src/ui/testing/util/portable_ui_test.h>
 
@@ -79,9 +80,7 @@ using ChildName = std::string;
 
 constexpr auto kResponseListener = "response_listener";
 
-// The type used to measure UTC time. The integer value here does not matter so
-// long as it differs from the ZX_CLOCK_MONOTONIC=0 defined by Zircon.
-using time_utc = zx::basic_time<1>;
+using time_utc = timekeeper::time_utc;
 
 class InputPositionState {
  public:

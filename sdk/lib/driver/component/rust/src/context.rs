@@ -5,7 +5,7 @@
 use crate::{Incoming, Node};
 use fuchsia_component::server::{ServiceFs, ServiceObjTrait};
 use namespace::Namespace;
-use tracing::error;
+use log::error;
 use zx::Status;
 
 use fdf::DispatcherRef;

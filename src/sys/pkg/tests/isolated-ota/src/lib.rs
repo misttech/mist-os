@@ -223,7 +223,7 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
         let blobfs_proxy = blobfs_handle.into_proxy();
         let (blobfs_client_end_clone, remote) =
             fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
-        blobfs_proxy.clone2(remote.into_channel().into()).unwrap();
+        blobfs_proxy.clone(remote.into_channel().into()).unwrap();
 
         let blobfs_proxy_clone = blobfs_client_end_clone.into_proxy();
         let blobfs_vfs = vfs::remote::remote_dir(blobfs_proxy_clone);
@@ -507,7 +507,7 @@ fn launch_cloned_blobfs(end: ServerEnd<fio::NodeMarker>) {
 async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result<(), Error> {
     while let Some(req) = stream.try_next().await? {
         match req {
-            fio::DirectoryRequest::Clone2 { request, control_handle: _ } => {
+            fio::DirectoryRequest::Clone { request, control_handle: _ } => {
                 launch_cloned_blobfs(ServerEnd::new(request.into_channel()))
             }
             fio::DirectoryRequest::Close { responder } => {
@@ -560,7 +560,7 @@ async fn serve_failing_blobfs(mut stream: fio::DirectoryRequestStream) -> Result
                 }
             }
             fio::DirectoryRequest::Open3 { path, flags, options, object, control_handle: _ } => {
-                vfs::ObjectRequest::new3(flags, &options, object).handle(|request| {
+                vfs::ObjectRequest::new(flags, &options, object).handle(|request| {
                     if path == "." {
                         launch_cloned_blobfs(request.take().into_server_end());
                         Ok(())

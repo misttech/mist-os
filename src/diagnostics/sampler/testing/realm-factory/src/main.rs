@@ -12,7 +12,7 @@ use fidl_test_sampler::{RealmFactoryRequest, RealmFactoryRequestStream};
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
-use tracing::error;
+use log::error;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::debug_assert;
 use std::convert::Infallible as Never;
 use std::pin::pin;
 
@@ -25,7 +26,7 @@ use crate::messaging::Sender;
 use crate::netlink_packet::errno::Errno;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
-use crate::{interfaces, routes, rules};
+use crate::{interfaces, route_tables, routes, rules};
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
@@ -88,6 +89,8 @@ pub(crate) struct EventLoop<
     pub(crate) v6_main_route_table: fnet_routes_admin::RouteTableV6Proxy,
     pub(crate) v4_route_table_provider: fnet_routes_admin::RouteTableProviderV4Proxy,
     pub(crate) v6_route_table_provider: fnet_routes_admin::RouteTableProviderV6Proxy,
+    pub(crate) v4_rule_table: fnet_routes_admin::RuleTableV4Proxy,
+    pub(crate) v6_rule_table: fnet_routes_admin::RuleTableV6Proxy,
     pub(crate) interfaces_handler: H,
     pub(crate) route_clients: ClientTable<NetlinkRoute, S>,
     pub(crate) unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
@@ -147,6 +150,13 @@ impl<T, E: EventLoopOptionality> EventLoopComponent<T, E> {
             EventLoopComponent::Absent(_) => panic!("must be present"),
         }
     }
+
+    fn present(&self) -> Option<&T> {
+        match self {
+            EventLoopComponent::Present(t) => Some(t),
+            EventLoopComponent::Absent(_) => None,
+        }
+    }
 }
 
 pub(crate) trait EventLoopSpec {
@@ -164,12 +174,16 @@ pub(crate) trait EventLoopSpec {
     type RoutesV4Worker: EventLoopOptionality;
     type RoutesV6Worker: EventLoopOptionality;
     type InterfacesWorker: EventLoopOptionality;
+    type RuleV4Worker: EventLoopOptionality;
+    type RuleV6Worker: EventLoopOptionality;
 }
 
 pub(crate) struct IncludedWorkers<E: EventLoopSpec> {
     pub(crate) routes_v4: EventLoopComponent<(), E::RoutesV4Worker>,
     pub(crate) routes_v6: EventLoopComponent<(), E::RoutesV6Worker>,
     pub(crate) interfaces: EventLoopComponent<(), E::InterfacesWorker>,
+    pub(crate) rules_v4: EventLoopComponent<(), E::RuleV4Worker>,
+    pub(crate) rules_v6: EventLoopComponent<(), E::RuleV6Worker>,
 }
 
 enum AllWorkers {}
@@ -188,6 +202,8 @@ impl EventLoopSpec for AllWorkers {
     type RoutesV4Worker = Required;
     type RoutesV6Worker = Required;
     type InterfacesWorker = Required;
+    type RuleV4Worker = Required;
+    type RuleV6Worker = Required;
 }
 
 pub(crate) struct EventLoopInputs<
@@ -208,6 +224,10 @@ pub(crate) struct EventLoopInputs<
         EventLoopComponent<fnet_routes_admin::RouteTableProviderV4Proxy, E::V4RouteTableProvider>,
     pub(crate) v6_route_table_provider:
         EventLoopComponent<fnet_routes_admin::RouteTableProviderV6Proxy, E::V6RouteTableProvider>,
+    pub(crate) v4_rule_table:
+        EventLoopComponent<fnet_routes_admin::RuleTableV4Proxy, E::RuleV4Worker>,
+    pub(crate) v6_rule_table:
+        EventLoopComponent<fnet_routes_admin::RuleTableV6Proxy, E::RuleV6Worker>,
     pub(crate) interfaces_handler: EventLoopComponent<H, E::InterfacesHandler>,
     pub(crate) route_clients: EventLoopComponent<ClientTable<NetlinkRoute, S>, E::RouteClients>,
 
@@ -236,6 +256,8 @@ impl<
             v6_main_route_table,
             v4_route_table_provider,
             v6_route_table_provider,
+            v4_rule_table,
+            v6_rule_table,
             interfaces_handler,
             route_clients,
             unified_request_stream,
@@ -308,12 +330,34 @@ impl<
             },
         );
 
-        let (routes_v4_worker, v4_route_table_map, v4_route_event_stream) =
+        let (routes_v4_worker, mut v4_route_table_map, v4_route_event_stream) =
             routes_v4_result.context("create v4 routes worker")?;
-        let (routes_v6_worker, v6_route_table_map, v6_route_event_stream) =
+        let (routes_v6_worker, mut v6_route_table_map, v6_route_event_stream) =
             routes_v6_result.context("create v6 routes worker")?;
         let (interfaces_worker, if_event_stream) =
             interfaces_result.context("create interfaces worker")?;
+        let rules_v4_worker = match included_workers.rules_v4 {
+            EventLoopComponent::Present(()) => {
+                let worker = rules::RulesWorker::<Ipv4>::create(
+                    v4_rule_table.get_ref(),
+                    v4_route_table_map.get_mut(),
+                )
+                .await;
+                EventLoopComponent::Present(worker)
+            }
+            EventLoopComponent::Absent(omitted) => EventLoopComponent::Absent(omitted),
+        };
+        let rules_v6_worker = match included_workers.rules_v6 {
+            EventLoopComponent::Present(()) => {
+                let worker = rules::RulesWorker::<Ipv6>::create(
+                    v6_rule_table.get_ref(),
+                    v6_route_table_map.get_mut(),
+                )
+                .await;
+                EventLoopComponent::Present(worker)
+            }
+            EventLoopComponent::Absent(omitted) => EventLoopComponent::Absent(omitted),
+        };
 
         let unified_event_stream = futures::stream_select!(
             v4_route_event_stream
@@ -351,8 +395,8 @@ impl<
             routes_v4_worker,
             routes_v6_worker,
             interfaces_worker,
-            rules_v4_worker: rules::RuleTable::new_with_defaults(),
-            rules_v6_worker: rules::RuleTable::new_with_defaults(),
+            rules_v4_worker,
+            rules_v6_worker,
             unified_pending_request: None,
             unified_event_stream,
             route_clients,
@@ -397,16 +441,14 @@ pub(crate) struct EventLoopState<
     routes_v6_worker: EventLoopComponent<routes::RoutesWorker<Ipv6>, E::RoutesV6Worker>,
     interfaces_worker:
         EventLoopComponent<interfaces::InterfacesWorkerState<H, S>, E::InterfacesWorker>,
-    rules_v4_worker: rules::RuleTable<Ipv4>,
-    rules_v6_worker: rules::RuleTable<Ipv6>,
+    rules_v4_worker: EventLoopComponent<rules::RulesWorker<Ipv4>, E::RuleV4Worker>,
+    rules_v6_worker: EventLoopComponent<rules::RulesWorker<Ipv6>, E::RuleV6Worker>,
 
     route_clients: EventLoopComponent<ClientTable<NetlinkRoute, S>, E::RouteClients>,
     interfaces_proxy: EventLoopComponent<fnet_root::InterfacesProxy, E::InterfacesProxy>,
 
-    v4_route_table_map:
-        EventLoopComponent<crate::route_tables::RouteTableMap<Ipv4>, E::RoutesV4Worker>,
-    v6_route_table_map:
-        EventLoopComponent<crate::route_tables::RouteTableMap<Ipv6>, E::RoutesV6Worker>,
+    v4_route_table_map: EventLoopComponent<route_tables::RouteTableMap<Ipv4>, E::RoutesV4Worker>,
+    v6_route_table_map: EventLoopComponent<route_tables::RouteTableMap<Ipv6>, E::RoutesV6Worker>,
     unified_pending_request: Option<UnifiedPendingRequest<S>>,
     unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
     unified_event_stream: futures::stream::Fuse<BoxStream<'static, Result<UnifiedEvent, Error>>>,
@@ -473,9 +515,10 @@ impl<
         .fuse();
         let mut request_fut = pin!(request_fut);
 
-        futures::select! {
+        let cleanup = futures::select! {
             event = unified_event_stream.next() => {
-                match event.expect("event stream cannot end without error")? {
+                match event
+                    .expect("event stream cannot end without error")? {
                     UnifiedEvent::RoutesV4Event(event) => {
                         routes_v4_worker.get_mut()
                         .handle_route_watcher_event(
@@ -483,6 +526,12 @@ impl<
                             route_clients.get_ref(),
                             event)
                         .map_err(Error::new)
+                        .map(|opt| opt.map_or(Cleanup::None,
+                            |table| Cleanup::RouteTable(CleanUpRouteTable {
+                                table,
+                                worker: WorkerTriggeringCleanup::RoutesV4
+                            }),
+                        ))
                         .context("handle v4 routes event")?
                     },
                     UnifiedEvent::RoutesV6Event(event) => {
@@ -490,13 +539,20 @@ impl<
                         .handle_route_watcher_event(
                             v6_route_table_map.get_mut(),
                             route_clients.get_ref(),
-                            event
-                        )
+                            event)
                         .map_err(Error::new)
-                        .context("handle v6 routes event")?},
+                        .map(|opt| opt.map_or(Cleanup::None,
+                            |table| Cleanup::RouteTable(CleanUpRouteTable {
+                                table,
+                                worker: WorkerTriggeringCleanup::RoutesV6
+                            }),
+                        ))
+                        .context("handle v6 routes event")?
+                    },
                     UnifiedEvent::InterfacesEvent(event) => interfaces_worker.get_mut()
                         .handle_interface_watcher_event(event).await
                         .map_err(Error::new)
+                        .map(|()| Cleanup::None)
                         .context("handle interfaces event")?,
                 }
             }
@@ -512,6 +568,7 @@ impl<
                         let request = interfaces_worker.get_mut()
                             .handle_request(request).await;
                         *unified_pending_request = request.map(UnifiedPendingRequest::Interfaces);
+                        Cleanup::None
                     }
                     UnifiedRequest::RoutesV4Request(request) => {
                         let request = routes_v4_worker.get_mut()
@@ -521,6 +578,7 @@ impl<
                                 request,
                             ).await;
                         *unified_pending_request = request.map(UnifiedPendingRequest::RoutesV4);
+                        Cleanup::None
                     }
                     UnifiedRequest::RoutesV6Request(request) => {
                         let request = routes_v6_worker.get_mut()
@@ -530,18 +588,75 @@ impl<
                                 request,
                             ).await;
                         *unified_pending_request = request.map(UnifiedPendingRequest::RoutesV6);
+                        Cleanup::None
                     }
                     UnifiedRequest::RuleV4Request(request, completer) => {
-                        completer.send(rules_v4_worker.handle_request(request))
+                        let result = rules_v4_worker.get_mut()
+                            .handle_request(
+                                request,
+                                v4_route_table_map.get_mut(),
+                                &interfaces_worker.get_ref().interface_properties
+                            ).await;
+                        completer.send(result.map(|_| ()))
                             .expect("receiving end of completer should not be dropped");
+                        match result {
+                            Ok(cleanup) => {
+                                cleanup.map_or(
+                                    Cleanup::None,
+                                    |table| Cleanup::RouteTable(
+                                        CleanUpRouteTable {
+                                            table,
+                                            worker: WorkerTriggeringCleanup::RulesV4,
+                                        }
+                                    ),
+                                )
+                            }
+                            Err(_) => Cleanup::None,
+                        }
                     }
                     UnifiedRequest::RuleV6Request(request, completer) => {
-                        completer.send(rules_v6_worker.handle_request(request))
+                        let result = rules_v6_worker.get_mut()
+                            .handle_request(
+                                request,
+                                v6_route_table_map.get_mut(),
+                                &interfaces_worker.get_ref().interface_properties
+                            ).await;
+                        completer.send(result.map(|_| ()))
                             .expect("receiving end of completer should not be dropped");
+                        match result {
+                            Ok(cleanup) => {
+                                cleanup.map_or(
+                                    Cleanup::None,
+                                    |table| Cleanup::RouteTable(
+                                        CleanUpRouteTable {
+                                            table,
+                                            worker: WorkerTriggeringCleanup::RulesV6,
+                                        }
+                                    ),
+                                )
+                            }
+                            Err(_) => Cleanup::None,
+                        }
                     }
                 }
             }
         };
+
+        match cleanup {
+            Cleanup::None => (),
+            Cleanup::RouteTable(cleanup) => {
+                Self::check_and_clean_up_unused_route_table(
+                    cleanup,
+                    routes_v4_worker,
+                    routes_v6_worker,
+                    rules_v4_worker,
+                    rules_v6_worker,
+                    v4_route_table_map,
+                    v6_route_table_map,
+                )
+                .await
+            }
+        }
 
         let pending_request = unified_pending_request.take();
         *unified_pending_request = pending_request.and_then(|pending| match pending {
@@ -562,6 +677,97 @@ impl<
         Ok(())
     }
 
+    /// Given a route table, checks if the route table needs to be cleaned up.
+    /// If so, removes the route table from the relevant [`crate::route_tables::RouteTableMap`].
+    async fn check_and_clean_up_unused_route_table(
+        cleanup: CleanUpRouteTable,
+        routes_v4_worker: &mut EventLoopComponent<routes::RoutesWorker<Ipv4>, E::RoutesV4Worker>,
+        routes_v6_worker: &mut EventLoopComponent<routes::RoutesWorker<Ipv6>, E::RoutesV6Worker>,
+        rules_v4_worker: &mut EventLoopComponent<rules::RulesWorker<Ipv4>, E::RuleV4Worker>,
+        rules_v6_worker: &mut EventLoopComponent<rules::RulesWorker<Ipv6>, E::RuleV6Worker>,
+        v4_route_table_map: &mut EventLoopComponent<
+            crate::route_tables::RouteTableMap<Ipv4>,
+            E::RoutesV4Worker,
+        >,
+        v6_route_table_map: &mut EventLoopComponent<
+            crate::route_tables::RouteTableMap<Ipv6>,
+            E::RoutesV6Worker,
+        >,
+    ) {
+        let CleanUpRouteTable {
+            table: table @ route_tables::TableNeedsCleanup(table_id, table_index),
+            worker,
+        } = cleanup;
+        match worker {
+            WorkerTriggeringCleanup::RoutesV4 => {
+                // Check to see if any rules reference this.
+                let referenced = rules_v4_worker
+                    .present()
+                    .map_or(false, |worker| worker.any_rules_reference_table(table_index));
+
+                // The routes worker only indicates cleanup is needed once the last route is
+                // removed from a table, so we don't need to check if any routes reference
+                // the table.
+                debug_assert!(!routes_v4_worker.get_ref().any_routes_reference_table(table));
+
+                if !referenced {
+                    assert_matches!(
+                        v4_route_table_map.get_mut().remove_table_by_fidl_id(table_id),
+                        Some(_)
+                    );
+                }
+            }
+            WorkerTriggeringCleanup::RoutesV6 => {
+                // Check to see if any rules reference this.
+                let referenced = rules_v6_worker
+                    .present()
+                    .map_or(false, |worker| worker.any_rules_reference_table(table_index));
+
+                // The routes worker only indicates cleanup is needed once the last route is
+                // removed from a table, so we don't need to check if any routes reference
+                // the table.
+                debug_assert!(!routes_v6_worker.get_ref().any_routes_reference_table(table));
+
+                if !referenced {
+                    assert_matches!(
+                        v6_route_table_map.get_mut().remove_table_by_fidl_id(table_id),
+                        Some(_)
+                    );
+                }
+            }
+            WorkerTriggeringCleanup::RulesV4 => {
+                // Check to see if any routes reference this.
+                let referenced_routes = routes_v4_worker
+                    .present()
+                    .map_or(false, |worker| worker.any_routes_reference_table(table));
+                // Check to see if any rules reference this.
+                let referenced_rules =
+                    rules_v4_worker.get_ref().any_rules_reference_table(table_index);
+                if !referenced_routes && !referenced_rules {
+                    assert_matches!(
+                        v4_route_table_map.get_mut().remove_table_by_fidl_id(table_id),
+                        Some(_)
+                    );
+                }
+            }
+            WorkerTriggeringCleanup::RulesV6 => {
+                // Check to see if any routes reference this.
+                let referenced_routes = routes_v6_worker
+                    .present()
+                    .map_or(false, |worker| worker.any_routes_reference_table(table));
+                // Check to see if any rules reference this.
+                let referenced_rules =
+                    rules_v6_worker.get_ref().any_rules_reference_table(table_index);
+                if !referenced_routes && !referenced_rules {
+                    assert_matches!(
+                        v6_route_table_map.get_mut().remove_table_by_fidl_id(table_id),
+                        Some(_)
+                    );
+                }
+            }
+        }
+    }
+
     #[cfg(test)]
     pub(crate) async fn run_one_step_in_tests(&mut self) -> Result<(), Error> {
         self.run_one_step().await
@@ -573,7 +779,10 @@ impl<
         S: crate::messaging::Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     > EventLoop<H, S>
 {
-    pub(crate) async fn run(self) -> Result<Never, Error> {
+    pub(crate) async fn run(
+        self,
+        on_initialized: Option<oneshot::Sender<()>>,
+    ) -> Result<Never, Error> {
         let Self {
             interfaces_proxy,
             interfaces_state_proxy,
@@ -583,6 +792,8 @@ impl<
             v6_main_route_table,
             v4_route_table_provider,
             v6_route_table_provider,
+            v4_rule_table,
+            v6_rule_table,
             interfaces_handler,
             route_clients,
             unified_request_stream,
@@ -597,6 +808,8 @@ impl<
             v6_main_route_table: EventLoopComponent::Present(v6_main_route_table),
             v4_route_table_provider: EventLoopComponent::Present(v4_route_table_provider),
             v6_route_table_provider: EventLoopComponent::Present(v6_route_table_provider),
+            v4_rule_table: EventLoopComponent::Present(v4_rule_table),
+            v6_rule_table: EventLoopComponent::Present(v6_rule_table),
             interfaces_handler: EventLoopComponent::Present(interfaces_handler),
             route_clients: EventLoopComponent::Present(route_clients),
             unified_request_stream,
@@ -605,11 +818,35 @@ impl<
             routes_v4: EventLoopComponent::Present(()),
             routes_v6: EventLoopComponent::Present(()),
             interfaces: EventLoopComponent::Present(()),
+            rules_v4: EventLoopComponent::Present(()),
+            rules_v6: EventLoopComponent::Present(()),
         })
         .await?;
 
         log_info!("routes and interfaces workers initialized, beginning execution");
+        if let Some(on_initialized) = on_initialized {
+            on_initialized
+                .send(())
+                .expect("caller should not have dropped `on_initialized` receiver");
+        }
 
         state.run().await
     }
+}
+
+pub(crate) enum WorkerTriggeringCleanup {
+    RulesV4,
+    RulesV6,
+    RoutesV4,
+    RoutesV6,
+}
+
+pub(crate) enum Cleanup {
+    None,
+    RouteTable(CleanUpRouteTable),
+}
+
+pub(crate) struct CleanUpRouteTable {
+    table: route_tables::TableNeedsCleanup,
+    worker: WorkerTriggeringCleanup,
 }

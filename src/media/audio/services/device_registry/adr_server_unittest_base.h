@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
-#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
+#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
+#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
 
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
@@ -126,7 +126,7 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     }
     void handle_unknown_event(
         fidl::UnknownEventMetadata<fuchsia_audio_device::Provider> metadata) override {
-      FX_LOGS(WARNING) << "ProviderFidlHandler: unknown method (Provider) ordinal "
+      FX_LOGS(WARNING) << "ProviderFidlHandler: unknown event (Provider) ordinal "
                        << metadata.event_ordinal;
     }
   };
@@ -158,7 +158,7 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     }
     void handle_unknown_event(
         fidl::UnknownEventMetadata<fuchsia_audio_device::Registry> metadata) override {
-      FX_LOGS(WARNING) << "RegistryFidlHandler: unknown method (Registry) ordinal "
+      FX_LOGS(WARNING) << "RegistryFidlHandler: unknown event (Registry) ordinal "
                        << metadata.event_ordinal;
     }
   };
@@ -188,7 +188,7 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     }
     void handle_unknown_event(
         fidl::UnknownEventMetadata<fuchsia_audio_device::ControlCreator> metadata) override {
-      FX_LOGS(WARNING) << "ControlCreatorFidlHandler: unknown method (ControlCreator) ordinal "
+      FX_LOGS(WARNING) << "ControlCreatorFidlHandler: unknown event (ControlCreator) ordinal "
                        << metadata.event_ordinal;
     }
   };
@@ -269,7 +269,7 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     }
     void handle_unknown_event(
         fidl::UnknownEventMetadata<fuchsia_audio_device::RingBuffer> metadata) override {
-      FX_LOGS(WARNING) << "RingBufferFidlHandler: unknown method (RingBuffer) ordinal "
+      FX_LOGS(WARNING) << "RingBufferFidlHandler: unknown event (RingBuffer) ordinal "
                        << metadata.event_ordinal;
     }
   };
@@ -337,4 +337,4 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
 
 }  // namespace media_audio
 
-#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_
+#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_ADR_SERVER_UNITTEST_BASE_H_

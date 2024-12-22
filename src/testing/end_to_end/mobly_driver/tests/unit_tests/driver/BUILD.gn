@@ -6,13 +6,11 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("common_test") {
-    enable_mypy = true
     main_source = "common_test.py"
     libraries = [ "//src/testing/end_to_end/mobly_driver" ]
   }
 
   python_host_test("local_test") {
-    enable_mypy = true
     main_source = "local_test.py"
     libraries = [
       "//src/testing/end_to_end/mobly_driver",
@@ -21,13 +19,11 @@ if (is_host) {
   }
 
   python_host_test("infra_test") {
-    enable_mypy = true
     main_source = "infra_test.py"
     libraries = [ "//src/testing/end_to_end/mobly_driver" ]
   }
 
   python_host_test("base_test") {
-    enable_mypy = true
     main_source = "base_test.py"
     libraries = [
       "//src/testing/end_to_end/mobly_driver",

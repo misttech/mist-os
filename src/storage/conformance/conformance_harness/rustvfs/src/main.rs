@@ -104,7 +104,7 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                         add_entry(*entry, &dir)?;
                     }
                 }
-                let mut object_request = vfs::ObjectRequest::new3(
+                let mut object_request = vfs::ObjectRequest::new(
                     flags,
                     &Default::default(),
                     object_request.into_channel(),
@@ -119,7 +119,7 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                 svc_dir.add_entry(EchoMarker::PROTOCOL_NAME, service).unwrap();
                 let (svc_client, svc_server) = create_endpoints::<fio::DirectoryMarker>();
                 let mut object_request =
-                    vfs::ObjectRequest::new3(FLAGS, &Default::default(), svc_server.into_channel());
+                    vfs::ObjectRequest::new(FLAGS, &Default::default(), svc_server.into_channel());
                 svc_dir
                     .open3(ExecutionScope::new(), Path::dot(), FLAGS, &mut object_request)
                     .unwrap();

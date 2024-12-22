@@ -53,7 +53,7 @@ fn make_fake_ra_prefix_packet(prefix: ot::Ip6Prefix, valid: u32, preferred: u32)
     use packet::{InnerPacketBuilder, Serializer};
     use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
     use packet_formats::icmp::ndp::{OptionSequenceBuilder, RoutePreference, RouterAdvertisement};
-    use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+    use packet_formats::icmp::{IcmpPacketBuilder, IcmpZeroCode};
 
     let src_addr = Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1); // Local host address
     let dst_addr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 2); // All routers multicast
@@ -88,7 +88,7 @@ fn make_fake_ra_prefix_packet(prefix: ot::Ip6Prefix, valid: u32, preferred: u32)
 
     let serialized = OptionSequenceBuilder::new(options.iter())
         .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(src_addr, dst_addr, IcmpUnusedCode, ra))
+        .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(src_addr, dst_addr, IcmpZeroCode, ra))
         .serialize_vec_outer()
         .unwrap()
         .as_ref()

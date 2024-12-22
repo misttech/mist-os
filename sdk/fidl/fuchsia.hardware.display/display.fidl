@@ -5,38 +5,6 @@ library fuchsia.hardware.display;
 
 using fuchsia.images2;
 using fuchsia.hardware.display.types;
-using fuchsia.math;
-
-/// Attributes for a [`Mode`].
-///
-/// This type allows for the future expansion of `Mode` with binary attributes,
-/// such as whether a display mode is interlaced.
-type ModeFlags = flexible bits : uint32 {};
-
-/// Describes an operational mode for a display device attached to the system.
-///
-/// The operational parameters that make up a mode description must be updated
-/// atomically, using a resource-intensive "mode setting" operation. Parameters
-/// that can be changed quickly, such as brightness and contrast, do not belong
-/// in a mode description.
-type Mode = struct {
-    /// The dimensions of the displayed image, in pixels.
-    ///
-    /// This describes the image data sent to the display, which is also called
-    /// the "active area" or "active pixels" in raster scan terminology. Despite
-    /// the name, some of the "active pixels" may not actually be shown to the
-    /// user, for example due to corners or notches.
-    active_area fuchsia.math.SizeU;
-
-    /// Number of images transmitted to the display in 1,000 seconds.
-    ///
-    /// This quantity is also known as the display's frame rate, or the
-    /// display's vertical refresh rate. The rate is measured in millihertz
-    /// (mHz).
-    refresh_rate_millihertz uint32;
-
-    flags ModeFlags;
-};
 
 /// Description for a display device attached to the system.
 ///
@@ -50,7 +18,7 @@ type Info = struct {
     /// Operational modes supported by the described display device.
     ///
     /// The first entry is the device's preferred mode.
-    modes vector<Mode>:MAX;
+    modes vector<fuchsia.hardware.display.types.Mode>:MAX;
 
     /// Pixel formats that can be directly displayed on the attached display.
     ///

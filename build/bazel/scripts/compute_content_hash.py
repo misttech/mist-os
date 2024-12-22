@@ -3,95 +3,176 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Generate a content hash file from a given source repository content.
+"""Generate a content hash file from one or more source repository content.
 
-By default, scan all files in the source path (file or directory) and hash
+By default, scan all files in the source paths (file or directory) and hash
 their content.
 
-However, if the directory's comes from a CIPD archive, using --cipd-name=NAME
-will use the .versions/NAME.cipd_version file, if present, to compute the hash,
-which is dramatically faster. If the file is not present, the default behavior
-is used as a fallback.
+- For symlinks, the link value is used as input (not the target file).
+
+- For regular files, its sha1 digest is used as input.
+
+- For git directories (which have a .git entry), use the HEAD commit as input
+  to speed things dramatically. NOTE: This ignores changes to the index,
+  during development.
+
+- If --cipd-name=NAME is set, and <source_path>/.versions/NAME.cipd_version
+  exists, its content will be used as input.
+
+- Otherwise, for directories, all files in it are found recursively,
+  and used as hash input independently.
 """
 
 import argparse
 import hashlib
 import os
 import sys
+import typing as T
 from pathlib import Path
-from typing import Sequence
+
+_HASH = "sha1"
+
+sys.path.insert(0, str(Path(__file__).parent))
+import get_git_head_commit as gghc
 
 
-def content_hash_for_files(paths: Sequence[Path | str]) -> str:
-    """Compute a unique content hash from a list of files.
-
-    Args:
-        paths: A list of Path objects.
-    Returns:
-        A string holding a hexadecimal content hash value.
-    """
-    h = hashlib.new("md5")
-    for p in paths:
-        p = Path(p)
-        h.update(b"|")
-        if p.is_symlink():
-            h.update(bytes(p.readlink()))
-        else:
-            h.update(p.read_bytes())
-    return h.hexdigest()
-
-
-def find_content_files(
-    source_dir: Path | str,
-    cipd_name: str | None = None,
-    exclude_extensions: Sequence[str] = [],
-) -> Sequence[Path]:
-    """Return a list of content files to send for hashing from a source directory.
-
-    By default, this scans all files from source_dir, removing any files whose
-    suffixes match exclude_extensions from the result.
-
-    However, if cipd_name is provided, this will first look under
-    ${source_dir}/.versions/${cipd_name}.cipd_version to look for a CIPD version
-    file. If present, this will be the only path returned in the result.
-
-    Args:
-        source_dir: Source installation directory path.
-        cipd_name: Optional CIPD archive name (e.g. 'cpython3').
-        exclude_extensions: Optional list of file suffixes to omit from
-           the result (e.g. [".pyc"]).
-    Returns:
-        A list of Path values.
-    """
-    source_dir = Path(source_dir)
-    if cipd_name:
-        cipd_version_file = (
-            source_dir / ".versions" / f"{cipd_name}.cipd_version"
-        )
-        if cipd_version_file.exists():
-            return [cipd_version_file]
-
-    result: list[Path] = []
-    for root, dirs, files in os.walk(source_dir):
-        result.extend(
-            Path(os.path.join(root, file))
-            for file in files
-            if not file.endswith(tuple(exclude_extensions))
-        )
-    return result
-
-
-def _depfile_quote(p: Path) -> str:
+def _depfile_quote(p: Path | str) -> str:
     """Quote a Path value for depfile output."""
     return str(p).replace("\\", "\\\\").replace(" ", "\\ ")
 
 
-def main(commandline_args: Sequence[str]) -> int:
+class FileState(object):
+    """State object used to hash one or more source paths.
+
+    Usage is:
+       - Create instance
+       - Call hash_source_path() as many times as possible.
+       - Use content_hash property to get final result.
+       - Use sorted_input_files to get list of input files.
+    """
+
+    def __init__(
+        self,
+        cipd_names: T.Sequence[str] = [],
+        exclude_suffixes: T.Sequence[str] = [],
+        git_binary: Path = Path("git"),
+    ) -> None:
+        """Create new instance.
+
+        Args:
+            cipd_names: A sequence of cipd names for prebuilt directories.
+            exclude_suffixes: A sequence of filename suffixes to exclude from hashing.
+            git_binary: Path to the git binary to use for .git repositories.
+        """
+        self._cipd_names = cipd_names
+        self._exclude_suffixes = tuple(exclude_suffixes)
+        self._git_binary = git_binary
+        self._input_files: T.Set[Path] = set()
+        self._sorted_input_files: T.Optional[T.List[str]] = None
+        self._hstate = hashlib.new(_HASH)
+
+    def hash_source_path(self, source_path: Path) -> None:
+        """Process and hash a given source file, updating internal state."""
+        self._hstate.update(self.process_source_path(source_path).encode())
+
+    def find_directory_files(self, source_path: Path) -> T.Set[Path]:
+        source_path.is_dir(), f"Input source path is not a directory: {source_path}"
+
+        if self._cipd_names:
+            for cipd_name in self._cipd_names:
+                clang_version_file = (
+                    source_path / ".versions" / f"{cipd_name}.cipd_version"
+                )
+                if clang_version_file.exists():
+                    return set([clang_version_file])
+
+        # Find all files in direcrory.
+        dir_files: T.Set[Path] = set()
+        for dirpath, dirnames, filenames in os.walk(source_path):
+            for filename in filenames:
+                if filename.endswith(self._exclude_suffixes):
+                    continue
+                file_path = Path(os.path.join(dirpath, filename))
+                dir_files.add(file_path)
+
+        return dir_files
+
+    def process_source_path(self, source_path: Path) -> str:
+        """Process a given source file, and return a string descriptor for it.
+
+        The first letter of the result corresponds to the type of the source path.
+        This function is useful for unit-testing the implementation and verify
+        that different types of source paths are handled correctly. Apart from
+        that, consider this as an implementation detail.
+        """
+        if not source_path.exists():
+            raise ValueError(f"Path does not exist: {source_path}")
+
+        if source_path.is_dir() and (source_path / ".git").exists():
+            head_commit = gghc.get_git_head_commit(
+                source_path, self._git_binary
+            )
+            self._input_files.update(gghc.find_git_head_inputs(source_path))
+            return "G" + head_commit
+
+        if source_path.is_symlink():
+            self._input_files.add(source_path)
+            return "S" + str(source_path.readlink())
+
+        if source_path.is_file():
+            self._input_files.add(source_path)
+            with source_path.open("rb") as f:
+                digest = hashlib.file_digest(f, _HASH)
+            return "F" + digest.hexdigest()
+
+        assert source_path.is_dir(), f"Unexpected file type for {source_path}"
+
+        if self._cipd_names:
+            for cipd_name in self._cipd_names:
+                clang_version_file = (
+                    source_path / ".versions" / f"{cipd_name}.cipd_version"
+                )
+                if clang_version_file.exists():
+                    return self.process_source_path(clang_version_file)
+
+        # Get the list of files relative to the source directory.
+        dir_files: T.List[str] = [
+            os.path.relpath(f, source_path)
+            for f in self.find_directory_files(source_path)
+        ]
+
+        # Process them recursively to build a directory description text
+        # where each line looks like: <file> <type><digest>
+        dir_content = "D\n"
+        for dir_file in sorted(dir_files):
+            file_hash = self.process_source_path(source_path / dir_file)
+            dir_content += f" {dir_file} {file_hash}\n"
+        return dir_content
+
+    @property
+    def content_hash(self) -> str:
+        """Return final content hash as hexadecimal string."""
+        return self._hstate.hexdigest()
+
+    @property
+    def sorted_input_files(self) -> T.List[str]:
+        """Return the list of input files used by this instance."""
+        if self._sorted_input_files is None:
+            self._sorted_input_files = sorted(
+                [str(p) for p in self._input_files]
+            )
+        return self._sorted_input_files
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
-        "--cipd-name", help="Provide name for optional CIPD version file.."
+        "--cipd-name",
+        action="append",
+        default=[],
+        help="Provide name for optional CIPD version file. Can be used multiple times.",
     )
     parser.add_argument(
         "--exclude-suffix",
@@ -101,7 +182,16 @@ def main(commandline_args: Sequence[str]) -> int:
         + "Can be used multiple times.",
     )
     parser.add_argument(
-        "source_path", type=Path, help="Source file or directory path."
+        "--git-binary",
+        type=Path,
+        default=Path("git"),
+        help="Specify git binary to use for git repositories.",
+    )
+    parser.add_argument(
+        "source_path",
+        type=Path,
+        nargs="+",
+        help="Source file or directory path.",
     )
     parser.add_argument(
         "--output", type=Path, help="Optional output file path."
@@ -109,37 +199,41 @@ def main(commandline_args: Sequence[str]) -> int:
     parser.add_argument(
         "--depfile", type=Path, help="Optional Ninja depfile output file path."
     )
-    args = parser.parse_args(commandline_args)
-
-    if not args.source_path.exists():
-        parser.error(f"Path does not exist: {args.source_path}")
+    parser.add_argument(
+        "--inputs-list",
+        type=Path,
+        help="Write list of inputs to file, one path per line.",
+    )
+    args = parser.parse_args()
 
     if args.depfile and not args.output:
         parser.error("--depfile option requires --output.")
 
-    if args.source_path.is_dir():
-        files = find_content_files(
-            args.source_path,
-            cipd_name=args.cipd_name,
-            exclude_extensions=args.exclude_suffix,
-        )
-    else:
-        files = [args.source_path]
+    fstate = FileState(args.cipd_name, args.exclude_suffix, args.git_binary)
+    for source_path in args.source_path:
+        fstate.hash_source_path(source_path)
 
-    content_hash = content_hash_for_files(files)
     if args.output:
-        args.output.write_text(content_hash)
+        args.output.write_text(fstate.content_hash)
     else:
-        print(content_hash)
+        print(fstate.content_hash)
+
+    if args.inputs_list:
+        args.inputs_list.write_text("\n".join(fstate.sorted_input_files) + "\n")
 
     if args.depfile:
         args.depfile.write_text(
             "%s: \\\n  %s\n"
-            % (args.output, " \\\n  ".join(_depfile_quote(p) for p in files))
+            % (
+                args.output,
+                " \\\n  ".join(
+                    _depfile_quote(f) for f in fstate.sorted_input_files
+                ),
+            )
         )
 
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(main())

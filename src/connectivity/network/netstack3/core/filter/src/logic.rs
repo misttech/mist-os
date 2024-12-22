@@ -800,10 +800,9 @@ mod tests {
     use alloc::vec::Vec;
 
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use ip_test_macro::ip_test;
-    use net_types::ip::{AddrSubnet, Ipv4, Ipv4Addr, Ipv6Addr};
+    use net_types::ip::{AddrSubnet, Ipv4};
     use netstack3_base::{AssignedAddrIpExt, SegmentHeader};
     use test_case::test_case;
 
@@ -1037,7 +1036,7 @@ mod tests {
 
     #[test]
     fn transparent_proxy_terminal_for_entire_hook() {
-        const TPROXY_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8080));
+        const TPROXY_PORT: NonZeroU16 = NonZeroU16::new(8080).unwrap();
 
         let ingress = Hook {
             routines: vec![
@@ -1465,35 +1464,24 @@ mod tests {
         let mut bindings_ctx = FakeBindingsCtx::new();
         let mut ctx = FakeCtx::new(&mut bindings_ctx);
 
-        for i in 0..conntrack::MAXIMUM_ENTRIES {
-            // This ensures that, no matter how big index is (under 2^32, at least),
-            // we'll always have unique src and dst ports, and thus unique
-            // connections.
-            assert!(i < u32::MAX as usize);
-            let port = (i % (u16::MAX as usize)) as u16;
-            let ip_index = (i / (u16::MAX as usize)) as u16;
-
-            let ip: I::Addr = I::map_ip(
-                (I::SRC_IP, ip_index),
-                |(base_ip, i)| {
-                    let start = u32::from_be_bytes(base_ip.ipv4_bytes());
-                    let bytes = (start + u32::try_from(i).unwrap()).to_be_bytes();
-                    Ipv4Addr::new(bytes)
-                },
-                |(base_ip, i)| {
-                    let start = u128::from_be_bytes(base_ip.ipv6_bytes());
-                    let bytes = (start + u128::try_from(i).unwrap()).to_be_bytes();
-                    Ipv6Addr::from_bytes(bytes)
-                },
+        for i in 0..u32::try_from(conntrack::MAXIMUM_ENTRIES / 2).unwrap() {
+            let (mut packet, mut reply_packet) = conntrack::testutils::make_test_udp_packets(i);
+            let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
+                &mut bindings_ctx,
+                &mut packet,
+                &ethernet_interface(),
+                &mut NullMetadata {},
             );
+            assert_eq!(verdict, Verdict::Accept(()));
 
-            // Create a self-connected flow so it's automatically considered established
-            // after the first packet.
-            let mut packet = FakeIpPacket {
-                src_ip: ip,
-                dst_ip: ip,
-                body: FakeUdpPacket { src_port: port, dst_port: port },
-            };
+            let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
+                &mut bindings_ctx,
+                &mut reply_packet,
+                &ethernet_interface(),
+                &mut NullMetadata {},
+            );
+            assert_eq!(verdict, Verdict::Accept(()));
+
             let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
                 &mut bindings_ctx,
                 &mut packet,

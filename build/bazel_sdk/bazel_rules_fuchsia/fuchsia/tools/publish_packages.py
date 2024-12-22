@@ -84,7 +84,11 @@ class FuchsiaTaskPublish(FuchsiaTask):
             return
         args.target = args.target or run(args.ffx, "target", "default", "get")
         print(f"Waiting for {args.target} to come online (60s)")
-        run(args.ffx, "--target", args.target, "target", "wait", "-t", "60")
+        ffx_cmd = [args.ffx]
+        if args.target.strip():
+            ffx_cmd += ["--target", args.target.strip()]
+        ffx_cmd += ["target", "wait", "-t", "60"]
+        run(*ffx_cmd)
 
     def resolve_repo(self, args):
         if args.publish_only:
@@ -245,16 +249,11 @@ class FuchsiaTaskPublish(FuchsiaTask):
         # We don't add the typical aliases here, since we use the repo_name to construct
         # the package URL.
         print(f"Registering {args.repo_name} to target device {args.target}")
-        run(
-            args.ffx,
-            "--target",
-            args.target,
-            "target",
-            "repository",
-            "register",
-            "-r",
-            args.repo_name,
-        )
+        ffx_cmd = [args.ffx]
+        if args.target.strip():
+            ffx_cmd += ["--target", args.target.strip()]
+        ffx_cmd += ["target", "repository", "register", "-r", args.repo_name]
+        run(*ffx_cmd)
 
         # Optionally make the ffx repository default.
         if args.make_repo_default:

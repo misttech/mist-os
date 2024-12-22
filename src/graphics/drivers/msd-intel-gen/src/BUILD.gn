@@ -76,7 +76,7 @@ source_set("src") {
     "//src/graphics/magma/lib/magma/platform:barriers",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:bus_mapper",
-    "//src/graphics/magma/lib/magma/platform:device",
+    "//src/graphics/magma/lib/magma/platform:device_header",
     "//src/graphics/magma/lib/magma/platform:event",
     "//src/graphics/magma/lib/magma/platform:logger",
     "//src/graphics/magma/lib/magma/platform:semaphore",

@@ -15,7 +15,7 @@ use fuchsia_async as fasync;
 use fuchsia_inspect::reader::ReadableTree;
 use fuchsia_inspect::Inspector;
 use futures::{TryFutureExt, TryStreamExt};
-use tracing::warn;
+use log::warn;
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 
 /// Runs a server for the `fuchsia.inspect.Tree` protocol. This protocol returns the VMO
@@ -60,7 +60,7 @@ pub async fn handle_request_stream(
                 }
             }
             TreeRequest::_UnknownMethod { ordinal, method_type, .. } => {
-                warn!(ordinal, ?method_type, "Unknown request");
+                warn!(ordinal, method_type:?; "Unknown request");
             }
         }
     }
@@ -79,9 +79,9 @@ pub fn spawn_tree_server_with_stream(
     stream: TreeRequestStream,
 ) -> fasync::Task<()> {
     fasync::Task::spawn(async move {
-        handle_request_stream(inspector, settings, stream).await.unwrap_or_else(|err: Error| {
-            warn!(?err, "failed to run `fuchsia.inspect.Tree` server")
-        });
+        handle_request_stream(inspector, settings, stream).await.unwrap_or_else(
+            |err: Error| warn!(err:?; "failed to run `fuchsia.inspect.Tree` server"),
+        );
     })
 }
 
@@ -127,13 +127,13 @@ fn spawn_tree_name_iterator_server(values: Vec<String>, mut stream: TreeNameIter
                         responder.send(&result)?;
                     }
                     TreeNameIteratorRequest::_UnknownMethod { ordinal, method_type, .. } => {
-                        warn!(ordinal, ?method_type, "Unknown request");
+                        warn!(ordinal, method_type:?; "Unknown request");
                     }
                 }
             }
             Ok(())
         }
-        .unwrap_or_else(|err: Error| warn!(?err, "failed to run tree name iterator server")),
+        .unwrap_or_else(|err: Error| warn!(err:?; "failed to run tree name iterator server")),
     )
     .detach()
 }

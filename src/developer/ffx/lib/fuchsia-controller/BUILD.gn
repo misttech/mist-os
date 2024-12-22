@@ -85,7 +85,6 @@ python_c_extension("fidl_codec") {
   ]
   sources = [
     "cpp/abi/convert.h",
-    "cpp/abi/macros.h",
     "cpp/fidl_codec/decode.cc",
     "cpp/fidl_codec/decode.h",
     "cpp/fidl_codec/encode.cc",
@@ -172,9 +171,6 @@ python_library("fidl_bindings") {
     "tests:*",
     "//src/testing/end_to_end/honeydew:*",
   ]
-
-  # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
-  enable_mypy = false
 
   library_name = "fidl"
   source_root = "python/fidl"

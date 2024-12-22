@@ -15,7 +15,7 @@
 /// be used instead.
 macro_rules! __log_inner {
     (level = $level:ident, $($arg:tt)*) => {
-        tracing::$level!(tag = $crate::NETLINK_LOG_TAG, $($arg)*)
+        log::$level!(tag = $crate::NETLINK_LOG_TAG; $($arg)*)
     }
 }
 

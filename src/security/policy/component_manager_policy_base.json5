@@ -378,7 +378,6 @@
                 "/core/system-update/system-update-committer",
                 "/core/wlancfg",
                 "/core/wlandevicemonitor",
-                "/core/wlanstack",
             ],
         },
     },

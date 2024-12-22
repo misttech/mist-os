@@ -18,7 +18,6 @@
 
 use std::num::NonZeroU16;
 
-use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net_filter as fnet_filter;
 use fidl_fuchsia_net_filter_ext::{
     Action, Change, Controller, ControllerId, Domain, InstalledIpRoutine, IpHook, Matchers,
@@ -31,8 +30,8 @@ const BUS_NAME: &str = "test-bus";
 const SETUP_COMPLETE: &str = "setup-complete";
 const IPV4_LOCALHOST: fidl_fuchsia_net::IpAddress = fidl_ip!("127.0.0.1");
 const IPV6_LOCALHOST: fidl_fuchsia_net::IpAddress = fidl_ip!("::1");
-const TPROXY_PORT_1: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8001));
-const TPROXY_PORT_2: NonZeroU16 = const_unwrap_option(NonZeroU16::new(8002));
+const TPROXY_PORT_1: NonZeroU16 = NonZeroU16::new(8001).unwrap();
+const TPROXY_PORT_2: NonZeroU16 = NonZeroU16::new(8002).unwrap();
 
 #[fuchsia::main]
 async fn main() {

@@ -4,7 +4,6 @@
 import("//build/python/python_library.gni")
 
 python_library("mobly_controller") {
-  enable_mypy = true
   testonly = true
   library_name = "mobly_controller"
   source_root = "."

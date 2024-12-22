@@ -6,15 +6,13 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_EVENTS_INTERFACE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_EVENTS_INTERFACE_H_
 
-#include <fidl/fuchsia.sysmem2/cpp/wire.h>
-// TODO(https://fxbug.dev/42079190): Switch from Banjo to FIDL or api-types-cpp types.
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/stdcompat/span.h>
-#include <lib/zx/result.h>
 #include <lib/zx/time.h>
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace virtio_display {
 
@@ -35,14 +33,12 @@ class DisplayEngineEventsInterface {
   DisplayEngineEventsInterface& operator=(const DisplayEngineEventsInterface&) = delete;
   DisplayEngineEventsInterface& operator=(DisplayEngineEventsInterface&&) = delete;
 
-  // TODO(https://fxbug.dev/42079190): Switch from Banjo to FIDL or api-types-cpp types.
-  virtual void OnDisplayAdded(const raw_display_info_t& display_info) = 0;
-
+  virtual void OnDisplayAdded(display::DisplayId display_id,
+                              cpp20::span<const display::ModeAndId> preferred_modes,
+                              cpp20::span<const display::PixelFormat> pixel_formats) = 0;
   virtual void OnDisplayRemoved(display::DisplayId display_id) = 0;
-
   virtual void OnDisplayVsync(display::DisplayId display_id, zx::time timestamp,
                               display::ConfigStamp config_stamp) = 0;
-
   virtual void OnCaptureComplete() = 0;
 
  protected:

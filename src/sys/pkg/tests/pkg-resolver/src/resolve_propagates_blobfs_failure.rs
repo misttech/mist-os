@@ -105,7 +105,7 @@ impl DirectoryWithFileCreateOverride {
                     object,
                     control_handle: _,
                 } => {
-                    ObjectRequest::new3(flags, &options, object).handle(|request| {
+                    ObjectRequest::new(flags, &options, object).handle(|request| {
                         if path == "." {
                             let stream = fio::NodeRequestStream::from_channel(
                                 fasync::Channel::from_channel(request.take().into_channel()),

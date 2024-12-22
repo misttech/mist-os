@@ -1077,24 +1077,10 @@ which is almost certainly a mistake: {}",
             //   AND
             //   2) Offering the current required capability
             for child in children.iter() {
-                if !offers.iter().any(|offer| {
-                    let names_this_child = offer.to.iter().any(|target| match target {
-                        OfferToRef::Named(ref name) => name == &child.name,
-                        OfferToRef::All => true,
-                        OfferToRef::OwnDictionary(_) => false,
-                    });
-                    let capability_names = match required_offer {
-                        OfferToAllCapability::Dictionary(_) => offer.dictionary.as_ref(),
-                        OfferToAllCapability::Protocol(_) => offer.protocol.as_ref(),
-                    };
-                    let names_this_capability = match capability_names.as_ref() {
-                        Some(c) => {
-                            c.iter().any(|capability| capability.as_str() == required_offer.name())
-                        }
-                        None => false,
-                    };
-                    names_this_child && names_this_capability
-                }) {
+                if !offers
+                    .iter()
+                    .any(|offer| Self::has_required_offer(offer, &child.name, required_offer))
+                {
                     let capability_type = required_offer.offer_type();
                     return Err(Error::validate(format!(
                         r#"{capability_type} "{}" is not offered to child component "{}" but it is a required offer"#,
@@ -1105,24 +1091,10 @@ which is almost certainly a mistake: {}",
             }
 
             for collection in collections.iter() {
-                if !offers.iter().any(|offer| {
-                    let names_this_collection = offer.to.iter().any(|target| match target {
-                        OfferToRef::Named(ref name) => name == &collection.name,
-                        OfferToRef::All => true,
-                        OfferToRef::OwnDictionary(_) => false,
-                    });
-                    let capability_names = match required_offer {
-                        OfferToAllCapability::Dictionary(_) => offer.dictionary.as_ref(),
-                        OfferToAllCapability::Protocol(_) => offer.protocol.as_ref(),
-                    };
-                    let names_this_capability = match capability_names {
-                        Some(c) => c.iter().any(|capability_list| {
-                            capability_list.as_str() == required_offer.name()
-                        }),
-                        None => false,
-                    };
-                    names_this_collection && names_this_capability
-                }) {
+                if !offers
+                    .iter()
+                    .any(|offer| Self::has_required_offer(offer, &collection.name, required_offer))
+                {
                     let capability_type = required_offer.offer_type();
                     return Err(Error::validate(format!(
                         r#"{capability_type} "{}" is not offered to collection "{}" but it is a required offer"#,
@@ -1134,6 +1106,33 @@ which is almost certainly a mistake: {}",
         }
 
         Ok(())
+    }
+
+    fn has_required_offer(
+        offer: &Offer,
+        target_name: &Name,
+        required_offer: &OfferToAllCapability<'_>,
+    ) -> bool {
+        let names_this_collection = offer.to.iter().any(|target| match target {
+            OfferToRef::Named(ref name) => name == target_name,
+            OfferToRef::All => true,
+            OfferToRef::OwnDictionary(_) => false,
+        });
+        let capability_names = match required_offer {
+            OfferToAllCapability::Dictionary(_) => offer.dictionary.as_ref(),
+            OfferToAllCapability::Protocol(_) => offer.protocol.as_ref(),
+        };
+        let names_this_capability = match capability_names.as_ref() {
+            Some(OneOrMany::Many(names)) => {
+                names.iter().any(|cap_name| cap_name.as_str() == required_offer.name())
+            }
+            Some(OneOrMany::One(name)) => {
+                let cap_name = offer.r#as.as_ref().unwrap_or(name);
+                cap_name.as_str() == required_offer.name()
+            }
+            None => false,
+        };
+        names_this_collection && names_this_capability
     }
 
     fn validate_required_use_decls(&self) -> Result<(), Error> {
@@ -2056,7 +2055,7 @@ mod tests {
             &vec!["fuchsia.component.Binder".into()],
             &[],
         );
-        assert!(result.is_ok());
+        assert_matches!(result, Ok(_));
     }
 
     #[test]
@@ -2104,7 +2103,7 @@ mod tests {
             &Vec::new(),
             &[],
         );
-        assert!(result.is_ok());
+        assert_matches!(result, Ok(_));
     }
 
     #[test]
@@ -2152,7 +2151,7 @@ mod tests {
             &[],
             &[],
         );
-        assert!(result.is_ok());
+        assert_matches!(result, Ok(_));
 
         let input = r##"{
             children: [
@@ -2191,7 +2190,7 @@ mod tests {
             &[],
             &[],
         );
-        assert!(result.is_ok());
+        assert_matches!(result, Ok(_));
     }
 
     #[test]
@@ -2226,7 +2225,7 @@ mod tests {
             &[],
         );
 
-        assert!(result.is_ok(), "{:#?}", result);
+        assert_matches!(result, Ok(_));
 
         let input = r##"{
 
@@ -2259,7 +2258,7 @@ mod tests {
             &[],
         );
 
-        assert!(result.is_ok(), "{:#?}", result);
+        assert_matches!(result, Ok(_));
     }
 
     #[test]
@@ -2299,7 +2298,7 @@ mod tests {
         );
 
         // exact duplication is allowed
-        assert!(result.is_ok(), "{:#?}", result);
+        assert_matches!(result, Ok(_));
 
         let input = r##"{
             children: [
@@ -2430,7 +2429,7 @@ mod tests {
         );
 
         // exact duplication is allowed
-        assert!(result.is_ok(), "{:#?}", result);
+        assert_matches!(result, Ok(_));
 
         let input = r##"{
             children: [
@@ -2619,12 +2618,48 @@ mod tests {
             "test.cml",
             input.as_bytes(),
             &FeatureSet::empty(),
-            &vec!["fuchsia.logger.LogSink".into()],
-            &Vec::new(),
+            &["fuchsia.logger.LogSink".into()],
+            &[],
             &[],
         );
 
-        assert!(result.is_ok());
+        assert_matches!(result, Ok(_));
+    }
+
+    #[test]
+    fn required_dict_offers_accept_aliases() {
+        let input = r##"{
+            capabilities: [
+                {
+                    dictionary: "test-diagnostics",
+                }
+            ],
+            children: [
+                {
+                    name: "something",
+                    url: "fuchsia-pkg://fuchsia.com/something#meta/something.cm",
+                },
+            ],
+            offer: [
+                {
+                    dictionary: "test-diagnostics",
+                    from: "self",
+                    to: "#something",
+                    as: "diagnostics",
+                }
+            ]
+        }"##;
+
+        let result = validate_with_features_for_test(
+            "test.cml",
+            input.as_bytes(),
+            &FeatureSet::empty(),
+            &[],
+            &[],
+            &["diagnostics".into()],
+        );
+
+        assert_matches!(result, Ok(_));
     }
 
     fn fail_to_make_required_offer(
@@ -2878,7 +2913,7 @@ mod tests {
             "test.cml",
             input.as_bytes(),
             &FeatureSet::empty(),
-            &vec![],
+            &[],
             &[],
             &["diagnostics".to_string()],
         );

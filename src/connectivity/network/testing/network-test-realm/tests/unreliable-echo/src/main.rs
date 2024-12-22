@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use futures::{StreamExt as _, TryStreamExt as _};
-use tracing::info;
+use log::info;
 use {fidl_fuchsia_net_test_realm as fntr, fuchsia_async as fasync};
 
 #[fuchsia::main]

@@ -20,7 +20,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // Send messages over FIDL interface
     for message in args {
         let out = echo.echo_string(Some(&message)).await.expect("echo_string failed");
-        tracing::info!("Server response: {}", out.as_ref().expect("echo_string got empty result"));
+        log::info!("Server response: {}", out.as_ref().expect("echo_string got empty result"));
     }
 
     Ok(())

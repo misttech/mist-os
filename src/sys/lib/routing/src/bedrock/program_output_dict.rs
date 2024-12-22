@@ -41,15 +41,6 @@ pub trait ProgramOutputGenerator<C: ComponentInstanceInterface + 'static> {
         decl: &cm_rust::ComponentDecl,
         capability: &cm_rust::CapabilityDecl,
     ) -> Router<DirEntry>;
-
-    /// Get an outgoing directory router for `capability` that returns [Dict]. `capability`
-    /// should be a type that maps to [Dict].
-    fn new_outgoing_dir_dictionary_router(
-        &self,
-        component: &Arc<C>,
-        decl: &cm_rust::ComponentDecl,
-        capability: &cm_rust::CapabilityDecl,
-    ) -> Router<Dict>;
 }
 
 pub fn build_program_output_dictionary<C: ComponentInstanceInterface + 'static>(
@@ -83,23 +74,7 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
     router_gen: &impl ProgramOutputGenerator<C>,
 ) {
     match capability {
-        cm_rust::CapabilityDecl::Service(_) => {
-            let router = router_gen.new_outgoing_dir_dictionary_router(component, decl, capability);
-            let router = router.with_policy_check::<C>(
-                CapabilitySource::Component(ComponentSource {
-                    capability: ComponentCapability::from(capability.clone()),
-                    moniker: component.moniker().clone(),
-                }),
-                component.policy_checker().clone(),
-            );
-            match program_output_dict.insert_capability(capability.name(), router.into()) {
-                Ok(()) => (),
-                Err(e) => {
-                    warn!("failed to add {} to program output dict: {e:?}", capability.name())
-                }
-            }
-        }
-        cm_rust::CapabilityDecl::Directory(_) => {
+        cm_rust::CapabilityDecl::Service(_) | cm_rust::CapabilityDecl::Directory(_) => {
             let router = router_gen.new_outgoing_dir_dir_entry_router(component, decl, capability);
             let router = router.with_policy_check::<C>(
                 CapabilitySource::Component(ComponentSource {

@@ -73,6 +73,8 @@ enumerable_enum! {
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     ObjectClass {
         // keep-sorted start
+        /// The SELinux "anon_inode" object class.
+        AnonFsNode,
         /// The SELinux "blk_file" object class.
         Block,
         /// The SELinux "chr_file" object class.
@@ -104,6 +106,7 @@ impl ObjectClass {
     pub fn name(&self) -> &'static str {
         match self {
             // keep-sorted start
+            Self::AnonFsNode => "anon_inode",
             Self::Block => "blk_file",
             Self::Character => "chr_file",
             Self::Dir => "dir",
@@ -138,6 +141,8 @@ enumerable_enum! {
     #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
     FileClass {
         // keep-sorted start
+        /// The SELinux "anon_inode" object class.
+        AnonFsNode,
         /// The SELinux "blk_file" object class.
         Block,
         /// The SELinux "chr_file" object class.
@@ -160,6 +165,7 @@ impl From<FileClass> for ObjectClass {
     fn from(file_class: FileClass) -> Self {
         match file_class {
             // keep-sorted start
+            FileClass::AnonFsNode => Self::AnonFsNode,
             FileClass::Block => Self::Block,
             FileClass::Character => Self::Character,
             FileClass::Dir => Self::Dir,
@@ -243,6 +249,8 @@ permission_enum! {
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     Permission {
         // keep-sorted start
+        /// Permissions for the well-known SELinux "anon_inode" file-like object class.
+        AnonFsNode(AnonFsNodePermission),
         /// Permissions for the well-known SELinux "blk_file" file-like object class.
         Block(BlockFilePermission),
         /// Permissions for the well-known SELinux "chr_file" file-like object class.
@@ -365,6 +373,7 @@ impl CommonFilePermission {
     /// "allow" rules for the correct target object class.
     pub fn for_class(&self, class: FileClass) -> Permission {
         match class {
+            FileClass::AnonFsNode => AnonFsNodePermission::Common(self.clone()).into(),
             FileClass::Block => BlockFilePermission::Common(self.clone()).into(),
             FileClass::Character => CharacterFilePermission::Common(self.clone()).into(),
             FileClass::Dir => DirPermission::Common(self.clone()).into(),
@@ -373,6 +382,14 @@ impl CommonFilePermission {
             FileClass::Link => LinkFilePermission::Common(self.clone()).into(),
             FileClass::Socket => SocketPermission::Common(self.clone()).into(),
         }
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "anon_file" class permission used to manage special file-like nodes not linked
+    /// into any directory structures.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    AnonFsNodePermission extends CommonFilePermission {
     }
 }
 
@@ -459,6 +476,8 @@ class_permission_enum! {
         Associate("associate"),
         /// Permission to get filesystem attributes.
         GetAttr("getattr"),
+        /// Permission mount a filesystem.
+        Mount("mount"),
         /// Permission to remount a filesystem with different flags.
         Remount("remount"),
         /// Permission to unmount a filesystem.
@@ -495,6 +514,8 @@ class_permission_enum! {
         GetSession("getsession"),
         /// Permission to trace a process.
         Ptrace("ptrace"),
+        /// Permission to inherit the parent process's resource limits on exec.
+        RlimitInh("rlimitinh"),
         /// Permission to set the calling task's current Security Context.
         /// The "dyntransition" permission separately limits which Contexts "setcurrent" may be used to transition to.
         SetCurrent("setcurrent"),

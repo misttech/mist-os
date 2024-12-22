@@ -3339,7 +3339,6 @@ mod tests {
     };
 
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use futures::future::{self, FutureExt as _};
     use futures::stream::{FusedStream as _, TryStreamExt as _};
     use net_declare::{
@@ -3452,7 +3451,7 @@ mod tests {
         ))
     }
 
-    const INTERFACE_ID: InterfaceId = const_unwrap_option(InterfaceId::new(1));
+    const INTERFACE_ID: InterfaceId = InterfaceId::new(1).unwrap();
     const DHCPV6_DNS_SOURCE: DnsServersUpdateSource =
         DnsServersUpdateSource::Dhcpv6 { interface_id: INTERFACE_ID.get() };
     const LINK_LOCAL_SOCKADDR1: fnet::Ipv6SocketAddress = fnet::Ipv6SocketAddress {
@@ -4681,7 +4680,7 @@ mod tests {
     }
 
     const UPSTREAM_INTERFACE_CONFIG: InterfaceConfig = InterfaceConfig {
-        id: const_unwrap_option(InterfaceId::new(1)),
+        id: InterfaceId::new(1).unwrap(),
         kind: InterfaceKind::Host { upstream: true },
     };
 
@@ -4720,21 +4719,15 @@ mod tests {
         const INTERFACE_CONFIGS: [InterfaceConfig; 5] = [
             UPSTREAM_INTERFACE_CONFIG,
             InterfaceConfig {
-                id: const_unwrap_option(InterfaceId::new(2)),
+                id: InterfaceId::new(2).unwrap(),
                 kind: InterfaceKind::Host { upstream: true },
             },
             InterfaceConfig {
-                id: const_unwrap_option(InterfaceId::new(3)),
+                id: InterfaceId::new(3).unwrap(),
                 kind: InterfaceKind::Host { upstream: false },
             },
-            InterfaceConfig {
-                id: const_unwrap_option(InterfaceId::new(4)),
-                kind: InterfaceKind::Unowned,
-            },
-            InterfaceConfig {
-                id: const_unwrap_option(InterfaceId::new(5)),
-                kind: InterfaceKind::NonHost,
-            },
+            InterfaceConfig { id: InterfaceId::new(4).unwrap(), kind: InterfaceKind::Unowned },
+            InterfaceConfig { id: InterfaceId::new(5).unwrap(), kind: InterfaceKind::NonHost },
         ];
 
         let (
@@ -5195,10 +5188,9 @@ mod tests {
             .await
             .expect("handle DHCPv6 acquire prefix");
 
-        for (id, upstream) in [
-            (const_unwrap_option(InterfaceId::new(1)), true),
-            (const_unwrap_option(InterfaceId::new(2)), false),
-        ] {
+        for (id, upstream) in
+            [(InterfaceId::new(1).unwrap(), true), (InterfaceId::new(2).unwrap(), false)]
+        {
             // Mock interface being discovered by NetCfg.
             let (control, control_server_end) =
                 fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()

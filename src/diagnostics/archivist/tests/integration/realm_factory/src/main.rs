@@ -10,7 +10,7 @@ use fidl_fuchsia_archivist_test::*;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
-use tracing::error;
+use log::error;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

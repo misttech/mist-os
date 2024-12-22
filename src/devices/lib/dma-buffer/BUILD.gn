@@ -17,7 +17,7 @@ zx_library("dma-buffer") {
   ]
 
   sources = [ "dma-buffer.cc" ]
-  deps = [
+  public_deps = [
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

@@ -1072,7 +1072,7 @@ impl DynamicFileSource for StatFile {
         }
 
         if let Some(mm) = task.mm() {
-            let mem_stats = mm.get_stats().map_err(|_| errno!(EIO))?;
+            let mem_stats = mm.get_stats();
             let page_size = *PAGE_SIZE as usize;
             vsize = mem_stats.vm_size;
             rss = mem_stats.vm_rss / page_size;
@@ -1107,7 +1107,7 @@ impl StatmFile {
 impl DynamicFileSource for StatmFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let mem_stats = if let Some(mm) = Task::from_weak(&self.0)?.mm() {
-            mm.get_stats().map_err(|_| errno!(EIO))?
+            mm.get_stats()
         } else {
             Default::default()
         };
@@ -1195,7 +1195,7 @@ impl DynamicFileSource for StatusFile {
 
         if let Some(task) = task {
             if let Some(mm) = task.mm() {
-                let mem_stats = mm.get_stats().map_err(|_| errno!(EIO))?;
+                let mem_stats = mm.get_stats();
                 writeln!(sink, "VmSize:\t{} kB", mem_stats.vm_size / 1024)?;
                 writeln!(sink, "VmRSS:\t{} kB", mem_stats.vm_rss / 1024)?;
                 writeln!(sink, "RssAnon:\t{} kB", mem_stats.rss_anonymous / 1024)?;

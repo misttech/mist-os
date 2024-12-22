@@ -26,7 +26,12 @@ impl SignalFd {
         if flags & SFD_NONBLOCK != 0 {
             open_flags |= OpenFlags::NONBLOCK;
         }
-        Anon::new_file(current_task, Box::new(SignalFd { mask: Mutex::new(mask) }), open_flags)
+        Anon::new_file(
+            current_task,
+            Box::new(SignalFd { mask: Mutex::new(mask) }),
+            open_flags,
+            "[signalfd]",
+        )
     }
 
     pub fn set_mask(&self, mask: SigSet) {

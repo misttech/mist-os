@@ -369,6 +369,7 @@ rustc_library("starnix_core") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
     "//src/lib/mundane",
     "//src/lib/network/fidl_fuchsia_net_filter_ext",
     "//src/lib/process_builder",
@@ -475,7 +476,6 @@ rustc_library("starnix_core") {
 
   test_deps = [
     "//src/connectivity/lib/net-declare",
-    "//src/lib/const-unwrap",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
@@ -641,7 +641,9 @@ rustc_library("starnix_logging") {
   deps = [
     "//sdk/rust/zx",
     "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/contrib/stubs:inspect_stubs",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fuchsia-runtime",
     "//src/lib/trace/rust:trace",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
@@ -731,14 +733,15 @@ loadable_module("vdso") {
     "vdso/vdso-${current_cpu}.cc",
     "vdso/vdso-common.cc",
   ]
-  deps = [
-    ":vdso-calculate-utc",
-    "//zircon/kernel/lib/fasttime:headers",
-    "//zircon/system/public",
-  ]
+  if (current_cpu == "arm") {
+    sources += [ "vdso/vdso-arm-eabi.cc" ]
+  }
+
+  deps = [ "//zircon/system/public" ]
 
   if (current_cpu != "arm") {
     deps += [
+      ":vdso-calculate-utc",
       "//zircon/kernel/lib/fasttime:headers",
       "//zircon/system/ulib/affine",
     ]

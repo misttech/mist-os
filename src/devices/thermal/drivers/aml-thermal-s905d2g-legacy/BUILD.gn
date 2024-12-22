@@ -69,6 +69,7 @@ fuchsia_driver_component("aml-thermal-s905d2g-legacy") {
 
 fuchsia_driver_package("package") {
   package_name = "aml-thermal-s905d2g-legacy"
+  export_to_bazel = true
   driver_components = [ ":aml-thermal-s905d2g-legacy" ]
 }
 

@@ -31,6 +31,10 @@ pub struct Attach {
     #[argh(option)]
     pub url: Option<String>,
 
+    /// buffer size in MiB to profile. Specifies the amount of memory allocated for storing profiling information.
+    #[argh(option)]
+    pub buffer_size_mb: Option<u64>,
+
     /// moniker of a component to profile. If there is no matching component, the profiler will
     #[argh(option)]
     pub moniker: Option<String>,
@@ -91,6 +95,10 @@ pub struct Launch {
     /// url of a component to launch and profile
     #[argh(option)]
     pub url: String,
+
+    /// buffer size in MiB to profile. Specifies the amount of memory allocated for storing profiling information.
+    #[argh(option)]
+    pub buffer_size_mb: Option<u64>,
 
     /// moniker of a component to attach to and profile. If specified in combination with `--url`,
     /// will attempt to launch the component at the given moniker.

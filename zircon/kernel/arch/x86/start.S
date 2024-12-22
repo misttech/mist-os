@@ -35,7 +35,7 @@
 .macro set_relocated_page_table_entry table_reg, shift, value
     // Extract 32-bit chunk of kernel_relocated_base containing the index bits
     // for this page level shift.
-    mov PHYS(kernel_relocated_base + SHIFT_OFFSET(\shift)), %ecx
+    mov (kernel_relocated_base + SHIFT_OFFSET(\shift))(%rip), %rcx
 
     // Get the exact portion of the 32-bit value that is the index
     shrl $SHIFT_REMAIN(\shift), %ecx
@@ -71,7 +71,7 @@ FUNCTION_LABEL(_start)
     .code_patching.end
 
     /* set up a temporary stack pointer */
-    mov $PHYS(_kstack_end), %rsp
+    lea _kstack_end(%rip), %rsp
 
     // Save off the handoff pointer in a register that won't get clobbered.
     mov %rsi, %r14
@@ -83,9 +83,9 @@ FUNCTION_LABEL(_start)
 
     // The first word after the kernel image (at __data_end in our view)
     // gives the size of the following code.  Copy it to _end.
-    mov PHYS(__data_end), %ecx
-    mov $PHYS(__data_end+4), %esi
-    mov $PHYS(_end), %edi
+    mov __data_end(%rip), %ecx
+    lea (__data_end + 4)(%rip), %esi
+    lea _end(%rip), %edi
 
     // We are copying the relocation code right after the bss.
     // It is possible that the code is larger than the bss, so we have to
@@ -103,14 +103,16 @@ FUNCTION_LABEL(_start)
     cld
 
     // Now it's safe to zero the bss.
-    movl $PHYS(__bss_start), %edi
-    movl $PHYS(_end), %ecx
+    lea __bss_start(%rip), %edi
+    lea _end(%rip), %ecx
     sub %edi, %ecx              // Compute the length of the bss in bytes.
     xor %eax, %eax
     rep stosb // while (ecx-- > 0) *edi++ = al;
 
-    // This is in .bss, so now it's safe to set it.
-    mov %r15, PHYS(kernel_entry_ticks)
+    // These variables are in the .bss, so now it's safe to set them.
+    mov %r15, kernel_entry_ticks(%rip)
+    lea __executable_start(%rip), %rax
+    mov %rax, kernel_base_phys(%rip)
 
     // We modify the currently live address space below. Store the address of
     // the root page table in %rdx.
@@ -120,35 +122,37 @@ FUNCTION_LABEL(_start)
 
     // Link the table called `pdp_high` as the last entry in the root, which
     // covers [-512GiB, 0). %rdx still holds the address of the root table.
-    movl $PHYS(pdp_high),   %eax
+    lea pdp_high(%rip), %rax
     orl  $X86_KERNEL_PD_FLAGS, %eax
     set_relocated_page_table_entry %edx, PML4_SHIFT, %eax
 
-    // Now link the table called `id_map_lower_512gib_page_table_phys` as the
-    // first entry of the root: as named, it covers [0, 512GiB). %rdx still
-    // holds the address of the root table.
+    // We want to link the table that identity maps the first 1GiB to the
+    // fourth-last entry pdp_high, effecting a mapping of [-4GiB, -3GiB]
+    // virtual also to [0, 1GiB] physical.
+    //
+    // We first pick out the table mapping the first 1GiB by descending from
+    // the root table, picking out the first entries.
+    //
+    // Note that %rdx still holds the address of the root table.
+
     mov (%rdx), %rax
     movabs $X86_PT_BASE_ADDRESS_MASK, %rbx
-    andl %ebx, %eax
-    mov %eax, PHYS(id_map_lower_512gib_page_table_phys)
+    and %rbx, %rax
 
-    // Now link the table called `id_map_lower_1gib_page_table_phys` as the
-    // first entry of the previous table: as named, it covers [0, 1GiB). %rdx
-    // still holds the address of the root table, and %rax the address of the
-    // parent.
+    // %rax now holds the address of the table covering [0, 512GiB); descend
+    // down the first entry again. %rbx still holds the address mask for a
+    // table entry.
     mov (%rax), %rax
-    andl %ebx, %eax
-    mov %eax, PHYS(id_map_lower_1gib_page_table_phys)
+    and %rbx, %rax
 
-    // Further, link the table that defines the early 1GiB mapping as the
-    // fourth last entry in `pdp_high`, effectively mapping [-4GiB, -3GiB) to
-    // [0, 1GiB) and the kernel's image within it.
+    // %rax now holds the address of the table covering [0, 1GiB) and we make
+    // the [-4GiB, -3GiB) -> [0, 1GiB) mapping.
     orl  $X86_KERNEL_PD_FLAGS, %eax
-    movl $PHYS(pdp_high), %ebx
+    lea pdp_high(%rip), %rbx
     set_relocated_page_table_entry %ebx, PDP_SHIFT, %eax
 
     /* set up a linear map of the first 64GB */
-    movl $PHYS(linear_map_pdp), %esi
+    lea linear_map_pdp(%rip), %rsi
     movl $32768, %ecx
     xor  %eax, %eax
 
@@ -166,9 +170,9 @@ FUNCTION_LABEL(_start)
     loop 0b
 
     /* point the high pdp at our linear mapping page tables */
-    movl $PHYS(pdp_high + PDP_HIGH_OFFSET * 8), %esi
+    lea (pdp_high + PDP_HIGH_OFFSET * 8)(%rip), %rsi
     movl $64, %ecx
-    movl $PHYS(linear_map_pdp), %eax
+    lea linear_map_pdp(%rip), %eax
     orl  $X86_KERNEL_PD_FLAGS, %eax
 
 0:
@@ -192,54 +196,37 @@ FUNCTION_LABEL(_start)
     // shadow map. This should never be accessed.
     // Make the kasan Page Tables point to the zero page
     movl $NO_OF_PT_ENTRIES, %ecx
-    movl $PHYS(kasan_shadow_pt), %edi
-    movabs $PHYS(kasan_zero_page) + X86_KERNEL_KASAN_INITIAL_PT_FLAGS, %rax
+    lea kasan_shadow_pt(%rip), %rdi
+    lea kasan_zero_page(%rip), %rax
+    or $X86_KERNEL_KASAN_INITIAL_PT_FLAGS, %rax
     rep stosq
 
     // Make the Page Directory point to the Page Table
     movl $NO_OF_PT_ENTRIES, %ecx
-    movl $PHYS(kasan_shadow_pd),  %edi
-    movabs $PHYS(kasan_shadow_pt) + X86_KERNEL_KASAN_INITIAL_PD_FLAGS, %rax
+    lea kasan_shadow_pd(%rip), %rdi
+    lea kasan_shadow_pt(%rip), %rax
+    or $X86_KERNEL_KASAN_INITIAL_PD_FLAGS, %rax
     rep stosq
 
     // Put the page directory entry into the pdp_high. It's 64 entries starting from
     // the index corresponding to the KASAN_SHADOW_OFFSET virtual address.
     // 64 pdp entries span 64GB of shadow map, covering 512 GB of kernel address space
 #define PDP_HIGH_SHADOW_OFFSET (((KASAN_SHADOW_OFFSET) >> 30) & 0x1ff)
-    movl $PHYS(pdp_high + PDP_HIGH_SHADOW_OFFSET * 8), %edi
+    lea (pdp_high + PDP_HIGH_SHADOW_OFFSET * 8)(%rip), %rdi
     movl $X86_KERNEL_KASAN_PDP_ENTRIES, %ecx
-    movabs $PHYS(kasan_shadow_pd) + X86_KERNEL_KASAN_INITIAL_PD_FLAGS, %rax
+    lea kasan_shadow_pd(%rip), %rax
+    or $X86_KERNEL_KASAN_INITIAL_PD_FLAGS, %rax
     rep stosq
 #endif  // __has_feature(address_sanitizer)
 
-    // Load our new GDT by physical pointer.
-    // _temp_gdtr has it as a virtual pointer, so copy it and adjust.
-    movw PHYS(_temp_gdtr), %ax
-    movl PHYS(_temp_gdtr+2), %ecx
-    sub $PHYS_ADDR_DELTA, %ecx
-    movw %ax, -6(%esp)
-    movl %ecx, -4(%esp)
-    lgdt -6(%esp)
-
-    /* long jump to our code selector and the high address relocated */
-    push  $CODE_64_SELECTOR
-    mov  $PHYS(high_entry), %rax
-    addq PHYS(kernel_relocated_base), %rax
-    pushq %rax
-    lretq
+    // Long jump to our code selector and the high address relocated.
+    lea .Lhigh_entry(%rip), %rax
+    addq kernel_relocated_base(%rip), %rax
+    jmp *%rax
 
 // This code runs at the final virtual address, so it should be pure PIC.
-.text
-high_entry:
-    /* zero our kernel segment data registers */
-    xor %eax, %eax
-    mov %eax, %ds
-    mov %eax, %es
-    mov %eax, %fs
-    mov %eax, %gs
-    mov %eax, %ss
-
-    /* load the high kernel stack */
+.Lhigh_entry:
+    // load the high kernel stack
     lea _kstack_end(%rip), %rsp
 
     // move_fixups_and_zero_bss copied the fixup code to _end.
@@ -248,8 +235,26 @@ high_entry:
     call _end
     // The fixup code won't be used again, so the memory can be reused now.
 
-    /* reload the gdtr after relocations as it relies on relocated VAs */
+    // Load our new GDT before touching the segment registers, as the latter
+    // will cause the CPU to verify the GDTR points to valid memory for the
+    // GDT.
     lgdt _temp_gdtr(%rip)
+
+    // Now zero the non-CS segment registers: DS, ES, and SS are vestigial; FS
+    // is unused in the kernel; GS will be reset below.
+    xor %eax, %eax
+    mov %eax, %ds
+    mov %eax, %es
+    mov %eax, %fs
+    mov %eax, %gs
+    mov %eax, %ss
+
+    // Load our new CS from the newly-loaded GDT with a long return.
+    pushq $CODE_64_SELECTOR
+    lea .Lreload_cs(%rip), %rax
+    pushq %rax
+    lretq
+.Lreload_cs:
 
     // Set %gs.base to &bp_percpu.  It's statically initialized
     // with kernel_unsafe_sp set, so after this it's safe to call
@@ -284,10 +289,6 @@ high_entry:
     mov %rax, %gs:ZX_TLS_STACK_GUARD_OFFSET
     // Don't leak that value to other code.
     xor %eax, %eax
-
-    // configure the kernel base address
-    // TODO: dynamically figure this out once we allow the x86 kernel to be loaded anywhere
-    movl $PHYS_LOAD_ADDRESS, kernel_base_phys(%rip)
 
     // Collect the time stamp of entering "normal" C++ code in virtual space.
     sample_ticks kernel_virtual_entry_ticks(%rip)

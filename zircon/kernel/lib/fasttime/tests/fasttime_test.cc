@@ -91,7 +91,8 @@ TEST(FasttimeTest, ComputeMonotonicTicks) {
   ASSERT_EQ(time_values_vmo.get_size(&vmo_size), ZX_OK);
 
   fzl::OwnedVmoMapper time_values_mapper;
-  ASSERT_EQ(time_values_mapper.Map(std::move(time_values_vmo), vmo_size, ZX_VM_PERM_READ), ZX_OK);
+  ASSERT_EQ(time_values_mapper.Map(std::move(time_values_vmo), 0, vmo_size, ZX_VM_PERM_READ),
+            ZX_OK);
   const zx_vaddr_t time_values_addr = reinterpret_cast<zx_vaddr_t>(time_values_mapper.start());
 
   // Ensure that compute_monotonic_ticks and zx_ticks_get return the same values.
@@ -118,7 +119,8 @@ TEST(FasttimeTest, ComputeMonotonicTime) {
   ASSERT_EQ(time_values_vmo.get_size(&vmo_size), ZX_OK);
 
   fzl::OwnedVmoMapper time_values_mapper;
-  ASSERT_EQ(time_values_mapper.Map(std::move(time_values_vmo), vmo_size, ZX_VM_PERM_READ), ZX_OK);
+  ASSERT_EQ(time_values_mapper.Map(std::move(time_values_vmo), 0, vmo_size, ZX_VM_PERM_READ),
+            ZX_OK);
   const zx_vaddr_t time_values_addr = reinterpret_cast<zx_vaddr_t>(time_values_mapper.start());
 
   // Ensure that compute_monotonic_time and zx_clock_get_monotonic return the same values.

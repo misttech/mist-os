@@ -3,27 +3,28 @@
 // found in the LICENSE file.
 
 use std::fs::{create_dir_all, File};
-use std::io::{copy, Cursor, Error};
+use std::io::{copy, Error};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
+use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
 use std::{env, fs};
 use tempfile::TempDir;
 use zip::ZipArchive;
 
-const LACEWING_ARTIFACTS_BYTES: &[u8] = data::LACEWING_ARTIFACTS;
-
 const PYTHON_RUNTIME_NAME: &str = "python3";
 const LACEWING_TEST_NAME: &str = "test.pyz";
 
-fn unpack_artifacts(dir: &TempDir) -> Result<(), Error> {
+fn unpack_artifacts(current_exe: &Path, dir: &TempDir) -> Result<(), Error> {
     println!("[HermeticWrapper] Extracting Lacewing artifacts");
     let t_before_unpack = Instant::now();
 
+    // The current executable file is assumed to have a ZIP file appended to it.
+    let current_exe_file = File::open(current_exe)?;
+
     // Extract archive contents.
-    let mut zip =
-        ZipArchive::new(Cursor::new(LACEWING_ARTIFACTS_BYTES)).expect("Unable to read archive.");
+    let mut zip = ZipArchive::new(&current_exe_file).expect("Unable to read archive.");
     for i in 0..zip.len() {
         let mut file = zip.by_index(i).expect("Unable to get file by index from archive.");
         let outpath = file.sanitized_name();
@@ -51,7 +52,9 @@ fn main() -> Result<(), Error> {
     // Create temp dir to unpack data resources
     let tempdir = TempDir::new().expect("failed to create tmp dir");
 
-    unpack_artifacts(&tempdir)?;
+    let current_exe = env::current_exe().expect("failed to obtain current executable path");
+
+    unpack_artifacts(&current_exe, &tempdir)?;
 
     // Execute the Lacewing test in an external process.
     let mut command = Command::new(tempdir.path().join(PYTHON_RUNTIME_NAME));

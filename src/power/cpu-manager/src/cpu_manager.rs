@@ -8,9 +8,9 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use futures::future::{join_all, LocalBoxFuture};
 use futures::stream::{FuturesUnordered, StreamExt};
+use log::*;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tracing::*;
 use {fuchsia_async as fasync, serde_json as json};
 
 // nodes

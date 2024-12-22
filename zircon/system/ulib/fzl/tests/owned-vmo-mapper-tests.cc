@@ -86,7 +86,7 @@ void CreateAndMapHelper(fzl::OwnedVmoMapper* inout_mapper, uint64_t size, const 
 }
 
 template <bool NON_ROOT_VMAR>
-void MapHelper(fzl::OwnedVmoMapper* inout_mapper, zx::vmo vmo, uint64_t size,
+void MapHelper(fzl::OwnedVmoMapper* inout_mapper, zx::vmo vmo, uint64_t offset, uint64_t size,
                zx_vm_option_t map_options = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE) {
   fbl::RefPtr<fzl::VmarManager> manager;
   if (NON_ROOT_VMAR) {
@@ -96,7 +96,7 @@ void MapHelper(fzl::OwnedVmoMapper* inout_mapper, zx::vmo vmo, uint64_t size,
 
   ASSERT_NOT_NULL(inout_mapper);
   zx_status_t status;
-  status = inout_mapper->Map(std::move(vmo), size, map_options, std::move(manager));
+  status = inout_mapper->Map(std::move(vmo), offset, size, map_options, std::move(manager));
   ASSERT_EQ(status, ZX_OK);
   ASSERT_NO_FATAL_FAILURE(ValidateCreateHelper(*inout_mapper, size));
 }
@@ -128,7 +128,7 @@ void MapTest() {
 
   fzl::OwnedVmoMapper mapper;
   ASSERT_NO_FATAL_FAILURE(
-      MapHelper<NON_ROOT_VMAR>(&mapper, std::move(vmo), zx_system_get_page_size()));
+      MapHelper<NON_ROOT_VMAR>(&mapper, std::move(vmo), 0, zx_system_get_page_size()));
 }
 
 template <bool NON_ROOT_VMAR>

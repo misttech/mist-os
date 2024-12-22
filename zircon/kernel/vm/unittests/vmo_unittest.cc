@@ -1471,19 +1471,12 @@ static bool vmo_clones_of_compressed_pages_test() {
       vmo->CreateClone(Resizability::NonResizable, CloneType::Snapshot, 0, PAGE_SIZE, true, &clone);
   ASSERT_OK(status);
   clone->set_user_id(43);
-#if ENABLE_LEGACY_ATTRIBUTION
-  EXPECT_TRUE((VmObject::AttributionCounts{
-                  .compressed_bytes = PAGE_SIZE,
-              }) == vmo->GetAttributedMemory());
-  EXPECT_TRUE((VmObject::AttributionCounts{}) == clone->GetAttributedMemory());
-#else
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE,
                                            .scaled_compressed_bytes = vm::FractionalBytes(
                                                PAGE_SIZE, 2)}) == vmo->GetAttributedMemory());
   EXPECT_TRUE((VmObject::AttributionCounts{.compressed_bytes = PAGE_SIZE,
                                            .scaled_compressed_bytes = vm::FractionalBytes(
                                                PAGE_SIZE, 2)}) == clone->GetAttributedMemory());
-#endif
 
   // Forking the page into a child will decompress in order to do the copy.
   status = clone->Write(&data, 0, sizeof(data));
@@ -2020,14 +2013,6 @@ static bool vmo_attribution_clones_test() {
 
   // Creation of the clone should increment the generation count.
   ++expected_gen_count;
-#if ENABLE_LEGACY_ATTRIBUTION
-  EXPECT_EQ(true, verify_object_memory_attribution(vmo.get(), expected_gen_count,
-                                                   AttributionCounts{
-                                                       .uncompressed_bytes = 2ul * PAGE_SIZE,
-                                                   }));
-  EXPECT_EQ(true,
-            verify_object_memory_attribution(clone.get(), expected_gen_count, AttributionCounts{}));
-#else
   EXPECT_EQ(true,
             verify_object_memory_attribution(
                 vmo.get(), expected_gen_count,
@@ -2040,7 +2025,6 @@ static bool vmo_attribution_clones_test() {
                 clone.get(), expected_gen_count,
                 AttributionCounts{.uncompressed_bytes = PAGE_SIZE,
                                   .scaled_uncompressed_bytes = vm::FractionalBytes(PAGE_SIZE, 2)}));
-#endif
 
   // Commit both pages in the clone. This should increment the generation count by the no. of pages
   // committed in the clone.
@@ -4086,12 +4070,6 @@ static bool vmo_snapshot_modified_test() {
   ASSERT_EQ(ZX_OK, status, "vmobject snapshot-modified\n");
   ASSERT_NONNULL(snapshot, "vmobject snapshot-modified clone\n");
 
-#if ENABLE_LEGACY_ATTRIBUTION
-  EXPECT_TRUE((vm::AttributionCounts{
-                  .uncompressed_bytes = PAGE_SIZE,
-              }) == clone->GetAttributedMemory());
-  EXPECT_TRUE((vm::AttributionCounts{}) == snapshot->GetAttributedMemory());
-#else
   // Pages in hidden parent will be attributed to both children.
   EXPECT_TRUE((vm::AttributionCounts{.uncompressed_bytes = PAGE_SIZE,
                                      .scaled_uncompressed_bytes = vm::FractionalBytes(
@@ -4099,7 +4077,6 @@ static bool vmo_snapshot_modified_test() {
   EXPECT_TRUE((vm::AttributionCounts{.uncompressed_bytes = PAGE_SIZE,
                                      .scaled_uncompressed_bytes = vm::FractionalBytes(
                                          PAGE_SIZE, 2)}) == snapshot->GetAttributedMemory());
-#endif
 
   // Calling CreateClone directly with SnapshotAtLeastOnWrite should upgrade to snapshot-modified.
   fbl::RefPtr<VmObject> atleastonwrite;

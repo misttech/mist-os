@@ -10,9 +10,9 @@ use fidl_fuchsia_metrics::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol};
+use log::error;
 #[cfg(test)]
 use mockall::automock;
-use tracing::error;
 
 #[cfg_attr(test, automock)]
 pub trait Cobalt {
@@ -67,7 +67,7 @@ fn get_logger_from_factory(
             )
             .await
         {
-            error!(%err, "Failed to create Cobalt logger");
+            error!(err:%; "Failed to create Cobalt logger");
         }
     })
     .detach();

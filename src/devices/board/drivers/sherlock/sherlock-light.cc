@@ -151,7 +151,7 @@ zx_status_t Sherlock::LightInit() {
   light_node.did() = PDEV_DID_GPIO_LIGHT;
   light_node.metadata() = {
       {{
-          .id = fuchsia_hardware_light::kMetadataTypeName,
+          .id = fuchsia_hardware_light::Metadata::kSerializableName,
           .data = std::move(metadata.value()),
       }},
   };

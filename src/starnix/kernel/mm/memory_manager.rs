@@ -18,6 +18,7 @@ use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use starnix_types::arch::ArchWidth;
+use starnix_uapi::user_address::MultiArchUserRef;
 
 use rand::{thread_rng, Rng};
 use range_map::RangeMap;
@@ -644,7 +645,11 @@ struct PrivateAnonymousMemoryManager {
 impl PrivateAnonymousMemoryManager {
     fn new(backing_size: u64) -> Self {
         let backing = Arc::new(MemoryObject::from(
-            zx::Vmo::create(backing_size).unwrap().replace_as_executable(&VMEX_RESOURCE).unwrap(),
+            zx::Vmo::create(backing_size)
+                .unwrap()
+                .replace_as_executable(&VMEX_RESOURCE)
+                .unwrap()
+                .with_zx_name("starnix:memory_manager"),
         ));
         Self { backing }
     }
@@ -2040,13 +2045,15 @@ impl MemoryManagerState {
             .ptr()
             .checked_sub(low_addr.ptr())
             .ok_or_else(|| anyhow!("Invalid growth range"))?;
-        let memory =
-            Arc::new(MemoryObject::from(zx::Vmo::create(length as u64).map_err(|s| match s {
+        let memory = Arc::new(
+            MemoryObject::from(zx::Vmo::create(length as u64).map_err(|s| match s {
                 zx::Status::NO_MEMORY | zx::Status::OUT_OF_RANGE => {
                     anyhow!("Could not allocate VMO for mapping growth")
                 }
                 _ => anyhow!("Unexpected error creating VMO: {s}"),
-            })?));
+            })?)
+            .with_zx_name(b"starnix:memory_manager"),
+        );
         let vmar_flags =
             mapping_to_grow.flags.access_flags().to_vmar_flags() | zx::VmarFlags::SPECIFIC;
         let mapping = Mapping::new(
@@ -2630,6 +2637,18 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         }
     }
 
+    /// Read an instance of T64 from `user` where the object has a different representation in 32
+    /// and 64 bits.
+    fn read_multi_arch_object<T64: FromBytes, T32: FromBytes + Into<T64>>(
+        &self,
+        user: MultiArchUserRef<T64, T32>,
+    ) -> Result<T64, Errno> {
+        match user {
+            MultiArchUserRef::<T64, T32>::Arch64(user) => self.read_object(user),
+            MultiArchUserRef::<T64, T32>::Arch32(user) => self.read_object(user).map(T32::into),
+        }
+    }
+
     /// Reads the first `partial` bytes of an object, leaving any remainder 0-filled.
     ///
     /// This is used for reading size-versioned structures where the user can specify an older
@@ -3194,11 +3213,6 @@ impl MemoryManager {
 
         let brk = match state.brk.clone() {
             None => {
-                let memory = Arc::new(MemoryObject::from(
-                    zx::Vmo::create(PROGRAM_BREAK_LIMIT).map_err(|_| errno!(ENOMEM))?,
-                ));
-                memory.set_zx_name(b"starnix-brk");
-
                 let brk = ProgramBreak { base: state.brk_origin, current: state.brk_origin };
                 state.brk = Some(brk.clone());
                 brk
@@ -4085,56 +4099,66 @@ impl MemoryManager {
         self.state.write().extend_growsdown_mapping_to_address(addr, is_write)
     }
 
-    pub fn get_stats(&self) -> Result<MemoryStats, Errno> {
-        let mut result = MemoryStats::default();
-        let state = self.state.read();
-        for (range, mapping) in state.mappings.iter() {
-            let size = range.end.ptr() - range.start.ptr();
-            result.vm_size += size;
+    pub fn get_stats(&self) -> MemoryStats {
+        // Grab our state lock before reading zircon mappings so that the two are consistent.
+        // Other Starnix threads should not make any changes to the Zircon mappings while we hold
+        // a write lock to the memory manager state.
+        let state = self.state.write();
 
-            match &mapping.backing {
-                MappingBacking::Memory(backing) => {
-                    let memory_info = backing.memory.info()?;
-                    let committed_bytes = memory_info.committed_bytes as usize;
-                    let populated_bytes = memory_info.populated_bytes as usize;
+        let zx_mappings = state
+            .user_vmar
+            .info_maps_vec()
+            // None of https://fuchsia.dev/reference/syscalls/object_get_info?hl=en#errors should be
+            // possible for this VMAR we created and the zx crate guarantees a well-formed query.
+            .expect("must be able to query mappings for private user VMAR");
 
-                    result.vm_rss += committed_bytes;
+        let mut stats = MemoryStats::default();
+        stats.vm_stack = state.stack_size;
 
-                    if mapping.flags.contains(MappingFlags::ANONYMOUS)
-                        && !mapping.flags.contains(MappingFlags::SHARED)
-                    {
-                        result.rss_anonymous += committed_bytes;
-                        result.vm_swap += populated_bytes - committed_bytes;
-                    }
+        for zx_mapping in zx_mappings {
+            // We only care about map info for actual mappings.
+            let zx_details = zx_mapping.details();
+            let Some(zx_details) = zx_details.as_mapping() else { continue };
+            let (_, mm_mapping) = state
+                .mappings
+                .get(&UserAddress::from(zx_mapping.base as u64))
+                .expect("mapping bookkeeping must be consistent with zircon's");
+            debug_assert_eq!(
+                match &mm_mapping.backing {
+                    MappingBacking::Memory(m) => m.memory.get_koid(),
+                    #[cfg(feature = "alternate_anon_allocs")]
+                    MappingBacking::PrivateAnonymous => state.private_anonymous.get_koid(),
+                },
+                zx_details.vmo_koid,
+                "MemoryManager and Zircon must agree on which VMO is mapped in this range",
+            );
 
-                    if memory_info.share_count > 1 {
-                        result.rss_shared += committed_bytes;
-                    }
+            stats.vm_size += zx_mapping.size;
 
-                    if let MappingName::File(_) = mapping.name {
-                        result.rss_file += committed_bytes;
-                    }
-                }
-                #[cfg(feature = "alternate_anon_allocs")]
-                MappingBacking::PrivateAnonymous => {
-                    // TODO(b/310255065): Populate |result|
-                }
+            stats.vm_rss += zx_details.committed_bytes;
+            stats.vm_swap += zx_details.populated_bytes - zx_details.committed_bytes;
+
+            if mm_mapping.flags.contains(MappingFlags::SHARED) {
+                stats.rss_shared += zx_details.committed_bytes;
+            } else if mm_mapping.flags.contains(MappingFlags::ANONYMOUS) {
+                stats.rss_anonymous += zx_details.committed_bytes;
+            } else if let MappingName::File(_) = mm_mapping.name {
+                stats.rss_file += zx_details.committed_bytes;
             }
 
-            if mapping.flags.contains(MappingFlags::ELF_BINARY)
-                && mapping.flags.contains(MappingFlags::WRITE)
+            if mm_mapping.flags.contains(MappingFlags::ELF_BINARY)
+                && mm_mapping.flags.contains(MappingFlags::WRITE)
             {
-                result.vm_data += size;
+                stats.vm_data += zx_mapping.size;
             }
 
-            if mapping.flags.contains(MappingFlags::ELF_BINARY)
-                && mapping.flags.contains(MappingFlags::EXEC)
+            if mm_mapping.flags.contains(MappingFlags::ELF_BINARY)
+                && mm_mapping.flags.contains(MappingFlags::EXEC)
             {
-                result.vm_exe += size;
+                stats.vm_exe += zx_mapping.size;
             }
         }
-        result.vm_stack = state.stack_size;
-        Ok(result)
+        stats
     }
 
     pub fn atomic_load_u32_relaxed(&self, futex_addr: FutexAddress) -> Result<u32, Errno> {
@@ -4279,12 +4303,6 @@ fn write_map(
                     .flat_map(|b| if *b == b'\n' { b"\\012" } else { std::slice::from_ref(b) })
                     .copied(),
             );
-            // If the mapping is file-backed and the file has been
-            // deleted, the string " (deleted)" is appended to the
-            // pathname.
-            if name.entry.is_dead() {
-                sink.write(b" (deleted)");
-            }
         }
         MappingName::Vma(name) => {
             fill_to_name(sink);
@@ -4432,7 +4450,8 @@ pub fn create_anonymous_mapping_memory(size: u64) -> Result<Arc<MemoryObject>, E
             zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
             _ => impossible_error(s),
         })?,
-    );
+    )
+    .with_zx_name(b"starnix:memory_manager");
 
     profile.pivot("SetAnonVmoName");
     memory.set_zx_name(b"starnix-anon");

@@ -5,6 +5,7 @@
 #ifndef LIB_DL_LINKING_SESSION_H_
 #define LIB_DL_LINKING_SESSION_H_
 
+#include <lib/elfldltl/init-fini.h>
 #include <lib/elfldltl/resolve.h>
 #include <lib/fit/result.h>
 #include <lib/ld/decoded-module-in-memory.h>
@@ -312,7 +313,9 @@ class LinkingSession<Loader>::SessionModule
     if (!decoded().DecodeFromMemory(  //
             diag, loader.memory(), loader.page_size(), *headers, max_tls_modid,
             elfldltl::DynamicRelocationInfoObserver(decoded().reloc_info()),
-            NeededObserver(needed_offsets))) [[unlikely]] {
+            elfldltl::DynamicInitObserver(decoded().module().init),
+            elfldltl::DynamicFiniObserver(decoded().module().fini), NeededObserver(needed_offsets)))
+        [[unlikely]] {
       return {};
     }
 

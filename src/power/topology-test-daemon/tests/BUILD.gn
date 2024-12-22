@@ -13,6 +13,7 @@ rustc_test("bin") {
   deps = [
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.observability:fuchsia.power.observability_rust",
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/reader/rust",
@@ -25,7 +26,7 @@ rustc_test("bin") {
     "//src/power/system-activity-governor:component",
     "//src/power/topology-test-daemon:component",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]

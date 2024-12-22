@@ -1043,7 +1043,6 @@ mod tests {
     use super::*;
     use crate::bindings::util::{IntoCore as _, TryIntoCore as _};
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use fixture::fixture;
     use futures::Stream;
     use itertools::Itertools as _;
@@ -1096,11 +1095,11 @@ mod tests {
         let () = watchers.try_collect().await.expect("watchers error");
     }
 
-    const IFACE1_ID: BindingId = const_unwrap_option(NonZeroU64::new(111));
+    const IFACE1_ID: BindingId = NonZeroU64::new(111).unwrap();
     const IFACE1_NAME: &str = "iface1";
     const IFACE1_TYPE: finterfaces_ext::PortClass = finterfaces_ext::PortClass::Ethernet;
 
-    const IFACE2_ID: BindingId = const_unwrap_option(NonZeroU64::new(222));
+    const IFACE2_ID: BindingId = NonZeroU64::new(222).unwrap();
     const IFACE2_NAME: &str = "iface2";
     const IFACE2_TYPE: finterfaces_ext::PortClass = finterfaces_ext::PortClass::Loopback;
 

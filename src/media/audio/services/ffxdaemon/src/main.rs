@@ -23,9 +23,9 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use futures::{StreamExt, TryStreamExt};
+use log::error;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tracing::error;
 use {fidl_fuchsia_audio_controller as fac, fuchsia_async as fasync};
 
 /// Wraps all hosted protocols into a single type that can be matched against and dispatched.
@@ -98,7 +98,7 @@ async fn serve_player(
                 let result = handle_play_request(device_control_connector.clone(), payload).await;
 
                 if let Err(ref err) = result {
-                    error!(%err, "Failed to play");
+                    error!(err:%; "Failed to play");
                 }
                 responder.send(result.map_err(|err| err.inner)).context("Could not send response")
             }
@@ -175,7 +175,7 @@ async fn serve_recorder(
                 let result = handle_record_request(device_control_connector.clone(), payload).await;
 
                 if let Err(ref err) = result {
-                    error!(%err, "Failed to record");
+                    error!(err:%; "Failed to record");
                 }
                 responder.send(result.map_err(|err| err.inner)).context("Could not send response")
             }
@@ -252,17 +252,17 @@ async fn main() -> Result<(), Error> {
                         if let Err(err) =
                             serve_device_control(device_control_connector, stream).await
                         {
-                            error!(%err, "Failed to serve DeviceControl protocol");
+                            error!(err:%; "Failed to serve DeviceControl protocol");
                         }
                     }
                     IncomingRequest::Player(stream) => {
                         if let Err(err) = serve_player(device_control_connector, stream).await {
-                            error!(%err, "Failed to serve Player protocol");
+                            error!(err:%; "Failed to serve Player protocol");
                         }
                     }
                     IncomingRequest::Recorder(stream) => {
                         if let Err(err) = serve_recorder(device_control_connector, stream).await {
-                            error!(%err, "Failed to serve Recorder protocol");
+                            error!(err:%; "Failed to serve Recorder protocol");
                         }
                     }
                 }

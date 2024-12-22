@@ -34,7 +34,6 @@ rustc_test("netstack3_ip_integration_test") {
     "//src/connectivity/network/netstack3/core/lock-order",
     "//src/connectivity/network/netstack3/core/macros:netstack3-macros",
     "//src/connectivity/network/netstack3/core/tcp:netstack3-tcp-testutils",
-    "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:assert_matches",

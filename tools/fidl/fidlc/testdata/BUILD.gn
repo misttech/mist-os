@@ -35,6 +35,7 @@ standalone_libraries = [
   "protocol_request.test.fidl",
   "protocols.test.fidl",
   "request_flexible_envelope.test.fidl",
+  "serializable.test.fidl",
   "service.test.fidl",
   "string_arrays.test.fidl",
   "struct.test.fidl",

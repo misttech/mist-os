@@ -46,9 +46,7 @@ closed protocol Device {
     /// the view of the monotonic clock.
     /// If status is ZX_ERR_SHOULD_WAIT the client can wait on the event
     /// from `GetReportsEvent`.
-    strict ReadReport() -> (resource struct {
-        report fuchsia.hardware.hidbus.Report;
-    }) error zx.Status;
+    strict ReadReport() -> (fuchsia.hardware.hidbus.Report) error zx.Status;
 
     /// Read up to MAX_REPORT_DATA bytes of reports that have been sent from a device.
     /// This is the interface that is supposed to be used for continuous polling.

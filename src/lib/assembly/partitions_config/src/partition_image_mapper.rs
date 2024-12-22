@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{Partition, PartitionsConfig, Slot};
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use assembly_manifest::Image;
 use assembly_util::write_json_file;
 use camino::Utf8PathBuf;
@@ -23,6 +23,8 @@ pub enum ImageType {
     FVM,
     /// Fuchsia Filesystem.
     Fxfs,
+    /// Device Tree Blob Overlay.
+    Dtbo,
 }
 
 /// A pair of an image path mapped to a specific partition.
@@ -47,7 +49,7 @@ impl PartitionImageMapper {
     }
 
     /// Map a set images that are intended for a specific slot to partitions.
-    pub fn map_images_to_slot(&mut self, images: &Vec<Image>, slot: Slot) {
+    pub fn map_images_to_slot(&mut self, images: &Vec<Image>, slot: Slot) -> Result<()> {
         let slot_entry = self.images.entry(slot).or_insert(BTreeMap::new());
         for image in images.iter() {
             match image {
@@ -75,9 +77,17 @@ impl PartitionImageMapper {
                         slot_entry.insert(ImageType::Fxfs, path.clone());
                     }
                 }
+                Image::Dtbo(path) => {
+                    // The software delivery system does not support dtbos in slot R.
+                    if slot == Slot::R {
+                        bail!("devicetree_overlay cannot be mapped to slot R");
+                    }
+                    slot_entry.insert(ImageType::Dtbo, path.clone());
+                }
                 _ => {}
             }
         }
+        Ok(())
     }
 
     /// Return the mappings of images to partitions.
@@ -99,6 +109,7 @@ impl PartitionImageMapper {
             let (image_type, slot) = match &p {
                 Partition::ZBI { slot, .. } => (ImageType::ZBI, slot),
                 Partition::VBMeta { slot, .. } => (ImageType::VBMeta, slot),
+                Partition::Dtbo { slot, .. } => (ImageType::Dtbo, slot),
 
                 // Arbitrarily, take the fvm from the slot A system.
                 Partition::FVM { .. } => (ImageType::FVM, &Slot::A),
@@ -167,8 +178,10 @@ mod tests {
             partitions: vec![
                 Partition::ZBI { name: "zbi_a".into(), slot: Slot::A, size: None },
                 Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: None },
+                Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None },
                 Partition::ZBI { name: "zbi_b".into(), slot: Slot::B, size: None },
                 Partition::VBMeta { name: "vbmeta_b".into(), slot: Slot::B, size: None },
+                Partition::Dtbo { name: "dtbo_b".into(), slot: Slot::B, size: None },
                 Partition::ZBI { name: "zbi_r".into(), slot: Slot::R, size: None },
                 Partition::VBMeta { name: "vbmeta_r".into(), slot: Slot::R, size: None },
                 Partition::FVM { name: "fvm".into(), size: None },
@@ -182,6 +195,7 @@ mod tests {
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
+                Image::Dtbo("path/to/a/dtbo".into()),
             ],
             board_name: "my_board".into(),
         };
@@ -191,6 +205,7 @@ mod tests {
                 Image::VBMeta("path/to/b/fuchsia.vbmeta".into()),
                 Image::FVM("path/to/b/fvm.blk".into()),
                 Image::FVMFastboot("path/to/b/fvm.fastboot.blk".into()),
+                Image::Dtbo("path/to/b/dtbo".into()),
             ],
             board_name: "my_board".into(),
         };
@@ -204,9 +219,9 @@ mod tests {
             board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
-        mapper.map_images_to_slot(&images_a.images, Slot::A);
-        mapper.map_images_to_slot(&images_b.images, Slot::B);
-        mapper.map_images_to_slot(&images_r.images, Slot::R);
+        mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
+        mapper.map_images_to_slot(&images_b.images, Slot::B).unwrap();
+        mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
 
         let expected = vec![
             PartitionAndImage {
@@ -218,12 +233,20 @@ mod tests {
                 path: "path/to/a/fuchsia.vbmeta".into(),
             },
             PartitionAndImage {
+                partition: Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None },
+                path: "path/to/a/dtbo".into(),
+            },
+            PartitionAndImage {
                 partition: Partition::ZBI { name: "zbi_b".into(), slot: Slot::B, size: None },
                 path: "path/to/b/fuchsia.zbi".into(),
             },
             PartitionAndImage {
                 partition: Partition::VBMeta { name: "vbmeta_b".into(), slot: Slot::B, size: None },
                 path: "path/to/b/fuchsia.vbmeta".into(),
+            },
+            PartitionAndImage {
+                partition: Partition::Dtbo { name: "dtbo_b".into(), slot: Slot::B, size: None },
+                path: "path/to/b/dtbo".into(),
             },
             PartitionAndImage {
                 partition: Partition::ZBI { name: "zbi_r".into(), slot: Slot::R, size: None },
@@ -247,8 +270,10 @@ mod tests {
             partitions: vec![
                 Partition::ZBI { name: "zbi_a".into(), slot: Slot::A, size: None },
                 Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: None },
+                Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None },
                 Partition::ZBI { name: "zbi_b".into(), slot: Slot::B, size: None },
                 Partition::VBMeta { name: "vbmeta_b".into(), slot: Slot::B, size: None },
+                Partition::Dtbo { name: "dtbo_b".into(), slot: Slot::B, size: None },
                 Partition::ZBI { name: "zbi_r".into(), slot: Slot::R, size: None },
                 Partition::VBMeta { name: "vbmeta_r".into(), slot: Slot::R, size: None },
                 Partition::FVM { name: "fvm".into(), size: None },
@@ -259,6 +284,7 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/a/dtbo".into()),
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
@@ -268,6 +294,7 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/b/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/b/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/b/dtbo".into()),
                 Image::FVM("path/to/b/fvm.blk".into()),
                 Image::FVMFastboot("path/to/b/fvm.fastboot.blk".into()),
             ],
@@ -283,9 +310,9 @@ mod tests {
             board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
-        mapper.map_images_to_slot(&images_a.images, Slot::A);
-        mapper.map_images_to_slot(&images_b.images, Slot::B);
-        mapper.map_images_to_slot(&images_r.images, Slot::R);
+        mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
+        mapper.map_images_to_slot(&images_b.images, Slot::B).unwrap();
+        mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
 
         let expected = vec![
             PartitionAndImage {
@@ -322,8 +349,10 @@ mod tests {
             partitions: vec![
                 Partition::ZBI { name: "zbi_a".into(), slot: Slot::A, size: None },
                 Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: None },
+                Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None },
                 Partition::ZBI { name: "zbi_b".into(), slot: Slot::B, size: None },
                 Partition::VBMeta { name: "vbmeta_b".into(), slot: Slot::B, size: None },
+                Partition::Dtbo { name: "dtbo_b".into(), slot: Slot::B, size: None },
                 Partition::ZBI { name: "zbi_r".into(), slot: Slot::R, size: None },
                 Partition::VBMeta { name: "vbmeta_r".into(), slot: Slot::R, size: None },
                 Partition::FVM { name: "fvm".into(), size: None },
@@ -335,6 +364,7 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/a/dtbo".into()),
                 Image::FxfsSparse {
                     path: "path/to/a/fxfs.blk".into(),
                     contents: BlobfsContents::default(),
@@ -346,6 +376,7 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/b/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/b/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/b/dtbo".into()),
                 Image::FxfsSparse {
                     path: "path/to/b/fxfs.blk".into(),
                     contents: BlobfsContents::default(),
@@ -365,9 +396,9 @@ mod tests {
             board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
-        mapper.map_images_to_slot(&images_a.images, Slot::A);
-        mapper.map_images_to_slot(&images_b.images, Slot::B);
-        mapper.map_images_to_slot(&images_r.images, Slot::R);
+        mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
+        mapper.map_images_to_slot(&images_b.images, Slot::B).unwrap();
+        mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
 
         let expected = vec![
             PartitionAndImage {
@@ -379,12 +410,20 @@ mod tests {
                 path: "path/to/a/fuchsia.vbmeta".into(),
             },
             PartitionAndImage {
+                partition: Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None },
+                path: "path/to/a/dtbo".into(),
+            },
+            PartitionAndImage {
                 partition: Partition::ZBI { name: "zbi_b".into(), slot: Slot::B, size: None },
                 path: "path/to/b/fuchsia.zbi".into(),
             },
             PartitionAndImage {
                 partition: Partition::VBMeta { name: "vbmeta_b".into(), slot: Slot::B, size: None },
                 path: "path/to/b/fuchsia.vbmeta".into(),
+            },
+            PartitionAndImage {
+                partition: Partition::Dtbo { name: "dtbo_b".into(), slot: Slot::B, size: None },
+                path: "path/to/b/dtbo".into(),
             },
             PartitionAndImage {
                 partition: Partition::ZBI { name: "zbi_r".into(), slot: Slot::R, size: None },
@@ -409,13 +448,14 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/a/dtbo".into()),
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
-        mapper.map_images_to_slot(&images_a.images, Slot::A);
+        mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
         assert!(mapper.map().is_empty());
     }
 
@@ -425,6 +465,7 @@ mod tests {
             partitions: vec![
                 Partition::ZBI { name: "zbi_a".into(), slot: Slot::A, size: None },
                 Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: None },
+                Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None },
                 Partition::FVM { name: "fvm".into(), size: None },
             ],
             ..Default::default()
@@ -433,6 +474,7 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/a/dtbo".into()),
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
@@ -442,6 +484,7 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/b/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/b/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/b/dtbo".into()),
                 Image::FVM("path/to/b/fvm.blk".into()),
                 Image::FVMFastboot("path/to/b/fvm.fastboot.blk".into()),
             ],
@@ -457,9 +500,9 @@ mod tests {
             board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
-        mapper.map_images_to_slot(&images_a.images, Slot::A);
-        mapper.map_images_to_slot(&images_b.images, Slot::B);
-        mapper.map_images_to_slot(&images_r.images, Slot::R);
+        mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
+        mapper.map_images_to_slot(&images_b.images, Slot::B).unwrap();
+        mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
 
         let expected = vec![
             PartitionAndImage {
@@ -469,6 +512,10 @@ mod tests {
             PartitionAndImage {
                 partition: Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: None },
                 path: "path/to/a/fuchsia.vbmeta".into(),
+            },
+            PartitionAndImage {
+                partition: Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None },
+                path: "path/to/a/dtbo".into(),
             },
             PartitionAndImage {
                 partition: Partition::FVM { name: "fvm".into(), size: None },
@@ -484,8 +531,10 @@ mod tests {
             partitions: vec![
                 Partition::ZBI { name: "zbi_a".into(), slot: Slot::A, size: None },
                 Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: None },
+                Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None },
                 Partition::ZBI { name: "zbi_b".into(), slot: Slot::B, size: None },
                 Partition::VBMeta { name: "vbmeta_b".into(), slot: Slot::B, size: None },
+                Partition::Dtbo { name: "dtbo_b".into(), slot: Slot::B, size: None },
                 Partition::ZBI { name: "zbi_r".into(), slot: Slot::R, size: None },
                 Partition::VBMeta { name: "vbmeta_r".into(), slot: Slot::R, size: None },
                 Partition::FVM { name: "fvm".into(), size: None },
@@ -497,6 +546,7 @@ mod tests {
             images: vec![
                 Image::ZBI { path: "path/to/a/fuchsia.zbi".into(), signed: false },
                 Image::VBMeta("path/to/a/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/a/dtbo".into()),
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
@@ -512,8 +562,8 @@ mod tests {
             board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
-        mapper.map_images_to_slot(&images_a.images, Slot::A);
-        mapper.map_images_to_slot(&images_r.images, Slot::R);
+        mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
+        mapper.map_images_to_slot(&images_r.images, Slot::R).unwrap();
 
         let expected = vec![
             PartitionAndImage {
@@ -523,6 +573,10 @@ mod tests {
             PartitionAndImage {
                 partition: Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: None },
                 path: "path/to/a/fuchsia.vbmeta".into(),
+            },
+            PartitionAndImage {
+                partition: Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: None },
+                path: "path/to/a/dtbo".into(),
             },
             PartitionAndImage {
                 partition: Partition::ZBI { name: "zbi_r".into(), slot: Slot::R, size: None },
@@ -541,20 +595,37 @@ mod tests {
     }
 
     #[test]
+    fn test_dbto_in_r_is_error() {
+        let partitions = PartitionsConfig {
+            partitions: vec![Partition::Dtbo { name: "dtbo_r".into(), slot: Slot::R, size: None }],
+            ..Default::default()
+        };
+        let images_r = AssemblyManifest {
+            images: vec![Image::Dtbo("path/to/r/dtbo".into())],
+            board_name: "my_board".into(),
+        };
+        let mut mapper = PartitionImageMapper::new(partitions);
+        assert!(mapper.map_images_to_slot(&images_r.images, Slot::R).is_err());
+    }
+
+    #[test]
     fn test_size_report() {
         let temp_dir = TempDir::new().unwrap();
         let temp_dir_path = Utf8PathBuf::from_path_buf(temp_dir.path().to_path_buf()).unwrap();
         let zbi_path = temp_dir_path.join("zbi");
         let vbmeta_path = temp_dir_path.join("vbmeta");
+        let dtbo_path = temp_dir_path.join("dtbo");
         let size_report_path = temp_dir_path.join("report.json");
 
         std::fs::write(&zbi_path, "zbi").unwrap();
         std::fs::write(&vbmeta_path, "vbmeta").unwrap();
+        std::fs::write(&dtbo_path, "dtbo").unwrap();
 
         let partitions = PartitionsConfig {
             partitions: vec![
                 Partition::ZBI { name: "zbi_a".into(), slot: Slot::A, size: Some(100) },
                 Partition::VBMeta { name: "vbmeta_a".into(), slot: Slot::A, size: Some(200) },
+                Partition::Dtbo { name: "dtbo_a".into(), slot: Slot::A, size: Some(300) },
                 Partition::FVM { name: "fvm".into(), size: None },
             ],
             ..Default::default()
@@ -563,17 +634,22 @@ mod tests {
             images: vec![
                 Image::ZBI { path: zbi_path, signed: false },
                 Image::VBMeta(vbmeta_path),
+                Image::Dtbo(dtbo_path),
                 Image::FVM("path/to/a/fvm.blk".into()),
                 Image::FVMFastboot("path/to/a/fvm.fastboot.blk".into()),
             ],
             board_name: "my_board".into(),
         };
         let mut mapper = PartitionImageMapper::new(partitions);
-        mapper.map_images_to_slot(&images_a.images, Slot::A);
+        mapper.map_images_to_slot(&images_a.images, Slot::A).unwrap();
         mapper.generate_gerrit_size_report(&size_report_path, &"prefix".to_string()).unwrap();
 
         let result: serde_json::Value = read_config(&size_report_path).unwrap();
         let expected = serde_json::json!({
+            "prefix-dtbo_a": 4,
+            "prefix-dtbo_a.budget": 300,
+            "prefix-dtbo_a.creepBudget": 200 * 1024,
+            "prefix-dtbo_a.owner": "http://go/fuchsia-size-stats/single_component/?f=component%3Ain%3Aprefix-dtbo_a",
             "prefix-vbmeta_a": 6,
             "prefix-vbmeta_a.budget": 200,
             "prefix-vbmeta_a.creepBudget": 200 * 1024,

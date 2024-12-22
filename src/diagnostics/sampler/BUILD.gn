@@ -38,10 +38,13 @@ rustc_library("lib") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
-  test_deps = [ "//src/lib/fuchsia" ]
+  test_deps = [
+    "//sdk/fidl/fuchsia.inspect:fuchsia.inspect_rust",
+    "//src/lib/fuchsia",
+  ]
 
   sources = [
     "src/diagnostics.rs",

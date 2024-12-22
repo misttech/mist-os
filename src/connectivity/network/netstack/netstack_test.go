@@ -340,7 +340,7 @@ func TestEndpoint_Close(t *testing.T) {
 		t.Errorf("peerC.Close() = %v", err)
 	}()
 
-	if err := s.Clone2(context.Background(), unknown.CloneableWithCtxInterfaceRequest{Channel: peerC}); err != nil {
+	if err := s.Clone(context.Background(), unknown.CloneableWithCtxInterfaceRequest{Channel: peerC}); err != nil {
 		t.Fatalf("s.Clone() = %s", err)
 	}
 

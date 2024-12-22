@@ -7,7 +7,7 @@ use fidl_fuchsia_validate_logs::{
     ValidateResultsIteratorGetNextResponse,
 };
 use fuchsia_component::client;
-use tracing::info;
+use log::info;
 
 #[fuchsia::test]
 async fn validate_rust_log_encoding() {

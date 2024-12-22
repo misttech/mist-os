@@ -156,6 +156,15 @@ func (i *Instance) WaitForLogMessageAssertNotSeen(msg, notSeen string) {
 	}
 }
 
+// WaitForLogMessageAssertNotSeenPrintUntil reimplements emulator.Instance.
+func (i *Instance) WaitForLogMessageAssertNotSeenPrintUntil(msg, notSeen string,
+	printUntil string) {
+	if err := i.i.WaitForLogMessageAssertNotSeenPrintUntil(msg, notSeen,
+		printUntil); err != nil {
+		i.t.Fatal(err)
+	}
+}
+
 // AssertLogMessageNotSeenWithinTimeout reimplements emulator.Instance.
 func (i *Instance) AssertLogMessageNotSeenWithinTimeout(notSeen string, timeout time.Duration) {
 	if err := i.i.AssertLogMessageNotSeenWithinTimeout(notSeen, timeout); err != nil {

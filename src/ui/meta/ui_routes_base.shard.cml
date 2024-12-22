@@ -109,6 +109,7 @@
                 "fuchsia.scenic.PointerAutoFocus",
                 "fuchsia.scenic.Renderer",
                 "fuchsia.session.AutoLaunch",
+                "fuchsia.ui.AttachA11yView",
                 "fuchsia.ui.DisplayPixelDensity",
                 "fuchsia.ui.IdleThresholdMs",
                 "fuchsia.ui.SupportedInputDevices",

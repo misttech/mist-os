@@ -34,7 +34,7 @@ fuchsia_remote_product_bundle(
     ]))
 
 fuchsia_products_repository = repository_rule(
-    doc = """Initalizes targets for SDK companion images.
+    doc = """Initializes targets for SDK companion images.
 
 Example Usage:
 ```

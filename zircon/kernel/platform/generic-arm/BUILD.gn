@@ -23,6 +23,7 @@ source_set("generic-arm") {
     "//zircon/kernel/dev/interrupt/gic/v3",
     "//zircon/kernel/dev/pcie",
     "//zircon/kernel/dev/pdev/power",
+    "//zircon/kernel/dev/power/moonflower",
     "//zircon/kernel/dev/power/motmot",
     "//zircon/kernel/dev/psci",
     "//zircon/kernel/dev/timer/arm_generic",

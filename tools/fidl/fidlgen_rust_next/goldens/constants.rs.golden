@@ -3,11 +3,20 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 pub const BOOL: bool = true;
+
 ::fidl_next::bitflags! {
-    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-    #[derive(Debug)]
+
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     pub struct Bits: u32 {
         const B = 8;
+
     }
 }
 
@@ -42,6 +51,7 @@ impl ::fidl_next::TakeFrom<WireBits> for Bits {
     }
 }
 
+/// The wire type corresponding to [`Bits`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireBits {
@@ -59,7 +69,7 @@ where
         ::fidl_next::munge!(let Self { value } = slot);
         let set = u32::from(*value);
         if set & !Bits::all().bits() != 0 {
-            return Err(fidl_next::DecodeError::InvalidBits {
+            return Err(::fidl_next::DecodeError::InvalidBits {
                 expected: Bits::all().bits() as usize,
                 actual: set as usize,
             });
@@ -74,14 +84,24 @@ impl ::core::convert::From<Bits> for WireBits {
         Self { value: ::fidl_next::u32_le::from(natural.bits()) }
     }
 }
+
 pub const UINT32: u32 = 4;
+
 ::fidl_next::bitflags! {
-    #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-    #[derive(Debug)]
+
+    #[derive(
+        Clone,
+        Copy,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
     pub struct BitsType: u32 {
         const VALUE = 1;
         const SECOND_VALUE = 4;
         const THIRD_VALUE = 2;
+
     }
 }
 
@@ -116,6 +136,7 @@ impl ::fidl_next::TakeFrom<WireBitsType> for BitsType {
     }
 }
 
+/// The wire type corresponding to [`BitsType`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireBitsType {
@@ -133,7 +154,7 @@ where
         ::fidl_next::munge!(let Self { value } = slot);
         let set = u32::from(*value);
         if set & !BitsType::all().bits() != 0 {
-            return Err(fidl_next::DecodeError::InvalidBits {
+            return Err(::fidl_next::DecodeError::InvalidBits {
                 expected: BitsType::all().bits() as usize,
                 actual: set as usize,
             });
@@ -148,6 +169,7 @@ impl ::core::convert::From<BitsType> for WireBitsType {
         Self { value: ::fidl_next::u32_le::from(natural.bits()) }
     }
 }
+
 #[derive(Clone, Copy, Debug)]
 #[repr(u32)]
 pub enum Enum {
@@ -180,6 +202,7 @@ impl ::core::convert::From<WireEnum> for Enum {
     fn from(wire: WireEnum) -> Self {
         match u32::from(wire.value) {
             170 => Self::E,
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -191,6 +214,7 @@ impl ::fidl_next::TakeFrom<WireEnum> for Enum {
     }
 }
 
+/// The wire type corresponding to [`Enum`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireEnum {
@@ -251,6 +275,7 @@ where
         ::fidl_next::munge!(let WireEnumType { mut value } = slot);
         *value = ::fidl_next::i32_le::from(match *self {
             Self::Value => 3,
+
             Self::SecondValue => 4,
         });
 
@@ -262,7 +287,9 @@ impl ::core::convert::From<WireEnumType> for EnumType {
     fn from(wire: WireEnumType) -> Self {
         match i32::from(wire.value) {
             3 => Self::Value,
+
             4 => Self::SecondValue,
+
             _ => unsafe { ::core::hint::unreachable_unchecked() },
         }
     }
@@ -274,6 +301,7 @@ impl ::fidl_next::TakeFrom<WireEnumType> for EnumType {
     }
 }
 
+/// The wire type corresponding to [`EnumType`].
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct WireEnumType {
@@ -282,6 +310,7 @@ pub struct WireEnumType {
 
 impl WireEnumType {
     pub const VALUE: WireEnumType = WireEnumType { value: ::fidl_next::i32_le::from_native(3) };
+
     pub const SECOND_VALUE: WireEnumType =
         WireEnumType { value: ::fidl_next::i32_le::from_native(4) };
 }
@@ -309,24 +338,36 @@ impl ::core::convert::From<EnumType> for WireEnumType {
     fn from(natural: EnumType) -> Self {
         match natural {
             EnumType::Value => WireEnumType::VALUE,
+
             EnumType::SecondValue => WireEnumType::SECOND_VALUE,
         }
     }
 }
 
 pub const FLOAT32: f32 = 3.14159;
+
 pub const FLOAT64: f64 = 3.14159;
+
 pub const INT16: i16 = 4;
+
 pub const INT32: i32 = 4;
+
 pub const INT64: i64 = 4;
+
 pub const INT8: i8 = 4;
+
 pub const STRING: &str = "string";
+
 #[derive(Clone, Debug)]
 pub struct Struct {
     pub int64_with_default: i64,
+
     pub string_with_default: String,
+
     pub bool_with_default: bool,
+
     pub enum_with_default: crate::Enum,
+
     pub bits_with_default: crate::Bits,
 }
 
@@ -337,9 +378,13 @@ impl ::fidl_next::Encodable for Struct {
 impl<___E> ::fidl_next::Encode<___E> for Struct
 where
     i64: ::fidl_next::Encode<___E>,
+
     String: ::fidl_next::Encode<___E>,
+
     bool: ::fidl_next::Encode<___E>,
+
     crate::Enum: ::fidl_next::Encode<___E>,
+
     crate::Bits: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -354,13 +399,20 @@ where
                 bool_with_default,
                 enum_with_default,
                 bits_with_default,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.int64_with_default, encoder, int64_with_default)?;
+
         ::fidl_next::Encode::encode(&mut self.string_with_default, encoder, string_with_default)?;
+
         ::fidl_next::Encode::encode(&mut self.bool_with_default, encoder, bool_with_default)?;
+
         ::fidl_next::Encode::encode(&mut self.enum_with_default, encoder, enum_with_default)?;
+
         ::fidl_next::Encode::encode(&mut self.bits_with_default, encoder, bits_with_default)?;
+
         Ok(())
     }
 }
@@ -394,21 +446,30 @@ impl<'buf> ::fidl_next::TakeFrom<WireStruct<'buf>> for Struct {
     fn take_from(from: &mut WireStruct<'buf>) -> Self {
         Self {
             int64_with_default: ::fidl_next::TakeFrom::take_from(&mut from.int64_with_default),
+
             string_with_default: ::fidl_next::TakeFrom::take_from(&mut from.string_with_default),
+
             bool_with_default: ::fidl_next::TakeFrom::take_from(&mut from.bool_with_default),
+
             enum_with_default: ::fidl_next::TakeFrom::take_from(&mut from.enum_with_default),
+
             bits_with_default: ::fidl_next::TakeFrom::take_from(&mut from.bits_with_default),
         }
     }
 }
 
+/// The wire type corersponding to [`Struct`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireStruct<'buf> {
     pub int64_with_default: ::fidl_next::i64_le,
+
     pub string_with_default: ::fidl_next::WireString<'buf>,
+
     pub bool_with_default: bool,
+
     pub enum_with_default: crate::WireEnum,
+
     pub bits_with_default: crate::WireBits,
 }
 
@@ -417,9 +478,13 @@ where
     ___D: ?Sized,
 
     ::fidl_next::i64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::WireString<'buf>: ::fidl_next::Decode<___D>,
+
     bool: ::fidl_next::Decode<___D>,
+
     crate::WireEnum: ::fidl_next::Decode<___D>,
+
     crate::WireBits: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -433,23 +498,38 @@ where
                 mut bool_with_default,
                 mut enum_with_default,
                 mut bits_with_default,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(int64_with_default.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(string_with_default.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(bool_with_default.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(enum_with_default.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(bits_with_default.as_mut(), decoder)?;
+
         Ok(())
     }
 }
 
 pub const UINT16: u16 = 4;
+
 pub const UINT64: u64 = 4;
+
 pub const UINT8: u8 = 4;
+
 pub const BITS_PRIMITIVE_VAL: u32 = 1;
+
 pub const BITS_VAL: crate::BitsType = crate::BitsType::VALUE;
+
 pub const ENUM_PRIMITIVE_VAL: i32 = 3;
+
 pub const ENUM_VAL: crate::EnumType = crate::EnumType::Value;
+
 pub const OR_RESULT: crate::BitsType = crate::BitsType::from_bits_retain(7);
+
 pub const OR_RESULT_PRIMITIVE_VAL: u32 = 5;

@@ -305,14 +305,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.logger/LogSink.Connect",
-        "strictness": "strict",
-        "ordinal": "7263263143300023835",
-        "direction": "one_way",
-        "request": "fuchsia.logger/LogSinkConnectRequest"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.logger/LogSink.ConnectStructured",
         "strictness": "strict",
         "ordinal": "7157386067685058380",
@@ -333,17 +325,6 @@
         "name": "fuchsia.logger/LogSink",
         "openness": "closed",
         "transport": "channel"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.logger/LogSinkConnectRequest.socket",
-        "ordinal": "1",
-        "type": "zx/Handle:SOCKET"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.logger/LogSinkConnectRequest",
-        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

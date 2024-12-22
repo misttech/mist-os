@@ -36,7 +36,7 @@ fuchsia_cc_driver("dwmac-driver") {
     "//sdk/fidl/fuchsia.hardware.ethernet.board:fuchsia.hardware.ethernet.board_cpp",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/dev-operation",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",

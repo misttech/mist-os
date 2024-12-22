@@ -129,14 +129,14 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   // The display coordinator currently uses zero-display configs to blank all
   // displays. We'll remove this eventually.
   if (banjo_display_configs.size() == 0) {
-    return CONFIG_CHECK_RESULT_OK;
+    return display::ConfigCheckResult::kOk.ToBanjo();
   }
 
   // This adapter does not support multiple-display operation. None of our
   // drivers supports this mode.
   if (banjo_display_configs.size() > 1) {
     ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
-    return CONFIG_CHECK_RESULT_TOO_MANY;
+    return display::ConfigCheckResult::kTooManyDisplays.ToBanjo();
   }
 
   const display_config& banjo_display_config = banjo_display_configs[0];
@@ -151,7 +151,7 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   // The display coordinator currently uses zero-display configs to blank a
   // display. We'll remove this eventually.
   if (banjo_layers.size() == 0) {
-    return CONFIG_CHECK_RESULT_OK;
+    return display::ConfigCheckResult::kOk.ToBanjo();
   }
 
   // This adapter does not currently support multi-layer configurations. This
@@ -161,18 +161,18 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
     for (size_t i = 1; i < banjo_layers.size(); ++i) {
       out_layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
     }
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
   // This adapter does not currently support color correction.
   if (banjo_display_config.cc_flags != 0) {
     out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION;
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
   if (!display::DriverLayer::IsValid(banjo_layers[0])) {
     // TODO(costan): Add an error code that indicates invalid input.
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
+    return display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo();
   }
   display::DriverLayer layer0(banjo_layers[0]);
   cpp20::span<const display::DriverLayer> layers(&layer0, 1);
@@ -180,17 +180,18 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   cpp20::span<display::LayerCompositionOperations> layer_composition_operations(
       &layer0_composition_operations, 1);
 
-  bool is_supported_configuration = engine_.CheckConfiguration(
-      display::ToDisplayId(banjo_display_config.display_id), layers, layer_composition_operations);
-  if (is_supported_configuration) {
-    return CONFIG_CHECK_RESULT_OK;
-  }
+  display::ConfigCheckResult config_check_result =
+      engine_.CheckConfiguration(display::ToDisplayId(banjo_display_config.display_id),
+                                 display::ModeId(1), layers, layer_composition_operations);
 
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = 1;
+  if (config_check_result == display::ConfigCheckResult::kUnsupportedConfig) {
+    // `layer_composition_operations` needs to be converted.
+    if (out_layer_composition_operations_actual != nullptr) {
+      *out_layer_composition_operations_actual = 1;
+    }
+    out_layer_composition_operations[0] = layer0_composition_operations.ToBanjo();
   }
-  out_layer_composition_operations[0] = layer0_composition_operations.ToBanjo();
-  return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+  return config_check_result.ToBanjo();
 }
 
 void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
@@ -236,7 +237,8 @@ void DisplayEngineBanjoAdapter::DisplayEngineApplyConfiguration(
   display::DriverLayer layer(banjo_layers[0]);
   cpp20::span<const display::DriverLayer> layers(&layer, 1);
 
-  engine_.ApplyConfiguration(display::ToDisplayId(banjo_display_config.display_id), layers,
+  engine_.ApplyConfiguration(display::ToDisplayId(banjo_display_config.display_id),
+                             display::ModeId(1), layers,
                              display::ToConfigStamp(*banjo_config_stamp));
 }
 

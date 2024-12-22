@@ -5,7 +5,7 @@
 use component_events::events::*;
 use component_events::matcher::*;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
-use tracing::*;
+use log::*;
 
 // This test demonstrates constructing a realm with two child components
 // and verifying the `fidl.examples.routing.Echo` protocol.

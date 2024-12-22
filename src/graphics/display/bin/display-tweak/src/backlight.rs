@@ -10,7 +10,7 @@ use crate::utils::{self, on_off_to_bool};
 
 /// Obtains a handle to the backlight service at the default hard-coded path.
 fn open_backlight() -> Result<backlight::DeviceProxy, Error> {
-    tracing::trace!("Opening backlight device");
+    log::trace!("Opening backlight device");
     let (proxy, server) = fidl::endpoints::create_proxy::<backlight::DeviceMarker>();
     fdio::service_connect("/dev/class/backlight/000", server.into_channel())
         .context("Failed to connect to default backlight service")?;
@@ -43,7 +43,7 @@ impl Backlight {
     }
 
     pub async fn read_and_modify_state(&mut self, args: &BacklightCmd) -> Result<(), Error> {
-        tracing::trace!("Querying backlight state");
+        log::trace!("Querying backlight state");
         let backlight_state = utils::flatten_zx_error(self.device.get_state_normalized().await)
             .context("Failed to get current backlight state")?;
         println!("Current panel backlight state: {:?}", backlight_state);
@@ -60,7 +60,7 @@ impl Backlight {
             return Ok(());
         }
 
-        tracing::trace!("Setting new backlight state");
+        log::trace!("Setting new backlight state");
         utils::flatten_zx_error(self.device.set_state_normalized(&new_state).await)
             .context("Failed to apply new backlight settings")?;
 

@@ -22,6 +22,7 @@ config("msd_vsi_vip_config") {
 }
 
 fuchsia_driver_package("msd-vsi-vip") {
+  export_to_bazel = true
   driver_components = [ ":msd_vsi" ]
 }
 

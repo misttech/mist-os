@@ -563,7 +563,6 @@ impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<BC>> HandleableTimer
 mod tests {
     use alloc::collections::hash_map::{Entry, HashMap};
     use alloc::vec::Vec;
-    use const_unwrap::const_unwrap_option;
     use core::time::Duration;
 
     use assert_matches::assert_matches;
@@ -716,8 +715,7 @@ mod tests {
         }
     }
 
-    const RETRANS_TIMER: NonZeroDuration =
-        const_unwrap_option(NonZeroDuration::new(Duration::from_secs(1)));
+    const RETRANS_TIMER: NonZeroDuration = NonZeroDuration::new(Duration::from_secs(1)).unwrap();
 
     const DAD_ADDRESS: UnicastAddr<Ipv6Addr> =
         unsafe { UnicastAddr::new_unchecked(Ipv6Addr::new([0xa, 0, 0, 0, 0, 0, 0, 1])) };
@@ -834,7 +832,7 @@ mod tests {
     fn perform_dad() {
         const DAD_TRANSMITS_REQUIRED: u16 = 5;
         const RETRANS_TIMER: NonZeroDuration =
-            const_unwrap_option(NonZeroDuration::new(Duration::from_secs(1)));
+            NonZeroDuration::new(Duration::from_secs(1)).unwrap();
 
         let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeDadContext {
@@ -886,7 +884,7 @@ mod tests {
     fn stop_dad() {
         const DAD_TRANSMITS_REQUIRED: u16 = 2;
         const RETRANS_TIMER: NonZeroDuration =
-            const_unwrap_option(NonZeroDuration::new(Duration::from_secs(2)));
+            NonZeroDuration::new(Duration::from_secs(2)).unwrap();
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
@@ -944,7 +942,7 @@ mod tests {
     ) {
         const MAX_DAD_TRANSMITS: u16 = 1;
         const RETRANS_TIMER: NonZeroDuration =
-            const_unwrap_option(NonZeroDuration::new(Duration::from_secs(1)));
+            NonZeroDuration::new(Duration::from_secs(1)).unwrap();
 
         let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
             state: if assigned { Ipv6DadState::Assigned } else { Ipv6DadState::Uninitialized },
@@ -983,7 +981,7 @@ mod tests {
     fn handle_incoming_dad_neighbor_solicitation_during_tentative(looped_back: bool) {
         const DAD_TRANSMITS_REQUIRED: u16 = 1;
         const RETRANS_TIMER: NonZeroDuration =
-            const_unwrap_option(NonZeroDuration::new(Duration::from_secs(1)));
+            NonZeroDuration::new(Duration::from_secs(1)).unwrap();
 
         let mut ctx = FakeCtx::with_default_bindings_ctx(|bindings_ctx| {
             FakeCoreCtxImpl::with_state(FakeDadContext {

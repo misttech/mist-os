@@ -572,13 +572,19 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             #[cfg(fuchsia_api_level_at_least = "NEXT")]
             fio::FileRequest::DeprecatedClone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::DeprecatedClone");
-                self.handle_clone_deprecated(flags, object);
+                self.handle_deprecated_clone(flags, object);
             }
             #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::FileRequest::Clone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::Clone");
-                self.handle_clone_deprecated(flags, object);
+                self.handle_deprecated_clone(flags, object);
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::Clone { request, control_handle: _ } => {
+                trace::duration!(c"storage", c"File::Clone");
+                self.handle_clone(ServerEnd::new(request.into_channel()));
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::FileRequest::Clone2 { request, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::Clone2");
                 self.handle_clone(ServerEnd::new(request.into_channel()));
@@ -839,7 +845,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         Ok(ConnectionState::Alive)
     }
 
-    fn handle_clone_deprecated(
+    fn handle_deprecated_clone(
         &mut self,
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,

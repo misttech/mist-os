@@ -7,7 +7,7 @@ mod topology_test_daemon;
 use crate::topology_test_daemon::TopologyTestDaemon;
 use anyhow::Result;
 use fuchsia_inspect::health::Reporter;
-use tracing::info;
+use log::info;
 
 #[fuchsia::main(logging_tags = ["topology-test-daemon"])]
 async fn main() -> Result<()> {
@@ -23,7 +23,7 @@ async fn main() -> Result<()> {
 
     // This future should never complete.
     let result = ttd.run().await;
-    tracing::error!(?result, "Unexpected exit");
+    log::error!(result:?; "Unexpected exit");
     fuchsia_inspect::component::health().set_unhealthy(&format!("Unexpected exit: {:?}", result));
     result
 }

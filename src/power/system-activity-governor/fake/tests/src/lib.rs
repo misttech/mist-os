@@ -9,8 +9,8 @@ use fidl_fuchsia_power_system::{self as fsystem, ApplicationActivityLevel, Execu
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::channel::mpsc;
 use futures::StreamExt;
+use log::*;
 use power_broker_client::PowerElementContext;
-use tracing::*;
 use {fidl_test_sagcontrol as fctrl, fuchsia_async as fasync};
 
 struct TestEnv {
@@ -102,6 +102,7 @@ async fn create_test_env() -> TestEnv {
                 .capability(Capability::protocol_by_name("test.sagcontrol.State"))
                 .capability(Capability::protocol_by_name("fuchsia.power.suspend.Stats"))
                 .capability(Capability::protocol_by_name("fuchsia.power.system.ActivityGovernor"))
+                .capability(Capability::protocol_by_name("fuchsia.power.system.BootControl"))
                 .from(&component_ref)
                 .to(Ref::parent()),
         )
@@ -117,10 +118,11 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
     let env = create_test_env().await;
 
     let activity_governor = env.connect_to_protocol::<fsystem::ActivityGovernorMarker>();
+    let boot_control = env.connect_to_protocol::<fsystem::BootControlMarker>();
     let sag_ctrl_state = env.connect_to_protocol::<fctrl::StateMarker>();
     let topology = env.connect_to_protocol::<fbroker::TopologyMarker>();
 
-    // Check initial booting state [2, 0, 0, 0].
+    // Check initial booting state [2, 0].
     assert_eq!(
         sag_ctrl_state.watch().await.unwrap(),
         fctrl::SystemActivityGovernorState {
@@ -192,7 +194,6 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
     })
     .detach();
 
-    // Trigger "boot complete" logic and a suspend/resume cycle.
     let _ = sag_ctrl_state
         .set(&fctrl::SystemActivityGovernorState {
             application_activity_level: Some(ApplicationActivityLevel::Active),
@@ -201,6 +202,9 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         .await
         .unwrap()
         .unwrap();
+
+    // Trigger "boot complete" logic and a suspend/resume cycle.
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     let mut current_state = fctrl::SystemActivityGovernorState {
         execution_state_level: Some(ExecutionStateLevel::Active),
@@ -277,9 +281,10 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
 async fn test_set_valid_sag_states() -> Result<()> {
     let env = create_test_env().await;
 
+    let boot_control = env.connect_to_protocol::<fsystem::BootControlMarker>();
     let sag_ctrl_state = env.connect_to_protocol::<fctrl::StateMarker>();
 
-    // Check initial booting state [2, 0, 0].
+    // Check initial booting state [2, 0].
     let mut current_state = fctrl::SystemActivityGovernorState {
         execution_state_level: Some(ExecutionStateLevel::Active),
         application_activity_level: Some(ApplicationActivityLevel::Inactive),
@@ -288,7 +293,6 @@ async fn test_set_valid_sag_states() -> Result<()> {
 
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
 
-    // Trigger "boot complete" logic.
     let _ = sag_ctrl_state
         .set(&fctrl::SystemActivityGovernorState {
             application_activity_level: Some(ApplicationActivityLevel::Active),
@@ -298,9 +302,12 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap()
         .unwrap();
 
-    // Wait until SAG state changes to [2, 1, 0].
+    // Wait until SAG state changes to [2, 1].
     current_state.application_activity_level.replace(ApplicationActivityLevel::Active);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
+
+    // Trigger "boot complete" logic.
+    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     let _ = sag_ctrl_state
         .set(&fctrl::SystemActivityGovernorState {
@@ -312,7 +319,7 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap()
         .unwrap();
 
-    // Wait until SAG state changes to [1, 0, 0].
+    // Wait until SAG state changes to [1, 0].
     current_state.execution_state_level.replace(ExecutionStateLevel::Suspending);
     current_state.application_activity_level.replace(ApplicationActivityLevel::Inactive);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
@@ -327,7 +334,7 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap()
         .unwrap();
 
-    // Wait until SAG state changes to [2, 1, 0].
+    // Wait until SAG state changes to [2, 1].
     current_state.execution_state_level.replace(ExecutionStateLevel::Active);
     current_state.application_activity_level.replace(ApplicationActivityLevel::Active);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
@@ -342,7 +349,7 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap()
         .unwrap();
 
-    // Wait until SAG state changes to [0, 0, 0].
+    // Wait until SAG state changes to [0, 0].
     current_state.execution_state_level.replace(ExecutionStateLevel::Inactive);
     current_state.application_activity_level.replace(ApplicationActivityLevel::Inactive);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
@@ -357,7 +364,7 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap()
         .unwrap();
 
-    // Wait until SAG state changes to [2, 1, 0].
+    // Wait until SAG state changes to [2, 1].
     current_state.execution_state_level.replace(ExecutionStateLevel::Active);
     current_state.application_activity_level.replace(ApplicationActivityLevel::Active);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
@@ -372,7 +379,7 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap()
         .unwrap();
 
-    // Wait until SAG state changes to [1, 0, 0].
+    // Wait until SAG state changes to [1, 0].
     current_state.execution_state_level.replace(ExecutionStateLevel::Suspending);
     current_state.application_activity_level.replace(ApplicationActivityLevel::Inactive);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
@@ -386,7 +393,7 @@ async fn test_set_invalid_sag_states() -> Result<()> {
 
     let sag_ctrl_state = env.connect_to_protocol::<fctrl::StateMarker>();
 
-    // Check initial booting state [2, 0, 0].
+    // Check initial booting state [2, 0].
     assert_eq!(
         sag_ctrl_state.watch().await.unwrap(),
         fctrl::SystemActivityGovernorState {

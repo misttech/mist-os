@@ -51,6 +51,7 @@ type Union struct {
 	Members             []UnionMember
 	BackingBufferTypeV2 string
 	TypeShapeV2         TypeShape
+	Serializable        fidlgen.Serializable
 
 	// Result points to the Result this union is being used to represent, if this
 	// is in fact a Result wrapper.
@@ -109,6 +110,7 @@ func (c *compiler) compileUnion(val fidlgen.Union) *Union {
 		BackingBufferTypeV2: computeAllocation(
 			TypeShape{val.TypeShapeV2}.MaxTotalSize(), TypeShape{val.TypeShapeV2}.MaxHandles, boundednessBounded).
 			BackingBufferType(),
+		Serializable: val.GetSerializable(),
 	}
 
 	naturalIndex := 1

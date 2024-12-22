@@ -67,7 +67,7 @@ test("factory-bootfs-test") {
   sources = [ "factory_bootfs_zbi.cc" ]
   deps = [
     "rust/factory_bootfs_util:factory-bootfs-util",
-    "//src/firmware/lib/zircon_boot:in_tree",
+    "//src/firmware/lib/zircon_boot:in_tree_with_internal_bootfs",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

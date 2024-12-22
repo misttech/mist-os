@@ -191,6 +191,7 @@ template("dtb") {
                            [
                              "testonly",
                              "visibility",
+                             "metadata",
                            ])
     deps = [ ":$dts_include_dirs_target" ]
 
@@ -339,6 +340,12 @@ template("dts") {
 #     - Type: list(path). Must only have one entry.
 #     - Default: target_out_dir + "/" + target_name + ".dtb"
 #
+#   * release_output
+#     - Optional: Whether to release this artifact, it will appear in the build
+#       api 'exported_files' if set to true
+#     - Type: boolean
+#     - Default: false
+#
 #
 template("devicetree") {
   main_target = target_name
@@ -365,6 +372,7 @@ template("devicetree") {
                              "deps",
                              "public_deps",
                              "dtcflags",
+                             "release_output",
                            ])
     outputs = _dtb_path
 
@@ -373,6 +381,17 @@ template("devicetree") {
       ":${decompiled_dts_target}",
       ":${main_target}",
     ]
+
+    metadata = {
+      if (defined(release_output) && release_output) {
+        exported_files = [
+          {
+            name = compiled_dtb_target
+            path = rebase_path(outputs[0], root_build_dir)
+          },
+        ]
+      }
+    }
   }
 
   # Decompile the compiled DTS so we can use it for the golden comparison.
@@ -382,8 +401,6 @@ template("devicetree") {
     forward_variables_from(invoker, [ "dtcflags" ])
     deps = [ ":$compiled_dtb_target" ]
     sources = get_target_outputs(":$compiled_dtb_target")
-
-    # visibility = [ ":${golden_dts_target}" ]
   }
 
   # Compare golden dts and decompiled dts file.
@@ -421,7 +438,7 @@ template("devicetree") {
     }
   }
 
-  group(target_name) {
+  group(main_target) {
     public_deps = [
       ":${compiled_dtb_target}",
       ":${golden_dts_target}",

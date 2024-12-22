@@ -399,6 +399,7 @@ void UITestRealm::ConfigureSceneOwner() {
   realm_builder_.AddRoute({
       .capabilities =
           {
+              component_testing::Config{.name = "fuchsia.ui.AttachA11yView"},
               component_testing::Config{.name = "fuchsia.ui.SupportedInputDevices"},
               component_testing::Config{.name = "fuchsia.ui.ViewingDistance"},
           },

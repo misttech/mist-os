@@ -451,6 +451,14 @@
             subdir: "rtc",
         },
         {
+            // For wake alarms programming.
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-hrtimer",
+            to: "#timekeeper",
+            subdir: "hrtimer",
+        },
+        {
             protocol: "fuchsia.metrics.MetricEventLoggerFactory",
             from: "#cobalt",
             to: [

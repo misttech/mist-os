@@ -16,7 +16,7 @@ use crate::error::{ParseError, ParseResult};
 use super::common::{IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpTimeExceeded};
 use super::{
     peek_message_type, IcmpIpExt, IcmpMessageType, IcmpPacket, IcmpPacketRaw, IcmpParseArgs,
-    IcmpUnusedCode, IdAndSeq, OriginalPacket,
+    IcmpZeroCode, IdAndSeq, OriginalPacket,
 };
 
 /// An ICMPv4 packet with a dynamic message type.
@@ -316,8 +316,8 @@ impl Icmpv4TimestampRequest {
 #[repr(transparent)]
 pub struct Icmpv4TimestampReply(Timestamp);
 
-impl_icmp_message!(Ipv4, Icmpv4TimestampRequest, TimestampRequest, IcmpUnusedCode);
-impl_icmp_message!(Ipv4, Icmpv4TimestampReply, TimestampReply, IcmpUnusedCode);
+impl_icmp_message!(Ipv4, Icmpv4TimestampRequest, TimestampRequest, IcmpZeroCode);
+impl_icmp_message!(Ipv4, Icmpv4TimestampReply, TimestampReply, IcmpZeroCode);
 
 create_protocol_enum! (
     #[allow(missing_docs)]

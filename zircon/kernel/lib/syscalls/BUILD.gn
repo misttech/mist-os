@@ -65,6 +65,7 @@ source_set("impl") {
   deps = [
     ":dispatch",
     ":headers",
+    "//src/lib/zbitl",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/counters",

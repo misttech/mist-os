@@ -512,8 +512,7 @@ TEST_F(IntegrationTest, SysmemImport) {
   });
 
   static constexpr image_metadata_t kDisplayImageMetadata = {
-      .width = kImageWidth,
-      .height = kImageHeight,
+      .dimensions = {.width = kImageWidth, .height = kImageHeight},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   uint64_t image_handle = 0;
@@ -527,7 +526,7 @@ TEST_F(IntegrationTest, SysmemImport) {
             kDisplayImageMetadata, image_handle, COORDINATE_TRANSFORMATION_IDENTITY);
         return region.bytes_per_row();
       });
-  EXPECT_LT(kDisplayImageMetadata.width * 4, kBytesPerRowDivisor);
+  EXPECT_LT(kDisplayImageMetadata.dimensions.width * 4, kBytesPerRowDivisor);
   EXPECT_EQ(kBytesPerRowDivisor, bytes_per_row);
 
   display.ReleaseImage(image_handle);
@@ -591,8 +590,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
   });
 
   static constexpr image_metadata_t kDisplayImageMetadata = {
-      .width = kImageWidth,
-      .height = kImageHeight,
+      .dimensions = {.width = kImageWidth, .height = kImageHeight},
       .tiling_type = IMAGE_TILING_TYPE_Y_LEGACY_TILED,
   };
   uint64_t image_handle = 0;
@@ -607,7 +605,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
             kDisplayImageMetadata, image_handle, COORDINATE_TRANSFORMATION_ROTATE_CCW_90);
         return region.bytes_per_row();
       });
-  EXPECT_LT(kDisplayImageMetadata.width * 4, kBytesPerRowDivisor);
+  EXPECT_LT(kDisplayImageMetadata.dimensions.width * 4, kBytesPerRowDivisor);
   EXPECT_EQ(kBytesPerRowDivisor, bytes_per_row);
 
   display.ReleaseImage(image_handle);

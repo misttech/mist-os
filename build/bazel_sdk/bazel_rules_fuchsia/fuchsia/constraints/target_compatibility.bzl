@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Tools to check the comatibility of fuchsia targets"""
+"""Tools to check the compatibility of fuchsia targets"""
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("@platforms//host:constraints.bzl", "HOST_CONSTRAINTS")
@@ -73,7 +73,7 @@ _FUCHSIA_DEPS = ["@fuchsia_sdk//fuchsia/constraints:check_fuchsia_compatibility"
 #   1. Any implicit toolchains that the target needs that are only compatible with the fuchsia
 #      target os. (eg: macros using `cc_*` that depend on `@fuchsia_clang//:cc-$ARCH`).
 #   2. Dependent targets can only meaningfully use this target's output (providers/files) by
-#      targeting the fuchsia os. (See #1).
+#      targeting Fuchsia. (See #1).
 #   3. Any target that should otherwise be skipped when not targeting fuchsia.
 #      (eg: some dependencies below the package level when it doesn't make sense to build them
 #      outside of the context of a package).

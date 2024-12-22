@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::log_formatter::{LogData, LogEntry};
-use crate::LogCommand;
+use crate::{InstanceGetter, LogCommand, LogError};
 use diagnostics_data::{LogsData, Severity};
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 use moniker::{ExtendedMoniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
@@ -12,8 +12,44 @@ use std::str::FromStr;
 use std::sync::LazyLock;
 use zx_types::zx_koid_t;
 
+static KLOG: &str = "klog";
 static KLOG_MONIKER: LazyLock<ExtendedMoniker> =
-    LazyLock::new(|| ExtendedMoniker::try_from("klog").unwrap());
+    LazyLock::new(|| ExtendedMoniker::try_from(KLOG).unwrap());
+
+struct MonikerFilters {
+    queries: Vec<String>,
+    matched_monikers: Vec<String>,
+}
+
+impl MonikerFilters {
+    fn new(queries: Vec<String>) -> Self {
+        Self { queries, matched_monikers: vec![] }
+    }
+
+    async fn expand_monikers(&mut self, getter: &impl InstanceGetter) -> Result<(), LogError> {
+        self.matched_monikers = vec![];
+        self.matched_monikers.reserve(self.queries.len());
+        for query in &self.queries {
+            if query == KLOG {
+                self.matched_monikers.push(query.clone());
+                continue;
+            }
+
+            let mut instances = getter.get_monikers_from_query(query).await?;
+            if instances.len() > 1 {
+                return Err(LogError::too_many_fuzzy_matches(
+                    instances.into_iter().map(|i| i.to_string()),
+                ));
+            }
+            match instances.pop() {
+                Some(instance) => self.matched_monikers.push(instance.to_string()),
+                None => return Err(LogError::SearchParameterNotFound(query.to_string())),
+            }
+        }
+
+        Ok(())
+    }
+}
 
 /// A struct that holds the criteria for filtering logs.
 pub struct LogFilterCriteria {
@@ -22,7 +58,7 @@ pub struct LogFilterCriteria {
     /// Filter by string.
     filters: Vec<String>,
     /// Monikers to include in logs.
-    moniker_filters: Vec<String>,
+    moniker_filters: MonikerFilters,
     /// Exclude by string.
     excludes: Vec<String>,
     /// The tags to include.
@@ -46,7 +82,7 @@ impl Default for LogFilterCriteria {
             filters: vec![],
             excludes: vec![],
             tags: vec![],
-            moniker_filters: vec![],
+            moniker_filters: MonikerFilters::new(vec![]),
             exclude_tags: vec![],
             pid: None,
             tid: None,
@@ -56,17 +92,22 @@ impl Default for LogFilterCriteria {
 }
 
 impl From<LogCommand> for LogFilterCriteria {
-    fn from(cmd: LogCommand) -> Self {
+    fn from(mut cmd: LogCommand) -> Self {
         Self {
             min_severity: cmd.severity,
             filters: cmd.filter,
             tags: cmd.tag,
             excludes: cmd.exclude,
-            moniker_filters: if cmd.kernel { vec!["klog".into()] } else { cmd.moniker },
+            moniker_filters: if cmd.kernel {
+                cmd.component.push(KLOG.to_string());
+                MonikerFilters::new(cmd.component)
+            } else {
+                MonikerFilters::new(cmd.component)
+            },
             exclude_tags: cmd.exclude_tags,
             pid: cmd.pid,
             tid: cmd.tid,
-            interest_selectors: cmd.select.into_iter().chain(cmd.set_severity).collect(),
+            interest_selectors: cmd.set_severity,
         }
     }
 }
@@ -75,6 +116,10 @@ impl LogFilterCriteria {
     /// Sets the minimum severity of logs to include.
     pub fn set_min_severity(&mut self, severity: Severity) {
         self.min_severity = severity;
+    }
+
+    pub async fn expand_monikers(&mut self, getter: &impl InstanceGetter) -> Result<(), LogError> {
+        self.moniker_filters.expand_monikers(getter).await
     }
 
     /// Sets the tags to include.
@@ -173,8 +218,12 @@ impl LogFilterCriteria {
             }
         }
 
-        if !self.moniker_filters.is_empty()
-            && !self.moniker_filters.iter().any(|f| Self::matches_filter_by_moniker_string(f, data))
+        if !self.moniker_filters.matched_monikers.is_empty()
+            && !self
+                .moniker_filters
+                .matched_monikers
+                .iter()
+                .any(|f| Self::matches_filter_by_moniker_string(f, data))
         {
             return false;
         }
@@ -498,13 +547,26 @@ mod test {
         )));
     }
 
+    struct FakeInstanceGetter;
+    #[async_trait::async_trait(?Send)]
+    impl InstanceGetter for FakeInstanceGetter {
+        async fn get_monikers_from_query(
+            &self,
+            query: &str,
+        ) -> Result<Vec<moniker::Moniker>, LogError> {
+            Ok(vec![moniker::Moniker::try_from(query).unwrap()])
+        }
+    }
+
     #[fuchsia::test]
-    async fn test_criteria_moniker_filter() {
+    async fn test_criteria_component_filter() {
         let cmd = LogCommand {
-            moniker: vec!["/core/network/netstack".to_string()],
+            component: vec!["/core/network/netstack".to_string()],
             ..empty_dump_command()
         };
-        let criteria = LogFilterCriteria::from(cmd);
+
+        let mut criteria = LogFilterCriteria::from(cmd);
+        criteria.expand_monikers(&FakeInstanceGetter).await.unwrap();
 
         assert!(!criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
@@ -752,7 +814,9 @@ mod test {
     #[fuchsia::test]
     async fn test_criteria_klog_tag_hack() {
         let cmd = LogCommand { kernel: true, ..empty_dump_command() };
-        let criteria = LogFilterCriteria::from(cmd);
+        let mut criteria = LogFilterCriteria::from(cmd);
+
+        criteria.expand_monikers(&FakeInstanceGetter).await.unwrap();
 
         assert!(criteria.matches(&make_log_entry(
             diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {

@@ -42,7 +42,7 @@ macro_rules! with_line {
 #[macro_export]
 macro_rules! fx_err_and_bail {
     ($tag:expr, $msg:expr) => {{
-        tracing::error!(tag = $tag, "{}", $msg);
+        log::error!(tag = $tag; "{}", $msg);
         return Err(format_err!($msg));
     }};
 }

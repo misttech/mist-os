@@ -6,7 +6,7 @@
 
 load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(":providers.bzl", "FuchsiaDeviceTreeSegmentInfo")
-load(":utils.bzl", "PREPROCESS_FILE_ATTRS", "preprocesss_file")
+load(":utils.bzl", "PREPROCESS_FILE_ATTRS", "preprocess_file")
 
 FUCHSIA_DEVICETREE_ATTR = {
     "dtcflags": attr.string_list(
@@ -45,7 +45,7 @@ def _fuchsia_devicetree_impl(ctx):
     # Computer the dts file that we can pass to compiler
     dts_file = source
     if source.extension == "S":
-        dts_file = preprocesss_file(ctx, source, include_depset, headers, files)
+        dts_file = preprocess_file(ctx, source, include_depset, headers, files)
 
     # Invoke dtc to compiles the dtb
     dtb_filename = dts_file.basename.replace("dts", "dtb")

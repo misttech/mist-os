@@ -144,7 +144,7 @@ impl ThermalWatcher {
                         );
                     }
                     Err(e) => {
-                        tracing::error!("Error while waiting for thermal state updates: {:?}", e);
+                        log::error!("Error while waiting for thermal state updates: {:?}", e);
                     }
                 }
             }

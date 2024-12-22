@@ -386,7 +386,7 @@ async fn rule_list() {
             mark_1: None,
             mark_2: None,
         },
-        fnet_routes_ext::rules::RuleAction::Lookup(table_id),
+        fnet_routes_ext::rules::RuleAction::Lookup(fnet_routes_ext::TableId::new(table_id)),
     )
     .await
     .expect("should not get FIDL error")
@@ -439,7 +439,7 @@ async fn rule_list() {
             mark_1: None,
             mark_2: None,
         },
-        fnet_routes_ext::rules::RuleAction::Lookup(table_id),
+        fnet_routes_ext::rules::RuleAction::Lookup(fnet_routes_ext::TableId::new(table_id)),
     )
     .await
     .expect("should not get FIDL error")

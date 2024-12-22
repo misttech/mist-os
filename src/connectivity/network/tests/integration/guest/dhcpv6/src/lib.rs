@@ -274,8 +274,10 @@ async fn test_setup<'a>(
     net_types::ip::Ipv6Addr,
     fnet_dhcpv6::ClientProviderProxy,
 ) {
-    tracing::subscriber::set_global_default(diagnostics_log::Publisher::default())
-        .expect("init logging");
+    diagnostics_log::initialize(
+        diagnostics_log::PublishOptions::default().install_panic_hook(false),
+    )
+    .expect("init logging");
 
     let (network, realm, iface, _): (_, _, _, netemul::TestFakeEndpoint<'_>) =
         setup_network_with::<Netstack2, _>(

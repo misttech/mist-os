@@ -20,7 +20,6 @@ python_library("mobly_controller_no_testonly") {
     "//src/testing/end_to_end/mobly_base_tests:*",
   ]
 
-  enable_mypy = true
   library_name = "mobly_controller"
   sources = [
     "__init__.py",

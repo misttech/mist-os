@@ -97,9 +97,14 @@
             max_size: 8,
         },
         {
-            from: "parent",
             config: "fuchsia.power.SuspendEnabled",
+            from: "parent",
             key: "suspend_enabled",
+            type: "bool",
+        },
+        {
+            config: "fuchsia.ui.AttachA11yView",
+            key: "attach_a11y_view",
             type: "bool",
         },
     ],

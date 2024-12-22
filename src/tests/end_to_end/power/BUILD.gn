@@ -13,7 +13,6 @@ python_library("power_test_utils") {
     "__init__.py",
     "power_test_utils.py",
   ]
-  enable_mypy = true
   library_deps = [ "//src/performance/lib/trace_processing" ]
 }
 
@@ -21,7 +20,6 @@ python_library("power_test_utils") {
 python_binary("merge_power_trace_bin") {
   testonly = true
   main_source = "merge_power_trace.py"
-  enable_mypy = true
   deps = [
     "//src/performance/lib/trace_processing",
     "//src/performance/trace2json",

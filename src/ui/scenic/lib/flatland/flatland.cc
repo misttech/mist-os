@@ -1038,6 +1038,59 @@ void Flatland::RemoveChild(TransformId parent_transform_identifier,
   }
 }
 
+void Flatland::ReplaceChildren(ReplaceChildrenRequest& request,
+                               ReplaceChildrenCompleter::Sync& completer) {
+  ReplaceChildren(request.parent_transform_id(), request.new_child_transform_ids());
+}
+
+void Flatland::ReplaceChildren(TransformId parent_transform_identifier,
+                               const std::vector<TransformId>& new_child_transform_ids) {
+  const uint64_t parent_transform_id = parent_transform_identifier.value();
+  if (parent_transform_id == kInvalidId) {
+    error_reporter_->ERROR() << "ReplaceChildren failed, parent transform_id "
+                             << parent_transform_id << " not found";
+    CloseConnection(FlatlandError::kBadOperation);
+    return;
+  }
+
+  auto parent_global_kv = transforms_.find(parent_transform_id);
+  if (parent_global_kv == transforms_.end()) {
+    error_reporter_->ERROR() << "ReplaceChildren failed, parent transform_id "
+                             << parent_transform_id << " not found";
+    CloseConnection(FlatlandError::kBadOperation);
+    return;
+  }
+
+  std::vector<TransformHandle> children;
+  for (auto child_transform_identifier : new_child_transform_ids) {
+    const uint64_t child_transform_id = child_transform_identifier.value();
+    if (child_transform_id == kInvalidId) {
+      error_reporter_->ERROR() << "ReplaceChildren failed, child transform_id "
+                               << child_transform_id << " not found";
+      CloseConnection(FlatlandError::kBadOperation);
+      return;
+    }
+
+    auto child_global_kv = transforms_.find(child_transform_id);
+    if (child_global_kv == transforms_.end()) {
+      error_reporter_->ERROR() << "ReplaceChildren failed, child transform_id "
+                               << child_transform_id << " not found";
+      CloseConnection(FlatlandError::kBadOperation);
+      return;
+    }
+    children.push_back(child_global_kv->second);
+  }
+
+  bool replaced = transform_graph_.ReplaceChildren(parent_global_kv->second, children);
+  if (!replaced) {
+    error_reporter_->ERROR()
+        << "ReplaceChildren failed, cannot add duplicate children to the same parent: "
+        << parent_transform_id;
+    CloseConnection(FlatlandError::kBadOperation);
+    return;
+  }
+}
+
 void Flatland::SetRootTransform(SetRootTransformRequest& request,
                                 SetRootTransformCompleter::Sync& completer) {
   SetRootTransform(request.transform_id());

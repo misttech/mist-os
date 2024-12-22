@@ -9,8 +9,8 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{self as inspect, component, HistogramProperty, NumericProperty};
 
 use futures::{StreamExt, TryStreamExt};
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 
 struct FizzBuzzServerMetrics {
     incoming_connection_count: inspect::UintProperty,
@@ -54,7 +54,7 @@ impl FizzBuzzServer {
         fasync::Task::local(async move {
             self.metrics.incoming_connection_count.add(1);
             self.handle_request_stream(stream).await.unwrap_or_else(|e| {
-                error!(?e, "Error handling fizzbuzz request stream");
+                error!(e:?; "Error handling fizzbuzz request stream");
             });
             self.metrics.closed_connection_count.add(1);
         })

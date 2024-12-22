@@ -8,7 +8,6 @@ use std::convert::Infallible as Never;
 use std::num::NonZeroU64;
 use std::panic::Location;
 
-use const_unwrap::const_unwrap_option;
 use either::Either;
 use fidl::endpoints::ProtocolMarker as _;
 use fidl_fuchsia_posix::Errno;
@@ -62,11 +61,11 @@ pub(crate) mod stream;
 pub(crate) mod worker;
 
 const ZXSIO_SIGNAL_INCOMING: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_DATAGRAM_INCOMING));
+    zx::Signals::from_bits(psocket::SIGNAL_DATAGRAM_INCOMING).unwrap();
 const ZXSIO_SIGNAL_OUTGOING: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_DATAGRAM_OUTGOING));
+    zx::Signals::from_bits(psocket::SIGNAL_DATAGRAM_OUTGOING).unwrap();
 const ZXSIO_SIGNAL_CONNECTED: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_STREAM_CONNECTED));
+    zx::Signals::from_bits(psocket::SIGNAL_STREAM_CONNECTED).unwrap();
 
 /// Common properties for socket workers.
 #[derive(Debug)]

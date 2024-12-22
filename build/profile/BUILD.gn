@@ -17,14 +17,12 @@ group("tests") {
 
 if (is_host) {
   python_library("ifconfig_trace") {
-    enable_mypy = true
     sources = [
       "ifconfig_trace.py",
       "trace_tools.py",
     ]
   }
   python_host_test("ifconfig_trace_test") {
-    enable_mypy = true
     main_source = "ifconfig_trace_test.py"
     sources = [
       "ifconfig_trace.py",
@@ -33,24 +31,20 @@ if (is_host) {
   }
 
   python_library("trace_tools") {
-    enable_mypy = true
     sources = [ "trace_tools.py" ]
   }
   python_host_test("trace_tools_test") {
-    enable_mypy = true
     main_source = "trace_tools_test.py"
     sources = [ "trace_tools.py" ]
   }
 
   python_library("vmstat_trace") {
-    enable_mypy = true
     sources = [
       "trace_tools.py",
       "vmstat_trace.py",
     ]
   }
   python_host_test("vmstat_trace_test") {
-    enable_mypy = true
     main_source = "vmstat_trace_test.py"
     sources = [
       "trace_tools.py",

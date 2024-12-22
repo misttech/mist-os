@@ -21,7 +21,6 @@ rustc_library("netlink") {
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
-    "//src/lib/const-unwrap",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
@@ -45,8 +44,8 @@ rustc_library("netlink") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
@@ -77,6 +76,7 @@ rustc_library("netlink") {
     "src/route_tables.rs",
     "src/routes.rs",
     "src/rules.rs",
+    "src/rules/conversions.rs",
     "src/util.rs",
   ]
 
@@ -111,5 +111,6 @@ group("tests") {
     ":netlink",
     ":netlink-lib-test-no-err-logs",
     ":netlink-lib-test-with-err-logs",
+    "tests",
   ]
 }

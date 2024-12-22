@@ -288,7 +288,10 @@ pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
 /// Opens a new connection to the given `directory`. The cloned connection has the same permissions.
 pub fn clone(dir: &fio::DirectoryProxy) -> Result<fio::DirectoryProxy, CloneError> {
     let (client_end, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-    dir.clone2(ServerEnd::new(server_end.into_channel())).map_err(CloneError::SendCloneRequest)?;
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    dir.clone(server_end.into_channel().into()).map_err(CloneError::SendCloneRequest)?;
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    dir.clone2(server_end.into_channel().into()).map_err(CloneError::SendCloneRequest)?;
     Ok(client_end)
 }
 
@@ -298,7 +301,10 @@ pub fn clone_onto(
     directory: &fio::DirectoryProxy,
     request: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), CloneError> {
-    directory.clone2(ServerEnd::new(request.into_channel())).map_err(CloneError::SendCloneRequest)
+    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    return directory.clone(request.into_channel().into()).map_err(CloneError::SendCloneRequest);
+    #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+    return directory.clone2(request.into_channel().into()).map_err(CloneError::SendCloneRequest);
 }
 
 /// Gracefully closes the directory proxy from the remote end.
@@ -935,14 +941,10 @@ mod tests {
         let scope = ExecutionScope::new();
         let example_dir_flags =
             fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-        ObjectRequest::new3(
-            example_dir_flags,
-            &fio::Options::default(),
-            example_dir_service.into(),
-        )
-        .handle(|request| {
-            example_dir.open3(scope, vfs::path::Path::dot(), example_dir_flags, request)
-        });
+        ObjectRequest::new(example_dir_flags, &fio::Options::default(), example_dir_service.into())
+            .handle(|request| {
+                example_dir.open3(scope, vfs::path::Path::dot(), example_dir_flags, request)
+            });
 
         for (file_name, flags, should_succeed) in vec![
             ("ro/read_only", fio::PERM_READABLE, true),

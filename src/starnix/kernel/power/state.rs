@@ -81,7 +81,9 @@ impl BytesFileOps for PowerStateFile {
         if !supported_states.contains(&state) {
             return error!(EINVAL);
         }
+        // LINT.IfChange
         fuchsia_trace::duration!(c"power", c"starnix-sysfs:suspend");
+        // LINT.ThenChange(//src/performance/lib/trace_processing/metrics/suspend.py)
         power_manager.suspend(state).inspect_err(|e| log_warn!("Suspend failed: {e}"))?;
 
         Ok(())

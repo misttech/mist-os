@@ -14,13 +14,13 @@ rustc_library("ddk-log-lib") {
     "//sdk/lib/device-watcher/rust",
     "//sdk/rust/zx",
     "//src/diagnostics/validator/logs/fidl:fuchsia.validate.logs_rust",
-    "//src/lib/diagnostics/log/encoding/rust",
+    "//src/lib/diagnostics/log/types",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [

@@ -137,7 +137,7 @@ _SDK_TEMPLATES = {
 # Note that while this is expanded once, then the content of the resulting file is modified
 # multiple times after that by various functions in this script.
 _REPOSITORY_BUILD_TEMPLATE = (
-    "//fuchsia/workspace/sdk_templates:repository.BUILD.template"
+    "//fuchsia/workspace/sdk_templates:fuchsia_sdk.BUILD.bazel"
 )
 
 def resolve_repository_labels(runtime):
@@ -606,6 +606,11 @@ def _generate_companion_host_tool_build_rules(
 
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files_str)
 
+# Only numerical API levels in the Supported phase and the mutable API level
+# "NEXT" are supported in the IDK and SDKs.
+# "HEAD" is technically not supported in the IDK or SDK(s) - see
+# https://fxbug.dev/334936990 - but it is currently used (without proper
+# versioning) in-tree.
 # buildifier: disable=unused-variable
 def _generate_api_version_rules(
         runtime,
@@ -615,26 +620,34 @@ def _generate_api_version_rules(
         process_context,
         parent_sdk_contents):
     ctx = runtime.ctx
-    versions = []
+    supported_api_levels = []
+    unsupported_api_levels = []
     for api_level, value in meta["data"]["api_levels"].items():
-        versions.append(
-            runtime.make_struct(
-                abi_revision = value["abi_revision"],
-                api_level = api_level,
-                as_u32 = int(api_level),
-                status = value["status"],
-            ),
+        level = runtime.make_struct(
+            abi_revision = value["abi_revision"],
+            api_level = api_level,
+            as_u32 = int(api_level),
         )
+        if value["status"] == "supported":
+            supported_api_levels.append(level)
+        else:
+            unsupported_api_levels.append(level)
 
     for api_level, value in meta["data"]["special_api_levels"].items():
-        versions.append(
-            runtime.make_struct(
-                abi_revision = value["abi_revision"],
-                api_level = api_level,
-                as_u32 = value["as_u32"],
-                status = value["status"],
-            ),
-        )
+        if api_level == "NEXT" or api_level == "HEAD":
+            supported_api_levels.append(
+                runtime.make_struct(
+                    abi_revision = value["abi_revision"],
+                    api_level = api_level,
+                    as_u32 = value["as_u32"],
+                ),
+            )
+        elif api_level == "PLATFORM":
+            # "PLATFORM" is for Platform use only and not "known" to the SDK.
+            pass
+
+        else:
+            fail("Unrecognized special API level '%s'" % api_level)
 
     # unlike other template rules that affect the corresponding BUILD.bazel file,
     # the api_version template creates a api_version.bzl file that is loaded in
@@ -646,7 +659,8 @@ def _generate_api_version_rules(
         bzl_file,
         _sdk_template_path(runtime, "api_version"),
         {
-            "{{valid_target_apis}}": _get_starlark_list(runtime, versions),
+            "{{supported_api_levels}}": _get_starlark_list(runtime, supported_api_levels),
+            "{{unsupported_api_levels}}": _get_starlark_list(runtime, unsupported_api_levels),
         },
     )
 
@@ -1471,7 +1485,7 @@ def _sdk_id_from_manifests(runtime, manifests):
     # buildifier: disable=function-docstring-return
     """Gets the SDK id from the given manifests.
 
-    This assumes all of the manifests have the same id an thus only uses the first manifest
+    This assumes all of the manifests have the same id and thus only uses the first manifest
     in the list. If no id is found an empty string will be returned.
     """
     id = ""
@@ -1752,6 +1766,9 @@ alias(
 )
 """,
         )
+
+        # Needed by the SDK test suite.
+        ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "tools"), "fuchsia/tools")
     else:
         # Simply symlink the content of @rules_fuchsia into the current
         # repository instead.

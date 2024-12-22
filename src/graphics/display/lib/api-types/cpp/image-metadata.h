@@ -74,14 +74,12 @@ class ImageMetadata {
 // static
 constexpr bool ImageMetadata::IsValid(
     const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata) {
-  return Dimensions::IsValid(fuchsia_math::wire::SizeU(
-      {.width = fidl_image_metadata.width, .height = fidl_image_metadata.height}));
+  return Dimensions::IsValid(fidl_image_metadata.dimensions);
 }
 
 // static
 constexpr bool ImageMetadata::IsValid(const image_metadata_t& banjo_image_metadata) {
-  return Dimensions::IsValid(fuchsia_math::wire::SizeU(
-      {.width = banjo_image_metadata.width, .height = banjo_image_metadata.height}));
+  return Dimensions::IsValid(banjo_image_metadata.dimensions);
 }
 
 constexpr ImageMetadata::ImageMetadata(const ImageMetadata::ConstructorArgs& args)
@@ -89,13 +87,11 @@ constexpr ImageMetadata::ImageMetadata(const ImageMetadata::ConstructorArgs& arg
 
 constexpr ImageMetadata::ImageMetadata(
     const fuchsia_hardware_display_types::wire::ImageMetadata& fidl_image_metadata)
-    : dimensions_(Dimensions::From(fuchsia_math::wire::SizeU(
-          {.width = fidl_image_metadata.width, .height = fidl_image_metadata.height}))),
+    : dimensions_(Dimensions::From(fidl_image_metadata.dimensions)),
       tiling_type_(fidl_image_metadata.tiling_type) {}
 
 constexpr ImageMetadata::ImageMetadata(const image_metadata_t& banjo_image_metadata)
-    : dimensions_(Dimensions::From(fuchsia_math::wire::SizeU(
-          {.width = banjo_image_metadata.width, .height = banjo_image_metadata.height}))),
+    : dimensions_(Dimensions::From(banjo_image_metadata.dimensions)),
       tiling_type_(banjo_image_metadata.tiling_type) {}
 
 constexpr bool operator==(const ImageMetadata& lhs, const ImageMetadata& rhs) {
@@ -110,8 +106,7 @@ constexpr fuchsia_hardware_display_types::wire::ImageMetadata ImageMetadata::ToF
   return fuchsia_hardware_display_types::wire::ImageMetadata{
       // The casts are guaranteed not to overflow (causing UB) because of the
       // allowed ranges on image widths and heights.
-      .width = static_cast<uint32_t>(dimensions_.width()),
-      .height = static_cast<uint32_t>(dimensions_.height()),
+      .dimensions = dimensions_.ToFidl(),
       .tiling_type = tiling_type_.ToFidl(),
   };
 }
@@ -120,8 +115,7 @@ constexpr image_metadata_t ImageMetadata::ToBanjo() const {
   return image_metadata_t{
       // The casts are guaranteed not to overflow (causing UB) because of the
       // allowed ranges on image widths and heights.
-      .width = static_cast<uint32_t>(dimensions_.width()),
-      .height = static_cast<uint32_t>(dimensions_.height()),
+      .dimensions = dimensions_.ToBanjo(),
       .tiling_type = tiling_type_.ToBanjo(),
   };
 }

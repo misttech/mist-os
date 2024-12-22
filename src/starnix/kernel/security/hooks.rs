@@ -223,6 +223,20 @@ pub fn fs_node_init_on_create(
     })
 }
 
+/// Called on creation of anonymous [`crate::vfs::FsNode`]s. APIs that create file-descriptors that
+/// are not linked into any filesystem directory structure create anonymous nodes, labeled by this
+/// hook rather than `fs_node_init_on_create()` above.
+pub fn fs_node_init_anon(current_task: &CurrentTask, new_node: &FsNode, node_type: &str) {
+    profile_duration!("security.hooks.fs_node_init_anon");
+    if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::fs_node_init_anon(security_server, current_task, new_node, node_type)
+        },
+        || (),
+    )
+}
+
 /// Validate that `current_task` has permission to create a regular file in the `parent` directory,
 /// with the specified file `mode`.
 /// Corresponds to the `inode_create()` LSM hook.
@@ -387,10 +401,14 @@ pub fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
 
 /// Returns whether `current_task` can issue an ioctl to `file`.
 /// Corresponds to the `file_ioctl()` LSM hook.
-pub fn check_file_ioctl_access(current_task: &CurrentTask, file: &FileObject) -> Result<(), Errno> {
+pub fn check_file_ioctl_access(
+    current_task: &CurrentTask,
+    file: &FileObject,
+    request: u32,
+) -> Result<(), Errno> {
     profile_duration!("security.hooks.check_file_ioctl_access");
     if_selinux_else_default_ok(current_task, |security_server| {
-        selinux_hooks::check_file_ioctl_access(security_server, current_task, file)
+        selinux_hooks::check_file_ioctl_access(security_server, current_task, file, request)
     })
 }
 
@@ -643,6 +661,19 @@ pub fn task_prlimit(
     })
 }
 
+/// Check permission before mounting `fs`.
+/// Corresponds to the `sb_kern_mount()` LSM hook.
+pub fn sb_kern_mount(current_task: &CurrentTask, fs: &FileSystem) -> Result<(), Errno> {
+    profile_duration!("security.hooks.sb_kern_mount");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::superblock::sb_kern_mount(
+            &security_server.as_permission_check(),
+            current_task,
+            fs,
+        )
+    })
+}
+
 /// Check permission before mounting to `path`. `flags` contains the mount flags that determine the
 /// kind of mount operation done, and therefore the permissions that the caller requires.
 /// Corresponds to the `sb_mount()` LSM hook.
@@ -691,6 +722,18 @@ pub fn sb_umount(
             node,
             flags,
         )
+    })
+}
+
+/// Checks if `current_task` has the permission to read file attributes for  `fs_node`.
+/// Corresponds to the `inode_getattr()` hook.
+pub fn check_fs_node_getattr_access(
+    current_task: &CurrentTask,
+    fs_node: &FsNode,
+) -> Result<(), Errno> {
+    profile_duration!("security.hooks.check_fs_node_getattr_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_getattr_access(security_server, current_task, fs_node)
     })
 }
 

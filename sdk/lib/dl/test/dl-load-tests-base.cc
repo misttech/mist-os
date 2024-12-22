@@ -12,6 +12,8 @@
 
 #include <gtest/gtest.h>
 
+#include "startup-symbols.h"
+
 namespace dl::testing {
 namespace {
 
@@ -68,6 +70,8 @@ DlLoadTestsBase::RetrieveFile(Diagnostics& diag, std::string_view filename) {
   return fit::error(std::nullopt);
 }
 
+void DlLoadTestsBase::SetUp() { gInitFiniState = 0; }
+
 void DlLoadTestsBase::TearDown() {
   for (auto& [ptr, info] : opened_modules()) {
     ADD_FAILURE() << info.refcnt << " calls to dlopen(\"" << info.name
@@ -77,6 +81,8 @@ void DlLoadTestsBase::TearDown() {
       CleanUpOpenedFile(ptr);
     }
   }
+  // Expect tests that modify this variable reset it to its initial state.
+  EXPECT_EQ(gInitFiniState, 0);
 }
 
 void DlLoadTestsBase::TrackModule(void* module, std::string filename) {

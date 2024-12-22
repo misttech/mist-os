@@ -11,7 +11,6 @@ use core::num::{NonZeroU16, NonZeroU8};
 use core::ops::{Deref, DerefMut};
 use core::time::Duration;
 
-use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ip::{
@@ -36,9 +35,9 @@ use crate::internal::device::{
     IpAddressIdSpec, IpDeviceAddr, IpDeviceTimerId, Ipv4DeviceAddr, Ipv4DeviceTimerId,
     Ipv6DeviceAddr, Ipv6DeviceTimerId, WeakIpAddressId,
 };
-use crate::internal::gmp::igmp::{IgmpConfig, IgmpState, IgmpTimerId};
-use crate::internal::gmp::mld::{MldConfig, MldTimerId};
-use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, MulticastGroupSet};
+use crate::internal::gmp::igmp::{IgmpConfig, IgmpTimerId, IgmpTypeLayout};
+use crate::internal::gmp::mld::{MldConfig, MldTimerId, MldTypeLayout};
+use crate::internal::gmp::{GmpGroupState, GmpState, GmpTimerId, GmpTypeLayout, MulticastGroupSet};
 use crate::internal::types::RawMetric;
 
 use super::dad::NonceCollection;
@@ -46,84 +45,59 @@ use super::dad::NonceCollection;
 /// The default value for *RetransTimer* as defined in [RFC 4861 section 10].
 ///
 /// [RFC 4861 section 10]: https://tools.ietf.org/html/rfc4861#section-10
-pub const RETRANS_TIMER_DEFAULT: NonZeroDuration =
-    const_unwrap_option(NonZeroDuration::from_secs(1));
+pub const RETRANS_TIMER_DEFAULT: NonZeroDuration = NonZeroDuration::from_secs(1).unwrap();
 
 /// The default value for the default hop limit to be used when sending IP
 /// packets.
-const DEFAULT_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(64));
+const DEFAULT_HOP_LIMIT: NonZeroU8 = NonZeroU8::new(64).unwrap();
 
 /// An `Ip` extension trait adding IP device state properties.
 pub trait IpDeviceStateIpExt: BroadcastIpExt {
     /// Information stored about an IP address assigned to an interface.
-    type AssignedAddressState<BT: IpDeviceStateBindingsTypes>: AssignedAddressState<Self::Addr>
+    type AssignedAddressState<BT: IpDeviceStateBindingsTypes>: AssignedAddressState<Address = Self::Addr>
         + Debug;
-    /// The GMP protocol-specific state.
-    type GmpProtoState<BT: IpDeviceStateBindingsTypes>;
     /// The GMP protocol-specific configuration.
     type GmpProtoConfig: Default;
+    /// The GMP type layout used by IP-version specific state.
+    type GmpTypeLayout<BT: IpDeviceStateBindingsTypes>: GmpTypeLayout<Self, BT>;
     /// The timer id for GMP timers.
     type GmpTimerId<D: WeakDeviceIdentifier>: From<GmpTimerId<Self, D>>;
-
-    /// Creates a new [`Self::GmpProtoState`].
-    fn new_gmp_state<
-        D: WeakDeviceIdentifier,
-        CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
-        BC: IpDeviceStateBindingsTypes + TimerContext,
-    >(
-        bindings_ctx: &mut BC,
-        device_id: D,
-    ) -> Self::GmpProtoState<BC>;
 }
 
 impl IpDeviceStateIpExt for Ipv4 {
     type AssignedAddressState<BT: IpDeviceStateBindingsTypes> = Ipv4AddressEntry<BT>;
-    type GmpProtoState<BT: IpDeviceStateBindingsTypes> = IgmpState<BT>;
     type GmpTimerId<D: WeakDeviceIdentifier> = IgmpTimerId<D>;
     type GmpProtoConfig = IgmpConfig;
-
-    fn new_gmp_state<
-        D: WeakDeviceIdentifier,
-        CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
-        BC: IpDeviceStateBindingsTypes + TimerContext,
-    >(
-        bindings_ctx: &mut BC,
-        device_id: D,
-    ) -> Self::GmpProtoState<BC> {
-        IgmpState::new::<_, CC>(bindings_ctx, device_id)
-    }
+    type GmpTypeLayout<BT: IpDeviceStateBindingsTypes> = IgmpTypeLayout;
 }
 
 impl IpDeviceStateIpExt for Ipv6 {
     type AssignedAddressState<BT: IpDeviceStateBindingsTypes> = Ipv6AddressEntry<BT>;
-    type GmpProtoState<BT: IpDeviceStateBindingsTypes> = ();
     type GmpTimerId<D: WeakDeviceIdentifier> = MldTimerId<D>;
     type GmpProtoConfig = MldConfig;
-
-    fn new_gmp_state<
-        D: WeakDeviceIdentifier,
-        CC: CoreTimerContext<Self::GmpTimerId<D>, BC>,
-        BC: IpDeviceStateBindingsTypes + TimerContext,
-    >(
-        _bindings_ctx: &mut BC,
-        _device_id: D,
-    ) -> Self::GmpProtoState<BC> {
-        ()
-    }
+    type GmpTypeLayout<BT: IpDeviceStateBindingsTypes> = MldTypeLayout;
 }
 
 /// The state associated with an IP address assigned to an IP device.
-pub trait AssignedAddressState<A: IpAddress>: Debug + Send + Sync + 'static {
+pub trait AssignedAddressState: Debug + Send + Sync + 'static {
+    /// The type of IP address that is assigned.
+    type Address: IpAddress<Version: AssignedAddrIpExt>;
+
     /// Gets the address.
-    fn addr(&self) -> IpDeviceAddr<A>;
+    fn addr(&self) -> IpDeviceAddr<Self::Address>;
 
     /// Gets the address subnet this ID represents.
-    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness>
-    where
-        A::Version: AssignedAddrIpExt;
+    fn addr_sub(
+        &self,
+    ) -> AddrSubnet<
+        Self::Address,
+        <<Self::Address as IpAddress>::Version as AssignedAddrIpExt>::AssignedWitness,
+    >;
 }
 
-impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv4Addr> for Ipv4AddressEntry<BT> {
+impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState for Ipv4AddressEntry<BT> {
+    type Address = Ipv4Addr;
+
     fn addr(&self) -> IpDeviceAddr<Ipv4Addr> {
         IpDeviceAddr::new_from_witness(self.addr_sub().addr())
     }
@@ -133,7 +107,9 @@ impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv4Addr> for Ipv4Addr
     }
 }
 
-impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv6Addr> for Ipv6AddressEntry<BT> {
+impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState for Ipv6AddressEntry<BT> {
+    type Address = Ipv6Addr;
+
     fn addr(&self) -> IpDeviceAddr<Ipv6Addr> {
         IpDeviceAddr::new_from_ipv6_device_addr(self.addr_sub().addr())
     }
@@ -145,11 +121,14 @@ impl<BT: IpDeviceStateBindingsTypes> AssignedAddressState<Ipv6Addr> for Ipv6Addr
 
 /// The primary reference to the state associated with an IP address assigned
 /// to an IP device.
-//
-// TODO(https://fxbug.dev/382093426): manually implement `Debug`.
-#[derive(Derivative)]
-#[derivative(Debug(bound = "S: Debug"))]
 pub struct PrimaryAddressId<S>(PrimaryRc<S>);
+
+impl<S: AssignedAddressState> Debug for PrimaryAddressId<S> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        write!(f, "PrimaryAddressId({:?} => {})", rc.debug_id(), self.addr_sub())
+    }
+}
 
 impl<S> Deref for PrimaryAddressId<S> {
     type Target = S;
@@ -187,34 +166,36 @@ impl<S> PrimaryAddressId<S> {
     }
 }
 
-impl<A, S> AssignedAddressState<A> for PrimaryAddressId<S>
-where
-    A: IpAddress<Version: AssignedAddrIpExt>,
-    S: AssignedAddressState<A>,
-{
-    fn addr(&self) -> IpDeviceAddr<A> {
+impl<S: AssignedAddressState> AssignedAddressState for PrimaryAddressId<S> {
+    type Address = S::Address;
+
+    fn addr(&self) -> IpDeviceAddr<S::Address> {
         let Self(inner) = self;
         inner.addr()
     }
 
-    fn addr_sub(&self) -> AddrSubnet<A, <A::Version as AssignedAddrIpExt>::AssignedWitness> {
+    fn addr_sub(
+        &self,
+    ) -> AddrSubnet<
+        S::Address,
+        <<S::Address as IpAddress>::Version as AssignedAddrIpExt>::AssignedWitness,
+    > {
         let Self(inner) = self;
         inner.addr_sub()
     }
 }
 
 /// A strongly-held reference to an IP address assigned to a device.
-//
-// TODO(https://fxbug.dev/382093426): manually implement `Debug`.
 #[derive(Derivative)]
-#[derivative(
-    Debug(bound = "S: Debug"),
-    Clone(bound = ""),
-    Eq(bound = ""),
-    Hash(bound = ""),
-    PartialEq(bound = "")
-)]
+#[derivative(Clone(bound = ""), Eq(bound = ""), Hash(bound = ""), PartialEq(bound = ""))]
 pub struct AddressId<S>(StrongRc<S>);
+
+impl<S: AssignedAddressState> Debug for AddressId<S> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        write!(f, "AddressId({:?} => {})", rc.debug_id(), self.addr_sub())
+    }
+}
 
 impl<S> Deref for AddressId<S> {
     type Target = S;
@@ -228,7 +209,7 @@ impl<S> Deref for AddressId<S> {
 impl<A, S> IpAddressId<A> for AddressId<S>
 where
     A: IpAddress<Version: AssignedAddrIpExt>,
-    S: AssignedAddressState<A>,
+    S: AssignedAddressState<Address = A>,
 {
     type Weak = WeakAddressId<S>;
 
@@ -249,22 +230,36 @@ where
 }
 
 /// A weakly-held reference to an IP address assigned to a device.
-//
-// TODO(https://fxbug.dev/382093426): manually implement `Debug`.
 #[derive(Derivative)]
-#[derivative(
-    Debug(bound = "S: Debug"),
-    Clone(bound = ""),
-    Eq(bound = ""),
-    Hash(bound = ""),
-    PartialEq(bound = "")
-)]
+#[derivative(Clone(bound = ""), Eq(bound = ""), Hash(bound = ""), PartialEq(bound = ""))]
 pub struct WeakAddressId<S>(WeakRc<S>);
+
+impl<S: AssignedAddressState> Debug for WeakAddressId<S> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self(rc) = self;
+        if let Some(id) = self.upgrade() {
+            write!(f, "WeakAddressId({:?} => {})", rc.debug_id(), id.addr_sub())
+        } else {
+            write!(
+                f,
+                "WeakAddressId({:?} => {})",
+                rc.debug_id(),
+                <S::Address as IpAddress>::Version::NAME
+            )
+        }
+    }
+}
+
+impl<S: AssignedAddressState> InspectableValue for WeakAddressId<S> {
+    fn record<I: Inspector>(&self, name: &str, inspector: &mut I) {
+        inspector.record_debug(name, self);
+    }
+}
 
 impl<A, S> WeakIpAddressId<A> for WeakAddressId<S>
 where
     A: IpAddress<Version: AssignedAddrIpExt>,
-    S: AssignedAddressState<A>,
+    S: AssignedAddressState<Address = A>,
 {
     type Strong = AddressId<S>;
 
@@ -290,10 +285,8 @@ pub struct IpDeviceFlags {
 pub struct IpDeviceMulticastGroups<I: IpDeviceStateIpExt, BT: IpDeviceStateBindingsTypes> {
     /// Multicast groups this device has joined.
     pub groups: MulticastGroupSet<I::Addr, GmpGroupState<I, BT>>,
-    /// Protocol-specific GMP state.
-    pub gmp_proto: I::GmpProtoState<BT>,
     /// GMP state.
-    pub gmp: GmpState<I, BT>,
+    pub gmp: GmpState<I, I::GmpTypeLayout<BT>, BT>,
     /// GMP protocol-specific configuration.
     pub gmp_config: I::GmpProtoConfig,
 }
@@ -411,7 +404,6 @@ impl<I: IpDeviceStateIpExt, BC: IpDeviceStateBindingsTypes + TimerContext> IpDev
             addrs: Default::default(),
             multicast_groups: RwLock::new(IpDeviceMulticastGroups {
                 groups: Default::default(),
-                gmp_proto: I::new_gmp_state::<_, CC, _>(bindings_ctx, device_id.clone()),
                 gmp: GmpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx, device_id),
                 gmp_config: Default::default(),
             }),
@@ -533,72 +525,6 @@ impl<BT: IpDeviceStateBindingsTypes> AsMut<IpDeviceState<Ipv4, BT>> for Ipv4Devi
     }
 }
 
-/// IPv4 device configurations and flags.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct Ipv4DeviceConfigurationAndFlags {
-    /// The IPv4 device configuration.
-    pub config: Ipv4DeviceConfiguration,
-    /// The IPv4 device flags.
-    pub flags: IpDeviceFlags,
-}
-
-impl AsRef<IpDeviceConfiguration> for Ipv4DeviceConfigurationAndFlags {
-    fn as_ref(&self) -> &IpDeviceConfiguration {
-        self.config.as_ref()
-    }
-}
-
-impl AsMut<IpDeviceConfiguration> for Ipv4DeviceConfigurationAndFlags {
-    fn as_mut(&mut self) -> &mut IpDeviceConfiguration {
-        self.config.as_mut()
-    }
-}
-
-impl AsRef<IpDeviceFlags> for Ipv4DeviceConfigurationAndFlags {
-    fn as_ref(&self) -> &IpDeviceFlags {
-        &self.flags
-    }
-}
-
-impl From<(Ipv4DeviceConfiguration, IpDeviceFlags)> for Ipv4DeviceConfigurationAndFlags {
-    fn from((config, flags): (Ipv4DeviceConfiguration, IpDeviceFlags)) -> Self {
-        Self { config, flags }
-    }
-}
-
-/// IPv6 device configurations and flags.
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct Ipv6DeviceConfigurationAndFlags {
-    /// The IPv6 device configuration.
-    pub config: Ipv6DeviceConfiguration,
-    /// The IPv6 device flags.
-    pub flags: IpDeviceFlags,
-}
-
-impl AsRef<IpDeviceConfiguration> for Ipv6DeviceConfigurationAndFlags {
-    fn as_ref(&self) -> &IpDeviceConfiguration {
-        self.config.as_ref()
-    }
-}
-
-impl AsMut<IpDeviceConfiguration> for Ipv6DeviceConfigurationAndFlags {
-    fn as_mut(&mut self) -> &mut IpDeviceConfiguration {
-        self.config.as_mut()
-    }
-}
-
-impl AsRef<IpDeviceFlags> for Ipv6DeviceConfigurationAndFlags {
-    fn as_ref(&self) -> &IpDeviceFlags {
-        &self.flags
-    }
-}
-
-impl From<(Ipv6DeviceConfiguration, IpDeviceFlags)> for Ipv6DeviceConfigurationAndFlags {
-    fn from((config, flags): (Ipv6DeviceConfiguration, IpDeviceFlags)) -> Self {
-        Self { config, flags }
-    }
-}
-
 /// Configurations common to all IP devices.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct IpDeviceConfiguration {
@@ -692,13 +618,13 @@ impl Ipv6DeviceConfiguration {
     /// The default `MAX_RTR_SOLICITATIONS` value from [RFC 4861 section 10].
     ///
     /// [RFC 4861 section 10]: https://datatracker.ietf.org/doc/html/rfc4861#section-10
-    pub const DEFAULT_MAX_RTR_SOLICITATIONS: NonZeroU8 = const_unwrap_option(NonZeroU8::new(3));
+    pub const DEFAULT_MAX_RTR_SOLICITATIONS: NonZeroU8 = NonZeroU8::new(3).unwrap();
 
     /// The default `DupAddrDetectTransmits` value from [RFC 4862 Section 5.1]
     ///
     /// [RFC 4862 Section 5.1]: https://www.rfc-editor.org/rfc/rfc4862#section-5.1
     pub const DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS: NonZeroU16 =
-        const_unwrap_option(NonZeroU16::new(1));
+        NonZeroU16::new(1).unwrap();
 }
 
 impl AsRef<IpDeviceConfiguration> for Ipv6DeviceConfiguration {

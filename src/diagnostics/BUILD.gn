@@ -10,6 +10,7 @@ group("diagnostics") {
     "archivist/bench:build-only",
     "config",
     "iquery",
+    "tools($host_toolchain)",
 
     # contains persistence, sampler, and detect
     "launcher",
@@ -17,6 +18,10 @@ group("diagnostics") {
     "triage",
     "validator",
     "//src/lib/diagnostics",
+
+    # Ensure we build the stress tests in this utility group. But don't include this in tests as we
+    # don't want to generally run them.
+    "//src/diagnostics/archivist/tests/stress-test",
 
     # Disabled due to lack of support in Clang and Rust toolchain;
     # see https://fxbug.dev/325488864.
@@ -36,6 +41,7 @@ group("tests") {
     "persistence:tests",
     "sampler:tests",
     "tests",
+    "tools:tests($host_toolchain)",
     "triage:tests",
     "validator:tests",
     "//src/developer/ffx/plugins/inspect:tests($host_toolchain)",

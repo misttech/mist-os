@@ -220,6 +220,7 @@ impl FileOps for SyncFile {
                     current_task,
                     Box::new(SyncFile::new(name, fence)),
                     OpenFlags::RDWR,
+                    "sync_file",
                 );
 
                 let fd = current_task.add_file(file, FdFlags::empty())?;

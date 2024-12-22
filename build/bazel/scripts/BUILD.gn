@@ -3,24 +3,38 @@
 # found in the LICENSE file.
 
 import("//build/python/python_host_test.gni")
+import("//build/testing/python_build_time_tests.gni")
+
+python_build_time_tests("get_git_head_commit_test") {
+  tests = [ "get_git_head_commit_test.py" ]
+  inputs = [ "get_git_head_commit.py" ]
+}
+
+python_build_time_tests("compute_content_hash_test") {
+  tests = [ "compute_content_hash_test.py" ]
+  inputs = [
+    "compute_content_hash.py",
+    "get_git_head_commit.py",
+  ]
+}
 
 if (is_host) {
   python_host_test("update_workspace_test") {
-    enable_mypy = true
     main_source = "update_workspace_test.py"
     sources = [
       "check_ninja_build_plan.py",
       "compute_content_hash.py",
+      "get_git_head_commit.py",
       "update_workspace.py",
     ]
     libraries = [ "//third_party/parameterized" ]
   }
   python_host_test("minimal_workspace_test") {
-    enable_mypy = true
     main_source = "minimal_workspace_test.py"
     sources = [
       "check_ninja_build_plan.py",
       "compute_content_hash.py",
+      "get_git_head_commit.py",
       "minimal_workspace.py",
       "update_workspace.py",
     ]
@@ -33,4 +47,13 @@ group("tests") {
     ":minimal_workspace_test($host_toolchain)",
     ":update_workspace_test($host_toolchain)",
   ]
+
+  # TODO(https://fxbug.dev/384878204): enable build-time tests once
+  # CI bots can run git commands properly.
+  if (false) {
+    deps += [
+      ":compute_content_hash_tests",
+      ":get_git_head_commit_tests",
+    ]
+  }
 }

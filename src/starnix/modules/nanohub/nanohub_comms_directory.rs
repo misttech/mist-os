@@ -29,6 +29,11 @@ impl NanohubCommsDirectory {
         let mut entries = DeviceDirectory::create_file_ops_entries();
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
+            name: b"display_panel_name".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
             name: b"display_select".into(),
             inode: None,
         });
@@ -50,6 +55,11 @@ impl NanohubCommsDirectory {
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
             name: b"firmware_version".into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: b"hw_reset".into(),
             inode: None,
         });
         entries.push(VecDirectoryEntry {
@@ -87,6 +97,13 @@ impl FsNodeOps for NanohubCommsDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
+            b"display_panel_name" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/display_panel_name".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+            )),
             b"display_select" => Ok(node.fs().create_node(
                 current_task,
                 SocketTunnelFile::new(
@@ -121,6 +138,13 @@ impl FsNodeOps for NanohubCommsDirectory {
                     b"/sys/devices/virtual/nanohub/nanohub_comms/firmware_version".into(),
                 ),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+            )),
+            b"hw_reset" => Ok(node.fs().create_node(
+                current_task,
+                SocketTunnelFile::new(
+                    b"/sys/devices/virtual/nanohub/nanohub_comms/hw_reset".into(),
+                ),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o220), FsCred::root()),
             )),
             b"wakeup_event_msec" => Ok(node.fs().create_node(
                 current_task,

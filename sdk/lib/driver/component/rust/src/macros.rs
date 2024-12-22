@@ -34,7 +34,7 @@ pub const fn make_driver_registration<T: Driver>() -> DriverRegistration {
 ///
 /// ```
 /// use fdf_server::{driver_register, Driver, DriverContext};
-/// use tracing::info;
+/// use log::info;
 /// use zx::Status;
 ///
 /// #[derive(Default)]

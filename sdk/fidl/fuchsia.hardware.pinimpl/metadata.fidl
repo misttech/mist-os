@@ -8,6 +8,7 @@ using fuchsia.hardware.gpio;
 using fuchsia.hardware.pin;
 using zx;
 
+@deprecated("Unused")
 const METADATA_TYPE_NAME string = "fuchsia.hardware.pinimpl.Metadata";
 
 type Pin = table {
@@ -38,6 +39,7 @@ type InitStep = flexible union {
     2: delay zx.Duration;
 };
 
+@serializable
 type Metadata = table {
     /// Init steps are processed sequentially in the order that they appear in the vector.
     /// Processing occurs once during the GPIO core driver's start hook.

@@ -6,9 +6,9 @@ use crate::Result;
 use fidl_fuchsia_media_sessions2::*;
 use futures::stream::{Fuse, Map, Stream, StreamExt};
 use futures::Future;
+use log::warn;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::warn;
 
 pub enum WatchStatusResponder {
     SessionControl(SessionControlWatchStatusResponder),
@@ -111,7 +111,7 @@ where
         match self.update(cx) {
             Err(UpdateError::DuplicateRequestForStatus) => {
                 warn!(
-                    tag = "observer",
+                    tag = "observer";
                     concat!(
                         "Client sent a request for status ",
                         "without waiting for a response to a prior request."
@@ -129,7 +129,7 @@ where
             let status = self.current_status.take().expect("Get status; variant checked");
             match responder.send(status) {
                 Err(e) => {
-                    warn!(tag = "observer", "Error writing status to observer: {:?}", e);
+                    warn!(tag = "observer"; "Error writing status to observer: {:?}", e);
                 }
                 Ok(_) => {}
             }

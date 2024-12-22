@@ -23,7 +23,7 @@ use packet_formats::icmp::ndp::options::{NdpOption, NdpOptionBuilder, PrefixInfo
 use packet_formats::icmp::ndp::{
     OptionSequenceBuilder, Options, RouterAdvertisement, RouterSolicitation,
 };
-use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpZeroCode};
 use packet_formats::ip::{DscpAndEcn, IpProto, Ipv6Proto};
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::testutil::{
@@ -219,7 +219,7 @@ fn test_address_resolution() {
     let body = Buf::new(req_body.to_vec(), ..).encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
         local_ip(),
         remote_ip(),
-        IcmpUnusedCode,
+        IcmpZeroCode,
         req,
     ));
     // Manually assigning the addresses.
@@ -898,7 +898,7 @@ fn test_receiving_router_solicitation_validity_check() {
         .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
-            IcmpUnusedCode,
+            IcmpZeroCode,
             RouterSolicitation::default(),
         ))
         .encapsulate(Ipv6PacketBuilder::new(
@@ -924,7 +924,7 @@ fn test_receiving_router_advertisement_validity_check() {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 RouterAdvertisement::new(
                     0,     /* current_hop_limit */
                     false, /* managed_flag */
@@ -988,7 +988,7 @@ fn test_sending_ipv6_packet_after_hop_limit_change() {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 RouterAdvertisement::new(hop_limit, false, false, 0, 0, 0),
             ))
             .encapsulate(Ipv6PacketBuilder::new(
@@ -1050,7 +1050,7 @@ fn test_receiving_router_advertisement_mtu_option() {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 RouterAdvertisement::new(0, false, false, 0, 0, 0),
             ))
             .encapsulate(Ipv6PacketBuilder::new(
@@ -1154,13 +1154,13 @@ fn test_host_send_router_solicitations() {
         src_mac: Mac,
         src_ip: Ipv6Addr,
         message: RouterSolicitation,
-        code: IcmpUnusedCode,
+        code: IcmpZeroCode,
     ) {
         let fake_config = Ipv6::TEST_ADDRS;
         assert_eq!(src_mac, fake_config.local_mac.get());
         assert_eq!(src_ip, fake_config.local_mac.to_ipv6_link_local().addr().get());
         assert_eq!(message, RouterSolicitation::default());
-        assert_eq!(code, IcmpUnusedCode);
+        assert_eq!(code, IcmpZeroCode);
     }
 
     let fake_config = Ipv6::TEST_ADDRS;
@@ -1467,7 +1467,7 @@ fn slaac_packet_buf(
         .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             RouterAdvertisement::new(0, false, false, 0, 0, 0),
         ))
         .encapsulate(Ipv6PacketBuilder::new(
@@ -2049,7 +2049,7 @@ fn test_host_slaac_address_deprecate_while_tentative() {
         &mut core_ctx.context(),
         bindings_ctx,
         &device,
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(10)),
+        NonZeroDuration::from_secs(10).unwrap(),
     );
 
     // Receive a new RA with new prefix (autonomous).

@@ -100,4 +100,7 @@ const struct pdev_power_ops motmot_power_ops = {
 
 }  // namespace
 
-void motmot_power_init_early() { pdev_register_power(&motmot_power_ops); }
+void motmot_power_init_early() {
+  dprintf(INFO, "POWER: registering motmot power hooks");
+  pdev_register_power(&motmot_power_ops);
+}

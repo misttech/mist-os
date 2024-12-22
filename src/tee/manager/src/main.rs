@@ -47,7 +47,7 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
         )
         .await
     {
-        tracing::error!("Could not create child component in TA collection: {e:?}");
+        log::error!("Could not create child component in TA collection: {e:?}");
         return;
     }
 
@@ -62,7 +62,7 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
         )
         .await
     {
-        tracing::error!("Could not open exposed directory on child component: {e:?}");
+        log::error!("Could not open exposed directory on child component: {e:?}");
         return;
     }
 
@@ -171,7 +171,7 @@ async fn main() -> Result<(), Error> {
             Some(config) => application_task_group
                 .spawn(fasync::Task::spawn(run_application(request, config.clone()))),
             None => {
-                tracing::warn!("Received connection request for unknown UUID {:?}", request.uuid)
+                log::warn!("Received connection request for unknown UUID {:?}", request.uuid)
             }
         }
     }

@@ -15,6 +15,20 @@ ffx_plugin("ffx_component_list") {
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/sys/lib/component_debug",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:schemars",
+    "//third_party/rust_crates:serde",
+  ]
+  test_deps = [
+    "//src/developer/ffx/lib/rcs:lib",
+    "//src/diagnostics/iquery/test_support:iquery_test_support",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/sys/lib/moniker",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:serde_json",
   ]
 
   args_deps = [ "//src/sys/lib/component_debug" ]

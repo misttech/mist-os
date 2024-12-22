@@ -12,6 +12,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_PID {
   BCM4356 = 0x01,
   BCM43458 = 0x02,
   BCM4359 = 0x03,
+  BCM4381A1 = 0xBA,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {

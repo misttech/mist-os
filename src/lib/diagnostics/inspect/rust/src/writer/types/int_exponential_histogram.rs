@@ -8,7 +8,7 @@ use crate::writer::{
 };
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams};
 use inspect_format::constants;
-use tracing::error;
+use log::error;
 
 #[derive(Debug, Default)]
 /// An exponential histogram property for int values.
@@ -82,7 +82,7 @@ impl HistogramProperty for IntExponentialHistogramProperty {
                     )
                 })
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to clear property");
+                    error!(err:?; "Failed to clear property");
                 });
         }
     }

@@ -50,7 +50,7 @@ async fn rule_watcher_add_remove<
             priority: DEFAULT_RULE_SET_PRIORITY,
             index: RULE_INDEX_0,
             matcher: RuleMatcher::default(),
-            action: RuleAction::Lookup(main_table_id.get()),
+            action: RuleAction::Lookup(main_table_id),
         }
     );
 

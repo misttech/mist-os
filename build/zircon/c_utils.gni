@@ -226,19 +226,10 @@ template("link_output_rspfile") {
 #     Type: string
 #     Default: "bin"
 #
-#   pure
-#     Optional: Check that executable needs no runtime relocation.
-#     This assumes it was linked with `--emit-relocs`.
-#     Type: bool
-#     Default: false
-#
 template("image_binary") {
   image_target = target_name
   rspfile_target = "_image_binary.rsp.$target_name"
   rspfile = "$target_gen_dir/$target_name.image.rsp"
-  check_target = "_image_binary.pure-check.$target_name"
-
-  image_target_visibility = [ ":$image_target" ]
 
   link_output_rspfile(rspfile_target) {
     forward_variables_from(invoker,
@@ -247,40 +238,12 @@ template("image_binary") {
                              "deps",
                              "testonly",
                            ])
-    visibility = image_target_visibility + [ ":$check_target" ]
+    visibility = [ ":$image_target" ]
     outputs = [ rspfile ]
   }
 
-  image_deps = [ ":$rspfile_target" ]
-  if (defined(invoker.pure) && invoker.pure) {
-    image_deps += [ ":$check_target" ]
-    toolchain_utils_action(check_target) {
-      visibility = image_target_visibility
-      forward_variables_from(invoker,
-                             [
-                               "applicable_licenses",
-                               "testonly",
-                             ])
-      deps = [ ":$rspfile_target" ]
-      sources = [ rspfile ]
-      outputs = [ "$target_out_dir/$image_target.pure-stamp" ]
-      script = "//zircon/kernel/gen-kaslr-fixups.sh"
-      utils = [
-        "readelf",
-        "objdump",
-      ]
-      depfile = "$target_out_dir/_image_binary.$target_name.d"
-      args = [
-        "--pure",
-        "@" + rebase_path(rspfile, root_build_dir),
-        rebase_path(outputs[0], root_build_dir),
-        rebase_path(depfile, root_build_dir),
-      ]
-    }
-  }
-
   toolchain_utils_action(image_target) {
-    deps = image_deps
+    deps = [ ":$rspfile_target" ]
     forward_variables_from(invoker,
                            [
                              "applicable_licenses",

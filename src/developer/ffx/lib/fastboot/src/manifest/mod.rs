@@ -135,13 +135,13 @@ impl FlashManifestVersion {
         // Create a map from slot to available images by name (zbi, vbmeta, fvm).
         let mut image_map = PartitionImageMapper::new(product_bundle.partitions.clone());
         if let Some(manifest) = &product_bundle.system_a {
-            image_map.map_images_to_slot(&manifest, Slot::A);
+            image_map.map_images_to_slot(&manifest, Slot::A)?;
         }
         if let Some(manifest) = &product_bundle.system_b {
-            image_map.map_images_to_slot(&manifest, Slot::B);
+            image_map.map_images_to_slot(&manifest, Slot::B)?;
         }
         if let Some(manifest) = &product_bundle.system_r {
-            image_map.map_images_to_slot(&manifest, Slot::R);
+            image_map.map_images_to_slot(&manifest, Slot::R)?;
         }
 
         // Define the flashable "products".

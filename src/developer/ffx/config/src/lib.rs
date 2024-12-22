@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::api::validate_type;
 use crate::api::value::{ConfigValue, ValueStrategy};
-use crate::api::{validate_type, ConfigError};
 use ::errors::ffx_bail;
 use analytics::metrics_state::MetricsStatus;
 use analytics::{set_new_opt_in_status, show_status_message};
 use anyhow::{anyhow, Context, Result};
+use api::value::TryConvert;
 use core::fmt;
 use std::io::Write;
 use std::path::PathBuf;
@@ -31,6 +32,7 @@ pub use aliases::{
     is_usb_discovery_disabled,
 };
 pub use api::query::{ConfigQuery, SelectMode};
+pub use api::ConfigError;
 pub use config_macros::FfxConfigBacked;
 
 pub use environment::{test_init, test_init_in_tree, Environment, EnvironmentContext, TestEnv};
@@ -137,7 +139,7 @@ pub fn global_env() -> Result<Environment> {
 
 /// Initialize the configuration. Only the first call in a process runtime takes effect, so users must
 /// call this early with the required values, such as in main() in the ffx binary.
-pub async fn init(context: &EnvironmentContext) -> Result<()> {
+pub fn init(context: &EnvironmentContext) -> Result<()> {
     let mut env_lock = ENV.lock().unwrap();
     if env_lock.is_some() {
         anyhow::bail!("Attempted to set the global environment more than once in a process invocation, outside of a test");
@@ -181,13 +183,20 @@ pub fn query<'a>(with: impl Into<ConfigQuery<'a>>) -> ConfigQuery<'a> {
 
 /// A shorthand for the very common case of querying a value from the global config
 /// cache and environment, using the provided value converted into a query.
-pub fn get<'a, T, U>(with: U) -> std::result::Result<T, T::Error>
+pub fn get<'a, T, U>(with: U) -> std::result::Result<T, ConfigError>
 where
-    T: TryFrom<ConfigValue> + ValueStrategy,
-    <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
+    T: TryConvert + ValueStrategy,
     U: Into<ConfigQuery<'a>>,
 {
     query(with).get()
+}
+
+pub fn get_optional<'a, T, U>(with: U) -> std::result::Result<T, ConfigError>
+where
+    T: TryConvert + ValueStrategy,
+    U: Into<ConfigQuery<'a>>,
+{
+    query(with).get_optional()
 }
 
 pub const SDK_OVERRIDE_KEY_PREFIX: &str = "sdk.overrides";
@@ -337,21 +346,23 @@ mod test {
     #[test]
     fn test_converting_array() -> Result<()> {
         let c = |val: Value| -> ConfigValue { ConfigValue(Some(val)) };
-        let conv_elem: Vec<String> = c(json!("test")).try_into()?;
+        let conv_elem: Vec<String> = <_>::try_convert(c(json!("test")))?;
         assert_eq!(1, conv_elem.len());
-        let conv_string: Vec<String> = c(json!(["test", "test2"])).try_into()?;
+        let conv_string: Vec<String> = <_>::try_convert(c(json!(["test", "test2"])))?;
         assert_eq!(2, conv_string.len());
-        let conv_bool: Vec<bool> = c(json!([true, "false", false])).try_into()?;
+        let conv_bool: Vec<bool> = <_>::try_convert(c(json!([true, "false", false])))?;
         assert_eq!(3, conv_bool.len());
-        let conv_bool_2: Vec<bool> = c(json!([36, "false", false])).try_into()?;
+        let conv_bool_2: Vec<bool> = <_>::try_convert(c(json!([36, "false", false])))?;
         assert_eq!(2, conv_bool_2.len());
-        let conv_num: Vec<u64> = c(json!([3, "36", 1000])).try_into()?;
+        let conv_num: Vec<u64> = <_>::try_convert(c(json!([3, "36", 1000])))?;
         assert_eq!(3, conv_num.len());
-        let conv_num_2: Vec<u64> = c(json!([3, "false", 1000])).try_into()?;
+        let conv_num_2: Vec<u64> = <_>::try_convert(c(json!([3, "false", 1000])))?;
         assert_eq!(2, conv_num_2.len());
-        let bad_elem: std::result::Result<Vec<u64>, ConfigError> = c(json!("test")).try_into();
+        let bad_elem: std::result::Result<Vec<u64>, ConfigError> =
+            <_>::try_convert(c(json!("test")));
         assert!(bad_elem.is_err());
-        let bad_elem_2: std::result::Result<Vec<u64>, ConfigError> = c(json!(["test"])).try_into();
+        let bad_elem_2: std::result::Result<Vec<u64>, ConfigError> =
+            <_>::try_convert(c(json!(["test"])));
         assert!(bad_elem_2.is_err());
         Ok(())
     }

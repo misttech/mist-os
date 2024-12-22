@@ -16,7 +16,7 @@
 
 class PmmNode;
 class PageQueues;
-class VmCompressor;
+class VmCompression;
 
 namespace vm_unittest {
 class TestPmmNode;
@@ -139,7 +139,7 @@ class Evictor {
  private:
   // Private constructor for test code to specify custom methods to fake the reclamation.
   using ReclaimFunction = fit::inline_function<ktl::optional<EvictedPageCounts>(
-      VmCompressor *compression_instance, EvictionLevel eviction_level)>;
+      VmCompression *compression, EvictionLevel eviction_level)>;
   using FreePagesFunction = fit::inline_function<uint64_t()>;
 
   Evictor(ReclaimFunction reclaim_function, FreePagesFunction free_pages_function);
@@ -188,7 +188,7 @@ class Evictor {
   // and reclaim.
   // This method will either reclaim from the global page queues, or receive fake data from a test
   // instance.
-  ktl::optional<EvictedPageCounts> EvictPageQueuesHelper(VmCompressor *compression_instance,
+  ktl::optional<EvictedPageCounts> EvictPageQueuesHelper(VmCompression *compression,
                                                          EvictionLevel eviction_level) const;
 
   // Target for eviction.

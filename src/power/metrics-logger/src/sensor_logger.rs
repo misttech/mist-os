@@ -12,11 +12,11 @@ use fuchsia_inspect::{
 };
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::{error, info, warn};
 use std::cell::Cell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_hardware_power_sensor as fpower,
     fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_power_metrics as fmetrics,
@@ -467,7 +467,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
                         info!(
                             name = sensor_names[index].as_str(),
                             unit = T::unit().as_str(),
-                            value,
+                            value;
                             "Reading sensor"
                         );
                     }
@@ -478,8 +478,8 @@ impl<T: Sensor<T>> SensorLogger<T> {
                 // should be performed on the trace. This sample will also be missing for
                 // calculating statistics.
                 Err(err) => error!(
-                    ?err,
-                    path = self.drivers[index].sensor_name.as_str(),
+                    err:?,
+                    path = self.drivers[index].sensor_name.as_str();
                     "Error reading sensor",
                 ),
             };
@@ -528,7 +528,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
                             min,
                             avg,
                             med,
-                            unit = T::unit().as_str(),
+                            unit = T::unit().as_str();
                             "Sensor statistics",
                         );
                     }

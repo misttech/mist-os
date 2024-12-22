@@ -138,8 +138,13 @@ class ScopedChild final {
   // Clone the exposed directory.
   fidl::InterfaceHandle<fuchsia::io::Directory> CloneExposedDir() const {
     fidl::InterfaceHandle<fuchsia::io::Directory> clone;
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    zx_status_t status = exposed_dir_->Clone(
+        fidl::InterfaceRequest<fuchsia::unknown::Cloneable>(clone.NewRequest().TakeChannel()));
+#else
     zx_status_t status = exposed_dir_->Clone2(
         fidl::InterfaceRequest<fuchsia::unknown::Cloneable>(clone.NewRequest().TakeChannel()));
+#endif
     ZX_ASSERT_MSG(status == ZX_OK, "Cloning exposed directory failed: %s",
                   zx_status_get_string(status));
     return clone;
@@ -148,8 +153,13 @@ class ScopedChild final {
   // Clone the exposed directory.
   void CloneExposedDir(fidl::InterfaceRequest<fuchsia::io::Directory> directory_request) const
       ZX_AVAILABLE_SINCE(11) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    zx_status_t status = exposed_dir_->Clone(
+        fidl::InterfaceRequest<fuchsia::unknown::Cloneable>(directory_request.TakeChannel()));
+#else
     zx_status_t status = exposed_dir_->Clone2(
         fidl::InterfaceRequest<fuchsia::unknown::Cloneable>(directory_request.TakeChannel()));
+#endif
     ZX_ASSERT_MSG(status == ZX_OK, "Cloning exposed directory failed: %s",
                   zx_status_get_string(status));
   }

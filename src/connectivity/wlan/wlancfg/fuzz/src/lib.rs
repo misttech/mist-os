@@ -57,7 +57,7 @@ async fn fuzz_saved_networks_manager_store(id: NetworkIdentifier, credential: Cr
 async fn create_saved_networks(store_id: &String) -> SavedNetworksManager {
     let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
     let telemetry_sender = TelemetrySender::new(telemetry_sender);
-    let store = wlan_stash::policy::PolicyStorage::new_with_id(store_id).await;
+    let store = wlan_storage::policy::PolicyStorage::new_with_id(store_id).await;
 
     let saved_networks = SavedNetworksManager::new_with_storage(store, telemetry_sender).await;
     saved_networks

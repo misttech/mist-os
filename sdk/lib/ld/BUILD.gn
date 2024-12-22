@@ -324,6 +324,7 @@ static_library("standalone") {
     "//zircon/system/public",
     "//zircon/system/ulib/c/stdlib:hermetic",
     "//zircon/system/ulib/c/string:hermetic",
+    "//zircon/system/ulib/c/strings:hermetic",
   ]
 
   if (is_linux) {

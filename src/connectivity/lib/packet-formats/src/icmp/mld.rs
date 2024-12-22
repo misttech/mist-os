@@ -22,7 +22,9 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice
 
 use crate::error::{ParseError, ParseResult, UnrecognizedProtocolCode};
 use crate::gmp::{GmpReportGroupRecord, InvalidConstraintsError, LinExpConversion, OverflowError};
-use crate::icmp::{IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode, MessageBody};
+use crate::icmp::{
+    IcmpIpExt, IcmpMessage, IcmpPacket, IcmpPacketRaw, IcmpSenderZeroCode, MessageBody,
+};
 
 // TODO(https://github.com/google/zerocopy/issues/1528): Use std::convert::Infallible.
 /// A record that can never be instantiated. Trying to instantiate this will result in a compile
@@ -248,7 +250,7 @@ impl_icmp_message!(
     Ipv6,
     MulticastListenerReportV2,
     MulticastListenerReportV2,
-    IcmpUnusedCode,
+    IcmpSenderZeroCode,
     Mldv2ReportBody<B>
 );
 
@@ -285,7 +287,7 @@ pub trait Mldv1MessageType {
 
 /// The trait for all ICMPv6 messages holding MLDv1 messages.
 pub trait IcmpMldv1MessageType:
-    Mldv1MessageType + IcmpMessage<Ipv6, Code = IcmpUnusedCode>
+    Mldv1MessageType + IcmpMessage<Ipv6, Code = IcmpSenderZeroCode>
 {
 }
 
@@ -393,7 +395,7 @@ impl<B: SplitByteSlice> MessageBody for Mldv1Body<B> {
 
 macro_rules! impl_mldv1_message {
     ($msg:ident, $resp_code:ty, $group_addr:ty) => {
-        impl_icmp_message!(Ipv6, $msg, $msg, IcmpUnusedCode, Mldv1Body<B>);
+        impl_icmp_message!(Ipv6, $msg, $msg, IcmpSenderZeroCode, Mldv1Body<B>);
         impl Mldv1MessageType for $msg {
             type MaxRespDelay = $resp_code;
             type GroupAddr = $group_addr;
@@ -627,7 +629,7 @@ where
 ///
 /// [RFC 3810 section 5.1.3]:
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.3
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Default)]
 pub struct Mldv2ResponseDelay(u16);
 
 impl LinExpConversion<Duration> for Mldv2ResponseDelay {
@@ -840,7 +842,7 @@ impl_icmp_message!(
     Ipv6,
     MulticastListenerQueryV2,
     MulticastListenerQuery,
-    IcmpUnusedCode,
+    IcmpSenderZeroCode,
     Mldv2QueryBody<B>
 );
 
@@ -930,7 +932,7 @@ mod tests {
         // Serialize an MLD(ICMPv6) packet using the builder.
         Mldv1MessageBuilder::<M>::new_with_max_resp_delay(group_addr, max_resp_delay)
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::new(src_ip, dst_ip, IcmpUnusedCode, msg))
+            .encapsulate(IcmpPacketBuilder::new(src_ip, dst_ip, IcmpSenderZeroCode, msg))
             .encapsulate(with_options)
             .serialize_vec_outer()
             .unwrap()
@@ -939,7 +941,7 @@ mod tests {
     }
 
     fn serialize_to_bytes_with_builder_v2<
-        M: IcmpMessage<Ipv6, Code = IcmpUnusedCode> + Debug,
+        M: IcmpMessage<Ipv6, Code = IcmpSenderZeroCode> + Debug,
         B: InnerPacketBuilder + Debug,
     >(
         src_ip: Ipv6Addr,
@@ -961,7 +963,7 @@ mod tests {
 
         builder
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::new(src_ip, dst_ip, IcmpUnusedCode, msg))
+            .encapsulate(IcmpPacketBuilder::new(src_ip, dst_ip, IcmpSenderZeroCode, msg))
             .encapsulate(with_options)
             .serialize_vec_outer()
             .unwrap()
@@ -1303,7 +1305,7 @@ mod tests {
         )
         .unwrap();
         let icmp_builder =
-            IcmpPacketBuilder::new(SRC_IP, DST_IP, IcmpUnusedCode, MulticastListenerReportV2);
+            IcmpPacketBuilder::new(SRC_IP, DST_IP, IcmpSenderZeroCode, MulticastListenerReportV2);
 
         let avail_len = ETH_MTU
             - ip_builder.constraints().header_len()
@@ -1403,7 +1405,7 @@ mod tests {
         )
         .unwrap();
         let icmp_builder =
-            IcmpPacketBuilder::new(SRC_IP, DST_IP, IcmpUnusedCode, MulticastListenerReportV2);
+            IcmpPacketBuilder::new(SRC_IP, DST_IP, IcmpSenderZeroCode, MulticastListenerReportV2);
 
         let avail_len = ETH_MTU
             - ip_builder.constraints().header_len()

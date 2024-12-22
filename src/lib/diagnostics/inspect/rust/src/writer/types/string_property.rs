@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{Inner, InnerPropertyType, InspectType, Property};
-use tracing::error;
+use log::error;
 
 /// Inspect String Property data type.
 ///

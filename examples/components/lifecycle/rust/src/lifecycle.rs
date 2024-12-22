@@ -8,8 +8,8 @@ use fidl::handle::AsyncChannel;
 use fidl::prelude::*;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use futures_util::stream::TryStreamExt;
+use log::{error, info};
 use std::process;
-use tracing::{error, info};
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_process_lifecycle as flifecycle};
 
 // [START imports]

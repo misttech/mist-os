@@ -4,8 +4,8 @@
 
 #[fuchsia::main]
 async fn main() -> Result<(), anyhow::Error> {
-    tracing::trace!("should not print");
-    tracing::info!("should print");
-    tracing::info!(foo = 1, bar = "baz", "hello, world!");
+    log::trace!("should not print");
+    log::info!("should print");
+    log::info!(foo = 1, bar = "baz"; "hello, world!");
     Ok(())
 }

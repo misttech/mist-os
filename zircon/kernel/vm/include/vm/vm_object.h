@@ -285,13 +285,6 @@ enum class VmObjectReadWriteOptions : uint8_t {
   // If set, attempts to read past the end of a VMO will not cause a failure and only copy the
   // existing bytes instead (i.e. the requested length will be trimmed to the actual VMO size).
   TrimLength = (1 << 0),
-
-  // If set the read or write operation is allowed (although not required) to assume that any VMO
-  // offsets above any supplied user content size (via SetUserContentSize) are zero. This also
-  // permits a write operation to actively zero this portion. Zeroing something that is going to get
-  // written to is beneficial when writing to partial pages of a pager backed VMO, where otherwise
-  // the contents of the rest of the page would have to be unnecessarily fetched.
-  ZeroAboveUserSize = (1 << 1),
 };
 FBL_ENABLE_ENUM_BITS(VmObjectReadWriteOptions)
 
@@ -371,6 +364,13 @@ class VmObject : public VmHierarchyBase,
   // Zero a range of the VMO. May release physical pages in the process.
   // May block on user pager requests and must be called without locks held.
   virtual zx_status_t ZeroRange(uint64_t offset, uint64_t len) { return ZX_ERR_NOT_SUPPORTED; }
+
+  // Zero a range of the VMO and also untrack it from any kind of dirty tracking. For committed
+  // pages, this means that they are released. And any kind of zero markers or intervals that are
+  // inserted will not subscribe to dirty tracking.
+  virtual zx_status_t ZeroRangeUntracked(uint64_t offset, uint64_t len) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   // Unpin the given range of the vmo.  This asserts if it tries to unpin a
   // page that is already not pinned (do not expose this function to
@@ -452,7 +452,7 @@ class VmObject : public VmHierarchyBase,
     return ZX_ERR_NOT_SUPPORTED;
   }
   virtual zx_status_t WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len,
-                                      VmObjectReadWriteOptions options, size_t* out_actual,
+                                      size_t* out_actual,
                                       const OnWriteBytesTransferredCallback& on_bytes_transferred);
 
   // Removes the pages from this vmo in the range [offset, offset + len) and returns
@@ -577,9 +577,7 @@ class VmObject : public VmHierarchyBase,
   virtual uint64_t parent_user_id() const = 0;
 
   // Sets the value returned by |user_id()|. May only be called once.
-  //
-  // Derived types overriding this method are expected to call it from their override.
-  virtual void set_user_id(uint64_t user_id);
+  void set_user_id(uint64_t user_id);
 
   // Returns the maximum possible size of a VMO.
   static size_t max_size() { return MAX_SIZE; }

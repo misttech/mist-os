@@ -32,7 +32,7 @@ class ElfInput(object):
          instance.
 
       2) Call is_elf64() and other methods to return information about
-         the intput file.
+         the input file.
 
       3) Call close() method when done.
     """

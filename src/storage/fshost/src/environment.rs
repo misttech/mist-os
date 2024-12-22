@@ -8,7 +8,6 @@ mod fxfs_container;
 use crate::copier::recursive_copy;
 use crate::crypt::fxfs::{self, CryptService};
 use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
-use crate::crypt::{get_policy, Policy};
 use crate::device::constants::{
     BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, DATA_PARTITION_LABEL, DATA_TYPE_GUID,
     DATA_VOLUME_LABEL, DEFAULT_F2FS_MIN_BYTES, FVM_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL,
@@ -19,6 +18,7 @@ use crate::inspect::register_migration_status;
 use crate::watcher::{DirSource, Watcher};
 use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
+use crypt_policy::{get_policy, Policy};
 use device_watcher::{recursive_wait, recursive_wait_and_open};
 use fidl::endpoints::{create_proxy, ServerEnd, ServiceMarker as _};
 use fidl_fuchsia_fs_startup::MountOptions;
@@ -170,11 +170,11 @@ impl Filesystem {
             Filesystem::Queue(queue) => queue.crypt_service_exposed_dir.push(server),
             Filesystem::Serving(_) => bail!(anyhow!("filesystem doesn't have crypt service")),
             Filesystem::ServingMultiVolume(crypt_service, ..) => {
-                crypt_service.exposed_dir().clone2(server.into_channel().into())?
+                crypt_service.exposed_dir().clone(server.into_channel().into())?
             }
             Filesystem::ServingVolumeInMultiVolume(crypt_service_option, ..) => {
                 match crypt_service_option {
-                    Some(s) => s.exposed_dir().clone2(server.into_channel().into())?,
+                    Some(s) => s.exposed_dir().clone(server.into_channel().into())?,
                     None => return Ok(None),
                 }
             }
@@ -191,19 +191,19 @@ impl Filesystem {
         let (proxy, server) = create_proxy::<fio::DirectoryMarker>();
         match self {
             Filesystem::Queue(queue) => queue.exposed_dir_queue.push(server),
-            Filesystem::Serving(fs) => fs.exposed_dir().clone2(server.into_channel().into())?,
+            Filesystem::Serving(fs) => fs.exposed_dir().clone(server.into_channel().into())?,
             Filesystem::ServingMultiVolume(_, fs, data_volume_name) => fs
                 .volume(&data_volume_name)
                 .ok_or_else(|| anyhow!("data volume {} not found", data_volume_name))?
                 .exposed_dir()
-                .clone2(server.into_channel().into())?,
+                .clone(server.into_channel().into())?,
             Filesystem::ServingVolumeInMultiVolume(_, volume_name) => serving_fs
                 .unwrap()
                 .volume(&volume_name)
                 .ok_or_else(|| anyhow!("volume {volume_name} not found"))?
                 .exposed_dir()
-                .clone2(server.into_channel().into())?,
-            Filesystem::ServingGpt(fs) => fs.exposed_dir().clone2(server.into_channel().into())?,
+                .clone(server.into_channel().into())?,
+            Filesystem::ServingGpt(fs) => fs.exposed_dir().clone(server.into_channel().into())?,
             Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
         }
         Ok(proxy)
@@ -634,7 +634,7 @@ impl FshostEnvironment {
 
         let exposed_dir = fs.exposed_dir(None)?;
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone2(server.into_channel().into())?;
+            exposed_dir.clone(server.into_channel().into())?;
         }
         self.blobfs = fs;
         Ok(())
@@ -751,7 +751,7 @@ impl Environment for FshostEnvironment {
         let queue = self.gpt.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir();
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone2(server.into_channel().into())?;
+            exposed_dir.clone(server.into_channel().into())?;
         }
         let partitions_dir = fuchsia_fs::directory::open_directory(
             &exposed_dir,
@@ -845,7 +845,7 @@ impl Environment for FshostEnvironment {
         let exposed_dir = blobfs.exposed_dir();
         let queue = self.blobfs.queue().ok_or_else(|| anyhow!("blobfs already mounted"))?;
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone2(server.into_channel().into())?;
+            exposed_dir.clone(server.into_channel().into())?;
         }
         self.blobfs = Filesystem::ServingVolumeInMultiVolume(None, label.to_string());
         if let Err(e) = container.fs().set_byte_limit(label, self.config.blobfs_max_bytes).await {
@@ -867,11 +867,11 @@ impl Environment for FshostEnvironment {
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(Some(container.fs()))?;
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone2(server.into_channel().into())?;
+            exposed_dir.clone(server.into_channel().into())?;
         }
         if let Some(crypt_service) = filesystem.crypt_service()? {
             for server in queue.crypt_service_exposed_dir.drain(..) {
-                crypt_service.clone2(server.into_channel().into())?;
+                crypt_service.clone(server.into_channel().into())?;
             }
         }
         self.data = filesystem;
@@ -1031,13 +1031,13 @@ impl Environment for FshostEnvironment {
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(None)?;
         for server in queue.exposed_dir_queue.drain(..) {
-            exposed_dir.clone2(server.into_channel().into())?;
+            exposed_dir.clone(server.into_channel().into())?;
         }
         match &filesystem {
             Filesystem::ServingMultiVolume(..) | Filesystem::ServingVolumeInMultiVolume(..) => {
                 if let Some(crypt_service_exposed_dir) = filesystem.crypt_service()? {
                     for server in queue.crypt_service_exposed_dir.drain(..) {
-                        crypt_service_exposed_dir.clone2(server.into_channel().into())?;
+                        crypt_service_exposed_dir.clone(server.into_channel().into())?;
                     }
                 }
             }

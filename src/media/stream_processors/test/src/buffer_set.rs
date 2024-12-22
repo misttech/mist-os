@@ -12,11 +12,11 @@ use fidl_fuchsia_media::*;
 use fidl_fuchsia_sysmem2::*;
 use fuchsia_component::client;
 use fuchsia_stream_processors::*;
+use log::debug;
 use std::fmt;
 use std::iter::StepBy;
 use std::ops::RangeFrom;
 use thiserror::Error;
-use tracing::debug;
 use zx::{self as zx, AsHandleRef};
 
 #[derive(Debug, Error)]

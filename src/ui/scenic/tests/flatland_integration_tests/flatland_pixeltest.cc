@@ -913,26 +913,29 @@ TEST_F(FlatlandPixelTestBase, ViewBoundClipping) {
   EXPECT_EQ(histogram[default_color], num_pixels / 2);
 }
 
-// This unit test verifies the behavior of view bound clipping when the view exists under a node
-// that itself has a translation applied to it. There are two views with a rectangle in each. The
-// first view is under a node that is translated (display_width/2, 0). The second view is placed
-// under the first transform node, and then translated again by (0, display_height/2). This
-// means that what you see on the screen should look like the following:
+// This test verifies the behavior of view bound clipping when multiple views exist under a node
+// that itself has a translation applied to it. We initially add a child view which is subsequently
+// replaced with two new views, all which have a rectangle in each. The parent view is under a node
+// that is translated (display_width/2, 0). We expect the two child views added with
+// ReplaceChildren to apply the parent's translation to their translation. On the other hand, the
+// second view, initially added as a child of the parent view, but removed with ReplaceChildren,
+// should be removed from the parent's graph. This means that what you see on the screen should
+// look like the following:
 //
-//  xxxxxxxxxxvvvvvvvvvv
-//  xxxxxxxxxxvvvvvvvvvv
-//  xxxxxxxxxxvvvvvvvvvv
-//  xxxxxxxxxxvvvvvvvvvv
-//  xxxxxxxxxxvvvvvvvvvv
+//  xxxxxxxxxxbbbbbbbbbb
+//  xxxxxxxxxxbbbbbbbbbb
+//  xxxxxxxxxxbbbbbbbbbb
+//  xxxxxxxxxxbbbbbbbbbb
 //  xxxxxxxxxxrrrrrrrrrr
 //  xxxxxxxxxxrrrrrrrrrr
-//  xxxxxxxxxxrrrrrrrrrr
-//  xxxxxxxxxxrrrrrrrrrr
-//  xxxxxxxxxxrrrrrrrrrr
+//  xxxxxxxxxxgggggggggg
+//  xxxxxxxxxxgggggggggg
+//
 //
 // Where x refers to empty display pixels.
-//       v refers to pixels covered by the first view's bounds.
-//       r refers to pixels covered by the second view's bounds.
+//       b refers to blue pixels covered by the parent view's bounds.
+//       r refers to red pixels covered by the first child of the parent view.
+//       g refers to green pixels covered by the second child of the parent view.
 TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
   // Draw the first rectangle in the top right quadrant.
   const fuc::ContentId kFilledRectId1 = {get_next_resource_id()};
@@ -950,12 +953,13 @@ TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
   // Attach the transform to the view.
   root_flatland_->AddChild(kRootTransform, kTransformId1);
 
-  // Draw the second rectangle in the bottom right quadrant.
+  // Draw the second rectangle which should be removed from the view, after ReplaceChildren
+  // removes it's child-parent connection.
   const fuc::ContentId kFilledRectId2 = {get_next_resource_id()};
   const fuc::TransformId kTransformId2 = {get_next_resource_id()};
 
   root_flatland_->CreateFilledRect(kFilledRectId2);
-  root_flatland_->SetSolidFill(kFilledRectId2, GetColorInFloat(utils::kGreen),
+  root_flatland_->SetSolidFill(kFilledRectId2, GetColorInFloat(utils::kMagenta),
                                {display_width_ / 2, display_height_ / 2});
 
   // Associate the rect with a transform.
@@ -963,9 +967,44 @@ TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
   root_flatland_->SetContent(kTransformId2, kFilledRectId2);
   root_flatland_->SetTranslation(kTransformId2, {0, static_cast<int32_t>(display_height_ / 2)});
 
-  // Add the |kTransformId2| as the child of |kTransformId1| so that its origin is translated to the
-  // center of the display.
+  // Add the |kTransformId2| as the child of |kTransformId1| temporarily, but expect that
+  // ReplaceChildren undoes this.
   root_flatland_->AddChild(kTransformId1, kTransformId2);
+  BlockingPresent(this, root_flatland_);
+
+  // Draw the first child rectangle which should appear in the top half of the bottom right
+  // quadrant.
+  const fuc::ContentId kFilledChildRectId1 = {get_next_resource_id()};
+  const fuc::TransformId kChildTransformId1 = {get_next_resource_id()};
+
+  root_flatland_->CreateFilledRect(kFilledChildRectId1);
+  root_flatland_->SetSolidFill(kFilledChildRectId1, GetColorInFloat(utils::kRed),
+                               {display_width_ / 2, display_height_ / 4});
+
+  // Associate the rect with a transform.
+  root_flatland_->CreateTransform(kChildTransformId1);
+  root_flatland_->SetContent(kChildTransformId1, kFilledChildRectId1);
+  root_flatland_->SetTranslation(kChildTransformId1,
+                                 {0, static_cast<int32_t>(display_height_ / 2)});
+
+  // Draw the second child rectangle which should appear in the bottom half of the bottom right
+  // quadrant.
+  const fuc::ContentId kFilledChildRectId2 = {get_next_resource_id()};
+  const fuc::TransformId kChildTransformId2 = {get_next_resource_id()};
+
+  root_flatland_->CreateFilledRect(kFilledChildRectId2);
+  root_flatland_->SetSolidFill(kFilledChildRectId2, GetColorInFloat(utils::kGreen),
+                               {display_width_ / 2, display_height_ / 4});
+
+  // Associate the rect with a transform.
+  root_flatland_->CreateTransform(kChildTransformId2);
+  root_flatland_->SetContent(kChildTransformId2, kFilledChildRectId2);
+  root_flatland_->SetTranslation(kChildTransformId2,
+                                 {0, static_cast<int32_t>(3 * display_height_ / 4)});
+
+  // Add |kChildTransformId1| and |kChildTransformId2| as children of |kTransformId1| by calling
+  // ReplaceChildren, which also should remove any previous children of |kTransformId1|.
+  root_flatland_->ReplaceChildren(kTransformId1, {kChildTransformId1, kChildTransformId2});
   BlockingPresent(this, root_flatland_);
 
   const utils::Pixel default_color(0, 0, 0, 0);
@@ -973,13 +1012,15 @@ TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
   auto screenshot = TakeScreenshot(screenshotter_, display_width_, display_height_);
 
   EXPECT_EQ(screenshot.GetPixelAt(0, 0), default_color);
-  EXPECT_EQ(screenshot.GetPixelAt(0, display_height_ - 1), default_color);
 
-  // Top left corner of the first rectangle drawn.
+  // Top left corner of the first rectangle drawn aka the parent transform.
   EXPECT_EQ(screenshot.GetPixelAt(display_width_ / 2, 0), utils::kBlue);
 
-  // TOp left corner of the second rectangle drawn.
-  EXPECT_EQ(screenshot.GetPixelAt(display_width_ / 2, display_height_ / 2), utils::kGreen);
+  // Top left corner of the first child of the parent transform.
+  EXPECT_EQ(screenshot.GetPixelAt(display_width_ / 2, display_height_ / 2), utils::kRed);
+
+  // Top left corner of the second child of the parent transform.
+  EXPECT_EQ(screenshot.GetPixelAt(display_width_ / 2, 3 * display_height_ / 4), utils::kGreen);
 
   const auto num_pixels = display_width_ * display_height_;
 
@@ -987,7 +1028,10 @@ TEST_F(FlatlandPixelTestBase, TranslateInheritsFromParent) {
 
   EXPECT_EQ(histogram[default_color], num_pixels / 2);
   EXPECT_EQ(histogram[utils::kBlue], num_pixels / 4);
-  EXPECT_EQ(histogram[utils::kGreen], num_pixels / 4);
+  // Expect |kTransformId2| was removed after ReplaceChildren, so we expect no matching pixels.
+  EXPECT_EQ(histogram[utils::kMagenta], 0);
+  EXPECT_EQ(histogram[utils::kRed], num_pixels / 8);
+  EXPECT_EQ(histogram[utils::kGreen], num_pixels / 8);
 }
 
 // This test zooms the entire content by a factor of 2 and verifies that only the top left quadrant

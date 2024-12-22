@@ -1,0 +1,107 @@
+{% let base_name = bits.name.decl_name().camel() %}
+{% let name = filters::ident(base_name)? %}
+{% let wire_name = format!("Wire{base_name}") %}
+{% let subtype = self.subtype() %}
+{% let natural_subtype = context.natural_prim(subtype) %}
+{% let wire_subtype = context.wire_prim(subtype) %}
+
+::fidl_next::bitflags! {
+    {% if let Some(doc) = bits.attributes.doc_string() %}
+        #[doc = "{{ doc.escape_default() }}"]
+    {% endif %}
+    #[derive(
+        Clone,
+        Copy,
+        {% if context.config.emit_debug_impls -%}
+            Debug,
+        {%- endif %}
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct {{ name }}: {{ natural_subtype }} {
+        {% for member in bits.members -%}
+            {%- if let Some(doc) = member.attributes.doc_string() -%}
+                #[doc = "{{ doc.escape_default() }}"]
+            {%- endif -%}
+            const {{ member.name.screaming_snake()|ident }} = {{ member.value.value }};
+        {% endfor %}
+        {%- if !bits.is_strict -%}
+            const _ = !0;
+        {%- endif %}
+    }
+}
+
+impl ::fidl_next::Encodable for {{ name }} {
+    type Encoded<'buf> = {{ wire_name }};
+}
+
+impl<___E> ::fidl_next::Encode<___E> for {{ name }}
+where
+    ___E: ?Sized,
+{
+    fn encode(
+        &mut self,
+        _: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let {{ wire_name }} { mut value } = slot);
+        *value = {{ wire_subtype }}::from(self.bits());
+        Ok(())
+    }
+}
+
+impl ::core::convert::From<{{ wire_name }}> for {{ name }} {
+    fn from(wire: {{ wire_name }}) -> Self {
+        Self::from_bits_retain({{ natural_subtype }}::from(wire.value))
+    }
+}
+
+impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
+    fn take_from(from: &mut {{ wire_name }}) -> Self {
+        Self::from(*from)
+    }
+}
+
+/// The wire type corresponding to [`{{ name }}`].
+#[derive(
+    Clone,
+    Copy,
+    {% if context.config.emit_debug_impls -%}
+        Debug,
+    {%- endif %}
+)]
+#[repr(transparent)]
+pub struct {{ wire_name }} {
+    value: {{ wire_subtype }},
+}
+
+unsafe impl<___D> ::fidl_next::Decode<___D> for {{ wire_name }}
+where
+    ___D: ?Sized,
+{
+    fn decode(
+        slot: ::fidl_next::Slot<'_, Self>,
+        _: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        {% if bits.is_strict %}
+            ::fidl_next::munge!(let Self { value } = slot);
+            let set = {{ natural_subtype }}::from(*value);
+            if set & !{{ name }}::all().bits() != 0 {
+                return Err(::fidl_next::DecodeError::InvalidBits {
+                    expected: {{ name }}::all().bits() as usize,
+                    actual: set as usize,
+                });
+            }
+        {% endif %}
+        Ok(())
+    }
+}
+
+impl ::core::convert::From<{{ name }}> for {{ wire_name }} {
+    fn from(natural: {{ name }}) -> Self {
+        Self {
+            value: {{ wire_subtype }}::from(natural.bits()),
+        }
+    }
+}

@@ -17,11 +17,11 @@ use futures::channel::oneshot;
 use futures::future::BoxFuture;
 use futures::stream::{FusedStream, FuturesUnordered};
 use futures::{Future, FutureExt, Stream, StreamExt};
+use log::info;
 use std::convert::*;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
-use tracing::info;
 
 const DEFAULT_PLAYER_USAGE: AudioRenderUsage = AudioRenderUsage::Media;
 
@@ -436,7 +436,7 @@ impl Stream for Player {
                             PlayerProxyEvent::Removed
                         }
                         e => {
-                            info!(tag = "player_proxy", "Player update failed: {:#?}", e);
+                            info!(tag = "player_proxy"; "Player update failed: {:#?}", e);
                             PlayerProxyEvent::Removed
                         }
                     },
@@ -447,7 +447,7 @@ impl Stream for Player {
                             PlayerProxyEvent::Updated(Arc::new(self.session_info_delta()))
                         }
                         Err(e) => {
-                            info!(tag = "player_proxy", "Player sent invalid update: {:#?}", e);
+                            info!(tag = "player_proxy"; "Player sent invalid update: {:#?}", e);
                             PlayerProxyEvent::Removed
                         }
                     },

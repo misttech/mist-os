@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_log_encoding::SeverityExt;
+use diagnostics_log::SeverityExt;
 use fidl_fuchsia_diagnostics::Severity;
 use fuchsia_sync::RwLock;
 use std::sync::Arc;

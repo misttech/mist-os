@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/imported-images.h"
 
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/result.h>
@@ -27,6 +28,7 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/imported-image.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace virtio_display {
 
@@ -112,10 +114,16 @@ zx::result<SysmemBufferInfo> ImportedBufferCollection::GetSysmemMetadata(uint32_
   ZX_DEBUG_ASSERT_MSG(image_format_constraints.has_min_bytes_per_row(),
                       "Sysmem deviated from its contract");
 
+  fuchsia_images2::wire::PixelFormat fidl_pixel_format = image_format_constraints.pixel_format();
+  if (!display::PixelFormat::IsSupported(fidl_pixel_format)) {
+    FDF_LOG(WARNING, "Rejecting access to BufferCollection with unsupported PixelFormat: %" PRIu32,
+            static_cast<uint32_t>(fidl_pixel_format));
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
   return zx::ok(SysmemBufferInfo{
       .image_vmo = std::move(buffer.vmo()),
       .image_vmo_offset = buffer.vmo_usable_start(),
-      .pixel_format = image_format_constraints.pixel_format(),
+      .pixel_format = display::PixelFormat(fidl_pixel_format),
       .pixel_format_modifier = image_format_constraints.pixel_format_modifier(),
       .minimum_size = image_format_constraints.min_size(),
       .minimum_bytes_per_row = image_format_constraints.min_bytes_per_row(),

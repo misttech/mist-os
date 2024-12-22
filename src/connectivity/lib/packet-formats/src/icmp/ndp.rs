@@ -11,7 +11,7 @@ use net_types::ip::{Ipv6, Ipv6Addr};
 use zerocopy::byteorder::network_endian::{U16, U32};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, SplitByteSlice, Unaligned};
 
-use crate::icmp::{IcmpIpExt, IcmpPacket, IcmpPacketRaw, IcmpUnusedCode};
+use crate::icmp::{IcmpIpExt, IcmpPacket, IcmpPacketRaw, IcmpZeroCode};
 use crate::utils::NonZeroDuration;
 
 /// An ICMPv6 packet with an NDP message.
@@ -123,7 +123,7 @@ pub struct RouterSolicitation {
     _reserved: [u8; 4],
 }
 
-impl_icmp_message!(Ipv6, RouterSolicitation, RouterSolicitation, IcmpUnusedCode, Options<B>);
+impl_icmp_message!(Ipv6, RouterSolicitation, RouterSolicitation, IcmpZeroCode, Options<B>);
 
 /// The preference for a route as defined by [RFC 4191 section 2.1].
 ///
@@ -210,7 +210,7 @@ pub struct RouterAdvertisement {
     retransmit_timer: U32,
 }
 
-impl_icmp_message!(Ipv6, RouterAdvertisement, RouterAdvertisement, IcmpUnusedCode, Options<B>);
+impl_icmp_message!(Ipv6, RouterAdvertisement, RouterAdvertisement, IcmpZeroCode, Options<B>);
 
 impl RouterAdvertisement {
     /// Managed address configuration flag.
@@ -355,7 +355,7 @@ pub struct NeighborSolicitation {
     target_address: Ipv6Addr,
 }
 
-impl_icmp_message!(Ipv6, NeighborSolicitation, NeighborSolicitation, IcmpUnusedCode, Options<B>);
+impl_icmp_message!(Ipv6, NeighborSolicitation, NeighborSolicitation, IcmpZeroCode, Options<B>);
 
 impl NeighborSolicitation {
     /// Creates a new neighbor solicitation message with the provided
@@ -381,7 +381,7 @@ pub struct NeighborAdvertisement {
     target_address: Ipv6Addr,
 }
 
-impl_icmp_message!(Ipv6, NeighborAdvertisement, NeighborAdvertisement, IcmpUnusedCode, Options<B>);
+impl_icmp_message!(Ipv6, NeighborAdvertisement, NeighborAdvertisement, IcmpZeroCode, Options<B>);
 
 impl NeighborAdvertisement {
     /// Router flag.
@@ -469,7 +469,7 @@ pub struct Redirect {
     destination_address: Ipv6Addr,
 }
 
-impl_icmp_message!(Ipv6, Redirect, Redirect, IcmpUnusedCode, Options<B>);
+impl_icmp_message!(Ipv6, Redirect, Redirect, IcmpZeroCode, Options<B>);
 
 /// Parsing and serialization of NDP options.
 pub mod options {
@@ -477,7 +477,6 @@ pub mod options {
     use core::time::Duration;
 
     use byteorder::{ByteOrder, NetworkEndian};
-    use const_unwrap::const_unwrap_option;
     use net_types::ip::{IpAddress as _, Ipv6Addr, Subnet, SubnetError};
     use net_types::UnicastAddress;
     use packet::records::options::{
@@ -496,7 +495,7 @@ pub mod options {
     /// A value representing an infinite lifetime for various NDP options'
     /// lifetime fields.
     pub const INFINITE_LIFETIME: NonZeroDuration =
-        const_unwrap_option(NonZeroDuration::from_secs(INFINITE_LIFETIME_SECONDS as u64));
+        NonZeroDuration::from_secs(INFINITE_LIFETIME_SECONDS as u64).unwrap();
 
     /// The number of reserved bytes immediately following the kind and length
     /// bytes in a Redirected Header option.
@@ -1000,7 +999,7 @@ pub mod options {
 
         // For NDP options the length should be multiplied by 8.
         const LENGTH_ENCODING: LengthEncoding = LengthEncoding::TypeLengthValue {
-            option_len_multiplier: const_unwrap_option(NonZeroUsize::new(8)),
+            option_len_multiplier: NonZeroUsize::new(8).unwrap(),
         };
     }
 
@@ -1515,7 +1514,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 *icmp.message(),
             ))
             .encapsulate(ipv6_builder)
@@ -1546,7 +1545,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 *icmp.message(),
             ))
             .encapsulate(ipv6_builder)
@@ -1676,7 +1675,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 *icmp.message(),
             ))
             .encapsulate(ipv6_builder)
@@ -1736,7 +1735,7 @@ mod tests {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 SRC_IP,
                 DST_IP,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 RouterAdvertisement::with_prf(
                     hop_limit,
                     managed_flag,

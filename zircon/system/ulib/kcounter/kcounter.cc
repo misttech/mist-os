@@ -77,14 +77,14 @@ VmoToInspectMapper::VmoToInspectMapper() : inspector_() {
       initialization_status_ = ZX_ERR_IO;
       return;
     }
-    status = desc_mapper_.Map(std::move(vmo), size, ZX_VM_PERM_READ);
+    status = desc_mapper_.Map(std::move(vmo), 0, size, ZX_VM_PERM_READ);
     if (status != ZX_OK) {
       fprintf(stderr, "cannot map %s VMO: %s\n", counters::DescriptorVmo::kVmoName,
               zx_status_get_string(status));
       initialization_status_ = ZX_ERR_IO;
       return;
     }
-    status = desc_mapper_.Map(std::move(vmo), size, ZX_VM_PERM_READ);
+    status = desc_mapper_.Map(std::move(vmo), 0, size, ZX_VM_PERM_READ);
     desc_ = reinterpret_cast<counters::DescriptorVmo*>(desc_mapper_.start());
     if (desc_->magic != counters::DescriptorVmo::kMagic) {
       fprintf(stderr, "%s: magic number %" PRIu64 " != expected %" PRIu64 "\n",
@@ -92,7 +92,7 @@ VmoToInspectMapper::VmoToInspectMapper() : inspector_() {
       initialization_status_ = ZX_ERR_IO;
       return;
     }
-    status = desc_mapper_.Map(std::move(vmo), size, ZX_VM_PERM_READ);
+    status = desc_mapper_.Map(std::move(vmo), 0, size, ZX_VM_PERM_READ);
     if (size < sizeof(*desc_) + desc_->descriptor_table_size) {
       fprintf(stderr, "%s size %#" PRIx64 " too small for %" PRIu64 " bytes of descriptor table\n",
               counters::DescriptorVmo::kVmoName, size, desc_->descriptor_table_size);
@@ -129,7 +129,7 @@ VmoToInspectMapper::VmoToInspectMapper() : inspector_() {
     initialization_status_ = ZX_ERR_IO;
     return;
   }
-  status = arena_mapper_.Map(std::move(vmo), size, ZX_VM_PERM_READ);
+  status = arena_mapper_.Map(std::move(vmo), 0, size, ZX_VM_PERM_READ);
   if (status != ZX_OK) {
     fprintf(stderr, "cannot map %s VMO: %s\n", counters::kArenaVmoName,
             zx_status_get_string(status));

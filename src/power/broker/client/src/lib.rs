@@ -174,17 +174,17 @@ pub fn basic_update_fn_factory<'a>(
         async move {
             let element_name = power_element.name();
 
-            tracing::debug!(
-                ?element_name,
-                ?new_power_level,
+            log::debug!(
+                element_name:?,
+                new_power_level:?;
                 "basic_update_fn_factory: updating current level"
             );
 
             let res = power_element.current_level.update(new_power_level).await;
             if let Err(error) = res {
-                tracing::warn!(
-                    ?element_name,
-                    ?error,
+                log::warn!(
+                    element_name:?,
+                    error:?;
                     "basic_update_fn_factory: updating current level failed"
                 );
             }
@@ -210,24 +210,24 @@ pub async fn run_power_element<'a>(
         .map(|node| node.create_uint("power_level", last_required_level.into()));
 
     loop {
-        tracing::debug!(
-            ?element_name,
-            ?last_required_level,
+        log::debug!(
+            element_name:?,
+            last_required_level:?;
             "run_power_element: waiting for new level"
         );
         match required_level_proxy.watch().await {
             Ok(Ok(required_level)) => {
-                tracing::debug!(
-                    ?element_name,
-                    ?required_level,
-                    ?last_required_level,
+                log::debug!(
+                    element_name:?,
+                    required_level:?,
+                    last_required_level:?;
                     "run_power_element: new level requested"
                 );
                 if required_level == last_required_level {
-                    tracing::debug!(
-                        ?element_name,
-                        ?required_level,
-                        ?last_required_level,
+                    log::debug!(
+                        element_name:?,
+                        required_level:?,
+                        last_required_level:?;
                         "run_power_element: required level has not changed, skipping."
                     );
                     continue;
@@ -240,11 +240,7 @@ pub async fn run_power_element<'a>(
                 last_required_level = required_level;
             }
             error => {
-                tracing::warn!(
-                    ?element_name,
-                    ?error,
-                    "run_power_element: watch_required_level failed"
-                );
+                log::warn!(element_name:?, error:?; "run_power_element: watch_required_level failed");
                 return;
             }
         }

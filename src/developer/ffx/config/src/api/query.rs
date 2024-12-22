@@ -3,15 +3,18 @@
 // found in the LICENSE file.
 
 use crate::api::ConfigResult;
+use crate::mapping::env_var::env_var_strict;
 use crate::nested::RecursiveMap;
 use crate::{
-    validate_type, ConfigError, ConfigLevel, ConfigValue, Environment, EnvironmentContext,
-    ValueStrategy,
+    validate_type, ConfigError, ConfigLevel, Environment, EnvironmentContext, ValueStrategy,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value;
 use std::default::Default;
 use tracing::debug;
+
+use super::value::TryConvert;
+use super::ConfigValue;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum SelectMode {
@@ -93,28 +96,42 @@ impl<'a> ConfigQuery<'a> {
     }
 
     /// Get a value with as little processing as possible
-    pub fn get_raw<T>(&self) -> std::result::Result<T, T::Error>
+    pub fn get_raw<T>(&self) -> Result<T, ConfigError>
     where
-        T: TryFrom<ConfigValue> + ValueStrategy,
-        <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
+        T: TryConvert + ValueStrategy,
     {
-        let ctx = self.get_env_context().map_err(|e| e.into())?;
+        let ctx = self.get_env_context().map_err(|e| ConfigError::new(e))?;
         T::validate_query(self)?;
-        self.get_config(ctx.load().map_err(|e| e.into())?)
-            .map_err(|e| e.into())?
-            .recursive_map(&validate_type::<T>)
-            .try_into()
+        let cv = self
+            .get_config(ctx.load().map_err(|e| ConfigError::new(e))?)
+            .map_err(|e| ConfigError::new(e))?
+            .recursive_map(&validate_type::<T>);
+        T::try_convert(cv)
+    }
+
+    /// Get an optional value, ignoring "BadKey" errors, which are only generated when in strict
+    /// mode. Used to let callers choose not to report errors due to bad mappings.
+    pub fn get_optional<T>(&self) -> Result<T, ConfigError>
+    where
+        T: TryConvert + ValueStrategy,
+    {
+        self.get().or_else(|e| {
+            if matches!(e, ConfigError::BadValue { .. }) {
+                T::try_convert(ConfigValue(None))
+            } else {
+                Err(e)
+            }
+        })
     }
 
     /// Get a value with the normal processing of substitution strings
-    pub fn get<T>(&self) -> std::result::Result<T, T::Error>
+    pub fn get<T>(&self) -> Result<T, ConfigError>
     where
-        T: TryFrom<ConfigValue> + ValueStrategy,
-        <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
+        T: TryConvert + ValueStrategy,
     {
         use crate::mapping::*;
 
-        let ctx = self.get_env_context().map_err(|e| e.into())?;
+        let ctx = self.get_env_context().map_err(|e| ConfigError::new(e))?;
         T::validate_query(self)?;
 
         // The use of `is_strict()` here is not ideal, because we'd like to have strict-specific
@@ -122,14 +139,38 @@ impl<'a> ConfigQuery<'a> {
         // will all change: we'll build a single ConfigMap before invoking the subtool, rather than
         // doing substitutions and layers at query time.
         if ctx.is_strict() {
-            self.get_config(ctx.load().map_err(|e| e.into())?)
-                .map_err(|e| e.into())?
-                .recursive_map(&T::handle_arrays)
-                .recursive_map(&validate_type::<T>)
-                .try_into()
+            // If we are going to fail to a reference to an env var, it's important that we
+            // know which one. Threading the failure through the ConfigValue apparatus is quite
+            // difficult, so for now, let's have an explicit check. Unfortunately, we need to
+            // do all the other mappings first, since they _all_ look like env vars ("$BUILD_DIR", etc)
+            let cv = self
+                .get_config(ctx.load().map_err(|e| ConfigError::new(e))?)
+                .map_err(|e| ConfigError::new(e))?
+                .recursive_map(&|val| build(&ctx, val))
+                .recursive_map(&|val| workspace(&ctx, val));
+            if let Some(ref v) = cv.0 {
+                // We want recursive mapping here, so that arrays that contain
+                // env variables get handled correctly.
+                let ev_res = cv.clone().recursive_map(&|val| env_var_strict(val));
+                if ev_res.0.is_none() {
+                    // Conveniently, this message will make sense for config
+                    // mappings that we are ignoring because they are based on
+                    // home: $CACHE, etc. Since they all look like environment
+                    // variables, they will cause the env_var_strict() check
+                    // to fail
+                    return Err(ConfigError::BadValue { value: v.clone(), reason: format!(
+                        "The value for {} contains a variable mapping, which is ignored in strict mode",
+                        self.name.unwrap(),
+                    )});
+                }
+            }
+            // The problem is not with an env variable; keep going
+            let cv = cv.recursive_map(&T::handle_arrays).recursive_map(&validate_type::<T>);
+            T::try_convert(cv)
         } else {
-            self.get_config(ctx.load().map_err(|e| e.into())?)
-                .map_err(|e| e.into())?
+            let cv = self
+                .get_config(ctx.load().map_err(|e| ConfigError::new(e))?)
+                .map_err(|e| ConfigError::new(e))?
                 .recursive_map(&|val| runtime(&ctx, val))
                 .recursive_map(&|val| cache(&ctx, val))
                 .recursive_map(&|val| data(&ctx, val))
@@ -140,36 +181,43 @@ impl<'a> ConfigQuery<'a> {
                 .recursive_map(&|val| workspace(&ctx, val))
                 .recursive_map(&|val| env_var(&ctx, val))
                 .recursive_map(&T::handle_arrays)
-                .recursive_map(&validate_type::<T>)
-                .try_into()
+                .recursive_map(&validate_type::<T>);
+            T::try_convert(cv)
         }
     }
 
     /// Get a value with normal processing, but verifying that it's a file that exists.
-    pub async fn get_file<T>(&self) -> std::result::Result<T, T::Error>
+    pub async fn get_file<T>(&self) -> Result<T, ConfigError>
     where
-        T: TryFrom<ConfigValue> + ValueStrategy,
-        <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
+        T: TryConvert + ValueStrategy,
     {
         use crate::mapping::*;
 
-        let ctx = self.get_env_context().map_err(|e| e.into())?;
+        let ctx = self.get_env_context().map_err(|e| ConfigError::new(e))?;
         T::validate_query(self)?;
-        // The use of `is_strict()` here is not ideal, because we'd like to have strict-specific
-        // library inside the subtool boundary. But when we change to read-only config, this code
-        // will all change: we'll build a single ConfigMap before invoking the subtool, rather than
-        // doing substitutions and layers at query time.
+        // See comments re strict checking in get() above
         if ctx.is_strict() {
-            // Don't do any mapping
-
-            self.get_config(ctx.load().map_err(|e| e.into())?)
-                .map_err(|e| e.into())?
-                .recursive_map(&T::handle_arrays)
-                .recursive_map(&file_check)
-                .try_into()
+            let cv = self
+                .get_config(ctx.load().map_err(|e| ConfigError::new(e))?)
+                .map_err(|e| ConfigError::new(e))?
+                .recursive_map(&|val| build(&ctx, val))
+                .recursive_map(&|val| workspace(&ctx, val));
+            if let Some(ref v) = cv.0 {
+                let ev_res = cv.clone().recursive_map(&|val| env_var_strict(val));
+                if ev_res.0.is_none() {
+                    return Err(ConfigError::BadValue{ value: v.clone(), reason: format!(
+                        "The value for {} contains a variable mapping, which is ignored in strict mode",
+                        self.name.unwrap(),
+                    )});
+                }
+            }
+            // The problem is not with an env variable; keep going
+            let cv = cv.recursive_map(&T::handle_arrays).recursive_map(&file_check);
+            T::try_convert(cv)
         } else {
-            self.get_config(ctx.load().map_err(|e| e.into())?)
-                .map_err(|e| e.into())?
+            let cv = self
+                .get_config(ctx.load().map_err(|e| ConfigError::new(e))?)
+                .map_err(|e| ConfigError::new(e))?
                 .recursive_map(&|val| runtime(&ctx, val))
                 .recursive_map(&|val| cache(&ctx, val))
                 .recursive_map(&|val| data(&ctx, val))
@@ -179,8 +227,8 @@ impl<'a> ConfigQuery<'a> {
                 .recursive_map(&|val| workspace(&ctx, val))
                 .recursive_map(&|val| env_var(&ctx, val))
                 .recursive_map(&T::handle_arrays)
-                .recursive_map(&file_check)
-                .try_into()
+                .recursive_map(&file_check);
+            T::try_convert(cv)
         }
     }
 

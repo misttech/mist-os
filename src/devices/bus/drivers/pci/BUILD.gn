@@ -10,15 +10,6 @@ group("pci") {
   deps = [ ":bus-pci" ]
 }
 
-source_set("metadata") {
-  sources = [ "metadata.h" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
-    "//sdk/lib/async-default",
-    "//sdk/lib/driver/metadata/cpp:cpp",
-  ]
-}
-
 # The userspace PCI bus driver uses this set, as well as the
 # automated tests.
 source_set("user_pci") {
@@ -47,7 +38,7 @@ source_set("user_pci") {
   ]
 
   deps = [
-    ":metadata",
+    "//sdk/lib/driver/metadata/cpp",
     "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
   ]
 

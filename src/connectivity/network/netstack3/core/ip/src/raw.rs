@@ -850,7 +850,7 @@ mod test {
     use netstack3_base::{ContextProvider, CounterContext, CtxPair};
     use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
     use packet_formats::icmp::{
-        IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode, Icmpv6MessageType,
+        IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpZeroCode, Icmpv6MessageType,
     };
     use packet_formats::ip::{IpPacketBuilder, IpProto, IpProtoExt, Ipv6Proto};
     use packet_formats::ipv6::Ipv6Packet;
@@ -1314,7 +1314,7 @@ mod test {
         assert_matches!(api.set_icmp_filter(&sock, filter), Ok(None));
 
         // Deliver an arbitrary ICMP message.
-        let icmp_body = new_icmp_message_buf::<I, _>(IcmpEchoReply::new(0, 0), IcmpUnusedCode);
+        let icmp_body = new_icmp_message_buf::<I, _>(IcmpEchoReply::new(0, 0), IcmpZeroCode);
         let buf = new_ip_packet_buf::<I>(icmp_body.as_ref(), I::ICMP_IP_PROTO);
         let mut buf_ref = buf.as_ref();
         let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
@@ -1352,10 +1352,9 @@ mod test {
 
         // Use a valid ICMP message, but intentionally corrupt the checksum.
         // The checksum is present at bytes 2 & 3.
-        let mut icmp_body =
-            new_icmp_message_buf::<Ipv6, _>(IcmpEchoReply::new(0, 0), IcmpUnusedCode)
-                .as_ref()
-                .to_vec();
+        let mut icmp_body = new_icmp_message_buf::<Ipv6, _>(IcmpEchoReply::new(0, 0), IcmpZeroCode)
+            .as_ref()
+            .to_vec();
         const CORRUPT_CHECKSUM: [u8; 2] = [123, 234];
         assert_ne!(
             packet_formats::testutil::overwrite_icmpv6_checksum(
@@ -1453,7 +1452,7 @@ mod test {
         // Use a valid ICMP body, but intentionally corrupt the checksum.
         // The checksum is present at bytes 2 & 3.
         let icmp_body_with_checksum =
-            new_icmp_message_buf::<Ipv6, _>(IcmpEchoReply::new(0, 0), IcmpUnusedCode)
+            new_icmp_message_buf::<Ipv6, _>(IcmpEchoReply::new(0, 0), IcmpZeroCode)
                 .as_ref()
                 .to_vec();
         const CORRUPT_CHECKSUM: [u8; 2] = [123, 234];

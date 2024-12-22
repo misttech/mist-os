@@ -128,11 +128,9 @@ impl<B: SplitByteSlice + PartialEq> ZbiItem<B> {
 
         let item_payload_len =
             usize::try_from(hdr.length).map_err(|_| ZbiError::PlatformBadLength)?;
-        if payload.len() < item_payload_len {
-            return Err(ZbiError::TooBig);
-        }
 
-        let (item_payload, tail) = payload.split_at(item_payload_len).ok().unwrap();
+        let (item_payload, tail) =
+            payload.split_at(item_payload_len).map_err(|_| ZbiError::TooBig)?;
         let item = ZbiItem { header: hdr, payload: item_payload };
         Ok((item, tail))
     }

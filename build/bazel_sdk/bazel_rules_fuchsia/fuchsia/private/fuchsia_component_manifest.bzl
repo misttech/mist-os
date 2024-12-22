@@ -4,13 +4,13 @@
 
 # buildifier: disable=module-docstring
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(
     ":providers.bzl",
     "FuchsiaComponentManifestInfo",
     "FuchsiaComponentManifestShardCollectionInfo",
     "FuchsiaComponentManifestShardInfo",
 )
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 _COMMON_CMC_ATTRIBUTES = {
     # This is to get the coverage.shard.cml in the SDK, so it can be merged
@@ -32,7 +32,7 @@ fuchsia_component_manifest_shard_collection = rule(
     doc = """Encapsulates a collection of component manifests and their include paths.
 
     This rule is not intended to be used directly. Rather, it should be added to the
-    fuchsia sdk toolchain to be added as implicity dependencies for all manifests.
+    fuchsia sdk toolchain to be added as implicit dependencies for all manifests.
 """,
     implementation = _fuchsia_component_manifest_shard_collection_impl,
     attrs = {
@@ -94,14 +94,14 @@ def _compile_component_manifest(ctx, manifest_in, component_name, includes_in):
         )
         manifest_in = manifest_merged
 
-    # use a dict to eliminate workspace root duplicates
+    # use a dict to eliminate duplicate include paths
     include_path_dict = {}
     includes = []
     for dep in includes_in + sdk.cmc_includes[FuchsiaComponentManifestShardCollectionInfo].shards:
         if FuchsiaComponentManifestShardInfo in dep:
             shard = dep[FuchsiaComponentManifestShardInfo]
             includes.append(shard.file)
-            include_path_dict[shard.file.owner.workspace_root + "/" + shard.base_path] = 1
+            include_path_dict[(shard.file.owner.workspace_root or ".") + "/" + shard.base_path] = 1
 
     include_path = []
     for w in include_path_dict.keys():

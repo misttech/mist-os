@@ -71,7 +71,7 @@ bin_base = {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:libc",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:trust-dns-proto",
     "//third_party/rust_crates:trust-dns-resolver",
     "//third_party/rust_crates:unicode-xid",
@@ -79,7 +79,6 @@ bin_base = {
 
   test_deps = [
     "//src/connectivity/lib/net-declare",
-    "//src/lib/const-unwrap",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:itertools",

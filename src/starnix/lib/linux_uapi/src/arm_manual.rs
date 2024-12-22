@@ -2,6 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+fn saturating_i64_to_i32(v: i64) -> i32 {
+    if v > i32::max_value().into() {
+        i32::max_value()
+    } else if v < i32::min_value().into() {
+        i32::min_value()
+    } else {
+        v as i32
+    }
+}
+
 impl From<crate::stat> for crate::arch32::stat64 {
     fn from(stat: crate::stat) -> Self {
         let mut result = Self::default();
@@ -24,5 +34,23 @@ impl From<crate::stat> for crate::arch32::stat64 {
         result.st_ctime_nsec = stat.st_ctime_nsec as u32;
         result.st_ino = stat.st_ino;
         result
+    }
+}
+
+impl From<crate::timespec> for crate::arch32::timespec {
+    fn from(tv: crate::timespec) -> Self {
+        Self {
+            tv_sec: saturating_i64_to_i32(tv.tv_sec),
+            tv_nsec: saturating_i64_to_i32(tv.tv_nsec),
+        }
+    }
+}
+
+impl From<crate::timeval> for crate::arch32::timeval {
+    fn from(tv: crate::timeval) -> Self {
+        Self {
+            tv_sec: saturating_i64_to_i32(tv.tv_sec),
+            tv_usec: saturating_i64_to_i32(tv.tv_usec),
+        }
     }
 }

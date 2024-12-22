@@ -52,7 +52,7 @@ rustc_binary("server") {
     "//src/connectivity/network/testing/netemul/sync-manager/rust:lib",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   source_root = "src/server.rs"
   sources = [ "src/server.rs" ]

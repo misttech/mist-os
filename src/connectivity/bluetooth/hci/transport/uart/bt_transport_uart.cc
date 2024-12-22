@@ -669,8 +669,7 @@ void BtTransportUart::GetInfo(fdf::Arena& arena, GetInfoCompleter::Sync& complet
 }
 void BtTransportUart::Config(ConfigRequestView request, fdf::Arena& arena,
                              ConfigCompleter::Sync& completer) {
-  auto result = serial_client_.sync().buffer(arena)->Config(
-      request->baud_rate, fuchsia_hardware_serialimpl::wire::kSerialSetBaudRateOnly);
+  auto result = serial_client_.sync().buffer(arena)->Config(request->baud_rate, request->flags);
   if (!result.ok()) {
     FDF_LOG(ERROR, "Config request failed with FIDL error %s", result.status_string());
     completer.buffer(arena).ReplyError(result.status());

@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::commands::types::{Command, DiagnosticsProvider};
-use crate::commands::ListCommand;
+use crate::commands::types::DiagnosticsProvider;
 use crate::types::Error;
 use anyhow::anyhow;
 use cm_rust::{ExposeDeclCommon, ExposeSource, SourceName};
@@ -33,51 +32,6 @@ pub async fn connect_accessor<P: DiscoverableProtocolMarker>(
     .await
     .map_err(|e| Error::ConnectToProtocol(accessor_name.to_string(), anyhow!("{:?}", e)))?;
     Ok(proxy)
-}
-
-/// Returns the selectors for a component whose url contains the `manifest` string.
-pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
-    manifest: String,
-    tree_selectors: Vec<String>,
-    accessor: Option<String>,
-    provider: &P,
-) -> Result<Vec<Selector>, Error> {
-    let list_command = ListCommand {
-        manifest: Some(manifest.clone()),
-        component: None,
-        with_url: false,
-        accessor: accessor.clone(),
-    };
-    let monikers = list_command
-        .execute(provider)
-        .await?
-        .into_inner()
-        .into_iter()
-        .map(|item| item.into_moniker())
-        .collect::<Vec<_>>();
-    if monikers.is_empty() {
-        Err(Error::ManifestNotFound(manifest.clone()))
-    } else if tree_selectors.is_empty() {
-        Ok(monikers
-            .into_iter()
-            .map(|moniker| {
-                let selector_string = format!("{moniker}:root");
-                selectors::parse_verbose(&selector_string)
-                    .map_err(|e| Error::ParseSelector(selector_string, e.into()))
-            })
-            .collect::<Result<Vec<_>, _>>()?)
-    } else {
-        Ok(monikers
-            .into_iter()
-            .flat_map(|moniker| {
-                tree_selectors.iter().map(move |tree_selector| {
-                    let selector_string = format!("{moniker}:{tree_selector}");
-                    selectors::parse_verbose(&selector_string)
-                        .map_err(|e| Error::ParseSelector(selector_string, e.into()))
-                })
-            })
-            .collect::<Result<Vec<_>, _>>()?)
-    }
 }
 
 async fn fuzzy_search(

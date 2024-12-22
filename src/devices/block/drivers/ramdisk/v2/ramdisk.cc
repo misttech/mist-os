@@ -34,7 +34,8 @@ zx::result<std::unique_ptr<Ramdisk>> Ramdisk::Create(
     int id, bool publish) {
   fzl::OwnedVmoMapper mapping;
   if (zx_status_t status =
-          mapping.Map(std::move(vmo), partition_info.block_size * partition_info.block_count);
+          mapping.Map(std::move(vmo), 0, partition_info.block_size * partition_info.block_count,
+                      ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
       status != ZX_OK) {
     return zx::error(status);
   }

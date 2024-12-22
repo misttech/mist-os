@@ -11,13 +11,6 @@
 
 #include <ffl/fixed.h>
 
-// Define this to enable legacy attribution codepaths (which requires usage of split bits instead of
-// share counts when tracking COW pages).
-//
-// TODO(https://fxbug.dev/issues/338300808): Remove this flag when the new attribution code (and
-// thus share counts) are the default.
-#define ENABLE_LEGACY_ATTRIBUTION false
-
 namespace vm {
 
 // Structure to store fractional counts of bytes in fixed point with 63 bits of precision. The max
@@ -39,14 +32,9 @@ struct FractionalBytes {
   FractionalBytes() = default;
 
   constexpr explicit FractionalBytes(uint64_t whole_bytes) : integral(whole_bytes) {}
-#if ENABLE_LEGACY_ATTRIBUTION
-  constexpr explicit FractionalBytes(uint64_t numerator, uint64_t denominator)
-      : integral(numerator / denominator) {}
-#else
   constexpr explicit FractionalBytes(uint64_t numerator, uint64_t denominator)
       : integral(numerator / denominator),
         fractional((kOneByte / denominator) * (numerator % denominator)) {}
-#endif
 
   FractionalBytes operator+(const uint64_t& other) const {
     FractionalBytes ret{*this};
@@ -74,9 +62,6 @@ struct FractionalBytes {
     return *this;
   }
   FractionalBytes& operator/=(const uint64_t& other) {
-    // TODO(https://fxbug.dev/338300808): Remove this logic once we always generate fractional
-    // bytes from attribution codepaths.
-#if !ENABLE_LEGACY_ATTRIBUTION
     // Input fraction must always be <1 to guard against overflow.
     // If this is true, the sum of fractions must be <1:
     // The sum is:
@@ -90,7 +75,6 @@ struct FractionalBytes {
     const Fraction scaled_remainder = (kOneByte / other) * remainder;
     fractional = (fractional / other) + scaled_remainder;
     DEBUG_ASSERT(fractional < kOneByte);
-#endif
     integral /= other;
 
     return *this;
@@ -102,9 +86,6 @@ struct FractionalBytes {
     return ret;
   }
   FractionalBytes& operator+=(const FractionalBytes& other) {
-    // TODO(https://fxbug.dev/338300808): Remove this logic once we always generate fractional
-    // bytes from attribution codepaths.
-#if !ENABLE_LEGACY_ATTRIBUTION
     // Input fractions must always be <1 to guard against overflow.
     // If the fractional sum is >=1, then roll that overflow byte into the integral part.
     DEBUG_ASSERT(fractional < kOneByte);
@@ -115,7 +96,6 @@ struct FractionalBytes {
       DEBUG_ASSERT(!overflow);
       fractional -= kOneByte;
     }
-#endif
     [[maybe_unused]] bool overflow = __builtin_add_overflow(integral, other.integral, &integral);
     DEBUG_ASSERT(!overflow);
 
@@ -128,15 +108,7 @@ struct FractionalBytes {
   bool operator!=(const FractionalBytes& other) const { return !(*this == other); }
 
   size_t integral = 0;
-  // Mark all fractional values as invalid when using legacy attribution - it can't generate valid
-  // fractional values.
-  // TODO(https://fxbug.dev/338300943): Initialize these to 0 once all code can generate valid
-  // fractional values.
-#if ENABLE_LEGACY_ATTRIBUTION
-  constexpr static Fraction fractional = Fraction::Max();
-#else
   Fraction fractional = Fraction::FromRaw(0);
-#endif
 };
 
 // Structure to store counts of memory attributed to VMOs or portions thereof.
@@ -158,20 +130,13 @@ struct AttributionCounts {
   AttributionCounts& operator+=(const AttributionCounts& other) {
     uncompressed_bytes += other.uncompressed_bytes;
     compressed_bytes += other.compressed_bytes;
-#if !ENABLE_LEGACY_ATTRIBUTION
     private_uncompressed_bytes += other.private_uncompressed_bytes;
     private_compressed_bytes += other.private_compressed_bytes;
     scaled_uncompressed_bytes += other.scaled_uncompressed_bytes;
     scaled_compressed_bytes += other.scaled_compressed_bytes;
-#endif
     return *this;
   }
 
-// TODO(https://fxbug.dev/338300943): While legacy attribution is supported the compiler will
-// complain about comparing the same static constexpr to itself. Once legacy attribution is removed
-// this warning disabling can also be removed.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wtautological-compare"
   bool operator==(const AttributionCounts& other) const {
     return uncompressed_bytes == other.uncompressed_bytes &&
            compressed_bytes == other.compressed_bytes &&
@@ -180,25 +145,14 @@ struct AttributionCounts {
            scaled_uncompressed_bytes == other.scaled_uncompressed_bytes &&
            scaled_compressed_bytes == other.scaled_compressed_bytes;
   }
-#pragma GCC diagnostic pop
   bool operator!=(const AttributionCounts& other) const { return !(*this == other); }
 
   size_t uncompressed_bytes = 0;
   size_t compressed_bytes = 0;
-  // TODO(https://fxbug.dev/338300943): These are declared as static constexpr when using legacy
-  // attribution to minimize the size of this object, which is included in the VmMapping and
-  // VmCowPages objects.
-#if ENABLE_LEGACY_ATTRIBUTION
-  constexpr static size_t private_uncompressed_bytes = 0;
-  constexpr static size_t private_compressed_bytes = 0;
-  constexpr static FractionalBytes scaled_uncompressed_bytes = FractionalBytes(0u);
-  constexpr static FractionalBytes scaled_compressed_bytes = FractionalBytes(0u);
-#else
   size_t private_uncompressed_bytes = 0;
   size_t private_compressed_bytes = 0;
   FractionalBytes scaled_uncompressed_bytes;
   FractionalBytes scaled_compressed_bytes;
-#endif
 };
 
 }  // namespace vm

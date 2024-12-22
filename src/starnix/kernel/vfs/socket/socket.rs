@@ -350,7 +350,7 @@ impl Socket {
         let mode = mode!(IFSOCK, 0o777);
         let node = fs.create_node(
             current_task,
-            Anon,
+            Anon::default(),
             FsNodeInfo::new_factory(mode, current_task.as_fscred()),
         );
         FileObject::new_anonymous(current_task, SocketFile::new(socket), node, open_flags)

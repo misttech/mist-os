@@ -5,7 +5,6 @@
 use core::num::NonZeroU16;
 
 use assert_matches::assert_matches;
-use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 use net_types::ZonedAddr;
 use packet::Buf;
@@ -15,7 +14,7 @@ use netstack3_base::testutil::{set_logger_for_test, TestIpExt};
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtxBuilder};
 use netstack3_core::IpExt;
 
-const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
+const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(100).unwrap();
 
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test(I)]

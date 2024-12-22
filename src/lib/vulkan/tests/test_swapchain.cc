@@ -931,6 +931,13 @@ TEST_P(SwapchainFidlTest, PresentAndAcquireNoSemaphore) {
 }
 
 TEST_P(SwapchainFidlTest, ForceQuit) {
+  // TODO(https://fxbug.dev/383660387): This test case is flaky and may cause
+  // a host crash on emulators with SwiftShader. Thus, we disable it on
+  // emulators.
+  if (GetVkPhysicalDeviceType(test_->vk_physical_device_) == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) {
+    GTEST_SKIP();
+  }
+
   std::unique_ptr<FakeFlatland> flatland;
   GetFakeFlatlandInjectedToLib(&flatland, /*should_present=*/true);
 
@@ -1109,6 +1116,13 @@ TEST_P(SwapchainFidlTest, DeviceLostAvoidSemaphoreHang) {
 }
 
 TEST_P(SwapchainFidlTest, AcquireZeroTimeout) {
+  // TODO(https://fxbug.dev/383660387): This test case is flaky and may cause
+  // a host crash on emulators with SwiftShader. Thus, we disable it on
+  // emulators.
+  if (GetVkPhysicalDeviceType(test_->vk_physical_device_) == VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU) {
+    GTEST_SKIP();
+  }
+
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   std::unique_ptr<FakeFlatland> flatland;

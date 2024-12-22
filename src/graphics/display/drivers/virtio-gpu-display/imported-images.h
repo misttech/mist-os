@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_IMPORTED_IMAGES_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_IMPORTED_IMAGES_H_
 
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.math/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/zx/result.h>
@@ -19,6 +20,7 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/imported-image.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
 namespace virtio_display {
 
@@ -26,7 +28,7 @@ namespace virtio_display {
 struct SysmemBufferInfo {
   zx::vmo image_vmo;
   uint64_t image_vmo_offset;
-  fuchsia_images2::wire::PixelFormat pixel_format;
+  display::PixelFormat pixel_format;
   fuchsia_images2::wire::PixelFormatModifier pixel_format_modifier;
   fuchsia_math::wire::SizeU minimum_size;
   uint32_t minimum_bytes_per_row;

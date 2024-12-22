@@ -14,11 +14,11 @@ use anyhow::{format_err, Error, Result};
 use async_trait::async_trait;
 use fuchsia_inspect::{self as inspect, Property};
 use futures::{StreamExt, TryFutureExt as _};
+use log::*;
 use serde_derive::Deserialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tracing::*;
 use {fuchsia_async as fasync, serde_json as json};
 
 /// Node: ThermalLoadDriver

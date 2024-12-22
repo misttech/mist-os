@@ -11,10 +11,10 @@ use fidl_fuchsia_bluetooth_le::{
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_sync::RwLock;
 use futures::{pin_mut, select, FutureExt, StreamExt};
+use log::{debug, error, info, warn};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use {fuchsia_async as fasync, fuchsia_component as app};
 
 // Sl4f-Constants and Ble advertising related functionality
@@ -67,9 +67,9 @@ impl BleAdvertiseFacade {
     ) {
         let tag = "BleAdvertiseFacade::set_advertise_task";
         if task.is_some() {
-            info!(tag = &with_line!(tag), "Assigned new advertise task");
+            info!(tag = &with_line!(tag); "Assigned new advertise task");
         } else if inner.read().advertise_task.is_some() {
-            info!(tag = &with_line!(tag), "Cleared advertise task");
+            info!(tag = &with_line!(tag); "Cleared advertise task");
         }
         inner.write().advertise_task = task;
     }
@@ -80,8 +80,8 @@ impl BleAdvertiseFacade {
             None => "None",
         };
         info!(tag = &with_line!("BleAdvertiseFacade::print"),
-            %adv_status,
-            peripheral = ?self.get_peripheral_proxy(),
+            adv_status:%,
+            peripheral:? = self.get_peripheral_proxy();
             "BleAdvertiseFacade",
         );
     }
@@ -92,7 +92,7 @@ impl BleAdvertiseFacade {
 
         let new_peripheral = match self.inner.read().peripheral.clone() {
             Some(p) => {
-                warn!(tag = &with_line!(tag), current_peripheral = ?p);
+                warn!(tag = &with_line!(tag), current_peripheral:? = p; "");
                 Some(p)
             }
             None => {
@@ -125,12 +125,12 @@ impl BleAdvertiseFacade {
                     p.clone(),
                     parameters,
                 ));
-                info!(tag = "start_adv", "Started advertising");
+                info!(tag = "start_adv"; "Started advertising");
                 BleAdvertiseFacade::set_advertise_task(&self.inner, Some(advertise_task));
                 Ok(())
             }
             None => {
-                error!(tag = "start_adv", "No peripheral created.");
+                error!(tag = "start_adv"; "No peripheral created.");
                 return Err(format_err!("No peripheral proxy created."));
             }
         }
@@ -149,13 +149,13 @@ impl BleAdvertiseFacade {
         let stream_fut = async move {
             while let Some(event) = stream.next().await {
                 match event {
-                    Ok(_) => debug!(tag = &with_line!(tag), "ignoring event for Connection"),
+                    Ok(_) => debug!(tag = &with_line!(tag); "ignoring event for Connection"),
                     Err(err) => {
-                        info!(tag = &with_line!(tag), "Connection ({}) error: {:?}", peer_id, err)
+                        info!(tag = &with_line!(tag); "Connection ({}) error: {:?}", peer_id, err)
                     }
                 }
             }
-            info!(tag = &with_line!(tag), "peer {} disconnected", peer_id);
+            info!(tag = &with_line!(tag); "peer {} disconnected", peer_id);
             inner_clone.write().connections.remove(&peer_id);
         };
         let event_task = fasync::Task::spawn(stream_fut);
@@ -175,7 +175,7 @@ impl BleAdvertiseFacade {
                 Ok(AdvertisedPeripheralRequest::OnConnected { peer, connection, responder }) => {
                     if let Err(err) = responder.send() {
                         warn!(
-                            tag = &with_line!(tag),
+                            tag = &with_line!(tag);
                             "error sending response to AdvertisedPeripheral::OnConnected: {}", err
                         );
                     }
@@ -185,11 +185,11 @@ impl BleAdvertiseFacade {
                     BleAdvertiseFacade::process_new_connection(inner.clone(), proxy, peer_id);
                 }
                 Err(err) => {
-                    info!(tag = &with_line!(tag), "AdvertisedPeripheral error: {:?}", err);
+                    info!(tag = &with_line!(tag); "AdvertisedPeripheral error: {:?}", err);
                 }
             }
         }
-        info!(tag = &with_line!(tag), "AdvertisedPeripheral closed, stopping advertising");
+        info!(tag = &with_line!(tag); "AdvertisedPeripheral closed, stopping advertising");
         BleAdvertiseFacade::set_advertise_task(&inner, None);
     }
 
@@ -215,10 +215,10 @@ impl BleAdvertiseFacade {
         pin_mut!(advertise_fut_fused, server_fut_fused);
         select! {
              result = advertise_fut_fused => {
-                info!(tag = &with_line!(tag), "advertise() returned with result {:?}", result);
+                info!(tag = &with_line!(tag); "advertise() returned with result {:?}", result);
              }
              _ = server_fut_fused => {
-                info!(tag = &with_line!(tag), "AdvertisedPeripheral closed");
+                info!(tag = &with_line!(tag); "AdvertisedPeripheral closed");
              }
         };
 
@@ -227,7 +227,7 @@ impl BleAdvertiseFacade {
     }
 
     pub fn stop_adv(&self) {
-        info!(tag = &with_line!("BleAdvertiseFacade::stop_adv"), "Stop advertising");
+        info!(tag = &with_line!("BleAdvertiseFacade::stop_adv"); "Stop advertising");
         BleAdvertiseFacade::set_advertise_task(&self.inner, None);
     }
 

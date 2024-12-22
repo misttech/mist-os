@@ -7,33 +7,28 @@
 //! which should enable the lower level logging which is disabled by default. Without having that
 //! flag correctly passed through test metadata to ffx/run-test-suite, this test should fail.
 
-use diagnostics_reader::{ArchiveReader, Logs, Severity};
-use fuchsia_async::{Task, Timer};
+use diagnostics_reader::{ArchiveReader, Logs};
 use futures::StreamExt;
-use std::time::Duration;
-use tracing::{info, trace};
 
 #[fuchsia::test]
 async fn hello_world() {
-    info!("spawning task to write TRACE messages");
-    Task::spawn(async {
-        loop {
-            trace!("TRACE LEVEL MESSAGE");
-            Timer::new(Duration::from_secs(1)).await;
-        }
-    })
-    .detach();
+    let tag = "hello_world".to_string();
+    tracing::trace!("TRACE LEVEL MESSAGE");
+    log::trace!("TRACE LEVEL MESSAGE 2");
 
-    let mut logs =
-        ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap().map(|r| r.unwrap());
+    let logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap().map(|r| r.unwrap());
+    let msgs = logs
+        .filter(|log| {
+            futures::future::ready(match log.tags() {
+                Some(tags) => tags.contains(&tag),
+                None => false,
+            })
+        })
+        .map(|log| log.msg().unwrap().to_owned())
+        .take(2)
+        .collect::<Vec<_>>()
+        .await;
 
-    info!("checking for the TRACE messages our task is writing");
-    while let Some(next) = logs.next().await {
-        if next.metadata.severity == Severity::Trace && next.msg().unwrap() == "TRACE LEVEL MESSAGE"
-        {
-            break;
-        }
-        info!("still waiting for our own TRACE message");
-    }
-    info!("trace message encountered, test metadata successfully configured test realm");
+    assert_eq!(msgs[0], "TRACE LEVEL MESSAGE");
+    assert_eq!(msgs[1], "TRACE LEVEL MESSAGE 2");
 }

@@ -178,24 +178,6 @@ tables_generator_tests_*.txt
 /third_party/fuchsia-infra-bazel-rules/src
 !/third_party/volk
 /third_party/volk/src
-!/third_party/glslang
-/third_party/glslang/src
-!/third_party/shaderc
-/third_party/shaderc/src
-!/third_party/spirv-cross
-/third_party/spirv-cross/src
-!/third_party/spirv-headers
-/third_party/spirv-headers/src
-!/third_party/spirv-tools
-/third_party/spirv-tools/src
-!/third_party/Vulkan-Headers
-/third_party/Vulkan-Headers/src
-!/third_party/Vulkan-Loader
-/third_party/Vulkan-Loader/src
-!/third_party/Vulkan-Tools
-/third_party/Vulkan-Tools/src
-!/third_party/Vulkan-ValidationLayers
-/third_party/Vulkan-ValidationLayers/src
 
 /tmp/
 /vendor/*

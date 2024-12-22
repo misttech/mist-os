@@ -14,9 +14,9 @@ use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::prelude::*;
+use log::*;
 use std::collections::HashSet;
 use std::ops::DerefMut;
-use tracing::*;
 
 /// Facade providing access to WebDriver debug services.  Supports enabling
 /// DevTools ports on Chrome contexts, and retrieving the set of open ports.

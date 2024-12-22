@@ -38,6 +38,8 @@ pub struct Id {
 impl Id {
     /// Returns a new `Id` from the given string.
     pub fn from_str(name: &str) -> &Self {
+        // SAFETY: `Id` is a transparent wrapper around `str`, so a `&str` has the same layout as
+        // `&Id`.
         unsafe { &*(name as *const str as *const Self) }
     }
 
@@ -78,6 +80,8 @@ pub struct CompId {
 impl CompId {
     /// Returns a `CompId` wrapping the given `str`.
     pub fn from_str(s: &str) -> &Self {
+        // SAFETY: `CompId` is a transparent wrapper around `str`, so a `&str` has the same layout
+        // as `&CompId`.
         unsafe { &*(s as *const str as *const Self) }
     }
 

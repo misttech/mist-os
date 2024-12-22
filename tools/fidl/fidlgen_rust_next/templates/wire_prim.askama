@@ -1,0 +1,13 @@
+{% match prim %}
+    {% when PrimSubtype::Bool %} bool
+    {% when PrimSubtype::Float32 %} ::fidl_next::f32_le
+    {% when PrimSubtype::Float64 %} ::fidl_next::f64_le
+    {% when PrimSubtype::Int8 %} i8
+    {% when PrimSubtype::Int16 %} ::fidl_next::i16_le
+    {% when PrimSubtype::Int32 %} ::fidl_next::i32_le
+    {% when PrimSubtype::Int64 %} ::fidl_next::i64_le
+    {% when PrimSubtype::Uint8 %} u8
+    {% when PrimSubtype::Uint16 %} ::fidl_next::u16_le
+    {% when PrimSubtype::Uint32 %} ::fidl_next::u32_le
+    {% when PrimSubtype::Uint64 %} ::fidl_next::u64_le
+{% endmatch %}

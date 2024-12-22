@@ -1,0 +1,432 @@
+{% let non_canonical_name = protocol.name.decl_name().non_canonical() %}
+{% let protocol_base_name = protocol.name.decl_name().camel() %}
+{% let protocol_name = filters::ident(protocol_base_name)? %}
+{% let module_name = filters::ident(protocol.name.decl_name().snake())? %}
+
+/// The type corresponding to the {{ non_canonical_name }} protocol.
+{% if context.config.emit_debug_impls -%}
+    #[derive(Debug)]
+{%- endif %}
+pub struct {{ protocol_name }};
+
+pub mod {{ module_name }} {
+    {% for method in protocol.methods %}
+        {% let method_name = filters::ident(method.name.camel())? %}
+        pub struct {{ method_name }};
+
+        impl ::fidl_next::bind::Method for {{ method_name }} {
+            const ORDINAL: u64 = {{ method.ordinal }};
+
+            type Protocol = crate::{{ protocol_name }};
+
+            {% if method.kind == ProtocolMethodKind::OneWay || method.kind == ProtocolMethodKind::TwoWay %}
+                {% if let Some(request) = method.maybe_request_payload %}
+                    type Request<'buf> = {{ context.wire_type(request) }};
+                {% else %}
+                    type Request<'buf> = ();
+                {% endif %}
+            {% else %}
+                type Request<'buf> = ::fidl_next::bind::Never;
+            {% endif %}
+
+            {% if method.kind == ProtocolMethodKind::TwoWay || method.kind == ProtocolMethodKind::Event %}
+                {% if let Some(response) = method.maybe_response_payload %}
+                    type Response<'buf> = {{ context.wire_type(response) }};
+                {% else %}
+                    type Response<'buf> = ();
+                {% endif %}
+            {% else %}
+                type Response<'buf> = ::fidl_next::bind::Never;
+            {% endif %}
+        }
+    {% endfor %}
+}
+
+{% let client_trait_name = format!("{protocol_base_name}Client") %}
+{% let client_handler_name = format!("{protocol_base_name}ClientHandler") %}
+
+/// A helper trait for the `{{ non_canonical_name }}` client protocol.
+pub trait {{ client_trait_name }}<___T: ::fidl_next::protocol::Transport> {
+    {% for method in protocol.methods %}
+        {% let method_name = filters::ident(method.name.snake())? %}
+        {% let method_type_name = filters::ident(method.name.camel())? %}
+
+        {% if let Some(doc) = method.attributes.doc_string() %}
+            #[doc = "{{ doc.escape_default() }}"]
+        {% endif %}
+        {% match method.kind %}
+            {% when ProtocolMethodKind::OneWay %}
+                {% if let Some(request) = method.maybe_request_payload %}
+                    fn {{ method_name }}<___R>(
+                        &self,
+                        request: &mut ___R,
+                    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+                    where
+                        for<'buf> ___R: ::fidl_next::Encode<
+                            ___T::Encoder<'buf>,
+                            Encoded<'buf> = {{ context.wire_type(request) }},
+                        >;
+                {% else %}
+                    fn {{ method_name }}(
+                        &self,
+                    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+                {% endif %}
+            {% when ProtocolMethodKind::TwoWay %}
+                {% if let Some(request) = method.maybe_request_payload %}
+                    fn {{ method_name }}<___R>(
+                        &self,
+                        request: &mut ___R,
+                    ) -> Result<
+                        ::fidl_next::bind::TransactionFuture<
+                            '_,
+                            ___T,
+                            {{ module_name }}::{{ method_type_name }},
+                        >,
+                        ::fidl_next::EncodeError,
+                    >
+                    where
+                        for<'buf> ___R: ::fidl_next::Encode<
+                            ___T::Encoder<'buf>,
+                            Encoded<'buf> = {{ context.wire_type(request) }},
+                        >;
+                {% else %}
+                    fn {{ method_name }}(
+                        &self,
+                    ) -> Result<
+                        ::fidl_next::bind::TransactionFuture<
+                            '_,
+                            ___T,
+                            {{ module_name }}::{{ method_type_name }},
+                        >,
+                        ::fidl_next::EncodeError,
+                    >;
+                {% endif %}
+            {% when ProtocolMethodKind::Event %}
+        {% endmatch %}
+    {% endfor %}
+}
+
+impl<___T> {{ client_trait_name }}<___T> for ::fidl_next::bind::Client<___T, {{ protocol_name }}>
+where
+    ___T: ::fidl_next::protocol::Transport,
+{
+    {% for method in protocol.methods %}
+        {% let method_name = filters::ident(method.name.snake())? %}
+        {% let method_type_name = filters::ident(method.name.camel())? %}
+
+        {% if let Some(doc) = method.attributes.doc_string() %}
+            #[doc = "{{ doc.escape_default() }}"]
+        {% endif %}
+        {% match method.kind %}
+            {% when ProtocolMethodKind::OneWay %}
+                {% if let Some(request) = method.maybe_request_payload %}
+                    fn {{ method_name }}<___R>(
+                        &self,
+                        request: &mut ___R,
+                    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+                    where
+                        for<'buf> ___R: ::fidl_next::Encode<
+                            ___T::Encoder<'buf>,
+                            Encoded<'buf> = {{ context.wire_type(request) }},
+                        >,
+                    {
+                        self.untyped().send_request({{ method.ordinal }}, request)
+                    }
+                {% else %}
+                    fn {{ method_name }}(
+                        &self,
+                    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
+                        self.untyped().send_request({{ method.ordinal }}, &mut ())
+                    }
+                {% endif %}
+            {% when ProtocolMethodKind::TwoWay %}
+                {% if let Some(request) = method.maybe_request_payload %}
+                    fn {{ method_name }}<___R>(
+                        &self,
+                        request: &mut ___R,
+                    ) -> Result<
+                        ::fidl_next::bind::TransactionFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
+                        ::fidl_next::EncodeError,
+                    >
+                    where
+                        for<'buf> ___R: ::fidl_next::Encode<
+                            ___T::Encoder<'buf>,
+                            Encoded<'buf> = {{ context.wire_type(request) }},
+                        >,
+                    {
+                        self.untyped().send_transaction({{ method.ordinal }}, request)
+                            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+                    }
+                {% else %}
+                    fn {{ method_name }}(
+                        &self,
+                    ) -> Result<
+                        ::fidl_next::bind::TransactionFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
+                        ::fidl_next::EncodeError,
+                    > {
+                        self.untyped().send_transaction({{ method.ordinal }}, &mut ())
+                            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+                    }
+                {% endif %}
+            {% when ProtocolMethodKind::Event %}
+        {% endmatch %}
+    {% endfor %}
+}
+
+/// A client handler for the {{ non_canonical_name }} protocol.
+{% if let Some(doc) = protocol.attributes.doc_string() %}
+    ///
+    #[doc = "{{ doc.escape_default() }}"]
+{% endif %}
+pub trait {{ client_handler_name }}<___T: ::fidl_next::protocol::Transport> {
+    {% for method in protocol.methods %}
+        {% if method.kind == ProtocolMethodKind::Event %}
+            {% let method_name = filters::ident(method.name.snake())? %}
+            {% let method_type_name = filters::ident(method.name.camel())? %}
+
+            {% if let Some(doc) = method.attributes.doc_string() %}
+                #[doc = "{{ doc.escape_default() }}"]
+            {% endif %}
+            {% if let Some(response) = method.maybe_response_payload %}
+                fn {{ method_name }}(
+                    &mut self,
+                    message: ::fidl_next::bind::ResponseBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
+                );
+            {% else %}
+                fn {{ method_name }}(&mut self);
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {% if protocol.openness != ProtocolOpenness::Closed %}
+        fn handle_unknown_interaction(
+            &mut self,
+            ordinal: u64,
+        );
+    {% endif %}
+}
+
+impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for {{ protocol_name }}
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: {{ client_handler_name }}<___T>,
+    {% for method in protocol.methods %}
+        {% if let Some(response) = method.maybe_response_payload %}
+            for<'buf> {{ context.wire_type(response) }}:
+                ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        {% endif %}
+    {% endfor %}
+{
+    fn on_event(
+        handler: &mut ___H,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
+        match ordinal {
+            {% for method in protocol.methods %}
+                {% let method_name = filters::ident(method.name.snake())? %}
+                {% if method.kind == ProtocolMethodKind::Event %}
+                    {{ method.ordinal }} => {
+                        {% if let Some(response) = method.maybe_response_payload %}
+                            let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
+                            handler.{{ method_name }}(buffer);
+                        {% else %}
+                            handler.{{ method_name}}();
+                        {% endif %}
+                    }
+                {% endif %}
+            {% endfor %}
+            {% if protocol.openness != ProtocolOpenness::Closed %}
+                ordinal => handler.handle_unknown_interaction(ordinal),
+            {% else %}
+                ordinal => todo!(),
+            {% endif %}
+        }
+    }
+}
+
+{% let server_trait_name = format!("{protocol_base_name}Server") %}
+{% let server_handler_name = format!("{protocol_base_name}ServerHandler") %}
+
+/// A helper trait for the `{{ non_canonical_name }}` server protocol.
+pub trait {{ server_trait_name }}<___T: ::fidl_next::protocol::Transport> {
+    {% for method in protocol.methods %}
+        {% let method_name = filters::ident(method.name.snake())? %}
+
+        {% if let Some(doc) = method.attributes.doc_string() %}
+            #[doc = "{{ doc.escape_default() }}"]
+        {% endif %}
+        {% if method.kind == ProtocolMethodKind::Event %}
+            {% if let Some(request) = method.maybe_request_payload %}
+                fn {{ method_name }}<___R>(
+                    &self,
+                    request: &mut ___R,
+                ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+                where
+                    for<'buf> ___R: ::fidl_next::Encode<
+                        ___T::Encoder<'buf>,
+                        Encoded<'buf> = {{ context.wire_type(request) }},
+                    >;
+            {% else %}
+                fn {{ method_name }}(
+                    &self,
+                ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+}
+
+impl<___T> {{ server_trait_name }}<___T> for ::fidl_next::bind::Server<___T, {{ protocol_name }}>
+where
+    ___T: ::fidl_next::protocol::Transport,
+{
+    {% for method in protocol.methods %}
+        {% let method_name = filters::ident(method.name.snake())? %}
+
+        {% if let Some(doc) = method.attributes.doc_string() %}
+            #[doc = "{{ doc.escape_default() }}"]
+        {% endif %}
+        {% if method.kind == ProtocolMethodKind::Event %}
+            {% if let Some(request) = method.maybe_request_payload %}
+                fn {{ method_name }}<___R>(
+                    &self,
+                    request: &mut ___R,
+                ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+                where
+                    for<'buf> ___R: ::fidl_next::Encode<
+                        ___T::Encoder<'buf>,
+                        Encoded<'buf> = {{ context.wire_type(request) }},
+                    >,
+                {
+                    self.untyped().send_event({{ method.ordinal }}, request)
+                }
+            {% else %}
+                fn {{ method_name }}(
+                    &self,
+                ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
+                    self.untyped().send_event({{ method.ordinal }}, &mut ())
+                }
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+}
+
+/// A server handler for the {{ non_canonical_name }} protocol.
+{% if let Some(doc) = protocol.attributes.doc_string() %}
+    ///
+    #[doc = "{{ doc.escape_default() }}"]
+{% endif %}
+pub trait {{ server_handler_name }}<___T: ::fidl_next::protocol::Transport> {
+    {% for method in protocol.methods %}
+        {% let method_name = filters::ident(method.name.snake())? %}
+        {% let method_type_name = filters::ident(method.name.camel())? %}
+
+        {% match method.kind %}
+            {% when ProtocolMethodKind::OneWay %}
+                {% if let Some(doc) = method.attributes.doc_string() %}
+                    #[doc = "{{ doc.escape_default() }}"]
+                {% endif %}
+                {% if let Some(request) = method.maybe_request_payload %}
+                    fn {{ method_name }}(
+                        &mut self,
+                        request: ::fidl_next::bind::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
+                    );
+                {% else %}
+                    fn {{ method_name }}(&mut self);
+                {% endif %}
+            {% when ProtocolMethodKind::TwoWay %}
+                {% if let Some(doc) = method.attributes.doc_string() %}
+                    #[doc = "{{ doc.escape_default() }}"]
+                {% endif %}
+                {% if let Some(request) = method.maybe_request_payload %}
+                    fn {{ method_name }}(
+                        &mut self,
+                        request: ::fidl_next::bind::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
+                        responder: ::fidl_next::bind::Responder<{{ module_name }}::{{ method_type_name }}>,
+                    );
+                {% else %}
+                    fn {{ method_name }}(
+                        &mut self,
+                        responder: ::fidl_next::bind::Responder<{{ module_name }}::{{ method_type_name }}>,
+                    );
+                {% endif %}
+            {% when ProtocolMethodKind::Event %}
+        {% endmatch %}
+    {% endfor %}
+
+    {% if protocol.openness != ProtocolOpenness::Closed %}
+        fn handle_unknown_interaction(
+            &mut self,
+            ordinal: u64,
+        );
+    {% endif %}
+}
+
+impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for {{ protocol_name }}
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: {{ server_handler_name }}<___T>,
+    {% for method in protocol.methods %}
+        {% if let Some(request) = method.maybe_request_payload %}
+            for<'buf> {{ context.wire_type(request) }}:
+                ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+        {% endif %}
+    {% endfor %}
+{
+    fn on_event(
+        handler: &mut ___H,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
+        match ordinal {
+            {% for method in protocol.methods %}
+                {% let method_name = filters::ident(method.name.snake())? %}
+                {% if method.kind == ProtocolMethodKind::OneWay %}
+                    {{ method.ordinal }} => {
+                        {% if let Some(request) = method.maybe_request_payload %}
+                            let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                            handler.{{ method_name }}(buffer);
+                        {% else %}
+                            handler.{{ method_name}}();
+                        {% endif %}
+                    }
+                {% endif %}
+            {% endfor %}
+            {% if protocol.openness != ProtocolOpenness::Closed %}
+                ordinal => handler.handle_unknown_interaction(ordinal),
+            {% else %}
+                ordinal => todo!(),
+            {% endif %}
+        }
+    }
+
+    fn on_transaction(
+        handler: &mut ___H,
+        ordinal: u64,
+        mut buffer: ___T::RecvBuffer,
+        responder: ::fidl_next::protocol::Responder,
+    ) {
+        match ordinal {
+            {% for method in protocol.methods %}
+                {% let method_name = filters::ident(method.name.snake())? %}
+                {% if method.kind == ProtocolMethodKind::TwoWay %}
+                    {{ method.ordinal }} => {
+                        let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+
+                        {% if let Some(request) = method.maybe_request_payload %}
+                            let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                            handler.{{ method_name }}(buffer, responder);
+                        {% else %}
+                            handler.{{ method_name}}(responder);
+                        {% endif %}
+                    }
+                {% endif %}
+            {% endfor %}
+            {% if protocol.openness != ProtocolOpenness::Closed %}
+                ordinal => handler.handle_unknown_interaction(ordinal),
+            {% else %}
+                ordinal => todo!(),
+            {% endif %}
+        }
+    }
+}

@@ -7,7 +7,10 @@ use crate::client::types;
 use crate::util::historical_list::{HistoricalList, Timestamped};
 use crate::util::pseudo_energy::{EwmaSignalData, RssiVelocity};
 use tracing::error;
-use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
+    fuchsia_async as fasync,
+};
 
 pub const ROAMING_CHANNEL_BUFFER_SIZE: usize = 100;
 /// This is how many past roam events will be remembered for limiting roams per day. Each roam
@@ -117,7 +120,11 @@ pub enum RoamTriggerData {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 pub enum RoamTriggerDataOutcome {
     Noop,
-    RoamSearch(types::NetworkIdentifier, Credential),
+    RoamSearch {
+        scan_type: fidl_common::ScanType,
+        network_identifier: types::NetworkIdentifier,
+        credential: Credential,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

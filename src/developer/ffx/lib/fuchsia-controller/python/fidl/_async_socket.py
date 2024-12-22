@@ -29,15 +29,15 @@ class AsyncSocket:
         if waker is None:
             self.waker = GlobalHandleWaker()
 
-    def __del__(self):
+    def __del__(self) -> None:
         if self.waker is not None:
             self.waker.unregister(self.socket)
 
-    async def read(self) -> bytearray:
+    async def read(self) -> bytes:
         """Attempts to read off of the socket.
 
         Returns:
-            A byte array to the caller.
+            bytes read from the socket.
 
         Raises:
             ZxStatus exception outlining the specific failure of the underlying handle.
@@ -52,7 +52,7 @@ class AsyncSocket:
                 if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
                     self.waker.unregister(self.socket)
                     raise e
-            await self.waker.wait_channel_ready(self.socket)
+            await self.waker.wait_ready(self.socket)
 
     async def read_all(self) -> bytearray:
         """Attempts to read all data on the socket until it is closed.

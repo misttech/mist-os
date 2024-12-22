@@ -36,7 +36,7 @@ pub unsafe extern "C" fn get_bootfs_file_payload(
     let zbi_parser = ZbiParser::new(vmo).parse().unwrap();
 
     // Try to find the StorageBootfsFactory item
-    match zbi_parser.try_get_item(StorageBootfsFactory) {
+    match zbi_parser.try_get_item(StorageBootfsFactory.into_raw(), None) {
         Ok(result) => {
             // Create a rust string from c char pointer
             let file_name_c_str: &std::ffi::CStr = std::ffi::CStr::from_ptr(file_name);

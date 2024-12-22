@@ -65,7 +65,7 @@ class VmPageOrMarker {
     // kAlignBits represents the number of low bits in a reference that must be zero so they can be
     // used for internal metadata. This is declared here for convenience, and is asserted to be in
     // sync with the private kReferenceBits.
-    static constexpr uint64_t kAlignBits = 4;
+    static constexpr uint64_t kAlignBits = 2;
     explicit constexpr ReferenceValue(uint64_t raw) : value_(raw) {
       DEBUG_ASSERT((value_ & BIT_MASK(kAlignBits)) == 0);
     }
@@ -232,8 +232,8 @@ class VmPageOrMarker {
                                      kDirtyStateShift);
     }
     void SetDirtyState(DirtyState state) {
-      // Only allow dirty zero ranges for now.
-      DEBUG_ASSERT(state == DirtyState::Dirty);
+      // Only allow dirty and untracked zero ranges for now.
+      DEBUG_ASSERT(state == DirtyState::Dirty || state == DirtyState::Untracked);
       // Clear the old state.
       value_ &= ~(BIT_MASK(kDirtyStateBits) << kDirtyStateShift);
       // Set the new state.
@@ -285,6 +285,11 @@ class VmPageOrMarker {
     return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
            ZeroRange::DirtyState::Dirty;
   }
+  bool IsZeroIntervalUntracked() const {
+    DEBUG_ASSERT(IsIntervalZero());
+    return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState() ==
+           ZeroRange::DirtyState::Untracked;
+  }
   ZeroRange::DirtyState GetZeroIntervalDirtyState() const {
     DEBUG_ASSERT(IsIntervalZero());
     return ZeroRange(raw_ & ~BIT_MASK(kIntervalBits)).GetDirtyState();
@@ -315,10 +320,10 @@ class VmPageOrMarker {
   static constexpr uint64_t kReferenceType = 0b10;
   static constexpr uint64_t kIntervalType = 0b11;
 
-  // Ensure two additional bits are available for storing metadata inside of references. The
-  // remaining bits are available for the actual ref value being stored. Unlike the page type, which
-  // does not allow the 0 value to be stored, a ref value of 0 is valid and may be stored.
-  static_assert(ReferenceValue::kAlignBits == (kTypeBits + 2));
+  // Ensure the reference values have alignment such the type bits can be set without overlapping
+  // actual ref being stored. Unlike the page type, which does not allow the 0 value to be stored, a
+  // ref value of 0 is valid and may be stored.
+  static_assert(ReferenceValue::kAlignBits == kTypeBits);
 
   // In addition to storing the type for an interval, we also need to track the type of interval
   // sentinel: the start, the end, or a single slot marker.
@@ -1147,6 +1152,29 @@ class VmPageList final {
   // caller takes ownership of the released page and is responsible for freeing it.
   vm_page_t* ReplacePageWithZeroInterval(uint64_t offset,
                                          VmPageOrMarker::IntervalDirtyState dirty_state);
+
+  // Overwrite a zero interval either fully or partially with a new zero interval, breaking off the
+  // old interval into two if required. old_start_offset and old_end_offset specify the start and
+  // end sentinels of the old interval that is being overwritten; either one of these or both can be
+  // specified, with the other set to UINT64_MAX. The new zero interval that overwrites the old
+  // spans [new_start_offset, new_end_offset] with its state set to new_dirty_state.
+  //  - For full overwrites, both old_start_offset and old_end_offset must be provided, and should
+  //  be equal to new_start_offset and new_end_offset respectively. At the end of the call, the old
+  //  interval will have been completely replaced by the new one.
+  //  - For partial overwrites from the start, old_start_offset must be provided and be equal to
+  //  new_start_offset, and old_end_offset must be UINT64_MAX. At the end of this call, the start of
+  //  the old interval will have been overwritten by the new interval, with the remainder of the old
+  //  interval now starting at |new_end_offset + PAGE_SIZE|.
+  //  - For partial overwrites from the end, old_end_offset must be provided and be equal to
+  //  new_end_offset, and old_start_offset must be UINT64_MAX. At the end of this call, the end of
+  //  the old interval will have been overwritten by the new interval, with the remainder of the old
+  //  interval now ending at |new_start_offset - PAGE_SIZE|.
+  //  - Partial overwrites in the middle are not allowed. In other words, either old_start_offset
+  //  must be the same as new_start_offset, or old_end_offset must be the same as new_end_offset, or
+  //  both.
+  zx_status_t OverwriteZeroInterval(uint64_t old_start_offset, uint64_t old_end_offset,
+                                    uint64_t new_start_offset, uint64_t new_end_offset,
+                                    VmPageOrMarker::IntervalDirtyState new_dirty_state);
 
  private:
   // Returns true if the specified offset falls in a sparse page interval.

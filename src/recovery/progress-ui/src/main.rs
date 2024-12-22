@@ -25,6 +25,7 @@ use fidl_fuchsia_recovery_ui::{
 };
 use fuchsia_async as fasync;
 use futures::prelude::*;
+use log::{error, info};
 #[cfg(feature = "debug_touch_to_update")]
 use rand;
 #[cfg(not(feature = "debug_touch_to_update"))]
@@ -35,7 +36,6 @@ use recovery_ui::progress_bar::{
 use rive_rs::File;
 #[cfg(feature = "debug_touch_to_update")]
 use std::time::Instant;
-use tracing::{error, info};
 use zx::{Event, MonotonicDuration};
 
 const LOGO_IMAGE_PATH: &str = "/pkg/data/logo.riv";

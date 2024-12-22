@@ -375,7 +375,7 @@ def get_target_deps_from_attributes(rule_attr, rule_kind = None, known_rule_kind
         rule_kind: Optional string for the rule kind (this is aspect_ctx.rule.kind
              when called from an aspect implementation function). If provided,
              this can speed up the computation for a few known target kinds.
-        known_rule_kinds: Optional dictionary contianing known rule kinds and their attributes to check
+        known_rule_kinds: Optional dictionary containing known rule kinds and their attributes to check
     Returns:
         A list of Target values corresponding to the dependencies of the current
         target.
@@ -511,7 +511,7 @@ PREPROCESS_FILE_ATTRS = {
     ),
 }
 
-def preprocesss_file(ctx, source, includes, headers = [], files = depset()):
+def preprocess_file(ctx, source, includes, headers = [], files = depset()):
     """Helper function for .S file preprocessing.
 
     This function must be called from a rule implementation function

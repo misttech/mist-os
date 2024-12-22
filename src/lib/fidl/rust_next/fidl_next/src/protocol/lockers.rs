@@ -5,14 +5,24 @@
 use core::mem::replace;
 use core::task::Waker;
 
-/// The locker was not writeable.
-#[derive(Debug)]
-pub struct NotWriteable;
+use thiserror::Error;
+
+/// Errors which may occur when attempting to write to a locker.
+#[derive(Debug, Error)]
+pub enum LockerError {
+    /// The locker was not in a writeable state.
+    #[error("the locker was not in a writeable state")]
+    NotWriteable,
+
+    /// The locker's ordinal did not match the given ordinal.
+    #[error("write expected a locker with ordinal {expected}, but found {actual}")]
+    MismatchedOrdinal { expected: u64, actual: u64 },
+}
 
 /// A dual-custody memory location which can be written to and read.
 pub enum Locker<T> {
     Free(usize),
-    Pending(Option<Waker>),
+    Pending { expected_ordinal: u64, read_waker: Option<Waker> },
     Ready(T),
     Canceled,
     Finished,
@@ -22,11 +32,17 @@ impl<T> Locker<T> {
     /// Writes the given value to the locker.
     ///
     /// On success, returns `true` if the reader canceled and the locker can now be freed.
-    pub fn write(&mut self, value: T) -> Result<bool, NotWriteable> {
+    pub fn write(&mut self, ordinal: u64, value: T) -> Result<bool, LockerError> {
         match self {
-            Self::Free(_) | Self::Ready(_) | Self::Finished => Err(NotWriteable),
-            Self::Pending(waker) => {
-                if let Some(waker) = waker.take() {
+            Self::Free(_) | Self::Ready(_) | Self::Finished => Err(LockerError::NotWriteable),
+            Self::Pending { expected_ordinal, read_waker } => {
+                if *expected_ordinal != ordinal {
+                    return Err(LockerError::MismatchedOrdinal {
+                        expected: *expected_ordinal,
+                        actual: ordinal,
+                    });
+                }
+                if let Some(waker) = read_waker.take() {
                     waker.wake();
                 }
                 *self = Locker::Ready(value);
@@ -41,11 +57,14 @@ impl<T> Locker<T> {
     /// On success, this finishes the locker and allows it to be freed. If the locker was pending,
     /// the given waker is registered.
     pub fn read(&mut self, waker: &Waker) -> Option<T> {
-        match replace(self, Self::Pending(Some(waker.clone()))) {
+        match self {
             Self::Free(_) | Self::Canceled | Self::Finished => unreachable!(),
-            Self::Pending(_) => None,
-            Self::Ready(result) => {
-                *self = Self::Finished;
+            Self::Pending { read_waker, .. } => {
+                *read_waker = Some(waker.clone());
+                None
+            }
+            Self::Ready(_) => {
+                let Self::Ready(result) = replace(self, Self::Finished) else { unreachable!() };
                 Some(result)
             }
         }
@@ -57,7 +76,7 @@ impl<T> Locker<T> {
     pub fn cancel(&mut self) -> bool {
         match self {
             Self::Free(_) | Self::Canceled | Self::Finished => unreachable!(),
-            Self::Pending(_) => {
+            Self::Pending { .. } => {
                 *self = Self::Canceled;
                 false
             }
@@ -84,16 +103,18 @@ impl<T> Lockers<T> {
     }
 
     /// Allocates a fresh locker, returning its index.
-    pub fn alloc(&mut self) -> u32 {
+    pub fn alloc(&mut self, ordinal: u64) -> u32 {
+        let new_locker = Locker::Pending { expected_ordinal: ordinal, read_waker: None };
+
         if self.next_free < self.lockers.len() {
-            let locker = replace(&mut self.lockers[self.next_free], Locker::Pending(None));
+            let locker = replace(&mut self.lockers[self.next_free], new_locker);
             let Locker::Free(next_free) = locker else {
                 panic!("unexpected allocation in free list");
             };
             replace(&mut self.next_free, next_free) as u32
         } else {
             let result = self.lockers.len();
-            self.lockers.push(Locker::Pending(None));
+            self.lockers.push(new_locker);
             self.next_free = self.lockers.len();
             result as u32
         }
@@ -108,8 +129,8 @@ impl<T> Lockers<T> {
     /// Wakes up all of the `Pending` lockers.
     pub fn wake_all(&mut self) {
         for locker in self.lockers.iter_mut() {
-            if let Locker::Pending(waker) = locker {
-                if let Some(waker) = waker.take() {
+            if let Locker::Pending { read_waker, .. } = locker {
+                if let Some(waker) = read_waker.take() {
                     waker.wake();
                 }
             }

@@ -7,7 +7,7 @@
 
 use anyhow::Context as _;
 use fho::{AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
-use tracing::error;
+use log::error;
 use {
     ffx_net_test_realm_args as ntr_args, fidl_fuchsia_developer_remotecontrol as fremotecontrol,
     fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,

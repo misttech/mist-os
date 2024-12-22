@@ -27,6 +27,7 @@ bind_library://bind/fuchsia.realtek.platform
 bind_library://bind/fuchsia.register
 bind_library://bind/fuchsia.regulator
 bind_library://bind/fuchsia.sdio
+bind_library://bind/fuchsia.sdmmc
 bind_library://bind/fuchsia.serial
 bind_library://bind/fuchsia.spmi
 bind_library://bind/fuchsia.sysmem

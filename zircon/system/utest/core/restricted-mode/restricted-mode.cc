@@ -36,6 +36,7 @@
 #include <zxtest/zxtest.h>
 
 #include "../needs-next.h"
+#include "arch-register-state.h"
 
 NEEDS_NEXT_SYSCALL(zx_restricted_bind_state);
 NEEDS_NEXT_SYSCALL(zx_restricted_enter);
@@ -48,369 +49,13 @@ extern "C" void restricted_exit(uintptr_t context, zx_restricted_reason_t reason
 extern "C" void load_fpu_registers(void* in);
 extern "C" void store_fpu_registers(void* out);
 
-// The normal-mode view of restricted-mode state will change slightly depending on
-// if the exit to normal-mode was caused by a syscall or an exception.
-enum class RegisterMutation {
-  kFromSyscall,
-  kFromException,
-};
-
-#if defined(__x86_64__)
-
-// The number of bytes needed to hold the FPU's state.
-// x86 has 8 10-byte registers, followed by 16 16-byte registers.
-static const uint16_t kFpuBufferSize = 8 * 10 + 16 * 16;
-
-class ArchRegisterState {
- public:
-  static void WritePcToGeneralRegs(zx_thread_state_general_regs_t& regs, uint64_t rip) {
-    regs.rip = rip;
-  }
-  void InitializeRegisters() {
-    state_.flags = 0;
-    state_.rax = 0x0101010101010101;
-    state_.rbx = 0x0202020202020202;
-    state_.rcx = 0x0303030303030303;
-    state_.rdx = 0x0404040404040404;
-    state_.rsi = 0x0505050505050505;
-    state_.rdi = 0x0606060606060606;
-    state_.rbp = 0x0707070707070707;
-    state_.rsp = 0x0808080808080808;
-    state_.r8 = 0x0909090909090909;
-    state_.r9 = 0x0a0a0a0a0a0a0a0a;
-    state_.r10 = 0x0b0b0b0b0b0b0b0b;
-    state_.r11 = 0x0c0c0c0c0c0c0c0c;
-    state_.r12 = 0x0d0d0d0d0d0d0d0d;
-    state_.r13 = 0x0e0e0e0e0e0e0e0e;
-    state_.r14 = 0x0f0f0f0f0f0f0f0f;
-    state_.r15 = 0x1010101010101010;
-    state_.fs_base = reinterpret_cast<uintptr_t>(&fs_val_);
-    state_.gs_base = reinterpret_cast<uintptr_t>(&gs_val_);
-    fs_val_ = 0;
-    gs_val_ = 0;
-  }
-
-  void InitializeFromThreadState(const zx_thread_state_general_regs_t& regs) {
-    state_.flags = regs.rflags;
-    state_.rax = regs.rax;
-    state_.rbx = regs.rbx;
-    state_.rcx = regs.rcx;
-    state_.rdx = regs.rdx;
-    state_.rsi = regs.rsi;
-    state_.rdi = regs.rdi;
-    state_.rbp = regs.rbp;
-    state_.rsp = regs.rsp;
-    state_.r8 = regs.r8;
-    state_.r9 = regs.r9;
-    state_.r10 = regs.r10;
-    state_.r11 = regs.r11;
-    state_.r12 = regs.r12;
-    state_.r13 = regs.r13;
-    state_.r14 = regs.r14;
-    state_.r15 = regs.r15;
-    state_.fs_base = regs.fs_base;
-    state_.gs_base = regs.gs_base;
-    state_.ip = regs.rip;
-  }
-
-  void VerifyTwiddledRestrictedState(RegisterMutation mutation) const {
-    // Validate the state of the registers is what was written inside restricted mode.
-    //
-    // NOTE: Each of the registers was incremented by one before exiting restricted mode.
-    EXPECT_EQ(0x0101010101010102, state_.rax);
-    EXPECT_EQ(0x0202020202020203, state_.rbx);
-    if (mutation == RegisterMutation::kFromSyscall) {
-      EXPECT_EQ(0, state_.rcx);  // RCX is trashed by the syscall and set to zero
-    } else {
-      EXPECT_EQ(0x0303030303030304, state_.rcx);
-    }
-    EXPECT_EQ(0x0404040404040405, state_.rdx);
-    EXPECT_EQ(0x0505050505050506, state_.rsi);
-    EXPECT_EQ(0x0606060606060607, state_.rdi);
-    EXPECT_EQ(0x0707070707070708, state_.rbp);
-    EXPECT_EQ(0x0808080808080809, state_.rsp);
-    EXPECT_EQ(0x090909090909090a, state_.r8);
-    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.r9);
-    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.r10);
-    if (mutation == RegisterMutation::kFromSyscall) {
-      EXPECT_EQ(0, state_.r11);  // r11 is trashed by the syscall and set to zero
-    } else {
-      EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state_.r11);
-    }
-    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.r12);
-    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.r13);
-    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.r14);
-    EXPECT_EQ(0x1010101010101011, state_.r15);
-
-    // Validate that it was able to write to fs:0 and gs:0 while inside restricted mode the post
-    // incremented values of rcx and r11 were written here.
-    EXPECT_EQ(0x0303030303030304, fs_val_);
-    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, gs_val_);
-  }
-
-  void VerifyArchSpecificRestrictedState() const {
-    // Verify that the flags field does not contain reserved bits. These are rejected by
-    // zx_restricted_enter.
-    // [intel/vol1]: 3.4.3 EFLAGS Register: Bits 1, 3, 5, 15, and 22 through 31 of this register are
-    // reserved. Software should not use or depend on the states of any of these bits.
-    constexpr uint64_t kX86ReservedFlagBitss =
-        0b11111111'11000000'10000000'00101010 | (0xffffffffull << 32);
-    EXPECT_EQ(state_.flags & kX86ReservedFlagBitss, 0);
-  }
-
-  uintptr_t pc() { return state_.ip; }
-  void set_pc(uintptr_t pc) { state_.ip = pc; }
-  void set_arg_regs(uint64_t arg0, uint64_t arg1) {
-    state_.rdi = arg0;
-    state_.rsi = arg1;
-  }
-  zx_restricted_state_t& restricted_state() { return state_; }
-
- private:
-  uint64_t fs_val_ = 0;
-  uint64_t gs_val_ = 0;
-  zx_restricted_state_t state_{};
-};
-
-#elif defined(__aarch64__)
-
-// The number of bytes needed to hold the FPU's state.
-// ARM has 32 16-byte floating-point registers.
-static const uint16_t kFpuBufferSize = 32 * 16;
-
-class ArchRegisterState {
- public:
-  static void WritePcToGeneralRegs(zx_thread_state_general_regs_t& regs, uint64_t pc) {
-    regs.pc = pc;
-  }
-
-  void InitializeRegisters() {
-    // Initialize all standard registers to arbitrary values.
-    state_.x[0] = 0x0101010101010101;
-    state_.x[1] = 0x0202020202020202;
-    state_.x[2] = 0x0303030303030303;
-    state_.x[3] = 0x0404040404040404;
-    state_.x[4] = 0x0505050505050505;
-    state_.x[5] = 0x0606060606060606;
-    state_.x[6] = 0x0707070707070707;
-    state_.x[7] = 0x0808080808080808;
-    state_.x[8] = 0x0909090909090909;
-    state_.x[9] = 0x0a0a0a0a0a0a0a0a;
-    state_.x[10] = 0x0b0b0b0b0b0b0b0b;
-    state_.x[11] = 0x0c0c0c0c0c0c0c0c;
-    state_.x[12] = 0x0d0d0d0d0d0d0d0d;
-    state_.x[13] = 0x0e0e0e0e0e0e0e0e;
-    state_.x[14] = 0x0f0f0f0f0f0f0f0f;
-    state_.x[15] = 0x0101010101010101;
-    state_.x[16] = 0x0202020202020202;
-    state_.x[17] = 0x0303030303030303;
-    state_.x[18] = 0x0404040404040404;
-    state_.x[19] = 0x0505050505050505;
-    state_.x[20] = 0x0606060606060606;
-    state_.x[21] = 0x0707070707070707;
-    state_.x[22] = 0x0808080808080808;
-    state_.x[23] = 0x0909090909090909;
-    state_.x[24] = 0x0a0a0a0a0a0a0a0a;
-    state_.x[25] = 0x0b0b0b0b0b0b0b0b;
-    state_.x[26] = 0x0c0c0c0c0c0c0c0c;
-    state_.x[27] = 0x0d0d0d0d0d0d0d0d;
-    state_.x[28] = 0x0e0e0e0e0e0e0e0e;
-    state_.x[29] = 0x0f0f0f0f0f0f0f0f;
-    state_.x[30] = 0x0101010101010101;
-    // Keep the SP 16-byte aligned, as required by the spec.
-    state_.sp = 0x0808080808080810;
-    state_.cpsr = 0;
-
-    // Initialize a new thread local storage for the restricted mode routine.
-    state_.tpidr_el0 = reinterpret_cast<uintptr_t>(&tls_val_);
-  }
-
-  void InitializeFromThreadState(const zx_thread_state_general_regs_t& regs) {
-    static_assert(sizeof(regs.r) <= sizeof(state_.x));
-    memcpy(state_.x, regs.r, sizeof(regs.r));
-    state_.x[30] = regs.lr;
-    state_.pc = regs.pc;
-    state_.tpidr_el0 = regs.tpidr;
-    state_.sp = regs.sp;
-    state_.cpsr = static_cast<uint32_t>(regs.cpsr);
-  }
-
-  void VerifyTwiddledRestrictedState(RegisterMutation mutation) const {
-    // Validate the state of the registers is what was written inside restricted mode.
-    //
-    // NOTE: Each of the registers was incremented by one before exiting restricted mode.
-    // x0 was used as temp space by syscall_bounce, so skip that one.
-    EXPECT_EQ(0x0202020202020203, state_.x[1]);
-    EXPECT_EQ(0x0303030303030304, state_.x[2]);
-    EXPECT_EQ(0x0404040404040405, state_.x[3]);
-    EXPECT_EQ(0x0505050505050506, state_.x[4]);
-    EXPECT_EQ(0x0606060606060607, state_.x[5]);
-    EXPECT_EQ(0x0707070707070708, state_.x[6]);
-    EXPECT_EQ(0x0808080808080809, state_.x[7]);
-    EXPECT_EQ(0x090909090909090a, state_.x[8]);
-    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.x[9]);
-    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.x[10]);
-    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state_.x[11]);
-    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.x[12]);
-    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.x[13]);
-    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.x[14]);
-    EXPECT_EQ(0x0101010101010102, state_.x[15]);
-    if (mutation == RegisterMutation::kFromSyscall) {
-      EXPECT_EQ(0x40, state_.x[16]);  // syscall_bounce ran syscall 0x40
-    } else {
-      EXPECT_EQ(0x0202020202020203, state_.x[16]);
-    }
-    EXPECT_EQ(0x0303030303030304, state_.x[17]);
-    EXPECT_EQ(0x0404040404040405, state_.x[18]);
-    EXPECT_EQ(0x0505050505050506, state_.x[19]);
-    EXPECT_EQ(0x0606060606060607, state_.x[20]);
-    EXPECT_EQ(0x0707070707070708, state_.x[21]);
-    EXPECT_EQ(0x0808080808080809, state_.x[22]);
-    EXPECT_EQ(0x090909090909090a, state_.x[23]);
-    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.x[24]);
-    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.x[25]);
-    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state_.x[26]);
-    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.x[27]);
-    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.x[28]);
-    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.x[29]);
-    EXPECT_EQ(0x0101010101010102, state_.x[30]);
-    EXPECT_EQ(0x0808080808080820, state_.sp);
-
-    // Check that thread local storage was updated correctly in restricted mode.
-    EXPECT_EQ(0x0202020202020203, tls_val_);
-  }
-
-  void VerifyArchSpecificRestrictedState() const {}
-
-  uintptr_t pc() { return state_.pc; }
-  void set_pc(uintptr_t pc) { state_.pc = pc; }
-  void set_arg_regs(uint64_t arg0, uint64_t arg1) {
-    state_.x[0] = arg0;
-    state_.x[1] = arg1;
-  }
-  zx_restricted_state_t& restricted_state() { return state_; }
-
- private:
-  uint64_t tls_val_ = 0;
-  zx_restricted_state_t state_{};
-};
-
-#elif defined(__riscv)
-
-// The number of bytes needed to hold the FPU's state.
-// RISC-V has 32 8-byte floating-point registers.
-static const uint16_t kFpuBufferSize = 32 * 8;
-
-class ArchRegisterState {
- public:
-  static void WritePcToGeneralRegs(zx_thread_state_general_regs_t& regs, uint64_t pc) {
-    regs.pc = pc;
-  }
-
-  void InitializeRegisters() {
-    // Initialize all standard registers to arbitrary values.
-    state_.ra = 0x0101010101010101;
-    state_.sp = 0x0202020202020202;
-    state_.gp = 0x0303030303030303;
-    state_.tp = reinterpret_cast<uintptr_t>(&tls_val_);
-    state_.t0 = 0x0505050505050505;
-    state_.t1 = 0x0606060606060606;
-    state_.t2 = 0x0707070707070707;
-    state_.s0 = 0x0808080808080808;
-    state_.s1 = 0x0909090909090909;
-    state_.a0 = 0x0a0a0a0a0a0a0a0a;
-    state_.a1 = 0x0b0b0b0b0b0b0b0b;
-    state_.a2 = 0x0c0c0c0c0c0c0c0c;
-    state_.a3 = 0x0d0d0d0d0d0d0d0d;
-    state_.a4 = 0x0e0e0e0e0e0e0e0e;
-    state_.a5 = 0x0f0f0f0f0f0f0f0f;
-    state_.a6 = 0x0101010101010101;
-    state_.a7 = 0x0202020202020202;
-    state_.s2 = 0x0303030303030303;
-    state_.s3 = 0x0404040404040404;
-    state_.s4 = 0x0505050505050505;
-    state_.s5 = 0x0606060606060606;
-    state_.s6 = 0x0707070707070707;
-    state_.s7 = 0x0808080808080808;
-    state_.s8 = 0x0909090909090909;
-    state_.s9 = 0x0a0a0a0a0a0a0a0a;
-    state_.s10 = 0x0b0b0b0b0b0b0b0b;
-    state_.s11 = 0x0c0c0c0c0c0c0c0c;
-    state_.t3 = 0x0d0d0d0d0d0d0d0d;
-    state_.t4 = 0x0e0e0e0e0e0e0e0e;
-    state_.t5 = 0x0f0f0f0f0f0f0f0f;
-    state_.t6 = 0x0101010101010101;
-  }
-
-  void InitializeFromThreadState(const zx_thread_state_general_regs_t& regs) {
-    static_assert(sizeof(regs) <= sizeof(state_));
-    memcpy(&state_, &regs, sizeof(regs));
-  }
-
-  void VerifyTwiddledRestrictedState(RegisterMutation mutation) const {
-    // Validate the state of the registers is what was written inside restricted mode.
-    //
-    // NOTE: Each of the registers was incremented by one before exiting restricted mode.
-    EXPECT_EQ(0x0101010101010102, state_.ra);
-    EXPECT_EQ(0x0202020202020203, state_.sp);
-    EXPECT_EQ(0x0303030303030304, state_.gp);
-    EXPECT_EQ(reinterpret_cast<uintptr_t>(&tls_val_), state_.tp);
-    if (mutation == RegisterMutation::kFromSyscall) {
-      EXPECT_EQ(0x40, state_.t0);
-    } else {
-      EXPECT_EQ(0x0505050505050506, state_.t0);
-    }
-    EXPECT_EQ(0x0606060606060607, state_.t1);
-    EXPECT_EQ(0x0707070707070708, state_.t2);
-    EXPECT_EQ(0x0808080808080809, state_.s0);
-    EXPECT_EQ(0x090909090909090a, state_.s1);
-    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.a0);
-    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.a1);
-    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state_.a2);
-    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.a3);
-    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.a4);
-    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.a5);
-    EXPECT_EQ(0x0101010101010102, state_.a6);
-    EXPECT_EQ(0x0202020202020203, state_.a7);
-    EXPECT_EQ(0x0303030303030304, state_.s2);
-    EXPECT_EQ(0x0404040404040405, state_.s3);
-    EXPECT_EQ(0x0505050505050506, state_.s4);
-    EXPECT_EQ(0x0606060606060607, state_.s5);
-    EXPECT_EQ(0x0707070707070708, state_.s6);
-    EXPECT_EQ(0x0808080808080809, state_.s7);
-    EXPECT_EQ(0x090909090909090a, state_.s8);
-    EXPECT_EQ(0x0a0a0a0a0a0a0a0b, state_.s9);
-    EXPECT_EQ(0x0b0b0b0b0b0b0b0c, state_.s10);
-    EXPECT_EQ(0x0c0c0c0c0c0c0c0d, state_.s11);
-    EXPECT_EQ(0x0d0d0d0d0d0d0d0e, state_.t3);
-    EXPECT_EQ(0x0e0e0e0e0e0e0e0f, state_.t4);
-    EXPECT_EQ(0x0f0f0f0f0f0f0f10, state_.t5);
-    EXPECT_EQ(0x0101010101010102, state_.t6);
-
-    // Check that thread local storage was updated correctly in restricted mode.
-    EXPECT_EQ(0x0505050505050506, tls_val_);
-  }
-
-  void VerifyArchSpecificRestrictedState() const {}
-
-  uintptr_t pc() { return state_.pc; }
-  void set_pc(uintptr_t pc) { state_.pc = pc; }
-  void set_arg_regs(uint64_t arg0, uint64_t arg1) {
-    state_.a0 = arg0;
-    state_.a1 = arg1;
-  }
-  zx_restricted_state_t& restricted_state() { return state_; }
-
- private:
-  uint64_t tls_val_ = 0;
-  zx_restricted_state_t state_{};
-};
-
-#endif
+// These constants ensure that there is enough space mapped at the correct
+// addresses for thread local storage and atomics used with restricted mode
+// in the fixture below.
+static const uint32_t kRestrictedAtomicCount = 2;
+static const uint32_t kRestrictedThreadCount = 32;
 
 namespace {
-
-constexpr std::string_view kRestrictedBlobName = RESTRICTED_BLOB_NAME;
 
 class RestrictedSymbols {
  public:
@@ -439,27 +84,36 @@ class RestrictedSymbols {
   std::unordered_map<std::string, uint64_t> symbol_addrs_;
 };
 
-class RestrictedMode : public zxtest::Test {
- public:
-  void SetUp() override {
-    unsigned int id = 100;
-    // Load the restricted blob for this architecture. If we wanted to add
-    // support for another arch (like running ARM32 on ARM64 hardware), we
-    // could add another blob to be loaded here.
-    LoadRestrictedBlob(kRestrictedBlobName, id);
-  }
+// The build system informs us of how many blobs exist and what machine they map
+// to and if they have a maximum memory limit.
+typedef struct RestrictedBlobInfo {
+  std::string_view name;
+  elfldltl::ElfMachine machine;
+  uint64_t max_load_address;
+} RestrictedBlobInfo;
+constexpr std::array<RestrictedBlobInfo, RESTRICTED_BLOB_COUNT> kRestrictedBlobs{
+    RESTRICTED_BLOB_INFO};
 
- protected:
+// This class encapsulates loading a single restricted blob.
+class RestrictedBlob {
+ public:
+  void Initialize(const RestrictedBlobInfo& info) { LoadRestrictedBlob(info); }
+
   const RestrictedSymbols& restricted_symbols() const { return restricted_symbols_; }
 
  private:
-  static const zx::vmo& elf_vmo() {
-    // This must be static because we can only fetch it from bootfs once.
+  static const zx::vmo& elf_vmo(const RestrictedBlobInfo& blob_info) {
+    // This must only be loaded once because we can only fetch it from bootfs once.
     // This is because bootfs transfers data to callers instead of copying it.
-    static zx::vmo elf_vmo = elfldltl::testing::GetTestLibVmo(kRestrictedBlobName);
-    EXPECT_TRUE(elf_vmo);
-    return elf_vmo;
+    auto machine = blob_info.machine;
+    if (elf_vmos_.contains(machine)) {
+      return elf_vmos_[machine];
+    }
+    elf_vmos_[machine] = elfldltl::testing::GetTestLibVmo(blob_info.name);
+    EXPECT_TRUE(elf_vmos_[machine]);
+    return elf_vmos_[machine];
   }
+
   static auto LogSink() {
     return zxtest::Runner::GetInstance()->mutable_reporter()->mutable_log_sink();
   }
@@ -468,18 +122,21 @@ class RestrictedMode : public zxtest::Test {
     LogSink()->Write("%.*s", static_cast<int>(str.size()), str.data());
   }
 
-  void LoadRestrictedBlob(std::string_view blob_name, unsigned int id) {
+  void LoadRestrictedBlob(const RestrictedBlobInfo& blob_info) {
     // Map the VMO into the test harness's address space for convenience of extracting the build ID.
     elfldltl::MappedVmoFile file;
     {
-      auto result = file.Init(elf_vmo().borrow());
-      ASSERT_TRUE(result.is_ok()) << blob_name << ": " << result.status_string();
+      auto result = file.Init(elf_vmo(blob_info).borrow());
+      ASSERT_TRUE(result.is_ok()) << "loading " << blob_info.name << ": " << result.status_string();
     }
+
+    // We use the ELF machine enum as the blob id to aid with debugging.
+    unsigned int id = static_cast<unsigned int>(blob_info.machine);
 
     auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
     // This lambda actually loads the ELF binary into the restricted address space.
-    auto load = [this, blob_name, id, &file, &diag]<class Ehdr, class Phdr>(
+    auto load = [this, blob_info, id, &file, &diag]<class Ehdr, class Phdr>(
                     const Ehdr& ehdr, std::span<const Phdr> phdrs) -> bool {
       using Elf = typename Ehdr::ElfLayout;
       using size_type = typename Elf::size_type;
@@ -488,7 +145,7 @@ class RestrictedMode : public zxtest::Test {
 
       // Perform basic header checks. Since we may be loading for an architecture that is not the
       // same as the host architecture, we have to pass nullopt to the machine argument.
-      EXPECT_TRUE(ehdr.Loadable(diag, std::nullopt)) << blob_name << " not loadable";
+      EXPECT_TRUE(ehdr.Loadable(diag, std::nullopt)) << blob_info.name << " not loadable";
 
       // This will collect the build ID from the file, for the symbolizer markup.
       std::span<const std::byte> build_id;
@@ -512,27 +169,47 @@ class RestrictedMode : public zxtest::Test {
                                          build_id_observer),
           elfldltl::PhdrDynamicObserver<Elf>(dyn_phdr)));
 
-      if (!loader_.Load(diag, load_info, elf_vmo().borrow())) {
-        ADD_FAILURE() << "cannot load " << blob_name;
+      // Attempt to allocate the ELF vmo below any machine-required maximum.
+      if (blob_info.max_load_address != 0) {
+        // It's worth noting that there is nothing magic about starting and
+        // incrementing by 0x20000. It avoids starting too low and increments
+        // by several times what's required to store the restricted blobs.
+        // The alternative would be refactoring Allocate() to take an upper
+        // limit or using a much smaller offset to search for an available
+        // restricted_blob-sized space.
+        size_t vmar_offset = 0x20000;
+        while (!loader_.Allocate(diag, load_info, vmar_offset)) {
+          printf("searching for valid ELF allocation offset: %lu\n", vmar_offset);
+          vmar_offset = vmar_offset + 0x20000;
+          if (vmar_offset >= blob_info.max_load_address) {
+            ADD_FAILURE() << "failed to allocate restricted addressable memory for "
+                          << blob_info.name;
+            return false;
+          }
+        }
+      }
+
+      if (!loader_.Load(diag, load_info, elf_vmo(blob_info).borrow())) {
+        ADD_FAILURE() << "cannot load " << blob_info.name;
         return false;
       }
 
       // Log symbolizer markup context for the test module to ease debugging.
       symbolizer_markup::Writer markup_writer{Log};
       load_info.SymbolizerContext(
-          markup_writer, id, blob_name, build_id,
+          markup_writer, id, blob_info.name, build_id,
           static_cast<size_type>(load_info.vaddr_start() + loader_.load_bias()));
 
       // Read the PT_DYNAMIC, which leads to symbol information.
       cpp20::span<const Dyn> dyn;
       {
-        EXPECT_TRUE(dyn_phdr) << blob_name << " has no PT_DYNAMIC";
+        EXPECT_TRUE(dyn_phdr) << blob_info.name << " has no PT_DYNAMIC";
         if (!dyn_phdr) {
           return false;
         }
         auto read_dyn =
             loader_.memory().ReadArray<Dyn>(dyn_phdr->vaddr, dyn_phdr->filesz / sizeof(Dyn));
-        EXPECT_TRUE(read_dyn) << blob_name << " PT_DYNAMIC not read";
+        EXPECT_TRUE(read_dyn) << blob_info.name << " PT_DYNAMIC not read";
         if (read_dyn) {
           dyn = *read_dyn;
         }
@@ -553,23 +230,164 @@ class RestrictedMode : public zxtest::Test {
       return elfldltl::ContainerArrayFromFile<elfldltl::StdContainer<std::vector>::Container<T>>(
           diag, "impossible")(count);
     };
-    EXPECT_TRUE(elfldltl::WithLoadHeadersFromFile(diag, file, phdr_allocator, load));
+
+    EXPECT_TRUE(elfldltl::WithLoadHeadersFromFile(diag, file, phdr_allocator, load,
+                                                  elfldltl::ElfData::kNative, blob_info.machine));
   }
 
   // Stores the addresses of the symbols in the ELF binary that are used in tests.
   RestrictedSymbols restricted_symbols_;
 
-  // Loads (and unloads) the ELF binary used in restricted mode. By making this a
-  // member variable, we ensure that the ELF binary's lifetime is the same as the
-  // test. Note that loader_.Commit() is never called, and this is what ensures
-  // the unmapping on destruction.
+  // Loads (and unloads) the ELF binary used in restricted mode. By making this
+  // a member variable, we ensure that the ELF binary's lifetime is the
+  // same as the symbol table. Note that loader_.Commit() is never called, and this
+  // is what ensures the unmapping on destruction.
   elfldltl::LocalVmarLoader loader_;
+
+  // Stores the ELF VMOs that can only be loaded once from bootfs.
+  static std::unordered_map<elfldltl::ElfMachine, zx::vmo> elf_vmos_;
 };
+
+std::unordered_map<elfldltl::ElfMachine, zx::vmo> RestrictedBlob::elf_vmos_{};
+
+class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
+ public:
+  static void SetUpTestSuite() {
+    restricted_blobs_ = std::make_unique<
+        std::unordered_map<elfldltl::ElfMachine, std::unique_ptr<RestrictedBlob>>>();
+    for (const auto info : kRestrictedBlobs) {
+      std::unique_ptr<RestrictedBlob> blob = std::make_unique<RestrictedBlob>();
+      blob->Initialize(info);
+      restricted_blobs_->insert({info.machine, std::move(blob)});
+    }
+  }
+
+  static void TearDownTestSuite() { restricted_blobs_.reset(); }
+
+  void SetUp() override {
+    // Configure the machine which will be used for selecting the correct
+    // register state.
+    restricted_blob_info_ = GetParam();
+
+    // This function allocates spaces for storing atomic ints and
+    // TLS data that is shared with restricted mode.  It should be
+    // mapped to a location that is reachable.
+    MapSharedStorage(kRestrictedAtomicCount, kRestrictedThreadCount);
+  }
+
+  void TearDown() override {
+    zx::vmar::root_self()->unmap(thread_storage_base_, kThreadStorageSize);
+    zx::vmar::root_self()->unmap(atomic_storage_base_, kAtomicStorageSize);
+  }
+
+  std::atomic_int* GetAtomicInt(unsigned int index) {
+    assert(index < atomic_count_);
+    std::atomic_int* ai = reinterpret_cast<std::atomic_int*>(atomic_storage_base_) + index;
+    // Always reset when collected.
+    *ai = 0;
+    return ai;
+  }
+
+  TlsStorage* GetTlsAddress(uint64_t thread_id) {
+    assert(thread_id < thread_count_);
+    TlsStorage* tls_base =
+        reinterpret_cast<TlsStorage*>(thread_storage_base_ + (kTlsStorageSize * thread_id));
+    return tls_base;
+  }
+
+  std::unique_ptr<ArchRegisterState> GetArchRegisterState() {
+    return ArchRegisterStateFactory::Create(restricted_blob_info_.machine);
+  }
+
+  size_t register_bytes() const {
+    return restricted_blob_info_.machine == elfldltl::ElfMachine::kNative ? sizeof(uint64_t)
+                                                                          : sizeof(uint32_t);
+  }
+
+ protected:
+  // Returns the correct symbols for the current machine.
+  const RestrictedSymbols& restricted_symbols() const {
+    auto machine = restricted_blob_info_.machine;
+    return restricted_blobs_->at(machine)->restricted_symbols();
+  }
+
+  // Storage size for the shared storage discussed below.
+  static const uint32_t kAtomicStorageSize;
+  static const uint32_t kThreadStorageSize;
+
+  // This function allocates and maps storage for objects that are shared
+  // between restricted mode and normal mode.  If the target machine requires
+  // an upper limit on where shared objects may be allocated, it will be
+  // enforced here.
+  void MapSharedStorage(unsigned int atomics, unsigned int threads) {
+    atomic_count_ = atomics;
+    thread_count_ = threads;
+    ASSERT_LT(sizeof(std::atomic_int) * atomics, kAtomicStorageSize);
+    ASSERT_LT(kTlsStorageSize * threads, kThreadStorageSize);
+    ASSERT_OK(zx::vmo::create(kAtomicStorageSize, 0, &atomic_storage_vmo_));
+    ASSERT_OK(zx::vmo::create(kThreadStorageSize, 0, &thread_storage_vmo_));
+
+    auto options = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
+    auto offset = restricted_blob_info_.max_load_address;
+    if (offset != 0) {
+      options |= ZX_VM_OFFSET_IS_UPPER_LIMIT;
+    }
+
+    ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(options, offset, atomic_storage_vmo_, 0,
+                                                kAtomicStorageSize, &atomic_storage_base_));
+    ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(options, offset, thread_storage_vmo_, 0,
+                                                kThreadStorageSize, &thread_storage_base_));
+  }
+
+ private:
+  // Contains the machine-specific restricted mode ELF blobs.
+  // Initialized and destroyed with the test suite.
+  static std::unique_ptr<std::unordered_map<elfldltl::ElfMachine, std::unique_ptr<RestrictedBlob>>>
+      restricted_blobs_;
+
+  // The target ELF machine is used to parameterize the tests.
+  RestrictedBlobInfo restricted_blob_info_{};
+
+  // VMO to hold thread local storage objects
+  zx::vmo thread_storage_vmo_;
+
+  // Atomic to hold shared atomic objects
+  zx::vmo atomic_storage_vmo_;
+
+  // Pointer to where thread_storage_vmo_ is mapped.
+  zx_vaddr_t thread_storage_base_ = 0;
+
+  // Pointer to where atomic_storage_vmo_ is mapped.
+  zx_vaddr_t atomic_storage_base_ = 0;
+
+  // The number of shared objects allocated.
+  unsigned int thread_count_ = 0;
+  unsigned int atomic_count_ = 0;
+};
+
+const uint32_t RestrictedMode::kAtomicStorageSize = 2048;
+const uint32_t RestrictedMode::kThreadStorageSize = 2048;
+std::unique_ptr<std::unordered_map<elfldltl::ElfMachine, std::unique_ptr<RestrictedBlob>>>
+    RestrictedMode::restricted_blobs_ = {};
 
 }  // namespace
 
+INSTANTIATE_TEST_SUITE_P(RestrictedModePerArch, RestrictedMode, zxtest::ValuesIn(kRestrictedBlobs),
+                         [](const zxtest::TestParamInfo<RestrictedMode::ParamType>& info) {
+                           switch (info.param.machine) {
+                             case elfldltl::ElfMachine::kX86_64:
+                               return "x64";
+                             case elfldltl::ElfMachine::kAarch64:
+                               return "aarch64";
+                             case elfldltl::ElfMachine::kRiscv:
+                               return "riscv64";
+                             default:
+                               return "unknown";
+                           }
+                         });
+
 // Verify that restricted_enter handles invalid args.
-TEST(RestrictedMode, EnterInvalidArgs) {
+TEST_P(RestrictedMode, EnterInvalidArgs) {
   NEEDS_NEXT_SKIP(zx_restricted_enter);
 
   // Invalid options.
@@ -580,7 +398,7 @@ TEST(RestrictedMode, EnterInvalidArgs) {
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, zx_restricted_enter(0, -1, 0));
 }
 
-TEST(RestrictedMode, BindState) {
+TEST_P(RestrictedMode, BindState) {
   NEEDS_NEXT_SKIP(zx_restricted_bind_state);
 
   // Bad options.
@@ -627,7 +445,7 @@ TEST(RestrictedMode, BindState) {
   zx::vmar::root_self()->unmap(ptr, zx_system_get_page_size());
 }
 
-TEST(RestrictedMode, UnbindState) {
+TEST_P(RestrictedMode, UnbindState) {
   NEEDS_NEXT_SKIP(zx_restricted_unbind_state);
 
   // Repeated unbind is OK.
@@ -642,7 +460,7 @@ TEST(RestrictedMode, UnbindState) {
 }
 
 // This is the happy case.
-TEST_F(RestrictedMode, Basic) {
+TEST_P(RestrictedMode, Basic) {
   NEEDS_NEXT_SKIP(zx_restricted_bind_state);
 
   zx::vmo vmo;
@@ -650,15 +468,15 @@ TEST_F(RestrictedMode, Basic) {
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
   // Configure the initial register state.
-  ArchRegisterState state;
-  state.InitializeRegisters();
+  auto state = GetArchRegisterState();
+  state->InitializeRegisters(GetTlsAddress(0));
 
   // Set the PC to the syscall_bounce routine, as the PC is where zx_restricted_enter
   // will jump to.
-  state.set_pc(restricted_symbols().addr_of("syscall_bounce"));
+  state->set_pc(restricted_symbols().addr_of("syscall_bounce"));
 
   // Write the state to the state VMO.
-  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
 
   // Enter restricted mode with reasonable args, expect a bounce back.
   zx_restricted_reason_t reason_code = 99;
@@ -667,30 +485,30 @@ TEST_F(RestrictedMode, Basic) {
   ASSERT_EQ(ZX_RESTRICTED_REASON_SYSCALL, reason_code);
 
   // Read the state out of the thread.
-  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  ASSERT_OK(vmo.read(&state->restricted_state(), 0, sizeof(state->restricted_state())));
 
-  state.VerifyArchSpecificRestrictedState();
+  state->VerifyArchSpecificRestrictedState();
 
   // Validate that the instruction pointer is right after the syscall instruction.
-  EXPECT_EQ(restricted_symbols().addr_of("syscall_bounce_post_syscall"), state.pc());
-  state.VerifyTwiddledRestrictedState(RegisterMutation::kFromSyscall);
+  EXPECT_EQ(restricted_symbols().addr_of("syscall_bounce_post_syscall"), state->pc());
+  state->VerifyTwiddledRestrictedState(RegisterMutation::kFromSyscall);
 }
 
 // Verify that floating point state is saved correctly on context switch.
-TEST_F(RestrictedMode, FloatingPointState) {
+TEST_P(RestrictedMode, FloatingPointState) {
   NEEDS_NEXT_SKIP(zx_restricted_bind_state);
 
-  constexpr uint32_t kNumRestrictedThreads = 32;
+  constexpr uint32_t kNumRestrictedThreads = kRestrictedThreadCount;
   constexpr uint32_t kNumFloatingPointThreads = 32;
   std::atomic_int num_threads_ready = 0;
-  std::atomic_int num_threads_in_rmode = 0;
+  std::atomic_int* num_threads_in_rmode = GetAtomicInt(0);
   std::atomic_int start_restricted_threads = 0;
-  std::atomic_int exit_restricted_mode = 0;
+  std::atomic_int* exit_restricted_mode = GetAtomicInt(1);
   zx_status_t statuses[kNumRestrictedThreads]{};
   memset(statuses, ZX_OK, sizeof(statuses));
   std::vector<std::thread> threads;
 
-  auto thread_body = [this, &exit_restricted_mode, &num_threads_ready, &num_threads_in_rmode,
+  auto thread_body = [this, exit_restricted_mode, &num_threads_ready, num_threads_in_rmode,
                       &start_restricted_threads, &statuses](uint32_t thread_num) {
     // Configure the initial register state.
     zx::vmo vmo;
@@ -701,14 +519,16 @@ TEST_F(RestrictedMode, FloatingPointState) {
     }
     auto cleanup = fit::defer([]() { zx_restricted_unbind_state(0); });
 
-    ArchRegisterState state;
-    state.InitializeRegisters();
-    state.set_pc(restricted_symbols().addr_of("wait_then_syscall"));
-    state.set_arg_regs(reinterpret_cast<uint64_t>(&num_threads_in_rmode),
-                       reinterpret_cast<uint64_t>(&exit_restricted_mode));
+    auto state = GetArchRegisterState();
+    state->InitializeRegisters(this->GetTlsAddress(thread_num));
+    uint64_t wait_then_syscall_addr = restricted_symbols().addr_of("wait_then_syscall");
+
+    state->set_pc(wait_then_syscall_addr);
+    state->set_arg_regs(reinterpret_cast<uint64_t>(num_threads_in_rmode),
+                        reinterpret_cast<uint64_t>(exit_restricted_mode));
 
     // Write the state to the state VMO.
-    status = vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state()));
+    status = vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state()));
     if (status != ZX_OK) {
       statuses[thread_num] = status;
       return;
@@ -723,15 +543,15 @@ TEST_F(RestrictedMode, FloatingPointState) {
     while (start_restricted_threads.load() == 0) {
     }
 
-    zx_restricted_reason_t reason_code;
+    zx_restricted_reason_t reason_code = 99;
     // Construct the desired FPU state.
-    char fpu_buffer[kFpuBufferSize]{};
-    memset(fpu_buffer, 0x10101010 + thread_num, kFpuBufferSize);
-    // Stack allocate the buffer we're going to use to retrieve the FPU state after exiting
+    std::unique_ptr<char[]> fpu_buffer = std::make_unique<char[]>(kFpuBufferSize);
+    memset(fpu_buffer.get(), 0x10 + thread_num, kFpuBufferSize);
+    // Allocate the buffer we're going to use to retrieve the FPU state after exiting
     // restricted mode. We do this before writing the desired FPU state as the process of
     // zeroing out the array modifies the floating-point registers on ARM.
-    char got_fpu_buffer[kFpuBufferSize]{};
-    load_fpu_registers(fpu_buffer);
+    std::unique_ptr<char[]> got_fpu_buffer = std::make_unique<char[]>(kFpuBufferSize);
+    load_fpu_registers(fpu_buffer.get());
     status =
         restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code);
     if (status != ZX_OK) {
@@ -739,13 +559,26 @@ TEST_F(RestrictedMode, FloatingPointState) {
       return;
     }
     if (reason_code != ZX_RESTRICTED_REASON_SYSCALL) {
+      ADD_FAILURE() << "thread " << thread_num << ": received reason code " << reason_code
+                    << "instead of ZX_RESTRICTED_REASON_SYSCALL";
+      // This is not a desired outcome. However, if it happens, logging
+      // actionable information is helpful.
+      if (reason_code == ZX_RESTRICTED_REASON_EXCEPTION) {
+        zx_restricted_exception_t exception_state = {};
+        status = vmo.read(&exception_state, 0, sizeof(exception_state));
+        if (status == ZX_OK &&
+            sizeof(exception_state.exception) == exception_state.exception.header.size) {
+          ADD_FAILURE() << "thread " << thread_num << ": dumping exception state to stdout";
+          state->PrintExceptionState(exception_state);
+        }
+      }
       statuses[thread_num] = ZX_ERR_BAD_STATE;
       return;
     }
 
     // Validate that the FPU contains the expected contents.
-    store_fpu_registers(got_fpu_buffer);
-    if (memcmp(fpu_buffer, got_fpu_buffer, kFpuBufferSize) != 0) {
+    store_fpu_registers(got_fpu_buffer.get());
+    if (memcmp(fpu_buffer.get(), got_fpu_buffer.get(), kFpuBufferSize) != 0) {
       // Mark this test as a failure.
       statuses[thread_num] = ZX_ERR_BAD_STATE;
 
@@ -778,7 +611,7 @@ TEST_F(RestrictedMode, FloatingPointState) {
   start_restricted_threads.store(1);
 
   // Wait for all of the restricted threads to enter restricted mode.
-  while (num_threads_in_rmode.load() != kNumRestrictedThreads) {
+  while (num_threads_in_rmode->load() != kNumRestrictedThreads) {
     // Check that each thread has successfully made it to the fetch_add that
     // increments num_threads_in_rmode. This will ensure the test fails out
     // instead of hanging in those cases.
@@ -792,15 +625,15 @@ TEST_F(RestrictedMode, FloatingPointState) {
   for (uint32_t i = 0; i < kNumFloatingPointThreads; i++) {
     threads.emplace_back(
         [](uint32_t thread_num) {
-          char fpu_buffer[kFpuBufferSize]{};
-          memset(fpu_buffer, 0x90909090 + thread_num, kFpuBufferSize);
-          load_fpu_registers(fpu_buffer);
+          std::unique_ptr<char[]> fpu_buffer = std::make_unique<char[]>(kFpuBufferSize);
+          memset(fpu_buffer.get(), 0x90 + thread_num, kFpuBufferSize);
+          load_fpu_registers(fpu_buffer.get());
         },
         i);
   }
 
   // Signal all of the restricted mode threads to exit, then wait for them to do so.
-  exit_restricted_mode.store(1);
+  exit_restricted_mode->store(1);
   for (auto& thread : threads) {
     thread.join();
   }
@@ -810,7 +643,7 @@ TEST_F(RestrictedMode, FloatingPointState) {
 }
 
 // This is a simple benchmark test that prints some rough performance numbers.
-TEST_F(RestrictedMode, Bench) {
+TEST_P(RestrictedMode, Bench) {
   NEEDS_NEXT_SKIP(zx_restricted_bind_state);
 
   // Run the test 5 times to help filter out noise.
@@ -820,10 +653,10 @@ TEST_F(RestrictedMode, Bench) {
     auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
     // Set the state.
-    ArchRegisterState state;
-    state.InitializeRegisters();
-    state.set_pc(restricted_symbols().addr_of("syscall_bounce"));
-    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+    auto state = GetArchRegisterState();
+    state->InitializeRegisters(GetTlsAddress(0));
+    state->set_pc(restricted_symbols().addr_of("syscall_bounce"));
+    ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
 
     // Go through a full restricted syscall entry/exit cycle iter times and show the time.
     {
@@ -862,8 +695,8 @@ TEST_F(RestrictedMode, Bench) {
     auto deadline = t + zx::ticks::per_second();
     int iter = 0;
     zx_restricted_reason_t reason_code;
-    state.set_pc(restricted_symbols().addr_of("exception_bounce_exception_address"));
-    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+    state->set_pc(restricted_symbols().addr_of("exception_bounce_exception_address"));
+    ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
     while (zx::ticks::now() <= deadline) {
       ASSERT_OK(
           restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code));
@@ -877,7 +710,7 @@ TEST_F(RestrictedMode, Bench) {
 }
 
 // Verify we can receive restricted exceptions using in-thread exception handlers.
-TEST_F(RestrictedMode, InThreadException) {
+TEST_P(RestrictedMode, InThreadException) {
   NEEDS_NEXT_SKIP(zx_restricted_bind_state);
 
   zx::vmo vmo;
@@ -885,13 +718,13 @@ TEST_F(RestrictedMode, InThreadException) {
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
   // Configure initial register state.
-  ArchRegisterState state;
-  state.InitializeRegisters();
-  state.set_pc(restricted_symbols().addr_of("exception_bounce"));
+  auto state = GetArchRegisterState();
+  state->InitializeRegisters(GetTlsAddress(0));
+  state->set_pc(restricted_symbols().addr_of("exception_bounce"));
 
   // Enter restricted mode. The restricted code will twiddle some registers
   // and generate an exception.
-  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
   zx_restricted_reason_t reason_code = 99;
   ASSERT_OK(
       restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(&restricted_exit), &reason_code));
@@ -920,54 +753,54 @@ TEST_F(RestrictedMode, InThreadException) {
 }
 
 // Verify that restricted_enter fails on invalid zx_restricted_state_t values.
-TEST_F(RestrictedMode, EnterBadStateStruct) {
+TEST_P(RestrictedMode, EnterBadStateStruct) {
   NEEDS_NEXT_SKIP(zx_restricted_bind_state);
 
   zx::vmo vmo;
   ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
-  ArchRegisterState state;
-  state.InitializeRegisters();
+  auto state = GetArchRegisterState();
+  state->InitializeRegisters(GetTlsAddress(0));
 
   [[maybe_unused]] auto set_state_and_enter = [&]() {
     // Set the state.
-    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+    ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
 
     // This should fail with bad state.
     ASSERT_EQ(ZX_ERR_BAD_STATE,
               zx_restricted_enter(0, reinterpret_cast<uintptr_t>(&restricted_exit), 0));
   };
 
-  state.set_pc(-1);  // pc is outside of user space
+  state->set_pc(-1);  // pc is outside of user space
   set_state_and_enter();
 
 #ifdef __x86_64__
-  state.InitializeRegisters();
-  state.set_pc(restricted_symbols().addr_of("syscall_bounce"));
-  state.restricted_state().flags = (1UL << 31);  // set an invalid flag
+  state->InitializeRegisters(GetTlsAddress(0));
+  state->set_pc(restricted_symbols().addr_of("syscall_bounce"));
+  state->restricted_state().flags = (1UL << 31);  // set an invalid flag
   set_state_and_enter();
 
-  state.InitializeRegisters();
-  state.set_pc(restricted_symbols().addr_of("syscall_bounce"));
-  state.restricted_state().fs_base = (1UL << 63);  // invalid fs (non canonical)
+  state->InitializeRegisters(GetTlsAddress(0));
+  state->set_pc(restricted_symbols().addr_of("syscall_bounce"));
+  state->restricted_state().fs_base = (1UL << 63);  // invalid fs (non canonical)
   set_state_and_enter();
 
-  state.InitializeRegisters();
-  state.set_pc(restricted_symbols().addr_of("syscall_bounce"));
-  state.restricted_state().gs_base = (1UL << 63);  // invalid gs (non canonical)
+  state->InitializeRegisters(GetTlsAddress(0));
+  state->set_pc(restricted_symbols().addr_of("syscall_bounce"));
+  state->restricted_state().gs_base = (1UL << 63);  // invalid gs (non canonical)
   set_state_and_enter();
 #endif
 
 #ifdef __aarch64__
-  state.InitializeRegisters();
-  state.set_pc(restricted_symbols().addr_of("syscall_bounce"));
-  state.restricted_state().cpsr = 0x1;  // CPSR contains non-user settable flags.
+  state->InitializeRegisters(GetTlsAddress(0));
+  state->set_pc(restricted_symbols().addr_of("syscall_bounce"));
+  state->restricted_state().cpsr = 0x1;  // CPSR contains non-user settable flags.
   set_state_and_enter();
 #endif
 }
 
-TEST_F(RestrictedMode, KickBeforeEnter) {
+TEST_P(RestrictedMode, KickBeforeEnter) {
   NEEDS_NEXT_SKIP(zx_restricted_bind_state);
 
   zx::vmo vmo;
@@ -975,15 +808,15 @@ TEST_F(RestrictedMode, KickBeforeEnter) {
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
   // Configure the initial register state.
-  ArchRegisterState state;
-  state.InitializeRegisters();
+  auto state = GetArchRegisterState();
+  state->InitializeRegisters(GetTlsAddress(0));
 
   // Set the PC to the syscall_bounce routine, as the PC is where zx_restricted_enter
   // will jump to.
-  state.set_pc(restricted_symbols().addr_of("syscall_bounce"));
+  state->set_pc(restricted_symbols().addr_of("syscall_bounce"));
 
   // Write the state to the state VMO.
-  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
 
   zx::unowned<zx::thread> current_thread(thrd_get_zx_handle(thrd_current()));
 
@@ -999,19 +832,23 @@ TEST_F(RestrictedMode, KickBeforeEnter) {
   EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
 
   // Read the state out of the thread.
-  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-  state.VerifyArchSpecificRestrictedState();
+  ASSERT_OK(vmo.read(&state->restricted_state(), 0, sizeof(state->restricted_state())));
+  state->VerifyArchSpecificRestrictedState();
 
   // Validate that the instruction pointer is still pointing at the entry point.
-  EXPECT_EQ(restricted_symbols().addr_of("syscall_bounce"), state.pc());
+  EXPECT_EQ(restricted_symbols().addr_of("syscall_bounce"), state->pc());
 
 #if defined(__x86_64__)
   // Validate that the state is unchanged
-  EXPECT_EQ(0x0101010101010101, state.restricted_state().rax);
+  EXPECT_EQ(0x0101010101010101, state->restricted_state().rax);
 #elif defined(__aarch64__)  // defined(__x86_64__)
-  EXPECT_EQ(0x0202020202020202, state.restricted_state().x[1]);
+  if (register_bytes() == sizeof(state->restricted_state().x[1])) {
+    EXPECT_EQ(0x0202020202020202, state->restricted_state().x[1]);
+  } else {
+    EXPECT_EQ(0x02020202, state->restricted_state().x[1]);
+  }
 #elif defined(__riscv)      // defined(__aarch64__)
-  EXPECT_EQ(0x0b0b0b0b0b0b0b0b, state.restricted_state().a1);
+  EXPECT_EQ(0x0b0b0b0b0b0b0b0b, state->restricted_state().a1);
 #endif                      // defined(__riscv)
 
   // Check that the kicked state is cleared
@@ -1020,17 +857,17 @@ TEST_F(RestrictedMode, KickBeforeEnter) {
   EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_SYSCALL);
 
   // Read the state out of the thread.
-  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-  state.VerifyArchSpecificRestrictedState();
+  ASSERT_OK(vmo.read(&state->restricted_state(), 0, sizeof(state->restricted_state())));
+  state->VerifyArchSpecificRestrictedState();
 
   // Validate that the instruction pointer is right after the syscall instruction.
-  EXPECT_EQ(restricted_symbols().addr_of("syscall_bounce_post_syscall"), state.pc());
+  EXPECT_EQ(restricted_symbols().addr_of("syscall_bounce_post_syscall"), state->pc());
 
   // Validate that the value in first general purpose register is incremented.
-  state.VerifyTwiddledRestrictedState(RegisterMutation::kFromSyscall);
+  state->VerifyTwiddledRestrictedState(RegisterMutation::kFromSyscall);
 }
 
-TEST_F(RestrictedMode, KickWhileStartingAndExiting) {
+TEST_P(RestrictedMode, KickWhileStartingAndExiting) {
   NEEDS_NEXT_SKIP(zx_restricted_kick);
 
   struct ExceptionChannelRegistered {
@@ -1118,16 +955,16 @@ TEST_F(RestrictedMode, KickWhileStartingAndExiting) {
     ec.cv.wait(lock, [&ec]() { return ec.registered; });
   }
 
-  std::thread child_thread([]() {
+  std::thread child_thread([this]() {
     zx::vmo vmo;
     ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
     auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
-    ArchRegisterState state;
-    state.InitializeRegisters();
-    state.set_pc(0u);
+    auto state = GetArchRegisterState();
+    state->InitializeRegisters(GetTlsAddress(0));
+    state->set_pc(0u);
 
-    ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+    ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
 
     // Attempting to enter restricted mode should return immediately with a kick.
     uint64_t reason_code = 99;
@@ -1156,7 +993,7 @@ TEST_F(RestrictedMode, KickWhileStartingAndExiting) {
   exception_thread.join();
 }
 
-TEST_F(RestrictedMode, KickWhileRunning) {
+TEST_P(RestrictedMode, KickWhileRunning) {
   NEEDS_NEXT_SKIP(zx_restricted_kick);
 
   zx::vmo vmo;
@@ -1164,22 +1001,22 @@ TEST_F(RestrictedMode, KickWhileRunning) {
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
   // Configure the initial register state.
-  ArchRegisterState state;
-  std::atomic_int flag = 0;
-  state.InitializeRegisters();
-  state.set_pc(restricted_symbols().addr_of("store_one"));
-  state.set_arg_regs(reinterpret_cast<uint64_t>(&flag), 42);
+  auto state = GetArchRegisterState();
+  std::atomic_int* flag = GetAtomicInt(0);
+  state->InitializeRegisters(GetTlsAddress(0));
+  state->set_pc(restricted_symbols().addr_of("store_one"));
+  state->set_arg_regs(reinterpret_cast<uint64_t>(flag), 42);
 
   // Write the state to the state VMO.
-  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
 
   zx::unowned<zx::thread> current_thread(thrd_get_zx_handle(thrd_current()));
 
   // Start up a thread that will enter kick this thread once it detects that 'flag' has been
   // written to, indicating that r-mode code is running.
-  std::thread kicker([&flag, &current_thread] {
+  std::thread kicker([flag, &current_thread] {
     // Wait for the first thread to write to 'flag' so we know it's in restricted mode.
-    while (flag.load() == 0) {
+    while (flag->load() == 0) {
     }
     // Kick it
     uint32_t options = 0;
@@ -1193,23 +1030,23 @@ TEST_F(RestrictedMode, KickWhileRunning) {
   EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
 
   kicker.join();
-  EXPECT_EQ(flag.load(), 1);
+  EXPECT_EQ(flag->load(), 1);
 
   // Read the state out of the thread.
-  ASSERT_OK(vmo.read(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-  state.VerifyArchSpecificRestrictedState();
+  ASSERT_OK(vmo.read(&state->restricted_state(), 0, sizeof(state->restricted_state())));
+  state->VerifyArchSpecificRestrictedState();
 
   // Expect to see second general purpose register incremented in the observed restricted state.
 #if defined(__x86_64__)
-  EXPECT_EQ(state.restricted_state().rsi, 43);
+  EXPECT_EQ(state->restricted_state().rsi, 43);
 #elif defined(__aarch64__)  // defined(__x86_64__)
-  EXPECT_EQ(state.restricted_state().x[1], 43);
+  EXPECT_EQ(state->restricted_state().x[1], 43);
 #elif defined(__riscv)      // defined(__aarch64__)
-  EXPECT_EQ(state.restricted_state().a1, 43);
+  EXPECT_EQ(state->restricted_state().a1, 43);
 #endif                      // defined(__riscv)
 }
 
-TEST_F(RestrictedMode, KickJustBeforeSyscall) {
+TEST_P(RestrictedMode, KickJustBeforeSyscall) {
   NEEDS_NEXT_SKIP(zx_restricted_kick);
 
   zx::vmo vmo;
@@ -1217,24 +1054,24 @@ TEST_F(RestrictedMode, KickJustBeforeSyscall) {
   auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
 
   // Configure the initial register state.
-  ArchRegisterState state;
-  state.InitializeRegisters();
+  auto state = GetArchRegisterState();
+  state->InitializeRegisters(GetTlsAddress(0));
 
-  state.set_pc(restricted_symbols().addr_of("wait_then_syscall"));
+  state->set_pc(restricted_symbols().addr_of("wait_then_syscall"));
 
   // Create atomic int 'signal' and 'wait_on'
-  std::atomic_int wait_on = 0;
-  std::atomic_int signal = 0;
-  state.set_arg_regs(reinterpret_cast<uint64_t>(&wait_on), reinterpret_cast<uint64_t>(&signal));
+  std::atomic_int* wait_on = GetAtomicInt(0);
+  std::atomic_int* signal = GetAtomicInt(1);
+  state->set_arg_regs(reinterpret_cast<uint64_t>(wait_on), reinterpret_cast<uint64_t>(signal));
 
   // Write the state to the state VMO.
-  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
+  ASSERT_OK(vmo.write(&state->restricted_state(), 0, sizeof(state->restricted_state())));
 
   zx::unowned<zx::thread> current_thread(thrd_get_zx_handle(thrd_current()));
 
-  std::thread kicker([&wait_on, &signal, &current_thread] {
+  std::thread kicker([wait_on, signal, &current_thread] {
     // Wait until the restricted mode thread is just about to issue a syscall.
-    while (wait_on.load() == 0) {
+    while (wait_on->load() == 0) {
     }
     // Suspend the restricted mode thread before we kick it so we can ensure that it doesn't
     // proceed before the kick is processed.
@@ -1249,7 +1086,7 @@ TEST_F(RestrictedMode, KickJustBeforeSyscall) {
     // Store a signal to release the restricted mode thread so it could issue a syscall
     // if it continues executing. We expect it to come out of thread suspend and process
     // the kick instead of continuing.
-    signal.store(1);
+    signal->store(1);
   });
   uint64_t reason_code = 99;
   ASSERT_OK(

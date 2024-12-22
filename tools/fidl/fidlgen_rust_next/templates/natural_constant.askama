@@ -1,0 +1,38 @@
+{% match constant.kind %}
+    {% when ConstantKind::Identifier { identifier } %}
+        {% let (comp_id, member) = identifier.split() %}
+        {{ context.natural_id(comp_id) }}
+        {% if let Some(member) = member %}
+            {% match context.schema.get_decl_type(comp_id).unwrap() %}
+                {% when DeclType::Bits %} ::{{ member.screaming_snake() }}
+                {% when DeclType::Enum %}
+                    {% if comp_id.library() == "zx" %}
+                        {% match comp_id.decl_name().non_canonical() %}
+                            {% when "ObjType" %} ::{{ member.screaming_snake() }}
+                            {% else %} ::{{ member.camel() }}
+                        {% endmatch %}
+                    {% else %}
+                        ::{{ member.camel() }}
+                    {% endif %}
+                {% else %} {{ panic!("expected member to bits or enum") }}
+            {% endmatch %}
+        {% endif %}
+    {% when ConstantKind::Literal { literal } %}
+        {% match literal.kind %}
+            {% when LiteralKind::String %} "{{ literal.value.escape_default() }}"
+            {% when LiteralKind::Bool %} {{ literal.value }}
+            {% when LiteralKind::Numeric %}
+                {% match ty.kind %}
+                    {% when TypeKind::Identifier { identifier, nullable, protocol_transport } %}
+                        {{ context.natural_id(identifier) }}::from_bits_retain({{ constant.value }})
+                    {% when TypeKind::Primitive { subtype } %} {{ literal.value }}
+                    {% else %} {{ panic!("invalid constant type") }}
+                {% endmatch %}
+        {% endmatch %}
+    {% when ConstantKind::BinaryOperator %}
+        {% if let TypeKind::Identifier { identifier, nullable, protocol_transport } = ty.kind %}
+            {{ context.natural_id(identifier) }}::from_bits_retain({{ constant.value }})
+        {% else %}
+            {{ panic!("invalid constant type") }}
+        {% endif %}
+{% endmatch %}

@@ -20,6 +20,7 @@
     ],
     capabilities: [
         { protocol: "fuchsia.time.test.Rtc" },
+        { protocol: "fuchsia.time.alarms.Wake" },
     ],
     use: [
         {
@@ -52,6 +53,15 @@
             path: "/dev/class/rtc",
         },
         {
+            // Used for handling wake alarms.
+            directory: "dev-hrtimer",
+            rights: [ "r*" ],
+            path: "/dev/class/hrtimer",
+
+            // Optional during development.
+            availability: "optional",
+        },
+        {
             storage: "data",
             path: "/data",
 
@@ -79,7 +89,10 @@
     ],
     expose: [
         {
-            protocol: [ "fuchsia.time.test.Rtc" ],
+            protocol: [
+                "fuchsia.time.alarms.Wake",
+                "fuchsia.time.test.Rtc",
+            ],
             from: "self",
             to: "parent",
             availability: "optional",

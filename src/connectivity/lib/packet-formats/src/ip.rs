@@ -134,6 +134,12 @@ impl DscpAndEcn {
         Self((dscp << DSCP_OFFSET) + ecn)
     }
 
+    /// Constructs a new `DspAndEcn` from a raw value, i.e., both fields packet
+    /// into one byte.
+    pub const fn new_with_raw(value: u8) -> Self {
+        Self(value)
+    }
+
     /// Returns the Differentiated Services Code Point value.
     pub fn dscp(self) -> u8 {
         let Self(v) = self;
@@ -155,7 +161,7 @@ impl DscpAndEcn {
 
 impl From<u8> for DscpAndEcn {
     fn from(value: u8) -> Self {
-        DscpAndEcn(value)
+        Self::new_with_raw(value)
     }
 }
 

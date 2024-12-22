@@ -69,6 +69,9 @@ typedef uint32_t zbi_kernel_driver_t;
 // '370P'
 #define ZBI_KERNEL_DRIVER_AS370_POWER ((zbi_kernel_driver_t)(0x50303733u))
 
+// 'MNFP'
+#define ZBI_KERNEL_DRIVER_MOONFLOWER_POWER ((zbi_kernel_driver_t)(0x4d4e4650u))
+
 // 'IMXU'
 #define ZBI_KERNEL_DRIVER_IMX_UART ((zbi_kernel_driver_t)(0x55584d49u))
 

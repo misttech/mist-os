@@ -104,7 +104,8 @@ void UsbFastbootFunction::Send(::fuchsia_hardware_fastboot::wire::FastbootImplSe
     return;
   }
 
-  if (zx_status_t status = send_vmo_.Map(std::move(request->data), total_to_send_);
+  if (zx_status_t status = send_vmo_.Map(std::move(request->data), 0, total_to_send_,
+                                         ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
       status != ZX_OK) {
     zxlogf(ERROR, "Failed to map vmo %d", status);
     completer.ReplyError(status);

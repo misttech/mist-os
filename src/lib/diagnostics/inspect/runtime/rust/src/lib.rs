@@ -9,11 +9,11 @@ use fidl::endpoints::ClientEnd;
 use fidl::AsHandleRef;
 use fuchsia_component::client;
 use fuchsia_inspect::Inspector;
+use log::error;
 use pin_project::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::error;
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -136,7 +136,7 @@ pub fn publish(
     let (server_task, tree) = match service::spawn_tree_server(inspector.clone(), vmo_preference) {
         Ok((task, tree)) => (task, tree),
         Err(err) => {
-            error!(%err, "failed to spawn the fuchsia.inspect.Tree server");
+            error!(err:%; "failed to spawn the fuchsia.inspect.Tree server");
             return None;
         }
     };
@@ -145,7 +145,7 @@ pub fn publish(
         None => match client::connect_to_protocol::<finspect::InspectSinkMarker>() {
             Ok(inspect_sink) => inspect_sink,
             Err(err) => {
-                error!(%err, "failed to spawn the fuchsia.inspect.Tree server");
+                error!(err:%; "failed to spawn the fuchsia.inspect.Tree server");
                 return None;
             }
         },
@@ -159,7 +159,7 @@ pub fn publish(
         name: tree_name,
         ..finspect::InspectSinkPublishRequest::default()
     }) {
-        error!(%err, "failed to spawn the fuchsia.inspect.Tree server");
+        error!(err:%; "failed to spawn the fuchsia.inspect.Tree server");
         return None;
     }
 
@@ -211,7 +211,7 @@ impl PublishedInspectController {
             None => match client::connect_to_protocol::<finspect::InspectSinkMarker>() {
                 Ok(inspect_sink) => inspect_sink,
                 Err(err) => {
-                    error!(%err, "failed to spawn the fuchsia.inspect.Tree server");
+                    error!(err:%; "failed to spawn the fuchsia.inspect.Tree server");
                     return None;
                 }
             },
@@ -228,7 +228,7 @@ impl PublishedInspectController {
             tree: Some(self.tree_koid.raw_koid()),
             ..Default::default()
         }) {
-            error!(%err, "failed to escrow inspect data");
+            error!(err:%; "failed to escrow inspect data");
             return None;
         }
         self.task.await;
@@ -300,7 +300,7 @@ mod tests {
         started_stream.await.expect("failed to observe Started event");
 
         let hierarchy = ArchiveReader::new()
-            .add_selector("coll\\:interesting_name:root")
+            .add_selector("coll\\:interesting_name:[name=tree-0]root")
             .snapshot::<Inspect>()
             .await?
             .into_iter()

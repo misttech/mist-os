@@ -11,7 +11,6 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::time::Duration;
 
-use const_unwrap::const_unwrap_option;
 use explicit::ResultExt as _;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, RequestStream as _};
 use fidl::{AsHandleRef as _, HandleBased as _};
@@ -504,8 +503,8 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
         //
         // Always accept connections with a minimum backlog size of 1.
         // Use a maximum value of 4096 like Linux.
-        const MINIMUM_BACKLOG_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
-        const MAXIMUM_BACKLOG_SIZE: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(4096));
+        const MINIMUM_BACKLOG_SIZE: NonZeroUsize = NonZeroUsize::new(1).unwrap();
+        const MAXIMUM_BACKLOG_SIZE: NonZeroUsize = NonZeroUsize::new(4096).unwrap();
 
         let backlog = usize::try_from(backlog).unwrap_or(0);
         let backlog = NonZeroUsize::new(backlog).map_or(MINIMUM_BACKLOG_SIZE, |b| {
@@ -806,7 +805,7 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 // end of this task.
                 return ControlFlow::Break(responder);
             }
-            fposix_socket::StreamSocketRequest::Clone2 { request, control_handle: _ } => {
+            fposix_socket::StreamSocketRequest::Clone { request, control_handle: _ } => {
                 let channel = fidl::AsyncChannel::from_channel(request.into_channel());
                 let rs = fposix_socket::StreamSocketRequestStream::from_channel(channel);
                 return ControlFlow::Continue(Some(rs));

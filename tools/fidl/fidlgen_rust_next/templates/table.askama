@@ -1,0 +1,219 @@
+{% let base_name = table.name.decl_name().camel() %}
+{% let name = filters::ident(base_name)? %}
+{% let wire_name = format!("Wire{base_name}") %}
+
+{% if let Some(doc) = table.attributes.doc_string() %}
+    #[doc = "{{ doc.escape_default() }}"]
+{% endif %}
+#[derive(
+{% if !table.is_resource %}
+    Clone,
+{% endif %}
+{% if context.config.emit_debug_impls %}
+    Debug,
+{% endif %}
+)]
+pub struct {{ name }} {
+    {% for member in table.members %}
+        pub {{ member.name.snake()|ident }}: Option<{{ context.natural_type(member.ty) }}>,
+    {% endfor %}
+}
+
+impl {{ name }} {
+    fn __max_ordinal(&self) -> usize {
+        {% for member in table.members %}
+            if self.{{ member.name.snake()|ident }}.is_some() { return {{ member.ordinal }}; }
+        {% endfor %}
+        0
+    }
+}
+
+impl ::fidl_next::Encodable for {{ name }} {
+    type Encoded<'buf> = {{ wire_name }}<'buf>;
+}
+
+impl<___E> ::fidl_next::Encode<___E> for {{ name }}
+where
+    ___E: ::fidl_next::Encoder + ?Sized,
+    {% for member in table.members %}
+        {{ context.natural_type(member.ty) }}: ::fidl_next::Encode<___E>,
+    {% endfor %}
+{
+    fn encode(
+        &mut self,
+        encoder: &mut ___E,
+        slot: ::fidl_next::Slot<'_, Self::Encoded<'_>>,
+    ) -> Result<(), ::fidl_next::EncodeError> {
+        ::fidl_next::munge!(let {{ wire_name }} { table } = slot);
+
+        let max_ord = self.__max_ordinal();
+
+        let mut backing = ::core::mem::MaybeUninit::<::fidl_next::WireEnvelope>::uninit();
+        let mut preallocated = ::fidl_next::EncoderExt::preallocate::<::fidl_next::WireEnvelope>(encoder, max_ord);
+
+        for i in 1..=max_ord {
+            let mut slot = ::fidl_next::Slot::new(&mut backing);
+            match i {
+                {% for member in table.members.iter().rev() %}
+                    {% let member_name = filters::ident(member.name.snake())? %}
+                    {{ member.ordinal }} => if let Some({{ member_name }}) = &mut self.{{ member_name }} {
+                        ::fidl_next::WireEnvelope::encode_value(
+                            {{ member_name }},
+                            preallocated.encoder,
+                            slot.as_mut(),
+                        )?;
+                    } else {
+                        ::fidl_next::WireEnvelope::encode_zero(slot.as_mut())
+                    }
+                {% endfor %}
+                _ => ::fidl_next::WireEnvelope::encode_zero(slot.as_mut()),
+            }
+            preallocated.write_next(slot);
+        }
+
+        ::fidl_next::WireTable::encode_len(table, max_ord);
+
+        Ok(())
+    }
+}
+
+impl<'buf> ::fidl_next::TakeFrom<{{ wire_name }}<'buf>> for {{ name }} {
+    fn take_from(from: &mut {{ wire_name }}<'buf>) -> Self {
+        Self {
+            {% for member in table.members %}
+                {% let member_name = filters::ident(member.name.snake())? %}
+                {{ member_name }}: from.{{ member_name }}_mut().map(::fidl_next::TakeFrom::take_from),
+            {% endfor %}
+        }
+    }
+}
+
+/// The wire type corresponding to [`{{ name }}`].
+#[repr(C)]
+pub struct {{ wire_name }}<'buf> {
+    table: ::fidl_next::WireTable<'buf>,
+}
+
+unsafe impl<'buf, ___D> ::fidl_next::Decode<___D> for {{ wire_name }}<'buf>
+where
+    ___D: ::fidl_next::Decoder<'buf> + ?Sized,
+    {% for member in table.members %}
+        {{ context.wire_type(member.ty) }}: ::fidl_next::Decode<___D>,
+    {% endfor %}
+{
+    fn decode(
+        slot: ::fidl_next::Slot<'_, Self>,
+        decoder: &mut ___D,
+    ) -> Result<(), ::fidl_next::DecodeError> {
+        ::fidl_next::munge!(let Self { table } = slot);
+
+        ::fidl_next::WireTable::decode_with(
+            table,
+            decoder,
+            |ordinal, mut slot, decoder| match ordinal {
+                0 => unsafe { ::core::hint::unreachable_unchecked() },
+                {% for member in table.members %}
+                    {% let member_name = filters::ident(member.name.snake())? %}
+                    {{ member.ordinal }} => {
+                        ::fidl_next::WireEnvelope::decode_as::<
+                            ___D,
+                            {{ context.wire_type(member.ty) }},
+                        >(slot.as_mut(), decoder)?;
+                        {# type check #}
+                        {% match member.ty.kind -%}
+                            {% when TypeKind::Array { element_count, element_type } %}
+                            {% when TypeKind::Vector { element_count, element_type, nullable } -%}
+                                {% if let Some(limit) = element_count -%}
+                                    let {{ member_name }} = unsafe {
+                                        slot
+                                            .deref_unchecked()
+                                            .deref_unchecked::<
+                                                {{ context.wire_type(member.ty) }}
+                                            >()
+                                    };
+                                    {% if nullable -%}
+                                        if let Some({{ member_name }}) = {{ member_name }}.as_ref() {
+                                    {%- endif %}
+                                            if {{ member_name }}.len() > {{ limit }} {
+                                                return Err(::fidl_next::DecodeError::VectorTooLong {
+                                                    size: {{ member_name }}.len() as u64,
+                                                    limit: {{ limit }},
+                                                });
+                                            }
+                                    {% if nullable -%}
+                                        }
+                                    {%- endif %}
+                                {%- endif %}
+                            {% when TypeKind::String { element_count, nullable } %}
+                                {% if let Some(limit) = element_count -%}
+                                    let {{ member_name }} = unsafe {
+                                        slot
+                                            .deref_unchecked()
+                                            .deref_unchecked::<
+                                                {{ context.wire_type(member.ty) }}
+                                            >()
+                                    };
+                                    {% if nullable -%}
+                                        if let Some({{ member_name }}) = {{ member_name }}.as_ref() {
+                                    {%- endif %}
+                                            if {{ member_name }}.len() > {{ limit }} {
+                                                return Err(::fidl_next::DecodeError::VectorTooLong {
+                                                    size: {{ member_name }}.len() as u64,
+                                                    limit: {{ limit }},
+                                                });
+                                            }
+                                    {% if nullable -%}
+                                        }
+                                    {%- endif %}
+                                {% endif %}
+                            {% else %} {# todo #}
+                        {%- endmatch %}
+
+                        Ok(())
+                    }
+                {% endfor %}
+                _ => ::fidl_next::WireEnvelope::decode_unknown(slot, decoder),
+            }
+        )
+    }
+}
+
+impl<'buf> {{ wire_name }}<'buf> {
+    {% for member in table.members %}
+        {% let member_name = member.name.snake() %}
+
+        pub fn {{ member_name|ident }}(&self) -> Option<&{{ context.wire_type(member.ty) }}> {
+            unsafe {
+                Some(self.table.get({{ member.ordinal }})?.deref_unchecked())
+            }
+        }
+
+        pub fn {{ member_name }}_mut(&mut self) -> Option<&mut {{ context.wire_type(member.ty) }}> {
+            unsafe {
+                Some(self.table.get_mut({{ member.ordinal }})?.deref_mut_unchecked())
+            }
+        }
+
+        pub fn take_{{ member_name }}(&mut self) -> Option<{{ context.wire_type(member.ty) }}> {
+            unsafe {
+                Some(self.table.get_mut({{ member.ordinal }})?.take_unchecked())
+            }
+        }
+    {% endfor %}
+}
+
+{% if context.config.emit_debug_impls %}
+    impl ::core::fmt::Debug for {{ wire_name }}<'_> {
+        fn fmt(
+            &self,
+            f: &mut ::core::fmt::Formatter<'_>,
+        ) -> Result<(), ::core::fmt::Error> {
+            f.debug_struct("{{ name }}")
+            {% for member in table.members %}
+                {% let member_name = filters::ident(member.name.snake())? %}
+                .field("{{ member_name }}", &self.{{ member_name }}())
+            {% endfor %}
+                .finish()
+        }
+    }
+{% endif %}

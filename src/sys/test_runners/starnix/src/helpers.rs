@@ -10,8 +10,8 @@ use frunner::ComponentNamespaceEntry;
 use fuchsiaperf::FuchsiaPerfBenchmarkResult;
 use futures::StreamExt;
 use gtest_runner_lib::parser::read_file;
+use log::debug;
 use namespace::Namespace;
-use tracing::debug;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     fidl_fuchsia_process as fprocess, fuchsia_runtime as fruntime,
@@ -176,7 +176,7 @@ pub fn start_test_component(
     let (component_controller, component_controller_server_end) =
         create_proxy::<frunner::ComponentControllerMarker>();
 
-    debug!(?start_info, "asking kernel to start component");
+    debug!(start_info:?; "asking kernel to start component");
     component_runner.start(start_info, component_controller_server_end)?;
 
     Ok(component_controller)
@@ -189,7 +189,7 @@ pub async fn read_component_epitaph(
     match event_stream.next().await {
         Some(Err(fidl::Error::ClientChannelClosed { status, .. })) => status,
         result => {
-            tracing::error!(
+            log::error!(
                 "Didn't get epitaph from the component controller, instead got: {:?}",
                 result
             );

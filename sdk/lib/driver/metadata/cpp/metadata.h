@@ -14,40 +14,6 @@
 
 namespace fdf_metadata {
 
-// This template class is explicitly specialized and defines `Name` so that the service that offers
-// |FidlType| can be routed by `MetadataServer` and found by `fdf_metadata::GetMetadata()`. The
-// value can be anything so long as it is the same as the name of the service offered/used by the
-// components that send/receive |FidlType|. Typically it will be related to the name of |FidlType|.
-//
-// For example, say there exists a FIDL type `fuchsia.hardware.test/Metadata` that is to be sent
-// with `fdf_metadata::MetadataServer<|FidlType|>` and received with
-// `fdf_metadata::GetMetadata<|FidlType|>()`:
-//
-//   library fuchsia.hardware.test;
-//
-//   type Metadata = table {
-//       1: test_property string:MAX;
-//   };
-//
-// There should be an `fdf_metadata::ObjectDetails<fuchsia_hardware_test::Metadata>`
-// class that defines `Name` like so:
-//
-//   namespace fdf_metadata {
-//
-//     template <>
-//     struct ObjectDetails<fuchsia_hardware_test::Metadata> {
-//       inline static const char* Name = "fuchsia.hardware.test.Metadata";
-//     };
-//
-//   }  // namespace fdf_metadata
-//
-// This struct can be defined in a header file that can be included by the components that use
-// `fdf_metadata::MetadataServer<|FidlType|>` and `fdf_metadata::GetMetadata<|FidlType|>()`.
-template <typename FidlType>
-struct ObjectDetails {
-  inline static const char* Name;
-};
-
 // Connects to the fuchsia.driver.metadata/Metadata FIDL protocol found within the |incoming|
 // incoming namespace at FIDL service |service_name| and instance |instance_name|.
 zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadataProtocol(
@@ -57,8 +23,8 @@ zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadata
 // Retrieves metadata from the fuchsia.driver.metadata/Metadata FIDL protocol within the |incoming|
 // incoming namespace found at FIDL service |service_name| and instance |instance_name|.
 //
-// Make sure that the component manifest specifies that it uses the
-// `fdf_metadata::ObjectDetails<|FidlType|>::Name` FIDL service.
+// Make sure that the component manifest specifies that it uses the `FidlType::kSerializableName`
+// FIDL service.
 template <typename FidlType>
 zx::result<FidlType> GetMetadataFromFidlService(
     const std::shared_ptr<fdf::Namespace>& incoming, std::string_view service_name,
@@ -102,15 +68,12 @@ zx::result<FidlType> GetMetadataFromFidlService(
 }
 
 // The same as `fdf_metadata::GetMetadataFromFidlService()` except that the service name is assumed
-// to be `fdf_metadata::ObjectDetails<FidlType>::Name`. Make sure that
-// `fdf_metadata::ObjectDetails<FidlType>::Name` is defined. See `fdf_metadata::ObjectDetails` for
-// more info.
+// to be `FidlType::kSerializableName`. Make sure that `FidlType` is annotated with `@serializable`.
 template <typename FidlType>
 zx::result<FidlType> GetMetadata(
     const std::shared_ptr<fdf::Namespace>& incoming,
     std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
-  return GetMetadataFromFidlService<FidlType>(incoming, ObjectDetails<FidlType>::Name,
-                                              instance_name);
+  return GetMetadataFromFidlService<FidlType>(incoming, FidlType::kSerializableName, instance_name);
 }
 
 // This function is the same as `fdf_metadata::GetMetadata<FidlType>()` except that it will return a
@@ -159,14 +122,13 @@ zx::result<std::optional<FidlType>> GetMetadataFromFidlServiceIfExists(
 }
 
 // The same as `fdf_metadata::GetMetadataFromFidlServiceIfExists()` except that the service name is
-// assumed to be `fdf_metadata::ObjectDetails<FidlType>::Name`. Make sure that
-// `fdf_metadata::ObjectDetails<FidlType>::Name` is defined. See `fdf_metadata::ObjectDetails` for
-// more info.
+// assumed to be `FidlType::kSerializableName`. Make sure that `FidlType` is annotated with
+// `@serializable`.
 template <typename FidlType>
 zx::result<std::optional<FidlType>> GetMetadataIfExists(
     const std::shared_ptr<fdf::Namespace>& incoming,
     std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
-  return GetMetadataFromFidlServiceIfExists<FidlType>(incoming, ObjectDetails<FidlType>::Name,
+  return GetMetadataFromFidlServiceIfExists<FidlType>(incoming, FidlType::kSerializableName,
                                                       instance_name);
 }
 

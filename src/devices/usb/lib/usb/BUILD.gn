@@ -56,6 +56,10 @@ config("enable_dfv2_compat_logging") {
   defines = [ "DFV2_COMPAT_LOGGING" ]
 }
 
+config("enable_dfv1_logging") {
+  defines = [ "DFV1_LOGGING" ]
+}
+
 source_set("usb-dfv2-compat-logging") {
   public = [
     "include/usb/request-cpp.h",
@@ -98,7 +102,10 @@ source_set("usb-dfv2-compat-logging") {
 
 source_set("usb-fidl") {
   public = [ "include/usb/request-fidl.h" ]
-  sources = [ "align.h" ]
+  sources = [
+    "align.h",
+    "include/usb/internal/request-fidl.h",
+  ]
   public_deps = [
     ":descriptors",
     "//src/devices/lib/io-buffer",
@@ -106,27 +113,47 @@ source_set("usb-fidl") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_cpp",
     "//src/lib/ddk",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
-  public_configs = [ ":includes" ]
+  public_configs = [
+    ":includes",
+    ":enable_dfv1_logging",
+  ]
 }
 
 source_set("usb-fidl-dfv2-compat-logging") {
   public = [ "include/usb/request-fidl.h" ]
-  sources = [ "align.h" ]
+  sources = [
+    "align.h",
+    "include/usb/internal/request-fidl.h",
+  ]
   public_deps = [
     ":descriptors",
     "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//src/devices/lib/io-buffer",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
   public_configs = [
     ":enable_dfv2_compat_logging",
     ":includes",
   ]
+}
+
+source_set("usb-fidl-sdk") {
+  public = [ "include/usb/sdk/request-fidl.h" ]
+  sources = [
+    "align.h",
+    "include/usb/internal/request-fidl.h",
+  ]
+  public_deps = [
+    ":descriptors",
+    "//sdk/fidl/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_cpp",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/lib/dma-buffer",
+    "//zircon/system/ulib/zx",
+  ]
+  public_configs = [ ":includes" ]
 }
 
 source_set("usb-header") {

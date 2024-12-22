@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use errors::IntoExitCode;
-pub use ffx_command_error::*;
 use ffx_config::environment::ExecutableKind;
 use fuchsia_async::TimeoutExt;
 use std::fs::File;
@@ -18,10 +17,19 @@ mod ffx;
 mod metrics;
 mod tools;
 
-pub use args_info::*;
-pub use ffx::*;
-pub use metrics::*;
-pub use tools::*;
+// Re-export the top level elements
+pub use args_info::{
+    CliArgsInfo, ErrorCodeInfo, FlagInfo, FlagKind, Optionality, PositionalInfo, SubCommandInfo,
+};
+
+pub use ffx::{check_strict_constraints, Ffx, FfxCommandLine, FFX_WRAPPER_INVOKE};
+pub use ffx_command_error::{
+    bug, exit_with_code, return_bug, return_user_error, user_error, Error, FfxContext,
+    NonFatalError, Result,
+};
+
+pub use metrics::{analytics_command, send_enhanced_analytics, MetricsSession};
+pub use tools::{FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite};
 
 fn stamp_file(stamp: &Option<String>) -> Result<Option<File>> {
     let Some(stamp) = stamp else { return Ok(None) };
@@ -81,7 +89,7 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
 
     let context = app.load_context(exe_kind)?;
 
-    ffx_config::init(&context).await?;
+    ffx_config::init(&context)?;
 
     // Everything that needs to use the config must be after loading the config.
     if !context.has_no_environment() {

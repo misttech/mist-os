@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_SIGNAL_PROCESSING_UTILS_UNITTEST_H_
-#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_SIGNAL_PROCESSING_UTILS_UNITTEST_H_
+#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_SIGNAL_PROCESSING_UTILS_UNITTEST_H_
+#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_SIGNAL_PROCESSING_UTILS_UNITTEST_H_
 
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/natural_types.h>
@@ -476,4 +476,4 @@ const std::vector<fhasp::Topology> kTopologiesWithTerminalNotEndpoint{kTopologyD
 
 }  // namespace media_audio
 
-#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_SIGNAL_PROCESSING_UTILS_UNITTEST_H_
+#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_SIGNAL_PROCESSING_UTILS_UNITTEST_H_

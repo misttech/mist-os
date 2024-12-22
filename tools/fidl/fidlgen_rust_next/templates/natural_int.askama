@@ -1,0 +1,10 @@
+{% match int %}
+    {% when IntType::Int8 %} i8
+    {% when IntType::Int16 %} i16
+    {% when IntType::Int32 %} i32
+    {% when IntType::Int64 %} i64
+    {% when IntType::Uint8 %} u8
+    {% when IntType::Uint16 %} u16
+    {% when IntType::Uint32 %} u32
+    {% when IntType::Uint64 %} u64
+{% endmatch %}

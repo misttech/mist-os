@@ -125,8 +125,9 @@ async fn assemble_realm(
     .await;
     b.add_route(
         fuchsia_component_test::Route::new()
-            .capability(Capability::configuration("fuchsia.ui.DisplayPixelDensity"))
             .capability(Capability::configuration("fuchsia.scenic.DisplayRotation"))
+            .capability(Capability::configuration("fuchsia.ui.AttachA11yView"))
+            .capability(Capability::configuration("fuchsia.ui.DisplayPixelDensity"))
             .capability(Capability::configuration("fuchsia.ui.IdleThresholdMs"))
             .capability(Capability::configuration("fuchsia.ui.SupportedInputDevices"))
             .capability(Capability::configuration("fuchsia.ui.ViewingDistance"))

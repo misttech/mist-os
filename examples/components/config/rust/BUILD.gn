@@ -29,7 +29,7 @@ rustc_binary("bin") {
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
 
     # [END_EXCLUDE]
   ]

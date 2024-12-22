@@ -345,7 +345,7 @@ pub struct NamespaceBinding(String);
 impl NamespaceBinding {
     pub fn create(root_dir: &fio::DirectoryProxy, path: String) -> Result<NamespaceBinding, Error> {
         let (client_end, server_end) = create_endpoints();
-        root_dir.clone2(ServerEnd::new(server_end.into_channel()))?;
+        root_dir.clone(ServerEnd::new(server_end.into_channel()))?;
         let namespace = fdio::Namespace::installed()?;
         namespace.bind(&path, client_end)?;
         Ok(Self(path))

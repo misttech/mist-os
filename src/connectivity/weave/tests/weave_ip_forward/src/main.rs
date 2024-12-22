@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 use anyhow::{format_err, Context as _, Error};
 use fuchsia_component::client;
+use log::info;
 use net_declare::fidl_ip_v6_with_prefix;
 use net_types::ip::Ipv6;
 use prettytable::{cell, format, row, Table};
@@ -11,7 +12,6 @@ use std::io::{Read as _, Write as _};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::pin::pin;
 use structopt::StructOpt;
-use tracing::info;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
@@ -140,9 +140,9 @@ async fn run_fuchsia_node() -> Result<(), Error> {
     let wpan_if_id = get_interface_id("wpan-f-ep", &intf)?;
     let weave_if_id = get_interface_id("weave-f-ep", &intf)?;
 
-    info!(wlan_intf = ?wlan_if_id);
-    info!(wpan_intf = ?wpan_if_id);
-    info!(weave_intf = ?weave_if_id);
+    info!(wlan_intf:? = wlan_if_id; "");
+    info!(wpan_intf:? = wpan_if_id; "");
+    info!(weave_intf:? = weave_if_id; "");
 
     // routing rules for weave tun
     let () = add_route_table_entry(

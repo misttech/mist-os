@@ -14,6 +14,7 @@ use fuchsia_sync::RwLock;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use log::{debug, error, info, warn};
 use net_declare::fidl_ip_v6;
 use net_types::ip::IpAddress;
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -24,7 +25,6 @@ use std::num::NonZeroUsize;
 use std::rc::Rc;
 use std::str::FromStr as _;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use trust_dns_proto::op::ResponseCode;
 use trust_dns_proto::rr::domain::IntoName;
 use trust_dns_proto::rr::{RData, RecordType};
@@ -2149,8 +2149,7 @@ mod tests {
     }
 
     // Safety: This is safe because the initial value is not zero.
-    const NON_ZERO_USIZE_ONE: NonZeroUsize =
-        const_unwrap::const_unwrap_option(NonZeroUsize::new(1));
+    const NON_ZERO_USIZE_ONE: NonZeroUsize = NonZeroUsize::new(1).unwrap();
 
     #[test]
     fn test_query_stats_inspect_average() {

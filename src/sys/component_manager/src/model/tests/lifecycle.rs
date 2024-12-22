@@ -537,8 +537,31 @@ async fn on_terminate_stop_triggers_reboot() {
         .await;
     let root = test.model.root();
 
-    // Start the critical component and make it stop. This should cause the Admin protocol to
-    // receive a reboot request.
+    // First stop of the critical component exits cleanly and so does not trigger a reboot.
+    test.mock_runner.add_controller_response(
+        "test:///system_resolved",
+        Box::new(|| ControllerActionResponse {
+            close_channel: true,
+            delay: None,
+            termination_status: Some(zx::Status::OK),
+            exit_code: Some(0),
+        }),
+    );
+    root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
+    let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
+    ActionsManager::register(component.clone(), StopAction::new(false)).await.unwrap();
+    assert!(!test.model.top_instance().has_reboot_task());
+
+    // Second stop of the critical component does not exit cleanly and so does trigger a reboot.
+    test.mock_runner.add_controller_response(
+        "test:///system_resolved",
+        Box::new(|| ControllerActionResponse {
+            close_channel: true,
+            delay: None,
+            termination_status: Some(zx::Status::OK),
+            exit_code: Some(1),
+        }),
+    );
     root.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await.unwrap();
     let component = root.find_and_maybe_resolve(&vec!["system"].try_into().unwrap()).await.unwrap();
     let stop = async move {

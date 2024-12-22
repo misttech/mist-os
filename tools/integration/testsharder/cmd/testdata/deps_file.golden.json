@@ -94,7 +94,7 @@
         ],
         "build_metadata": {
             "board": "x64",
-            "optimize": "debug",
+            "compilation_mode": "debug",
             "product": "core",
             "target_arch": "x64",
             "variants": [

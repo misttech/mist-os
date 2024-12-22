@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use camino::Utf8PathBuf;
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +22,9 @@ pub enum ICUType {
 }
 
 /// Platform configuration options for the input area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(default, deny_unknown_fields)]
 pub struct SetUiConfig {
     /// If set, the setui config is added to the product configuration.
@@ -33,11 +35,14 @@ pub struct SetUiConfig {
     pub with_camera: bool,
 
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub display: Option<Utf8PathBuf>,
+    #[file_relative_paths]
+    pub display: Option<FileRelativePathBuf>,
 
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub interface: Option<Utf8PathBuf>,
+    #[file_relative_paths]
+    pub interface: Option<FileRelativePathBuf>,
 
     #[schemars(schema_with = "crate::option_path_schema")]
-    pub agent: Option<Utf8PathBuf>,
+    #[file_relative_paths]
+    pub agent: Option<FileRelativePathBuf>,
 }

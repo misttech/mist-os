@@ -209,7 +209,6 @@ impl DeviceControl for Registry {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use fidl::endpoints::spawn_stream_handler;
     use fuchsia_audio::dai::{DaiFrameFormat, DaiFrameFormatStandard, DaiSampleFormat};
     use fuchsia_audio::format::{SampleSize, BITS_16, BITS_32};
@@ -224,7 +223,7 @@ mod tests {
         sample_format: DaiSampleFormat::PcmSigned,
         frame_format: DaiFrameFormat::Standard(DaiFrameFormatStandard::I2S),
         frame_rate: 48000,
-        sample_size: const_unwrap_option(SampleSize::from_partial_bits(BITS_16, BITS_32)),
+        sample_size: SampleSize::from_partial_bits(BITS_16, BITS_32).unwrap(),
     };
 
     const TEST_ELEMENT_ID: fadevice::ElementId = 1;

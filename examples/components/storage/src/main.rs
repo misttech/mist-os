@@ -8,10 +8,10 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{Inspector, Node};
 use futures::stream::StreamExt;
 use lazy_static::lazy_static;
+use log::{info, warn};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use tracing::{info, warn};
 
 const U64_SIZE: usize = (u64::BITS / 8) as usize;
 const DEFAULT_VALUE: u64 = 1;

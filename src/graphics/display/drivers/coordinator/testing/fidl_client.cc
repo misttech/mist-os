@@ -43,8 +43,7 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   monitor_name_ = fbl::String(info.monitor_name.data());
   monitor_serial_ = fbl::String(info.monitor_serial.data());
   image_metadata_ = {
-      .width = modes_[0].active_area.width,
-      .height = modes_[0].active_area.height,
+      .dimensions = {.width = modes_[0].active_area.width, .height = modes_[0].active_area.height},
       .tiling_type = fhdt::wire::kImageTilingTypeLinear,
   };
 }

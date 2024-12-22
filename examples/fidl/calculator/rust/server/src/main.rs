@@ -44,7 +44,7 @@ async fn main() -> Result<(), anyhow::Error> {
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
 
     component::health().set_ok();
-    tracing::debug!("Initialized.");
+    log::debug!("Initialized.");
 
     service_fs
         .for_each_concurrent(None, |request: IncomingRequest| async move {

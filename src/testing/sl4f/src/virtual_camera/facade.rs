@@ -7,8 +7,8 @@ use fidl_fuchsia_camera_test_virtualcamera::{
     StreamConfig, VirtualCameraDeviceMarker, VirtualCameraDeviceProxy,
 };
 use fuchsia_component::client::connect_to_protocol;
+use log::*;
 use serde_json::{to_value, Value};
-use tracing::*;
 
 /// Facade providing access to Virtual Camera interfaces.
 #[derive(Debug)]

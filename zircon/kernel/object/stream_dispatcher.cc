@@ -205,15 +205,14 @@ zx_status_t StreamDispatcher::WriteVector(user_in_iovec_t user_data, size_t* out
 
   if (prev_content_size) {
     status = vmo_->WriteUserVector(
-        user_data, seek_, length, VmObjectReadWriteOptions::ZeroAboveUserSize, out_actual,
+        user_data, seek_, length, out_actual,
         [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
           if (write_offset + len > *prev_content_size) {
             op.UpdateContentSizeFromProgress(write_offset + len);
           }
         });
   } else {
-    status = vmo_->WriteUserVector(user_data, seek_, length, VmObjectReadWriteOptions::None,
-                                   out_actual, nullptr);
+    status = vmo_->WriteUserVector(user_data, seek_, length, out_actual, nullptr);
   }
 
   // Reacquire the lock to potentially shrink and commit the operation.
@@ -266,15 +265,14 @@ zx_status_t StreamDispatcher::WriteVectorAt(user_in_iovec_t user_data, zx_off_t 
 
   if (prev_content_size) {
     status = vmo_->WriteUserVector(
-        user_data, offset, length, VmObjectReadWriteOptions::ZeroAboveUserSize, out_actual,
+        user_data, offset, length, out_actual,
         [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
           if (write_offset + len > *prev_content_size) {
             op.UpdateContentSizeFromProgress(write_offset + len);
           }
         });
   } else {
-    status = vmo_->WriteUserVector(user_data, offset, length, VmObjectReadWriteOptions::None,
-                                   out_actual, nullptr);
+    status = vmo_->WriteUserVector(user_data, offset, length, out_actual, nullptr);
   }
 
   // Reacquire the lock to potentially shrink and commit the operation.
@@ -356,11 +354,10 @@ zx_status_t StreamDispatcher::AppendVector(user_in_iovec_t user_data, size_t* ou
     length = ktl::min(vmo_size, new_content_size) - offset;
   }
 
-  status =
-      vmo_->WriteUserVector(user_data, offset, length, VmObjectReadWriteOptions::ZeroAboveUserSize,
-                            out_actual, [&op](const uint64_t write_offset, const size_t len) {
-                              op.UpdateContentSizeFromProgress(write_offset + len);
-                            });
+  status = vmo_->WriteUserVector(user_data, offset, length, out_actual,
+                                 [&op](const uint64_t write_offset, const size_t len) {
+                                   op.UpdateContentSizeFromProgress(write_offset + len);
+                                 });
   seek_ = offset + *out_actual;
 
   // Reacquire the lock to potentially shrink and commit the operation.

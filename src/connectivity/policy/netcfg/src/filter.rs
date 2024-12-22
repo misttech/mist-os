@@ -762,7 +762,6 @@ pub(crate) async fn remove_masquerade_rule_current(
 
 #[cfg(test)]
 mod tests {
-    use const_unwrap::const_unwrap_option;
     use test_case::test_case;
 
     use crate::interface::DeviceInfoRef;
@@ -770,7 +769,7 @@ mod tests {
 
     use super::*;
 
-    const INTERFACE_ID: InterfaceId = const_unwrap_option(InterfaceId::new(1));
+    const INTERFACE_ID: InterfaceId = InterfaceId::new(1).unwrap();
     const LOCAL_INGRESS: &str = "local_ingress";
     const UNINSTALLED_LOCAL_INGRESS: &str = "local_ingress_uninstalled";
     const LOCAL_EGRESS: &str = "local_egress";
@@ -950,7 +949,7 @@ mod tests {
             [InterfaceType::WlanClient].iter().cloned().collect();
         let types_ap: HashSet<InterfaceType> = [InterfaceType::WlanAp].iter().cloned().collect();
 
-        let id = const_unwrap_option(InterfaceId::new(10));
+        let id = InterfaceId::new(10).unwrap();
 
         let make_info = |device_class| DeviceInfoRef {
             device_class,

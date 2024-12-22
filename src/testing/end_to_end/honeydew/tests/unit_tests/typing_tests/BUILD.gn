@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("custom_types_test") {
-    enable_mypy = true
     main_source = "custom_types_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -17,7 +16,6 @@ if (is_host) {
   }
 
   python_host_test("screenshot_image_test") {
-    enable_mypy = true
     main_source = "screenshot_image_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

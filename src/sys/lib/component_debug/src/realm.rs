@@ -163,7 +163,7 @@ pub enum GetStructuredConfigError {
     UnknownError,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(JsonSchema, Serialize))]
 #[derive(Debug, Clone)]
 pub struct Instance {
     /// Moniker of the component.
@@ -206,7 +206,7 @@ impl TryFrom<fsys::Instance> for Instance {
 }
 
 /// Additional information about components that are resolved.
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(JsonSchema, Serialize))]
 #[derive(Debug, Clone)]
 pub struct ResolvedInfo {
     pub resolved_url: String,
@@ -228,7 +228,7 @@ impl TryFrom<fsys::ResolvedInfo> for ResolvedInfo {
 }
 
 /// Additional information about components that are running.
-#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", derive(JsonSchema, Serialize))]
 #[derive(Debug, Clone)]
 pub struct ExecutionInfo {
     pub start_reason: String,

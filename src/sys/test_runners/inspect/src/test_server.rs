@@ -12,8 +12,8 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::oneshot;
 use futures::future::{abortable, select, Either};
 use futures::{pin_mut, select, stream, FutureExt, StreamExt, TryStreamExt};
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 use zx::{MonotonicDuration, MonotonicInstant, Status};
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics as fdiagnostics,

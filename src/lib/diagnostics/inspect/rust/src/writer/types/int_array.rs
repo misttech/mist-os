@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{ArithmeticArrayProperty, ArrayProperty, Inner, InnerValueType, InspectType};
-use tracing::error;
+use log::error;
 
 /// Inspect int array data type.
 ///
@@ -32,7 +32,7 @@ impl ArrayProperty for IntArrayProperty {
                     state.set_array_int_slot(inner_ref.block_index, index, value.into())
                 })
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to set property");
+                    error!(err:?; "Failed to set property");
                 });
         }
     }
@@ -58,7 +58,7 @@ impl ArithmeticArrayProperty for IntArrayProperty {
                 .try_lock()
                 .and_then(|mut state| state.add_array_int_slot(inner_ref.block_index, index, value))
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to add property");
+                    error!(err:?; "Failed to add property");
                 });
         }
     }
@@ -72,7 +72,7 @@ impl ArithmeticArrayProperty for IntArrayProperty {
                     state.subtract_array_int_slot(inner_ref.block_index, index, value)
                 })
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to subtract property");
+                    error!(err:?; "Failed to subtract property");
                 });
         }
     }

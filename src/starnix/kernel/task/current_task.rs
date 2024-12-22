@@ -15,8 +15,9 @@ use crate::signals::{
 };
 use crate::task::{
     ExitStatus, Kernel, PidTable, ProcessGroup, PtraceCoreState, PtraceEvent, PtraceEventData,
-    PtraceOptions, SeccompFilter, SeccompFilterContainer, SeccompNotifierHandle, SeccompState,
-    SeccompStateValue, StopState, Task, TaskFlags, ThreadGroup, ThreadGroupParent, Waiter,
+    PtraceOptions, RobustList, RobustListHead, SeccompFilter, SeccompFilterContainer,
+    SeccompNotifierHandle, SeccompState, SeccompStateValue, StopState, Task, TaskFlags,
+    ThreadGroup, ThreadGroupParent, Waiter,
 };
 use crate::vfs::{
     CheckAccessReason, FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext,
@@ -941,7 +942,7 @@ impl CurrentTask {
             .map_err(|status| from_status_like_fdio!(status))?;
 
         // Update the SELinux state, if enabled.
-        // TODO: Do we need to update this state after up the creds for exec?
+        // TODO: Do we need to update this state after updating the creds for exec?
         security::update_state_on_exec(self, &resolved_elf.security_state);
 
         {
@@ -980,7 +981,7 @@ impl CurrentTask {
 
             let mut persistent_info = self.persistent_info.lock();
             state.set_sigaltstack(None);
-            state.robust_list_head = UserAddress::NULL.into();
+            state.robust_list_head = Default::default();
 
             // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
             //
@@ -1158,7 +1159,7 @@ impl CurrentTask {
             // No one has called set_robust_list.
             return;
         }
-        let robust_list_res = self.read_object(task_state.robust_list_head);
+        let robust_list_res = RobustListHead::read(self, task_state.robust_list_head);
 
         let head = if let Ok(head) = robust_list_res {
             head
@@ -1170,8 +1171,8 @@ impl CurrentTask {
 
         let mut entries_count = 0;
         let mut curr_ptr = head.list.next;
-        while curr_ptr.addr != robust_list_addr.into() && entries_count < ROBUST_LIST_LIMIT {
-            let curr_ref = self.read_object(curr_ptr.into());
+        while curr_ptr.addr() != robust_list_addr.into() && entries_count < ROBUST_LIST_LIMIT {
+            let curr_ref = RobustList::read(self, curr_ptr);
 
             let curr = if let Ok(curr) = curr_ref {
                 curr
@@ -1179,14 +1180,11 @@ impl CurrentTask {
                 return;
             };
 
-            let futex_base: u64;
-            if let Some(fb) = curr_ptr.addr.addr.checked_add_signed(offset) {
-                futex_base = fb;
-            } else {
+            let Some(futex_base) = curr_ptr.addr().checked_add_signed(offset) else {
                 return;
-            }
+            };
 
-            let futex_addr = match FutexAddress::try_from(futex_base as usize) {
+            let futex_addr = match FutexAddress::try_from(futex_base) {
                 Ok(addr) => addr,
                 Err(_) => {
                     return;
@@ -1514,7 +1512,7 @@ impl CurrentTask {
                 false,
                 SeccompState::default(),
                 SeccompFilterContainer::default(),
-                UserAddress::NULL.into(),
+                Default::default(),
                 default_timerslack,
                 security_state,
             )),
@@ -1583,7 +1581,7 @@ impl CurrentTask {
             false,
             SeccompState::default(),
             SeccompFilterContainer::default(),
-            UserAddress::NULL.into(),
+            Default::default(),
             default_timerslack_ns,
             security_state,
         ))
@@ -1716,7 +1714,7 @@ impl CurrentTask {
         let scheduler_policy;
         let no_new_privs;
         let seccomp_filters;
-        let robust_list_head = UserAddress::NULL.into();
+        let robust_list_head = Default::default();
         let child_signal_mask;
         let timerslack_ns;
         let uts_ns;

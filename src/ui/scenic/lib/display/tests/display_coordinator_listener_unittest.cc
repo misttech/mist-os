@@ -79,7 +79,7 @@ TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
   DisplayCoordinatorListener listener(TakeListenerServerEnd(), std::move(displays_changed_cb),
                                       /*on_vsync=*/nullptr, /*on_client_ownership_change=*/nullptr);
 
-  fuchsia_hardware_display::Mode test_mode = {{
+  fuchsia_hardware_display_types::Mode test_mode = {{
       .active_area = fuchsia_math::SizeU({.width = 1024, .height = 800}),
       .refresh_rate_millihertz = 60'000,
   }};

@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_VIRTIO_GPU_DEVICE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_VIRTIO_GPU_DEVICE_H_
 
-#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
@@ -16,6 +15,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 namespace virtio_display {
@@ -69,7 +69,7 @@ class VirtioGpuDevice {
   // virtio spec Section 5.7.6.8 "Device Operation: controlq", operation
   // VIRTIO_GPU_CMD_RESOURCE_CREATE_2D.
   zx::result<uint32_t> Create2DResource(uint32_t width, uint32_t height,
-                                        fuchsia_images2::wire::PixelFormat pixel_format);
+                                        display::PixelFormat pixel_format);
 
   // Sets scanout parameters for one scanout.
   //

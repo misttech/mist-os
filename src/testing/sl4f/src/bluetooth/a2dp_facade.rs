@@ -7,8 +7,8 @@ use anyhow::Error;
 use fidl_fuchsia_bluetooth_a2dp::{AudioModeMarker, AudioModeProxy, Role};
 use fuchsia_component::client;
 use fuchsia_sync::Mutex;
+use log::info;
 use std::ops::DerefMut;
-use tracing::info;
 
 #[derive(Debug)]
 pub struct A2dpFacade {
@@ -27,7 +27,7 @@ impl A2dpFacade {
         let mut proxy_locked = self.audio_mode_proxy.lock();
         if proxy_locked.is_some() {
             info!(
-                tag = &with_line!(tag),
+                tag = &with_line!(tag);
                 "Current A2DP AudioMode proxy: {0:?}", self.audio_mode_proxy
             );
             return Ok(());

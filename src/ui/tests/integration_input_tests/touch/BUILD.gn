@@ -46,6 +46,7 @@ cc_test_executable("touch-input-test-bin") {
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/lib/timekeeper",
     "//src/ui/input/testing/fake_input_report_device",
     "//src/ui/testing/util:fidl_cpp_helpers",
     "//src/ui/testing/util:portable_ui_test",

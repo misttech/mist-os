@@ -51,14 +51,14 @@ async fn run_drop_test(a: Arc<Overnet>, b: Arc<Overnet>) -> Result<(), Error> {
             let chan =
                 receiver.next().await.ok_or_else(|| format_err!("No test request received"))?;
             let chan = fidl::AsyncChannel::from_channel(chan);
-            tracing::info!(node_id = b.node_id().0, "CLIENT CONNECTED TO SERVER");
+            log::info!(node_id = b.node_id().0; "CLIENT CONNECTED TO SERVER");
             chan.write(&[], &mut vec![]).context("writing to client")?;
-            tracing::info!(node_id = b.node_id().0, "WAITING FOR CLOSE of {chan:?}");
+            log::info!(node_id = b.node_id().0; "WAITING FOR CLOSE of {chan:?}");
             assert_eq!(
                 chan.recv_msg(&mut Default::default()).await,
                 Err(zx_status::Status::PEER_CLOSED)
             );
-            tracing::info!("RETURNING OBSERVER");
+            log::info!("RETURNING OBSERVER");
             // TODO(b/306655845): Figure out why the test hangs without this and delete it.
             drop(a_clone);
             Ok(())
@@ -80,13 +80,13 @@ async fn run_drop_test(a: Arc<Overnet>, b: Arc<Overnet>) -> Result<(), Error> {
                     }
                 }
             };
-            tracing::info!(node_id = a.node_id().0, "GOT CLIENT CHANNEL");
+            log::info!(node_id = a.node_id().0; "GOT CLIENT CHANNEL");
             let chan = fidl::AsyncChannel::from_channel(chan);
             chan.recv_msg(&mut Default::default()).await.context("waiting for server message")?;
-            tracing::info!(node_id = a.node_id().0, "GOT MESSAGE FROM SERVER - DROPPING CLIENT");
+            log::info!(node_id = a.node_id().0; "GOT MESSAGE FROM SERVER - DROPPING CLIENT");
             drop(a);
             drop(chan);
-            tracing::info!("RETURNING DROPPER");
+            log::info!("RETURNING DROPPER");
             Ok(())
         },
     )

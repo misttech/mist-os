@@ -13,6 +13,7 @@ cc_library(
     ],
     hdrs = [
         "include/lib/dma-buffer/buffer.h",
+        "include/lib/dma-buffer/phys-iter.h",
     ],
     includes = [
         "include",

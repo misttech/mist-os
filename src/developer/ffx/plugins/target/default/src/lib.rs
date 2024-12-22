@@ -74,6 +74,10 @@ pub async fn exec_target_default_impl<W: std::io::Write>(
                             ConfigError::KeyNotFound | ConfigError::EmptyKey => {
                                 user_error!("No {} level default target to unset.", unset.level)
                             }
+                            ConfigError::BadValue { .. } => {
+                                // Only occurs in strict mode, and ffx config doesn't support strict
+                                unreachable!()
+                            }
                         }
                     } else {
                         user_error!(

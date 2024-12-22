@@ -810,7 +810,7 @@ async fn assert_clone_directory_overflow(
     let (clone, server_end) = create_proxy::<fio::DirectoryMarker>();
 
     let node_request = fidl::endpoints::ServerEnd::new(server_end.into_channel());
-    parent.clone2(node_request).expect("cloned node");
+    parent.clone(node_request).expect("cloned node");
 
     assert_read_dirents_overflow(&clone, expected_dirents).await;
 }

@@ -37,7 +37,6 @@ source_set("usb-adb-common") {
     "//src/devices/usb/lib/usb:peripheral",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-client",
     "//src/lib/ddk",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/sync:sync-cpp",
     "//zircon/system/ulib/trace",

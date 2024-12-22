@@ -9,12 +9,12 @@ use crate::output::{
 };
 use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
+use log::error;
 use std::collections::HashMap;
 use std::io::{Error, Write};
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::error;
 
 mod writer;
 pub use writer::ShellWriterView;

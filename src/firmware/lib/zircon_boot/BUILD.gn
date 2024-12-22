@@ -39,11 +39,11 @@ zx_library("zircon_boot") {
   ]
 }
 
-# In-tree library.
+# Common variables for in-tree targets.
 # This is necessary because in-tree targets use //zircon/system/public
 # as the sysroot dependency, which is not available to sdk_publishable
 # targets.
-zx_library("in_tree") {
+in_tree_vars = {
   forward_variables_from(common_vars, "*")
   public_deps += [
     "//src/firmware/lib/abr:in_tree",
@@ -55,6 +55,27 @@ zx_library("in_tree") {
   # accordingly.
   public_deps += [ "//third_party/android/platform/external/avb:lib" ]
   deps = [ "//zircon/system/public" ]
+}
+
+# Default in-tree library.
+zx_library("in_tree") {
+  forward_variables_from(in_tree_vars, "*")
+}
+
+# Config to enable the internal bootfs APIs.
+config("internal_bootfs") {
+  defines = [ "ZIRCON_BOOT_USE_INTERNAL_BOOTFS" ]
+}
+
+# In-tree library with internal bootfs APIs enabled.
+zx_library("in_tree_with_internal_bootfs") {
+  forward_variables_from(in_tree_vars, "*")
+  public_configs = [ ":internal_bootfs" ]
+
+  # These APIs should not be used by any new devices, only for legacy support
+  # of existing devices, so nothing in-tree should need them except us and our
+  # tests.
+  visibility = [ "./*" ]
 }
 
 source_set("gpt_boot_demo_lib") {

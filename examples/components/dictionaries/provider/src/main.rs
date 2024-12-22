@@ -7,7 +7,7 @@ use fidl_fidl_examples_routing_echo::{EchoMarker, EchoRequest, EchoRequestStream
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 enum IncomingRequest {
@@ -78,7 +78,7 @@ async fn main() {
                             fsandbox::DictionaryRouterRequest::_UnknownMethod {
                                 ordinal, ..
                             } => {
-                                warn!(%ordinal, "Unknown DictionaryRouter request");
+                                warn!(ordinal:%; "Unknown DictionaryRouter request");
                             }
                         }
                     }
@@ -102,7 +102,7 @@ async fn handle_echo_receiver(index: u64, mut receiver_stream: fsandbox::Receive
                 });
             }
             fsandbox::ReceiverRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown Receiver request");
+                warn!(ordinal:%; "Unknown Receiver request");
             }
         }
     }
@@ -116,7 +116,7 @@ async fn run_echo_server(index: u64, mut stream: EchoRequestStream) {
             None => responder.send(None),
         };
         if let Err(err) = res {
-            warn!(%err, "Failed to send echo response");
+            warn!(err:%; "Failed to send echo response");
         }
     }
 }

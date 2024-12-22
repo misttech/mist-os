@@ -89,24 +89,17 @@ fn default_spectrum_management_support() -> fidl_common::SpectrumManagementSuppo
     fidl_common::SpectrumManagementSupport { dfs: fidl_common::DfsFeature { supported: false } }
 }
 
-fn default_fullmac_band_capability() -> fidl_fullmac::WlanFullmacBandCapability {
-    let mut cap = fidl_fullmac::WlanFullmacBandCapability {
-        band: fidl_ieee80211::WlanBand::TwoGhz,
-        basic_rates: vec![2, 4, 11, 22, 12, 18, 24, 36, 48, 72, 96, 108],
-        ht_supported: true,
-        ht_caps: fidl_ieee80211::HtCapabilities {
+fn default_fullmac_band_capability() -> fidl_fullmac::BandCapability {
+    fidl_fullmac::BandCapability {
+        band: Some(fidl_ieee80211::WlanBand::TwoGhz),
+        basic_rates: Some(vec![2, 4, 11, 22, 12, 18, 24, 36, 48, 72, 96, 108]),
+        ht_caps: Some(fidl_ieee80211::HtCapabilities {
             bytes: fake_ht_capabilities().as_bytes().try_into().unwrap(),
-        },
-        vht_supported: false,
-        vht_caps: fidl_ieee80211::VhtCapabilities { bytes: [0; 12] },
-        operating_channel_count: 11,
-        operating_channel_list: [0; 256],
-    };
-
-    // By default, the fullmac fake driver supports 2 GHz channels in the US.
-    // Specifically, channels 12-14 are avoided or not allowed in the US.
-    for i in 0..11 {
-        cap.operating_channel_list[i] = (i + 1) as u8;
+        }),
+        vht_caps: None,
+        // By default, the fullmac fake driver supports 2 GHz channels in the US.
+        // Specifically, channels 12-14 are avoided or not allowed in the US.
+        operating_channels: Some((1..11).collect()),
+        ..Default::default()
     }
-    cap
 }

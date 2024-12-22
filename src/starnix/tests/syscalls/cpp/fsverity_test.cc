@@ -3,12 +3,6 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-
-#include <linux/fs.h>
-#include <linux/fsverity.h>
-
-// Must be included after <linux/*.h> to avoid conflicts between Bionic UAPI and glibc headers.
-// TODO(b/307959737): Build these tests without glibc.
 #include <sys/ioctl.h>
 #include <sys/uio.h>
 #include <sys/vfs.h>
@@ -17,10 +11,47 @@
 #include <cstdint>
 
 #include <gtest/gtest.h>
+#include <linux/fs.h>
+#include <linux/fsverity.h>
 
 #include "fidl/fuchsia.fs/cpp/common_types.h"
 #include "fidl/fuchsia.fs/cpp/wire.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
+
+#ifndef FS_VERITY_METADATA_TYPE_MERKLE_TREE
+
+// Assume we are targeting an older sysroot without these symbols
+// and define them ourselves.
+
+struct fsverity_descriptor {
+  uint8_t version;          /* must be 1 */
+  uint8_t hash_algorithm;   /* Merkle tree hash algorithm */
+  uint8_t log_blocksize;    /* log2 of size of data and tree blocks */
+  uint8_t salt_size;        /* size of salt in bytes; 0 if none */
+  uint32_t __reserved_0x04; /* must be 0 */
+  uint64_t data_size;       /* size of file the Merkle tree is built over */
+  uint8_t root_hash[64];    /* Merkle tree root hash */
+  uint8_t salt[32];         /* salt prepended to each hashed block */
+  uint8_t __reserved[144];  /* must be 0's */
+};
+
+#define FS_VERITY_METADATA_TYPE_MERKLE_TREE 1
+#define FS_VERITY_METADATA_TYPE_DESCRIPTOR 2
+#define FS_VERITY_METADATA_TYPE_SIGNATURE 3
+
+struct fsverity_read_metadata_arg {
+  uint64_t metadata_type;
+  uint64_t offset;
+  uint64_t length;
+  uint64_t buf_ptr;
+  uint64_t __reserved;
+};
+
+#define FS_IOC_ENABLE_VERITY _IOW('f', 133, struct fsverity_enable_arg)
+#define FS_IOC_MEASURE_VERITY _IOWR('f', 134, struct fsverity_digest)
+#define FS_IOC_READ_VERITY_METADATA _IOWR('f', 135, struct fsverity_read_metadata_arg)
+
+#endif  // FS_VERITY_METADATA_TYPE_MERKLE_TREE
 
 namespace {
 

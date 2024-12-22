@@ -48,7 +48,6 @@ fuchsia_cc_driver("usb-hid-driver") {
     "//sdk/fidl/fuchsia.hardware.usb:fuchsia.hardware.usb_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/driver/power/cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/usb/lib/usb",

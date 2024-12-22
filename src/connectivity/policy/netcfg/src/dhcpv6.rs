@@ -363,7 +363,6 @@ impl PrefixProviderHandler {
 mod tests {
     use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 
-    use const_unwrap::const_unwrap_option;
     use net_declare::{fidl_socket_addr_v6, net_subnet_v6};
     use test_case::test_case;
 
@@ -437,7 +436,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(InterfaceId::new(1)),
+            interface_id: InterfaceId::new(1).unwrap(),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         });
@@ -445,7 +444,7 @@ mod tests {
     )]
     #[test_case(
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(InterfaceId::new(1)),
+            interface_id: InterfaceId::new(1).unwrap(),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         }),
@@ -457,7 +456,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(InterfaceId::new(1)),
+            interface_id: InterfaceId::new(1).unwrap(),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         });
@@ -465,7 +464,7 @@ mod tests {
     )]
     #[test_case(
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(InterfaceId::new(1)),
+            interface_id: InterfaceId::new(1).unwrap(),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         }),
@@ -477,7 +476,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(InterfaceId::new(1)),
+            interface_id: InterfaceId::new(1).unwrap(),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: RENEWED_LIFETIMES,
         });
@@ -485,7 +484,7 @@ mod tests {
     )]
     #[test_case(
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(InterfaceId::new(1)),
+            interface_id: InterfaceId::new(1).unwrap(),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         }),
@@ -501,7 +500,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(InterfaceId::new(2)),
+            interface_id: InterfaceId::new(2).unwrap(),
             prefix: net_subnet_v6!("efff::/64"),
             lifetimes: RENEWED_LIFETIMES,
         });

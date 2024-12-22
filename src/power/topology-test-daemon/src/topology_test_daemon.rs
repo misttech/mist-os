@@ -9,13 +9,13 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::StreamExt;
+use log::{error, info, warn};
 use power_broker_client::PowerElementContext;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
-use tracing::{error, info, warn};
 use zx::{HandleBased, Rights};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
@@ -148,7 +148,7 @@ impl PowerTopology {
                 .start(&element_name, initial_current_level, required_level, current_level)
                 .await?
             {
-                error!(element_name, "Failed to run power element");
+                error!(element_name:%; "Failed to run power element");
                 return Err(anyhow!("Failed to run power element: {}", element_name));
             }
         }
@@ -221,7 +221,7 @@ impl TopologyTestDaemon {
                     let result = responder.send(self.clone().create_topology(elements).await);
 
                     if let Err(error) = result {
-                        warn!(?error, "Error while responding to TopologyControl.Create request");
+                        warn!(error:?; "Error while responding to TopologyControl.Create request");
                     }
                 }
                 Ok(fpt::TopologyControlRequest::AcquireLease {
@@ -234,7 +234,7 @@ impl TopologyTestDaemon {
 
                     if let Err(error) = result {
                         warn!(
-                            ?error,
+                            error:?;
                             "Error while responding to TopologyControl.AcquireLease request"
                         );
                     }
@@ -244,7 +244,7 @@ impl TopologyTestDaemon {
 
                     if let Err(error) = result {
                         warn!(
-                            ?error,
+                            error:?;
                             "Error while responding to TopologyControl.DropLease request"
                         );
                     }
@@ -260,16 +260,16 @@ impl TopologyTestDaemon {
                         .send(self.clone().open_status_channel(element_name, status_channel).await);
                     if let Err(error) = result {
                         warn!(
-                            ?error,
+                            error:?;
                             "Error while responding to TopologyControl.OpenStatusChannel request"
                         );
                     }
                 }
                 Ok(fpt::TopologyControlRequest::_UnknownMethod { ordinal, .. }) => {
-                    warn!(?ordinal, "Unknown TopologyControl method");
+                    warn!(ordinal:?; "Unknown TopologyControl method");
                 }
                 Err(error) => {
-                    error!(?error, "Error handling TopologyControl request stream");
+                    error!(error:?; "Error handling TopologyControl request stream");
                 }
             }
         }
@@ -285,21 +285,21 @@ impl TopologyTestDaemon {
                     let result = responder.send(self.clone().start_application_activity().await);
 
                     if let Err(error) = result {
-                        warn!(?error, "Error while responding to StartApplicationActivity request");
+                        warn!(error:?; "Error while responding to StartApplicationActivity request");
                     }
                 }
                 Ok(fpt::SystemActivityControlRequest::StopApplicationActivity { responder }) => {
                     let result = responder.send(self.clone().stop_application_activity().await);
 
                     if let Err(error) = result {
-                        warn!(?error, "Error while responding to StopApplicationActivity request");
+                        warn!(error:?; "Error while responding to StopApplicationActivity request");
                     }
                 }
                 Ok(fpt::SystemActivityControlRequest::_UnknownMethod { ordinal, .. }) => {
-                    warn!(?ordinal, "Unknown ActivityGovernorRequest method");
+                    warn!(ordinal:?; "Unknown ActivityGovernorRequest method");
                 }
                 Err(error) => {
-                    error!(?error, "Error handling SystemActivityControl request stream");
+                    error!(error:?; "Error handling SystemActivityControl request stream");
                 }
             }
         }
@@ -323,13 +323,13 @@ impl TopologyTestDaemon {
         }
 
         let realm_instance = builder.build().await.map_err(|err| {
-            error!(%err, "Failed to create a realm instance");
+            error!(err:%; "Failed to create a realm instance");
             fpt::CreateTopologyGraphError::Internal
         })?;
         let _ = self.internal_topology.realm_instance.borrow_mut().insert(realm_instance);
 
         self.internal_topology.run_power_elements().await.map_err(|err| {
-            error!(%err, "Failed to run power elements on separate components");
+            error!(err:%; "Failed to run power elements on separate components");
             fpt::CreateTopologyGraphError::Internal
         })?;
 
@@ -391,7 +391,7 @@ impl TopologyTestDaemon {
             )
             .await
             .map_err(|err| {
-                error!(%err, element_name, "Failed to create power element");
+                error!(err:%, element_name:%; "Failed to create power element");
                 fpt::CreateTopologyGraphError::Internal
             })?;
 
@@ -407,12 +407,12 @@ impl TopologyTestDaemon {
     ) -> fpt::TopologyControlAcquireLeaseResult {
         let elements = self.internal_topology.elements.borrow_mut();
         let element = elements.get(&element_name).ok_or_else(|| {
-            warn!(element_name, "Failed to find element name in the created topology graph");
+            warn!(element_name:%; "Failed to find element name in the created topology graph");
             fpt::LeaseControlError::InvalidElement
         })?;
         let _ = element.lease.borrow_mut().replace(lease(&element.lessor, level).await.map_err(
             |err| {
-                warn!(%err, element_name, level, "Failed to acquire a lease");
+                warn!(err:%, element_name:%, level; "Failed to acquire a lease");
                 fpt::LeaseControlError::Internal
             },
         )?);
@@ -426,7 +426,7 @@ impl TopologyTestDaemon {
     ) -> fpt::TopologyControlDropLeaseResult {
         let elements = self.internal_topology.elements.borrow();
         let element = elements.get(&element_name).ok_or_else(|| {
-            warn!(element_name, "Failed to find element name in the created topology graph");
+            warn!(element_name:%; "Failed to find element name in the created topology graph");
             fpt::LeaseControlError::InvalidElement
         })?;
         element.lease.borrow_mut().take();
@@ -441,12 +441,12 @@ impl TopologyTestDaemon {
     ) -> fpt::TopologyControlOpenStatusChannelResult {
         let elements = self.internal_topology.elements.borrow_mut();
         let element = elements.get(&element_name).ok_or_else(|| {
-            warn!(element_name, "Failed to find element name in the created topology graph");
+            warn!(element_name:%; "Failed to find element name in the created topology graph");
             fpt::OpenStatusChannelError::InvalidElement
         })?;
 
         let _ = element.element_control.open_status_channel(status_channel).map_err(|err| {
-            warn!(%err, element_name, "Failed to open_status_channel");
+            warn!(err:%, element_name:%; "Failed to open_status_channel");
             fpt::OpenStatusChannelError::Internal
         })?;
 
@@ -463,11 +463,11 @@ impl TopologyTestDaemon {
             .contains_key(APPLICATION_ACTIVITY_CONTROLLER)
         {
             let sag = connect_to_protocol::<fsystem::ActivityGovernorMarker>().map_err(|err| {
-                error!(%err, "Failed to connect to fuchsia.power.system");
+                error!(err:%; "Failed to connect to fuchsia.power.system");
                 fpt::SystemActivityControlError::Internal
             })?;
             let sag_power_elements = sag.get_power_elements().await.map_err(|err| {
-                error!(%err, "Failed to get power elements from SAG");
+                error!(err:%; "Failed to get power elements from SAG");
                 fpt::SystemActivityControlError::Internal
             })?;
             let aa_token = sag_power_elements
@@ -498,11 +498,11 @@ impl TopologyTestDaemon {
             )
             .await
             .map_err(|err| {
-                error!(%err, "Failed to create application activity controller");
+                error!(err:%; "Failed to create application activity controller");
                 fpt::SystemActivityControlError::Internal
             })?;
             let realm_instance = builder.build().await.map_err(|err| {
-                error!(%err, "Failed to create a realm instance");
+                error!(err:%; "Failed to create a realm instance");
                 fpt::SystemActivityControlError::Internal
             })?;
             let _ =
@@ -514,7 +514,7 @@ impl TopologyTestDaemon {
                 .insert(APPLICATION_ACTIVITY_CONTROLLER.to_string(), aa_controller);
 
             self.system_activity_topology.run_power_elements().await.map_err(|err| {
-                error!(%err, "Failed to run power elements on separate components");
+                error!(err:%; "Failed to run power elements on separate components");
                 fpt::SystemActivityControlError::Internal
             })?;
         }
@@ -526,7 +526,7 @@ impl TopologyTestDaemon {
                     .lease
                     .borrow_mut()
                     .insert(lease(&aa_controller_element.lessor, 1).await.map_err(|err| {
-                    error!(%err, "Failed to require a lease for application activity controller");
+                    error!(err:%; "Failed to require a lease for application activity controller");
                     fpt::SystemActivityControlError::Internal
                 })?);
         }

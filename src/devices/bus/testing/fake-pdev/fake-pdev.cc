@@ -158,17 +158,6 @@ void FakePDevFidl::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& c
 
 void FakePDevFidl::GetMetadata(GetMetadataRequestView request,
                                GetMetadataCompleter::Sync& completer) {
-  auto id = std::to_string(request->type);
-  auto metadata = metadata_.find(id);
-  if (metadata == metadata_.end()) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-    return;
-  }
-  completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
-}
-
-void FakePDevFidl::GetMetadata2(GetMetadata2RequestView request,
-                                GetMetadata2Completer::Sync& completer) {
   if (auto metadata = metadata_.find(request->id.get()); metadata != metadata_.end()) {
     completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
     return;

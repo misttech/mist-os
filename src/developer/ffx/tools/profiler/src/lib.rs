@@ -173,6 +173,7 @@ pub fn pprof_conversion(from: &PathBuf, to: PathBuf) -> Result<()> {
 #[derive(Debug)]
 struct SessionOpts {
     symbolize: bool,
+    buffer_size_mb: Option<u64>,
     print_stats: bool,
     pprof_conversion: bool,
     output: String,
@@ -214,7 +215,11 @@ async fn run_session(
 
     info!("Starting profiler...");
     controller
-        .start(&profiler::SessionStartRequest { buffer_results: Some(true), ..Default::default() })
+        .start(&profiler::SessionStartRequest {
+            buffer_results: Some(true),
+            buffer_size_mb: opts.buffer_size_mb,
+            ..Default::default()
+        })
         .await?
         .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
     info!("Profiler started.");
@@ -305,6 +310,7 @@ pub async fn profiler(
             };
             let session_opts = SessionOpts {
                 symbolize: opts.symbolize,
+                buffer_size_mb: opts.buffer_size_mb,
                 print_stats: opts.print_stats,
                 output: opts.output,
                 duration: opts.duration,
@@ -347,6 +353,7 @@ pub async fn profiler(
             };
             let session_opts = SessionOpts {
                 symbolize: opts.symbolize,
+                buffer_size_mb: opts.buffer_size_mb,
                 print_stats: opts.print_stats,
                 output: opts.output,
                 duration: opts.duration,
@@ -388,6 +395,7 @@ mod tests {
             tids: vec![4, 5, 6],
             job_ids: vec![7, 8, 9],
             url: None,
+            buffer_size_mb: Some(8 as u64),
             moniker: None,
             duration: None,
             output: String::from("output_file"),
@@ -405,6 +413,7 @@ mod tests {
             job_ids: vec![],
             moniker: None,
             url: None,
+            buffer_size_mb: None,
             duration: None,
             output: String::from("output_file"),
             ..Default::default()
@@ -418,6 +427,7 @@ mod tests {
             tids: vec![],
             job_ids: vec![],
             moniker: Some(String::from("core/test")),
+            buffer_size_mb: Some(8 as u64),
             url: None,
             duration: None,
             output: String::from("output_file"),
@@ -429,6 +439,7 @@ mod tests {
             job_ids: vec![],
             moniker: Some(String::from("core/test")),
             url: None,
+            buffer_size_mb: Some(8 as u64),
             duration: None,
             output: String::from("output_file"),
             ..Default::default()
@@ -438,6 +449,7 @@ mod tests {
             tids: vec![],
             job_ids: vec![1],
             moniker: Some(String::from("core/test")),
+            buffer_size_mb: Some(8 as u64),
             url: None,
             duration: None,
             output: String::from("output_file"),

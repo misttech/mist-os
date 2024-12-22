@@ -624,18 +624,16 @@ class base_socket {
   }
 
   zx_status_t CloneSocket(zx_handle_t* out_handle) {
-    zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
-    if (endpoints.is_error()) {
-      return endpoints.status_value();
-    }
-    zx_status_t status =
-        client_
-            ->Clone2(fidl::ServerEnd<fuchsia_unknown::Cloneable>{endpoints->server.TakeChannel()})
-            .status();
+    auto [client, server] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    zx_status_t status = client_->Clone(std::move(server)).status();
+#else
+    zx_status_t status = client_->Clone2(std::move(server)).status();
+#endif
     if (status != ZX_OK) {
       return status;
     }
-    *out_handle = endpoints->client.channel().release();
+    *out_handle = client.TakeChannel().release();
     return ZX_OK;
   }
 

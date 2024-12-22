@@ -12,8 +12,6 @@ use futures::{AsyncReadExt, AsyncWrite, FutureExt, TryFutureExt};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, ErrorKind};
 
-pub mod ffxtool;
-
 #[derive(Debug, Serialize, PartialEq, Deserialize)]
 pub struct PlayResult {
     pub bytes_processed: Option<u64>,

@@ -14,6 +14,7 @@
         runner: "elf",
         binary: "bin/test_manager",
         args: [ "test_manager_for_bootstrap.cm" ],
+        lifecycle: { stop_event: "notify" },
     },
     children: [
         {

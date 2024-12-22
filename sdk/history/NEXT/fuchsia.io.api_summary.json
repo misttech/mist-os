@@ -129,11 +129,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Directory.Clone2",
+        "name": "fuchsia.io/Directory.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",
@@ -750,11 +750,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/File.Clone2",
+        "name": "fuchsia.io/File.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",
@@ -1624,11 +1624,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Node.Clone2",
+        "name": "fuchsia.io/Node.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",
@@ -2507,11 +2507,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.io/Symlink.Clone2",
+        "name": "fuchsia.io/Symlink.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",

@@ -4,14 +4,15 @@
 
 #include "src/devices/adc/drivers/adc/adc.h"
 
+#include <fidl/fuchsia.hardware.adcimpl/cpp/driver/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <cmath>
 
 #include <gtest/gtest.h>
+#include <sdk/lib/driver/metadata/cpp/metadata_server.h>
 
-#include "src/devices/adc/metadata/metadata.h"
 #include "src/devices/lib/fidl-metadata/adc.h"
 
 namespace adc {
@@ -92,7 +93,7 @@ class AdcTestEnvironment : fdf_testing::Environment {
  private:
   compat::DeviceServer device_server_;
   FakeAdcImplServer fake_adc_impl_server_;
-  MetadataServer metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_adcimpl::Metadata> metadata_server_;
 };
 
 class AdcTestConfig final {

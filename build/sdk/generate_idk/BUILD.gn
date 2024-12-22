@@ -14,13 +14,11 @@ if (is_host) {
       ":lib",
       "//build/python/modules/depfile",
     ]
-    enable_mypy = true
   }
 
   python_library("lib") {
     library_name = "generate_idk"
     sources = [ "__init__.py" ]
-    enable_mypy = true
   }
 
   python_host_test("generate_idk_unittest") {

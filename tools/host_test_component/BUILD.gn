@@ -18,7 +18,6 @@ binary_sources = [
 binary_deps = []
 
 python_binary("host_test_component_runner") {
-  enable_mypy = true
   testonly = true
   main_source = "main.py"
   sources = binary_sources + [ "main.py" ]
@@ -68,7 +67,6 @@ foreach(test_name, main_module_tests) {
   target = "host_test_component_runner.${test_name}_test"
   main_source = "tests/${test_name}_test.py"
   python_host_test(target) {
-    enable_mypy = true
     main_source = main_source
     main_callable = "unittest.main"
     extra_args = [ "-v" ]

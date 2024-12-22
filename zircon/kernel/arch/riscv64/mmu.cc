@@ -31,6 +31,7 @@
 #include <kernel/mp.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
+#include <ktl/span.h>
 #include <phys/arch/arch-handoff.h>
 #include <vm/arch_vm_aspace.h>
 #include <vm/physmap.h>
@@ -1667,6 +1668,25 @@ vaddr_t Riscv64ArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, 
                                       uint mmu_flags) {
   canary_.Assert();
   return PAGE_ALIGN(base);
+}
+
+void Riscv64ArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {
+  while (list_node_t* node = list_remove_head(mmu_pages)) {
+    vm_page_t* page = reinterpret_cast<vm_page_t*>(node);
+    page->set_state(vm_page_state::MMU);
+
+    ktl::span entries{
+        reinterpret_cast<pte_t*>(paddr_to_physmap(page->paddr())),
+        PAGE_SIZE / sizeof(pte_t),
+    };
+    page->mmu.num_mappings = 0;
+    for (pte_t entry : entries) {
+      if ((entry & RISCV64_PTE_V) != 0) {
+        page->mmu.num_mappings++;
+      }
+    }
+    page->set_state(vm_page_state::MMU);
+  }
 }
 
 void riscv64_mmu_early_init() {

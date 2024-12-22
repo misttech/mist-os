@@ -112,9 +112,9 @@ fuchsia_test_package("storage-benchmarks") {
   deps = [
     "//src/storage/benchmarks/fuchsia/pkgdir-component:production-component-and-config",
     "//src/storage/blobfs/bin:blobfs-component",
+    "//src/storage/crypt/fxfs",
     "//src/storage/f2fs/bin:f2fs-component",
     "//src/storage/fxfs:fxfs_component",
-    "//src/storage/fxfs-crypt",
     "//src/storage/memfs:memfs_component",
     "//src/storage/minfs/bin:minfs-component",
   ]
@@ -132,9 +132,9 @@ fuchsia_test_package("fuchsia-storage-benchmarks-tests") {
   deps = [
     "//src/storage/benchmarks/fuchsia/pkgdir-component:production-component-and-config",
     "//src/storage/blobfs/bin:blobfs-component",
+    "//src/storage/crypt/fxfs",
     "//src/storage/f2fs/bin:f2fs-component",
     "//src/storage/fxfs:fxfs_component",
-    "//src/storage/fxfs-crypt",
     "//src/storage/memfs:memfs_component",
     "//src/storage/minfs/bin:minfs-component",
   ]

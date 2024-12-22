@@ -7,22 +7,18 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <arch/x86/asm.h>
-#include <arch/x86/descriptor.h>
+#include <lib/arch/asm.h>
 
-.section .rodata.gdt,"a",%progbits
+.object _temp_gdtr_words, scope=local, type=relro, align=8
 // Intentionlly misalign this by 6 so that the address word holding _temp_gdt
-// is naturally aligned.  This address gets fixed up by apply_fixups (image.S).
-.balign 8
+// is naturally aligned.
 .skip 6
-DATA(_temp_gdtr)
+.label _temp_gdtr, global
     .short _temp_gdt_end - _temp_gdt - 1
     .quad _temp_gdt
-END_DATA(_temp_gdtr)
+.end_object
 
-.data
-.align 8
-DATA(_temp_gdt)
+.object _temp_gdt, scope=global, type=rodata, align=8
     /* null entry */
     .int 0
     .int 0
@@ -84,6 +80,6 @@ DATA(_temp_gdt)
     .int   0x00000000       /* reserved/sbz */
 .endr
 
-END_DATA(_temp_gdt)
+.label _temp_gdt_end, global
+.end_object
 
-DATA(_temp_gdt_end)

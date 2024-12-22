@@ -12,6 +12,7 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/pci/devicetree.h>
 #include <lib/pci/pciroot.h>
 #include <lib/pci/root_host.h>
@@ -22,12 +23,6 @@
 #include <type_traits>
 
 #include <bind/fuchsia/pci/cpp/bind.h>
-
-#include "src/devices/bus/drivers/pci/metadata.h"
-
-// Compile time check that metadata type has been defined and included properly.
-static_assert(
-    std::is_object_v<fdf_metadata::ObjectDetails<fuchsia_hardware_pci::BoardConfiguration>>);
 
 namespace board_crosvm {
 

@@ -35,7 +35,7 @@ class MockDisplayCoordinator
       fuchsia_math::RectU, fuchsia_math::RectU)>;
 
   using SetDisplayModeFn = std::function<void(fuchsia_hardware_display_types::DisplayId,
-                                              fuchsia_hardware_display::Mode)>;
+                                              fuchsia_hardware_display_types::Mode)>;
 
   explicit MockDisplayCoordinator(fuchsia_hardware_display::Info display_info);
   ~MockDisplayCoordinator() override;

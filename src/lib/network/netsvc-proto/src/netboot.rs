@@ -10,7 +10,6 @@
 //! over time with the netsvc code. The closest to an authoritative source is
 //! the netsvc source code in `//src/bringup/bin/netsvc`.
 
-use const_unwrap::const_unwrap_option;
 use packet::{
     BufferView, FragmentedBytesMut, PacketBuilder, PacketConstraints, ParsablePacket,
     ParseMetadata, SerializeTarget,
@@ -23,9 +22,9 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice
 pub use witness::ErrorValue;
 
 /// The UDP port a netboot server listens on.
-pub const SERVER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33330));
+pub const SERVER_PORT: NonZeroU16 = NonZeroU16::new(33330).unwrap();
 /// The UDP port multicast advertisements are sent to.
-pub const ADVERT_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33331));
+pub const ADVERT_PORT: NonZeroU16 = NonZeroU16::new(33331).unwrap();
 
 const MAGIC: u32 = 0xAA774217;
 

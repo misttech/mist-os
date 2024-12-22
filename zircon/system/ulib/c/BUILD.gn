@@ -34,9 +34,15 @@ libc_components = [
 libc_testonly_components = []
 
 if (use_llvm_libc_string_functions) {
-  libc_components += [ "string" ]
+  libc_components += [
+    "string",
+    "strings",
+  ]
 } else {
-  libc_testonly_components += [ "string" ]
+  libc_testonly_components += [
+    "string",
+    "strings",
+  ]
 }
 
 group("components") {

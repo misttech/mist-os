@@ -5,7 +5,7 @@
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_driver_component", "fuchsia_package")
-load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo")
+load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo")
 load("//test_utils:make_file.bzl", "make_fake_component_manifest", "make_file")
 
 def _local_name(name):

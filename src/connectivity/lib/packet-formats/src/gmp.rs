@@ -226,7 +226,7 @@ impl GroupRecordType {
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-4.1.7
 /// [RFC 3810 section 5.1.9]:
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.9
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Default)]
 pub struct QQIC(u8);
 
 impl QQIC {
@@ -278,7 +278,7 @@ impl From<u8> for QQIC {
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-4.1.6
 /// [RFC 3810 section 5.1.8]:
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-5.1.8
-#[derive(PartialEq, Eq, Debug, Clone, Copy)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Default)]
 pub struct QRV(u8);
 
 impl QRV {

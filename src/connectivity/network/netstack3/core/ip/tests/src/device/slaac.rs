@@ -11,7 +11,7 @@ use net_types::{LinkLocalAddress as _, NonMappedAddr, Witness as _};
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
 use packet_formats::icmp::ndp::{OptionSequenceBuilder, RouterAdvertisement};
-use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpPacketBuilder, IcmpZeroCode};
 use packet_formats::ip::Ipv6Proto;
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::utils::NonZeroDuration;
@@ -53,7 +53,7 @@ fn build_slaac_ra_packet(
         .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             RouterAdvertisement::new(0, false, false, 0, 0, 0),
         ))
         .encapsulate(Ipv6PacketBuilder::new(
@@ -72,10 +72,8 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
     let TestAddrs { local_mac, remote_mac, local_ip: _, remote_ip: _, subnet: _ } =
         Ipv6::TEST_ADDRS;
 
-    const ONE_HOUR: NonZeroDuration =
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(60 * 60));
-    const TWO_HOURS: NonZeroDuration =
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(2 * 60 * 60));
+    const ONE_HOUR: NonZeroDuration = NonZeroDuration::from_secs(60 * 60).unwrap();
+    const TWO_HOURS: NonZeroDuration = NonZeroDuration::from_secs(2 * 60 * 60).unwrap();
 
     let mut ctx = FakeCtx::default();
     let device_id = ctx

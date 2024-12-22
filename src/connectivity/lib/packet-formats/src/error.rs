@@ -173,3 +173,7 @@ impl<I: IcmpIpExt> From<OptionParseErr> for IpParseError<I> {
 /// Error type for an unrecognized protocol code of type `T`.
 #[derive(Debug, Eq, PartialEq)]
 pub struct UnrecognizedProtocolCode<T>(pub T);
+
+/// A not zero value for `T` was observed, but zero was expected.
+#[derive(Debug, Eq, PartialEq)]
+pub struct NotZeroError<T>(pub T);

@@ -19,13 +19,13 @@ use fuchsia_inspect::{self as inspect, HistogramProperty, LinearHistogramParams,
 use futures::future::{self, LocalBoxFuture};
 use futures::stream::FuturesUnordered;
 use futures::{FutureExt, StreamExt};
+use log::*;
 use power_manager_metrics::power_manager_metrics as power_metrics_registry;
 use power_metrics_registry::ThermalLimitResultMigratedMetricDimensionResult as thermal_limit_result;
 use serde_derive::Deserialize;
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
-use tracing::*;
 use {fuchsia_async as fasync, serde_json as json};
 
 /// Node: PlatformMetrics

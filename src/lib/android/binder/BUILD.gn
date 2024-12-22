@@ -15,6 +15,7 @@ aidl_cpp("libbinder") {
   parcelables = [
     "//third_party/android/platform/frameworks/native/libs/binder/aidl/android/os/ConnectionInfo.aidl",
     "//third_party/android/platform/frameworks/native/libs/binder/aidl/android/os/Service.aidl",
+    "//third_party/android/platform/frameworks/native/libs/binder/aidl/android/os/ServiceWithMetadata.aidl",
     "//third_party/android/platform/frameworks/native/libs/binder/aidl/android/os/ServiceDebugInfo.aidl",
   ]
   interfaces = [
@@ -22,7 +23,6 @@ aidl_cpp("libbinder") {
     "//third_party/android/platform/frameworks/native/libs/binder/aidl/android/os/IServiceCallback.aidl",
     "//third_party/android/platform/frameworks/native/libs/binder/aidl/android/os/IServiceManager.aidl",
   ]
-  deps = [ ":libbinder_accessor" ]
 }
 
 aidl_cpp("libbinder_accessor") {
@@ -45,6 +45,17 @@ config("binder_config") {
 
     # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
     "//build/config:Wno-vla-cxx-extension",
+  ]
+
+  defines = [
+    # "libbinder_addservice_cache_flag" upstream.
+    "LIBBINDER_ADDSERVICE_CACHE",
+
+    # "libbinder_client_cache_flag" upstream.
+    "LIBBINDER_CLIENT_CACHE",
+
+    # "libbinder_remove_cache_static_list_flag" upstream.
+    "LIBBINDER_REMOVE_CACHE_STATIC_LIST",
   ]
 }
 

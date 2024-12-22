@@ -429,7 +429,7 @@ mod tests {
     }
 
     impl DenseMapCollectionKey for FakeKey {
-        const VARIANT_COUNT: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(3));
+        const VARIANT_COUNT: NonZeroUsize = NonZeroUsize::new(3).unwrap();
 
         fn get_variant(&self) -> usize {
             match self.var {

@@ -116,6 +116,9 @@ toc:
   - title: test.requestflexibleenvelope
     path: /test.requestflexibleenvelope
     version_added: ""
+  - title: test.serializable
+    path: /test.serializable
+    version_added: ""
   - title: test.service
     path: /test.service
     version_added: ""

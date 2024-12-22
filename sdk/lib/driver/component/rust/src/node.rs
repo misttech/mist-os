@@ -6,7 +6,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_driver_framework::{
     NodeAddArgs, NodeControllerMarker, NodeMarker, NodeProperty, NodeProxy, Offer,
 };
-use tracing::error;
+use log::error;
 use zx::Status;
 
 mod offers;

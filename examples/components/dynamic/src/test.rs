@@ -73,7 +73,7 @@ async fn create_child_with_specialized_name(
 
     // Create our dictionary
     let dict_ref = create_dictionary_with_receiver(&store, id_gen, connector_id).await;
-    tracing::info!("Populated the dictionary");
+    log::info!("Populated the dictionary");
 
     // Create our child and supply it with the protocol in the form of a
     // `Connector` in its input dictionary.

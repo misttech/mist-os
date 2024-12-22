@@ -149,7 +149,7 @@ impl<I: deps::Instant> State<I> {
                     .await?
                 {
                     RequestingOutcome::RanOutOfRetransmits => {
-                        tracing::info!(
+                        log::info!(
                             "{debug_log_prefix} Returning to Init due to \
                             running out of DHCPREQUEST retransmits"
                         );
@@ -183,7 +183,7 @@ impl<I: deps::Instant> State<I> {
                         // Per RFC 2131 section 3.1: "If the client receives a
                         // DHCPNAK message, the client restarts the
                         // configuration process."
-                        tracing::warn!(
+                        log::warn!(
                             "{debug_log_prefix} Returning to Init due to DHCPNAK: {:?}",
                             nak
                         );
@@ -258,7 +258,7 @@ impl<I: deps::Instant> State<I> {
                                     rebinding_time: _,
                                 },
                         } = renewing;
-                        tracing::warn!(
+                        log::warn!(
                             "{debug_log_prefix} Dropping lease on {} \
                             and returning to Init due to DHCPNAK: {:?}",
                             yiaddr,
@@ -328,7 +328,7 @@ impl<I: deps::Instant> State<I> {
                                     rebinding_time: _,
                                 },
                         } = rebinding;
-                        tracing::warn!(
+                        log::warn!(
                             "{debug_log_prefix} Dropping lease on {} \
                             and returning to Init due to DHCPNAK: {:?}",
                             yiaddr,
@@ -349,7 +349,7 @@ impl<I: deps::Instant> State<I> {
                                     rebinding_time: _,
                                 },
                         } = rebinding;
-                        tracing::warn!(
+                        log::warn!(
                             "{debug_log_prefix} Dropping lease on {} \
                             and returning to Init due to lease expiration",
                             yiaddr,
@@ -385,7 +385,7 @@ impl<I: deps::Instant> State<I> {
             | State::Selecting(_)
             | State::Requesting(_)
             | State::WaitingToRestart(_) => {
-                tracing::warn!(
+                log::warn!(
                     "{debug_log_prefix} received address rejection in state {}; ignoring",
                     self.state_name()
                 );
@@ -405,7 +405,7 @@ impl<I: deps::Instant> State<I> {
                 } = bound;
 
                 if *yiaddr != ip_address {
-                    tracing::warn!(
+                    log::warn!(
                         "{debug_log_prefix} received rejection of address {} while bound to \
                          different address {}; ignoring",
                         *yiaddr,
@@ -435,7 +435,7 @@ impl<I: deps::Instant> State<I> {
                     .await
                     .map_err(Error::Socket)?;
 
-                tracing::info!(
+                log::info!(
                     "{debug_log_prefix} sent DHCPDECLINE for {}; waiting to restart",
                     ip_address
                 );
@@ -497,7 +497,7 @@ impl<I: deps::Instant> State<I> {
             Transition::WaitingToRestart(waiting) => (State::WaitingToRestart(waiting), None),
         };
 
-        tracing::info!(
+        log::info!(
             "{debug_log_prefix} transitioning from {} to {}",
             self.state_name(),
             next_state.state_name()
@@ -698,12 +698,12 @@ async fn send_with_retransmits_at_instants<I: deps::Instant, T: Clone + Send + D
                 // not necessarily indicate an issue with our own network stack.
                 // Log a warning and continue retransmitting.
                 deps::SocketError::HostUnreachable => {
-                    tracing::warn!("{debug_log_prefix} destination host unreachable: {:?}", dest);
+                    log::warn!("{debug_log_prefix} destination host unreachable: {:?}", dest);
                 }
                 // For errors that we don't recognize, default to logging an
                 // error and continuing to operate.
                 deps::SocketError::Other(_) => {
-                    tracing::error!(
+                    log::error!(
                         "{debug_log_prefix} socket error while sending to {:?}: {:?}",
                         dest,
                         e
@@ -769,13 +769,13 @@ fn recv_stream<'a, T: 'a, U: Send>(
                 // like when IP_RECVERR is set on the socket and link resolution
                 // fails, or as a result of an ICMP message.)
                 deps::SocketError::HostUnreachable => {
-                    tracing::warn!("{debug_log_prefix} EHOSTUNREACH from recv_from");
+                    log::warn!("{debug_log_prefix} EHOSTUNREACH from recv_from");
                     return Ok(Some((None, (recv_buf, parser))));
                 }
                 // For errors that we don't recognize, default to logging an
                 // error and continuing to operate.
                 deps::SocketError::Other(_) => {
-                    tracing::error!("{debug_log_prefix} socket error while receiving: {:?}", e);
+                    log::error!("{debug_log_prefix} socket error while receiving: {:?}", e);
                     return Ok(Some((None, (recv_buf, parser))));
                 }
             },
@@ -892,11 +892,11 @@ fn parse_incoming_dhcp_message_from_ip_packet(
         Ok(message) => Ok(Some(message)),
         Err(err) => match err {
             crate::parse::ParseError::NotUdp => {
-                tracing::debug!("{debug_log_prefix} ignoring non-UDP incoming packet");
+                log::debug!("{debug_log_prefix} ignoring non-UDP incoming packet");
                 return Ok(None);
             }
             crate::parse::ParseError::WrongPort(port) => {
-                tracing::debug!(
+                log::debug!(
                     "{debug_log_prefix} ignoring incoming UDP packet \
                     to non-DHCP-client port {port}"
                 );
@@ -1005,7 +1005,7 @@ impl<I: deps::Instant> Selecting<I> {
             futures::future::ok(match parse_result {
                 Ok(fields) => fields,
                 Err(error) => {
-                    tracing::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
+                    log::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
                     None
                 }
             })
@@ -1018,7 +1018,7 @@ impl<I: deps::Instant> Selecting<I> {
                     fields_to_use_in_request_result?;
 
                 if src_addr != fields_from_offer_to_use_in_request.server_identifier.get() {
-                    tracing::warn!("{debug_log_prefix} received offer from {src_addr} with \
+                    log::warn!("{debug_log_prefix} received offer from {src_addr} with \
                         differing server_identifier = {}",
                         fields_from_offer_to_use_in_request.server_identifier);
                 }
@@ -1190,7 +1190,7 @@ impl<I: deps::Instant> Requesting<I> {
             futures::future::ok(match parse_result {
                 Ok(msg) => msg,
                 Err(error) => {
-                    tracing::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
+                    log::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
                     None
                 }
             })
@@ -1231,7 +1231,7 @@ impl<I: deps::Instant> Requesting<I> {
                 });
 
                 if src_addr != server_identifier.get() {
-                    tracing::warn!(
+                    log::warn!(
                         "{debug_log_prefix} accepting DHCPACK from {src_addr} \
                         with differing server_identifier = {server_identifier}"
                     );
@@ -1357,7 +1357,7 @@ impl<I: deps::Instant> Bound<I> {
         let renewal_time = renewal_time.unwrap_or(*ip_address_lease_time / 2);
 
         let debug_log_prefix = &client_config.debug_log_prefix;
-        tracing::info!(
+        log::info!(
             "{debug_log_prefix} In Bound state; ip_address_lease_time = {}, renewal_time = {}, \
              server_identifier = {server_identifier}",
             ip_address_lease_time.as_secs(),
@@ -1505,7 +1505,7 @@ impl<I: deps::Instant> Renewing<I> {
             futures::future::ok(match parse_result {
                 Ok(msg) => Some(msg),
                 Err(error) => {
-                    tracing::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
+                    log::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
                     None
                 }
             })
@@ -1538,13 +1538,13 @@ impl<I: deps::Instant> Renewing<I> {
                     parameters,
                 } = ack;
                 let variant = if new_yiaddr == *yiaddr {
-                    tracing::debug!(
+                    log::debug!(
                         "{debug_log_prefix} renewed with new lease time: {}",
                         ip_address_lease_time_secs
                     );
                     RenewingOutcome::Renewed
                 } else {
-                    tracing::info!(
+                    log::info!(
                         "{debug_log_prefix} obtained different address from renewal: {}",
                         new_yiaddr
                     );
@@ -1725,7 +1725,7 @@ impl<I: deps::Instant> Rebinding<I> {
             futures::future::ok(match parse_result {
                 Ok(msg) => Some(msg),
                 Err(error) => {
-                    tracing::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
+                    log::warn!("{debug_log_prefix} discarding incoming packet: {:?}", error);
                     None
                 }
             })
@@ -1756,13 +1756,13 @@ impl<I: deps::Instant> Rebinding<I> {
                     parameters,
                 } = ack;
                 let variant = if new_yiaddr == *yiaddr {
-                    tracing::debug!(
+                    log::debug!(
                         "{debug_log_prefix} rebound with new lease time: {}",
                         ip_address_lease_time_secs
                     );
                     RebindingOutcome::Renewed
                 } else {
-                    tracing::info!(
+                    log::info!(
                         "{debug_log_prefix} obtained different address from rebinding: {}",
                         new_yiaddr
                     );
@@ -1801,26 +1801,19 @@ mod test {
     };
     use crate::deps::Clock as _;
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use fuchsia_async as fasync;
     use futures::{join, Future};
     use itertools::Itertools as _;
     use net_declare::net::prefix_length_v4;
     use net_declare::{net_mac, std_ip_v4};
     use net_types::ip::{Ipv4, PrefixLength};
+    use simplelog::{Config, LevelFilter, WriteLogger};
     use std::cell::RefCell;
     use std::rc::Rc;
     use test_case::test_case;
 
     fn initialize_logging() {
-        let subscriber = tracing_subscriber::fmt()
-            .with_writer(std::io::stderr)
-            .with_max_level(tracing::Level::INFO)
-            .finish();
-
-        // Intentionally don't use the result here, since it'll succeed with the
-        // first test case that calls it and fail with the others.
-        let _: Result<_, _> = tracing::subscriber::set_global_default(subscriber);
+        WriteLogger::init(LevelFilter::Info, Config::default(), std::io::stderr()).unwrap();
     }
 
     const TEST_MAC_ADDRESS: Mac = net_mac!("01:01:01:01:01:01");
@@ -1907,9 +1900,7 @@ mod test {
 
     fn build_test_selecting_state() -> Selecting<Duration> {
         Selecting {
-            discover_options: DiscoverOptions {
-                xid: TransactionId(const_unwrap_option(NonZeroU32::new(1))),
-            },
+            discover_options: DiscoverOptions { xid: TransactionId(NonZeroU32::new(1).unwrap()) },
             start_time: std::time::Duration::from_secs(0),
         }
     }
@@ -2007,9 +1998,7 @@ mod test {
         let time = FakeTimeController::new();
 
         let selecting = Selecting {
-            discover_options: DiscoverOptions {
-                xid: TransactionId(const_unwrap_option(NonZeroU32::new(1))),
-            },
+            discover_options: DiscoverOptions { xid: TransactionId(NonZeroU32::new(1).unwrap()) },
             start_time: std::time::Duration::from_secs(0),
         };
         let mut rng = FakeRngProvider::new(0);
@@ -2098,7 +2087,7 @@ mod test {
         run_with_accelerated_time(&mut executor, time, &mut main_future);
     }
 
-    const XID: NonZeroU32 = const_unwrap_option(NonZeroU32::new(1));
+    const XID: NonZeroU32 = NonZeroU32::new(1).unwrap();
     #[test_case(u32::from(XID), TEST_MAC_ADDRESS => Ok(()) ; "accepts good reply")]
     #[test_case(u32::from(XID), TEST_SERVER_MAC_ADDRESS => Err(
         ValidateMessageError::WrongChaddr {
@@ -2334,9 +2323,9 @@ mod test {
                     server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
                         .try_into()
                         .expect("should be specified"),
-                    ip_address_lease_time_secs: Some(const_unwrap_option(NonZeroU32::new(
-                        DEFAULT_LEASE_LENGTH_SECONDS
-                    ))),
+                    ip_address_lease_time_secs: Some(
+                        NonZeroU32::new(DEFAULT_LEASE_LENGTH_SECONDS).unwrap()
+                    ),
                     ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
                         .try_into()
                         .expect("should be specified"),
@@ -2346,7 +2335,7 @@ mod test {
         );
     }
 
-    const TEST_XID: TransactionId = TransactionId(const_unwrap_option(NonZeroU32::new(1)));
+    const TEST_XID: TransactionId = TransactionId(NonZeroU32::new(1).unwrap());
     const TEST_DISCOVER_OPTIONS: DiscoverOptions = DiscoverOptions { xid: TEST_XID };
 
     fn build_test_requesting_state() -> Requesting<std::time::Duration> {
@@ -2357,9 +2346,9 @@ mod test {
                 server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
                     .try_into()
                     .expect("should be specified"),
-                ip_address_lease_time_secs: Some(const_unwrap_option(NonZeroU32::new(
-                    DEFAULT_LEASE_LENGTH_SECONDS,
-                ))),
+                ip_address_lease_time_secs: Some(
+                    NonZeroU32::new(DEFAULT_LEASE_LENGTH_SECONDS).unwrap(),
+                ),
                 ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
                     .try_into()
                     .expect("should be specified"),

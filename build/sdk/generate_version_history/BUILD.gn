@@ -13,19 +13,16 @@ if (is_host) {
     visibility += [ "*" ]
     main_source = "cmd.py"
     deps = [ ":lib" ]
-    enable_mypy = true
   }
 
   python_library("lib") {
     library_name = "generate_version_history"
     sources = [ "__init__.py" ]
-    enable_mypy = true
   }
 
   python_host_test("generate_version_history_unittest") {
     main_source = "generate_version_history_unittest.py"
     libraries = [ ":lib" ]
-    enable_mypy = true
   }
 }
 

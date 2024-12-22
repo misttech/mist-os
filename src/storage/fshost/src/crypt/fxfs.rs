@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{format_sources, get_policy, unseal_sources, KeyConsumer};
 use crate::device::constants::{DATA_VOLUME_LABEL, UNENCRYPTED_VOLUME_LABEL};
 use anyhow::{anyhow, Context, Error};
+use crypt_policy::{format_sources, get_policy, unseal_sources, KeyConsumer};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};

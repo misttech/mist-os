@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
               zx_status_get_string(status));
       return 2;
     }
-    status = desc_mapper.Map(std::move(vmo), size, ZX_VM_PERM_READ);
+    status = desc_mapper.Map(std::move(vmo), 0, size, ZX_VM_PERM_READ);
     if (status != ZX_OK) {
       fprintf(stderr, "cannot map %s VMO: %s\n", counters::DescriptorVmo::kVmoName,
               zx_status_get_string(status));
@@ -121,7 +121,7 @@ int main(int argc, char** argv) {
               counters::kArenaVmoName, size, desc->max_cpus, desc->num_counters());
       return 2;
     }
-    status = arena_mapper.Map(std::move(vmo), size, ZX_VM_PERM_READ);
+    status = arena_mapper.Map(std::move(vmo), 0, size, ZX_VM_PERM_READ);
     if (status != ZX_OK) {
       fprintf(stderr, "cannot map %s VMO: %s\n", counters::kArenaVmoName,
               zx_status_get_string(status));

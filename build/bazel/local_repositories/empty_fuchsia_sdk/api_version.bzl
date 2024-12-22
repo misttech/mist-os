@@ -3,4 +3,6 @@
 # found in the LICENSE file.
 
 # Loaded from @rules_fuchsia//fuchsia/private/fuchsia_api_level.bzl
-INTERNAL_ONLY_VALID_TARGET_APIS = []
+INTERNAL_ONLY_SUPPORTED_API_LEVELS = []
+INTERNAL_ONLY_KNOWN_UNSUPPORTED_API_LEVELS = []
+INTERNAL_ONLY_ALL_KNOWN_API_LEVELS = []

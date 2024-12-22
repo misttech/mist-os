@@ -193,7 +193,7 @@ impl StorageAdmin {
                         .await
                         .map_err(|_| fcomponent::Error::Internal)?;
                         directory
-                            .clone2(object.into_channel().into())
+                            .clone(object.into_channel().into())
                             .map_err(|_| fcomponent::Error::Internal)?;
                         Ok(())
                     };
@@ -250,7 +250,7 @@ impl StorageAdmin {
                     .await
                     {
                         Ok(dir) => responder.send(
-                            dir.clone2(object.into_channel().into())
+                            dir.clone(object.into_channel().into())
                                 .map_err(|_| fcomponent::Error::Internal),
                         )?,
                         Err(_) => responder.send(Err(fcomponent::Error::Internal))?,

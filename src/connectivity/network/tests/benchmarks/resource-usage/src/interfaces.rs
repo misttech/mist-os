@@ -239,7 +239,7 @@ fn serialize_neighbor_solictation(
     use packet::serialize::{InnerPacketBuilder as _, Serializer as _};
     use packet_formats::ethernet::{EtherType, EthernetFrameBuilder, ETHERNET_MIN_BODY_LEN_NO_TAG};
     use packet_formats::icmp::ndp::NeighborSolicitation;
-    use packet_formats::icmp::{IcmpPacketBuilder, IcmpUnusedCode};
+    use packet_formats::icmp::{IcmpPacketBuilder, IcmpZeroCode};
     use packet_formats::ip::Ipv6Proto;
     use packet_formats::ipv6::Ipv6PacketBuilder;
 
@@ -248,7 +248,7 @@ fn serialize_neighbor_solictation(
         .encapsulate(IcmpPacketBuilder::<_, _>::new(
             net_types::ip::Ipv6::UNSPECIFIED_ADDRESS,
             snmc.get(),
-            IcmpUnusedCode,
+            IcmpZeroCode,
             NeighborSolicitation::new(src_ip),
         ))
         .encapsulate(Ipv6PacketBuilder::new(

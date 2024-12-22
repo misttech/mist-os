@@ -1103,32 +1103,14 @@ fn check_mldv1_report(
 
 fn check_mld_report(
     mld_version: Option<fnet_interfaces_admin::MldVersion>,
-    netstack_version: NetstackVersion,
     dst_ip: net_types_ip::Ipv6Addr,
     mld: MldPacket<&[u8]>,
     expected_group: MulticastAddr<net_types_ip::Ipv6Addr>,
 ) -> bool {
-    match mld_version {
-        Some(version) => match version {
-            fnet_interfaces_admin::MldVersion::V1 => {
-                check_mldv1_report(dst_ip, mld, expected_group)
-            }
-            fnet_interfaces_admin::MldVersion::V2 => {
-                check_mldv2_report(dst_ip, mld, expected_group)
-            }
-            _ => panic!("unknown MLD version {:?}", version),
-        },
-        None => match netstack_version {
-            NetstackVersion::Netstack2 { tracing: false, fast_udp: false } => {
-                check_mldv2_report(dst_ip, mld, expected_group)
-            }
-            NetstackVersion::Netstack3 => check_mldv1_report(dst_ip, mld, expected_group),
-            v @ (NetstackVersion::Netstack2 { tracing: _, fast_udp: _ }
-            | NetstackVersion::ProdNetstack2
-            | NetstackVersion::ProdNetstack3) => {
-                panic!("netstack_test should only be parameterized with Netstack2 or Netstack3: got {:?}", v);
-            }
-        },
+    match mld_version.unwrap_or(fnet_interfaces_admin::MldVersion::V2) {
+        fnet_interfaces_admin::MldVersion::V1 => check_mldv1_report(dst_ip, mld, expected_group),
+        fnet_interfaces_admin::MldVersion::V2 => check_mldv2_report(dst_ip, mld, expected_group),
+        other => panic!("unknown MLD version {:?}", other),
     }
 }
 
@@ -1267,7 +1249,7 @@ async fn sends_mld_reports<N: Netstack>(
                 //   link-local IPv6 Source Address, an IPv6 Hop Limit of 1, ...
                 assert_eq!(ttl, 1, "MLD messages must have a hop limit of 1");
 
-                Ok(check_mld_report(mld_version, N::VERSION, dst_ip, mld, snmc).then_some(()))
+                Ok(check_mld_report(mld_version, dst_ip, mld, snmc).then_some(()))
             }
         });
     let mut stream = pin!(stream);

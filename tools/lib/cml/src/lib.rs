@@ -3328,8 +3328,8 @@ pub struct Child {
     /// Determines the fault recovery policy to apply if this component terminates.
     /// - `none` _(default)_: Do nothing.
     /// - `reboot`: Gracefully reboot the system if the component terminates for
-    ///     any reason. This is a special feature for use only by a narrow set of
-    ///     components; see [Termination policies][doc-reboot-on-terminate] for more
+    ///     any reason other than graceful exit. This is a special feature for use only by a narrow
+    ///     set of components; see [Termination policies][doc-reboot-on-terminate] for more
     ///     information.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub on_terminate: Option<OnTerminate>,
@@ -4274,9 +4274,9 @@ pub fn offer_to_all_and_component_diff_sources_message<'a>(
         if i > 0 {
             write!(&mut output, ", ").unwrap();
         }
-        write!(&mut output, "{}", capability.offer_type()).unwrap();
+        write!(&mut output, "{}", capability.name()).unwrap();
     }
-    write!(&mut output, r#"is offered to both "all" and "{}" with different sources"#, component)
+    write!(&mut output, r#" is offered to both "all" and "{}" with different sources"#, component)
         .unwrap();
     output
 }
@@ -4297,9 +4297,9 @@ pub fn offer_to_all_and_component_diff_capabilities_message<'a>(
         if i > 0 {
             write!(&mut output, ", ").unwrap();
         }
-        write!(&mut output, "{}", capability.offer_type()).unwrap();
+        write!(&mut output, "{}", capability.name()).unwrap();
     }
-    write!(&mut output, r#"is aliased to "{}" with the same name as an offer to "all", but from different source {}"#, component, first_offer_to_all.offer_type_plural()).unwrap();
+    write!(&mut output, r#" is aliased to "{}" with the same name as an offer to "all", but from different source {}"#, component, first_offer_to_all.offer_type_plural()).unwrap();
     output
 }
 

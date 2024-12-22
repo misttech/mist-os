@@ -9,6 +9,7 @@ import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/component/component_id_index.gni")
 import("//build/component/config.gni")
 import("//build/components.gni")
+import("//build/dist/renamed_binary.gni")
 import("//build/images/filesystem_limits.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
@@ -128,7 +129,6 @@ _component_manager_bin = {
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:scopeguard",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
@@ -432,6 +432,16 @@ group("hermetic_tests") {
 
 bootfs_files_for_assembly("bootfs") {
   deps = [ ":bin" ]
+}
+
+renamed_binary("renamed_bin_with_tracing") {
+  dest = "bin/component_manager"
+  source = "$root_out_dir/component_manager_with_tracing"
+  source_deps = [ ":bin_with_tracing" ]
+}
+
+bootfs_files_for_assembly("bootfs_with_tracing") {
+  deps = [ ":renamed_bin_with_tracing" ]
 }
 
 component_config("component_manager_realm_builder_config") {

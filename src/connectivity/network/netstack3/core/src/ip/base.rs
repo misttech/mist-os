@@ -31,11 +31,11 @@ use netstack3_ip::icmp::{
 use netstack3_ip::multicast_forwarding::MulticastForwardingState;
 use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
-    self as ip, FragmentContext, IpCounters, IpDeviceContext, IpLayerBindingsContext, IpLayerIpExt,
-    IpPacketFragmentCache, IpRouteTableContext, IpRouteTablesContext, IpStateContext, IpStateInner,
-    IpTransportContext, IpTransportDispatchContext, Marks, MulticastMembershipHandler, PmtuCache,
-    PmtuContext, ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, RoutingTable,
-    RoutingTableId, RulesTable, TransportReceiveError,
+    self as ip, FragmentContext, IpCounters, IpDeviceContext, IpHeaderInfo, IpLayerBindingsContext,
+    IpLayerIpExt, IpPacketFragmentCache, IpRouteTableContext, IpRouteTablesContext, IpStateContext,
+    IpStateInner, IpTransportContext, IpTransportDispatchContext, LocalDeliveryPacketInfo, Marks,
+    MulticastMembershipHandler, PmtuCache, PmtuContext, ResolveRouteError, ResolvedRoute,
+    RoutingTable, RoutingTableId, RulesTable, TransportReceiveError,
 };
 use netstack3_sync::rc::Primary;
 use netstack3_sync::RwLock;
@@ -371,7 +371,7 @@ where
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<Ipv4>>>
     IpTransportDispatchContext<Ipv4, BC> for CoreCtx<'_, BC, L>
 {
-    fn dispatch_receive_ip_packet<B: BufferMut>(
+    fn dispatch_receive_ip_packet<B: BufferMut, H: IpHeaderInfo<Ipv4>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
@@ -379,7 +379,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         proto: Ipv4Proto,
         body: B,
-        meta: ReceiveIpPacketMeta<Ipv4>,
+        info: &LocalDeliveryPacketInfo<Ipv4, H>,
     ) -> Result<(), TransportReceiveError> {
         match proto {
             Ipv4Proto::Icmp => {
@@ -390,12 +390,12 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    meta,
+                    info,
                 )
                 .map_err(|(_body, err)| err)
             }
             Ipv4Proto::Igmp => {
-                device::receive_igmp_packet(self, bindings_ctx, device, src_ip, dst_ip, body);
+                device::receive_igmp_packet(self, bindings_ctx, device, src_ip, dst_ip, body, info);
                 Ok(())
             }
             Ipv4Proto::Proto(IpProto::Udp) => {
@@ -406,7 +406,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    meta,
+                    info,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -418,7 +418,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    meta,
+                    info,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -432,7 +432,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<Ipv6>>>
     IpTransportDispatchContext<Ipv6, BC> for CoreCtx<'_, BC, L>
 {
-    fn dispatch_receive_ip_packet<B: BufferMut>(
+    fn dispatch_receive_ip_packet<B: BufferMut, H: IpHeaderInfo<Ipv6>>(
         &mut self,
         bindings_ctx: &mut BC,
         device: &Self::DeviceId,
@@ -440,7 +440,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
         dst_ip: SpecifiedAddr<Ipv6Addr>,
         proto: Ipv6Proto,
         body: B,
-        meta: ReceiveIpPacketMeta<Ipv6>,
+        info: &LocalDeliveryPacketInfo<Ipv6, H>,
     ) -> Result<(), TransportReceiveError> {
         match proto {
             Ipv6Proto::Icmpv6 => {
@@ -451,7 +451,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    meta,
+                    info,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -467,7 +467,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    meta,
+                    info,
                 )
                 .map_err(|(_body, err)| err)
             }
@@ -479,7 +479,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IcmpAllSocketsSet<
                     src_ip,
                     dst_ip,
                     body,
-                    meta,
+                    info,
                 )
                 .map_err(|(_body, err)| err)
             }

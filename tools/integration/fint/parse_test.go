@@ -20,7 +20,7 @@ import (
 
 func TestReadStatic(t *testing.T) {
 	message := &fintpb.Static{
-		Optimize:         fintpb.Static_RELEASE,
+		CompilationMode:  fintpb.Static_COMPILATION_MODE_RELEASE,
 		Board:            "qemu",
 		Product:          "workstation",
 		NinjaTargets:     []string{"default"},

@@ -43,7 +43,7 @@ static_assert(MAX_OPS_PER_PAGE_DEF == MAX_OPS_PER_PAGE,
 
 // Implemented in assembly. Copies the new kernel into place and branches to it.
 typedef void (*mexec_asm_func)(uint64_t arg0, uint64_t arg1, uint64_t arg2, uint64_t aux,
-                               memmov_ops_t* ops, void* new_kernel_addr);
+                               memmov_ops_t* ops, uintptr_t new_kernel_entry);
 
 // Writes an mexec data ZBI into the provided buffer and returns the size of
 // that ZBI if successful.

@@ -42,6 +42,7 @@
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_errinj.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_hw.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/sim_iovar.h"
+#include "wlan/common/element.h"
 #include "wlan/common/macaddr.h"
 #include "wlan/drivers/components/frame_storage.h"
 
@@ -231,6 +232,71 @@ class SimFirmware {
     uint64_t switch_timer_id;
   };
 
+  // Default values for firmware parameters related to HT and VHT capabilities are defined below.
+  // These values were taken from the brcmfmac driver running on VIM3.
+  // Public so that tests can check the default values if necessary.
+  static constexpr uint32_t kDefaultLdpcCap = 1;
+  static constexpr uint32_t kDefaultStbcRx = 1;
+  static constexpr uint32_t kDefaultAmpduRxDensity = 5;
+  static constexpr uint32_t kDefaultAmpduRxFactor = 7;
+  static constexpr uint32_t kDefaultRxStreamsCap = 3;
+  static constexpr uint32_t kDefaultTxStreamsCap = 2;
+
+  // Contains iovars related to HT, VHT, and band capabilities.
+  // By default, it's constructed with values seen on brcmfmac running on a VIM3.
+  struct CapabilityIovars {
+    CapabilityIovars() {
+      const std::vector<uint32_t> kDefaultChanspecList = {4097, 4098, 4099, 4100, 4101, 4102,
+                                                          4103, 4104, 4105, 4106, 4107};
+      ZX_ASSERT(SetChanspecList(kDefaultChanspecList).is_ok());
+    }
+    uint32_t ldpc_cap = kDefaultLdpcCap;
+    uint32_t stbc_rx = kDefaultStbcRx;
+    uint32_t ampdu_rx_density = kDefaultAmpduRxDensity;
+    uint32_t ampdu_rx_factor = kDefaultAmpduRxFactor;
+    uint32_t rxstreams_cap = kDefaultRxStreamsCap;
+    uint32_t bw_cap_2ghz = 0;
+    uint32_t bw_cap_5ghz = WLC_BW_20MHZ_BIT | WLC_BW_40MHZ_BIT | WLC_BW_80MHZ_BIT;
+
+    // Note: VIM3 doesn't support tx_bfe_cap_hw, but it's supported in SIM HW. Tests that care about
+    // which iovars are supported can inject errors that cause tx_bfe_cap_hw to return an error.
+    uint32_t txbf_bfe_cap_hw = BRCMF_TXBF_SU_BFE_CAP;
+    uint32_t txbf_bfr_cap_hw = BRCMF_TXBF_SU_BFR_CAP;
+    uint32_t txbf_bfe_cap = BRCMF_TXBF_SU_BFE_CAP;
+    uint32_t txbf_bfr_cap = BRCMF_TXBF_SU_BFR_CAP;
+    uint32_t txstreams_cap = kDefaultTxStreamsCap;
+
+    std::vector<uint32_t> GetChanspecList() {
+      std::vector<uint32_t> ret;
+      ret.resize(chanspec_list_.count);
+      std::memcpy(ret.data(), &chanspec_list_.element[0], ret.size() * sizeof(uint32_t));
+      return ret;
+    }
+
+    zx::result<> SetChanspecList(const std::vector<uint32_t>& v) {
+      if (v.size() > kMaxChanspecListSize) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      chanspec_list_.count = static_cast<uint32_t>(v.size());
+      std::memcpy(&chanspec_list_.element[0], v.data(), v.size() * sizeof(uint32_t));
+      return zx::ok();
+    }
+
+   private:
+    // SimFirmware can access |chanspec_list_| directly.
+    friend class SimFirmware;
+
+    static constexpr size_t kMaxChanspecListSize = 32;
+    // brcmf_chanspec_list has a variable length uint32_t list containing the elemeents.
+    // Backing storage is provided by |__storage|, which shouldn't be accessed by the user directly.
+    union {
+      struct brcmf_chanspec_list chanspec_list_;
+
+      // +1 to account for |count| member in chanspec_list.
+      uint32_t __storage[kMaxChanspecListSize + 1];
+    };
+  };
+
   SimFirmware() = delete;
   explicit SimFirmware(brcmf_simdev* simdev);
   ~SimFirmware();
@@ -252,6 +318,9 @@ class SimFirmware {
   // Allows simulation of a deauth ind coming from an unexpected BSS.
   void TriggerFirmwareDeauthIndFromBssid(wlan_ieee80211::ReasonCode reason,
                                          const uint8_t bssid[ETH_ALEN]);
+
+  // Allow simulation to set CapabilityIovars
+  void SetCapabilityIovars(CapabilityIovars new_iovars) { capability_iovars_ = new_iovars; }
 
   // Firmware iovar accessors
   zx_status_t IovarsSet(uint16_t ifidx, const char* name, const void* value, size_t value_len,
@@ -325,6 +394,8 @@ class SimFirmware {
   zx_status_t IovarWsecKeyGet(SimIovarGetReq* req);
   zx_status_t IovarWstatsCountersGet(SimIovarGetReq* req);
   zx_status_t IovarWmeCounterGet(SimIovarGetReq* req);
+  zx_status_t IovarBwCapGet(SimIovarGetReq* req);
+  zx_status_t IovarChanspecsGet(SimIovarGetReq* req);
 
  private:
   struct Client {
@@ -621,6 +692,9 @@ class SimFirmware {
   bool wme_rx_error_high_ =
       false;  // If set to true, sim-fw will return wme stats with high rx drop
 
+  CapabilityIovars capability_iovars_{};
+
+  // Firmware parameters related to HT or VHT capabilities are defined below.
   std::unordered_map<std::string, SimIovar> iovar_table_;
 };
 

@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <fstream>
 #include <string>
 
 #include <gtest/gtest.h>
@@ -43,7 +44,7 @@ class CgroupTest : public ::testing::Test {
     // cgroup2 filesystem persists on the system after umounting, and lingering subdirectories can
     // cause subsequent tests to fail.
     for (auto path = cgroup_paths_.rbegin(); path != cgroup_paths_.rend(); path++) {
-      ASSERT_THAT(rmdir(path->c_str()), SyscallSucceeds());
+      ASSERT_THAT(rmdir(path->c_str()), SyscallSucceeds()) << "Could not delete " << *path << "";
     }
     ASSERT_THAT(umount(root_path().c_str()), SyscallSucceeds());
   }
@@ -86,6 +87,34 @@ class CgroupTest : public ::testing::Test {
       ASSERT_NE(found, entry_types.end());
       EXPECT_EQ(found->second, entry.type);
     }
+  }
+
+  static void CheckFileForLine(const std::string& path, const std::string& line,
+                               const bool should_exist) {
+    std::ifstream file(path);
+    ASSERT_TRUE(file.is_open());
+
+    std::string file_line;
+    while (std::getline(file, file_line)) {
+      if (line == file_line) {
+        if (should_exist) {
+          return;
+        }
+        FAIL() << "Unexpectedly found " << line << " in " << path;
+      }
+    }
+
+    if (should_exist) {
+      FAIL() << "Could not find " << line << " in " << path;
+    }
+  }
+
+  static void CheckFileHasLine(const std::string& path, const std::string& line) {
+    CheckFileForLine(path, line, true);
+  }
+
+  static void CheckFileDoesNotHaveLine(const std::string& path, const std::string& line) {
+    CheckFileForLine(path, line, false);
   }
 
   void CreateCgroup(std::string path) {
@@ -177,4 +206,66 @@ TEST_F(CgroupTest, WriteToInterfaceFileAfterCgroupIsDeleted) {
   std::string pid_string = std::to_string(getpid());
   EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
               SyscallFailsWithErrno(ENODEV));
+}
+
+TEST_F(CgroupTest, MoveProcessToCgroup) {
+  std::string root_procs_path = root_path() + "/" + PROCS_FILE;
+  std::string child_path = root_path() + "/child";
+  std::string child_procs_path = child_path + "/" + PROCS_FILE;
+  std::string pid_string = std::to_string(getpid());
+
+  CreateCgroup(child_path);
+
+  {
+    fbl::unique_fd child_procs_fd(open(child_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_procs_fd.is_valid());
+    EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
+                SyscallSucceeds());
+  }
+
+  CheckFileDoesNotHaveLine(root_procs_path, pid_string);
+  CheckFileHasLine(child_procs_path, pid_string);
+
+  {
+    fbl::unique_fd procs_fd(open(root_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(procs_fd.is_valid());
+    EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
+  }
+
+  CheckFileDoesNotHaveLine(child_procs_path, pid_string);
+  CheckFileHasLine(root_procs_path, pid_string);
+}
+
+TEST_F(CgroupTest, UnlinkCgroupWithProcess) {
+  std::string root_procs_path = root_path() + "/" + PROCS_FILE;
+  std::string child_path = root_path() + "/child";
+  std::string child_procs_path = child_path + "/" + PROCS_FILE;
+  std::string pid_string = std::to_string(getpid());
+
+  CreateCgroup(child_path);
+
+  {
+    fbl::unique_fd child_procs_fd(open(child_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(child_procs_fd.is_valid());
+    EXPECT_THAT(write(child_procs_fd.get(), pid_string.c_str(), pid_string.length()),
+                SyscallSucceeds());
+  }
+
+  ASSERT_THAT(rmdir(child_path.c_str()), SyscallFailsWithErrno(EBUSY));
+
+  {
+    fbl::unique_fd procs_fd(open(root_procs_path.c_str(), O_WRONLY));
+    ASSERT_TRUE(procs_fd.is_valid());
+    EXPECT_THAT(write(procs_fd.get(), pid_string.c_str(), pid_string.length()), SyscallSucceeds());
+  }
+}
+
+TEST_F(CgroupTest, UnlinkCgroupWithChildren) {
+  std::string child_path = root_path() + "/child";
+  std::string grandchild_path = child_path + "/grandchild";
+
+  CreateCgroup(child_path);
+  CreateCgroup(grandchild_path);
+
+  ASSERT_THAT(rmdir(child_path.c_str()), SyscallFailsWithErrno(EBUSY));
 }

@@ -544,13 +544,12 @@ pub struct RuleId {
 
 #[cfg(test)]
 mod tests {
-    use const_unwrap::const_unwrap_option;
     use net_declare::{fidl_ip, fidl_subnet};
     use test_case::test_case;
 
     use super::*;
 
-    const THREE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(3));
+    const THREE: NonZeroU64 = NonZeroU64::new(3).unwrap();
 
     #[test_case("id:0" => Err(()); "id must be nonzero")]
     #[test_case("id:-1" => Err(()); "id must be nonnegative")]

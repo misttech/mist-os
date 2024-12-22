@@ -394,7 +394,7 @@ async fn main_inner() -> Result<(), Error> {
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE;
-    ObjectRequest::new3(
+    ObjectRequest::new(
         flags,
         &fio::Options::default(),
         fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::DirectoryRequest.into())

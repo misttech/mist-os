@@ -10,10 +10,10 @@ use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use fuchsia_component::client::connect_to_protocol;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
+use log::info;
 use rand::rngs::SmallRng;
 use rand::Rng;
 use stress_test_actor::{actor_loop, Action};
-use tracing::info;
 
 /// Stores all data needed by this Worker. This singleton gets passed into every action.
 struct WorkerData {

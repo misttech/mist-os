@@ -139,13 +139,13 @@ mod proxy_count {
                 if self.count == self.increment * 10 {
                     self.increment *= 10;
                 }
-                tracing::info!("{} proxies extant or never reaped", self.count)
+                log::info!("{} proxies extant or never reaped", self.count)
             }
         }
 
         pub fn decrement(&mut self) {
             if self.count == 0 {
-                tracing::warn!("proxy counter went below zero");
+                log::warn!("proxy counter went below zero");
             } else {
                 self.count -= 1;
             }

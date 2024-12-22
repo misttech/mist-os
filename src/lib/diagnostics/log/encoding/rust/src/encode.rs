@@ -4,9 +4,7 @@
 
 //! Encoding diagnostic records using the Fuchsia Tracing format.
 
-use crate::{
-    constants, ArgType, Argument, Header, Metatag, RawSeverity, Record, SeverityExt, Value,
-};
+use crate::{constants, ArgType, Argument, Header, Metatag, RawSeverity, Record, Value};
 use fidl_fuchsia_diagnostics::Severity;
 use std::array::TryFromSliceError;
 use std::borrow::{Borrow, Cow};
@@ -14,18 +12,11 @@ use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::Deref;
 use thiserror::Error;
-use tracing::{Event, Metadata, Subscriber};
-use tracing_core::field::{Field, Visit};
-use tracing_core::span;
-use tracing_log::NormalizeEvent;
-use tracing_subscriber::layer::Context;
-use tracing_subscriber::registry::{LookupSpan, Scope};
 
 /// An `Encoder` wraps any value implementing `MutableBuffer` and writes diagnostic stream records
 /// into it.
 pub struct Encoder<B> {
     pub(crate) buf: B,
-    found_error: Option<EncodingError>,
     /// Encoder options
     options: EncoderOpts,
 }
@@ -61,7 +52,7 @@ where
 {
     /// Create a new `Encoder` from the provided buffer.
     pub fn new(buf: B, options: EncoderOpts) -> Self {
-        Self { buf, found_error: None, options }
+        Self { buf, options }
     }
 
     /// Returns a reference to the underlying buffer being used for encoding.
@@ -74,7 +65,7 @@ where
         self.buf
     }
 
-    /// Writes a [`tracing::Event`] to the buffer as a record.
+    /// Writes an event to to the buffer as a record.
     ///
     /// Fails if there is insufficient space in the buffer for encoding.
     pub fn write_event<'a, E, MS, T>(
@@ -218,18 +209,6 @@ where
         Ok(())
     }
 
-    fn maybe_write_argument(
-        &mut self,
-        field: &Field,
-        value: impl WriteArgumentValue<B>,
-    ) -> Result<(), EncodingError> {
-        let name = field.name();
-        if !matches!(name, "log.target" | "log.module_path" | "log.file" | "log.line") {
-            self.write_raw_argument(name, value)?;
-        }
-        Ok(())
-    }
-
     /// Write an unsigned integer.
     fn write_u64(&mut self, n: u64) -> Result<(), EncodingError> {
         self.buf.put_u64_le(n).map_err(|_| EncodingError::BufferTooSmall)
@@ -251,7 +230,8 @@ where
     }
 
     /// Write bytes padded to 8-byte alignment.
-    fn write_bytes(&mut self, src: &[u8]) -> Result<(), EncodingError> {
+    #[doc(hidden)]
+    pub fn write_bytes(&mut self, src: &[u8]) -> Result<(), EncodingError> {
         self.buf.put_slice(src).map_err(|_| EncodingError::BufferTooSmall)?;
         unsafe {
             let align = std::mem::size_of::<u64>();
@@ -406,74 +386,6 @@ fn string_mask(s: &str) -> u16 {
     (len as u16) | (1 << 15)
 }
 
-/// The attributes of a Span pre-encoded for usage in child events.
-pub struct EncodedSpanArguments {
-    encoder: Encoder<Cursor<ResizableBuffer>>,
-}
-
-impl EncodedSpanArguments {
-    /// Encodes the given span attributes.
-    pub fn new(attrs: &span::Attributes<'_>) -> Result<Self, EncodingError> {
-        let mut encoder =
-            Encoder::new(Cursor::new(ResizableBuffer(Vec::new())), EncoderOpts::default());
-        attrs.record(&mut encoder);
-        if let Some(err) = encoder.found_error {
-            return Err(err);
-        }
-        Ok(Self { encoder })
-    }
-
-    /// Encodes the given span attributes, replacing existing ones.
-    // TODO(b/312805612): this should update rather than overwrite.
-    pub fn from_record(record: &span::Record<'_>) -> Result<Self, EncodingError> {
-        let mut encoder =
-            Encoder::new(Cursor::new(ResizableBuffer(Vec::new())), EncoderOpts::default());
-        record.record(&mut encoder);
-        if let Some(err) = encoder.found_error {
-            return Err(err);
-        }
-        Ok(Self { encoder })
-    }
-
-    fn copy_to<B: MutableBuffer>(&self, encoder: &mut Encoder<B>) -> Result<(), EncodingError> {
-        let buffer = self.encoder.inner();
-        let end = buffer.cursor().min(buffer.get_ref().0.len());
-        encoder.write_bytes(&buffer.get_ref().0[..end])
-    }
-}
-
-impl<B: MutableBuffer> Visit for Encoder<B> {
-    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        if let Err(err) = self.maybe_write_argument(field, format!("{value:?}").as_str()) {
-            self.found_error = Some(err);
-        };
-    }
-
-    fn record_str(&mut self, field: &Field, value: &str) {
-        if let Err(err) = self.maybe_write_argument(field, value) {
-            self.found_error = Some(err);
-        }
-    }
-
-    fn record_i64(&mut self, field: &Field, value: i64) {
-        if let Err(err) = self.maybe_write_argument(field, value) {
-            self.found_error = Some(err);
-        }
-    }
-
-    fn record_u64(&mut self, field: &Field, value: u64) {
-        if let Err(err) = self.maybe_write_argument(field, value) {
-            self.found_error = Some(err);
-        }
-    }
-
-    fn record_bool(&mut self, field: &Field, value: bool) {
-        if let Err(err) = self.maybe_write_argument(field, value) {
-            self.found_error = Some(err);
-        }
-    }
-}
-
 /// Trait implemented by types which can be written by the Encoder.
 pub trait RecordEvent {
     /// Returns the record severity.
@@ -506,109 +418,6 @@ pub trait RecordFields {
         self,
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError>;
-}
-
-/// An event emitted by `tracing`.
-pub struct TracingEvent<'a, S> {
-    event: &'a Event<'a>,
-    context: Option<Context<'a, S>>,
-    metadata: StoredMetadata<'a>,
-    timestamp: zx::BootInstant,
-}
-
-// Just like Cow, but without requiring the inner type to be Clone.
-enum StoredMetadata<'a> {
-    Borrowed(&'a Metadata<'a>),
-    Owned(Metadata<'a>),
-}
-
-impl<'a> Deref for StoredMetadata<'a> {
-    type Target = Metadata<'a>;
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Borrowed(meta) => meta,
-            Self::Owned(meta) => meta,
-        }
-    }
-}
-
-impl<'a, S> TracingEvent<'a, S> {
-    /// Wraps a tracing event with its associated context.
-    pub fn new(event: &'a Event<'_>, context: Context<'a, S>) -> TracingEvent<'a, S> {
-        Self::inner(event, Some(context))
-    }
-
-    // Just for benchmark purposes since we can't construct a Context manually.
-    #[doc(hidden)]
-    pub fn from_event(event: &'a Event<'_>) -> TracingEvent<'a, S> {
-        Self::inner(event, None)
-    }
-
-    fn inner(event: &'a Event<'_>, context: Option<Context<'a, S>>) -> TracingEvent<'a, S> {
-        // normalizing is needed to get log records to show up in trace metadata correctly
-        if let Some(metadata) = event.normalized_metadata() {
-            Self {
-                event,
-                context,
-                metadata: StoredMetadata::Owned(metadata),
-                timestamp: zx::BootInstant::get(),
-            }
-        } else {
-            Self {
-                event,
-                context,
-                metadata: StoredMetadata::Borrowed(event.metadata()),
-                timestamp: zx::BootInstant::get(),
-            }
-        }
-    }
-}
-
-impl<S> RecordEvent for TracingEvent<'_, S>
-where
-    for<'lookup> S: Subscriber + LookupSpan<'lookup>,
-{
-    fn raw_severity(&self) -> RawSeverity {
-        self.metadata.raw_severity()
-    }
-
-    fn file(&self) -> Option<&str> {
-        self.metadata.file()
-    }
-
-    fn line(&self) -> Option<u32> {
-        self.metadata.line()
-    }
-
-    fn target(&self) -> &str {
-        self.metadata.target()
-    }
-
-    fn timestamp(&self) -> zx::BootInstant {
-        self.timestamp
-    }
-
-    fn write_arguments<B: MutableBuffer>(
-        self,
-        writer: &mut Encoder<B>,
-    ) -> Result<(), EncodingError> {
-        writer.found_error = None;
-        if let Some(context) = self.context {
-            let span_iter =
-                context.event_scope(self.event).map(Scope::from_root).into_iter().flatten();
-            for span in span_iter {
-                let extensions = span.extensions();
-                if let Some(encoded) = extensions.get::<EncodedSpanArguments>() {
-                    encoded.copy_to(writer)?;
-                }
-            }
-        }
-        self.event.record(writer);
-        if let Some(err) = writer.found_error.take() {
-            return Err(err);
-        }
-        Ok(())
-    }
 }
 
 /// Arguments to create a record for testing purposes.
@@ -855,12 +664,21 @@ pub struct WriteSlot {
 }
 
 /// Wrapper for a vector that allows us to implement necessary traits.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ResizableBuffer(Vec<u8>);
 
 impl From<Vec<u8>> for ResizableBuffer {
     fn from(buf: Vec<u8>) -> Self {
         Self(buf)
+    }
+}
+
+impl Deref for ResizableBuffer {
+    type Target = Vec<u8>;
+
+    // Required method
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -1036,6 +854,21 @@ pub enum EncodingError {
     /// We attempted to write to a buffer with no remaining capacity.
     #[error("the buffer has no remaining capacity")]
     NoCapacity,
+
+    /// Some other error happened. Useful for integrating with this crate, but providing custom
+    /// errors.
+    #[error(transparent)]
+    Other(Box<dyn std::error::Error + Send + Sync>),
+}
+
+impl EncodingError {
+    /// Treat a custom error as an encoding error.
+    pub fn other<E>(err: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
+    {
+        Self::Other(err.into())
+    }
 }
 
 impl From<TryFromSliceError> for EncodingError {
@@ -1048,10 +881,6 @@ impl From<TryFromSliceError> for EncodingError {
 mod tests {
     use super::*;
     use crate::parse::parse_record;
-    use std::sync::{LazyLock, Mutex};
-    use tracing::info_span;
-    use tracing_subscriber::layer::{Layer, SubscriberExt};
-    use tracing_subscriber::Registry;
 
     #[fuchsia::test]
     fn build_basic_record() {
@@ -1150,119 +979,6 @@ mod tests {
                     Argument::pid(zx::Koid::from_raw(0)),
                     Argument::tid(zx::Koid::from_raw(0)),
                     Argument::dropped(7),
-                ]
-            }
-        );
-    }
-
-    // Note the inner u32 is used in the debug implementation.
-    #[derive(Debug)]
-    struct PrintMe(#[allow(unused)] u32);
-
-    type ByteEncoder = Encoder<Cursor<[u8; 1024]>>;
-    static LAST_RECORD: LazyLock<Mutex<Option<ByteEncoder>>> = LazyLock::new(|| Mutex::new(None));
-
-    struct EncoderLayer;
-    impl<S> Layer<S> for EncoderLayer
-    where
-        for<'lookup> S: Subscriber + LookupSpan<'lookup>,
-    {
-        fn on_event(&self, event: &Event<'_>, cx: Context<'_, S>) {
-            let mut encoder = Encoder::new(Cursor::new([0u8; 1024]), EncoderOpts::default());
-            encoder
-                .write_event(WriteEventParams {
-                    event: TracingEvent::new(event, cx),
-                    tags: &["a-tag"],
-                    metatags: [Metatag::Target].iter(),
-                    pid: zx::Koid::from_raw(0),
-                    tid: zx::Koid::from_raw(0),
-                    dropped: 0,
-                })
-                .expect("wrote event");
-            *LAST_RECORD.lock().unwrap() = Some(encoder);
-        }
-
-        fn on_new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
-            let span = ctx.span(id).expect("Span not found, this is a bug");
-            let mut extensions = span.extensions_mut();
-            if extensions.get_mut::<EncodedSpanArguments>().is_none() {
-                let encoded = EncodedSpanArguments::new(attrs).expect("encoded");
-                extensions.insert(encoded);
-            }
-        }
-    }
-
-    #[test]
-    fn build_record_from_tracing_event() {
-        let before_timestamp = zx::BootInstant::get();
-        let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
-        tracing::info!(
-            is_a_str = "hahaha",
-            is_debug = ?PrintMe(5),
-            is_signed = -500,
-            is_unsigned = 1000u64,
-            is_bool = false,
-            "blarg this is a message"
-        );
-
-        let guard = LAST_RECORD.lock().unwrap();
-        let encoder = guard.as_ref().unwrap();
-        let (record, _) = parse_record(encoder.inner().get_ref()).expect("wrote valid record");
-        assert!(record.timestamp > before_timestamp);
-        assert_eq!(
-            record,
-            Record {
-                timestamp: record.timestamp,
-                severity: Severity::Info as u8,
-                arguments: vec![
-                    Argument::pid(zx::Koid::from_raw(0)),
-                    Argument::tid(zx::Koid::from_raw(0)),
-                    Argument::tag("diagnostics_log_encoding_lib_test::encode::tests"),
-                    Argument::message("blarg this is a message"),
-                    Argument::other("is_a_str", "hahaha"),
-                    Argument::other("is_debug", "PrintMe(5)"),
-                    Argument::other("is_signed", -500),
-                    Argument::other("is_unsigned", 1000u64),
-                    Argument::other("is_bool", false),
-                    Argument::tag("a-tag"),
-                ]
-            }
-        );
-    }
-
-    #[test]
-    fn spans_are_supported() {
-        let before_timestamp = zx::BootInstant::get();
-        let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
-        let span = info_span!("my span", tag = "span_tag", span_field = 42);
-        span.in_scope(|| {
-            let nested_span =
-                info_span!("my other span", tag = "nested_span_tag", nested_span_field = "hello");
-            nested_span.in_scope(|| {
-                tracing::info!(is_bool = true, "a log in spans");
-            });
-        });
-
-        let guard = LAST_RECORD.lock().unwrap();
-        let encoder = guard.as_ref().unwrap();
-        let (record, _) = parse_record(encoder.inner().get_ref()).expect("wrote valid record");
-        assert!(record.timestamp > before_timestamp);
-        assert_eq!(
-            record,
-            Record {
-                timestamp: record.timestamp,
-                severity: Severity::Info as u8,
-                arguments: vec![
-                    Argument::pid(zx::Koid::from_raw(0)),
-                    Argument::tid(zx::Koid::from_raw(0)),
-                    Argument::tag("diagnostics_log_encoding_lib_test::encode::tests"),
-                    Argument::tag("span_tag"),
-                    Argument::other("span_field", 42),
-                    Argument::tag("nested_span_tag"),
-                    Argument::other("nested_span_field", "hello"),
-                    Argument::message("a log in spans"),
-                    Argument::other("is_bool", true,),
-                    Argument::tag("a-tag",),
                 ]
             }
         );

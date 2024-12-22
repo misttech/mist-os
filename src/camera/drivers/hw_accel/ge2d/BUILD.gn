@@ -76,6 +76,7 @@ fuchsia_driver_component("ge2d-driver") {
 }
 
 fuchsia_driver_package("ge2d") {
+  export_to_bazel = true
   driver_components = [ ":ge2d-driver" ]
 }
 
@@ -104,12 +105,12 @@ cc_test_executable("ge2d_task_unittest_bin") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/mock-mmio-reg/cpp",
     "//src/camera/drivers/test_utils",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/lib/sysmem",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
     "//src/lib/fsl",

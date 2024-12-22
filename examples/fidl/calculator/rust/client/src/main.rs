@@ -41,8 +41,8 @@ async fn main() -> Result<(), anyhow::Error> {
     for line in input.lines() {
         let result = calculator_line(line, &calculator).await;
         match result {
-            Ok(result) => tracing::info!("{} = {}", &line, result),
-            Err(msg) => tracing::info!("Error with expression '{}': {}", &line, &msg),
+            Ok(result) => log::info!("{} = {}", &line, result),
+            Err(msg) => log::info!("Error with expression '{}': {}", &line, &msg),
         }
     }
 

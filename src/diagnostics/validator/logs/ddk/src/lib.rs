@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use diagnostics_log_encoding::Severity;
+use diagnostics_log_types::Severity;
 use diagnostics_reader::{ArchiveReader, Data, Logs, SubscriptionResultsStream};
 use fidl_fuchsia_validate_logs::{
     Argument, LogSinkPuppetProxy, PuppetInfo, Record, RecordSpec, Value,
 };
 use fuchsia_async::Task;
 use futures::StreamExt;
-use tracing::*;
+use log::*;
 
 struct Puppet {
     _info: PuppetInfo,
@@ -59,7 +59,7 @@ impl Puppet {
                 name: "message".to_string(),
                 value: Value::Text(test_log.to_string()),
             }],
-            severity: Severity::Error,
+            severity: Severity::Error.into(),
             timestamp: zx::BootInstant::ZERO,
         };
         let spec = RecordSpec { file: test_file.clone(), line: test_line_32, record };
@@ -93,7 +93,7 @@ impl Puppet {
                 name: "message".to_string(),
                 value: Value::Text(long_test_log.to_string()),
             }],
-            severity: Severity::Info,
+            severity: Severity::Info.into(),
             timestamp: zx::BootInstant::ZERO,
         };
         let spec = RecordSpec { file: test_file, line: test_line_32, record };

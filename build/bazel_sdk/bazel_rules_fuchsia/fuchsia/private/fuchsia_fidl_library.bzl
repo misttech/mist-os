@@ -5,7 +5,7 @@
 """Rule for declaring a FIDL library"""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
-load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "fail_missing_api_level", "get_fuchsia_api_level")
+load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library", "get_cc_lib_name")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
@@ -40,8 +40,6 @@ def _fidl_impl(context):
         inputs.extend(lib.files)
 
     api_level = get_fuchsia_api_level(context)
-    if api_level == "":
-        fail_missing_api_level("FIDL: " + context.label.name)
 
     context.actions.run(
         executable = sdk.fidlc,

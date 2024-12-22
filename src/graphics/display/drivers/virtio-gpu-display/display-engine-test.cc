@@ -4,8 +4,6 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine.h"
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fidl/fuchsia.math/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -28,8 +26,6 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
-#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
 #define USE_GTEST
@@ -440,8 +436,7 @@ TEST_F(VirtioGpuTest, ImportImage) {
 
   // Invalid import: bad collection id
   static constexpr image_metadata_t kDefaultImageMetadata = {
-      .width = 800,
-      .height = 600,
+      .dimensions = {.width = 800, .height = 600},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   constexpr display::DriverBufferCollectionId kInvalidCollectionId(100);

@@ -684,7 +684,6 @@ mod tests {
     use crate::NetstackSeed;
 
     use assert_matches::assert_matches;
-    use const_unwrap::const_unwrap_option;
     use fidl::endpoints::Proxy;
     use fidl_fuchsia_net_multicast_ext::TableControllerProxy as _;
     use futures::task::Poll;
@@ -829,9 +828,9 @@ mod tests {
     ) {
         // Create a test_setup with 3 interfaces.
         // NB: Don't use ID `1`, as that will conflict with Loopback.
-        const WRONG_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(2));
-        const INPUT_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(3));
-        const OUTPUT_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(4));
+        const WRONG_BINDING_ID: BindingId = NonZeroU64::new(2).unwrap();
+        const INPUT_BINDING_ID: BindingId = NonZeroU64::new(3).unwrap();
+        const OUTPUT_BINDING_ID: BindingId = NonZeroU64::new(4).unwrap();
         let mut test_setup = TestSetupBuilder::new()
             .add_endpoint()
             .add_endpoint()

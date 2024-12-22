@@ -5,7 +5,7 @@
 """Fuchsia API level support."""
 
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@fuchsia_sdk//fuchsia/private:fuchsia_api_level.bzl", "FuchsiaAPILevelInfo", "fuchsia_api_level")
+load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaAPILevelInfo", "fuchsia_api_level")
 load("//test_utils:api_levels.bzl", "some_valid_numerical_api_level_as_string")
 
 def _level_setting_test_impl(ctx):
@@ -29,10 +29,21 @@ level_setting_test = analysistest.make(
     },
 )
 
+level_setting_test_no_checks_test = analysistest.make(
+    _level_setting_test_impl,
+    attrs = {
+        "expected_level": attr.string(),
+    },
+    config_settings = {
+        "@fuchsia_sdk//fuchsia:fuchsia_targets_enabled": False,
+    },
+)
+
 def _make_test_fuchsia_api_level(name, level):
     fuchsia_api_level(
         name = name,
         build_setting_default = level,
+        target_compatible_with = ["@platforms//os:fuchsia"],
     )
 
 def _test_level_setting():
@@ -72,29 +83,23 @@ def _test_level_setting():
         tags = ["manual"],
     )
 
-    # TODO(https://fxbug.dev/354047162): Move to failures when filtering supported levels.
-    _make_test_fuchsia_api_level(
-        name = "platform",
-        level = "PLATFORM",
-    )
-
-    level_setting_test(
-        name = "test_setting_platform",
-        target_under_test = ":platform",
-        expected_level = "PLATFORM",
-        tags = ["manual"],
-    )
-
     _make_test_fuchsia_api_level(
         name = "unset",
         level = "",
     )
 
-    level_setting_test(
+    level_setting_failure_test(
         name = "test_unset",
         target_under_test = ":unset",
-        expected_level = "",
+        expected_failure_message = '`@//fuchsia/api_levels:unset` has not been set to an API level. Has an API level been specified for this target? Valid API levels are ["',
         tags = ["manual"],
+    )
+
+    # test that we can skip the validation
+    level_setting_test_no_checks_test(
+        name = "test_no_validation_empty_string",
+        target_under_test = "unset",
+        expected_level = "",
     )
 
 # Failure tests
@@ -126,14 +131,13 @@ def _test_level_setting_failures():
 
     _make_test_fuchsia_api_level(
         name = "retired_level",
-        # TODO(https://fxbug.dev/354047162): Change to 21 when filtering supported levels.
-        level = "3",
+        level = "21",
     )
 
     level_setting_failure_test(
         name = "test_retired",
         target_under_test = ":retired_level",
-        expected_failure_message = '"3" is not an API level supported by this SDK. API level should be one of ["',
+        expected_failure_message = '"21" is not an API level supported by this SDK. API level should be one of ["',
         tags = ["manual"],
     )
 
@@ -161,6 +165,18 @@ def _test_level_setting_failures():
         tags = ["manual"],
     )
 
+    _make_test_fuchsia_api_level(
+        name = "platform",
+        level = "PLATFORM",
+    )
+
+    level_setting_failure_test(
+        name = "test_setting_platform",
+        target_under_test = ":platform",
+        expected_failure_message = '"PLATFORM" is not an API level supported by this SDK. API level should be one of ["',
+        tags = ["manual"],
+    )
+
 def fuchsia_api_level_test_suite(name, **kwargs):
     _test_level_setting()
     _test_level_setting_failures()
@@ -174,6 +190,7 @@ def fuchsia_api_level_test_suite(name, **kwargs):
             ":test_setting_head",
             ":test_setting_platform",
             ":test_unset",
+            ":test_no_validation_empty_string",
 
             # _test_level_setting_failures tests
             ":test_setting_unknown_string",

@@ -481,69 +481,68 @@ zx_status_t PlatformDevice::Start() {
 
 void PlatformDevice::DdkInit(ddk::InitTxn txn) {
   const size_t metadata_count = node_.metadata() == std::nullopt ? 0 : node_.metadata()->size();
+  for (size_t i = 0; i < metadata_count; i++) {
+    const auto& metadata = node_.metadata().value()[i];
+    if (!IsValid(metadata)) {
+      txn.Reply(ZX_ERR_INTERNAL);
+      return;
+    }
+
+    auto metadata_id = metadata.id();
+    ZX_ASSERT(metadata_id.has_value());
+    auto metadata_data = metadata.data();
+    ZX_ASSERT(metadata_data.has_value());
+
+    // TODO(b/341981272): Remove `DdkAddMetadata()` once all drivers bound to platform devices do
+    // not use `device_get_metadata()` to retrieve metadata. They should be using
+    // fuchsia.hardware.platform.device/Device::GetMetadata().
+    errno = 0;
+    char* metadata_id_end{};
+    const char* metadata_id_start = metadata_id.value().c_str();
+    auto metadata_type =
+        static_cast<uint32_t>(std::strtol(metadata_id_start, &metadata_id_end, 10));
+    if (!metadata_id.value().empty() && errno == 0 && *metadata_id_end == '\0') {
+      zx_status_t status =
+          DdkAddMetadata(metadata_type, metadata_data->data(), metadata_data->size());
+      if (status != ZX_OK) {
+        txn.Reply(status);
+        return;
+      }
+    }
+
+    metadata_.emplace(metadata_id.value(), metadata_data.value());
+  }
+
   const size_t boot_metadata_count =
       node_.boot_metadata() == std::nullopt ? 0 : node_.boot_metadata()->size();
-  if (metadata_count > 0 || boot_metadata_count > 0) {
-    for (size_t i = 0; i < metadata_count; i++) {
-      const auto& metadata = node_.metadata().value()[i];
-      if (!IsValid(metadata)) {
-        txn.Reply(ZX_ERR_INTERNAL);
-        return;
-      }
-
-      auto metadata_id = metadata.id();
-      ZX_ASSERT(metadata_id.has_value());
-      auto metadata_data = metadata.data();
-      ZX_ASSERT(metadata_data.has_value());
-
-      // TODO(b/341981272): Remove `DdkAddMetadata()` once all drivers bound to platform devices do
-      // not use `device_get_metadata()` to retrieve metadata. They should be using
-      // fuchsia.hardware.platform.device/Device::GetMetadata().
-      errno = 0;
-      char* metadata_id_end{};
-      const char* metadata_id_start = metadata_id.value().c_str();
-      auto metadata_type =
-          static_cast<uint32_t>(std::strtol(metadata_id_start, &metadata_id_end, 10));
-      if (!metadata_id.value().empty() && errno == 0 && *metadata_id_end == '\0') {
-        zx_status_t status =
-            DdkAddMetadata(metadata_type, metadata_data->data(), metadata_data->size());
-        if (status != ZX_OK) {
-          txn.Reply(status);
-          return;
-        }
-      }
-
-      metadata_.emplace(metadata_id.value(), metadata_data.value());
+  for (size_t i = 0; i < boot_metadata_count; i++) {
+    const auto& metadata = node_.boot_metadata().value()[i];
+    if (!IsValid(metadata)) {
+      txn.Reply(ZX_ERR_INTERNAL);
+      return;
     }
 
-    for (size_t i = 0; i < boot_metadata_count; i++) {
-      const auto& metadata = node_.boot_metadata().value()[i];
-      if (!IsValid(metadata)) {
-        txn.Reply(ZX_ERR_INTERNAL);
-        return;
+    auto metadata_zbi_type = metadata.zbi_type();
+    ZX_ASSERT(metadata_zbi_type.has_value());
+
+    zx::result data =
+        bus_->GetBootItemArray(metadata_zbi_type.value(), metadata.zbi_extra().value());
+    zx_status_t status = data.status_value();
+    if (data.is_ok()) {
+      // TODO(b/341981272): Remove `DdkAddMetadata()` once all drivers bound to platform devices
+      // do not use `device_get_metadata()` to retrieve metadata. They should be using
+      // fuchsia.hardware.platform.device/Device::GetMetadata().
+      status = DdkAddMetadata(metadata_zbi_type.value(), data->data(), data->size());
+      if (status != ZX_OK) {
+        zxlogf(WARNING, "%s failed to add metadata for new device", __func__);
       }
 
-      auto metadata_zbi_type = metadata.zbi_type();
-      ZX_ASSERT(metadata_zbi_type.has_value());
-
-      zx::result data =
-          bus_->GetBootItemArray(metadata_zbi_type.value(), metadata.zbi_extra().value());
-      zx_status_t status = data.status_value();
-      if (data.is_ok()) {
-        // TODO(b/341981272): Remove `DdkAddMetadata()` once all drivers bound to platform devices
-        // do not use `device_get_metadata()` to retrieve metadata. They should be using
-        // fuchsia.hardware.platform.device/Device::GetMetadata().
-        status = DdkAddMetadata(metadata_zbi_type.value(), data->data(), data->size());
-        if (status != ZX_OK) {
-          zxlogf(WARNING, "%s failed to add metadata for new device", __func__);
-        }
-
-        metadata_.emplace(std::to_string(metadata_zbi_type.value()),
-                          std::vector<uint8_t>{data->begin(), data->end()});
-      }
+      metadata_.emplace(std::to_string(metadata_zbi_type.value()),
+                        std::vector<uint8_t>{data->begin(), data->end()});
     }
   }
-  return txn.Reply(ZX_OK);
+
+  txn.Reply(ZX_OK);
 }
 
 void PlatformDevice::GetMmioById(GetMmioByIdRequestView request,
@@ -742,17 +741,6 @@ void PlatformDevice::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
 
 void PlatformDevice::GetMetadata(GetMetadataRequestView request,
                                  GetMetadataCompleter::Sync& completer) {
-  auto id = std::to_string(request->type);
-  auto metadata = metadata_.find(id);
-  if (metadata == metadata_.end()) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-    return;
-  }
-  completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
-}
-
-void PlatformDevice::GetMetadata2(GetMetadata2RequestView request,
-                                  GetMetadata2Completer::Sync& completer) {
   if (auto metadata = metadata_.find(request->id.get()); metadata != metadata_.end()) {
     completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
     return;

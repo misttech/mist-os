@@ -82,7 +82,9 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
     "//src/performance/experimental/profiler:e2e_tests",
     "//src/storage/blackout/host:blackout_workbench_vim3_stable",
     "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
-    "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
+
+    # TODO(https://fxbug.dev/375341470): This test is flaky on VIM3. Fix the flakes.
+    # "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test($host_toolchain)",
   ]
 }

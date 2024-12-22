@@ -15,6 +15,11 @@ if (zircon_kernel_disable_asserts) {
 }
 
 declare_args() {
+  # Build an ELF kernel rather than a ZBI image kernel.
+  use_elf_kernel = current_cpu != "x64"
+}
+
+declare_args() {
   # Maximum number of CPUs the kernel will run on (others will be ignored).
   smp_max_cpus = 32
   if (current_cpu == "arm64" || current_cpu == "riscv64") {
@@ -25,12 +30,10 @@ declare_args() {
   # base of addresses that appear in the kernel symbol table.  At runtime
   # KASLR relocation processing adjusts addresses in memory from this base
   # to the actual runtime virtual address.
-  if (current_cpu == "arm64") {
-    kernel_base = "0xffffffff00000000"
-  } else if (current_cpu == "x64") {
+  if (current_cpu == "x64" && !use_elf_kernel) {
     kernel_base = "0xffffffff80100000"  # Has KERNEL_LOAD_OFFSET baked into it.
   } else {
-    # TODO(mcgrathr): stub, probably not needed post-physboot
+    # TODO(https://fxbug.dev/42164859): stub, probably not needed post-physboot
     kernel_base = 0
   }
 
@@ -132,9 +135,6 @@ declare_args() {
 
   # Build a kernel with no user-space support, for development only.
   kernel_no_userabi = false
-
-  # Build an ELF kernel rather than a ZBI image kernel.
-  use_elf_kernel = current_cpu != "x64"
 
   # Include a mechanism for the kernel to sample threads and write the results to a buffer
   experimental_thread_sampler_enabled = false

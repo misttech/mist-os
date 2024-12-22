@@ -74,7 +74,7 @@ impl BrokerSvc {
             .try_for_each(|request| async {
                 match request {
                     LessorRequest::Lease { level, responder } => {
-                        tracing::debug!("Lease({:?}, {:?})", &element_id, &level);
+                        log::debug!("Lease({:?}, {:?})", &element_id, &level);
                         let resp = {
                             let mut broker = self.broker.borrow_mut();
                             let Some(level) =
@@ -88,22 +88,22 @@ impl BrokerSvc {
                         };
                         match resp {
                             Ok(lease) => {
-                                tracing::debug!("responder.send({:?})", &lease);
+                                log::debug!("responder.send({:?})", &lease);
                                 let (client, stream) =
                                     create_request_stream::<LeaseControlMarker>();
-                                tracing::debug!("Spawning lease control task for {:?}", &lease.id);
+                                log::debug!("Spawning lease control task for {:?}", &lease.id);
                                 Task::local({
                                     let svc = self.clone();
                                     async move {
                                         if let Err(err) =
                                             svc.run_lease_control(&lease.id, stream).await
                                         {
-                                            tracing::debug!("run_lease_control err: {:?}", err);
+                                            log::debug!("run_lease_control err: {:?}", err);
                                         }
                                         // When the channel is closed, drop the lease.
                                         let mut broker = svc.broker.borrow_mut();
                                         if let Err(err) = broker.drop_lease(&lease.id) {
-                                            tracing::error!("Lease: drop_lease failed: {:?}", err);
+                                            log::error!("Lease: drop_lease failed: {:?}", err);
                                         }
                                     }
                                 })
@@ -114,7 +114,7 @@ impl BrokerSvc {
                         }
                     }
                     LessorRequest::_UnknownMethod { ordinal, .. } => {
-                        tracing::warn!("Received unknown LessorRequest: {ordinal}");
+                        log::warn!("Received unknown LessorRequest: {ordinal}");
                         todo!()
                     }
                 }
@@ -135,7 +135,7 @@ impl BrokerSvc {
                         last_status,
                         responder,
                     } => {
-                        tracing::debug!(
+                        log::debug!(
                             "WatchStatus({:?}, {:?})",
                             lease_id,
                             &last_status
@@ -145,19 +145,19 @@ impl BrokerSvc {
                             broker.watch_lease_status(lease_id)
                         };
                         while let Some(next) = receiver.next().await {
-                            tracing::debug!(
+                            log::debug!(
                                 "receiver.next = {:?}, last_status = {:?}",
                                 &next,
                                 last_status
                             );
                             let status = next.unwrap_or(LeaseStatus::Unknown);
                             if last_status != LeaseStatus::Unknown && last_status == status {
-                                tracing::debug!(
+                                log::debug!(
                                     "WatchStatus: status has not changed, watching for next update...",
                                 );
                                 continue;
                             } else {
-                                tracing::debug!(
+                                log::debug!(
                                     "WatchStatus: sending new status: {:?}", &status,
                                 );
                                 return responder.send(status).context("send failed");
@@ -166,7 +166,7 @@ impl BrokerSvc {
                         Err(anyhow::anyhow!("Receiver closed, element is no longer available."))
                     }
                     LeaseControlRequest::_UnknownMethod { ordinal, .. } => {
-                        tracing::warn!("Received unknown LeaseControlRequest: {ordinal}");
+                        log::warn!("Received unknown LeaseControlRequest: {ordinal}");
                         todo!()
                     }
                 }
@@ -185,13 +185,13 @@ impl BrokerSvc {
                 self.clone().handle_element_control_request(&element_id, request)
             })
             .await;
-        tracing::debug!("ElementControl stream is closed, removing element ({element_id:?})...");
+        log::debug!("ElementControl stream is closed, removing element ({element_id:?})...");
         let mut broker = self.broker.borrow_mut();
         broker.remove_element(&element_id);
 
         // Clean up ElementHandlers.
         self.element_handlers.borrow_mut().remove(&element_id);
-        tracing::debug!("Element ({element_id:?}) removed.");
+        log::debug!("Element ({element_id:?}) removed.");
         res
     }
 
@@ -202,7 +202,7 @@ impl BrokerSvc {
     ) -> Result<(), Error> {
         match request {
             ElementControlRequest::OpenStatusChannel { status_channel, .. } => {
-                tracing::debug!("OpenStatusChannel({:?})", element_id);
+                log::debug!("OpenStatusChannel({:?})", element_id);
                 let svc = self.clone();
                 svc.create_status_channel_handler(element_id.clone(), status_channel).await
             }
@@ -211,22 +211,22 @@ impl BrokerSvc {
                 dependency_type,
                 responder,
             } => {
-                tracing::debug!("RegisterDependencyToken({:?}, {:?})", element_id, &token);
+                log::debug!("RegisterDependencyToken({:?}, {:?})", element_id, &token);
                 let mut broker = self.broker.borrow_mut();
                 let res =
                     broker.register_dependency_token(element_id, token.into(), dependency_type);
-                tracing::debug!("RegisterDependencyToken register_credentials = ({:?})", &res);
+                log::debug!("RegisterDependencyToken register_credentials = ({:?})", &res);
                 responder.send(res.map_err(Into::into)).context("send failed")
             }
             ElementControlRequest::UnregisterDependencyToken { token, responder } => {
-                tracing::debug!("UnregisterDependencyToken({:?}, {:?})", element_id, &token);
+                log::debug!("UnregisterDependencyToken({:?}, {:?})", element_id, &token);
                 let mut broker = self.broker.borrow_mut();
                 let res = broker.unregister_dependency_token(element_id, token.into());
-                tracing::debug!("UnregisterDependencyToken unregister_credentials = ({:?})", &res);
+                log::debug!("UnregisterDependencyToken unregister_credentials = ({:?})", &res);
                 responder.send(res.map_err(Into::into)).context("send failed")
             }
             ElementControlRequest::_UnknownMethod { ordinal, .. } => {
-                tracing::warn!("Received unknown ElementControlRequest: {ordinal}");
+                log::warn!("Received unknown ElementControlRequest: {ordinal}");
                 todo!()
             }
         }
@@ -273,7 +273,7 @@ impl BrokerSvc {
             .try_for_each(|request| async {
                 match request {
                     TopologyRequest::AddElement { payload, responder } => {
-                        tracing::debug!("AddElement({:?})", &payload);
+                        log::debug!("AddElement({:?})", &payload);
                         let Ok((
                             element_name,
                             initial_current_level,
@@ -297,7 +297,7 @@ impl BrokerSvc {
                                 level_dependencies,
                             )
                         };
-                        tracing::debug!("AddElement add_element = {:?}", res);
+                        log::debug!("AddElement add_element = {:?}", res);
                         match res {
                             Ok(element_id) => {
                                 self.element_handlers
@@ -326,7 +326,7 @@ impl BrokerSvc {
                                 }
                                 if let Some(element_control) = element_control {
                                     let element_control_stream = element_control.into_stream();
-                                    tracing::debug!(
+                                    log::debug!(
                                         "Spawning element control task for {:?}",
                                         &element_id
                                     );
@@ -341,17 +341,14 @@ impl BrokerSvc {
                                                 )
                                                 .await
                                             {
-                                                tracing::debug!(
-                                                    "run_element_control err: {:?}",
-                                                    err
-                                                );
+                                                log::debug!("run_element_control err: {:?}", err);
                                             }
                                         }
                                     })
                                     .detach();
                                 }
                                 if let Some(lessor_channel) = lessor_channel {
-                                    tracing::debug!("Spawning lessor task for {:?}", &element_id);
+                                    log::debug!("Spawning lessor task for {:?}", &element_id);
                                     let lessor_stream = lessor_channel.into_stream();
                                     Task::local({
                                         let svc = self.clone();
@@ -361,7 +358,7 @@ impl BrokerSvc {
                                                 .run_lessor(element_id.clone(), lessor_stream)
                                                 .await
                                             {
-                                                tracing::debug!(
+                                                log::debug!(
                                                     "run_lessor({element_id:?}) err: {:?}",
                                                     err
                                                 );
@@ -376,7 +373,7 @@ impl BrokerSvc {
                         }
                     }
                     TopologyRequest::_UnknownMethod { ordinal, .. } => {
-                        tracing::warn!("Received unknown TopologyRequest: {ordinal}");
+                        log::warn!("Received unknown TopologyRequest: {ordinal}");
                         todo!()
                     }
                 }
@@ -443,7 +440,7 @@ impl RequiredLevelHandler {
     ) {
         let element_id = self.element_id.clone();
         let mut shutdown = self.shutdown.wait_or_dropped();
-        tracing::debug!("Starting new RequiredLevelHandler for {:?}", &self.element_id);
+        log::debug!("Starting new RequiredLevelHandler for {:?}", &self.element_id);
         Task::local(async move {
             let subscriber = subscriber;
             loop {
@@ -454,7 +451,7 @@ impl RequiredLevelHandler {
                     next = stream.next() => {
                         if let Some(Ok(request)) = next {
                             if let Err(err) = RequiredLevelHandler::handle_request(request, &subscriber).await {
-                                tracing::debug!("handle_request error: {:?}", err);
+                                log::debug!("handle_request error: {:?}", err);
                             }
                         } else {
                             break;
@@ -462,7 +459,7 @@ impl RequiredLevelHandler {
                     }
                 }
             }
-            tracing::debug!("Closed RequiredLevel channel for {:?}.", &element_id);
+            log::debug!("Closed RequiredLevel channel for {:?}.", &element_id);
         }).detach();
     }
 
@@ -476,7 +473,7 @@ impl RequiredLevelHandler {
                 Ok(())
             }
             RequiredLevelRequest::_UnknownMethod { ordinal, .. } => {
-                tracing::warn!("Received unknown RequiredLevelRequest: {ordinal}");
+                log::warn!("Received unknown RequiredLevelRequest: {ordinal}");
                 Err(anyhow::anyhow!("Received unknown RequiredLevelRequest: {ordinal}"))
             }
         }
@@ -503,11 +500,7 @@ impl CurrentLevelHandler {
             .try_for_each(|request| async {
                 match request {
                     CurrentLevelRequest::Update { current_level, responder } => {
-                        tracing::debug!(
-                            "CurrentLevel.Update({:?}, {:?})",
-                            &element_id,
-                            &current_level
-                        );
+                        log::debug!("CurrentLevel.Update({:?}, {:?})", &element_id, &current_level);
                         let mut broker = self.broker.borrow_mut();
                         fuchsia_trace::counter!(
                             c"power-broker", c"CurrentLevel.Update.Received", 0,
@@ -520,7 +513,7 @@ impl CurrentLevelHandler {
                         responder.send(Ok(())).context("send failed")
                     }
                     CurrentLevelRequest::_UnknownMethod { ordinal, .. } => {
-                        tracing::warn!("Received unknown CurrentLevelRequest: {ordinal}");
+                        log::warn!("Received unknown CurrentLevelRequest: {ordinal}");
                         Err(anyhow::anyhow!("Received unknown CurrentLevelRequest: {ordinal}"))
                     }
                 }
@@ -530,12 +523,12 @@ impl CurrentLevelHandler {
 
     fn start(self: Rc<Self>, stream: CurrentLevelRequestStream) {
         let element_id = self.element_id.clone();
-        tracing::debug!("Starting new CurrentLevelHandler for {:?}", &self.element_id);
+        log::debug!("Starting new CurrentLevelHandler for {:?}", &self.element_id);
         Task::local(async move {
             if let Err(err) = self.handle_current_level_stream(element_id.clone(), stream).await {
-                tracing::error!("handle_current_level_control_stream error: {:?}", err);
+                log::error!("handle_current_level_control_stream error: {:?}", err);
             }
-            tracing::debug!("Closed CurrentLevel channel for {:?}.", &element_id);
+            log::debug!("Closed CurrentLevel channel for {:?}.", &element_id);
         })
         .detach();
     }
@@ -554,7 +547,7 @@ impl StatusChannelHandler {
     fn start(&mut self, mut stream: StatusRequestStream, subscriber: CurrentLevelSubscriber) {
         let element_id = self.element_id.clone();
         let mut shutdown = self.shutdown.wait_or_dropped();
-        tracing::debug!("Starting new StatusChannelHandler for {:?}", &self.element_id);
+        log::debug!("Starting new StatusChannelHandler for {:?}", &self.element_id);
         Task::local(async move {
             let subscriber = subscriber;
             loop {
@@ -565,7 +558,7 @@ impl StatusChannelHandler {
                     next = stream.next() => {
                         if let Some(Ok(request)) = next {
                             if let Err(err) = StatusChannelHandler::handle_request(request, &subscriber).await {
-                                tracing::debug!("handle_request error: {:?}", err);
+                                log::debug!("handle_request error: {:?}", err);
                             }
                         } else {
                             break;
@@ -573,7 +566,7 @@ impl StatusChannelHandler {
                     }
                 }
             }
-            tracing::debug!("Closed StatusChannel for {:?}.", &element_id);
+            log::debug!("Closed StatusChannel for {:?}.", &element_id);
         }).detach();
     }
 
@@ -587,7 +580,7 @@ impl StatusChannelHandler {
                 Ok(())
             }
             StatusRequest::_UnknownMethod { ordinal, .. } => {
-                tracing::warn!("Received unknown StatusRequest: {ordinal}");
+                log::warn!("Received unknown StatusRequest: {ordinal}");
                 todo!()
             }
         }

@@ -6,7 +6,7 @@ use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect, Logs, Severity};
 use fuchsia_component_test::ScopedInstance;
 use futures::{future, StreamExt};
-use tracing::debug;
+use log::debug;
 use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
 
 const URL: &'static str =

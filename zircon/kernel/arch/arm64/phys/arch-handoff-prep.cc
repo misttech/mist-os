@@ -201,8 +201,12 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
           SaveForMexec(header, payload);
           break;
         case ZBI_KERNEL_DRIVER_MOTMOT_POWER:
-          ZX_ASSERT(payload.size() == 0);
+          // Ignore the payload and just use the presence of this node.
           arch_handoff.motmot_power_driver = true;
+          break;
+        case ZBI_KERNEL_DRIVER_MOONFLOWER_POWER:
+          // Ignore the payload and just use the presence of this node.
+          arch_handoff.moonflower_power_driver = true;
           break;
       }
       break;

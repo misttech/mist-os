@@ -255,8 +255,7 @@ TEST(DriverLayerTest, FromFidlLayer) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId({.value = 4242}),
-      .image_metadata = {.width = 700,
-                         .height = 800,
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeLinear},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -299,7 +298,8 @@ TEST(DriverLayerTest, FromBanjoLayer) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_handle = 4242,
-      .image_metadata = {.width = 700, .height = 800, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
@@ -363,8 +363,8 @@ TEST(DriverLayerTest, ToFidlLayer) {
 
   EXPECT_EQ(4242u, fidl_layer.image_id.value);
 
-  EXPECT_EQ(700u, fidl_layer.image_metadata.width);
-  EXPECT_EQ(800u, fidl_layer.image_metadata.height);
+  EXPECT_EQ(700u, fidl_layer.image_metadata.dimensions.width);
+  EXPECT_EQ(800u, fidl_layer.image_metadata.dimensions.height);
   EXPECT_EQ(fuchsia_hardware_display_types::wire::kImageTilingTypeLinear,
             fidl_layer.image_metadata.tiling_type);
 
@@ -407,8 +407,8 @@ TEST(DriverLayerTest, ToBanjoLayer) {
 
   EXPECT_EQ(4242u, banjo_layer.image_handle);
 
-  EXPECT_EQ(700u, banjo_layer.image_metadata.width);
-  EXPECT_EQ(800u, banjo_layer.image_metadata.height);
+  EXPECT_EQ(700u, banjo_layer.image_metadata.dimensions.width);
+  EXPECT_EQ(800u, banjo_layer.image_metadata.dimensions.height);
   EXPECT_EQ(IMAGE_TILING_TYPE_LINEAR, banjo_layer.image_metadata.tiling_type);
 
   EXPECT_EQ(static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
@@ -427,8 +427,7 @@ TEST(DriverLayerTest, IsValidFidlScaledLayer) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId({.value = 4242}),
-      .image_metadata = {.width = 700,
-                         .height = 800,
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeLinear},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -445,7 +444,8 @@ TEST(DriverLayerTest, IsValidBanjoScaledLayer) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_handle = 4242,
-      .image_metadata = {.width = 700, .height = 800, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
@@ -461,8 +461,7 @@ TEST(DriverLayerTest, IsValidFidlScaledLayerWithoutImageId) {
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId(
           {.value = fuchsia_hardware_display_types::wire::kInvalidDispId}),
-      .image_metadata = {.width = 700,
-                         .height = 800,
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeLinear},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -479,7 +478,8 @@ TEST(DriverLayerTest, IsValidBanjoScaledLayerWithoutImageHandle) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_handle = INVALID_ID,
-      .image_metadata = {.width = 700, .height = 800, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
@@ -495,8 +495,7 @@ TEST(DriverLayerTest, IsValidFidlSolidFillLayer) {
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId(
           {.value = fuchsia_hardware_display_types::wire::kInvalidDispId}),
-      .image_metadata = {.width = 0,
-                         .height = 0,
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeLinear},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -513,7 +512,8 @@ TEST(DriverLayerTest, IsValidBanjoSolidFillLayer) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_handle = INVALID_ID,
-      .image_metadata = {.width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
@@ -528,8 +528,7 @@ TEST(DriverLayerTest, IsValidFidlSolidFillLayerWithImageId) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId({.value = 4242}),
-      .image_metadata = {.width = 0,
-                         .height = 0,
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeLinear},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -546,7 +545,8 @@ TEST(DriverLayerTest, IsValidBanjoSolidFillLayerWithImageHandle) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_handle = 4242,
-      .image_metadata = {.width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
@@ -562,8 +562,7 @@ TEST(DriverLayerTest, IsValidFidlSolidFillLayerWithMetadataDimensions) {
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId(
           {.value = fuchsia_hardware_display_types::wire::kInvalidDispId}),
-      .image_metadata = {.width = 700,
-                         .height = 800,
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeLinear},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -580,7 +579,8 @@ TEST(DriverLayerTest, IsValidBanjoSolidFillLayerWithMetadataDimensions) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_handle = INVALID_ID,
-      .image_metadata = {.width = 700, .height = 800, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
@@ -596,8 +596,7 @@ TEST(DriverLayerTest, IsValidFidlSolidFillLayerWithMetadataTilingType) {
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId(
           {.value = fuchsia_hardware_display_types::wire::kInvalidDispId}),
-      .image_metadata = {.width = 0,
-                         .height = 0,
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeCapture},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -614,7 +613,8 @@ TEST(DriverLayerTest, IsValidBanjoSolidFillLayerWithMetadataTilingType) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_handle = INVALID_ID,
-      .image_metadata = {.width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_CAPTURE},
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
+                         .tiling_type = IMAGE_TILING_TYPE_CAPTURE},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
@@ -630,8 +630,7 @@ TEST(DriverLayerTest, IsValidFidlSolidFillLayerWithTransformation) {
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId(
           {.value = fuchsia_hardware_display_types::wire::kInvalidDispId}),
-      .image_metadata = {.width = 0,
-                         .height = 0,
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeLinear},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -648,7 +647,8 @@ TEST(DriverLayerTest, IsValidBanjoSolidFillLayerWithTransformation) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_handle = INVALID_ID,
-      .image_metadata = {.width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
@@ -663,8 +663,7 @@ TEST(DriverLayerTest, IsValidFidlEmptyDestination) {
       .display_destination = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId({.value = 4242}),
-      .image_metadata = {.width = 700,
-                         .height = 800,
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeLinear},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -681,7 +680,8 @@ TEST(DriverLayerTest, IsValidBanjoEmptyDestination) {
       .display_destination = {.x = 0, .y = 0, .width = 0, .height = 0},
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_handle = 4242,
-      .image_metadata = {.width = 700, .height = 800, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+      .image_metadata = {.dimensions = {.width = 700, .height = 800},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
@@ -696,8 +696,7 @@ TEST(DriverLayerTest, IsValidFidlScaledLayerWithEmptyMetadataDimensions) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_id = fuchsia_hardware_display_engine::wire::ImageId({.value = 4242}),
-      .image_metadata = {.width = 0,
-                         .height = 0,
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
                          .tiling_type =
                              fuchsia_hardware_display_types::wire::kImageTilingTypeLinear},
       .fallback_color = {.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
@@ -714,7 +713,8 @@ TEST(DriverLayerTest, IsValidBanjoScaledLayerWithEmptyMetadataDimensions) {
       .display_destination = {.x = 10, .y = 20, .width = 300, .height = 400},
       .image_source = {.x = 30, .y = 40, .width = 500, .height = 600},
       .image_handle = 4242,
-      .image_metadata = {.width = 0, .height = 0, .tiling_type = IMAGE_TILING_TYPE_LINEAR},
+      .image_metadata = {.dimensions = {.width = 0, .height = 0},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .fallback_color = {.format =
                              static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},

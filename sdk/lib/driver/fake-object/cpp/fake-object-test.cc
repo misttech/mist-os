@@ -23,7 +23,7 @@
 #include <fbl/algorithm.h>
 #include <zxtest/zxtest.h>
 
-namespace fdf_fake_object::test {
+namespace fake_object::test {
 
 class FakeObjectTest : public zxtest::Test {
  protected:
@@ -380,4 +380,4 @@ TEST_F(FakeObjectTest, ChannelEtc) {
   }
 }
 
-}  // namespace fdf_fake_object::test
+}  // namespace fake_object::test

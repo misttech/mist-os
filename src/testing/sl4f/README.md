@@ -39,7 +39,7 @@ this with your tag in your log lines.
 Example:
 ```
 200: let tag = "GenericFacade::func";
-201: tracing::info!(tag = &with_line!(tag), "{:?}", "Really important log.");
+201: log::info!(tag = &with_line!(tag); "{:?}"; "Really important log.");
 ```
 This outputs to
 ```

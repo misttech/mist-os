@@ -270,7 +270,7 @@ async fn main() {
 mod test {
     use super::*;
     use ffx_config::{ConfigLevel, TestEnv};
-    use ffx_config_domain::*;
+    use ffx_config_domain::{ConfigPath, FuchsiaEnv};
 
     use camino::Utf8PathBuf;
 

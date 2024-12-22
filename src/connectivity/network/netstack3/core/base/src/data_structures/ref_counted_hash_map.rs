@@ -54,7 +54,7 @@ impl<K: Eq + Hash, V> RefCountedHashMap<K, V> {
             Entry::Vacant(entry) => {
                 let (value, output) = f();
                 let _: &mut (NonZeroUsize, V) =
-                    entry.insert((const_unwrap::const_unwrap_option(NonZeroUsize::new(1)), value));
+                    entry.insert((NonZeroUsize::new(1).unwrap(), value));
                 InsertResult::Inserted(output)
             }
         }
@@ -108,6 +108,14 @@ impl<K: Eq + Hash, V> RefCountedHashMap<K, V> {
     /// non-mutable references to the values.
     pub fn iter<'a>(&'a self) -> impl 'a + Iterator<Item = (&'a K, &'a V)> + Clone {
         self.inner.iter().map(|(key, (_, value))| (key, value))
+    }
+
+    /// An iterator visiting all keys in arbitrary order with the reference
+    /// count for each key.
+    pub fn iter_ref_counts<'a>(
+        &'a self,
+    ) -> impl 'a + Iterator<Item = (&'a K, &'a NonZeroUsize)> + Clone {
+        self.inner.iter().map(|(key, (count, _))| (key, count))
     }
 
     /// Returns whether the map is empty.

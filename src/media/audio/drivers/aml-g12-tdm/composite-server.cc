@@ -752,8 +752,8 @@ void RingBufferServer::GetVmo(
     binding_.Close(ZX_ERR_BAD_STATE);
     return;
   }
-  uint32_t frame_size =
-      engine_.config.ring_buffer.number_of_channels * engine_.config.ring_buffer.bytes_per_sample;
+  uint32_t frame_size = engine_.ring_buffer_format.pcm_format()->number_of_channels() *
+                        engine_.ring_buffer_format.pcm_format()->bytes_per_sample();
   size_t ring_buffer_size = fbl::round_up<size_t, size_t>(
       request.min_frames() * frame_size + engine_.device->fifo_depth(),
       std::lcm(frame_size, engine_.device->GetBufferAlignment()));

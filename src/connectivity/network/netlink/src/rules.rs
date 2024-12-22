@@ -10,6 +10,8 @@ use std::collections::BTreeMap;
 
 use assert_matches::assert_matches;
 use derivative::Derivative;
+use fidl_fuchsia_net_routes_admin::{GrantForRouteTableAuthorization, RuleSetError};
+use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use linux_uapi::{
     rt_class_t_RT_TABLE_DEFAULT, rt_class_t_RT_TABLE_LOCAL, rt_class_t_RT_TABLE_MAIN,
 };
@@ -18,18 +20,53 @@ use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::rule::{RuleAction, RuleAttribute, RuleMessage};
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 
+use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_routes_ext::rules::{FidlRuleAdminIpExt, FidlRuleIpExt};
+use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext, FidlRouteIpExt};
+
 use crate::client::InternalClient;
 use crate::messaging::Sender;
 use crate::netlink_packet::errno::Errno;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
+use crate::route_tables::{
+    MainRouteTable, NetlinkRouteTableIndex, RouteTable, RouteTableLookupMut, RouteTableMap,
+    TableNeedsCleanup,
+};
+
+mod conversions;
 
 // The priorities of the default rules installed on Linux.
 const LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY: u32 = 0;
 const LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY: u32 = 32766;
 const LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY: u32 = 32767;
 
+// This is a bit arbitrary, but is set so that the leading bit of the resulting RuleIndex is 1 once
+// this is shifted left 16 bits in order to be included.
+const NETLINK_RULE_SET_PRIORITY: fnet_routes_ext::rules::RuleSetPriority =
+    fnet_routes_ext::rules::RuleSetPriority::new((1u16 << 15) as u32);
+
 type RulePriority = u32;
+
+/// Witness that a [`RuleMessage`] has a [`RulePriority`].
+#[derive(Clone)]
+struct RuleMessageWithPriority {
+    rule_message: RuleMessage,
+    priority: u32,
+}
+
+impl TryFrom<RuleMessage> for RuleMessageWithPriority {
+    type Error = RuleMessage;
+
+    fn try_from(rule_message: RuleMessage) -> Result<Self, Self::Error> {
+        if let Some(priority) = get_priority(&rule_message) {
+            Ok(RuleMessageWithPriority { rule_message, priority })
+        } else {
+            Err(rule_message)
+        }
+    }
+}
 
 /// Helper to retrieve the `Priority` NLA from a [`RuleMessage`].
 fn get_priority(RuleMessage { header: _, attributes, .. }: &RuleMessage) -> Option<RulePriority> {
@@ -128,6 +165,10 @@ impl IndexedRules {
         Some((index, rule))
     }
 
+    fn remove(&mut self, index: u16) -> Option<RuleMessage> {
+        self.rules.remove(&index)
+    }
+
     fn iter(&self) -> impl Iterator<Item = &RuleMessage> {
         self.rules.values()
     }
@@ -137,16 +178,19 @@ impl IndexedRules {
     }
 }
 
+pub(crate) trait IpExt:
+    Ip + FidlRuleAdminIpExt + FidlRuleIpExt + FidlRouteAdminIpExt + FidlRouteIpExt
+{
+}
+impl<I: Ip + FidlRuleAdminIpExt + FidlRuleIpExt + FidlRouteAdminIpExt + FidlRouteIpExt> IpExt
+    for I
+{
+}
+
 /// Holds an IP-versioned table of PBR rules.
-///
-/// Note that Fuchsia does not support policy based routing, so this
-/// implementation merely tracks the state of the "rule table", so that requests
-/// are handled consistently (E.g. RTM_GETRULE correctly returns rules that were
-/// previously installed via RTM_NEWRULE).
-#[derive(GenericOverIp, Derivative)]
+#[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-#[derivative(Default(bound = ""))]
-pub(crate) struct RuleTable<I: Ip> {
+pub(crate) struct RuleTable<I: IpExt> {
     /// The rules held by this rule table.
     ///
     /// The [`BTreeMap`] ensures that the rules are sorted by their
@@ -158,22 +202,15 @@ pub(crate) struct RuleTable<I: Ip> {
     _ip_version_marker: IpVersionMarker<I>,
 }
 
-impl<I: Ip> RuleTable<I> {
-    #[cfg(test)]
-    /// Constructs an empty RuleTable.
-    pub(crate) fn new() -> RuleTable<I> {
-        RuleTable { rules: BTreeMap::default(), _ip_version_marker: I::VERSION_MARKER }
-    }
-
-    /// Constructs a RuleTable prepopulated with the default rules present on
-    /// Linux.
+impl<I: IpExt> RuleTable<I> {
+    /// The default rules present on Linux.
     /// * [V4] 0:        from all lookup local
     /// * [V4] 32766:    from all lookup main
     /// * [V4] 32767:    from all lookup default
     /// * [V6] 0:        from all lookup local
     /// * [V6] 32766:    from all lookup main
-    pub(crate) fn new_with_defaults() -> RuleTable<I> {
-        fn build_lookup_rule<I: Ip>(priority: RulePriority, table: u8) -> RuleMessage {
+    fn default_rules() -> impl Iterator<Item = RuleMessage> {
+        fn build_lookup_rule<I: IpExt>(priority: RulePriority, table: u8) -> RuleMessage {
             let mut rule = RuleMessage::default();
             rule.header.family = match I::VERSION {
                 IpVersion::V4 => AddressFamily::Inet,
@@ -185,9 +222,7 @@ impl<I: Ip> RuleTable<I> {
             rule
         }
 
-        let mut table =
-            RuleTable { rules: BTreeMap::default(), _ip_version_marker: I::VERSION_MARKER };
-        let rules_to_add = match I::VERSION {
+        match I::VERSION {
             IpVersion::V4 => itertools::Either::Left(
                 [
                     build_lookup_rule::<Ipv4>(
@@ -218,34 +253,58 @@ impl<I: Ip> RuleTable<I> {
                 ]
                 .into_iter(),
             ),
-        };
+        }
+    }
 
-        for rule in rules_to_add {
-            table.add_rule(rule).expect("should not fail to add a default rule");
+    /// Constructs an empty RuleTable.
+    pub(crate) fn new() -> RuleTable<I> {
+        RuleTable { rules: BTreeMap::default(), _ip_version_marker: I::VERSION_MARKER }
+    }
+
+    /// Constructs a RuleTable prepopulated with the default rules present on
+    /// Linux.
+    #[cfg(test)]
+    pub(crate) fn new_with_defaults() -> RuleTable<I> {
+        let mut table =
+            RuleTable { rules: BTreeMap::default(), _ip_version_marker: I::VERSION_MARKER };
+        for rule in Self::default_rules() {
+            let _index = table
+                .add_rule(table.apply_default_priority_if_needed(rule))
+                .expect("should not fail to add a default rule");
         }
 
         table
     }
 
+    fn apply_default_priority_if_needed(&self, rule: RuleMessage) -> RuleMessageWithPriority {
+        match rule.try_into() {
+            Ok(rule) => rule,
+            Err(mut rule) => {
+                let priority = self.default_priority();
+                rule.attributes.push(RuleAttribute::Priority(priority));
+                RuleMessageWithPriority { rule_message: rule, priority }
+            }
+        }
+    }
+
     /// Adds the given rule to the table.
-    fn add_rule(&mut self, mut rule: RuleMessage) -> Result<(), AddRuleError> {
+    ///
+    /// If successful, returns the index within the given priority set at which the rule was added.
+    fn add_rule(&mut self, rule: RuleMessageWithPriority) -> Result<u16, AddRuleError> {
         // Get the rule's priority, setting it to a default if unset.
-        let priority = if let Some(priority) = get_priority(&rule) {
-            priority
-        } else {
-            let priority = self.default_priority();
-            rule.attributes.push(RuleAttribute::Priority(priority));
-            priority
-        };
+        let RuleMessageWithPriority { rule_message: rule, priority } = rule;
 
         let rules_at_priority = self.rules.entry(priority).or_default();
-        let _index: u16 = rules_at_priority.add_rule(rule.clone())?;
+        let index: u16 = rules_at_priority.add_rule(rule)?;
 
-        Ok(())
+        Ok(index)
     }
 
     /// Deletes the first rule from the table that matches the given pattern.
-    fn del_rule(&mut self, del_pattern: &RuleMessage) -> Result<(), DelRuleError> {
+    fn del_first_matching_rule(
+        &mut self,
+        del_pattern: &RuleMessage,
+    ) -> Result<(RulePriority, u16, RuleMessage), DelRuleError> {
         if !is_valid_del_pattern(del_pattern) {
             return Err(DelRuleError::InvalidPattern);
         }
@@ -269,16 +328,29 @@ impl<I: Ip> RuleTable<I> {
             None
         }
 
-        if let Some((priority, _index, _rule)) =
+        if let Some((priority, index, rule)) =
             remove_rule_in_bounds(&mut self.rules, del_pattern, bounds)
         {
             if self.rules.get(&priority).map(IndexedRules::is_empty).unwrap_or(false) {
                 // Garbage collect the empty `IndexedRules`.
                 let _: Option<IndexedRules> = self.rules.remove(&priority);
             }
-            Ok(())
+            Ok((priority, index, rule))
         } else {
             Err(DelRuleError::NoMatchesForPattern)
+        }
+    }
+
+    /// Deletes the rule at the given priority and index.
+    fn del_rule(&mut self, priority: RulePriority, index: u16) -> Option<RuleMessage> {
+        let rules = self.rules.get_mut(&priority)?;
+        if let Some(rule) = rules.remove(index) {
+            if rules.is_empty() {
+                assert_matches!(self.rules.remove(&priority), Some(_));
+            }
+            Some(rule)
+        } else {
+            None
         }
     }
 
@@ -304,11 +376,230 @@ impl<I: Ip> RuleTable<I> {
     }
 }
 
+/// Handles asynchronous requests for managing the rule table.
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub(crate) struct RulesWorker<I: IpExt> {
+    /// The rule table.
+    rule_table: RuleTable<I>,
+    rule_set: <I::RuleSetMarker as ProtocolMarker>::Proxy,
+}
+
+impl<I: IpExt> RulesWorker<I> {
+    /// Constructs an empty RulesWorker.
+    pub(crate) fn new(rule_set: <I::RuleSetMarker as ProtocolMarker>::Proxy) -> RulesWorker<I> {
+        RulesWorker { rule_table: RuleTable::<I>::new(), rule_set }
+    }
+
+    /// Constructs a RulesWorker prepopulated with the default rules present on
+    /// Linux.
+    /// * [V4] 0:        from all lookup local
+    /// * [V4] 32766:    from all lookup main
+    /// * [V4] 32767:    from all lookup default
+    /// * [V6] 0:        from all lookup local
+    /// * [V6] 32766:    from all lookup main
+    pub(crate) async fn new_with_defaults(
+        rule_set: <I::RuleSetMarker as ProtocolMarker>::Proxy,
+        route_table_map: &mut RouteTableMap<I>,
+    ) -> RulesWorker<I> {
+        struct NoIif;
+        impl conversions::LookupIfInterfaceIsLoopback for NoIif {
+            fn is_loopback(&self, _interface: &str) -> Option<bool> {
+                panic!("should never be invoked as no default rules use `iif`");
+            }
+        }
+
+        let mut table = RulesWorker::<I>::new(rule_set);
+        for rule in RuleTable::<I>::default_rules() {
+            table
+                // None of the rules specify `iif`.
+                .add_rule(rule, route_table_map, &NoIif)
+                .await
+                .expect("should not fail to add a default rule");
+        }
+
+        table
+    }
+
+    pub(crate) async fn create(
+        provider: &<I::RuleTableMarker as ProtocolMarker>::Proxy,
+        route_table_map: &mut RouteTableMap<I>,
+    ) -> Self {
+        let rule_set =
+            fnet_routes_ext::rules::new_rule_set::<I>(provider, NETLINK_RULE_SET_PRIORITY)
+                .expect("new rule set should succeed");
+        Self::new_with_defaults(rule_set, route_table_map).await
+    }
+
+    /// Adds the given rule to the table.
+    /// `interface_properties` are needed in case the rule specifies an `iif` (input interface), as
+    /// we'd need to check whether it is loopback.
+    async fn add_rule(
+        &mut self,
+        rule: RuleMessage,
+        route_table_map: &mut RouteTableMap<I>,
+        interface_properties: &impl conversions::LookupIfInterfaceIsLoopback,
+    ) -> Result<(), AddRuleError> {
+        let rule = self.rule_table.apply_default_priority_if_needed(rule);
+        let priority = rule.priority;
+        let index = self.rule_table.add_rule(rule.clone())?;
+
+        match self
+            .install_fidl_rule(rule.rule_message, index, route_table_map, interface_properties)
+            .await
+        {
+            Ok(()) => (),
+            Err(e) => {
+                let _rule = self.rule_table.del_rule(priority, index);
+                return Err(e);
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn install_fidl_rule(
+        &self,
+        rule: RuleMessage,
+        index: u16,
+        route_table_map: &mut RouteTableMap<I>,
+        interface_properties: &impl conversions::LookupIfInterfaceIsLoopback,
+    ) -> Result<(), AddRuleError> {
+        let conversions::FidlRule { index, matcher, action } =
+            conversions::fidl_rule_from_rule_message::<I>(&rule, index, interface_properties)
+                .map_err(|e| {
+                    crate::logging::log_warn!("failed to convert rule {rule:?} to FIDL: {e:?}");
+
+                    use conversions::FidlRuleConversionError as E;
+                    match e {
+                        E::IpVersionMismatch
+                        | E::UnsupportedAction
+                        | E::InvalidTable
+                        | E::InvalidSourceSubnet => AddRuleError::InvalidRule,
+                        E::RuleIndexOverflow => AddRuleError::IndicesExhausted,
+                        E::NoSuchInterface => AddRuleError::NoSuchInterface,
+                    }
+                })?;
+
+        let action = match action {
+            conversions::Action::Unreachable => fnet_routes_ext::rules::RuleAction::Unreachable,
+            conversions::Action::ToTable(table_index) => {
+                route_table_map.create_route_table_if_managed_and_not_present(table_index).await;
+                let (table, fidl_table_id, rule_set_authenticated) =
+                    match route_table_map.get_mut(&table_index).expect("should have just inserted")
+                    {
+                        RouteTableLookupMut::Unmanaged(MainRouteTable {
+                            route_table_proxy,
+                            fidl_table_id,
+                            rule_set_authenticated,
+                            ..
+                        }) => (&*route_table_proxy, *fidl_table_id, rule_set_authenticated),
+                        RouteTableLookupMut::Managed(RouteTable {
+                            route_table_proxy,
+                            fidl_table_id,
+                            rule_set_authenticated,
+                            ..
+                        }) => (&*route_table_proxy, *fidl_table_id, rule_set_authenticated),
+                    };
+                if !*rule_set_authenticated {
+                    let GrantForRouteTableAuthorization { table_id, token } =
+                        fnet_routes_ext::admin::get_authorization_for_route_table::<I>(table)
+                            .await
+                            .expect("should not get FIDL error");
+                    fnet_routes_ext::rules::authenticate_for_route_table::<I>(
+                        &self.rule_set,
+                        table_id,
+                        token,
+                    )
+                    .await
+                    .expect("should not get FIDL error")
+                    .expect("authentication should be valid");
+                    *rule_set_authenticated = true;
+                }
+                fnet_routes_ext::rules::RuleAction::Lookup(fidl_table_id)
+            }
+        };
+
+        fnet_routes_ext::rules::add_rule(&self.rule_set, index, matcher, action.into())
+            .await
+            .expect("should not get FIDL error")
+            .map_err(AddRuleError::RuleSetError)
+    }
+
+    /// Deletes the first rule from the table that matches the given pattern.
+    async fn del_rule(&mut self, del_pattern: &RuleMessage) -> Result<RuleMessage, DelRuleError> {
+        if !is_valid_del_pattern(del_pattern) {
+            return Err(DelRuleError::InvalidPattern);
+        }
+
+        let (priority, index, rule) = self.rule_table.del_first_matching_rule(del_pattern)?;
+        match self.uninstall_fidl_rule(priority, index).await {
+            Ok(()) => (),
+            Err(e) => {
+                use RuleSetError as E;
+                match e {
+                    E::RuleDoesNotExist => {
+                        crate::logging::log_error!(
+                            "tried to uninstall nonexistent rule {rule:?} \
+                             (priority={priority} index={index})"
+                        );
+                    }
+                    E::Unauthenticated => panic!(
+                        "should already be authenticated to delete rule we previously installed"
+                    ),
+                    E::RuleAlreadyExists
+                    | E::InvalidAction
+                    | E::BaseMatcherMissing
+                    | E::InvalidMatcher => {
+                        panic!("should not get RuleSetError {e:?} while deleting")
+                    }
+                    E::__SourceBreaking { unknown_ordinal } => {
+                        crate::logging::log_error!(
+                            "unknown RuleSetError (ordinal={unknown_ordinal}) \
+                            while deleting rule {rule:?} \
+                            (priority={priority:?}) (index={index:?})"
+                        );
+                    }
+                }
+            }
+        }
+        Ok(rule)
+    }
+
+    async fn uninstall_fidl_rule(&self, priority: u32, index: u16) -> Result<(), RuleSetError> {
+        fnet_routes_ext::rules::remove_rule::<I>(
+            &self.rule_set,
+            conversions::compute_rule_index(priority, index)
+                .expect("index of installed rule could not have overflowed"),
+        )
+        .await
+        .expect("should not get FIDL error")
+    }
+
+    /// Iterate over all the rules.
+    ///
+    /// The rules are ordered first by [`RulePriority`], and second by age.
+    fn iter_rules(&self) -> impl Iterator<Item = &RuleMessage> {
+        self.rule_table.iter_rules()
+    }
+
+    pub(crate) fn any_rules_reference_table(&self, table_index: NetlinkRouteTableIndex) -> bool {
+        self.iter_rules().any(|rule| {
+            conversions::get_referenced_table(rule)
+                .map(|table| table == table_index)
+                .unwrap_or(false)
+        })
+    }
+}
+
 /// Possible errors when adding a rule to a [`RuleTable`].
 #[derive(Debug)]
 enum AddRuleError {
     AlreadyExists,
     IndicesExhausted,
+    InvalidRule,
+    NoSuchInterface,
+    RuleSetError(RuleSetError),
 }
 
 impl AddRuleError {
@@ -316,6 +607,19 @@ impl AddRuleError {
         match self {
             AddRuleError::AlreadyExists => Errno::EEXIST,
             AddRuleError::IndicesExhausted => Errno::ETOOMANYREFS,
+            AddRuleError::InvalidRule => Errno::EINVAL,
+            AddRuleError::NoSuchInterface => Errno::ENODEV,
+            AddRuleError::RuleSetError(e) => match e {
+                RuleSetError::Unauthenticated => panic!("should handle authentication prior"),
+                RuleSetError::InvalidAction => Errno::EINVAL,
+                RuleSetError::RuleAlreadyExists => Errno::EEXIST,
+                RuleSetError::RuleDoesNotExist => {
+                    panic!("should not get RuleDoesNotExist while adding")
+                }
+                RuleSetError::BaseMatcherMissing => Errno::EINVAL,
+                RuleSetError::InvalidMatcher => Errno::EINVAL,
+                RuleSetError::__SourceBreaking { unknown_ordinal: _ } => Errno::EINVAL,
+            },
         }
     }
 }
@@ -364,11 +668,23 @@ pub(crate) struct RuleRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerM
     pub(crate) _ip_version_marker: IpVersionMarker<I>,
 }
 
-impl<I: Ip> RuleTable<I> {
-    pub(crate) fn handle_request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>(
+impl<I: IpExt> RulesWorker<I> {
+    pub(crate) async fn handle_request<
+        S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
+    >(
         &mut self,
         req: RuleRequest<S, I>,
-    ) -> Result<(), Errno> {
+        route_table_map: &mut RouteTableMap<I>,
+        interface_properties: &BTreeMap<
+            u64,
+            fnet_interfaces_ext::PropertiesAndState<
+                crate::interfaces::InterfaceState,
+                fnet_interfaces_ext::AllInterest,
+            >,
+        >,
+    ) -> Result<Option<TableNeedsCleanup>, Errno> {
+        crate::logging::log_info!("Handling netlink rules request: {req:?}");
+
         let RuleRequest { args, _ip_version_marker: _, sequence_number, mut client } = req;
 
         match args {
@@ -376,17 +692,26 @@ impl<I: Ip> RuleTable<I> {
                 for rule in self.iter_rules() {
                     client.send_unicast(to_nlm_new_rule(rule.clone(), sequence_number, true));
                 }
-                Ok(())
+                Ok(None)
             }
             RuleRequestArgs::New(rule) => {
-                self.add_rule(rule).map_err(|e| e.errno())
+                self.add_rule(rule, route_table_map, interface_properties)
+                    .await
+                    .map_err(|e| e.errno())
+                    .map(|()| None)
                 // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_NEWRULE`.
             }
             RuleRequestArgs::Del(del_pattern) => {
-                self.del_rule(&del_pattern).map_err(|e| e.errno())
+                let rule_message = self.del_rule(&del_pattern).await.map_err(|e| e.errno())?;
+                if let Some(table) = conversions::get_referenced_table(&rule_message) {
+                    if let Some(table_id) = route_table_map.get_fidl_table_id(&table) {
+                        return Ok(Some(TableNeedsCleanup(table_id, table)));
+                    }
+                }
                 // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_DELRULE`.
+                Ok(None)
             }
         }
     }
@@ -397,38 +722,67 @@ mod tests {
     use super::*;
 
     use ip_test_macro::ip_test;
-    use linux_uapi::{AF_INET, AF_INET6, FR_ACT_TO_TBL, FR_ACT_UNSPEC};
+    use linux_uapi::{
+        rt_class_t_RT_TABLE_COMPAT, AF_INET, AF_INET6, FR_ACT_TO_TBL, FR_ACT_UNREACHABLE,
+        FR_ACT_UNSPEC,
+    };
     use net_types::ip::IpInvariant;
     use test_case::test_case;
 
+    use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+
     use crate::messaging::testutil::{FakeSender, FakeSenderSink, SentMessage};
+    use crate::route_tables::{
+        ManagedNetlinkRouteTableIndex, NetlinkRouteTableIndex, RouteTable, TableNeedsCleanup,
+    };
 
     const DUMP_SEQUENCE_NUM: u32 = 999;
+    const EMPTY_INTERFACE_PROPERTIES: BTreeMap<
+        u64,
+        fnet_interfaces_ext::PropertiesAndState<
+            crate::interfaces::InterfaceState,
+            fnet_interfaces_ext::AllInterest,
+        >,
+    > = BTreeMap::new();
 
-    fn build_rule(action: u32, nlas: Vec<RuleAttribute>) -> RuleMessage {
+    fn build_rule<I: Ip>(action: u32, nlas: Vec<RuleAttribute>) -> RuleMessage {
         // This conversion is safe because action is actually a u8,
         // but out binding generator incorrectly emits a u32.
         let action = action as u8;
         let mut rule = RuleMessage::default();
         rule.header.action = RuleAction::from(action);
+        rule.header.family =
+            if I::VERSION == IpVersion::V4 { AddressFamily::Inet } else { AddressFamily::Inet6 };
         rule.attributes = nlas;
         rule
     }
 
+    fn build_rule_with_table<I: Ip>(
+        action: u32,
+        nlas: Vec<RuleAttribute>,
+        table: NetlinkRouteTableIndex,
+    ) -> RuleMessage {
+        let mut rule = build_rule::<I>(action, nlas);
+        let header_table =
+            u8::try_from(table.get()).ok().unwrap_or(rt_class_t_RT_TABLE_COMPAT as u8);
+        rule.header.table = header_table;
+        rule.attributes.push(RuleAttribute::Table(table.get()));
+        rule
+    }
+
     /// Helper function to dump the rules in the rule table.
-    fn dump_rules<I: Ip>(
+    fn dump_rules<I: IpExt>(
         sink: &mut FakeSenderSink<RouteNetlinkMessage>,
-        client: InternalClient<NetlinkRoute, FakeSender<RouteNetlinkMessage>>,
+        mut client: InternalClient<NetlinkRoute, FakeSender<RouteNetlinkMessage>>,
         table: &mut RuleTable<I>,
     ) -> Vec<NetlinkMessage<RouteNetlinkMessage>> {
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::DumpRules,
-                _ip_version_marker: I::VERSION_MARKER,
-                sequence_number: DUMP_SEQUENCE_NUM,
-                client: client,
-            })
-            .expect("dump rules should succeed");
+        for rule in table.iter_rules() {
+            client.send_unicast(to_nlm_new_rule(
+                rule.clone(),
+                DUMP_SEQUENCE_NUM,
+                true, /* dump */
+            ));
+        }
         sink.take_messages().into_iter().map(|SentMessage { message, group: _ }| message).collect()
     }
 
@@ -443,24 +797,44 @@ mod tests {
     }
     // Casts to u8 are safe as these are constants which fit into a u8.
     #[test_case(
-        build_rule(FR_ACT_UNSPEC, vec![]),
-        build_rule(FR_ACT_TO_TBL, vec![]),
-        false; "different headers"
+        build_rule::<Ipv4>(FR_ACT_UNSPEC, vec![]),
+        build_rule::<Ipv4>(FR_ACT_TO_TBL, vec![]),
+        false; "different headers v4"
     )]
     #[test_case(
-        build_rule(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1)]),
-        build_rule(FR_ACT_TO_TBL, vec![]),
-        false; "different nlas"
+        build_rule::<Ipv4>(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1)]),
+        build_rule::<Ipv4>(FR_ACT_TO_TBL, vec![]),
+        false; "different nlas v4"
     )]
     #[test_case(
-        build_rule(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1)]),
-        build_rule(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1)]),
-        true; "same header and nlas"
+        build_rule::<Ipv4>(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1)]),
+        build_rule::<Ipv4>(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1)]),
+        true; "same header and nlas v4"
     )]
     #[test_case(
-        build_rule(FR_ACT_TO_TBL, vec![RuleAttribute::Oifname(String::from("lo")), RuleAttribute::Priority(1)]),
-        build_rule(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1), RuleAttribute::Oifname(String::from("lo"))]),
-        true; "different nla order"
+        build_rule::<Ipv4>(FR_ACT_TO_TBL, vec![RuleAttribute::Oifname(String::from("lo")), RuleAttribute::Priority(1)]),
+        build_rule::<Ipv4>(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1), RuleAttribute::Oifname(String::from("lo"))]),
+        true; "different nla order v4"
+    )]
+    #[test_case(
+        build_rule::<Ipv6>(FR_ACT_UNSPEC, vec![]),
+        build_rule::<Ipv6>(FR_ACT_TO_TBL, vec![]),
+        false; "different headers v6"
+    )]
+    #[test_case(
+        build_rule::<Ipv6>(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1)]),
+        build_rule::<Ipv6>(FR_ACT_TO_TBL, vec![]),
+        false; "different nlas v6"
+    )]
+    #[test_case(
+        build_rule::<Ipv6>(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1)]),
+        build_rule::<Ipv6>(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1)]),
+        true; "same header and nlas v6"
+    )]
+    #[test_case(
+        build_rule::<Ipv6>(FR_ACT_TO_TBL, vec![RuleAttribute::Oifname(String::from("lo")), RuleAttribute::Priority(1)]),
+        build_rule::<Ipv6>(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(1), RuleAttribute::Oifname(String::from("lo"))]),
+        true; "different nla order v6"
     )]
     fn test_rules_are_equal(rule1: RuleMessage, rule2: RuleMessage, equal: bool) {
         assert_eq!(rules_are_equal(&rule1, &rule2), equal);
@@ -475,7 +849,7 @@ mod tests {
         ], true; "no_action_and_multiple nlas_is_valid")]
     #[test_case(FR_ACT_TO_TBL as u8, vec![RuleAttribute::Priority(1)], true; "action_and_nlas_is_valid")]
     fn test_is_valid_del_pattern(action: u8, nlas: Vec<RuleAttribute>, expect_valid: bool) {
-        let rule = build_rule(action.into(), nlas);
+        let rule = build_rule::<Ipv4>(action.into(), nlas);
         assert_eq!(is_valid_del_pattern(&rule), expect_valid);
     }
 
@@ -510,8 +884,8 @@ mod tests {
         pattern_nlas: Vec<RuleAttribute>,
         expect_match: bool,
     ) {
-        let rule = build_rule(rule_action.into(), rule_nlas);
-        let pattern = build_rule(pattern_action.into(), pattern_nlas);
+        let rule = build_rule::<Ipv4>(rule_action.into(), rule_nlas);
+        let pattern = build_rule::<Ipv4>(pattern_action.into(), pattern_nlas);
         assert_eq!(rule_matches_del_pattern(&rule, &pattern), expect_match);
     }
 
@@ -522,17 +896,21 @@ mod tests {
     #[test_case(&[0, 100, 200], 99; "three_existing_rules_defaults_to_second_minus_1")]
     #[test_case(&[0, 1], 0; "default_priority_duplicates_existing_priority")]
     #[test_case(&[0, 0], 0; "default_priority_saturates_at_0")]
-    fn test_rule_table_default_priority<I: Ip>(
+    fn test_rule_table_default_priority<I: IpExt>(
         existing_rule_priorities: &[RulePriority],
         expected_default_priority: RulePriority,
     ) {
-        let mut table = RuleTable::<I>::default();
+        let mut table = RuleTable::<I>::new();
         for (index, priority) in existing_rule_priorities.iter().enumerate() {
             // Give each rule a different `OifName` to avoid "already exists"
             // conflicts.
             let name = RuleAttribute::Oifname(index.to_string());
-            table
-                .add_rule(build_rule(FR_ACT_UNSPEC, vec![RuleAttribute::Priority(*priority), name]))
+            let _index = table
+                .add_rule(
+                    build_rule::<I>(FR_ACT_UNSPEC, vec![RuleAttribute::Priority(*priority), name])
+                        .try_into()
+                        .unwrap(),
+                )
                 .expect("add rule should succeed");
         }
 
@@ -540,84 +918,155 @@ mod tests {
     }
 
     #[ip_test(I)]
-    fn test_rule_table_frees_unused_priorities<I: Ip>() {
-        let mut table = RuleTable::<I>::default();
+    fn test_rule_table_frees_unused_priorities<I: IpExt>() {
+        let mut table = RuleTable::<I>::new();
         const PRIORITY: RulePriority = 99;
-        let rule = build_rule(FR_ACT_UNSPEC, vec![RuleAttribute::Priority(PRIORITY)]);
+        let rule = build_rule::<I>(FR_ACT_UNSPEC, vec![RuleAttribute::Priority(PRIORITY)]);
 
-        table.add_rule(rule.clone()).expect("add rule should succeed");
+        let _index =
+            table.add_rule(rule.clone().try_into().unwrap()).expect("add rule should succeed");
         assert!(table.rules.contains_key(&PRIORITY));
         // Remove the rule, and verify the priority was removed (as opposed to
         // still existing and holding an empty vec).
-        table.del_rule(&rule).expect("del rule should succeed");
+        let (_priority, _index, _message) =
+            table.del_first_matching_rule(&rule).expect("del rule should succeed");
         assert!(!table.rules.contains_key(&PRIORITY));
+    }
+
+    const MAIN_FIDL_TABLE_ID: fnet_routes_ext::TableId = fnet_routes_ext::TableId::new(0);
+    const MANAGED_FIDL_TABLE_ID: fnet_routes_ext::TableId = fnet_routes_ext::TableId::new(42);
+    const MANAGED_NETLINK_TABLE_ID: NetlinkRouteTableIndex = NetlinkRouteTableIndex::new(888);
+
+    fn test_route_table_map<I: IpExt>() -> RouteTableMap<I> {
+        let (main_route_table_proxy, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
+        let (unmanaged_route_set_proxy, _unmanaged_route_set_server_end) =
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
+        let (route_table_provider, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableProviderMarker>();
+
+        RouteTableMap::<I>::new(
+            main_route_table_proxy,
+            MAIN_FIDL_TABLE_ID,
+            unmanaged_route_set_proxy,
+            route_table_provider,
+        )
     }
 
     #[test_case(<Ipv4 as Ip>::VERSION_MARKER; "v4")]
     #[test_case(<Ipv6 as Ip>::VERSION_MARKER; "v6")]
-    fn test_rule_table<I: Ip>(ip_version_marker: IpVersionMarker<I>) {
+    #[fuchsia::test]
+    async fn test_rule_table<I: IpExt>(ip_version_marker: IpVersionMarker<I>) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::<I>::new();
+        let (rule_set, server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
+        let _serve_task = fuchsia_async::Task::local(
+            fnet_routes_ext::testutil::rules::serve_noop_rule_set::<I>(server_end),
+        );
+        let mut table = RulesWorker::<I>::new(rule_set);
 
         // Verify that the table is empty.
-        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table)[..], &[],);
+        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..], &[],);
 
         const LOW_PRIORITY: RulePriority = 100;
         const HIGH_PRIORITY: RulePriority = 200;
 
-        // Add a new rule and expect success.
-        // Conversion is safe as FR_ACT_TO_TBL (1), fits into a u8.
-        let low_priority_rule =
-            build_rule(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(LOW_PRIORITY)]);
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::New(low_priority_rule.clone()),
-                _ip_version_marker: ip_version_marker,
-                sequence_number: 0,
-                client: client.clone(),
-            })
-            .expect("new rule should succeed");
-        assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table)[..],
-            &[to_nlm_new_rule(low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true)]
+        let (own_route_table_proxy, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteTableMarker>();
+        let (route_set_proxy, _server_end) = fidl::endpoints::create_proxy::<I::RouteSetMarker>();
+        let (route_set_from_main_table_proxy, _server_end) =
+            fidl::endpoints::create_proxy::<I::RouteSetMarker>();
+
+        let mut route_table_map = test_route_table_map::<I>();
+
+        // We should pre-populate the table so that we don't need to create a new one.
+        route_table_map.insert(
+            ManagedNetlinkRouteTableIndex::new(MANAGED_NETLINK_TABLE_ID).unwrap(),
+            RouteTable {
+                route_table_proxy: own_route_table_proxy,
+                route_set_proxy,
+                route_set_from_main_table_proxy,
+                fidl_table_id: MANAGED_FIDL_TABLE_ID,
+                rule_set_authenticated: true,
+            },
         );
 
-        // Adding a "different" rule with the same priority should succeed.
-        let newer_low_priority_rule = build_rule(
+        // Add a new rule and expect success.
+        // Conversion is safe as FR_ACT_TO_TBL (1), fits into a u8.
+        let low_priority_rule = build_rule_with_table::<I>(
             FR_ACT_TO_TBL,
-            vec![RuleAttribute::Priority(LOW_PRIORITY), RuleAttribute::Oifname(String::from("lo"))],
+            vec![RuleAttribute::Priority(LOW_PRIORITY)],
+            MANAGED_NETLINK_TABLE_ID,
         );
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::New(newer_low_priority_rule.clone()),
-                _ip_version_marker: ip_version_marker,
-                sequence_number: 0,
-                client: client.clone(),
-            })
+        let cleanup = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::New(low_priority_rule.clone()),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await
             .expect("new rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..],
+            &[to_nlm_new_rule(low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true)]
+        );
+        assert_eq!(cleanup, None);
+
+        // Adding a "different" rule with the same priority should succeed.
+        let newer_low_priority_rule = build_rule_with_table::<I>(
+            FR_ACT_TO_TBL,
+            vec![RuleAttribute::Priority(LOW_PRIORITY), RuleAttribute::Oifname(String::from("lo"))],
+            MANAGED_NETLINK_TABLE_ID,
+        );
+        let cleanup = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::New(newer_low_priority_rule.clone()),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await
+            .expect("new rule should succeed");
+        assert_eq!(
+            &dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..],
             // Ordered oldest to newest
             &[
                 to_nlm_new_rule(low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
                 to_nlm_new_rule(newer_low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
             ]
         );
+        assert_eq!(cleanup, None);
 
         // Adding the "same" rule with a different priority should succeed.
-        let high_priority_rule =
-            build_rule(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(HIGH_PRIORITY)]);
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::New(high_priority_rule.clone()),
-                _ip_version_marker: ip_version_marker,
-                sequence_number: 0,
-                client: client.clone(),
-            })
+        let high_priority_rule = build_rule_with_table::<I>(
+            FR_ACT_TO_TBL,
+            vec![RuleAttribute::Priority(HIGH_PRIORITY)],
+            MANAGED_NETLINK_TABLE_ID,
+        );
+        let cleanup = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::New(high_priority_rule.clone()),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await
             .expect("new rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..],
             &[
                 // Ordered in ascending priority
                 to_nlm_new_rule(low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
@@ -625,150 +1074,228 @@ mod tests {
                 to_nlm_new_rule(high_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
             ]
         );
+        assert_eq!(cleanup, None);
 
         // Specify a deletion pattern that matches all three existing rules, and
         // expect the oldest, lowest priority rule to be removed first.
-        let del_pattern_match_all = build_rule(FR_ACT_TO_TBL, vec![]);
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::Del(del_pattern_match_all.clone()),
-                _ip_version_marker: ip_version_marker,
-                sequence_number: 0,
-                client: client.clone(),
-            })
+        let del_pattern_match_all =
+            build_rule_with_table::<I>(FR_ACT_TO_TBL, vec![], MANAGED_NETLINK_TABLE_ID);
+        let cleanup = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::Del(del_pattern_match_all.clone()),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await
             .expect("del rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..],
             &[
                 to_nlm_new_rule(newer_low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
                 to_nlm_new_rule(high_priority_rule.clone(), DUMP_SEQUENCE_NUM, true),
             ]
         );
+        assert_eq!(
+            cleanup,
+            Some(TableNeedsCleanup(MANAGED_FIDL_TABLE_ID, MANAGED_NETLINK_TABLE_ID))
+        );
 
         // Specify a deletion pattern that only matches the high_priority_rule,
         // and expect it to be deleted.
         // Conversion is safe as FR_ACT_TO_TBL (1) fits into a u8.
-        let del_pattern_match_high_priority =
-            build_rule(FR_ACT_TO_TBL, vec![RuleAttribute::Priority(HIGH_PRIORITY)]);
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::Del(del_pattern_match_high_priority),
-                _ip_version_marker: ip_version_marker,
-                sequence_number: 0,
-                client: client.clone(),
-            })
+        let del_pattern_match_high_priority = build_rule_with_table::<I>(
+            FR_ACT_TO_TBL,
+            vec![RuleAttribute::Priority(HIGH_PRIORITY)],
+            MANAGED_NETLINK_TABLE_ID,
+        );
+        let cleanup = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::Del(del_pattern_match_high_priority),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await
             .expect("del rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..],
             &[to_nlm_new_rule(newer_low_priority_rule.clone(), DUMP_SEQUENCE_NUM, true)]
+        );
+        assert_eq!(
+            cleanup,
+            Some(TableNeedsCleanup(MANAGED_FIDL_TABLE_ID, MANAGED_NETLINK_TABLE_ID))
         );
 
         // Delete the final rule.
         // Conversion is safe as FR_ACT_TO_TBL (1) fits into a u8.
-        let del_pattern_match_all = build_rule(FR_ACT_TO_TBL, vec![]);
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::Del(del_pattern_match_all),
-                _ip_version_marker: ip_version_marker,
-                sequence_number: 0,
-                client: client.clone(),
-            })
+        let del_pattern_match_all =
+            build_rule_with_table::<I>(FR_ACT_TO_TBL, vec![], MANAGED_NETLINK_TABLE_ID);
+        let cleanup = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::Del(del_pattern_match_all),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await
             .expect("del rule should succeed");
-        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table)[..], &[]);
+        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..], &[]);
+        assert_eq!(
+            cleanup,
+            Some(TableNeedsCleanup(MANAGED_FIDL_TABLE_ID, MANAGED_NETLINK_TABLE_ID))
+        );
     }
 
     #[test_case(<Ipv4 as Ip>::VERSION_MARKER; "v4")]
     #[test_case(<Ipv6 as Ip>::VERSION_MARKER; "v6")]
-    fn test_rule_table_new_rule_already_exists<I: Ip>(ip_version_marker: IpVersionMarker<I>) {
+    #[fuchsia::test]
+    async fn test_rule_table_new_rule_already_exists<I: IpExt>(
+        ip_version_marker: IpVersionMarker<I>,
+    ) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::new();
+        let (rule_set, server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
+        let _serve_task = fuchsia_async::Task::local(
+            fnet_routes_ext::testutil::rules::serve_noop_rule_set::<I>(server_end),
+        );
+        let mut table = RulesWorker::new(rule_set);
 
         const PRIORITY_NLA: RuleAttribute = RuleAttribute::Priority(0);
         let oif_nla = RuleAttribute::Oifname(String::from("lo"));
 
+        let mut route_table_map = test_route_table_map::<I>();
+
         // Add a new rule and expect success.
-        // Conversion is safe as FR_ACT_UNSPEC (0) fits into a u8.
-        let rule = build_rule(FR_ACT_UNSPEC, vec![oif_nla.clone(), PRIORITY_NLA]);
-        table
-            .handle_request(RuleRequest {
-                args: RuleRequestArgs::New(rule.clone()),
-                _ip_version_marker: ip_version_marker,
-                sequence_number: 0,
-                client: client.clone(),
-            })
+        // Conversion is safe as FR_ACT_UNREACHABLE (7) fits into a u8.
+        let rule = build_rule::<I>(FR_ACT_UNREACHABLE, vec![oif_nla.clone(), PRIORITY_NLA]);
+        let cleanup = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::New(rule.clone()),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await
             .expect("new rule should succeed");
         assert_eq!(
-            &dump_rules(&mut sink, client.clone(), &mut table)[..],
+            &dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..],
             &[to_nlm_new_rule(rule.clone(), DUMP_SEQUENCE_NUM, true)]
         );
+        assert_eq!(cleanup, None);
 
         // Adding the same rule should return EEXIST.
-        let result = table.handle_request(RuleRequest {
-            args: RuleRequestArgs::New(rule.clone()),
-            _ip_version_marker: ip_version_marker,
-            sequence_number: 0,
-            client: client.clone(),
-        });
+        let result = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::New(rule.clone()),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await;
         assert_eq!(result, Err(Errno::EEXIST));
 
         // Adding the same rule with out-of-order NLAs should return EEXIST.
-        // Conversion is safe as FR_ACT_UNSPEC (0) fits into a u8.
-        let out_of_order_rule = build_rule(FR_ACT_UNSPEC, vec![PRIORITY_NLA, oif_nla.clone()]);
-        let result = table.handle_request(RuleRequest {
-            args: RuleRequestArgs::New(out_of_order_rule),
-            _ip_version_marker: ip_version_marker,
-            sequence_number: 0,
-            client: client.clone(),
-        });
+        // Conversion is safe as FR_ACT_UNREACHABLE (7) fits into a u8.
+        let out_of_order_rule =
+            build_rule::<I>(FR_ACT_UNREACHABLE, vec![PRIORITY_NLA, oif_nla.clone()]);
+        let result = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::New(out_of_order_rule),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await;
         assert_eq!(result, Err(Errno::EEXIST));
 
         // Try again, but erase the `Priority` NLA. This confirms EEXIST is
         // still reported when the default priority would conflict with an
         // existing_rule
-        // Conversion is safe as FR_ACT_UNSPEC (0) fits into a u8.
-        let rule_without_priority = build_rule(FR_ACT_UNSPEC, vec![oif_nla.clone()]);
-        let result = table.handle_request(RuleRequest {
-            args: RuleRequestArgs::New(rule_without_priority),
-            _ip_version_marker: ip_version_marker,
-            sequence_number: 0,
-            client: client.clone(),
-        });
+        // Conversion is safe as FR_ACT_UNREACHABLE (7) fits into a u8.
+        let rule_without_priority = build_rule::<I>(FR_ACT_UNREACHABLE, vec![oif_nla.clone()]);
+        let result = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::New(rule_without_priority),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client.clone(),
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await;
         assert_eq!(result, Err(Errno::EEXIST));
     }
 
     // Conversions are safe as these constants fit into a u8.
     #[test_case(RuleMessage::default(), Errno::ENOTSUP, <Ipv4 as Ip>::VERSION_MARKER;
         "empty_patern_not_supported_v4")]
-    #[test_case(build_rule(FR_ACT_TO_TBL, vec![]), Errno::ENOENT, <Ipv4 as Ip>::VERSION_MARKER;
+    #[test_case(build_rule::<Ipv4>(FR_ACT_TO_TBL, vec![]), Errno::ENOENT, <Ipv4 as Ip>::VERSION_MARKER;
         "no_matching_rules_v4")]
     #[test_case(RuleMessage::default(), Errno::ENOTSUP, <Ipv6 as Ip>::VERSION_MARKER;
         "empty_patern_not_supported_v6")]
-    #[test_case(build_rule(FR_ACT_TO_TBL, vec![]), Errno::ENOENT, <Ipv6 as Ip>::VERSION_MARKER;
+    #[test_case(build_rule::<Ipv6>(FR_ACT_TO_TBL, vec![]), Errno::ENOENT, <Ipv6 as Ip>::VERSION_MARKER;
         "no_matching_rules_v6")]
-    fn test_rule_table_del_rule_fails<I: Ip>(
+    #[fuchsia::test]
+    async fn test_rule_table_del_rule_fails<I: IpExt>(
         pattern: RuleMessage,
         error: Errno,
         ip_version_marker: IpVersionMarker<I>,
     ) {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
-        let mut table = RuleTable::new();
-        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table)[..], &[]);
+        let (rule_set, _server_end) = fidl::endpoints::create_proxy::<I::RuleSetMarker>();
+        let mut table = RulesWorker::new(rule_set);
+        assert_eq!(&dump_rules(&mut sink, client.clone(), &mut table.rule_table)[..], &[]);
 
-        let result = table.handle_request(RuleRequest {
-            args: RuleRequestArgs::Del(pattern),
-            _ip_version_marker: ip_version_marker,
-            sequence_number: 0,
-            client: client,
-        });
+        let mut route_table_map = test_route_table_map::<I>();
+
+        let result = table
+            .handle_request(
+                RuleRequest {
+                    args: RuleRequestArgs::Del(pattern),
+                    _ip_version_marker: ip_version_marker,
+                    sequence_number: 0,
+                    client: client,
+                },
+                &mut route_table_map,
+                &EMPTY_INTERFACE_PROPERTIES,
+            )
+            .await;
         assert_eq!(result, Err(error));
     }
 
     #[ip_test(I)]
-    fn test_default_rules<I: Ip>() {
+    fn test_default_rules<I: IpExt>() {
         let (mut sink, client) =
             crate::client::testutil::new_fake_client(crate::client::testutil::CLIENT_ID_1, &[]);
+
         let mut table = RuleTable::<I>::new_with_defaults();
 
         let new_rule = |table: u8, priority: RulePriority, family: u16| {

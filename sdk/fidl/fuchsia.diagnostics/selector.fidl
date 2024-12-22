@@ -167,10 +167,8 @@ type Selector = table {
     /// A set of fuchsia.inspect.Tree names to filter with before applying
     /// hierarchy/property selectors.
     ///
-    /// Currently, leaving this field out is equivalent to TreeNames::all. This
-    /// is a soft transition; eventually it will be equivalent to
-    /// TreeNames::some(["root"]), where "root" is the default tree name.
-    /// https://fxbug.dev/355732696 tracks this transition.
+    /// Omitting a name-filter is equivalent to TreeNames::some(["root"]).
+    /// Note that "root" is the default tree name.
     @available(added=22)
     3: tree_names TreeNames;
 };

@@ -22,11 +22,11 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <utility>
 
 #include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/alloc_checker.h>
-#include <fbl/auto_lock.h>
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -93,6 +93,7 @@ zx_koid_t GetCurrentProcessKoid() {
 
 void FramebufferDisplay::DisplayEngineSetListener(
     const display_engine_listener_protocol_t* engine_listener) {
+  std::lock_guard lock(engine_listener_mutex_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient(engine_listener);
 
   const int64_t pixel_clock_hz =
@@ -135,6 +136,7 @@ void FramebufferDisplay::DisplayEngineSetListener(
 }
 
 void FramebufferDisplay::DisplayEngineUnsetListener() {
+  std::lock_guard lock(engine_listener_mutex_);
   engine_listener_ = ddk::DisplayEngineListenerProtocolClient();
 }
 
@@ -275,7 +277,7 @@ zx_status_t FramebufferDisplay::DisplayEngineImportImage(
 
   bool key_matched;
   {
-    fbl::AutoLock lock(&framebuffer_key_mtx_);
+    std::lock_guard lock(framebuffer_key_mtx_);
     key_matched = framebuffer_key_.has_value() && (*framebuffer_key_ == buffer_key);
   }
   if (!key_matched) {
@@ -389,7 +391,7 @@ void FramebufferDisplay::DisplayEngineApplyConfiguration(const display_config_t*
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   has_image_ = display_count != 0 && display_config[0].layer_count != 0;
   {
-    fbl::AutoLock lock(&mtx_);
+    std::lock_guard lock(mtx_);
     config_stamp_ = display::ToConfigStamp(*banjo_config_stamp);
   }
 }
@@ -477,7 +479,7 @@ void FramebufferDisplay::AllocateVmo(AllocateVmoRequestView request,
 
   bool had_framebuffer_key;
   {
-    fbl::AutoLock lock(&framebuffer_key_mtx_);
+    std::lock_guard lock(framebuffer_key_mtx_);
     had_framebuffer_key = framebuffer_key_.has_value();
     if (!had_framebuffer_key) {
       framebuffer_key_ = buffer_key;
@@ -494,7 +496,7 @@ void FramebufferDisplay::AllocateVmo(AllocateVmoRequestView request,
 void FramebufferDisplay::DeleteVmo(DeleteVmoRequestView request,
                                    DeleteVmoCompleter::Sync& completer) {
   {
-    fbl::AutoLock lock(&framebuffer_key_mtx_);
+    std::lock_guard lock(framebuffer_key_mtx_);
     framebuffer_key_.reset();
   }
 
@@ -585,12 +587,21 @@ void FramebufferDisplay::OnPeriodicVSync(async_dispatcher_t* dispatcher, async::
     return;
   }
 
-  if (engine_listener_.is_valid()) {
-    fbl::AutoLock lock(&mtx_);
-    const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
-    const config_stamp_t banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp_);
-    engine_listener_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
+  config_stamp_t banjo_config_stamp = {};
+  {
+    std::lock_guard lock(mtx_);
+    banjo_config_stamp = display::ToBanjoConfigStamp(config_stamp_);
   }
+
+  {
+    std::lock_guard lock(engine_listener_mutex_);
+    if (engine_listener_.is_valid()) {
+      const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
+      engine_listener_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(),
+                                      &banjo_config_stamp);
+    }
+  }
+
   next_vsync_time_ += kVSyncInterval;
   zx_status_t post_status = vsync_task_.PostForTime(&dispatcher_, next_vsync_time_);
   if (post_status != ZX_OK) {

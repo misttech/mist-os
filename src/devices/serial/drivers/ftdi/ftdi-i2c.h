@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.ftdi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <threads.h>
 
 #include <vector>
@@ -15,7 +16,6 @@
 
 #include "ftdi-mpsse.h"
 #include "ftdi.h"
-#include "sdk/lib/driver/outgoing/cpp/outgoing_directory.h"
 
 namespace ftdi_mpsse {
 

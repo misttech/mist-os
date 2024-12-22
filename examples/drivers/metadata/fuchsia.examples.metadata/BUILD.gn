@@ -8,12 +8,3 @@ fidl("fuchsia.examples.metadata") {
   sources = [ "fuchsia.examples.metadata.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
-
-source_set("metadata") {
-  sources = [ "metadata.h" ]
-
-  public_deps = [
-    ":fuchsia.examples.metadata_cpp",
-    "//sdk/lib/driver/metadata/cpp",
-  ]
-}

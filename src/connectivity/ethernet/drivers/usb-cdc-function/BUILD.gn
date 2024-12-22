@@ -38,7 +38,6 @@ fuchsia_cc_driver("usb-cdc-function-driver") {
     "//src/devices/usb/lib/usb:peripheral",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-client",
     "//src/lib/ddk",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace",

@@ -88,7 +88,7 @@ zx_status_t PipeIo::SetupPipe() {
     return set_event_result.status();
   }
 
-  status = cmd_buffer_.Map(std::move(vmo));
+  status = cmd_buffer_.Map(std::move(vmo), 0, 0, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to map the command buffer VMO: %s", zx_status_get_string(status));
     return status;

@@ -153,8 +153,9 @@ TEST_F(IncomingProtocolTest, CloneWorksForServiceDirectories) {
 
 using EmptyCloneableNode = fidl_service_test::EmptyCloneableNode;
 
-// |EmptyCloneableNode| server that asserts that only |fuchsia.io/Node.Clone| is called.
-
+// |EmptyCloneableNode| server that asserts that only |fuchsia.io/Node.DeprecatedClone| is called.
+// TODO(https://fxbug.dev/324111518): This should call `fuchsia.unknown/Cloneable.Clone` instead
+// of `fuchsia.io/Node.DeprecatedClone`.
 class EmptyCloneableNodeImpl : public fidl::testing::WireTestBase<EmptyCloneableNode> {
  public:
   explicit EmptyCloneableNodeImpl(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
@@ -162,17 +163,13 @@ class EmptyCloneableNodeImpl : public fidl::testing::WireTestBase<EmptyCloneable
     return fidl::BindServer(dispatcher_, std::move(request), this);
   }
 
-  void Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) override {
+  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override {
     GTEST_FAIL();
     completer.Close(ZX_ERR_BAD_STATE);
   }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
   void DeprecatedClone(DeprecatedCloneRequestView request,
                        DeprecatedCloneCompleter::Sync& completer) override {
-#else
-  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override {
-#endif
     fidl::BindServer(dispatcher_,
                      fidl::ServerEnd<EmptyCloneableNode>(request->object.TakeChannel()), this);
   }
@@ -199,8 +196,6 @@ class IncomingCloneTest : public IncomingTest {
   constexpr static const char kProtocolName[] = "empty";
 };
 
-// TODO(https://fxbug.dev/324111518): This should call `fuchsia.unknown/Cloneable.Clone2` instead
-// of `fuchsia.io/Node.Clone` when all out-of-tree servers have support for Clone2.
 TEST_F(IncomingCloneTest, CloneDispatchesToNodeClone) {
   // Manually convert to the |Empty| protocol.
   auto empty = component::ConnectAt<EmptyCloneableNode>(TakeSvcDirectoryRoot(), kProtocolName);

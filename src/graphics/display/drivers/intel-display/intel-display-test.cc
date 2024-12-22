@@ -214,8 +214,7 @@ TEST(IntelDisplay, ImportImage) {
 
   // Invalid import: bad collection id
   static constexpr image_metadata_t kDisplayImageMetadata = {
-      .width = 32,
-      .height = 32,
+      .dimensions = {.width = 32, .height = 32},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   static constexpr uint64_t kBanjoInvalidCollectionId = 100;
@@ -233,8 +232,7 @@ TEST(IntelDisplay, ImportImage) {
 
   // Invalid import: bad type
   static constexpr image_metadata_t kInvalidTilingTypeMetadata = {
-      .width = 32,
-      .height = 32,
+      .dimensions = {.width = 32, .height = 32},
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
   };
   EXPECT_EQ(display.DisplayEngineImportImage(&kInvalidTilingTypeMetadata, kBanjoBufferCollectionId,

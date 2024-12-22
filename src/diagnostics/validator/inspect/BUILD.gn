@@ -57,8 +57,8 @@ rustc_library("inspect_validator") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:num-derive",
-    "//third_party/rust_crates:tracing",
   ]
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]

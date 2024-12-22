@@ -21,6 +21,10 @@ follow in order to be uploaded to the performance dashboard.
 ]
 ```
 
+Note that having multiple values in the `values` array is somewhat
+vestigial. The consumers of fuchsiaperf files usually just use the mean of
+the `values` array, and the array often just contains a single value.
+
 ### Supported units
 
 In order to convert benchmark results to the format required by the performance

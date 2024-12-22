@@ -10,7 +10,7 @@ use fidl_fuchsia_diagnostics::Severity;
 use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMarker, LogMessage, LogProxy};
 use futures::channel::mpsc;
 use futures::{Stream, StreamExt};
-use tracing::info;
+use log::info;
 use {
     fidl_fuchsia_archivist_test as ftest, fuchsia_async as fasync,
     fuchsia_syslog_listener as syslog_listener,

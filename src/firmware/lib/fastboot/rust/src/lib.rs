@@ -33,7 +33,7 @@ fn to_string(c_str: *const c_char) -> Option<String> {
 fn to_status(error: anyhow::Error) -> Status {
     // We can't easily convert an arbitrary string into a meaningful Zircon error code, so
     // we log the string for debugging and just report an internal error.
-    tracing::warn!("{error}");
+    log::warn!("{error}");
     Status::INTERNAL
 }
 
@@ -66,7 +66,7 @@ pub extern "C" fn install_from_usb(source: *const c_char, destination: *const c_
 
     // This function just handles C/Rust conversion and async execution so the internals can be pure
     // async Rust.
-    tracing::trace!("Starting install_from_usb()");
+    log::trace!("Starting install_from_usb()");
 
     // To handle async, this code spins up a separate thread with a new LocalExecutor. There may be
     // a better way to do this, but these other methods failed:
@@ -86,12 +86,12 @@ pub extern "C" fn install_from_usb(source: *const c_char, destination: *const c_
         ))
     };
     let thread_result = std::thread::spawn(func).join();
-    tracing::trace!("install_from_usb() result = {thread_result:?}");
+    log::trace!("install_from_usb() result = {thread_result:?}");
 
     match thread_result {
         Ok(result) => Status::from(result).into_raw(),
         Err(thread_panic) => {
-            tracing::error!("install_from_usb thread panic: {thread_panic:?}");
+            log::error!("install_from_usb thread panic: {thread_panic:?}");
             Status::INTERNAL.into_raw()
         }
     }
@@ -142,13 +142,13 @@ async fn install_from_usb_internal(
     destination: Option<String>,
     dependencies: &Dependencies,
 ) -> Result<(), Status> {
-    tracing::trace!(
+    log::trace!(
         "Starting install_from_usb_internal(), source = {source:?}, dest = {destination:?}"
     );
 
     let installation_paths =
         get_installation_paths(source.as_deref(), destination.as_deref(), dependencies).await?;
-    tracing::trace!("Installation paths: {installation_paths:?}");
+    log::trace!("Installation paths: {installation_paths:?}");
 
     (dependencies.do_install)(installation_paths).await.map_err(to_status)
 }
@@ -165,9 +165,9 @@ async fn get_installation_paths(
     // For now we don't care about coreboot, just hardcode EFI.
     let bootloader_type = BootloaderType::Efi;
 
-    tracing::trace!("Looking for block devices");
+    log::trace!("Looking for block devices");
     let block_devices = (dependencies.get_block_devices)().await.map_err(to_status)?;
-    tracing::trace!("Got block devices {block_devices:?}");
+    log::trace!("Got block devices {block_devices:?}");
 
     let install_source = match requested_source {
         // If a particular block device was requested, use it (or error out if not found).
@@ -206,7 +206,7 @@ async fn get_installation_paths(
         install_destinations: Vec::new(),
         available_disks: block_devices,
     };
-    tracing::trace!("Found installation paths: {paths:?}");
+    log::trace!("Found installation paths: {paths:?}");
 
     Ok(paths)
 }

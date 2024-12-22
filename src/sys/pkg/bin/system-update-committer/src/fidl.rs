@@ -2,85 +2,87 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Error};
-use fidl_fuchsia_update::{CommitStatusProviderRequest, CommitStatusProviderRequestStream};
-use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
-use futures::channel::oneshot;
+use anyhow::{Context, Error};
+use fidl_fuchsia_update as fupdate;
 use futures::prelude::*;
 use std::sync::Arc;
-use tracing::warn;
-use zx::{self as zx, EventPair, HandleBased};
+use zx::HandleBased as _;
 
-pub struct FidlServer {
-    p_external: EventPair,
-    // The blocker is shared to support multiple IsCurrentSystemCommitted calls while blocked.
-    blocker: future::Shared<oneshot::Receiver<()>>,
+pub struct FuchsiaUpdateFidlServer {
+    p_external: zx::EventPair,
+    wait_for_status_check: future::Shared<futures::future::BoxFuture<'static, Result<(), String>>>,
+    idle_timeout: zx::MonotonicDuration,
 }
 
-impl FidlServer {
-    pub fn new(p_external: EventPair, blocker: oneshot::Receiver<()>) -> Self {
-        Self { p_external, blocker: blocker.shared() }
-    }
-
-    pub async fn run(server: Arc<Self>, mut fs: ServiceFs<ServiceObjLocal<'_, IncomingService>>) {
-        fs.dir("svc").add_fidl_service(IncomingService::CommitStatusProvider);
-        fs.for_each_concurrent(None, |incoming_service| match incoming_service {
-            IncomingService::CommitStatusProvider(stream) => {
-                Self::handle_commit_status_provider_request_stream(Arc::clone(&server), stream)
-                    .unwrap_or_else(|e| {
-                        warn!(
-                        "error handling fuchsia.update/CommitStatusProvider request stream:  {:#}",
-                        anyhow!(e)
-                    )
-                    })
-            }
-        })
-        .await;
+impl FuchsiaUpdateFidlServer {
+    pub fn new(
+        p_external: zx::EventPair,
+        wait_for_status_check: impl std::future::Future<Output = Result<(), String>> + Send + 'static,
+        idle_timeout: zx::MonotonicDuration,
+    ) -> Self {
+        Self {
+            p_external,
+            wait_for_status_check: wait_for_status_check.boxed().shared(),
+            idle_timeout,
+        }
     }
 
     /// Handle a fuchsia.update/CommitStatusProvider request stream.
-    async fn handle_commit_status_provider_request_stream(
-        server: Arc<Self>,
-        mut stream: CommitStatusProviderRequestStream,
+    pub async fn handle_commit_status_provider_stream(
+        self: Arc<Self>,
+        stream: fupdate::CommitStatusProviderRequestStream,
     ) -> Result<(), Error> {
+        let (stream, unbind_if_stalled) = detect_stall::until_stalled(stream, self.idle_timeout);
+        let mut stream = std::pin::pin!(stream);
         while let Some(request) =
             stream.try_next().await.context("while receiving CommitStatusProvider request")?
         {
-            let () =
-                Self::handle_commit_status_provider_request(Arc::clone(&server), request).await?;
+            let () = Self::handle_request(self.clone(), request).await?;
         }
+
+        if let Ok(Some(server_end)) = unbind_if_stalled.await {
+            fuchsia_component::client::connect_channel_to_protocol_at::<
+                fupdate::CommitStatusProviderMarker,
+            >(server_end, "/escrow")
+            .context("escrowing stream")?;
+        }
+
         Ok(())
     }
 
-    async fn handle_commit_status_provider_request(
-        server: Arc<Self>,
-        req: CommitStatusProviderRequest,
+    async fn handle_request(
+        self: Arc<Self>,
+        req: fupdate::CommitStatusProviderRequest,
     ) -> Result<(), Error> {
         // The server should only unblock when either of these conditions are met:
-        // * The system is committed on boot and p_external already has `USER_0` asserted.
-        // * The system is pending commit and p_external does not have `USER_0` asserted.
+        // * The current configuration was already committed on boot and p_external already has
+        //   `USER_0` asserted.
+        // * The current configuration was pending on boot (p_external may or may not have `USER_0`
+        //   asserted depending on how quickly the system is committed).
         //
-        // This ensures that consumers (e.g. the GC service) will always observe the `USER_0` signal
-        // on p_external if the system is committed. Otherwise, there would be an edge case where
-        // the system is committed and the consumer received the EventPair, but we haven't yet
-        // asserted the signal on the EventPair.
+        // The common case is that the current configuration is committed on boot, so this
+        // arrangement avoids the race condition where a client (e.g. an update checker) queries
+        // the commit status right after boot, sees that `USER_0` is not yet asserted (because the
+        // system-update-committer itself is still obtaining the status from the paver) and then
+        // postpones its work (e.g. an update check), when it would have been able to continue if
+        // it had queried the commit status a couple seconds later (many clients check the
+        // instantaneous state of `USER_0` instead of waiting for it to be asserted so that they
+        // can report failure and retry later instead of blocking indefinitely).
         //
         // If there is an error with `put_metadata_in_happy_state`, the FIDL server will hang here
         // indefinitely. This is acceptable because we'll Soon™ reboot on error.
-        let () = server.blocker.clone().await.context("while unblocking fidl server")?;
-
-        let CommitStatusProviderRequest::IsCurrentSystemCommitted { responder } = req;
-
+        let () = self
+            .wait_for_status_check
+            .clone()
+            .await
+            .map_err(|e| anyhow::anyhow!("while unblocking fidl server: {e}"))?;
+        let fupdate::CommitStatusProviderRequest::IsCurrentSystemCommitted { responder } = req;
         responder
             .send(
-                server
-                    .p_external
+                self.p_external
                     .duplicate_handle(zx::Rights::BASIC)
                     .context("while duplicating p_external")?,
             )
             .context("while sending IsCurrentSystemCommitted response")
     }
-}
-pub enum IncomingService {
-    CommitStatusProvider(CommitStatusProviderRequestStream),
 }

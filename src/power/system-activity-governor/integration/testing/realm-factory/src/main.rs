@@ -12,7 +12,7 @@ use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
 };
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 
 const ACTIVITY_GOVERNOR_CHILD_NAME: &str = "system-activity-governor";
 

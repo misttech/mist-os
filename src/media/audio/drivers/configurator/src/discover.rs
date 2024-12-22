@@ -32,7 +32,7 @@ pub async fn find_codecs<T: Configurator>(
                     continue;
                 }
                 let path = Path::new(&msg.filename);
-                tracing::info!("Found new codec in devfs node: {:?}", path);
+                log::info!("Found new codec in devfs node: {:?}", path);
                 let interface = CodecInterface::new(Clone::clone(dev_proxy), &path);
                 if let Err(e) = configurator.lock().await.process_new_codec(interface).await {
                     if break_count != 0 {
@@ -40,7 +40,7 @@ pub async fn find_codecs<T: Configurator>(
                         return Err(anyhow!("Codec processing error: {:?}", e));
                     } else {
                         // Otherwise we continue finding codecs.
-                        tracing::warn!("Codec processing error: {:?}", e);
+                        log::warn!("Codec processing error: {:?}", e);
                     }
                 }
                 codecs_found += 1;
@@ -75,7 +75,7 @@ pub async fn find_dais<T: Configurator>(
                     continue;
                 }
                 let path = Path::new(&msg.filename);
-                tracing::info!("Found new DAI in devfs node: {:?}", path);
+                log::info!("Found new DAI in devfs node: {:?}", path);
                 let interface = DaiInterface::new(Clone::clone(dev_proxy), &path);
                 let mut configurator = configurator.lock().await;
                 if let Err(e) = configurator.process_new_dai(interface).await {
@@ -84,13 +84,13 @@ pub async fn find_dais<T: Configurator>(
                         return Err(anyhow!("DAI processing error: {:?}", e));
                     } else {
                         // Otherwise we continue finding DAIs.
-                        tracing::warn!("DAI processing error: {:?}", e);
+                        log::warn!("DAI processing error: {:?}", e);
                     }
                 } else {
                     // If we are not breaking then serve the required interfaces.
                     if break_count == 0 {
                         match configurator.serve_interface() {
-                            Err(e) => tracing::warn!("Interface serving error: {:?}", e),
+                            Err(e) => log::warn!("Interface serving error: {:?}", e),
                             Ok(task) => {
                                 stream_config_serve_tasks.push(task);
                             }

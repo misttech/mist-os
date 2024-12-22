@@ -7,7 +7,6 @@
 #include "encode.h"
 #include "ir.h"
 #include "mod.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/macros.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
@@ -48,8 +47,8 @@ PyMODINIT_FUNC PyInit_libfidl_codec() {
 
 }  // namespace
 
-DES_MIX struct PyModuleDef libfidl_codec = {
-    PyModuleDef_HEAD_INIT,
+struct PyModuleDef libfidl_codec = {
+    .m_base = PyModuleDef_HEAD_INIT,
     .m_name = "fidl_codec",
     .m_doc = nullptr,
     .m_size = sizeof(mod::FidlCodecState *),

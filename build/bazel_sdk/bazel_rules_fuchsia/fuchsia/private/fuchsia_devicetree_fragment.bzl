@@ -6,7 +6,7 @@
 
 load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(":providers.bzl", "FuchsiaDeviceTreeSegmentInfo")
-load(":utils.bzl", "PREPROCESS_FILE_ATTRS", "preprocesss_file")
+load(":utils.bzl", "PREPROCESS_FILE_ATTRS", "preprocess_file")
 
 def _fuchsia_devicetree_fragment_impl(ctx):
     source = ctx.file.source
@@ -37,7 +37,7 @@ def _fuchsia_devicetree_fragment_impl(ctx):
     )
 
     if source.extension == "S":
-        output = preprocesss_file(ctx, source, include_depset, headers, files)
+        output = preprocess_file(ctx, source, include_depset, headers, files)
 
     return [
         DefaultInfo(

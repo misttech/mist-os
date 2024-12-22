@@ -99,7 +99,7 @@ pub fn compute(passphrase: &[u8], ssid: &Ssid) -> Result<Psk, anyhow::Error> {
     // Compute PSK: IEEE Std 802.11-2016, J.4.1
     let size = 256 / 8;
     let mut psk = vec![0_u8; size];
-    const ITERS: NonZeroU32 = const_unwrap::const_unwrap_option(NonZeroU32::new(4096));
+    const ITERS: NonZeroU32 = NonZeroU32::new(4096).unwrap();
     // PBKDF2-HMAC-SHA1 is considered insecure but required for PSK computation.
     #[allow(deprecated)]
     insecure_pbkdf2_hmac_sha1(&passphrase[..], &ssid[..], ITERS, &mut psk[..]);

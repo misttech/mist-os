@@ -32,6 +32,7 @@ use fidl::HandleBased;
 use futures::channel::mpsc;
 use futures::sink::SinkExt;
 use futures::StreamExt;
+use scopeguard::defer;
 use std::cell::RefCell;
 use std::cmp;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
@@ -152,7 +153,7 @@ enum Cmd {
         ///
         /// This is important so that wake alarms can be scheduled before we
         /// allow the system to go to sleep.
-        keep_alive: fidl::EventPair,
+        setup_done: zx::Event,
         /// An alarm identifier, chosen by the caller.
         alarm_id: String,
         /// A responder that will be called when the timer expires. The
@@ -272,7 +273,7 @@ pub async fn serve(timer_loop: Rc<Loop>, requests: fta::WakeRequestStream) {
 /// - `request`: a single inbound Wake FIDL API request.
 async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta::WakeRequest) {
     match request {
-        fta::WakeRequest::SetAndWait { deadline, keep_alive, alarm_id, responder } => {
+        fta::WakeRequest::SetAndWait { deadline, setup_done, alarm_id, responder } => {
             // Since responder is consumed by the happy path and the error path, but not both,
             // and because the responder does not implement Default, this is a way to
             // send it in two mutually exclusive directions.  Each direction will reverse
@@ -296,7 +297,7 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
                 .send(Cmd::Start {
                     cid,
                     deadline: deadline.into(),
-                    keep_alive,
+                    setup_done,
                     alarm_id: alarm_id.clone(),
                     responder: responder.clone(),
                 })
@@ -311,10 +312,7 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
                     .unwrap();
             }
         }
-        fta::WakeRequest::Cancel { alarm_id, responder } => {
-            // Respond to Cancel first to ensure that a cancelation always results
-            // in a predictable message ordering.
-            responder.send(Ok(())).expect("infallible");
+        fta::WakeRequest::Cancel { alarm_id, .. } => {
             let done = zx::Event::create();
             let timer_id = TimerId { alarm_id: alarm_id.clone(), cid };
             if let Err(e) = cmd.send(Cmd::StopById { timer_id, done: clone_handle(&done) }).await {
@@ -951,7 +949,7 @@ async fn wake_timer_loop(
         // Use a consistent notion of "now" across commands.
         let now = fasync::BootInstant::now();
         match cmd {
-            Cmd::Start { cid, deadline, keep_alive, alarm_id, responder } => {
+            Cmd::Start { cid, deadline, setup_done, alarm_id, responder } => {
                 let responder = responder.borrow_mut().take().expect("responder is always present");
                 // NOTE: hold keep_alive until all work is done.
                 debug!(
@@ -961,8 +959,13 @@ async fn wake_timer_loop(
                     format_timer(deadline.into()),
                     format_timer(now.into()),
                 );
+                defer! {
+                    // Must signal once the setup is completed.
+                    signal(&setup_done);
+                };
                 if Timers::expired(now, deadline) {
                     // A timer set into now or the past expires right away.
+                    let (_lease, keep_alive) = zx::EventPair::create();
                     responder
                         .send(Ok(keep_alive))
                         .map(|_| {
@@ -1729,7 +1732,7 @@ mod tests {
         let deadline = zx::BootInstant::from_nanos(100);
         let test_duration = zx::MonotonicDuration::from_nanos(110);
         run_in_fake_time_and_test_context(test_duration, |wake_proxy| async move {
-            let (_lease, keep_alive) = zx::EventPair::create();
+            let keep_alive = zx::Event::create();
 
             wake_proxy
                 .set_and_wait(deadline.into(), keep_alive, "Hello".into())
@@ -1770,12 +1773,11 @@ mod tests {
         duration: zx::MonotonicDuration,
     ) {
         run_in_fake_time_and_test_context(duration, |wake_proxy| async move {
-            let (_lease1, keep_alive1) = zx::EventPair::create();
-            let (_lease2, keep_alive2) = zx::EventPair::create();
+            let lease1 = zx::Event::create();
+            let fut1 = wake_proxy.set_and_wait(first_deadline.into(), lease1, "Hello1".into());
 
-            let fut1 = wake_proxy.set_and_wait(first_deadline.into(), keep_alive1, "Hello1".into());
-            let fut2 =
-                wake_proxy.set_and_wait(second_deadline.into(), keep_alive2, "Hello2".into());
+            let lease2 = zx::Event::create();
+            let fut2 = wake_proxy.set_and_wait(second_deadline.into(), lease2, "Hello2".into());
 
             let (result1, result2) = futures::join!(fut1, fut2);
 
@@ -1817,16 +1819,16 @@ mod tests {
         duration: zx::MonotonicDuration,
     ) {
         run_in_fake_time_and_test_context(duration, |wake_proxy| async move {
-            let (_lease1, keep_alive1) = zx::EventPair::create();
-            let (_lease2, keep_alive2) = zx::EventPair::create();
+            let lease1 = zx::Event::create();
 
             wake_proxy
-                .set_and_wait(first_deadline.into(), keep_alive1, "Hello".into())
+                .set_and_wait(first_deadline.into(), lease1, "Hello".into())
                 .await
                 .unwrap()
                 .unwrap();
+            let lease2 = zx::Event::create();
             wake_proxy
-                .set_and_wait(second_deadline.into(), keep_alive2, "Hello2".into())
+                .set_and_wait(second_deadline.into(), lease2, "Hello2".into())
                 .await
                 .unwrap()
                 .unwrap();
@@ -1845,7 +1847,7 @@ mod tests {
             |wake_proxy| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
-                let (_lease, keep_alive) = zx::EventPair::create();
+                let keep_alive = zx::Event::create();
 
                 let (mut sync_send, mut sync_recv) = mpsc::channel(1);
 
@@ -1872,7 +1874,7 @@ mod tests {
                     // Wait until we know that the long deadline timer has been scheduled.
                     let _ = sync_recv.next().await;
 
-                    let (_lease2, keep_alive2) = zx::EventPair::create();
+                    let keep_alive2 = zx::Event::create();
                     let _ = wake_proxy
                         .borrow()
                         .set_and_wait(
@@ -1905,7 +1907,7 @@ mod tests {
             |wake_proxy| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
-                let (_lease, keep_alive) = zx::EventPair::create();
+                let keep_alive = zx::Event::create();
 
                 let (mut sync_send, mut sync_recv) = mpsc::channel(1);
 
@@ -1938,7 +1940,7 @@ mod tests {
                     // Wait until we know that the other deadline timer has been scheduled.
                     let _ = sync_recv.next().await;
 
-                    let (_lease2, keep_alive2) = zx::EventPair::create();
+                    let keep_alive2 = zx::Event::create();
                     let _ = wake_proxy
                         .borrow()
                         .set_and_wait(

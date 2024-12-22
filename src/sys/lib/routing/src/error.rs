@@ -305,9 +305,6 @@ pub enum RoutingError {
     #[error("failed to route capability because the route source has been shutdown and possibly destroyed")]
     RouteSourceShutdown { moniker: Moniker },
 
-    #[error("failed to route capability because the route source stopped running while the route operation was happening")]
-    RouteSourceStopped { moniker: Moniker },
-
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
 
@@ -386,7 +383,6 @@ impl Explain for RoutingError {
             | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::BedrockFailedToSend { .. }
             | RoutingError::RouteSourceShutdown { .. }
-            | RoutingError::RouteSourceStopped { .. }
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::BedrockNotCloneable { .. }
@@ -437,7 +433,6 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::UseFromRootEnvironmentNotAllowed { moniker, .. }
             | RoutingError::DynamicDictionariesNotAllowed { moniker, .. }
             | RoutingError::RouteSourceShutdown { moniker }
-            | RoutingError::RouteSourceStopped { moniker }
             | RoutingError::UseFromSelfNotFound { moniker, .. }
             | RoutingError::MissingPorcelainType { moniker, .. } => moniker.into(),
 

@@ -4,9 +4,9 @@
 
 use anyhow::{Context as _, Error};
 use futures::prelude::*;
+use log::{debug, error, info, warn};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use zx::{self as zx, Signals};
 use {fidl_fuchsia_hardware_powersource as hpower, fuchsia_async as fasync};
 
@@ -51,7 +51,7 @@ pub async fn load_power_info(
     match power_source.get_power_info().map_err(|_| zx::Status::IO).await? {
         result => {
             let (status, info) = result;
-            debug!(get_power_info = ?info, ?status, "::power::");
+            debug!(get_power_info:? = info, status:?; "::power::");
             Ok(info)
         }
     }
@@ -75,7 +75,7 @@ pub async fn load_battery_info(
     match power_source.get_battery_info().map_err(|_| zx::Status::IO).await? {
         result => {
             let (status, info) = result;
-            debug!(get_battery_info = ?info, ?status, "::power::");
+            debug!(get_battery_info:? = info, status:?; "::power::");
             Ok(info)
         }
     }
@@ -149,7 +149,7 @@ async fn process_watch_event(
         let battery_manager2 = battery_manager2.clone();
         fasync::Task::spawn(async move {
             if let Err(err) = battery_manager2.update_status(p_info.clone(), b_info.clone()) {
-                error!(%err);
+                error!(err:%; "");
             }
         })
         .detach()
@@ -171,7 +171,7 @@ async fn process_watch_event(
                 if let Err(err) =
                     battery_manager.update_status(power_info.clone(), battery_info.clone())
                 {
-                    error!(%err);
+                    error!(err:%; "");
                 }
             }
         })

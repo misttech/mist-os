@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.examples.metadata/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/logging/cpp/logger.h>
-
-#include "examples/drivers/metadata/fuchsia.examples.metadata/metadata.h"
+#include <lib/driver/metadata/cpp/metadata.h>
 
 namespace examples::drivers::metadata {
 

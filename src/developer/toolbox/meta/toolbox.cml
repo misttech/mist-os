@@ -7,6 +7,7 @@
             protocol: [
                 "fuchsia.bluetooth.pandora.GrpcServerController",
                 "fuchsia.bluetooth.pandora.RootcanalClientController",
+                "fuchsia.bluetooth.sys.Access",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.feedback.DataProvider",
                 "fuchsia.posix.socket.Provider",

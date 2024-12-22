@@ -6,13 +6,13 @@ mod test_server;
 
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
+use log::{info, warn};
 use rand::Rng;
 use std::fs;
 use std::path::Path;
 use test_runners_lib::elf;
 use test_server::TestServer;
 use thiserror::Error;
-use tracing::{info, warn};
 use {fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[cfg(feature = "gtest")]
@@ -73,7 +73,7 @@ async fn start_runner(
                 };
             }
             fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown ComponentRunner request");
+                warn!(ordinal:%; "Unknown ComponentRunner request");
             }
         }
     }

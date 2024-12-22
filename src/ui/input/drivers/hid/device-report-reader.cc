@@ -91,11 +91,12 @@ zx_status_t DeviceReportsReader::SendReports() {
       status =
           ReadReportFromFifo(buf.data() + buf_index, buf.size() - buf_index, &time, &report_size);
       if (status == ZX_OK) {
-        reports[reports_size] =
-            fhidbus::wire::Report::Builder(arena)
-                .timestamp(time)
-                .buf(fidl::VectorView<uint8_t>::FromExternal(buf.data() + buf_index, report_size))
-                .Build();
+        auto report = fhidbus::wire::Report::Builder(arena).timestamp(time).buf(
+            fidl::VectorView<uint8_t>::FromExternal(buf.data() + buf_index, report_size));
+        if (wake_lease_.is_valid()) {
+          report.wake_lease(std::move(wake_lease_));
+        }
+        reports[reports_size] = report.Build();
         reports_size++;
         buf_index += report_size;
       }
@@ -143,6 +144,10 @@ zx_status_t DeviceReportsReader::WriteToFifo(const uint8_t* report, size_t repor
     }
   }
   return ZX_OK;
+}
+
+void DeviceReportsReader::SetWakeLease(const zx::eventpair& wake_lease) {
+  ZX_ASSERT(wake_lease.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_lease_) == ZX_OK);
 }
 
 }  // namespace hid_driver

@@ -47,7 +47,7 @@ async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenC
             object,
             control_handle: _control_handle,
         } => {
-            ObjectRequest::new3(flags, &options, object).handle(|request| {
+            ObjectRequest::new(flags, &options, object).handle(|request| {
                 if path == "." {
                     reopen_self(request, flags, Arc::clone(&open_counts))?;
                 }

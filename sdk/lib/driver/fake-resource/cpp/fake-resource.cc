@@ -23,11 +23,11 @@ namespace {
 // range. Only shared resources are permitted at this time to reduce complexity
 // as exclusive resources are not needed for most test purposes. It is not permitted
 // to create a |root| resource through this interface.
-class FakeResource final : public fdf_fake_object::FakeObject {
+class FakeResource final : public fake_object::FakeObject {
  public:
   FakeResource(zx_paddr_t base, size_t size, zx_rsrc_kind_t kind, zx_rsrc_flags_t flags,
                const char* name, size_t name_len)
-      : fdf_fake_object::FakeObject(ZX_OBJ_TYPE_RESOURCE),
+      : fake_object::FakeObject(ZX_OBJ_TYPE_RESOURCE),
         base_(base),
         size_(size),
         kind_(kind),
@@ -40,7 +40,7 @@ class FakeResource final : public fdf_fake_object::FakeObject {
 
   static zx_status_t Create(zx_paddr_t base, size_t size, zx_rsrc_kind_t kind,
                             zx_rsrc_flags_t flags, const char* name, size_t name_len,
-                            std::shared_ptr<fdf_fake_object::FakeObject>* out) {
+                            std::shared_ptr<fake_object::FakeObject>* out) {
     *out = std::make_shared<FakeResource>(base, size, kind, flags, name, name_len);
     return ZX_OK;
   }
@@ -70,8 +70,8 @@ bool exclusive_region_overlaps(zx_rsrc_kind_t kind, zx_paddr_t new_rsrc_base,
                                size_t new_rsrc_size) {
   bool overlaps = false;
   zx_paddr_t new_rsrc_end = new_rsrc_base + new_rsrc_size;
-  fdf_fake_object::FakeHandleTable().ForEach(
-      ZX_OBJ_TYPE_RESOURCE, [&](fdf_fake_object::FakeObject* obj) -> bool {
+  fake_object::FakeHandleTable().ForEach(
+      ZX_OBJ_TYPE_RESOURCE, [&](fake_object::FakeObject* obj) -> bool {
         auto* rsrc = static_cast<FakeResource*>(obj);
         // In the case of exclusive resources we need to ensure the new resource does not
         // overlap with existing exclusive ranges.
@@ -126,7 +126,7 @@ __EXPORT
 zx_status_t zx_resource_create(zx_handle_t parent_rsrc, uint32_t options, uint64_t base,
                                size_t size, const char* name, size_t name_size,
                                zx_handle_t* resource_out) {
-  zx::result get_res = fdf_fake_object::FakeHandleTable().Get(parent_rsrc);
+  zx::result get_res = fake_object::FakeHandleTable().Get(parent_rsrc);
   if (!get_res.is_ok()) {
     return get_res.status_value();
   }
@@ -150,9 +150,9 @@ zx_status_t zx_resource_create(zx_handle_t parent_rsrc, uint32_t options, uint64
     return ZX_ERR_ACCESS_DENIED;
   }
 
-  std::shared_ptr<fdf_fake_object::FakeObject> new_res;
+  std::shared_ptr<fake_object::FakeObject> new_res;
   ZX_ASSERT(FakeResource::Create(base, size, kind, flags, name, name_size, &new_res) == ZX_OK);
-  zx::result add_res = fdf_fake_object::FakeHandleTable().Add(std::move(new_res));
+  zx::result add_res = fake_object::FakeHandleTable().Add(std::move(new_res));
   if (add_res.is_ok()) {
     *resource_out = add_res.value();
   }
@@ -165,7 +165,7 @@ zx_status_t zx_resource_create(zx_handle_t parent_rsrc, uint32_t options, uint64
 __EXPORT
 zx_status_t zx_vmo_create_physical(zx_handle_t handle, zx_paddr_t paddr, size_t size,
                                    zx_handle_t* out) {
-  zx::result get_res = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result get_res = fake_object::FakeHandleTable().Get(handle);
   if (!get_res.is_ok()) {
     return get_res.status_value();
   }
@@ -182,7 +182,7 @@ zx_status_t zx_vmo_create_physical(zx_handle_t handle, zx_paddr_t paddr, size_t 
 // needs IO permissions then more work will need to be done getting them real
 // resources to allwow it.
 zx_status_t ioport_syscall_common(zx_handle_t handle, uint16_t io_addr, uint32_t len) {
-  zx::result get_res = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result get_res = fake_object::FakeHandleTable().Get(handle);
   if (!get_res.is_ok()) {
     return get_res.status_value();
   }
@@ -215,10 +215,10 @@ zx_status_t zx_ioports_release(zx_handle_t resource, uint16_t io_addr, uint32_t 
 __EXPORT
 zx_status_t fake_root_resource_create(zx_handle_t* out) {
   std::array<char, ZX_MAX_NAME_LEN> name = {"FAKE ROOT"};
-  std::shared_ptr<fdf_fake_object::FakeObject> new_res;
+  std::shared_ptr<fake_object::FakeObject> new_res;
   ZX_ASSERT(FakeResource::Create(0, 0, ZX_RSRC_KIND_ROOT, 0, name.data(), name.size(), &new_res) ==
             ZX_OK);
-  zx::result add_res = fdf_fake_object::FakeHandleTable().Add(std::move(new_res));
+  zx::result add_res = fake_object::FakeHandleTable().Add(std::move(new_res));
   if (add_res.is_ok()) {
     *out = add_res.value();
   }

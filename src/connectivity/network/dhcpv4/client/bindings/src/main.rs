@@ -26,7 +26,7 @@ enum IncomingService {
 
 #[fuchsia::main()]
 pub async fn main() {
-    tracing::info!("starting");
+    log::info!("starting");
 
     let mut fs = ServiceFs::new_local();
     let _: &mut ServiceFsDir<'_, _> =
@@ -49,7 +49,7 @@ pub async fn main() {
                     )
                     .await
                     .unwrap_or_else(|e| {
-                        tracing::error!(
+                        log::error!(
                             "error while serving {}: {e:?}",
                             <ClientProviderMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME
                         );

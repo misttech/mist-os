@@ -44,5 +44,9 @@
             }
         }
     },
-    "provided_features": []
+    "provided_features": [],
+    "tee_trusted_app_guids": [
+        "ta_1",
+        "ta_2"
+    ]
 }

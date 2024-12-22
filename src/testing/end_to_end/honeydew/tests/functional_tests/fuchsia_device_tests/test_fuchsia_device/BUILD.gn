@@ -82,7 +82,9 @@ group("tests") {
   testonly = true
   public_deps = [
     ":nelson_test($host_toolchain)",
-    ":vim3_test($host_toolchain)",
+
+    # TODO(https://fxbug.dev/375341470): This test is flaky on VIM3. Fix the flakes.
+    # ":vim3_test($host_toolchain)",
     ":x64_emu_test($host_toolchain)",
     ":x64_nuc_test($host_toolchain)",
   ]

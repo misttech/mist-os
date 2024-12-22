@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/bind/bind.gni")
 import("//build/cipd.gni")
 import("//build/components.gni")
@@ -70,9 +71,16 @@ fuchsia_driver_component("bt-hci-broadcom") {
 }
 
 # This is the firmware for VIM3 board only
-resource("broadcom-firmware") {
+resource("broadcom-firmware-vim3") {
   sources = [
     "//prebuilt/connectivity/bluetooth/firmware/broadcom/vim3/BCM4359C0.hcd",
+  ]
+  outputs = [ "lib/firmware/{{source_file_part}}" ]
+}
+
+resource("broadcom-firmware-sorrel") {
+  sources = [
+    "//prebuilt/connectivity/bluetooth/firmware/broadcom/sorrel/BCM4381A1.hcd",
   ]
   outputs = [ "lib/firmware/{{source_file_part}}" ]
 }
@@ -82,7 +90,17 @@ fuchsia_driver_package("broadcom") {
   driver_components = [ ":bt-hci-broadcom" ]
 
   if (internal_access) {
-    deps = [ ":broadcom-firmware" ]
+    deps = [ ":broadcom-firmware-vim3" ]
+  }
+}
+
+# This package is only referenced by moonflower/BUILD.gn for now.
+fuchsia_driver_package("broadcom-sorrel") {
+  export_to_bazel = true
+  driver_components = [ ":bt-hci-broadcom" ]
+
+  if (internal_access) {
+    deps = [ ":broadcom-firmware-sorrel" ]
   }
 }
 

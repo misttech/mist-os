@@ -4,6 +4,7 @@
 library fuchsia.fdomain;
 
 // FDomain operations on Events.
+@no_resource
 open protocol Event {
     // Create a new event in this FDomain and return it.
     flexible CreateEvent(struct {

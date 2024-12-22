@@ -14,20 +14,18 @@
 
 #include "internal.h"
 
-namespace fdf_fake_object {
+namespace fake_object {
 
-__EXPORT
 class FakeHandleTable& FakeHandleTable() {
   static class FakeHandleTable gFakeHandleTable;
   return gFakeHandleTable;
 }
 
-__EXPORT void* FindRealSyscall(const char* name) {
+void* FindRealSyscall(const char* name) {
   static void* vdso = dlopen("libzircon.so", RTLD_NOLOAD);
   return dlsym(vdso, name);
 }
 
-__EXPORT
 zx::result<zx_handle_t> fake_object_create_typed(zx_obj_type_t type) {
   auto obj = std::make_shared<FakeObject>(type);
   zx::result result = FakeHandleTable().Add(std::move(obj));
@@ -37,10 +35,8 @@ zx::result<zx_handle_t> fake_object_create_typed(zx_obj_type_t type) {
   return zx::success(result.value());
 }
 
-__EXPORT
 zx::result<zx_handle_t> fake_object_create() { return fake_object_create_typed(ZX_OBJ_TYPE_NONE); }
 
-__EXPORT
 zx::result<zx_koid_t> fake_object_get_koid(zx_handle_t handle) {
   zx::result result = FakeHandleTable().Get(handle);
   if (result.is_error()) {
@@ -49,17 +45,21 @@ zx::result<zx_koid_t> fake_object_get_koid(zx_handle_t handle) {
   return zx::success(result->get_koid());
 }
 
-}  // namespace fdf_fake_object
+}  // namespace fake_object
+
+namespace {
+
+extern "C" {
 
 // Closes a fake handle. Real handles are passed through to |zx_handle_close|.
 // In the event of ZX_HANDLE_INVALID, that is technically a valid fake handle due
 // to fake handles all being even values.
 __EXPORT
 zx_status_t zx_handle_close(zx_handle_t handle) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_handle_close)(handle);
   }
-  return fdf_fake_object::FakeHandleTable().Remove(handle).status_value();
+  return fake_object::FakeHandleTable().Remove(handle).status_value();
 }
 
 // Calls our |zx_handle_close| on each handle, ensuring that both real and fake handles are
@@ -77,15 +77,15 @@ zx_status_t zx_handle_close_many(const zx_handle_t* handles, size_t num_handles)
 // |rights| is ignored for fake handles.
 __EXPORT
 zx_status_t zx_handle_duplicate(zx_handle_t handle, zx_rights_t rights, zx_handle_t* out) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_handle_duplicate)(handle, rights, out);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     return fake_object.status_value();
   }
-  zx::result result = fdf_fake_object::FakeHandleTable().Add(std::move(fake_object.value()));
+  zx::result result = fake_object::FakeHandleTable().Add(std::move(fake_object.value()));
   if (result.is_ok()) {
     *out = result.value();
   }
@@ -95,18 +95,18 @@ zx_status_t zx_handle_duplicate(zx_handle_t handle, zx_rights_t rights, zx_handl
 // Adds an object to the table a second time before removing the first handle.
 __EXPORT
 zx_status_t zx_handle_replace(zx_handle_t handle, zx_rights_t rights, zx_handle_t* out) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_handle_replace)(handle, rights, out);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     return fake_object.status_value();
   }
-  zx::result result = fdf_fake_object::FakeHandleTable().Add(std::move(fake_object.value()));
+  zx::result result = fake_object::FakeHandleTable().Add(std::move(fake_object.value()));
   ZX_ASSERT(result.is_ok());
   *out = result.value();
-  ZX_ASSERT(fdf_fake_object::FakeHandleTable().Remove(handle).is_ok());
+  ZX_ASSERT(fake_object::FakeHandleTable().Remove(handle).is_ok());
   return ZX_OK;
 }
 
@@ -115,11 +115,11 @@ zx_status_t zx_handle_replace(zx_handle_t handle, zx_rights_t rights, zx_handle_
 __EXPORT
 zx_status_t zx_object_get_child(zx_handle_t handle, uint64_t koid, zx_rights_t rights,
                                 zx_handle_t* out) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_object_get_child)(handle, koid, rights, out);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     printf("%s: Bad handle = %#x, status = %d\n", __func__, handle, fake_object.status_value());
     return fake_object.status_value();
@@ -130,12 +130,12 @@ zx_status_t zx_object_get_child(zx_handle_t handle, uint64_t koid, zx_rights_t r
 __EXPORT
 zx_status_t zx_object_get_info(zx_handle_t handle, uint32_t topic, void* buffer, size_t buffer_size,
                                size_t* actual_count, size_t* avail_count) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_object_get_info)(handle, topic, buffer, buffer_size, actual_count,
                                             avail_count);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     printf("%s: Bad handle = %#x, status = %d\n", __func__, handle, fake_object.status_value());
     return fake_object.status_value();
@@ -147,11 +147,11 @@ zx_status_t zx_object_get_info(zx_handle_t handle, uint32_t topic, void* buffer,
 __EXPORT
 zx_status_t zx_object_get_property(zx_handle_t handle, uint32_t property, void* value,
                                    size_t value_size) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_object_get_property)(handle, property, value, value_size);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     printf("%s: Bad handle = %#x, status = %d\n", __func__, handle, fake_object.status_value());
     return fake_object.status_value();
@@ -161,11 +161,11 @@ zx_status_t zx_object_get_property(zx_handle_t handle, uint32_t property, void* 
 
 __EXPORT
 zx_status_t zx_object_set_profile(zx_handle_t handle, zx_handle_t profile, uint32_t options) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_object_set_profile)(handle, profile, options);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     printf("%s: Bad handle = %#x, status = %d\n", __func__, handle, fake_object.status_value());
     return fake_object.status_value();
@@ -176,11 +176,11 @@ zx_status_t zx_object_set_profile(zx_handle_t handle, zx_handle_t profile, uint3
 __EXPORT
 zx_status_t zx_object_set_property(zx_handle_t handle, uint32_t property, const void* value,
                                    size_t value_size) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_object_set_property)(handle, property, value, value_size);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     printf("%s: Bad handle = %#x, status = %d\n", __func__, handle, fake_object.status_value());
     return fake_object.status_value();
@@ -190,11 +190,11 @@ zx_status_t zx_object_set_property(zx_handle_t handle, uint32_t property, const 
 
 __EXPORT
 zx_status_t zx_object_signal(zx_handle_t handle, uint32_t clear_mask, uint32_t set_mask) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_object_signal)(handle, clear_mask, set_mask);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     printf("%s: Bad handle = %#x, status = %d\n", __func__, handle, fake_object.status_value());
     return fake_object.status_value();
@@ -204,11 +204,11 @@ zx_status_t zx_object_signal(zx_handle_t handle, uint32_t clear_mask, uint32_t s
 
 __EXPORT
 zx_status_t zx_object_signal_peer(zx_handle_t handle, uint32_t clear_mask, uint32_t set_mask) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_object_signal_peer)(handle, clear_mask, set_mask);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     printf("%s: Bad handle = %#x, status = %d\n", __func__, handle, fake_object.status_value());
     return fake_object.status_value();
@@ -219,11 +219,11 @@ zx_status_t zx_object_signal_peer(zx_handle_t handle, uint32_t clear_mask, uint3
 __EXPORT
 zx_status_t zx_object_wait_one(zx_handle_t handle, zx_signals_t signals, zx_time_t deadline,
                                zx_signals_t* observed) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_object_wait_one)(handle, signals, deadline, observed);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     printf("%s: Bad handle = %#x, status = %d\n", __func__, handle, fake_object.status_value());
     return fake_object.status_value();
@@ -234,11 +234,11 @@ zx_status_t zx_object_wait_one(zx_handle_t handle, zx_signals_t signals, zx_time
 __EXPORT
 zx_status_t zx_object_wait_async(zx_handle_t handle, zx_handle_t port, uint64_t key,
                                  zx_signals_t signals, uint32_t options) {
-  if (!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
+  if (!fake_object::FakeHandleTable::IsValidFakeHandle(handle)) {
     return REAL_SYSCALL(zx_object_wait_async)(handle, port, key, signals, options);
   }
 
-  zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handle);
+  zx::result fake_object = fake_object::FakeHandleTable().Get(handle);
   if (fake_object.is_error()) {
     printf("%s: Bad handle = %#x, status = %d\n", __func__, handle, fake_object.status_value());
     return fake_object.status_value();
@@ -249,7 +249,7 @@ zx_status_t zx_object_wait_async(zx_handle_t handle, zx_handle_t port, uint64_t 
 __EXPORT
 zx_status_t zx_object_wait_many(zx_wait_item_t* items, size_t count, zx_time_t deadline) {
   for (size_t i = 0; i < count; i++) {
-    ZX_ASSERT_MSG(!fdf_fake_object::FakeHandleTable::IsValidFakeHandle(items[i].handle),
+    ZX_ASSERT_MSG(!fake_object::FakeHandleTable::IsValidFakeHandle(items[i].handle),
                   "Fake handle %u was passed as index %zu to zx_object_wait_many!\n",
                   items[i].handle, i);
   }
@@ -257,6 +257,8 @@ zx_status_t zx_object_wait_many(zx_wait_item_t* items, size_t count, zx_time_t d
   // No fake handles were passed in so it's safe to call the real syscall.
   return REAL_SYSCALL(zx_object_wait_many)(items, count, deadline);
 }
+
+}  // extern "C"
 
 std::vector<zx_handle_disposition_t> FixHandleDisposition(zx_handle_disposition_t* handles,
                                                           uint32_t num_handles) {
@@ -268,7 +270,7 @@ std::vector<zx_handle_disposition_t> FixHandleDisposition(zx_handle_disposition_
   std::vector<zx_handle_disposition_t> filtered_handles;
   for (uint32_t i = 0; i < num_handles; i++) {
     filtered_handles.push_back(handles[i]);
-    if (fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handles[i].handle)) {
+    if (fake_object::FakeHandleTable::IsValidFakeHandle(handles[i].handle)) {
       filtered_handles[i].type = ZX_OBJ_TYPE_NONE;
     }
   }
@@ -279,12 +281,14 @@ std::vector<zx_handle_disposition_t> FixHandleDisposition(zx_handle_disposition_
 // and must be adjusted back into their correct fake type before being handed to the caller.
 void FixIncomingHandleTypes(zx_handle_info_t* handles, uint32_t num_handles) {
   for (uint32_t i = 0; i < num_handles; i++) {
-    if (fdf_fake_object::FakeHandleTable::IsValidFakeHandle(handles[i].handle)) {
-      zx::result fake_object = fdf_fake_object::FakeHandleTable().Get(handles[i].handle);
+    if (fake_object::FakeHandleTable::IsValidFakeHandle(handles[i].handle)) {
+      zx::result fake_object = fake_object::FakeHandleTable().Get(handles[i].handle);
       handles[i].type = static_cast<zx_obj_type_t>(fake_object->type());
     }
   }
 }
+
+extern "C" {
 
 __EXPORT
 zx_status_t zx_channel_write_etc(zx_handle_t handle, uint32_t options, const void* bytes,
@@ -337,3 +341,7 @@ zx_status_t zx_channel_read_etc(zx_handle_t handle, uint32_t options, void* byte
   FixIncomingHandleTypes(handles, std::min(num_handles, *actual_handles));
   return status;
 }
+
+}  // extern "C"
+
+}  // namespace

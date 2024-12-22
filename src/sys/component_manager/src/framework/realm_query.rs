@@ -526,9 +526,10 @@ async fn open_directory(
     // TODO(https://fxbug.dev/42059901): Close the connection if the scope root cannot be found.
     let instance = model.root().find(&moniker).await.ok_or(fsys::OpenError::InstanceNotFound)?;
 
-    // The intention is that this is only used for component introspection, so we only request
-    // readable/executable rights when creating a connection to the desired directory.
-    const FLAGS: fio::Flags = fio::PERM_READABLE.union(fio::Flags::PERM_INHERIT_EXECUTE);
+    // Request all possible rights for the resulting directory connection.
+    const FLAGS: fio::Flags = fio::PERM_READABLE
+        .union(fio::Flags::PERM_INHERIT_EXECUTE)
+        .union(fio::Flags::PERM_INHERIT_WRITE);
     let mut request = FLAGS.to_object_request(object);
     let path = vfs::path::Path::dot();
 

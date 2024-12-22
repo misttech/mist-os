@@ -10,6 +10,7 @@ use anyhow::{bail, Context as _, Error};
 use fuchsia_inspect as inspect;
 use futures::FutureExt;
 use glob::{GlobError, Paths};
+use log::warn;
 use moniker::ExtendedMoniker;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
@@ -17,7 +18,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use string_list::StringList;
-use tracing::warn;
 
 pub use selector_list::{ParsedSelector, SelectorList};
 
@@ -369,7 +369,7 @@ impl MetricConfig {
                         }
                         Ok(None) => Ok(None),
                         Err(err) => {
-                            warn!(?err, "Couldn't fill selector template");
+                            warn!(err:?; "Couldn't fill selector template");
                             Ok(None)
                         }
                     }
@@ -497,7 +497,7 @@ impl SamplerConfig {
                 Ok(ids) => add_instance_ids(ids, &mut fire_components),
                 Err(error) => {
                     warn!(
-                        ?error,
+                        error:?;
                         "Unable to read ID file; FIRE selectors with instance IDs won't work"
                     );
                 }

@@ -114,14 +114,10 @@ mod tests {
         let scope = ExecutionScope::new();
         let example_dir_flags =
             fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
-        ObjectRequest::new3(
-            example_dir_flags,
-            &fio::Options::default(),
-            example_dir_service.into(),
-        )
-        .handle(|request| {
-            example_dir.open3(scope, vfs::path::Path::dot(), example_dir_flags, request)
-        });
+        ObjectRequest::new(example_dir_flags, &fio::Options::default(), example_dir_service.into())
+            .handle(|request| {
+                example_dir.open3(scope, vfs::path::Path::dot(), example_dir_flags, request)
+            });
 
         for (file_name, flags, should_succeed) in vec![
             ("ro/read_only", fio::PERM_READABLE, true),

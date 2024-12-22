@@ -87,7 +87,7 @@ impl Registry {
 
     pub fn lookup(&self, token: &Token) -> Option<Credential> {
         let Some(koid) = token.koid() else {
-            tracing::debug!("could not get koid for {:?}", token);
+            log::debug!("could not get koid for {:?}", token);
             return None;
         };
         self.get_credential_by_koid(&koid)
@@ -99,11 +99,11 @@ impl Registry {
         credential_to_register: CredentialToRegister,
     ) -> Result<(), RegisterCredentialsError> {
         let Some(id) = credential_to_register.broker_token.koid() else {
-            tracing::error!("could not get koid for {:?}", credential_to_register.broker_token);
+            log::error!("could not get koid for {:?}", credential_to_register.broker_token);
             return Err(RegisterCredentialsError::Internal);
         };
         if self.tokens.contains_key(&id) {
-            tracing::debug!("register_dependency_token: token already in use");
+            log::debug!("register_dependency_token: token already in use");
             return Err(RegisterCredentialsError::AlreadyInUse);
         };
         self.tokens.insert(id, credential_to_register.broker_token);
@@ -113,7 +113,7 @@ impl Registry {
             element: element.clone(),
             permissions: credential_to_register.permissions,
         };
-        tracing::debug!("registered credential: {:?}", &credential);
+        log::debug!("registered credential: {:?}", &credential);
         self.credentials.insert(id, credential);
         Ok(())
     }
@@ -130,10 +130,7 @@ impl Registry {
                 {
                     by_element_entry.retain(|cid| cid != id);
                 } else {
-                    tracing::error!(
-                        "missing {:?} in credential_ids_by_element",
-                        &credential.element
-                    );
+                    log::error!("missing {:?} in credential_ids_by_element", &credential.element);
                 };
                 Some(credential)
             } else {

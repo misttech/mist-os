@@ -13,7 +13,10 @@ ffx_plugin("ffx_bluetooth") {
 
   with_unit_tests = false
 
-  plugin_deps = [ "src/pandora:ffx_bluetooth_pandora" ]
+  plugin_deps = [
+    "src/pandora:ffx_bluetooth_pandora",
+    "src/peer:ffx_bluetooth_peer",
+  ]
   args_sources = [ "src/args.rs" ]
 
   deps = [ "//src/developer/ffx/lib/errors:lib" ]

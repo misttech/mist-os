@@ -7,7 +7,6 @@
 //! The debuglog protocol is used to multicast log messages.
 
 use crate::ValidStr;
-use const_unwrap::const_unwrap_option;
 use packet::{
     BufferView, BufferViewMut, FragmentedBytesMut, InnerPacketBuilder, PacketBuilder,
     PacketConstraints, ParsablePacket, ParseMetadata, SerializeTarget,
@@ -16,8 +15,8 @@ use std::num::NonZeroU16;
 use zerocopy::byteorder::little_endian::U32;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice, Unaligned};
 
-pub const MULTICAST_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33337));
-pub const ACK_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33338));
+pub const MULTICAST_PORT: NonZeroU16 = NonZeroU16::new(33337).unwrap();
+pub const ACK_PORT: NonZeroU16 = NonZeroU16::new(33338).unwrap();
 
 const MAGIC: u32 = 0xAEAE1123;
 const MAX_LOG_DATA: usize = 1216;

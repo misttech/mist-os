@@ -94,7 +94,11 @@ class BtHciBroadcom final
 
   fpromise::promise<void, zx_status_t> LoadFirmware();
 
-  fpromise::promise<void, zx_status_t> SendVmoAsCommands(zx::vmo vmo, size_t size, size_t offset);
+  // Used by firmware loading
+  zx_status_t SendCommandSync(const void* command, size_t length);
+  zx::result<std::vector<uint8_t>> ReadEventSync();
+
+  fpromise::promise<void, zx_status_t> SendVmoAsCommands(zx::vmo vmo, size_t size);
 
   fpromise::promise<void, zx_status_t> Initialize();
 

@@ -565,7 +565,7 @@ mod tests {
                 scope.clone(),
                 vfs::path::Path::validate_and_split("part-0").unwrap(),
                 flags.clone(),
-                &mut ObjectRequest::new3(flags, &options, server_end.into_channel().into()),
+                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
             )
             .unwrap();
         let block =
@@ -750,7 +750,7 @@ mod tests {
                 scope.clone(),
                 vfs::path::Path::validate_and_split("part-0").unwrap(),
                 flags.clone(),
-                &mut ObjectRequest::new3(flags, &options, server_end.into_channel().into()),
+                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
             )
             .unwrap();
         let block =
@@ -818,7 +818,7 @@ mod tests {
                 scope.clone(),
                 vfs::path::Path::validate_and_split("part-0").unwrap(),
                 flags.clone(),
-                &mut ObjectRequest::new3(flags, &options, server_end_0.into_channel().into()),
+                &mut ObjectRequest::new(flags, &options, server_end_0.into_channel().into()),
             )
             .unwrap();
         partitions_dir
@@ -827,7 +827,7 @@ mod tests {
                 scope.clone(),
                 vfs::path::Path::validate_and_split("part-1").unwrap(),
                 flags.clone(),
-                &mut ObjectRequest::new3(flags, &options, server_end_1.into_channel().into()),
+                &mut ObjectRequest::new(flags, &options, server_end_1.into_channel().into()),
             )
             .unwrap();
         let part_0_proxy = connect_to_named_protocol_at_dir_root::<fpartitions::PartitionMarker>(
@@ -962,7 +962,7 @@ mod tests {
                 scope.clone(),
                 vfs::path::Path::validate_and_split("part-0").unwrap(),
                 flags.clone(),
-                &mut ObjectRequest::new3(flags, &options, server_end.into_channel().into()),
+                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
             )
             .unwrap();
         let block =

@@ -36,8 +36,8 @@ rustc_binary("blackout-fxfs-tree-bin") {
     "//third_party/rust_crates:tracing",
   ]
   data_deps = [
+    "//src/storage/crypt/fxfs",
     "//src/storage/fxfs",
-    "//src/storage/fxfs-crypt",
   ]
   sources = [ "src/main.rs" ]
   rustenv = [ "DATA_FILESYSTEM_FORMAT=fxfs" ]

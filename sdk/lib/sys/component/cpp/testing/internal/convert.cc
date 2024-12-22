@@ -152,7 +152,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
     return fuchsia::component::test::Capability::WithStorage(std::move(fidl_capability));
   }
   if ([[maybe_unused]] auto dictionary = cpp17_get_if<Dictionary>(&capability)) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
     fuchsia::component::test::Dictionary fidl_capability;
 
     fidl_capability.set_name(std::string(dictionary->name));

@@ -349,7 +349,7 @@ class WatchForTarget(Step):
                 ctx.log(
                     f"{target_name} found. Registered 'devhost.fuchsia.com'"
                 )
-                self._check_target_compatability(ctx, target_name)
+                self._check_target_compatibility(ctx, target_name)
             elif repository_registered and not target_up:
                 ctx.log(
                     f"{target_name} lost. Waiting for target to come back online."
@@ -361,7 +361,7 @@ class WatchForTarget(Step):
     def cleanup(self, ctx):
         pass
 
-    def _check_target_compatability(self, ctx, target):
+    def _check_target_compatibility(self, ctx, target):
         ctx.log("checking for target compatibility")
         ctx.ffx().run("--target", target, "target", "wait", "-t", "60")
         result = json.loads(

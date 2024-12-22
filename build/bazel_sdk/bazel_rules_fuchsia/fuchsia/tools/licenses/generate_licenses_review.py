@@ -268,7 +268,7 @@ def _write_detailed_csv(
                                 for r in identification.overriding_rules
                             ]
                         )
-                        row["email_subject_lines"] = "\n=======\\n".join(
+                        row["email_subject_lines"] = "\n=======\n".join(
                             _dedup(
                                 [
                                     "\n".join(r.email_subject_line)
@@ -277,7 +277,7 @@ def _write_detailed_csv(
                                 ]
                             )
                         )
-                        row["comments"] = "\n=======\\n".join(
+                        row["comments"] = "\n=======\n".join(
                             _dedup(
                                 [
                                     "\n".join(r.comment)

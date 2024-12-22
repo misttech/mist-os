@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error, Result};
-use const_unwrap::const_unwrap_option;
 use regex::Regex;
 use std::fmt::Display;
 use std::io::{Cursor, Seek, SeekFrom, Write};
@@ -18,10 +17,10 @@ use {
 pub const DURATION_REGEX: &'static str = r"^(\d+)(h|m|s|ms)$";
 
 // Common sample sizes.
-pub const BITS_8: NonZeroU32 = const_unwrap_option(NonZeroU32::new(8));
-pub const BITS_16: NonZeroU32 = const_unwrap_option(NonZeroU32::new(16));
-pub const BITS_24: NonZeroU32 = const_unwrap_option(NonZeroU32::new(24));
-pub const BITS_32: NonZeroU32 = const_unwrap_option(NonZeroU32::new(32));
+pub const BITS_8: NonZeroU32 = NonZeroU32::new(8).unwrap();
+pub const BITS_16: NonZeroU32 = NonZeroU32::new(16).unwrap();
+pub const BITS_24: NonZeroU32 = NonZeroU32::new(24).unwrap();
+pub const BITS_32: NonZeroU32 = NonZeroU32::new(32).unwrap();
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Format {
@@ -241,7 +240,7 @@ impl SampleType {
             Self::Uint8 => SampleSize::from_full_bits(BITS_8),
             Self::Int16 => SampleSize::from_full_bits(BITS_16),
             // Assuming Int32 is really "24 in 32".
-            Self::Int32 => const_unwrap_option(SampleSize::from_partial_bits(BITS_24, BITS_32)),
+            Self::Int32 => SampleSize::from_partial_bits(BITS_24, BITS_32).unwrap(),
             Self::Float32 => SampleSize::from_full_bits(BITS_32),
         }
     }
@@ -416,7 +415,7 @@ impl SampleSize {
 
     pub const fn total_bytes(&self) -> NonZeroU32 {
         // It's safe to unwrap because `div_ceil` will always return at least 1 since `total_bits` is non-zero.
-        const_unwrap_option(NonZeroU32::new(self.total_bits.get().div_ceil(8)))
+        NonZeroU32::new(self.total_bits.get().div_ceil(8)).unwrap()
     }
 
     pub const fn valid_bits(&self) -> NonZeroU32 {

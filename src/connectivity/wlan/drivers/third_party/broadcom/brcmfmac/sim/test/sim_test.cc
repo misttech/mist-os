@@ -295,12 +295,11 @@ void SimInterface::OnWmmStatusResp(OnWmmStatusRespRequestView request,
   completer.Reply();
 }
 
-void SimInterface::Query(wlan_fullmac_wire::WlanFullmacImplQueryResponse* out_info) {
+fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse SimInterface::Query() {
   auto result = client_.buffer(test_arena_)->Query();
   ZX_ASSERT(result.ok());
   ZX_ASSERT(!result->is_error());
-
-  *out_info = *result->value();
+  return fidl::ToNatural(*result->value());
 }
 
 void SimInterface::QueryMacSublayerSupport(wlan_common::MacSublayerSupport* out_resp) {
@@ -329,10 +328,9 @@ void SimInterface::QuerySpectrumManagementSupport(
 }
 
 void SimInterface::GetMacAddr(common::MacAddr* out_macaddr) {
-  wlan_fullmac_wire::WlanFullmacImplQueryResponse info;
-  Query(&info);
-  ZX_ASSERT(info.has_sta_addr());
-  memcpy(out_macaddr->byte, info.sta_addr().data(), ETH_ALEN);
+  fuchsia_wlan_fullmac::WlanFullmacImplQueryResponse info = Query();
+  ZX_ASSERT(info.sta_addr().has_value());
+  memcpy(out_macaddr->byte, info.sta_addr()->data(), ETH_ALEN);
 }
 
 void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,

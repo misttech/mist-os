@@ -4,7 +4,7 @@
 
 use fidl::endpoints::{RequestStream, ServerEnd};
 use fidl_test_detect_factory::{TriageDetectEventsControlHandle, TriageDetectEventsMarker};
-use tracing::error;
+use log::error;
 
 // A handle that emits TriageDetectEvents to the test suite.
 // local mock components use this when they receive FIDL requests from the

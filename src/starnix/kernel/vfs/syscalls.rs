@@ -54,22 +54,24 @@ use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::vfs::{EpollEvent, FdEvents, ResolveFlags};
 use starnix_uapi::{
-    __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, io_uring_params, iocb,
-    itimerspec, off_t, pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi,
-    uid_t, AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
+    __kernel_fd_set, aio_context_t, errno, error, f_owner_ex, io_event, io_uring_params,
+    io_uring_register_op_IORING_REGISTER_BUFFERS as IORING_REGISTER_BUFFERS,
+    io_uring_register_op_IORING_UNREGISTER_BUFFERS as IORING_UNREGISTER_BUFFERS, iocb, itimerspec,
+    off_t, pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t,
+    AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
     AT_SYMLINK_NOFOLLOW, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME,
     CLOCK_REALTIME_ALARM, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK,
     EFD_SEMAPHORE, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, FIOCLEX, FIONCLEX,
     F_ADD_SEALS, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN,
     F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
     F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX,
-    IN_CLOEXEC, IN_NONBLOCK, IORING_REGISTER_BUFFERS, IORING_SETUP_CQSIZE,
-    IORING_UNREGISTER_BUFFERS, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK,
-    MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX,
-    PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND,
-    POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
-    POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK,
-    TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
+    IN_CLOEXEC, IN_NONBLOCK, IORING_SETUP_CQSIZE, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB,
+    MFD_HUGE_MASK, MFD_HUGE_SHIFT, MFD_NOEXEC_SEAL, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW,
+    O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI,
+    POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE,
+    POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED,
+    RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET,
+    XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
 };
 use std::cmp::Ordering;
 use std::collections::VecDeque;
@@ -1553,9 +1555,6 @@ pub fn sys_ioctl(
     request: u32,
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
-    // TODO: https://fxbug.dev/364569179 - Figure out what to do about the security
-    // check for FIONREAD, FIBMAP, FIGETBSZ, FIONBIO, and FIOASYNC. These ioctls check
-    // a different set of permissions than other arbitrary ioctls.
     match request {
         FIOCLEX => {
             current_task.files.set_fd_flags(fd, FdFlags::CLOEXEC)?;
@@ -1567,7 +1566,7 @@ pub fn sys_ioctl(
         }
         _ => {
             let file = current_task.files.get(fd)?;
-            security::check_file_ioctl_access(current_task, &file)?;
+            security::check_file_ioctl_access(current_task, &file, request)?;
             file.ioctl(locked, current_task, request, arg)
         }
     }
@@ -1651,7 +1650,10 @@ pub fn sys_memfd_create(
 ) -> Result<FdNumber, Errno> {
     const HUGE_SHIFTED_MASK: u32 = MFD_HUGE_MASK << MFD_HUGE_SHIFT;
 
-    if flags & !(MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_HUGETLB | HUGE_SHIFTED_MASK) != 0 {
+    if flags
+        & !(MFD_CLOEXEC | MFD_ALLOW_SEALING | MFD_HUGETLB | HUGE_SHIFTED_MASK | MFD_NOEXEC_SEAL)
+        != 0
+    {
         return error!(EINVAL);
     }
 
@@ -1664,7 +1666,7 @@ pub fn sys_memfd_create(
         None
     };
 
-    if flags & !(MFD_CLOEXEC | MFD_ALLOW_SEALING) != 0 {
+    if flags & !MFD_NOEXEC_SEAL != 0 {
         track_stub!(TODO("https://fxbug.dev/322875665"), "memfd_create unknown flags", flags);
     }
 
@@ -1676,7 +1678,7 @@ pub fn sys_memfd_create(
         }
     })?;
 
-    let seals = if flags & MFD_ALLOW_SEALING != 0 {
+    let seals = if flags & (MFD_ALLOW_SEALING | MFD_NOEXEC_SEAL) != 0 {
         SealFlags::empty()
     } else {
         // Forbid sealing, by sealing the seal operation.
@@ -1852,6 +1854,8 @@ fn do_mount_create(
     };
 
     let fs = current_task.create_filesystem(locked, fs_type, options)?;
+
+    security::sb_kern_mount(current_task, &fs)?;
     target.mount(WhatToMount::Fs(fs), flags)
 }
 
@@ -3145,6 +3149,83 @@ pub fn sys_io_uring_register(
         _ => return error!(EINVAL),
     }
 }
+
+// Syscalls for arch32 usage
+#[cfg(feature = "arch32")]
+mod arch32 {
+    use crate::mm::MemoryAccessorExt;
+    use crate::vfs::syscalls::{lookup_at, sys_faccessat, sys_openat, sys_readlinkat, LookupFlags};
+    use crate::vfs::{CurrentTask, FdNumber, FsNode};
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::uapi;
+    use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+
+    pub fn sys_arch32_open(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        flags: u32,
+        mode: FileMode,
+    ) -> Result<FdNumber, Errno> {
+        sys_openat(locked, current_task, FdNumber::AT_FDCWD, user_path, flags, mode)
+    }
+
+    pub fn sys_arch32_access(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        mode: u32,
+    ) -> Result<(), Errno> {
+        sys_faccessat(locked, current_task, FdNumber::AT_FDCWD, user_path, mode)
+    }
+    pub fn stat64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        node: &FsNode,
+        arch32_stat_buf: UserRef<uapi::arch32::stat64>,
+    ) -> Result<(), Errno> {
+        let stat_buffer = node.stat(locked, current_task)?;
+        let result: uapi::arch32::stat64 = stat_buffer.into();
+        // Now we copy to the arch32 version and write.
+        current_task.write_object(arch32_stat_buf, &result)?;
+        Ok(())
+    }
+
+    pub fn sys_arch32_fstat64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+        arch32_stat_buf: UserRef<uapi::arch32::stat64>,
+    ) -> Result<(), Errno> {
+        let file = current_task.files.get_allowing_opath(fd)?;
+        stat64(locked, current_task, file.node(), arch32_stat_buf)
+    }
+    pub fn sys_arch32_stat64(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        arch32_stat_buf: UserRef<uapi::arch32::stat64>,
+    ) -> Result<(), Errno> {
+        let name =
+            lookup_at(locked, current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+        stat64(locked, current_task, &name.entry.node, arch32_stat_buf)
+    }
+
+    pub fn sys_arch32_readlink(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        buffer: UserAddress,
+        buffer_size: usize,
+    ) -> Result<usize, Errno> {
+        sys_readlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, buffer, buffer_size)
+    }
+}
+
+#[cfg(feature = "arch32")]
+pub use arch32::*;
 
 #[cfg(test)]
 mod tests {

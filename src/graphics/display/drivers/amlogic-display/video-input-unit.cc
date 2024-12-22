@@ -367,8 +367,8 @@ void VideoInputUnit::FlipOnVsync(const display_config_t& config,
 
   // This is guaranteed by DisplayEngine::CheckConfiguration().
   ZX_DEBUG_ASSERT(config.layer_count > 0);
-  ZX_DEBUG_ASSERT(config.layer_list[0].image_metadata.width != 0);
-  ZX_DEBUG_ASSERT(config.layer_list[0].image_metadata.height != 0);
+  ZX_DEBUG_ASSERT(config.layer_list[0].image_metadata.dimensions.width != 0);
+  ZX_DEBUG_ASSERT(config.layer_list[0].image_metadata.dimensions.height != 0);
   const layer_t& primary_layer = config.layer_list[0];
   if (primary_layer.alpha_mode != ALPHA_DISABLE) {
     // If a global alpha value is provided, apply it.

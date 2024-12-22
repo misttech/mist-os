@@ -51,19 +51,6 @@
                 "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/Read",
                 "ProcSelfMemProts.CanWriteToPrivateAnonymousMappings/ReadExecute",
 
-                // TODO(https://fxbug.dev/382241450)
-                "ProcSelfFdTest.AnonymousPipeFdName",
-                "ProcSelfFdTest.EpollFdName",
-                "ProcSelfFdTest.EventFdName",
-                "ProcSelfFdTest.InotifyFdName",
-                "ProcSelfFdTest.MemFdName",
-                "ProcSelfFdTest.PidFdName",
-                "ProcSelfFdTest.SignalFdName",
-                "ProcSelfFdTest.SocketFdName",
-                "ProcSelfFdTest.TimerFdName",
-                "ProcSelfFdTest.TmpFileFdName",
-                "ProcSelfFdTest.OpenedAndUnlinkedFileFdName",
-
                 // TODO(https://fxbug.dev/355404941)
                 "OverlayFs/FsMountTest.CantBypassDirectoryPermissions/0",
                 "OverlayFs/FsMountTest.ChmodWithDifferentModes/0",
@@ -101,8 +88,8 @@
                 // TODO(https://fxbug.dev/379958264)
                 "CgroupTest.WriteToInterfaceFileAfterCgroupIsDeleted",
 
-                // TODO(https://fxbug.dev/333766695): Re-enable impl of cgroup.freezer is complete
-                "CgroupFreezerTest.FreezeSingleProcess",
+                // TODO(https://fxbug.dev/377755814): Re-enable impl of cgroup.events is complete
+                "CgroupFreezerTest.CheckStateInEventsFile",
             ],
         },
     ],

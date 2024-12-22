@@ -208,7 +208,7 @@ static zx::result<fidl::ClientEnd<fuchsia_io::Directory>> RecursivelyWalkPath(
   // root directory.
   if (path.empty() || path == std::filesystem::path(".")) {
     auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-    auto result = fidl::WireCall(root)->Clone2(
+    auto result = fidl::WireCall(root)->Clone(
         fidl::ServerEnd<fuchsia_unknown::Cloneable>{server_end.TakeChannel()});
     if (!result.ok()) {
       return zx::error(result.status());

@@ -38,23 +38,6 @@ async fn test_list_no_duplicates() {
 }
 
 #[fuchsia::test]
-async fn test_list_filter_manifest() {
-    let test = new_test(&[TestComponent::Regular("test"), TestComponent::Basic("basic")]).await;
-    test.assert(AssertionParameters {
-        command: IqueryCommand::List,
-        golden_basename: "list_filter_manifest",
-        iquery_args: vec![
-            "--manifest",
-            "test_component.cm",
-            "--accessor",
-            "archivist:fuchsia.diagnostics.ArchiveAccessor",
-        ],
-        opts: vec![AssertionOption::Retry],
-    })
-    .await;
-}
-
-#[fuchsia::test]
 async fn test_list_filter_component() {
     let test = new_test(&[TestComponent::Regular("test"), TestComponent::Basic("basic")]).await;
     test.assert(AssertionParameters {

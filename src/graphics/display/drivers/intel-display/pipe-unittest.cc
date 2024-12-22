@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-display/pipe.h"
 
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
@@ -12,7 +13,6 @@
 #include <memory>
 #include <vector>
 
-#include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
@@ -32,7 +32,7 @@ class PipeTest : public ::testing::Test {
  protected:
   constexpr static uint32_t kMinimumRegCount = 0xd0000 / sizeof(uint32_t);
   fdf_testing::ScopedGlobalLogger logger_;
-  ddk_fake::FakeMmioRegRegion reg_region_{sizeof(uint32_t), kMinimumRegCount};
+  fake_mmio::FakeMmioRegRegion reg_region_{sizeof(uint32_t), kMinimumRegCount};
   std::optional<fdf::MmioBuffer> mmio_buffer_;
 };
 
@@ -74,12 +74,8 @@ layer_t CreatePrimaryLayerConfig(uint64_t handle) {
       .display_destination = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
       .image_source = {.x = 0, .y = 0, .width = kWidth, .height = kHeight},
       .image_handle = handle,
-      .image_metadata =
-          {
-              .width = kWidth,
-              .height = kHeight,
-              .tiling_type = IMAGE_TILING_TYPE_LINEAR,
-          },
+      .image_metadata = {.dimensions = {.width = kWidth, .height = kHeight},
+                         .tiling_type = IMAGE_TILING_TYPE_LINEAR},
       .alpha_mode = ALPHA_DISABLE,
       .image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY,
   };

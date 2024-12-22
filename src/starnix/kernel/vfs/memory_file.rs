@@ -37,7 +37,7 @@ impl MemoryFileNode {
         let vmo =
             zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 0).map_err(|_| errno!(ENOMEM))?;
         Ok(Self {
-            memory: Arc::new(MemoryObject::from(vmo)),
+            memory: Arc::new(MemoryObject::from(vmo).with_zx_name(b"starnix:vfs")),
             xattrs: MemoryXattrStorage::default(),
         })
     }
@@ -417,11 +417,16 @@ pub fn new_memfd(
     let ops =
         node.open(locked, current_task, &MountInfo::detached(), flags, AccessCheck::skip())?;
 
-    // In /proc/[pid]/fd, the target of this memfd's symbolic link is "/memfd:[name]".
-    let mut local_name = FsString::from("/memfd:");
+    // memfd instances appear in /proc[pid]/fd as though they are O_TMPFILE files with names of
+    // the form "memfd:[name]".
+    let mut local_name = FsString::from("memfd:");
     local_name.append(&mut name);
 
-    let name = NamespaceNode::new_anonymous(DirEntry::new(node, None, local_name));
+    // TODO: The choice of `Mount` and parent `DirEntry` is not important here, but using ones
+    // only shared by memfd nodes here would make sense.
+    let root_mount = current_task.fs().root().mount.as_ref().unwrap().clone();
+    let dir_entry = DirEntry::new_deleted(node, Some(current_task.fs().root().entry), local_name);
+    let name = NamespaceNode::new(root_mount, dir_entry);
 
     FileObject::new(current_task, ops, name, flags)
 }

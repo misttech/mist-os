@@ -32,8 +32,12 @@ class DlImplTests : public Base {
   static constexpr bool kSupportsNoLoadMode = false;
   // TODO(https://fxbug.dev/342480690): Support Dynamic TLS
   static constexpr bool kSupportsDynamicTls = false;
+  // TODO(https://fxbug.dev/382529434): Have dlclose() run finalizers
+  static constexpr bool kDlCloseCanRunFinalizers = false;
 
   void SetUp() override {
+    Base::SetUp();
+
     fbl::AllocChecker ac;
     dynamic_linker_ = RuntimeDynamicLinker::Create(gStartupLdAbi, ac);
     ASSERT_TRUE(ac.check());
@@ -46,6 +50,9 @@ class DlImplTests : public Base {
     auto result = dynamic_linker_->Open<typename Base::Loader>(
         file, mode, std::bind_front(&Base::RetrieveFile, this));
     if (result.is_ok()) {
+      // TODO(https://fxbug.dev/382527519): RuntimeDynamicLinker should have a
+      // `RunInitializers` method that will run this with proper synchronization.
+      static_cast<RuntimeModule*>(result.value())->InitializeModuleTree();
       Base::TrackModule(result.value(), std::string{file});
     }
     return result;

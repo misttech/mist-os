@@ -13,6 +13,7 @@ group("tests") {
     "devfs:tests",
     "devicetree:tests",
     "fake-bti/cpp:tests",
+    "fake-mmio-reg/cpp:tests",
     "fake-object/cpp:tests",
     "fake-resource/cpp:tests",
     "metadata/cpp:tests",

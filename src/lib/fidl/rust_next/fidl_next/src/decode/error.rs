@@ -101,6 +101,10 @@ pub enum DecodeError {
     #[error("union is absent but has a non-zero envelope")]
     InvalidUnionEnvelope,
 
+    /// A framework error contained an unrecognized error code.
+    #[error("framework error has an unrecognized error code")]
+    InvalidFrameworkError(i32),
+
     /// The decoder ran out of data before decoding finished
     #[error("reached the end of the buffer before decoding finished")]
     InsufficientData,

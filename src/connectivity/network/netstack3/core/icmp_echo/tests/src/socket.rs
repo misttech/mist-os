@@ -9,7 +9,7 @@ use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 use net_types::ZonedAddr;
 use packet::{Buf, Serializer};
-use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpZeroCode};
 use test_case::test_case;
 
 use netstack3_base::testutil::{set_logger_for_test, TestIpExt};
@@ -77,7 +77,7 @@ fn test_icmp_connection<I: TestIpExt + IpExt>(
         .encapsulate(IcmpPacketBuilder::<I, _>::new(
             *config.local_ip,
             *remote_addr,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             IcmpEchoRequest::new(0, 1),
         ))
         .serialize_vec_outer()
@@ -126,7 +126,7 @@ fn test_icmp_connection<I: TestIpExt + IpExt>(
         .encapsulate(IcmpPacketBuilder::<I, _>::new(
             *config.local_ip,
             *remote_addr,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             packet_formats::icmp::IcmpEchoReply::new(icmp_id, 1),
         ))
         .serialize_vec_outer()

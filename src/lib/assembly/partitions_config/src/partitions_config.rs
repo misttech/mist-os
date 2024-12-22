@@ -159,6 +159,16 @@ pub enum Partition {
         /// An optional size constraint for the partition.
         size: Option<u64>,
     },
+
+    /// A partition preparted for a device tree binary overlay.
+    Dtbo {
+        /// The partition name.
+        name: String,
+        /// The slot of the partition.
+        slot: Slot,
+        /// An optional size constraint for the partition.
+        size: Option<u64>,
+    },
 }
 
 impl Partition {
@@ -169,6 +179,7 @@ impl Partition {
             Self::VBMeta { name, .. } => name,
             Self::FVM { name, .. } => name,
             Self::Fxfs { name, .. } => name,
+            Self::Dtbo { name, .. } => name,
         }
     }
 
@@ -179,6 +190,7 @@ impl Partition {
             Self::VBMeta { slot, .. } => Some(slot),
             Self::FVM { .. } => None,
             Self::Fxfs { .. } => None,
+            Self::Dtbo { slot, .. } => Some(slot),
         }
     }
 
@@ -189,6 +201,7 @@ impl Partition {
             Self::VBMeta { size, .. } => size.as_ref(),
             Self::FVM { size, .. } => size.as_ref(),
             Self::Fxfs { size, .. } => size.as_ref(),
+            Self::Dtbo { size, .. } => size.as_ref(),
         }
     }
 }
@@ -258,6 +271,16 @@ mod tests {
                         type: "Fxfs",
                         name: "fxfs",
                     },
+                    {
+                        type: "Dtbo",
+                        name: "dtbo_a",
+                        slot: "A",
+                    },
+                    {
+                        type: "Dtbo",
+                        name: "dtbo_b",
+                        slot: "B",
+                    },
                 ],
                 hardware_revision: "hw",
                 unlock_credentials: [
@@ -273,7 +296,7 @@ mod tests {
 
         assert_eq!(config.bootloader_partitions[0].image, test_dir.join("tpl_image"));
         assert_eq!(config.unlock_credentials[0], test_dir.join("unlock_credentials.zip"));
-        assert_eq!(config.partitions.len(), 4);
+        assert_eq!(config.partitions.len(), 6);
         assert_eq!(config.hardware_revision, "hw");
     }
 

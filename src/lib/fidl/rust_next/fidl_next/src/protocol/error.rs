@@ -6,29 +6,25 @@ use thiserror::Error;
 
 use crate::DecodeError;
 
-/// Errors that can be produced when decoding FIDL messages.
+/// Errors that can be produced by FIDL client and server dispatchers.
 #[derive(Error, Debug)]
-pub enum ProtocolError<E> {
-    /// The dispatcher was stopped. This may be due to an error or because the channel was closed.
-    #[error("the dispatcher was stopped")]
-    DispatcherStopped,
-
+pub enum DispatcherError<E> {
     /// The underlying transport encountered an error.
-    #[error("transport error: {0}")]
+    #[error("the underlying transport encountered an error: {0}")]
     TransportError(E),
 
-    /// The endpoint received a message with an invalid protocol header.
-    #[error("invalid message header")]
+    /// The dispatcher received a message with an invalid protocol header.
+    #[error("received a message with an invalid message header: {0}")]
     InvalidMessageHeader(DecodeError),
 
-    /// The endpoint received a response for a transaction which did not occur.
-    #[error("unrequested response to txid {0}")]
+    /// The dispatcher received a response for a transaction which did not occur.
+    #[error("received a response which did not correspond to a pending request: {0}")]
     UnrequestedResponse(u32),
 
-    /// The response from the server was of the wrong type.
+    /// The dispatcher received a response with the wrong ordinal for the transaction.
     #[error(
-        "the response from the server was the wrong type; expected ordinal {expected}, but got \
-        ordinal {actual}"
+        "received a response with the wrong ordinal for the transaction; expected ordinal \
+        {expected}, but got ordinal {actual}"
     )]
     InvalidResponseOrdinal {
         /// The expected ordinal of the response

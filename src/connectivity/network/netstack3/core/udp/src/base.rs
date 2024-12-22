@@ -55,8 +55,9 @@ use netstack3_ip::socket::{
     IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
 };
 use netstack3_ip::{
-    HopLimits, IpTransportContext, Mark, MarkDomain, MulticastMembershipHandler,
-    ReceiveIpPacketMeta, TransparentLocalDelivery, TransportIpContext, TransportReceiveError,
+    HopLimits, IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, Mark, MarkDomain,
+    MulticastMembershipHandler, ReceiveIpPacketMeta, TransparentLocalDelivery, TransportIpContext,
+    TransportReceiveError,
 };
 use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
@@ -1351,6 +1352,7 @@ pub enum UdpIpTransportContext {}
 fn receive_ip_packet<
     I: IpExt,
     B: BufferMut,
+    H: IpHeaderInfo<I>,
     BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
     CC: StateContext<I, BC> + StateContext<I::OtherVersion, BC> + CounterContext<UdpCounters<I>>,
 >(
@@ -1360,9 +1362,10 @@ fn receive_ip_packet<
     src_ip: I::RecvSrcAddr,
     dst_ip: SpecifiedAddr<I::Addr>,
     mut buffer: B,
-    meta: ReceiveIpPacketMeta<I>,
+    info: &LocalDeliveryPacketInfo<I, H>,
 ) -> Result<(), (B, TransportReceiveError)> {
-    let ReceiveIpPacketMeta { broadcast, transparent_override, dscp_and_ecn } = meta;
+    let LocalDeliveryPacketInfo { meta, header_info } = info;
+    let ReceiveIpPacketMeta { broadcast, transparent_override } = meta;
 
     trace_duration!(bindings_ctx, c"udp::receive_ip_packet");
     core_ctx.increment(|counters| &counters.rx);
@@ -1395,7 +1398,7 @@ fn receive_ip_packet<
 
     let dst_port = packet.dst_port();
     let (delivery_ip, delivery_port, require_transparent) = match transparent_override {
-        Some(TransparentLocalDelivery { addr, port }) => (addr, port, true),
+        Some(TransparentLocalDelivery { addr, port }) => (*addr, *port, true),
         None => (dst_ip, dst_port, false),
     };
 
@@ -1435,7 +1438,7 @@ fn receive_ip_packet<
                     (src_ip, src_port),
                     (delivery_ip, delivery_port),
                     device_weak,
-                    broadcast,
+                    *broadcast,
                 )
                 .map(|result| match result {
                     LookupResult::Conn(id, _) | LookupResult::Listener(id, _) => id.clone(),
@@ -1451,7 +1454,7 @@ fn receive_ip_packet<
         src_port,
         dst_ip: *dst_ip,
         dst_port,
-        dscp_and_ecn,
+        dscp_and_ecn: header_info.dscp_and_ecn(),
     };
     let was_delivered = recipients.into_iter().fold(false, |was_delivered, lookup_result| {
         let delivered = try_dual_stack_deliver::<I, B, BC, CC>(
@@ -1639,23 +1642,23 @@ impl<
         );
     }
 
-    fn receive_ip_packet<B: BufferMut>(
+    fn receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         device: &CC::DeviceId,
         src_ip: I::RecvSrcAddr,
         dst_ip: SpecifiedAddr<I::Addr>,
         buffer: B,
-        meta: ReceiveIpPacketMeta<I>,
+        info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        receive_ip_packet::<I, _, _, _>(
+        receive_ip_packet::<I, _, _, _, _>(
             core_ctx,
             bindings_ctx,
             device,
             src_ip,
             dst_ip,
             buffer,
-            meta,
+            info,
         )
     }
 }
@@ -2688,7 +2691,6 @@ mod tests {
     use alloc::borrow::ToOwned;
     use alloc::collections::{HashMap, HashSet};
     use alloc::vec;
-    use const_unwrap::const_unwrap_option;
     use core::convert::TryInto as _;
     use core::ops::{Deref, DerefMut};
 
@@ -2712,11 +2714,10 @@ mod tests {
     use netstack3_datagram::MulticastInterfaceSelector;
     use netstack3_ip::device::IpDeviceStateIpExt;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
-    use netstack3_ip::testutil::DualStackSendIpPacketMeta;
-    use netstack3_ip::{
-        IpPacketDestination, ReceiveIpPacketMeta, ResolveRouteError, SendIpPacketMeta,
-    };
+    use netstack3_ip::testutil::{DualStackSendIpPacketMeta, FakeIpHeaderInfo};
+    use netstack3_ip::{IpPacketDestination, ResolveRouteError, SendIpPacketMeta};
     use packet::Buf;
+
     use test_case::test_case;
 
     use super::*;
@@ -3135,47 +3136,24 @@ mod tests {
             unimplemented!()
         }
 
-        fn receive_ip_packet<B: BufferMut>(
+        fn receive_ip_packet<B: BufferMut, H: IpHeaderInfo<I>>(
             core_ctx: &mut FakeUdpCoreCtx<D>,
             bindings_ctx: &mut FakeUdpBindingsCtx<D>,
             device: &D,
             src_ip: I::RecvSrcAddr,
             dst_ip: SpecifiedAddr<I::Addr>,
             buffer: B,
-            meta: ReceiveIpPacketMeta<I>,
+            info: &LocalDeliveryPacketInfo<I, H>,
         ) -> Result<(), (B, TransportReceiveError)> {
-            // NB: The compiler can't deduce that `I::OtherVersion`` implements
-            // `TestIpExt`, so use `map_ip` to transform the associated types
-            // into concrete types (`Ipv4` & `Ipv6`).
-            #[derive(GenericOverIp)]
-            #[generic_over_ip(I, Ip)]
-            struct SrcWrapper<I: IpExt>(I::RecvSrcAddr);
-            let IpInvariant(result) = net_types::map_ip_twice!(
-                I,
-                (
-                    IpInvariant((core_ctx, bindings_ctx, device, buffer)),
-                    SrcWrapper(src_ip),
-                    dst_ip,
-                    meta,
-                ),
-                |(
-                    IpInvariant((core_ctx, bindings_ctx, device, buffer)),
-                    SrcWrapper(src_ip),
-                    dst_ip,
-                    meta,
-                )| {
-                    IpInvariant(receive_ip_packet::<I, _, _, _>(
-                        core_ctx,
-                        bindings_ctx,
-                        device,
-                        src_ip,
-                        dst_ip,
-                        buffer,
-                        meta,
-                    ))
-                }
-            );
-            result
+            receive_ip_packet::<I, _, _, _, _>(
+                core_ctx,
+                bindings_ctx,
+                device,
+                src_ip,
+                dst_ip,
+                buffer,
+                info,
+            )
         }
     }
 
@@ -3224,7 +3202,7 @@ mod tests {
         I::get_other_ip_address(2)
     }
 
-    trait TestIpExt: netstack3_base::testutil::TestIpExt + IpExt + IpDeviceStateIpExt {
+    trait BaseTestIpExt: netstack3_base::testutil::TestIpExt + IpExt + IpDeviceStateIpExt {
         type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
             DualStackDatagramBoundStateContext<Self, FakeUdpBindingsCtx<D>, Udp<FakeUdpBindingsCtx<D>>, DeviceId=D, WeakDeviceId=D::Weak>;
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static>:
@@ -3232,7 +3210,7 @@ mod tests {
         fn into_recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr;
     }
 
-    impl TestIpExt for Ipv4 {
+    impl BaseTestIpExt for Ipv4 {
         type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
             UninstantiableWrapper<FakeUdpBoundSocketsCtx<D>>;
 
@@ -3244,7 +3222,7 @@ mod tests {
         }
     }
 
-    impl TestIpExt for Ipv6 {
+    impl BaseTestIpExt for Ipv6 {
         type UdpDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
             FakeUdpBoundSocketsCtx<D>;
         type UdpNonDualStackBoundStateContext<D: FakeStrongDeviceId + 'static> =
@@ -3254,6 +3232,9 @@ mod tests {
             Ipv6SourceAddr::new(addr).unwrap_or_else(|| panic!("{addr} is not a valid source addr"))
         }
     }
+
+    trait TestIpExt: BaseTestIpExt<OtherVersion: BaseTestIpExt> {}
+    impl<I: BaseTestIpExt<OtherVersion: BaseTestIpExt>> TestIpExt for I {}
 
     /// Helper function to inject an UDP packet with the provided parameters.
     fn receive_udp_packet<
@@ -3284,15 +3265,18 @@ mod tests {
             I::into_recv_src_addr(src_ip),
             SpecifiedAddr::new(dst_ip).unwrap(),
             buffer,
-            ReceiveIpPacketMeta { dscp_and_ecn, ..Default::default() },
+            &LocalDeliveryPacketInfo {
+                header_info: FakeIpHeaderInfo { dscp_and_ecn, ..Default::default() },
+                ..Default::default()
+            },
         )
         .expect("Receive IP packet succeeds");
     }
 
-    const LOCAL_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(100));
-    const OTHER_LOCAL_PORT: NonZeroU16 = const_unwrap_option(LOCAL_PORT.checked_add(1));
-    const REMOTE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(200));
-    const OTHER_REMOTE_PORT: NonZeroU16 = const_unwrap_option(REMOTE_PORT.checked_add(1));
+    const LOCAL_PORT: NonZeroU16 = NonZeroU16::new(100).unwrap();
+    const OTHER_LOCAL_PORT: NonZeroU16 = LOCAL_PORT.checked_add(1).unwrap();
+    const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(200).unwrap();
+    const OTHER_REMOTE_PORT: NonZeroU16 = REMOTE_PORT.checked_add(1).unwrap();
 
     fn conn_addr<I>(
         device: Option<FakeWeakDeviceId<FakeDeviceId>>,
@@ -3708,10 +3692,7 @@ mod tests {
         assert!(api.get_posix_reuse_port(&socket));
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
-            HashMap::from([(
-                (FakeDeviceId, multicast_addr),
-                const_unwrap_option(NonZeroUsize::new(1))
-            )])
+            HashMap::from([((FakeDeviceId, multicast_addr), NonZeroUsize::new(1).unwrap())])
         );
         assert_eq!(
             api.set_multicast_membership(
@@ -3757,10 +3738,7 @@ mod tests {
         assert!(api.get_posix_reuse_port(&socket));
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
-            HashMap::from([(
-                (FakeDeviceId, multicast_addr),
-                const_unwrap_option(NonZeroUsize::new(1))
-            )])
+            HashMap::from([((FakeDeviceId, multicast_addr), NonZeroUsize::new(1).unwrap())])
         );
         assert_eq!(
             api.set_multicast_membership(
@@ -4293,8 +4271,8 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[test_case(const_unwrap_option(NonZeroU16::new(u16::MAX)), Ok(const_unwrap_option(NonZeroU16::new(u16::MAX))); "ephemeral available")]
-    #[test_case(const_unwrap_option(NonZeroU16::new(100)), Err(LocalAddressError::FailedToAllocateLocalPort);
+    #[test_case(NonZeroU16::new(u16::MAX).unwrap(), Ok(NonZeroU16::new(u16::MAX).unwrap()); "ephemeral available")]
+    #[test_case(NonZeroU16::new(100).unwrap(), Err(LocalAddressError::FailedToAllocateLocalPort);
         "no ephemeral available")]
     fn test_bind_picked_port_all_others_taken<I: TestIpExt>(
         available_port: NonZeroU16,
@@ -5163,10 +5141,7 @@ mod tests {
         assert_eq!(result, Ok(()));
         assert_eq!(
             ip_options,
-            HashMap::from([(
-                (MultipleDevicesId::A, mcast_addr),
-                const_unwrap_option(NonZeroUsize::new(1))
-            )])
+            HashMap::from([((MultipleDevicesId::A, mcast_addr), NonZeroUsize::new(1).unwrap())])
         );
     }
 
@@ -5238,7 +5213,7 @@ mod tests {
             ip_options,
             expected_result.map_or(HashMap::default(), |()| HashMap::from([(
                 (bound_device, mcast_addr),
-                const_unwrap_option(NonZeroUsize::new(1))
+                NonZeroUsize::new(1).unwrap()
             )]))
         );
     }
@@ -5297,10 +5272,7 @@ mod tests {
 
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
-            HashMap::from([(
-                (MultipleDevicesId::A, group),
-                const_unwrap_option(NonZeroUsize::new(1))
-            )])
+            HashMap::from([((MultipleDevicesId::A, group), NonZeroUsize::new(1).unwrap())])
         );
 
         api.close(unbound).into_removed();
@@ -5342,8 +5314,8 @@ mod tests {
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
             HashMap::from([
-                ((MultipleDevicesId::A, first_group), const_unwrap_option(NonZeroUsize::new(1))),
-                ((MultipleDevicesId::A, second_group), const_unwrap_option(NonZeroUsize::new(1)))
+                ((MultipleDevicesId::A, first_group), NonZeroUsize::new(1).unwrap()),
+                ((MultipleDevicesId::A, second_group), NonZeroUsize::new(1).unwrap())
             ])
         );
 
@@ -5391,8 +5363,8 @@ mod tests {
         assert_eq!(
             api.core_ctx().bound_sockets.ip_socket_ctx.state.multicast_memberships::<I>(),
             HashMap::from([
-                ((MultipleDevicesId::A, first_group), const_unwrap_option(NonZeroUsize::new(1))),
-                ((MultipleDevicesId::A, second_group), const_unwrap_option(NonZeroUsize::new(1)))
+                ((MultipleDevicesId::A, first_group), NonZeroUsize::new(1).unwrap()),
+                ((MultipleDevicesId::A, second_group), NonZeroUsize::new(1).unwrap())
             ])
         );
 
@@ -6098,8 +6070,8 @@ mod tests {
         let mut api = UdpApi::<I, _>::new(ctx.as_mut());
         let listener = api.create();
 
-        const UNICAST_HOPS: NonZeroU8 = const_unwrap_option(NonZeroU8::new(23));
-        const MULTICAST_HOPS: NonZeroU8 = const_unwrap_option(NonZeroU8::new(98));
+        const UNICAST_HOPS: NonZeroU8 = NonZeroU8::new(23).unwrap();
+        const MULTICAST_HOPS: NonZeroU8 = NonZeroU8::new(98).unwrap();
         api.set_unicast_hop_limit(&listener, Some(UNICAST_HOPS), I::VERSION).unwrap();
         api.set_multicast_hop_limit(&listener, Some(MULTICAST_HOPS), I::VERSION).unwrap();
 
@@ -6277,7 +6249,7 @@ mod tests {
         ));
 
         // Specifically selected to be in the `EPHEMERAL_RANGE`.
-        const AVAILABLE_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(54321));
+        const AVAILABLE_PORT: NonZeroU16 = NonZeroU16::new(54321).unwrap();
 
         // Densely pack the port space for one IP Version.
         for port in 1..=u16::MAX {

@@ -22,7 +22,7 @@ rustc_binary("lifecycle_example") {
     "//src/lib/sandbox",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures-util",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lifecycle.rs" ]
@@ -39,7 +39,7 @@ rustc_binary("lifecycle_manager") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/manager.rs" ]

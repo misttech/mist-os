@@ -5,6 +5,7 @@
 #[derive(Clone, Debug)]
 pub struct Padding1ByteEnd {
     pub a: u16,
+
     pub b: u8,
 }
 
@@ -15,6 +16,7 @@ impl ::fidl_next::Encodable for Padding1ByteEnd {
 impl<___E> ::fidl_next::Encode<___E> for Padding1ByteEnd
 where
     u16: ::fidl_next::Encode<___E>,
+
     u8: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -26,10 +28,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -63,15 +69,18 @@ impl ::fidl_next::TakeFrom<WirePadding1ByteEnd> for Padding1ByteEnd {
     fn take_from(from: &mut WirePadding1ByteEnd) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding1ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding1ByteEnd {
     pub a: ::fidl_next::u16_le,
+
     pub b: u8,
 }
 
@@ -80,6 +89,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+
     u8: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -90,10 +100,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -101,6 +115,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding1ByteMiddle {
     pub a: u8,
+
     pub b: u16,
 }
 
@@ -111,6 +126,7 @@ impl ::fidl_next::Encodable for Padding1ByteMiddle {
 impl<___E> ::fidl_next::Encode<___E> for Padding1ByteMiddle
 where
     u8: ::fidl_next::Encode<___E>,
+
     u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -122,10 +138,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -159,15 +179,18 @@ impl ::fidl_next::TakeFrom<WirePadding1ByteMiddle> for Padding1ByteMiddle {
     fn take_from(from: &mut WirePadding1ByteMiddle) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding1ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding1ByteMiddle {
     pub a: u8,
+
     pub b: ::fidl_next::u16_le,
 }
 
@@ -176,6 +199,7 @@ where
     ___D: ?Sized,
 
     u8: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -186,10 +210,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -197,7 +225,9 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding2ByteAlignmentLength6 {
     pub a: u8,
+
     pub b: u16,
+
     pub c: u8,
 }
 
@@ -208,7 +238,9 @@ impl ::fidl_next::Encodable for Padding2ByteAlignmentLength6 {
 impl<___E> ::fidl_next::Encode<___E> for Padding2ByteAlignmentLength6
 where
     u8: ::fidl_next::Encode<___E>,
+
     u16: ::fidl_next::Encode<___E>,
+
     u8: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -221,11 +253,16 @@ where
                 a,
                 b,
                 c,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         ::fidl_next::Encode::encode(&mut self.c, encoder, c)?;
+
         Ok(())
     }
 }
@@ -259,17 +296,22 @@ impl ::fidl_next::TakeFrom<WirePadding2ByteAlignmentLength6> for Padding2ByteAli
     fn take_from(from: &mut WirePadding2ByteAlignmentLength6) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
+
             c: ::fidl_next::TakeFrom::take_from(&mut from.c),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding2ByteAlignmentLength6`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteAlignmentLength6 {
     pub a: u8,
+
     pub b: ::fidl_next::u16_le,
+
     pub c: u8,
 }
 
@@ -278,7 +320,9 @@ where
     ___D: ?Sized,
 
     u8: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+
     u8: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -290,11 +334,16 @@ where
                 mut a,
                 mut b,
                 mut c,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(c.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -302,6 +351,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding2ByteEnd {
     pub a: u32,
+
     pub b: u16,
 }
 
@@ -312,6 +362,7 @@ impl ::fidl_next::Encodable for Padding2ByteEnd {
 impl<___E> ::fidl_next::Encode<___E> for Padding2ByteEnd
 where
     u32: ::fidl_next::Encode<___E>,
+
     u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -323,10 +374,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -360,15 +415,18 @@ impl ::fidl_next::TakeFrom<WirePadding2ByteEnd> for Padding2ByteEnd {
     fn take_from(from: &mut WirePadding2ByteEnd) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding2ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteEnd {
     pub a: ::fidl_next::u32_le,
+
     pub b: ::fidl_next::u16_le,
 }
 
@@ -377,6 +435,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -387,10 +446,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -398,6 +461,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding2ByteMiddle {
     pub a: u16,
+
     pub b: u32,
 }
 
@@ -408,6 +472,7 @@ impl ::fidl_next::Encodable for Padding2ByteMiddle {
 impl<___E> ::fidl_next::Encode<___E> for Padding2ByteMiddle
 where
     u16: ::fidl_next::Encode<___E>,
+
     u32: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -419,10 +484,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -456,15 +525,18 @@ impl ::fidl_next::TakeFrom<WirePadding2ByteMiddle> for Padding2ByteMiddle {
     fn take_from(from: &mut WirePadding2ByteMiddle) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding2ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding2ByteMiddle {
     pub a: ::fidl_next::u16_le,
+
     pub b: ::fidl_next::u32_le,
 }
 
@@ -473,6 +545,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -483,10 +556,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -494,6 +571,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding3ByteEnd {
     pub a: u32,
+
     pub b: u8,
 }
 
@@ -504,6 +582,7 @@ impl ::fidl_next::Encodable for Padding3ByteEnd {
 impl<___E> ::fidl_next::Encode<___E> for Padding3ByteEnd
 where
     u32: ::fidl_next::Encode<___E>,
+
     u8: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -515,10 +594,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -552,15 +635,18 @@ impl ::fidl_next::TakeFrom<WirePadding3ByteEnd> for Padding3ByteEnd {
     fn take_from(from: &mut WirePadding3ByteEnd) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding3ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding3ByteEnd {
     pub a: ::fidl_next::u32_le,
+
     pub b: u8,
 }
 
@@ -569,6 +655,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+
     u8: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -579,10 +666,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -590,6 +681,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding3ByteMiddle {
     pub a: u8,
+
     pub b: u32,
 }
 
@@ -600,6 +692,7 @@ impl ::fidl_next::Encodable for Padding3ByteMiddle {
 impl<___E> ::fidl_next::Encode<___E> for Padding3ByteMiddle
 where
     u8: ::fidl_next::Encode<___E>,
+
     u32: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -611,10 +704,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -648,15 +745,18 @@ impl ::fidl_next::TakeFrom<WirePadding3ByteMiddle> for Padding3ByteMiddle {
     fn take_from(from: &mut WirePadding3ByteMiddle) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding3ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding3ByteMiddle {
     pub a: u8,
+
     pub b: ::fidl_next::u32_le,
 }
 
@@ -665,6 +765,7 @@ where
     ___D: ?Sized,
 
     u8: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -675,10 +776,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -686,8 +791,11 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding4ByteAlignmentLength12 {
     pub a: u32,
+
     pub b: u8,
+
     pub c: u16,
+
     pub d: u16,
 }
 
@@ -698,8 +806,11 @@ impl ::fidl_next::Encodable for Padding4ByteAlignmentLength12 {
 impl<___E> ::fidl_next::Encode<___E> for Padding4ByteAlignmentLength12
 where
     u32: ::fidl_next::Encode<___E>,
+
     u8: ::fidl_next::Encode<___E>,
+
     u16: ::fidl_next::Encode<___E>,
+
     u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -713,12 +824,18 @@ where
                 b,
                 c,
                 d,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         ::fidl_next::Encode::encode(&mut self.c, encoder, c)?;
+
         ::fidl_next::Encode::encode(&mut self.d, encoder, d)?;
+
         Ok(())
     }
 }
@@ -752,19 +869,26 @@ impl ::fidl_next::TakeFrom<WirePadding4ByteAlignmentLength12> for Padding4ByteAl
     fn take_from(from: &mut WirePadding4ByteAlignmentLength12) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
+
             c: ::fidl_next::TakeFrom::take_from(&mut from.c),
+
             d: ::fidl_next::TakeFrom::take_from(&mut from.d),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding4ByteAlignmentLength12`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteAlignmentLength12 {
     pub a: ::fidl_next::u32_le,
+
     pub b: u8,
+
     pub c: ::fidl_next::u16_le,
+
     pub d: ::fidl_next::u16_le,
 }
 
@@ -773,8 +897,11 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+
     u8: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -787,12 +914,18 @@ where
                 mut b,
                 mut c,
                 mut d,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(c.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(d.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -800,6 +933,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding4ByteEnd {
     pub a: u64,
+
     pub b: u32,
 }
 
@@ -810,6 +944,7 @@ impl ::fidl_next::Encodable for Padding4ByteEnd {
 impl<___E> ::fidl_next::Encode<___E> for Padding4ByteEnd
 where
     u64: ::fidl_next::Encode<___E>,
+
     u32: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -821,10 +956,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -858,15 +997,18 @@ impl ::fidl_next::TakeFrom<WirePadding4ByteEnd> for Padding4ByteEnd {
     fn take_from(from: &mut WirePadding4ByteEnd) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding4ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteEnd {
     pub a: ::fidl_next::u64_le,
+
     pub b: ::fidl_next::u32_le,
 }
 
@@ -875,6 +1017,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -885,10 +1028,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -896,6 +1043,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding4ByteMiddle {
     pub a: u32,
+
     pub b: u64,
 }
 
@@ -906,6 +1054,7 @@ impl ::fidl_next::Encodable for Padding4ByteMiddle {
 impl<___E> ::fidl_next::Encode<___E> for Padding4ByteMiddle
 where
     u32: ::fidl_next::Encode<___E>,
+
     u64: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -917,10 +1066,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -954,15 +1107,18 @@ impl ::fidl_next::TakeFrom<WirePadding4ByteMiddle> for Padding4ByteMiddle {
     fn take_from(from: &mut WirePadding4ByteMiddle) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding4ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding4ByteMiddle {
     pub a: ::fidl_next::u32_le,
+
     pub b: ::fidl_next::u64_le,
 }
 
@@ -971,6 +1127,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -981,10 +1138,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -992,7 +1153,9 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding5ByteEnd {
     pub a: u64,
+
     pub b: u16,
+
     pub c: u8,
 }
 
@@ -1003,7 +1166,9 @@ impl ::fidl_next::Encodable for Padding5ByteEnd {
 impl<___E> ::fidl_next::Encode<___E> for Padding5ByteEnd
 where
     u64: ::fidl_next::Encode<___E>,
+
     u16: ::fidl_next::Encode<___E>,
+
     u8: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -1016,11 +1181,16 @@ where
                 a,
                 b,
                 c,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         ::fidl_next::Encode::encode(&mut self.c, encoder, c)?;
+
         Ok(())
     }
 }
@@ -1054,17 +1224,22 @@ impl ::fidl_next::TakeFrom<WirePadding5ByteEnd> for Padding5ByteEnd {
     fn take_from(from: &mut WirePadding5ByteEnd) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
+
             c: ::fidl_next::TakeFrom::take_from(&mut from.c),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding5ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding5ByteEnd {
     pub a: ::fidl_next::u64_le,
+
     pub b: ::fidl_next::u16_le,
+
     pub c: u8,
 }
 
@@ -1073,7 +1248,9 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+
     u8: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -1085,11 +1262,16 @@ where
                 mut a,
                 mut b,
                 mut c,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(c.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -1097,7 +1279,9 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding5ByteMiddle {
     pub a: u16,
+
     pub b: u8,
+
     pub c: u64,
 }
 
@@ -1108,7 +1292,9 @@ impl ::fidl_next::Encodable for Padding5ByteMiddle {
 impl<___E> ::fidl_next::Encode<___E> for Padding5ByteMiddle
 where
     u16: ::fidl_next::Encode<___E>,
+
     u8: ::fidl_next::Encode<___E>,
+
     u64: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -1121,11 +1307,16 @@ where
                 a,
                 b,
                 c,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         ::fidl_next::Encode::encode(&mut self.c, encoder, c)?;
+
         Ok(())
     }
 }
@@ -1159,17 +1350,22 @@ impl ::fidl_next::TakeFrom<WirePadding5ByteMiddle> for Padding5ByteMiddle {
     fn take_from(from: &mut WirePadding5ByteMiddle) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
+
             c: ::fidl_next::TakeFrom::take_from(&mut from.c),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding5ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding5ByteMiddle {
     pub a: ::fidl_next::u16_le,
+
     pub b: u8,
+
     pub c: ::fidl_next::u64_le,
 }
 
@@ -1178,7 +1374,9 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+
     u8: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -1190,11 +1388,16 @@ where
                 mut a,
                 mut b,
                 mut c,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(c.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -1202,6 +1405,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding6ByteEnd {
     pub a: u64,
+
     pub b: u16,
 }
 
@@ -1212,6 +1416,7 @@ impl ::fidl_next::Encodable for Padding6ByteEnd {
 impl<___E> ::fidl_next::Encode<___E> for Padding6ByteEnd
 where
     u64: ::fidl_next::Encode<___E>,
+
     u16: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -1223,10 +1428,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -1260,15 +1469,18 @@ impl ::fidl_next::TakeFrom<WirePadding6ByteEnd> for Padding6ByteEnd {
     fn take_from(from: &mut WirePadding6ByteEnd) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding6ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding6ByteEnd {
     pub a: ::fidl_next::u64_le,
+
     pub b: ::fidl_next::u16_le,
 }
 
@@ -1277,6 +1489,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -1287,10 +1500,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -1298,6 +1515,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding6ByteMiddle {
     pub a: u16,
+
     pub b: u64,
 }
 
@@ -1308,6 +1526,7 @@ impl ::fidl_next::Encodable for Padding6ByteMiddle {
 impl<___E> ::fidl_next::Encode<___E> for Padding6ByteMiddle
 where
     u16: ::fidl_next::Encode<___E>,
+
     u64: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -1319,10 +1538,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -1356,15 +1579,18 @@ impl ::fidl_next::TakeFrom<WirePadding6ByteMiddle> for Padding6ByteMiddle {
     fn take_from(from: &mut WirePadding6ByteMiddle) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding6ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding6ByteMiddle {
     pub a: ::fidl_next::u16_le,
+
     pub b: ::fidl_next::u64_le,
 }
 
@@ -1373,6 +1599,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u16_le: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -1383,10 +1610,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -1394,6 +1625,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding7ByteEnd {
     pub a: u64,
+
     pub b: u8,
 }
 
@@ -1404,6 +1636,7 @@ impl ::fidl_next::Encodable for Padding7ByteEnd {
 impl<___E> ::fidl_next::Encode<___E> for Padding7ByteEnd
 where
     u64: ::fidl_next::Encode<___E>,
+
     u8: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -1415,10 +1648,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -1452,15 +1689,18 @@ impl ::fidl_next::TakeFrom<WirePadding7ByteEnd> for Padding7ByteEnd {
     fn take_from(from: &mut WirePadding7ByteEnd) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding7ByteEnd`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding7ByteEnd {
     pub a: ::fidl_next::u64_le,
+
     pub b: u8,
 }
 
@@ -1469,6 +1709,7 @@ where
     ___D: ?Sized,
 
     ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
+
     u8: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -1479,10 +1720,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -1490,6 +1735,7 @@ where
 #[derive(Clone, Debug)]
 pub struct Padding7ByteMiddle {
     pub a: u8,
+
     pub b: u64,
 }
 
@@ -1500,6 +1746,7 @@ impl ::fidl_next::Encodable for Padding7ByteMiddle {
 impl<___E> ::fidl_next::Encode<___E> for Padding7ByteMiddle
 where
     u8: ::fidl_next::Encode<___E>,
+
     u64: ::fidl_next::Encode<___E>,
 {
     fn encode(
@@ -1511,10 +1758,14 @@ where
             let Self::Encoded {
                 a,
                 b,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.a, encoder, a)?;
+
         ::fidl_next::Encode::encode(&mut self.b, encoder, b)?;
+
         Ok(())
     }
 }
@@ -1548,15 +1799,18 @@ impl ::fidl_next::TakeFrom<WirePadding7ByteMiddle> for Padding7ByteMiddle {
     fn take_from(from: &mut WirePadding7ByteMiddle) -> Self {
         Self {
             a: ::fidl_next::TakeFrom::take_from(&mut from.a),
+
             b: ::fidl_next::TakeFrom::take_from(&mut from.b),
         }
     }
 }
 
+/// The wire type corersponding to [`Padding7ByteMiddle`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WirePadding7ByteMiddle {
     pub a: u8,
+
     pub b: ::fidl_next::u64_le,
 }
 
@@ -1565,6 +1819,7 @@ where
     ___D: ?Sized,
 
     u8: ::fidl_next::Decode<___D>,
+
     ::fidl_next::u64_le: ::fidl_next::Decode<___D>,
 {
     fn decode(
@@ -1575,10 +1830,14 @@ where
             let Self {
                 mut a,
                 mut b,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(a.as_mut(), decoder)?;
+
         ::fidl_next::Decode::decode(b.as_mut(), decoder)?;
+
         Ok(())
     }
 }

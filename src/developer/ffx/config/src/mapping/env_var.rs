@@ -9,6 +9,9 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use serde_json::Value;
 
+// Succeeds if every environment variable ("$ENV") exists -- including
+// zero env variables. If there are any mentioned that _don't_ exist, then
+// this fails.
 fn check(ctx: &EnvironmentContext, value: &String, regex: &Regex) -> bool {
     // First verify all environment variables exist.
     // If one does not exist, return none.
@@ -59,6 +62,16 @@ pub fn env_var(ctx: &EnvironmentContext, value: Value) -> Option<Value> {
         .map(|s| replace(s, &*REGEX, |v| ctx.env_var(v).map_err(|_| anyhow!(""))))
         .map(postprocess)
         .or(Some(value))
+}
+
+pub fn env_var_strict(value: Value) -> Option<Value> {
+    let env_string = preprocess(&value);
+    if let Some(ref e) = env_string {
+        if REGEX.is_match(e) {
+            return None;
+        }
+    }
+    Some(value)
 }
 
 ////////////////////////////////////////////////////////////////////////////////

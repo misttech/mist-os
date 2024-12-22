@@ -13,14 +13,12 @@ common_deps = [
 ]
 
 python_binary("system-status") {
-  enable_mypy = true
   main_source = "main.py"
   deps = common_deps
 }
 
 if (is_host) {
   python_host_test("system_status_test") {
-    enable_mypy = true
     main_source = "tests/test_system_status.py"
     sources = [
       "main.py",

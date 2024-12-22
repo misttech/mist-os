@@ -109,7 +109,11 @@ void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& 
                                   std::move(request->object));
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
+#else
 void DirectoryConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+#endif
   Connection::NodeClone(fio::Flags::kProtocolDirectory | fs::internal::RightsToFlags(rights()),
                         request->request.TakeChannel());
 }
@@ -368,8 +372,9 @@ void DirectoryConnection::Rewind(RewindCompleter::Sync& completer) {
 
 void DirectoryConnection::GetToken(GetTokenCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryGetToken] our rights: ", rights());
-  // TODO(https://fxbug.dev/346585458): This operation should need ENUMERATE or another right.
-  if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
+  // GetToken exists to support linking, so we must make sure the connection has the permission to
+  // modify the directory.
+  if (!(rights() & fuchsia_io::Rights::kModifyDirectory)) {
     completer.Reply(ZX_ERR_BAD_HANDLE, zx::handle());
     return;
   }
@@ -413,9 +418,12 @@ void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& com
     completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
   }
-  // TODO(https://fxbug.dev/346585458): This operation should require the MODIFY_DIRECTORY right
-  // instead of the WRITE_BYTES right.
-  if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
+
+  // To avoid rights escalation, we must make sure that the connection to the source directory has
+  // the maximal set of file rights.  We do not check for EXECUTE because mutable filesystems that
+  // support link don't currently support EXECUTE rights.  The destination rights are verified by
+  // virtue of the fact that it is not possible to get a token without the MODIFY_DIRECTORY right.
+  if ((rights() & fuchsia_io::kRwStarDir) != fuchsia_io::kRwStarDir) {
     completer.Reply(ZX_ERR_BAD_HANDLE);
     return;
   }

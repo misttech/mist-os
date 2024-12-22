@@ -4,10 +4,11 @@
 
 #include "src/lib/ddktl/tests/metadata-server-test/metadata-sender-test-driver/metadata_test_device.h"
 
+#include <fidl/fuchsia.hardware.test/cpp/fidl.h>
+
 #include <bind/metadata_server_test_bind_library/cpp/bind.h>
 #include <ddktl/device.h>
-
-#include "src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test/metadata.h"
+#include <ddktl/metadata_server.h>
 
 namespace ddk::test {
 
@@ -33,7 +34,8 @@ zx_status_t MetadataTestDevice::Init(
       ddk::MakeStrProperty(bind_metadata_server_test::PURPOSE, device_purpose),
   };
 
-  std::array offers = {MetadataServer::kFidlServiceName};
+  std::array offers = {
+      ddk::MetadataServer<fuchsia_hardware_test::wire::Metadata>::kFidlServiceName};
   ddk::DeviceAddArgs args{device_name};
   args.set_str_props(device_string_properties);
   if (outgoing.has_value()) {

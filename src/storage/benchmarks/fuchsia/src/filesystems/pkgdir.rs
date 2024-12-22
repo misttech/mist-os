@@ -45,7 +45,7 @@ impl FilesystemConfig for PkgDirTest {
 
         let (clone, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         fs.exposed_dir()
-            .clone2(server_end.into_channel().into())
+            .clone(server_end.into_channel().into())
             .expect("connect to blob volume exposed dir");
         let realm = PkgDirRealm::new(self.use_fxblob, clone).await;
         PkgDirInstance { fs, realm, use_fxblob: self.use_fxblob }
@@ -91,7 +91,7 @@ impl CacheClearableFilesystem for PkgDirInstance {
         let (clone, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         self.fs
             .exposed_dir()
-            .clone2(server_end.into_channel().into())
+            .clone(server_end.into_channel().into())
             .expect("connect to blob volume exposed dir");
         self.realm = PkgDirRealm::new(self.use_fxblob, clone).await
     }

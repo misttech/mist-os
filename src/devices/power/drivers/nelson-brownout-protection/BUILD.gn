@@ -51,6 +51,7 @@ fuchsia_driver_component("nelson-brownout-protection") {
 }
 
 fuchsia_driver_package("package") {
+  export_to_bazel = true
   package_name = "nelson-brownout-protection"
   driver_components = [ ":nelson-brownout-protection" ]
 }

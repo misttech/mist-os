@@ -7,8 +7,8 @@ use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
 use injectable_time::TimeSource;
+use log::{error, warn};
 use std::cell::RefCell;
-use tracing::{error, warn};
 use {fidl_fuchsia_feedback as fidl_feedback, fuchsia_async as fasync};
 
 // Name of the crash-report product we're filing against.
@@ -55,7 +55,7 @@ pub struct CrashReportHandlerBuilder<T: TimeSource> {
 macro_rules! log_if_err {
     ($result:expr, $log_prefix:expr) => {
         if let Err(e) = $result.as_ref() {
-            tracing::error!("{}: {}", $log_prefix, e);
+            log::error!("{}: {}", $log_prefix, e);
         }
     };
 }

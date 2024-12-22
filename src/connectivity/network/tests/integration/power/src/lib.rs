@@ -486,7 +486,6 @@ async fn rx_lease_drops(name: &str, netstack_suspend_enabled: bool) {
             &realm,
             "netstack",
             "root/Counters/Bindings/Power:DroppedRxLeases",
-            netstack_testing_common::constants::inspect::DEFAULT_INSPECT_TREE_NAME,
         )
         .await
         .expect("getting inspect property");

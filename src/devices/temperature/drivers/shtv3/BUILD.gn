@@ -50,6 +50,7 @@ fuchsia_driver_component("shtv3") {
 
 fuchsia_driver_package("package") {
   package_name = "shtv3"
+  export_to_bazel = true
   driver_components = [ ":shtv3" ]
 }
 

@@ -9,13 +9,13 @@ use fidl_fuchsia_validate_logs::{
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use tracing::*;
+use log::{debug, error, info, trace, warn};
 use zx::{self as zx, AsHandleRef};
 use {diagnostics_log_validator_utils as utils, fuchsia_runtime as rt};
 
 #[fuchsia::main(always_log_file_line = true)]
 async fn main() {
-    tracing::info!("Puppet started.");
+    log::info!("Puppet started.");
     tracing::dispatcher::get_default(|dispatcher| {
         let publisher: &diagnostics_log::Publisher = dispatcher.downcast_ref().unwrap();
         publisher.set_interest_listener(Listener);

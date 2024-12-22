@@ -59,14 +59,15 @@ use crate::internal::device::slaac::{SlaacHandler, SlaacTimerId};
 use crate::internal::device::state::{
     IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
     IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4AddressEntry, Ipv4AddressState,
-    Ipv4DeviceConfiguration, Ipv4DeviceConfigurationAndFlags, Ipv4DeviceState, Ipv6AddrConfig,
-    Ipv6AddrManualConfig, Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags,
-    Ipv6AddressState, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags, Ipv6DeviceState,
-    Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, WeakAddressId,
+    Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig,
+    Ipv6AddrSlaacConfig, Ipv6AddressEntry, Ipv6AddressFlags, Ipv6AddressState,
+    Ipv6DeviceConfiguration, Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime,
+    PreferredLifetime, WeakAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
-use crate::internal::gmp::{GmpHandler, GroupJoinResult, GroupLeaveResult};
+use crate::internal::gmp::{self, GmpHandler, GroupJoinResult, GroupLeaveResult};
+use crate::internal::local_delivery::{IpHeaderInfo, LocalDeliveryPacketInfo};
 
 /// An IP device timer.
 ///
@@ -264,12 +265,17 @@ impl<
 }
 
 /// An extension trait adding IP device properties.
-pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt {
+pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt + gmp::IpExt {
     /// IP layer state kept by the device.
     type State<BT: IpDeviceStateBindingsTypes>: AsRef<IpDeviceState<Self, BT>>
         + AsMut<IpDeviceState<Self, BT>>;
     /// IP layer configuration kept by the device.
-    type Configuration: AsRef<IpDeviceConfiguration> + Clone;
+    type Configuration: AsRef<IpDeviceConfiguration>
+        + AsMut<IpDeviceConfiguration>
+        + Clone
+        + Debug
+        + Eq
+        + PartialEq;
     /// High level IP device timer.
     type Timer<D: WeakDeviceIdentifier, A: IpAddressIdSpec>: Into<IpDeviceTimerId<Self, D, A>>
         + From<IpDeviceTimerId<Self, D, A>>
@@ -287,13 +293,6 @@ pub trait IpDeviceIpExt: IpDeviceStateIpExt + AssignedAddrIpExt {
     /// Device configuration update request.
     type ConfigurationUpdate: From<IpDeviceConfigurationUpdate>
         + AsRef<IpDeviceConfigurationUpdate>
-        + Debug;
-    /// IP layer configuration and flags.
-    type ConfigurationAndFlags: From<(Self::Configuration, IpDeviceFlags)>
-        + AsRef<IpDeviceConfiguration>
-        + AsRef<IpDeviceFlags>
-        + AsMut<IpDeviceConfiguration>
-        + PartialEq
         + Debug;
 
     /// Gets the common properties of an address from its configuration.
@@ -322,7 +321,6 @@ impl IpDeviceIpExt for Ipv4 {
     type ManualAddressConfig<I: Instant> = Ipv4AddrConfig<I>;
     type AddressState<I: Instant> = Ipv4AddressState<I>;
     type ConfigurationUpdate = Ipv4DeviceConfigurationUpdate;
-    type ConfigurationAndFlags = Ipv4DeviceConfigurationAndFlags;
 
     fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I> {
         config.common
@@ -354,7 +352,6 @@ impl IpDeviceIpExt for Ipv6 {
     type ManualAddressConfig<I: Instant> = Ipv6AddrManualConfig<I>;
     type AddressState<I: Instant> = Ipv6AddressState<I>;
     type ConfigurationUpdate = Ipv6DeviceConfigurationUpdate;
-    type ConfigurationAndFlags = Ipv6DeviceConfigurationAndFlags;
 
     fn get_common_props<I: Instant>(config: &Self::AddressConfig<I>) -> CommonAddressProperties<I> {
         CommonAddressProperties {
@@ -888,19 +885,21 @@ impl<
 }
 
 /// Handles receipt of an IGMP packet on `device`.
-pub fn receive_igmp_packet<CC, BC, B>(
+pub fn receive_igmp_packet<CC, BC, B, H>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     src_ip: Ipv4Addr,
     dst_ip: SpecifiedAddr<Ipv4Addr>,
     buffer: B,
+    info: &LocalDeliveryPacketInfo<Ipv4, H>,
 ) where
     CC: IpDeviceConfigurationContext<Ipv4, BC>,
     BC: IpDeviceBindingsContext<Ipv4, CC::DeviceId>,
     for<'a> CC::WithIpDeviceConfigurationInnerCtx<'a>: IpDeviceStateContext<Ipv4, BC, DeviceId = CC::DeviceId>
         + IgmpPacketHandler<BC, CC::DeviceId>,
     B: BufferMut,
+    H: IpHeaderInfo<Ipv4>,
 {
     core_ctx.with_ip_device_configuration(device, |_config, mut core_ctx| {
         IgmpPacketHandler::receive_igmp_packet(
@@ -910,6 +909,7 @@ pub fn receive_igmp_packet<CC, BC, B>(
             src_ip,
             dst_ip,
             buffer,
+            info,
         )
     })
 }

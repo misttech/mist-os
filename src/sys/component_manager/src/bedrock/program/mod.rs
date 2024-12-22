@@ -69,12 +69,12 @@ pub enum StopDisposition {
 impl StopDisposition {
     pub fn stop_info(&self) -> StopInfo {
         match self {
-            StopDisposition::Killed(status) => status.clone(),
+            StopDisposition::Killed(stop_info) => stop_info.clone(),
             StopDisposition::KilledAfterTimeout => {
                 StopInfo::from_status(zx::Status::TIMED_OUT, None)
             }
             StopDisposition::NoController => StopInfo::from_ok(None),
-            StopDisposition::Stopped(status) => status.clone(),
+            StopDisposition::Stopped(stop_info) => stop_info.clone(),
         }
     }
 }
@@ -485,8 +485,18 @@ pub mod tests {
             requests.clone(),
             program.koid(),
             // stop the component after 60ms
-            ControllerActionResponse { close_channel: true, delay: Some(component_stop_delay) },
-            ControllerActionResponse { close_channel: true, delay: Some(component_stop_delay) },
+            ControllerActionResponse {
+                close_channel: true,
+                delay: Some(component_stop_delay),
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
+            ControllerActionResponse {
+                close_channel: true,
+                delay: Some(component_stop_delay),
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
         );
         controller.serve();
 
@@ -577,8 +587,18 @@ pub mod tests {
             program.koid(),
             // Process the stop message, but fail to close the channel. Channel
             // closure is the indication that a component stopped.
-            ControllerActionResponse { close_channel: false, delay: Some(stop_resp_delay) },
-            ControllerActionResponse { close_channel: true, delay: Some(kill_resp_delay) },
+            ControllerActionResponse {
+                close_channel: false,
+                delay: Some(stop_resp_delay),
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
+            ControllerActionResponse {
+                close_channel: true,
+                delay: Some(kill_resp_delay),
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
         );
         let mut mock_controller_future = Box::pin(controller.into_serve_future());
 
@@ -676,8 +696,18 @@ pub mod tests {
             program.koid(),
             // Process the stop message, but fail to close the channel. Channel
             // closure is the indication that a component stopped.
-            ControllerActionResponse { close_channel: false, delay: None },
-            ControllerActionResponse { close_channel: true, delay: Some(kill_resp_delay) },
+            ControllerActionResponse {
+                close_channel: false,
+                delay: None,
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
+            ControllerActionResponse {
+                close_channel: true,
+                delay: Some(kill_resp_delay),
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
         );
         controller.serve();
 
@@ -753,10 +783,20 @@ pub mod tests {
             program.koid(),
             // Process the stop message, but fail to close the channel after
             // the timeout of stop_component()
-            ControllerActionResponse { close_channel: true, delay: Some(resp_delay) },
+            ControllerActionResponse {
+                close_channel: true,
+                delay: Some(resp_delay),
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
             // This is irrelevant because the controller should never receive
             // the kill message
-            ControllerActionResponse { close_channel: true, delay: Some(resp_delay) },
+            ControllerActionResponse {
+                close_channel: true,
+                delay: Some(resp_delay),
+                termination_status: Some(zx::Status::OK),
+                exit_code: Some(MOCK_EXIT_CODE),
+            },
         );
         controller.serve();
 

@@ -39,6 +39,11 @@ pub struct BoardInformation {
     #[file_relative_paths]
     pub devicetree: Option<FileRelativePathBuf>,
 
+    /// Path to the devicetree binary overlay (.dtbo) this provided by this board.
+    #[serde(default)]
+    #[file_relative_paths]
+    pub devicetree_overlay: Option<FileRelativePathBuf>,
+
     /// Configuration for the various filesystems that the product can choose to
     /// include.
     #[serde(default)]
@@ -384,6 +389,7 @@ mod test {
                 "bundle_b"
             ],
             "devicetree": "test.dtb",
+            "devicetree_overlay": "test.dtbo",
             "kernel": {
                 "contiguous_physical_pages": true,
                 "scheduler_prefer_little_cpus": true,
@@ -413,6 +419,9 @@ mod test {
                 FileRelativePathBuf::Resolved("some/path/to/board/bundle_b".into()),
             ],
             devicetree: Some(FileRelativePathBuf::Resolved("some/path/to/board/test.dtb".into())),
+            devicetree_overlay: Some(FileRelativePathBuf::Resolved(
+                "some/path/to/board/test.dtbo".into(),
+            )),
             kernel: BoardKernelConfig {
                 contiguous_physical_pages: true,
                 serial_mode: SerialMode::NoOutput,

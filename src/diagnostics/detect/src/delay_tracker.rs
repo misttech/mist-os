@@ -8,9 +8,9 @@ use {
     crate::{Mode, MINIMUM_SIGNATURE_INTERVAL_NANOS},
     fuchsia_triage::SnapshotTrigger,
     injectable_time::TimeSource,
+    log::warn,
     std::collections::HashMap,
     std::sync::Arc,
-    tracing::warn,
 };
 
 pub struct DelayTracker {

@@ -294,7 +294,7 @@ AudioBuffer<OutputFormat> HermeticFidelityTest::GetRendererOutput(
     }
 
     fuchsia::media::AudioRenderUsage usage = fuchsia::media::AudioRenderUsage::MEDIA;
-    if (path == RenderPath::Communications || path == RenderPath::Communication) {
+    if (path == RenderPath::Communication) {
       usage = fuchsia::media::AudioRenderUsage::COMMUNICATION;
     }
     auto audio_renderer =

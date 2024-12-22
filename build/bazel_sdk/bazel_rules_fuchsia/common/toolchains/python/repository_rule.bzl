@@ -122,7 +122,7 @@ def _compact_python_runtime_impl(repo_ctx):
     # script that calls `python<version>-real` which is the real interpreter
     # after adjusting the PYTHONPATH and PYTHONHOME.
     #
-    # Detect this here by looking wheter the lib/ directory exists.
+    # Detect this here by looking whether the lib/ directory exists.
     if not python_binpath.dirname.get_child("lib").exists:
         python3_launcher = "python%s" % python_version
         python_runtime_files = [

@@ -17,7 +17,17 @@ _DISPLAY_VSYNC_EVENT_NAME: str = "Display::Controller::OnDisplayVsync"
 
 
 class AppRenderLatencyMetricsProcessor(trace_metrics.MetricsProcessor):
-    """Computes present latency metrics."""
+    """Computes present-latency metrics for a given app.
+
+    App render latency is measured from the moment that the chosen app begins presenting through
+    the Flatland API until the first vsync that corresponds with app content being displayed on
+    screen. Flow events in the trace enable this class to reliably correlate the correct events to
+    calculate this duration.
+
+    By default, this module reports aggregate latency measurements -- such as min, max, average, and
+    percentiles -- calculated across all presentations of the chosen app during the test. It can be
+    configured to instead report a time series of latency measurements, one for each event.
+    """
 
     def __init__(self, debug_name: str, aggregates_only: bool = True):
         """Constructor.

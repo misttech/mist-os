@@ -1,0 +1,7 @@
+#include <fidl/test.serializable/cpp/driver/natural_messaging.h>
+#include <lib/fidl_driver/cpp/unknown_interactions.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
+#pragma clang diagnostic pop

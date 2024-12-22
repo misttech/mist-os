@@ -17,7 +17,7 @@ use std::future::Future;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::warn;
 use zx::{AsHandleRef, Task};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -197,7 +197,6 @@ pub struct ResumeEvents {
 
 #[derive(Default)]
 pub struct SuspendContext {
-    suspended_processes: Arc<Mutex<Vec<zx::Handle>>>,
     resume_events: Arc<Mutex<ResumeEvents>>,
     wake_watchers: Arc<Mutex<Vec<zx::EventPair>>>,
 }
@@ -356,12 +355,6 @@ pub async fn serve_starnix_manager(
 ) -> Result<(), Error> {
     while let Some(event) = stream.try_next().await? {
         match event {
-            fstarnixrunner::ManagerRequest::Suspend { responder, .. } => {
-                suspend_kernels(kernels, &suspend_context.suspended_processes).await;
-                if let Err(e) = responder.send() {
-                    warn!("error replying to suspend request: {e}");
-                }
-            }
             fstarnixrunner::ManagerRequest::SuspendContainer { payload, responder, .. } => {
                 let response = suspend_container(payload, &suspend_context, kernels).await?;
                 if let Err(e) = match response {
@@ -403,10 +396,6 @@ pub async fn serve_starnix_manager(
                 );
                 sender.try_send((proxy, suspend_context.resume_events.clone())).unwrap();
             }
-            fstarnixrunner::ManagerRequest::Resume { .. } => {
-                resume_kernels(&suspend_context.suspended_processes)
-            }
-
             fstarnixrunner::ManagerRequest::RegisterWakeWatcher { payload, responder } => {
                 if let Some(watcher) = payload.watcher {
                     let (clear_mask, set_mask) = (ASLEEP_SIGNAL, AWAKE_SIGNAL);
@@ -603,25 +592,6 @@ fn forward_message(
     } else {
         Ok(())
     }
-}
-
-async fn suspend_kernels(kernels: &Kernels, suspended_processes: &Mutex<Vec<zx::Handle>>) {
-    fuchsia_trace::duration!(c"starnix_runner", c"suspend_kernels");
-
-    debug!("suspending processes...");
-    for job in kernels.all_jobs() {
-        suspended_processes
-            .lock()
-            .append(&mut suspend_kernel(&job).await.expect("Failed to suspend kernel job"));
-    }
-    debug!("...done suspending processes");
-}
-
-fn resume_kernels(suspended_processes: &Mutex<Vec<zx::Handle>>) {
-    debug!("requesting resume...");
-    // Drop all the suspend handles to resume the kernel.
-    *suspended_processes.lock() = vec![];
-    debug!("...requested resume (completes asynchronously)");
 }
 
 /// Suspends `kernel` by suspending all the processes in the kernel's job.

@@ -263,7 +263,6 @@ source_set("ddktl") {
     "//src/devices/tpm/drivers/tpm:*",
     "//src/devices/tpm/drivers/tpm-lpc:*",
     "//src/devices/usb/drivers/dwc2:*",
-    "//src/devices/usb/drivers/dwc3:*",
     "//src/devices/usb/drivers/usb-bus:*",
     "//src/devices/usb/drivers/usb-composite:*",
     "//src/devices/usb/drivers/usb-peripheral:*",

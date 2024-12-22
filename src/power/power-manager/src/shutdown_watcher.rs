@@ -15,10 +15,10 @@ use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, NumericProperty as _};
 use futures::prelude::*;
 use futures::TryStreamExt;
+use log::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tracing::*;
 use zx::AsHandleRef;
 use {fidl_fuchsia_hardware_power_statecontrol as fpower, serde_json as json};
 

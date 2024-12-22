@@ -33,7 +33,7 @@ use netstack3_ip::device::{
     PreferredLifetime, RsTimerId, SetIpAddressPropertiesError, SlaacConfigurationUpdate,
     TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
 };
-use netstack3_ip::gmp::MldTimerId;
+use netstack3_ip::gmp::{IgmpConfigMode, MldConfigMode, MldTimerId};
 use netstack3_ip::nud::{self, LinkResolutionResult};
 
 #[test]
@@ -291,8 +291,7 @@ fn enable_disable_ipv6() {
             ),
             (
                 TimerId::from(
-                    Ipv6DeviceTimerId::Mld(MldTimerId::new_delayed_report(device_id.downgrade()))
-                        .into_common(),
+                    Ipv6DeviceTimerId::Mld(MldTimerId::new(device_id.downgrade())).into_common(),
                 ),
                 ..,
             ),
@@ -697,6 +696,7 @@ fn update_ipv4_configuration_return() {
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(true),
                 },
+                igmp_mode: Some(IgmpConfigMode::V1),
             },
         ),
         Ok(Ipv4DeviceConfigurationUpdate {
@@ -706,6 +706,7 @@ fn update_ipv4_configuration_return() {
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: Some(false),
             },
+            igmp_mode: Some(IgmpConfigMode::V3),
         }),
     );
 
@@ -720,6 +721,7 @@ fn update_ipv4_configuration_return() {
                     multicast_forwarding_enabled: Some(true),
                     gmp_enabled: None,
                 },
+                igmp_mode: None,
             },
         ),
         Ok(Ipv4DeviceConfigurationUpdate {
@@ -729,6 +731,7 @@ fn update_ipv4_configuration_return() {
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: None,
             },
+            igmp_mode: None,
         }),
     );
 
@@ -744,6 +747,7 @@ fn update_ipv4_configuration_return() {
                     multicast_forwarding_enabled: None,
                     gmp_enabled: Some(true),
                 },
+                igmp_mode: None,
             },
         ),
         Ok(Ipv4DeviceConfigurationUpdate {
@@ -753,6 +757,7 @@ fn update_ipv4_configuration_return() {
                 multicast_forwarding_enabled: None,
                 gmp_enabled: Some(true),
             },
+            igmp_mode: None,
         }),
     );
 
@@ -767,6 +772,7 @@ fn update_ipv4_configuration_return() {
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
                 },
+                igmp_mode: Some(IgmpConfigMode::V3),
             },
         ),
         Ok(Ipv4DeviceConfigurationUpdate {
@@ -776,6 +782,7 @@ fn update_ipv4_configuration_return() {
                 multicast_forwarding_enabled: Some(true),
                 gmp_enabled: Some(true),
             },
+            igmp_mode: Some(IgmpConfigMode::V1),
         }),
     );
 }
@@ -824,6 +831,7 @@ fn update_ipv6_configuration_return() {
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(true),
                 },
+                mld_mode: Some(MldConfigMode::V1),
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
@@ -839,6 +847,7 @@ fn update_ipv6_configuration_return() {
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: Some(false),
             },
+            mld_mode: Some(MldConfigMode::V2),
         }),
     );
 
@@ -856,6 +865,7 @@ fn update_ipv6_configuration_return() {
                     multicast_forwarding_enabled: Some(true),
                     gmp_enabled: None,
                 },
+                mld_mode: None,
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
@@ -868,6 +878,7 @@ fn update_ipv6_configuration_return() {
                 multicast_forwarding_enabled: Some(false),
                 gmp_enabled: None,
             },
+            mld_mode: None,
         }),
     );
 
@@ -886,6 +897,7 @@ fn update_ipv6_configuration_return() {
                     multicast_forwarding_enabled: None,
                     gmp_enabled: Some(true),
                 },
+                mld_mode: None,
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
@@ -898,6 +910,7 @@ fn update_ipv6_configuration_return() {
                 multicast_forwarding_enabled: None,
                 gmp_enabled: Some(true),
             },
+            mld_mode: None,
         }),
     );
 
@@ -920,6 +933,7 @@ fn update_ipv6_configuration_return() {
                     multicast_forwarding_enabled: Some(false),
                     gmp_enabled: Some(false),
                 },
+                mld_mode: Some(MldConfigMode::V2),
             },
         ),
         Ok(Ipv6DeviceConfigurationUpdate {
@@ -937,6 +951,7 @@ fn update_ipv6_configuration_return() {
                 multicast_forwarding_enabled: Some(true),
                 gmp_enabled: Some(true),
             },
+            mld_mode: Some(MldConfigMode::V1),
         }),
     );
 }

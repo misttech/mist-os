@@ -64,7 +64,6 @@ tests = [
   },
   {
     label = "ipv4"
-    err_logs = true
   },
   {
     label = "ipv6"

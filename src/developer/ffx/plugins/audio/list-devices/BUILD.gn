@@ -17,8 +17,8 @@ ffx_plugin("ffx_audio_listdevices") {
     "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/plugins/audio/common:ffx_audio_common",
     "//src/developer/ffx/plugins/audio/device:ffx_audio_device",
+    "//src/developer/ffx/plugins/audio/ffx_optional_moniker",
     "//src/media/audio/lib/rust",
     "//third_party/rust_crates:async-trait",
   ]

@@ -188,6 +188,9 @@ zx_status_t x86_bootstrap16_acquire(uintptr_t entry64, void** bootstrap_aperture
   bootstrap_data->phys_long_mode_entry = static_cast<uint32_t>(long_mode_entry);
   bootstrap_data->long_mode_cs = CODE_64_SELECTOR;
 
+  bootstrap_data->virt_long_mode_high_entry =
+      reinterpret_cast<uintptr_t>(_x86_secondary_cpu_long_mode_high_entry);
+
   *bootstrap_aperture = (void*)((uintptr_t)bootstrap_virt_addr + PAGE_SIZE);
   *instr_ptr = bootstrap_phys_addr;
 

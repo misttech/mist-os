@@ -16,6 +16,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use futures::prelude::*;
 use futures::TryStreamExt;
+use log::*;
 use serde_derive::Deserialize;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -23,7 +24,6 @@ use std::iter::FromIterator as _;
 use std::path::Path;
 use std::rc::Rc;
 use thermal_config::{ClientConfig, ThermalConfig};
-use tracing::*;
 use {fidl_fuchsia_thermal as fthermal, fuchsia_async as fasync, serde_json as json};
 
 /// Node: ThermalStateHandler
@@ -252,7 +252,7 @@ impl ClientStates {
 
         match self.0.borrow_mut().get_mut(Self::CPU_CLIENT_TYPE) {
             Some(client_state) => client_state.process_new_cpu_thermal_load(thermal_load),
-            None => tracing::error!("CPU thermal client is not enabled"),
+            None => log::error!("CPU thermal client is not enabled"),
         }
     }
 

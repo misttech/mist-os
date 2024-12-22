@@ -533,7 +533,7 @@ fx list-packages --base
 [Component manifests][doc-manifests] let you control the termination policy of
 your component using [`on_terminate`][cml-children]. Components with the
 "reboot-on-terminate" policy set cause the system to gracefully reboot if the
-component terminates for any reason (including successful exit).
+component terminates for any reason other than successful exit.
 
 Note: This is a special feature intended for use only by system components
 deemed critical to the system's function. Therefore, its use is governed by a
@@ -541,7 +541,7 @@ security policy allowlist.
 
 To enable this feature, do the following:
 
-1.  Mark the child as `on_terminate: reboot` in the parent's component manifest:
+1.  Mark the child as `on_terminate: "reboot"` in the parent's component manifest:
 
     ```json5
     // core.cml

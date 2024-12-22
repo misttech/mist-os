@@ -11,7 +11,6 @@ use crate::client::types;
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use fidl_fuchsia_wlan_internal as fidl_internal;
 use futures::channel::mpsc;
 use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
@@ -20,6 +19,7 @@ use futures::{select, FutureExt};
 use std::any::Any;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal};
 
 pub mod default_monitor;
 pub mod stationary_monitor;
@@ -78,11 +78,12 @@ pub async fn serve_roam_monitor(
             // Handle incoming trigger data.
             trigger_data = trigger_data_receiver.next() => if let Some(data) = trigger_data {
                 match roam_monitor.handle_roam_trigger_data(data).await {
-                    Ok(RoamTriggerDataOutcome::RoamSearch(network_identifier, credential)) => {
+                    Ok(RoamTriggerDataOutcome::RoamSearch { scan_type, network_identifier, credential }) => {
                         telemetry_sender.send(TelemetryEvent::RoamingScan);
                         info!("Performing scan to find proactive local roaming candidates.");
                         let roam_search_fut = get_roaming_connection_selection_future(
                             connection_selection_requester.clone(),
+                            scan_type,
                             network_identifier.clone(),
                             credential.clone(),
                         );
@@ -138,10 +139,14 @@ pub async fn serve_roam_monitor(
 // to be queued and that can also return the initiating request.
 async fn get_roaming_connection_selection_future(
     mut connection_selection_requester: ConnectionSelectionRequester,
+    scan_type: fidl_common::ScanType,
     network_identifier: types::NetworkIdentifier,
     credential: Credential,
 ) -> Result<types::ScannedCandidate, Error> {
-    match connection_selection_requester.do_roam_selection(network_identifier, credential).await? {
+    match connection_selection_requester
+        .do_roam_selection(scan_type, network_identifier, credential)
+        .await?
+    {
         Some(candidate) => Ok(candidate),
         None => Err(format_err!("No roam candidates found.")),
     }
@@ -158,13 +163,13 @@ mod test {
         generate_random_network_identifier, generate_random_password,
         generate_random_scanned_candidate,
     };
-    use fidl_fuchsia_wlan_internal as fidl_internal;
     use fuchsia_async::{self as fasync, TestExecutor};
     use futures::task::Poll;
     use futures::{pin_mut, Future};
     use std::pin::Pin;
     use test_case::test_case;
     use wlan_common::assert_variant;
+    use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal};
 
     struct TestValues {
         trigger_data_sender: mpsc::Sender<RoamTriggerData>,
@@ -217,7 +222,7 @@ mod test {
     }
 
     #[test_case(RoamTriggerDataOutcome::Noop; "should not queue roam search")]
-    #[test_case(RoamTriggerDataOutcome::RoamSearch(generate_random_network_identifier(), generate_random_password()); "should queue roam search")]
+    #[test_case(RoamTriggerDataOutcome::RoamSearch { scan_type: fidl_common::ScanType::Passive, network_identifier: generate_random_network_identifier(), credential: generate_random_password() }; "should queue roam search")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_serve_loop_handles_trigger_data(response_to_should_roam_scan: RoamTriggerDataOutcome) {
         let mut exec = TestExecutor::new();
@@ -260,7 +265,7 @@ mod test {
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         match response_to_should_roam_scan {
-            RoamTriggerDataOutcome::RoamSearch(..) => {
+            RoamTriggerDataOutcome::RoamSearch { .. } => {
                 // Verify metric was sent for upcoming roam scan
                 assert_variant!(
                     test_values.telemetry_receiver.try_next(),
@@ -297,10 +302,11 @@ mod test {
         // Create a fake roam monitor. Set should_roam_scan to true to ensure roam searches get
         // queued. Conditionally set the should_send_roam_request response.
         let mut roam_monitor = FakeRoamMonitor::new();
-        roam_monitor.response_to_should_roam_scan = RoamTriggerDataOutcome::RoamSearch(
-            generate_random_network_identifier(),
-            generate_random_password(),
-        );
+        roam_monitor.response_to_should_roam_scan = RoamTriggerDataOutcome::RoamSearch {
+            scan_type: fidl_common::ScanType::Passive,
+            network_identifier: generate_random_network_identifier(),
+            credential: generate_random_password(),
+        };
         roam_monitor.response_to_should_send_roam_request = response_to_should_send_roam_request;
 
         // Start a serve loop with the fake roam monitor
@@ -368,10 +374,11 @@ mod test {
         // Create a fake roam monitor. Set should_roam_scan to true to ensure roam searches get
         // queued. Conditionally set the should_send_roam_request response.
         let mut roam_monitor = FakeRoamMonitor::new();
-        roam_monitor.response_to_should_roam_scan = RoamTriggerDataOutcome::RoamSearch(
-            generate_random_network_identifier(),
-            generate_random_password(),
-        );
+        roam_monitor.response_to_should_roam_scan = RoamTriggerDataOutcome::RoamSearch {
+            scan_type: fidl_common::ScanType::Passive,
+            network_identifier: generate_random_network_identifier(),
+            credential: generate_random_password(),
+        };
         roam_monitor.response_to_should_send_roam_request = true;
 
         // Start a serve loop with the fake roam monitor

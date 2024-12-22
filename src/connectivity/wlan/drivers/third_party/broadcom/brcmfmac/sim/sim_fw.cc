@@ -49,6 +49,53 @@
 #include "zircon/errors.h"
 #include "zircon/types.h"
 
+namespace {
+
+constexpr auto kAlignVal = static_cast<std::align_val_t>(alignof(std::max_align_t));
+constexpr auto kAlignedBufferDeleter = [](char* buffer) { operator delete[](buffer, kAlignVal); };
+using AlignedBuffer = std::unique_ptr<char, decltype(kAlignedBufferDeleter)>;
+
+// Represents a parsed iovar message. This contains a *copy* of the data in an iovar message. It
+// does not provide a view into the original message.
+struct IovarGetSetMessage {
+  // The name of the iovar.
+  std::string name;
+
+  // A buffer with the value following the iovar name. This buffer is aligned so that the user can
+  // freely cast it to the expected type.
+  AlignedBuffer aligned_value;
+
+  // The actual size of the value in |aligned_value|.
+  size_t value_size;
+};
+
+// Parses an iovar message from |data|.
+// The format of the message is a null-terminated string containing the iovar name, followed by the
+// value to assign to that iovar.
+zx::result<IovarGetSetMessage> ParseIovarGetSetMessage(const uint8_t* data, size_t len) {
+  // The command consists of a NUL-terminated name, followed by a value.
+  const char* const name_begin = reinterpret_cast<const char*>(data);
+  const char* const name_end = static_cast<const char*>(memchr(name_begin, '\0', len));
+  if (name_end == nullptr) {
+    BRCMF_DBG(SIM, "ParseIovarGetSetMessage: iovar name not null-terminated");
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  const char* const value_begin = name_end + 1;
+  const size_t value_size = len - (value_begin - name_begin);
+
+  AlignedBuffer value_buffer(static_cast<char*>(operator new[](value_size, kAlignVal)),
+                             kAlignedBufferDeleter);
+
+  std::memcpy(value_buffer.get(), value_begin, value_size);
+  return zx::ok(IovarGetSetMessage{
+      // Copy name into return value
+      .name = name_begin,
+      .aligned_value = std::move(value_buffer),
+      .value_size = value_size,
+  });
+}
+}  // namespace
+
 namespace wlan::brcmfmac {
 
 #define SIM_FW_CHK_CMD_LEN(dcmd_len, exp_len) \
@@ -144,7 +191,7 @@ zx_status_t SimFirmware::SetupIovarTable() {
       {"txstreams", sizeof(txstreams_), &SimFirmware::IovarTxstreamsSet, &SimFirmware::IovarGet,
        std::nullopt, &txstreams_},
       {"ver", strlen(kFirmwareVer) + 1, nullptr, &SimFirmware::IovarVerGet},
-      {"vht_mode", sizeof(uint32_t), nullptr, &SimFirmware::IovarVhtModeGet},
+      {"vhtmode", sizeof(uint32_t), nullptr, &SimFirmware::IovarVhtModeGet},
       {"wme_ac_sta", sizeof(edcf_acparam_t) * 4, nullptr, &SimFirmware::IovarWmeAcStaGet},
       {"wme_apsd", sizeof(uint32_t), nullptr, &SimFirmware::IovarWmeApsdGet},
       {"wnm", sizeof(wnm_), &SimFirmware::IovarSet, &SimFirmware::IovarGet, std::nullopt, &wnm_},
@@ -160,6 +207,28 @@ zx_status_t SimFirmware::SetupIovarTable() {
       {"buf_key_b4_m4", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
        std::nullopt, &buf_key_b4_m4_},
       {"wme_counters", sizeof(wl_wme_cnt_t), nullptr, &SimFirmware::IovarWmeCounterGet},
+      {"ldpc_cap", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet, std::nullopt,
+       &capability_iovars_.ldpc_cap},
+      {"stbc_rx", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet, std::nullopt,
+       &capability_iovars_.stbc_rx},
+      {"ampdu_rx_density", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
+       std::nullopt, &capability_iovars_.ampdu_rx_density},
+      {"ampdu_rx_factor", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
+       std::nullopt, &capability_iovars_.ampdu_rx_factor},
+      {"rxstreams_cap", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
+       std::nullopt, &capability_iovars_.rxstreams_cap},
+      {"bw_cap", sizeof(uint32_t), nullptr, &SimFirmware::IovarBwCapGet},
+      {"chanspecs", std::nullopt, nullptr, &SimFirmware::IovarChanspecsGet},
+      {"txbf_bfe_cap_hw", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
+       std::nullopt, &capability_iovars_.txbf_bfe_cap_hw},
+      {"txbf_bfe_cap", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
+       std::nullopt, &capability_iovars_.txbf_bfe_cap},
+      {"txbf_bfr_cap_hw", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
+       std::nullopt, &capability_iovars_.txbf_bfe_cap_hw},
+      {"txbf_bfr_cap", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
+       std::nullopt, &capability_iovars_.txbf_bfe_cap},
+      {"txstreams_cap", sizeof(uint32_t), &SimFirmware::IovarSet, &SimFirmware::IovarGet,
+       std::nullopt, &capability_iovars_.txstreams_cap},
   };
 
   for (const auto& it : kIovarInfoTable) {
@@ -283,26 +352,15 @@ zx_status_t SimFirmware::BcdcVarOp(uint16_t ifidx, brcmf_proto_bcdc_dcmd* dcmd, 
   zx_status_t status = ZX_OK;
 
   if (is_set) {
-    // The command consists of a NUL-terminated name, followed by a value.
-    const char* const name_begin = reinterpret_cast<char*>(data);
-    const char* const name_end = static_cast<const char*>(memchr(name_begin, '\0', dcmd->len));
-    if (name_end == nullptr) {
-      BRCMF_DBG(SIM, "SET_VAR: iovar name not null-terminated");
-      return ZX_ERR_INVALID_ARGS;
+    zx::result<IovarGetSetMessage> res = ParseIovarGetSetMessage(data, dcmd->len);
+    if (res.is_error()) {
+      return res.error_value();
     }
-    const char* const value_begin = name_end + 1;
-    const size_t value_size = dcmd->len - (value_begin - name_begin);
-
-    // Since we're passing the value as a buffer down to users that may expect to be able to cast
-    // directly into it, make a suitably aligned copy here.
-    static constexpr auto align_val = static_cast<std::align_val_t>(alignof(std::max_align_t));
-    const auto aligned_delete = [](char* buffer) { operator delete[](buffer, align_val); };
-    std::unique_ptr<char, decltype(aligned_delete)> value_buffer(
-        static_cast<char*>(operator new[](value_size, align_val)), aligned_delete);
-    std::memcpy(value_buffer.get(), value_begin, value_size);
+    IovarGetSetMessage iovar_message = std::move(res.value());
 
     // IovarsSet returns the input unchanged
-    status = IovarsSet(ifidx, name_begin, value_buffer.get(), value_size, &dcmd->status);
+    status = IovarsSet(ifidx, iovar_message.name.c_str(), iovar_message.aligned_value.get(),
+                       iovar_message.value_size, &dcmd->status);
   } else {
     // IovarsGet modifies the buffer in-place
     status = IovarsGet(ifidx, reinterpret_cast<const char*>(data), data, dcmd->len, &dcmd->status);
@@ -2877,6 +2935,49 @@ zx_status_t SimFirmware::IovarWmeCounterGet(SimIovarGetReq* req) {
   wme_cnt->version = version;
   wme_cnt->length = length;
 
+  return ZX_OK;
+}
+
+// The bw_cap iovar uses the passed in value as both the parameter and the return value.
+zx_status_t SimFirmware::IovarBwCapGet(SimIovarGetReq* req) {
+  // This assumes that the original command buffer was passed in |req->value|. In the future, we may
+  // want to more cleanly separate input and output buffers.
+  zx::result<IovarGetSetMessage> res =
+      ParseIovarGetSetMessage(reinterpret_cast<const uint8_t*>(req->value), req->value_len);
+  if (res.is_error()) {
+    return res.error_value();
+  }
+  ZX_ASSERT(res->name == "bw_cap");
+  uint32_t bw_param = *reinterpret_cast<uint32_t*>(res->aligned_value.get());
+  uint32_t bw_ret = 0;
+
+  switch (bw_param) {
+    case WLC_BAND_2G:
+      bw_ret = capability_iovars_.bw_cap_2ghz;
+      break;
+    case WLC_BAND_5G:
+      bw_ret = capability_iovars_.bw_cap_5ghz;
+      break;
+    default:
+      return ZX_ERR_INVALID_ARGS;
+  }
+
+  // return the value by the input pointer.
+  uint32_t* ret_val_ptr = reinterpret_cast<uint32_t*>(req->value);
+  *ret_val_ptr = bw_ret;
+  return ZX_OK;
+}
+
+zx_status_t SimFirmware::IovarChanspecsGet(SimIovarGetReq* req) {
+  struct brcmf_chanspec_list* chanspec_list = &capability_iovars_.chanspec_list_;
+
+  size_t list_size_bytes =
+      (chanspec_list->count * sizeof(chanspec_list->element[0])) + sizeof(chanspec_list->count);
+  if (req->value_len < list_size_bytes) {
+    BRCMF_INFO("size bytes: %u, value_len: %u", list_size_bytes, req->value_len);
+    return ZX_ERR_BUFFER_TOO_SMALL;
+  }
+  std::memcpy(req->value, chanspec_list, list_size_bytes);
   return ZX_OK;
 }
 

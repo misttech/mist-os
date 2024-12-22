@@ -12,7 +12,7 @@ use starnix_uapi::errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK};
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    self as uapi, errno, error, sigaction, sigaltstack, sigcontext, siginfo_t, ucontext,
+    self as uapi, errno, error, sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
 };
 
 /// The size of the red zone.
@@ -58,7 +58,7 @@ impl SignalStackFrame {
         extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
-        _action: sigaction,
+        _action: sigaction_t,
         stack_pointer: UserAddress,
     ) -> Result<SignalStackFrame, Errno> {
         let context = ucontext {

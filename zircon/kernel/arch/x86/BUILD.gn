@@ -227,10 +227,6 @@ zx_library("x86") {
   ]
 }
 
-# x86 still always uses the ZBI kernel image, so nothing to add here.
-group("zbi-kernel-image") {
-}
-
 source_set("syscall") {
   sources = [ "syscall.S" ]
   deps = [

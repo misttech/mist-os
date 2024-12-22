@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use futures::StreamExt as _;
-use tracing::{info, warn};
+use log::{info, warn};
 use {
     delegated_provisioning_constants as constants, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces as fnet_interfaces,

@@ -8,6 +8,7 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_zbi_abi::{ZbiTopologyEntityType, ZbiTopologyNode, ZbiType};
 use futures::stream::StreamExt;
+use log::{error, info};
 use num_traits::FromPrimitive;
 use std::cmp::max;
 use std::collections::hash_map::DefaultHasher;
@@ -15,7 +16,6 @@ use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::mem;
 use std::rc::Rc;
-use tracing::{error, info};
 use zerocopy::FromBytes;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_kernel as fkernel,
@@ -219,7 +219,7 @@ impl CpuLoadLogger {
                             );
 
                             if self.output_samples_to_syslog {
-                                info!(max_perf_scale = cluster.max_perf_scale, cpu_usage);
+                                info!(max_perf_scale = cluster.max_perf_scale, cpu_usage; "");
                             }
 
                             fuchsia_trace::counter!(
@@ -244,7 +244,7 @@ impl CpuLoadLogger {
                         );
 
                         if self.output_samples_to_syslog {
-                            info!(cpu_usage);
+                            info!(cpu_usage; "");
                         }
 
                         fuchsia_trace::counter!(
@@ -268,7 +268,7 @@ impl CpuLoadLogger {
 
                 self.last_sample.replace(current_sample);
             }
-            Err(err) => error!(%err, "get_cpu_stats IPC failed"),
+            Err(err) => error!(err:%; "get_cpu_stats IPC failed"),
         }
     }
 }

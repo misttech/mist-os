@@ -14,7 +14,6 @@ group("tests") {
 
 if (is_host) {
   python_library("termout") {
-    enable_mypy = true
     sources = [
       "__init__.py",
       "termout.py",
@@ -23,7 +22,6 @@ if (is_host) {
   }
 
   python_host_test("termout_test") {
-    enable_mypy = true
     main_source = "tests/termout_test.py"
     main_callable = "unittest.main"
     extra_args = [ "-v" ]

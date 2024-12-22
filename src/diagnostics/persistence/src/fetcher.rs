@@ -10,13 +10,13 @@ use fuchsia_async::{self as fasync, Task};
 
 use futures::channel::mpsc::{self, UnboundedSender};
 use futures::StreamExt;
+use log::*;
 use persistence_config::{Config, ServiceName, Tag, TagConfig};
 use serde::ser::SerializeMap;
 use serde::{Serialize, Serializer};
 use serde_json::{Map, Value};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use tracing::*;
 
 // The capability name for the Inspect reader
 const INSPECT_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.ArchiveAccessor.feedback";

@@ -84,7 +84,7 @@ where
                         object,
                         control_handle,
                     } => {
-                        ObjectRequest::new3(flags, &options, object).handle(|request| {
+                        ObjectRequest::new(flags, &options, object).handle(|request| {
                             self.open_handler.handle_open3_request(
                                 path,
                                 flags,
@@ -576,7 +576,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                         object,
                         control_handle,
                     } => {
-                        ObjectRequest::new3(flags, &options, object).handle(|request| {
+                        ObjectRequest::new(flags, &options, object).handle(|request| {
                             parent.open_handler.handle_open3_request(
                                 path,
                                 flags,
@@ -676,7 +676,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                         object,
                         control_handle,
                     } => {
-                        ObjectRequest::new3(flags, &options, object).handle(|request| {
+                        ObjectRequest::new(flags, &options, object).handle(|request| {
                             parent.open_handler.handle_open3_request(
                                 path,
                                 flags,

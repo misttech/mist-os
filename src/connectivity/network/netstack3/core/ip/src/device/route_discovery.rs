@@ -333,10 +333,8 @@ mod tests {
         gateway: None,
     };
 
-    const ONE_SECOND: NonZeroDuration =
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(1));
-    const TWO_SECONDS: NonZeroDuration =
-        const_unwrap::const_unwrap_option(NonZeroDuration::from_secs(2));
+    const ONE_SECOND: NonZeroDuration = NonZeroDuration::from_secs(1).unwrap();
+    const TWO_SECONDS: NonZeroDuration = NonZeroDuration::from_secs(2).unwrap();
 
     fn new_context() -> CtxPair<FakeCoreCtxImpl, FakeBindingsCtxImpl> {
         CtxPair::with_default_bindings_ctx(|bindings_ctx| {

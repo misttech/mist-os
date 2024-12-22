@@ -21,7 +21,6 @@
 //! [RFC 7440]: https://datatracker.ietf.org/doc/html/rfc7440
 
 use crate::ValidStr;
-use const_unwrap::const_unwrap_option;
 use packet::{
     BufferView, FragmentedBytesMut, InnerPacketBuilder, PacketBuilder, PacketConstraints,
     ParsablePacket, ParseMetadata, SerializeTarget,
@@ -37,10 +36,10 @@ use zerocopy::{
 };
 
 /// The port netsvc uses to send TFTP traffic from.
-pub const OUTGOING_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33340));
+pub const OUTGOING_PORT: NonZeroU16 = NonZeroU16::new(33340).unwrap();
 
 /// The port netsvc uses to listen to TFTP traffic.
-pub const INCOMING_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33341));
+pub const INCOMING_PORT: NonZeroU16 = NonZeroU16::new(33341).unwrap();
 
 /// The default block size option value, according to [RFC 1350].
 ///

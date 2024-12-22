@@ -105,6 +105,9 @@ class CompileStep : public Compiler::Step {
 
   // Stack of decls in the kCompiling state, used to detect cycles.
   std::vector<const Decl*> decl_stack_;
+
+  // Number of @no_resource attributes we are nested within.
+  size_t no_resource_count_ = 0;
 };
 
 }  // namespace fidlc

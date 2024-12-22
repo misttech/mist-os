@@ -248,7 +248,8 @@ int try_read_skip_blk(const fidl::UnownedClientEnd<fuchsia_skipblock::SkipBlock>
   }
 
   fzl::OwnedVmoMapper mapper;
-  if (zx_status_t status = mapper.Map(std::move(vmo), count); status != ZX_OK) {
+  if (zx_status_t status = mapper.Map(std::move(vmo), 0, count, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
+      status != ZX_OK) {
     fprintf(stderr, "Failed to map vmo: %s\n", zx_status_get_string(status));
     return -1;
   }

@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use crate::security::selinux_hooks::{
-    check_permission, fs_node_effective_sid, FileSystemLabelState,
+    check_permission, fs_node_effective_sid_and_class, todo_check_permission, FileSystemLabelState,
+    FsNodeSidAndClass,
 };
 use crate::task::CurrentTask;
-use crate::todo_check_permission;
 use crate::vfs::{FileSystem, NamespaceNode};
+use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
-use selinux::{CommonFilePermission, FileClass, FileSystemPermission, SecurityId};
+use selinux::{CommonFilePermission, FileSystemPermission, SecurityId};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -27,6 +28,17 @@ fn fs_sid(fs: &FileSystem) -> Result<SecurityId, Errno> {
     Ok(filesystem_sid)
 }
 
+/// Checks if `current_task` has the permission to mount `fs`.
+pub fn sb_kern_mount(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    fs: &FileSystem,
+) -> Result<(), Errno> {
+    let source_sid = current_task.security_state.lock().current_sid;
+    let target_sid = fs_sid(fs)?;
+    check_permission(permission_check, source_sid, target_sid, FileSystemPermission::Mount)
+}
+
 /// Checks if `current_task` has the permission to mount at `path` with the mounting flags `flags`.
 pub fn sb_mount(
     permission_check: &PermissionCheck<'_>,
@@ -40,13 +52,14 @@ pub fn sb_mount(
         let target_sid = fs_sid(&mount.root().entry.node.fs())?;
         check_permission(permission_check, source_sid, target_sid, FileSystemPermission::Remount)
     } else {
-        let target_sid = fs_node_effective_sid(&path.entry.node);
-        todo_check_permission!(
-            TODO("https://fxbug.dev/380230897", "Check mounton permission."),
+        let FsNodeSidAndClass { sid: target_sid, class: target_class } =
+            fs_node_effective_sid_and_class(&path.entry.node);
+        todo_check_permission(
+            TODO_DENY!("https://fxbug.dev/380230897", "Check mounton permission."),
             permission_check,
             source_sid,
             target_sid,
-            CommonFilePermission::MountOn.for_class(FileClass::Dir)
+            CommonFilePermission::MountOn.for_class(target_class),
         )
     }
 }

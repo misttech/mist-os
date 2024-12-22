@@ -170,6 +170,12 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
                 ui_config.viewing_distance.as_ref().to_string().into(),
             ),
         )?;
+
+        builder.set_config_capability(
+            "fuchsia.ui.AttachA11yView",
+            Config::new(ConfigValueType::Bool, ui_config.attach_a11y_view.into()),
+        )?;
+
         builder.set_config_capability(
             "fuchsia.ui.IdleThresholdMs",
             Config::new(ConfigValueType::Uint64, {
@@ -186,7 +192,7 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             .directory("sensor-config");
         if let Some(sensor_config_path) = &ui_config.sensor_config {
             config_dir.entry(FileEntry {
-                source: sensor_config_path.clone(),
+                source: sensor_config_path.clone().into(),
                 destination: "config.json".into(),
             })?;
         }

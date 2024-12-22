@@ -44,6 +44,9 @@ class DlTestsBase : public ::testing::Test {
   // Whether the test fixture supports dynamic TLS.
   static constexpr bool kSupportsDynamicTls = true;
 
+  // Whether the test fixture's dlclose function will run finalizers.
+  static constexpr bool kDlCloseCanRunFinalizers = true;
+
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
 

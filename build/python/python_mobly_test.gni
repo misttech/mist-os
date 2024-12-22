@@ -485,7 +485,6 @@ template("python_mobly_test") {
     _labels = {
       fidl_ir_list = "${_test_name}_fidl_ir_list"
       compress_artifacts = "${_test_name}_compress_artifacts"
-      rust_embed_lib = "${_test_name}_rustc_embed_files"
     }
 
     _files = {
@@ -493,6 +492,8 @@ template("python_mobly_test") {
       compress_artifacts =
           "${target_gen_dir}/${_test_name}_lacewing_artifacts.zip"
     }
+
+    _hermetic_test_binary_label = "${_test_name}_hermetic_python_binary"
 
     generated_file(_labels.fidl_ir_list) {
       testonly = _testonly
@@ -556,32 +557,30 @@ template("python_mobly_test") {
       ]
     }
 
-    rustc_embed_files(_labels.rust_embed_lib) {
-      edition = "2021"
-      testonly = _testonly
-      name = "data"
+    _output_file_name = "$root_out_dir/${_hermetic_test_binary_label}"
 
-      files = [
-        {
-          constant_name = "LACEWING_ARTIFACTS"
-          source = _files.compress_artifacts
-          deps = [ ":${_labels.compress_artifacts}" ]
-        },
+    python_action(_hermetic_test_binary_label) {
+      forward_variables_from(invoker, [ "visibility" ])
+      testonly = _testonly
+      binary_label = "//build/python:python_hermetic_concatenate"
+      inputs = [
+        "$root_out_dir/self_extracting_binary",
+        _files.compress_artifacts,
       ]
-    }
+      outputs = [ _output_file_name ]
+      args = [
+        "--executable",
 
-    _hermetic_test_binary_label = "${_test_name}_hermetic_python_binary"
-    rustc_binary(_hermetic_test_binary_label) {
-      edition = "2021"
-      testonly = _testonly
-      source_root = "//build/python/self_extracting_binary/src/main.rs"
-
-      sources = [ "//build/python/self_extracting_binary/src/main.rs" ]
-
+        # This path is from //build/python/self_extracting_binary
+        rebase_path("$root_out_dir/self_extracting_binary", root_build_dir),
+        "--zip-file",
+        rebase_path("${_files.compress_artifacts}", root_build_dir),
+        "--output",
+        rebase_path(_output_file_name, root_build_dir),
+      ]
       deps = [
-        ":${_labels.rust_embed_lib}",
-        "//third_party/rust_crates:tempfile",
-        "//third_party/rust_crates:zip",
+        ":${_labels.compress_artifacts}",
+        "//build/python/self_extracting_binary",
       ]
     }
 

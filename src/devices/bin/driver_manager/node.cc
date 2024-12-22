@@ -857,10 +857,24 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
 
   auto& fdf_offers = args.offers2();
   std::vector<fuchsia_driver_framework::NodeProperty2> properties;
-  const auto& arg_properties = args.properties();
+
+  const auto& arg_properties = args.properties2();
   if (arg_properties.has_value()) {
-    properties.reserve(arg_properties->size());
-    for (auto& property : arg_properties.value()) {
+    properties = arg_properties.value();
+  }
+
+  const auto& arg_deprecated_properties = args.properties();
+  if (arg_deprecated_properties.has_value()) {
+    if (arg_properties.has_value()) {
+      LOGF(
+          ERROR,
+          "Failed to add Node '%.*s'. Found values for both properties and properties2 are set. Only one of the fields can be set.",
+          static_cast<int>(name.size()), name.data());
+      return fit::as_error(fdf::wire::NodeError::kUnsupportedArgs);
+    }
+
+    properties.reserve(arg_deprecated_properties->size());
+    for (auto& property : arg_deprecated_properties.value()) {
       if (property.key().Which() == fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue) {
         LOGF(ERROR,
              "Failed to add Node '%.*s'. Found integer-based key %zu which is no longer supported.",

@@ -36,9 +36,9 @@ impl DurationScope {
 #[cfg(not(target_os = "fuchsia"))]
 impl std::ops::Drop for DurationScope {
     fn drop(&mut self) {
-        tracing::trace!(
-            name = self.name.to_string_lossy().to_string(),
-            duration = self.start.elapsed().as_nanos() as u64,
+        log::trace!(
+            name = self.name.to_string_lossy().to_string().as_str(),
+            duration = self.start.elapsed().as_nanos() as u64;
             "DURATION_NANOS"
         );
     }

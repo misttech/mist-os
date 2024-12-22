@@ -11,12 +11,12 @@ use fuchsia_async as fasync;
 use futures::future::{abortable, AbortHandle};
 use futures::prelude::*;
 use futures::TryStreamExt;
+use log::{debug, error};
 use std::sync::{Arc, Weak};
 use test_runners_lib::cases::TestCaseInfo;
 use test_runners_lib::elf::{Component, EnumeratedTestCases, KernelError, SuiteServer};
 use test_runners_lib::errors::*;
 use test_runners_lib::logs::SocketLogWriter;
-use tracing::{debug, error};
 
 /// Implements `fuchsia.test.Suite` and runs provided test.
 #[derive(Default)]

@@ -354,12 +354,13 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
       fidl::Arena arena;
       // AFBC does not use canvas.
       uint64_t offset = collection_info.buffers().at(index).vmo_usable_start();
-      size_t size = fbl::round_up(
-          ImageFormatImageSize(
-              ImageConstraintsToFormat(arena, collection_info.settings().image_format_constraints(),
-                                       image_metadata->width, image_metadata->height)
-                  .value()),
-          ZX_PAGE_SIZE);
+      size_t size =
+          fbl::round_up(ImageFormatImageSize(
+                            ImageConstraintsToFormat(
+                                arena, collection_info.settings().image_format_constraints(),
+                                image_metadata->dimensions.width, image_metadata->dimensions.height)
+                                .value()),
+                        ZX_PAGE_SIZE);
       zx_paddr_t paddr;
       zx_status_t status =
           bti_.pin(ZX_BTI_PERM_READ | ZX_BTI_CONTIGUOUS, collection_info.buffers().at(index).vmo(),
@@ -369,21 +370,21 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
         return status;
       }
       import_info->paddr = paddr;
-      import_info->image_height = image_metadata->height;
-      import_info->image_width = image_metadata->width;
+      import_info->image_height = image_metadata->dimensions.height;
+      import_info->image_width = image_metadata->dimensions.width;
       import_info->is_afbc = true;
     } break;
     case fuchsia_images2::wire::PixelFormatModifier::kLinear:
     case fuchsia_images2::wire::PixelFormatModifier::kArmLinearTe: {
       uint32_t minimum_row_bytes;
       if (!ImageFormatMinimumRowBytes(collection_info.settings().image_format_constraints(),
-                                      image_metadata->width, &minimum_row_bytes)) {
-        FDF_LOG(ERROR, "Invalid image width %d for collection", image_metadata->width);
+                                      image_metadata->dimensions.width, &minimum_row_bytes)) {
+        FDF_LOG(ERROR, "Invalid image width %d for collection", image_metadata->dimensions.width);
         return ZX_ERR_INVALID_ARGS;
       }
 
       fuchsia_hardware_amlogiccanvas::wire::CanvasInfo canvas_info;
-      canvas_info.height = image_metadata->height;
+      canvas_info.height = image_metadata->dimensions.height;
       canvas_info.stride_bytes = minimum_row_bytes;
       canvas_info.blkmode = fuchsia_hardware_amlogiccanvas::CanvasBlockMode::kLinear;
       canvas_info.endianness = fuchsia_hardware_amlogiccanvas::CanvasEndianness();
@@ -407,8 +408,8 @@ zx_status_t DisplayEngine::DisplayEngineImportImage(const image_metadata_t* imag
 
       import_info->canvas = canvas_.client_end();
       import_info->canvas_idx = result->value()->canvas_idx;
-      import_info->image_height = image_metadata->height;
-      import_info->image_width = image_metadata->width;
+      import_info->image_height = image_metadata->dimensions.height;
+      import_info->image_width = image_metadata->dimensions.width;
       import_info->is_afbc = false;
     } break;
     default:
@@ -512,10 +513,10 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     if (layer.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
-    if (layer.image_metadata.width != width) {
+    if (layer.image_metadata.dimensions.width != width) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
-    if (layer.image_metadata.height != height) {
+    if (layer.image_metadata.dimensions.height != height) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     if (memcmp(&layer.display_destination, &display_area, sizeof(rect_u_t)) != 0) {

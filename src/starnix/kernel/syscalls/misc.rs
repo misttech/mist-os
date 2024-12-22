@@ -461,3 +461,47 @@ pub fn sys_perf_event_open(
     track_stub!(TODO("https://fxbug.dev/287120583"), "perf_event_open()");
     error!(ENOSYS)
 }
+
+// Syscalls for arch32 usage
+#[cfg(feature = "arch32")]
+mod arch32 {
+    use crate::mm::MemoryAccessorExt;
+    use crate::syscalls::misc::do_uname;
+    use crate::task::CurrentTask;
+    use starnix_sync::{Locked, Unlocked};
+    use starnix_uapi::errors::Errno;
+    use starnix_uapi::uapi;
+    use starnix_uapi::user_address::UserRef;
+
+    pub fn sys_arch32_uname(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        name: UserRef<uapi::arch32::oldold_utsname>,
+    ) -> Result<(), Errno> {
+        fn trunc(val64: &[u8; 65], val32: &mut [u8; 9]) {
+            val32.copy_from_slice(&val64[..9]);
+            val32[8] = 0;
+        }
+        let mut new_result = uapi::utsname {
+            sysname: [0; 65],
+            nodename: [0; 65],
+            release: [0; 65],
+            version: [0; 65],
+            machine: [0; 65],
+            domainname: [0; 65],
+        };
+        do_uname(locked, current_task, &mut new_result)?;
+        let mut old_result: uapi::arch32::oldold_utsname = Default::default();
+        trunc(&new_result.sysname, &mut old_result.sysname);
+        trunc(&new_result.nodename, &mut old_result.nodename);
+        trunc(&new_result.release, &mut old_result.release);
+        trunc(&new_result.version, &mut old_result.version);
+        let arch32_mach: &str = "armv7l\0\0\0";
+        old_result.machine.copy_from_slice(arch32_mach.as_bytes());
+        current_task.write_object(name, &old_result)?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "arch32")]
+pub use arch32::*;

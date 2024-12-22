@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("cipd_utils_test") {
-    enable_mypy = true
     main_source = "cipd_utils_test.py"
     sources = [ "cipd_utils.py" ]
   }

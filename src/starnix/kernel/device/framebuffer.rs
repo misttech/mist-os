@@ -106,12 +106,13 @@ impl Framebuffer {
             }))
         } else {
             let memory_len = info.xres * info.yres * (info.bits_per_pixel / 8);
-            let memory = Arc::new(MemoryObject::from(zx::Vmo::create(memory_len as u64).map_err(
-                |s| match s {
+            let memory = Arc::new(
+                MemoryObject::from(zx::Vmo::create(memory_len as u64).map_err(|s| match s {
                     zx::Status::NO_MEMORY => errno!(ENOMEM),
                     _ => impossible_error(s),
-                },
-            )?));
+                })?)
+                .with_zx_name(b"starnix:framebuffer"),
+            );
             Ok(Arc::new(Self {
                 memory,
                 memory_len,

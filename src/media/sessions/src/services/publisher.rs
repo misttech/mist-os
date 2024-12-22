@@ -10,8 +10,8 @@ use fidl_fuchsia_media_sessions2::*;
 use fuchsia_inspect as inspect;
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 
 const LOG_TAG: &str = "publisher";
 
@@ -56,7 +56,7 @@ impl Publisher {
                     }
                 }
                 Err(e) => {
-                    warn!(tag = LOG_TAG, "A request to publish a player was invalid: {:?}", e);
+                    warn!(tag = LOG_TAG; "A request to publish a player was invalid: {:?}", e);
                 }
             }
         }

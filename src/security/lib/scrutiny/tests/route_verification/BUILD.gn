@@ -221,7 +221,6 @@ if (is_host) {
   }
 
   python_binary("test_route_verification_bin") {
-    enable_mypy = true
     main_source = "test_route_verification.py"
   }
 

@@ -58,6 +58,9 @@ public:
 {{- range .AnonymousChildren }}
   using {{ .ScopedName }} = {{ .FlattenedName }};
 {{- end }}
+  {{- if .Serializable.IsSerializable }}
+  static constexpr char kSerializableName[] = "{{ .Serializable.Name }}";
+  {{- end }}
   {{ .Name }}() = default;
   {{ .Name }}(const {{ .Name }}& other) noexcept = default;
   {{ .Name }}& operator=(const {{ .Name }}& other) noexcept = default;

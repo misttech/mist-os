@@ -86,6 +86,9 @@ def _fuchsia_board_configuration_impl(ctx):
     if hardware_info != {}:
         board_config["hardware_info"] = hardware_info
 
+    if ctx.attr.tee_trusted_app_guids:
+        board_config["tee_trusted_app_guids"] = ctx.attr.tee_trusted_app_guids
+
     # Files from board_input_bundles have paths that are relative to root,
     # prefix "../"s to make them relative to the output board config.
     board_config_relative_to_root = "../" * board_config_file.path.count("/")
@@ -101,6 +104,10 @@ def _fuchsia_board_configuration_impl(ctx):
     if ctx.attr.devicetree:
         board_files.append(ctx.file.devicetree)
         board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
+
+    if ctx.attr.devicetree_overlay:
+        board_files.append(ctx.file.devicetree_overlay)
+        board_config["devicetree_overlay"] = board_config_relative_to_root + ctx.file.devicetree_overlay.path
 
     args = []
     if ctx.attr.post_processing_script:
@@ -195,6 +202,10 @@ _fuchsia_board_configuration = rule(
             doc = "Devicetree binary (.dtb) file",
             allow_single_file = True,
         ),
+        "devicetree_overlay": attr.label(
+            doc = "Devicetree binary overlay (.dtbo) file",
+            allow_single_file = True,
+        ),
         "post_processing_script": attr.label(
             doc = "The post processing script to be included into the board configuration",
             providers = [FuchsiaPostProcessingScriptInfo],
@@ -206,6 +217,10 @@ _fuchsia_board_configuration = rule(
         "kernel": attr.string(
             doc = "The kernel related configuration provided by the board.",
             default = "{}",
+        ),
+        "tee_trusted_app_guids": attr.string_list(
+            doc = "GUIDs for the TAs provided by this board's TEE driver.",
+            default = [],
         ),
         "_establish_board_config_dir": attr.label(
             default = "//fuchsia/tools:establish_board_config_dir",

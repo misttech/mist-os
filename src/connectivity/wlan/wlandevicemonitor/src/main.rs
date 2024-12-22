@@ -107,5 +107,7 @@ async fn main() -> Result<(), Error> {
     )
     .await?;
     error!("Exiting");
-    Ok(())
+    // wlandevicemonitor should never exit. Return an error to trigger device reboot via the
+    // component's `on_terminate: "reboot"` setting.
+    Err(anyhow::anyhow!("Exiting"))
 }

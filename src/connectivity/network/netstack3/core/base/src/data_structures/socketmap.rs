@@ -364,7 +364,7 @@ impl<'a, A: Debug + Eq + Hash, V: Tagged<A>> Debug for OccupiedEntry<'a, A, V> {
 }
 
 impl<T: Eq, const INLINE_SIZE: usize> DescendantCounts<T, INLINE_SIZE> {
-    const ONE: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(1));
+    const ONE: NonZeroUsize = NonZeroUsize::new(1).unwrap();
 
     /// Increments the count for the given tag.
     fn increment(&mut self, tag: T) {

@@ -33,7 +33,7 @@ constexpr std::string_view kBuiltinSemantics =
     "  }\n"
     "}\n"
     "library fuchsia.unknown {\n"
-    "  Cloneable::Clone2 {\n"
+    "  Cloneable::Clone {\n"
     "    request.request = handle : 'cloned';\n"
     "  }\n"
     "}\n";

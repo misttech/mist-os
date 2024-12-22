@@ -14,12 +14,12 @@ use fidl_fuchsia_stresstest::{ActorMarker, ActorProxy, Error};
 use fuchsia_async::{Task, TimeoutExt};
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use futures::FutureExt;
+use log::{debug, info};
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use std::str::FromStr;
 use std::time::Duration;
-use tracing::{debug, info};
 
 /// Stress tests assume that this collection exists and actors can be created in it.
 static ACTOR_COLLECTION_NAME: &'static str = "actors";

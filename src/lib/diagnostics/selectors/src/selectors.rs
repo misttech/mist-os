@@ -327,12 +327,7 @@ pub fn match_tree_name_against_selector(tree_name: &str, selector: &Selector) ->
 
         Some(TreeNames::Some(filters)) => filters.iter().any(|f| f == tree_name),
 
-        // TODO(https://fxbug.dev/355732696): None for name filter
-        // should use fidl_fuchsia_inspect::DEFAULT_TREE_NAME as an implicit
-        // filter value. This has to be done after tests relying on the current
-        // behavior where a bare selector matches all trees (mainly driver
-        // manager) have been updated to specify tree names or [...].
-        None => true,
+        None => tree_name == DEFAULT_TREE_NAME,
 
         Some(TreeNames::__SourceBreaking { .. }) => false,
     }

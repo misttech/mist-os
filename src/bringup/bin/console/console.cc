@@ -31,7 +31,7 @@ Console::Console(async_dispatcher_t* dispatcher, zx::eventpair event1, zx::event
 
 Console::~Console() { rx_thread_.join(); }
 
-void Console::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+void Console::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
   fidl::BindServer(dispatcher_,
                    fidl::ServerEnd<fuchsia_hardware_pty::Device>(request->request.TakeChannel()),
                    static_cast<fidl::WireServer<fuchsia_hardware_pty::Device>*>(this));

@@ -203,6 +203,8 @@ impl<DirectoryType: MutableDirectory> MutableConnection<DirectoryType> {
     }
 
     fn handle_get_token(this: Pin<&Tokenizable<Self>>) -> Result<Handle, Status> {
+        // GetToken exists to support linking, so we must make sure the connection has the
+        // permission to modify the directory.
         if !this.base.options.rights.contains(fio::Rights::MODIFY_DIRECTORY) {
             return Err(Status::BAD_HANDLE);
         }

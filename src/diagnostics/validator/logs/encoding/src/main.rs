@@ -12,7 +12,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
-use tracing::*;
+use log::*;
 
 type TestCase = (&'static str, Record, Vec<u8>);
 

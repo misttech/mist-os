@@ -70,7 +70,7 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
             util::add_build_type_config_data("cobalt", context, builder)?;
             if let Some(api_key) = &config.cobalt.api_key {
                 builder.package("cobalt").config_data(FileEntry {
-                    source: api_key.clone(),
+                    source: api_key.clone().into(),
                     destination: "api_key.hex".into(),
                 })?;
             }

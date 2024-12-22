@@ -5,7 +5,6 @@
 import("//build/python/python_binary.gni")
 
 python_binary("bin") {
-  enable_mypy = true
   main_source = "main.py"
   output_name = "main.pyz"
   deps = [ "//build/python/tests/lib" ]

@@ -99,7 +99,7 @@ pub(crate) async fn serve_client_provider(
                                 control_handle
                                     .send_on_exit(ClientExitReason::ClientAlreadyExistsOnInterface)
                                     .unwrap_or_else(|e| {
-                                        tracing::error!(
+                                        log::error!(
                                             "FIDL error while sending on_exit event: {:?}",
                                             e
                                         );
@@ -117,7 +117,7 @@ pub(crate) async fn serve_client_provider(
                     let mac = match provider.get_mac().await {
                         Ok(mac) => mac,
                         Err(e) => {
-                            tracing::warn!("error while getting MAC address: {:?}", e);
+                            log::warn!("error while getting MAC address: {:?}", e);
                             control_handle
                                 .send_on_exit({
                                     match e {
@@ -134,10 +134,7 @@ pub(crate) async fn serve_client_provider(
                                     }
                                 })
                                 .unwrap_or_else(|e| {
-                                    tracing::error!(
-                                        "FIDL error while sending on_exit event: {:?}",
-                                        e
-                                    );
+                                    log::error!("FIDL error while sending on_exit event: {:?}", e);
                                 });
                             return Ok(());
                         }
@@ -154,23 +151,23 @@ pub(crate) async fn serve_client_provider(
                     .await
                     .unwrap_or_else(|error| match error {
                         crate::client::Error::Exit(reason) => {
-                            tracing::info!(
+                            log::info!(
                                 "(interface_id = {interface_id}) client exiting: {:?}",
                                 reason
                             );
                             control_handle.send_on_exit(reason).unwrap_or_else(|e| {
-                                tracing::error!("FIDL error while sending on_exit event: {:?}", e);
+                                log::error!("FIDL error while sending on_exit event: {:?}", e);
                             });
                         }
                         crate::client::Error::Fidl(e) => {
                             if e.is_closed() {
-                                tracing::warn!("Channel closed while serving client: {:?}", e);
+                                log::warn!("Channel closed while serving client: {:?}", e);
                             } else {
-                                tracing::error!("FIDL error while serving client: {:?}", e);
+                                log::error!("FIDL error while serving client: {:?}", e);
                             }
                         }
                         crate::client::Error::Core(e) => {
-                            tracing::warn!("error while serving client: {:?}", e);
+                            log::warn!("error while serving client: {:?}", e);
                         }
                     });
                     Ok(())

@@ -33,39 +33,6 @@ paver_targets = [
   },
 ]
 
-if (enable_netboot) {
-  paver_targets += [
-    {
-      name = "netboot-script"
-      outputs = [ "$root_build_dir/netboot.sh" ]
-      switch = "--netboot="
-      extra_bootserver_arguments = ""
-
-      deps = [ "//build/images/tools:bootserver" ]
-
-      # TODO(https://fxbug.dev/42123048): The build graph for "bringup" (use_bringup_assembly) MUST only
-      # contain one zircon-a metadata target, which means that anything
-      # reaching fuchsia.zbi must be excluded from the build graph.
-      if (use_bringup_assembly) {
-        deps += [ "//build/images/bringup" ]
-      } else {
-        deps += [ "//build/images/fuchsia:netboot" ]
-      }
-      metadata = {
-        images = [
-          {
-            label = get_label_info(":$name", "label_with_toolchain")
-            name = name
-            path = "netboot.sh"
-            type = "script"
-          },
-        ]
-        image_paths = [ "IMAGE_NETBOOT_SH=netboot.sh" ]
-      }
-    },
-  ]
-}
-
 if (recovery_is_zedboot) {
   paver_targets += [
     {

@@ -4,8 +4,7 @@
 
 """A test which verifies that driver binaries are built correctly. """
 
-load("@fuchsia_sdk//fuchsia/private:fuchsia_debug_symbols.bzl", "FUCHSIA_DEBUG_SYMBOLS_ATTRS", "strip_resources")
-load("@fuchsia_sdk//fuchsia/private:fuchsia_transition.bzl", "fuchsia_transition")
+load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FUCHSIA_DEBUG_SYMBOLS_ATTRS", "fuchsia_transition", "strip_resources")
 load("//test_utils:py_test_utils.bzl", "PY_TOOLCHAIN_DEPS", "create_python3_shell_wrapper_provider")
 
 def _driver_binary_test_impl(ctx):

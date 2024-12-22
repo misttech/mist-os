@@ -6,7 +6,7 @@ group("drivers") {
   testonly = true
   deps = [
     "drivers/dwc2",
-    "drivers/dwc3",
+    "drivers/dwc3:bazel_package",
     "drivers/usb-bus",
     "drivers/usb-composite",
     "drivers/usb-hub",

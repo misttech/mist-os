@@ -85,6 +85,29 @@ bool TransformGraph::RemoveChild(TransformHandle parent, TransformHandle child) 
   return false;
 }
 
+bool TransformGraph::ReplaceChildren(TransformHandle parent,
+                                     const std::vector<TransformHandle>& new_children) {
+  FX_DCHECK(is_valid_);
+  FX_DCHECK(working_set_.count(parent));
+
+  std::unordered_set<TransformHandle> unique_children;
+  unique_children.reserve(new_children.size());
+  for (auto child : new_children) {
+    auto res = unique_children.insert(child);
+    // Do not allow duplicate handles in `new_children`.
+    if (!res.second) {
+      return false;
+    }
+  }
+  ClearChildren(parent);
+  for (auto child : unique_children) {
+    children_.insert({{parent, NORMAL}, child});
+    FLATLAND_VERBOSE_LOG << "TransformGraph::ReplaceChildren(" << parent << ", [.., " << child
+                         << ", ..]): success!";
+  }
+  return true;
+}
+
 void TransformGraph::SetPriorityChild(TransformHandle parent, TransformHandle child) {
   FX_DCHECK(is_valid_);
   FX_DCHECK(working_set_.count(parent));

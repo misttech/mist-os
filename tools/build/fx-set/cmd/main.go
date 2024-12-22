@@ -119,7 +119,7 @@ func mainImpl(ctx context.Context) error {
 			fmt.Printf("Unable to determine RBE access, assuming False.")
 			canUseRbe = false
 		}
-		staticSpec, err = constructStaticSpec(ctx, fx, args.checkoutDir, args, canUseRbe)
+		staticSpec, err = constructStaticSpec(args.checkoutDir, args, canUseRbe)
 		if err != nil {
 			return err
 		}
@@ -191,6 +191,7 @@ type setArgs struct {
 	includeClippy bool
 
 	isRelease        bool
+	isBalanced       bool
 	netboot          bool
 	cargoTOMLGen     bool
 	jsonIDEScripts   []string
@@ -251,7 +252,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.StringVar(&cmd.mainPbLabel, "main-pb", "", "")
 
 	flagSet.BoolVar(&cmd.isRelease, "release", false, "")
-	flagSet.BoolVar(&cmd.netboot, "netboot", false, "")
+	flagSet.BoolVar(&cmd.isBalanced, "balanced", false, "")
 	flagSet.BoolVar(&cmd.cargoTOMLGen, "cargo-toml-gen", false, "")
 	flagSet.StringSliceVar(&cmd.jsonIDEScripts, "json-ide-script", []string{}, "")
 	flagSet.StringSliceVar(&cmd.universePackages, "with", []string{}, "")
@@ -336,6 +337,8 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		nameComponents = append(nameComponents, cmd.variants...)
 		if cmd.isRelease {
 			nameComponents = append(nameComponents, "release")
+		} else if cmd.isBalanced {
+			nameComponents = append(nameComponents, "balanced")
 		}
 		cmd.buildDir = filepath.Join("out", strings.Join(nameComponents, "-"))
 	}
@@ -348,7 +351,7 @@ func rbeIsSupported() bool {
 	return (runtime.GOOS == "linux") && (runtime.GOARCH == "amd64")
 }
 
-func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, args *setArgs, canUseRbe bool) (*fintpb.Static, error) {
+func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fintpb.Static, error) {
 	productPath, err := findGNIFile(checkoutDir, "products", args.product)
 	if err != nil {
 		productPath, err = findGNIFile(checkoutDir, filepath.Join("products", "tests"), args.product)
@@ -361,9 +364,15 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		return nil, fmt.Errorf("no such board: %q", args.board)
 	}
 
-	optimize := fintpb.Static_DEBUG
+	compilationMode := fintpb.Static_COMPILATION_MODE_DEBUG
 	if args.isRelease {
-		optimize = fintpb.Static_RELEASE
+		if args.isBalanced {
+			return nil, fmt.Errorf("Only one of --release and --balanced can be specified.")
+		}
+		compilationMode = fintpb.Static_COMPILATION_MODE_RELEASE
+
+	} else if args.isBalanced {
+		compilationMode = fintpb.Static_COMPILATION_MODE_BALANCED
 	}
 
 	variants := args.variants
@@ -445,10 +454,6 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		gnArgs = append(gnArgs, fmt.Sprintf("bazel_upload_build_events = \"%s\"", args.buildEventService))
 	}
 
-	if args.netboot {
-		gnArgs = append(gnArgs, "enable_netboot=true")
-	}
-
 	if args.includeClippy {
 		gnArgs = append(gnArgs, "include_clippy=true")
 	}
@@ -462,7 +467,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		Board:               boardPath,
 		Product:             productPath,
 		MainPbLabel:         args.mainPbLabel,
-		Optimize:            optimize,
+		CompilationMode:     compilationMode,
 		BasePackages:        args.basePackages,
 		CachePackages:       args.cachePackages,
 		UniversePackages:    args.universePackages,

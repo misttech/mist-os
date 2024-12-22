@@ -56,7 +56,7 @@ class ZxcryptInspect : public gtest::RealLoopFixture {
 
     return fpromise::make_ok_promise(
                std::unique_ptr<ArchiveReader>(new ArchiveReader(
-                   dispatcher(), {SanitizeMonikerForSelectors(moniker) + ":root"})))
+                   dispatcher(), {SanitizeMonikerForSelectors(moniker) + ":[name=zxcrypt]root"})))
         .and_then([moniker = std::move(moniker)](std::unique_ptr<ArchiveReader>& reader) {
           return reader->SnapshotInspectUntilPresent({moniker}).then(
               [](fpromise::result<std::vector<diagnostics::reader::InspectData>, std::string>&

@@ -20,6 +20,10 @@ class {{ .Name }} {
  private:
   struct Storage_;
  public:
+  {{ if .Serializable.IsSerializable }}
+  static constexpr char kSerializableName[] = "{{ .Serializable.Name }}";
+  {{ end -}}
+
   {{ .Name }}(Storage_ storage) noexcept;
 
   {{- if len .Members }}

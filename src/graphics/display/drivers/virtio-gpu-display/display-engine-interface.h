@@ -6,10 +6,12 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_DISPLAY_ENGINE_INTERFACE_H_
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 
 #include <cstdint>
 
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
@@ -19,6 +21,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace virtio_display {
 
@@ -60,11 +63,12 @@ class DisplayEngineInterface {
   // Returns true if the configuration is acceptable to the driver. If false,
   // `layer_composition_operations` must be set to a sequence of operations that
   // are likely to yield an acceptable configuration.
-  virtual bool CheckConfiguration(
-      display::DisplayId display_id, cpp20::span<const display::DriverLayer> layers,
+  virtual display::ConfigCheckResult CheckConfiguration(
+      display::DisplayId display_id, display::ModeId display_mode_id,
+      cpp20::span<const display::DriverLayer> layers,
       cpp20::span<display::LayerCompositionOperations> layer_composition_operations) = 0;
 
-  virtual void ApplyConfiguration(display::DisplayId display_id,
+  virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                                   cpp20::span<const display::DriverLayer> layers,
                                   display::ConfigStamp config_stamp) = 0;
 

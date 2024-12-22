@@ -11,7 +11,7 @@ use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_REA
 
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::FsStr;
-use starnix_logging::{log_debug, log_error, log_info, log_warn};
+use starnix_logging::{log_debug, log_error, log_info, log_warn, with_zx_name};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -52,7 +52,10 @@ impl Pager {
             })?,
             port: zx::Port::create(),
             files_by_inode: Mutex::new(HashMap::new()),
-            zero_vmo: zx::Vmo::create(ZERO_VMO_SIZE).map_err(|_| errno!(EINVAL))?,
+            zero_vmo: with_zx_name(
+                zx::Vmo::create(ZERO_VMO_SIZE).map_err(|_| errno!(EINVAL))?,
+                b"starnix:ext4",
+            ),
         })
     }
 
@@ -113,8 +116,10 @@ impl Pager {
     /// Dedicated thread responsible for listening on port and supplying pages as needed.
     /// More than one pager thread can be running concurrently.
     pub fn run_pager_thread(&self) {
-        let transfer_vmo =
-            zx::Vmo::create(TRANSFER_VMO_SIZE).expect("unable to create transfer vmo");
+        let transfer_vmo = with_zx_name(
+            zx::Vmo::create(TRANSFER_VMO_SIZE).expect("unable to create transfer vmo"),
+            b"starnix:ext4",
+        );
         let transfer_vmo_addr = fuchsia_runtime::vmar_root_self()
             .map(
                 0,

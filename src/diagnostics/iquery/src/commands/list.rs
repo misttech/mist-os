@@ -69,12 +69,6 @@ impl Serialize for ListResultItem {
 #[derive(Serialize)]
 pub struct ListResult(Vec<ListResultItem>);
 
-impl ListResult {
-    pub(crate) fn into_inner(self) -> Vec<ListResultItem> {
-        self.0
-    }
-}
-
 impl fmt::Display for ListResult {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for item in self.0.iter() {
@@ -104,18 +98,10 @@ fn components_from_inspect_data(
 }
 
 pub fn list_response_items(
-    manifest: Option<&str>,
     with_url: bool,
     components: impl Iterator<Item = ListResultItem>,
 ) -> Vec<ListResultItem> {
     components
-        .filter(|result| match manifest {
-            None => true,
-            Some(manifest) => match result {
-                ListResultItem::Moniker(_) => true,
-                ListResultItem::MonikerWithUrl(url) => url.component_url.contains(manifest),
-            },
-        })
         .map(|result| {
             if with_url {
                 result
@@ -137,10 +123,6 @@ pub fn list_response_items(
 #[derive(Default, ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "list")]
 pub struct ListCommand {
-    #[argh(option)]
-    /// DEPRECATED: use `--component` instead.
-    pub manifest: Option<String>,
-
     #[argh(option)]
     /// a fuzzy-search query. May include URL, moniker, or manifest fragments.
     /// a fauzzy-search query for the component we are interested in. May include URL, moniker, or
@@ -169,32 +151,17 @@ impl Command for ListCommand {
     type Result = ListResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        let (inspect, manifest) = if self.manifest.is_some() {
-            eprintln!(
-                "WARNING: --manifest is DEPRECATED and will be removed soon. Please use --component only."
-            );
-            if self.component.is_some() {
-                eprintln!("WARNING: --component ignored due to usage of deprecated --manifest. Please use --component only.")
-            }
-            let inspect =
-                provider.snapshot::<Inspect>(self.accessor.as_deref(), std::iter::empty()).await?;
-            (inspect, self.manifest)
+        let mut selectors = if let Some(query) = self.component {
+            let instances = find_components(provider.realm_query(), &query).await?;
+            instances_to_root_selectors(instances)?
         } else {
-            let mut selectors = if let Some(query) = self.component {
-                let instances = find_components(provider.realm_query(), &query).await?;
-                instances_to_root_selectors(instances)?
-            } else {
-                vec![]
-            };
-            utils::ensure_tree_field_is_set(&mut selectors, None)?;
-            let inspect = provider
-                .snapshot::<Inspect>(self.accessor.as_deref(), selectors.into_iter())
-                .await?;
-            (inspect, None)
+            vec![]
         };
-
+        utils::ensure_tree_field_is_set(&mut selectors, None)?;
+        let inspect =
+            provider.snapshot::<Inspect>(self.accessor.as_deref(), selectors.into_iter()).await?;
         let components = components_from_inspect_data(inspect);
-        let results = list_response_items(manifest.as_deref(), self.with_url, components);
+        let results = list_response_items(self.with_url, components);
         Ok(ListResult(results))
     }
 }

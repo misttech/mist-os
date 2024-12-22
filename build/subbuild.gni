@@ -6,6 +6,7 @@ import("//build/config/compiler.gni")
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/config/jobserver.gni")
 import("//build/sdk/config.gni")
+import("//build/testing/config.gni")
 import("//sdk/config.gni")
 
 # Create a GN directory, and build a target label for a particular
@@ -144,6 +145,10 @@ template("subbuild") {
         "--api-level-path",
         rebase_path(_build_dir, root_build_dir) + invoker.api_level_path,
       ]
+    }
+
+    if (update_goldens) {
+      args += [ "--update-goldens" ]
     }
 
     # If jobserver mode is not enabled, limit the number of concurrent

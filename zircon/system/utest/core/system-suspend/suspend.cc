@@ -80,7 +80,7 @@ TEST(SystemSuspend, TimeoutIsPast) {
   const zx::result resource_result = GetSystemCpuResource();
   ASSERT_OK(resource_result.status_value());
 
-  const zx::time almost_now = zx::clock::get_monotonic() - zx::nsec(1);
+  const zx::time_boot almost_now = zx::clock::get_boot() - zx::nsec(1);
   EXPECT_EQ(ZX_ERR_TIMED_OUT, zx_system_suspend_enter(resource_result->get(), almost_now.get()));
   EXPECT_EQ(ZX_ERR_TIMED_OUT,
             zx_system_suspend_enter(resource_result->get(), ZX_TIME_INFINITE_PAST));
@@ -94,22 +94,17 @@ TEST(SystemSuspend, SuspendAndResumeByTimer) {
   ASSERT_OK(resource_result.status_value());
 
   // Avoid flakes due to VM pauses by using increasing resume durations until timeouts do not occur.
-  zx::time resume_at;
+  zx::time_boot resume_at;
   zx_status_t suspend_status;
   zx::duration suspend_duration = zx::sec(1);
   do {
-    resume_at = zx::clock::get_monotonic() + suspend_duration;
+    resume_at = zx::clock::get_boot() + suspend_duration;
     suspend_status = zx_system_suspend_enter(resource_result->get(), resume_at.get());
     suspend_duration *= 2;
   } while (suspend_status == ZX_ERR_TIMED_OUT);
 
   EXPECT_OK(suspend_status);
-
-  // TODO(https://fxbug.dev/328306129): This test observes that CLOCK_MONOTONIC advances past the
-  // resume_at time before the suspend call exits. When freezing CLOCK_MONOTONIC is implemented
-  // this test should fail, at which point this should be replaced with the equivalent CLOCK_BOOT
-  // call.
-  EXPECT_GT(zx::clock::get_monotonic(), resume_at);
+  EXPECT_GT(zx::clock::get_boot(), resume_at);
 }
 
 TEST(SystemSuspend, ConcurrentSuspend) {
@@ -144,7 +139,7 @@ TEST(SystemSuspend, ConcurrentSuspend) {
       const zx::duration suspend_duration = random.GetUniform(zx::msec(10), zx::sec(1));
 
       std::cout << "Suspend tester " << id << " attempt " << i << "...\n";
-      const zx::time resume_at = zx::clock::get_monotonic() + suspend_duration;
+      const zx::time_boot resume_at = zx::clock::get_boot() + suspend_duration;
       const zx_status_t suspend_status =
           zx_system_suspend_enter(resource_result->get(), resume_at.get());
       EXPECT_TRUE(suspend_status == ZX_OK || suspend_status == ZX_ERR_TIMED_OUT);

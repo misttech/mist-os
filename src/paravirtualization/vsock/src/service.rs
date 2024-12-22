@@ -34,7 +34,6 @@
 
 use crate::{addr, port};
 use anyhow::{format_err, Context as _};
-use const_unwrap::const_unwrap_option;
 use fidl::endpoints;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_hardware_vsock::{
@@ -58,8 +57,7 @@ use std::rc::Rc;
 use std::task::{Context, Poll};
 use thiserror::Error;
 
-const ZXIO_SIGNAL_INCOMING: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(SIGNAL_STREAM_INCOMING));
+const ZXIO_SIGNAL_INCOMING: zx::Signals = zx::Signals::from_bits(SIGNAL_STREAM_INCOMING).unwrap();
 
 type Cid = u32;
 type Port = u32;

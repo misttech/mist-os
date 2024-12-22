@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
     instance
         .root
         .get_exposed_dir()
-        .clone2(fidl::endpoints::ServerEnd::new(dir_server.into_channel()))
+        .clone(fidl::endpoints::ServerEnd::new(dir_server.into_channel()))
         .context("clone failed")?;
     fs.add_remote("realm_builder_exposed_dir", dir_client);
 

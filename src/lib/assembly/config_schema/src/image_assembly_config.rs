@@ -71,6 +71,10 @@ pub struct ImageAssemblyConfig {
     /// Devicetree binary to be added to zbi
     pub devicetree: Option<Utf8PathBuf>,
 
+    /// Devicetree binary overlay to be added to the update package and flashed
+    /// to a dedicated partition.
+    pub devicetree_overlay: Option<Utf8PathBuf>,
+
     /// How to generate the filesystem image.
     #[serde(default)]
     pub image_mode: FilesystemImageMode,
@@ -94,6 +98,7 @@ impl ImageAssemblyConfig {
             board_name: "my_board".into(),
             board_driver_arguments: None,
             devicetree: Some("path/to/devicetree/binary".into()),
+            devicetree_overlay: Some("path/to/devicetree/binary/overlay".into()),
             image_mode: Default::default(),
         }
     }

@@ -16,10 +16,10 @@ use async_trait::async_trait;
 use futures::future::{FutureExt, LocalBoxFuture};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
+use log::*;
 use serde_derive::Deserialize;
 use std::collections::HashMap;
 use std::rc::Rc;
-use tracing::*;
 use {fuchsia_async as fasync, serde_json as json};
 
 /// Node: ThermalShutdown

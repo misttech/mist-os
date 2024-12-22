@@ -364,15 +364,13 @@ impl RcsKnocker for LocalRcsKnockerImpl {
         target_spec: Option<String>,
         env: &EnvironmentContext,
     ) -> Result<(), KnockError> {
-        knock_target_daemonless(&target_spec, env, Some(DEFAULT_RCS_KNOCK_TIMEOUT)).await.map(
-            |compat| {
-                let msg = match compat {
-                    Some(c) => format!("Received compat info: {c:?}"),
-                    None => format!("No compat info received"),
-                };
-                tracing::debug!("Knocked target. {msg}");
-            },
-        )
+        knock_target_daemonless(&target_spec, env, None).await.map(|compat| {
+            let msg = match compat {
+                Some(c) => format!("Received compat info: {c:?}"),
+                None => format!("No compat info received"),
+            };
+            tracing::debug!("Knocked target. {msg}");
+        })
     }
 }
 
@@ -465,8 +463,10 @@ pub async fn knock_target_daemonless(
                 .await
                 .map_err(|e| KnockError::CriticalError(e.into()))?;
                 tracing::debug!("daemonless knock connection established");
-                let _ =
-                    conn.rcs_proxy().await.map_err(|e| KnockError::NonCriticalError(e.into()))?;
+                let _ = conn
+                    .rcs_proxy_fdomain()
+                    .await
+                    .map_err(|e| KnockError::NonCriticalError(e.into()))?;
                 conn
             }
         };
@@ -490,7 +490,7 @@ pub async fn knock_target_daemonless(
 /// an explicit _name_ is provided.  In other contexts, it is valid for the specifier
 /// to be a substring, a network address, etc.
 pub async fn get_target_specifier(context: &EnvironmentContext) -> Result<Option<String>> {
-    let target_spec = context.get(TARGET_DEFAULT_KEY)?;
+    let target_spec = context.get_optional(TARGET_DEFAULT_KEY)?;
     match target_spec {
         Some(ref target) => info!("Target specifier: ['{target:?}']"),
         None => debug!("No target specified"),

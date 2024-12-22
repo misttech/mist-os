@@ -178,7 +178,7 @@ async fn clone2_file() {
         .unwrap();
 
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-    file.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    file.clone(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_eq!(
         clone_proxy.get_connection_info().await.unwrap(),
         fio::ConnectionInfo {
@@ -212,7 +212,7 @@ async fn clone2_file_node_reference() {
 
     // fuchsia.unknown/Cloneable.Clone2
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-    node.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    node.clone(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_eq!(
         clone_proxy.get_connection_info().await.unwrap(),
         fio::ConnectionInfo { rights: Some(fio::Rights::GET_ATTRIBUTES), ..Default::default() }
@@ -242,7 +242,7 @@ async fn clone2_directory() {
         .unwrap();
 
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-    dir.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    dir.clone(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_eq!(
         clone_proxy.get_connection_info().await.unwrap(),
         fio::ConnectionInfo { rights: Some(fio::Rights::TRAVERSE), ..Default::default() }
@@ -271,7 +271,7 @@ async fn clone2_directory_node_reference() {
 
     // fuchsia.unknown/Cloneable.Clone2
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-    node.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    node.clone(ServerEnd::new(clone_server.into_channel())).unwrap();
     assert_eq!(
         clone_proxy.get_connection_info().await.unwrap(),
         fio::ConnectionInfo { rights: Some(fio::Rights::GET_ATTRIBUTES), ..Default::default() }

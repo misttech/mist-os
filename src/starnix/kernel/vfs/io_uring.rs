@@ -618,7 +618,7 @@ impl IoUringFileObject {
         };
 
         let object = Box::new(IoUringFileObject { queue, registered_buffers: Default::default() });
-        Ok(Anon::new_file(current_task, object, OpenFlags::RDWR))
+        Ok(Anon::new_file(current_task, object, OpenFlags::RDWR, "[io_uring]"))
     }
 
     pub fn register_buffers(&self, buffers: UserBuffers) {

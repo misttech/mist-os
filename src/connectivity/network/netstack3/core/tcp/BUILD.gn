@@ -29,7 +29,6 @@ rustc_library_with_features("netstack3-tcp") {
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/lib/explicit",
     "//src/connectivity/network/netstack3/core/lock-order",
-    "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//src/lib/replace-with",

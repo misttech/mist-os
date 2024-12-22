@@ -170,9 +170,9 @@ TEST_F(HidDriverTest, BootMouseTest) {
     auto response = client->ReadReport();
     ASSERT_TRUE(response.ok());
     ASSERT_TRUE(response->is_ok());
-    ASSERT_EQ(response.value()->report.buf().count(), sizeof(test_report));
+    ASSERT_EQ(response.value()->buf().count(), sizeof(test_report));
 
-    memcpy(&test_report, response.value()->report.buf().data(), sizeof(test_report));
+    memcpy(&test_report, response.value()->buf().data(), sizeof(test_report));
     ASSERT_EQ(mouse_report.rel_x, test_report.rel_x);
     ASSERT_EQ(mouse_report.rel_y, test_report.rel_y);
   }

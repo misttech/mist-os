@@ -43,6 +43,7 @@ cc_test_executable("web-touch-input-test-bin") {
     "//src/lib/fostr/fidl/fuchsia.ui.input",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/lib/timekeeper",
     "//src/ui/testing/util",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/zx",

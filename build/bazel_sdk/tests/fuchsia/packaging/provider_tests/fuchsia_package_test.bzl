@@ -5,7 +5,7 @@
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
-load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("@fuchsia_sdk//fuchsia:private_defs.bzl", "FuchsiaPackageInfo")
 load("//fuchsia/packaging:common_utils.bzl", "failure_test", "no_repo_default_api_level_failure_test", "unknown_override_api_level_failure_test", "unknown_repo_default_api_level_failure_test")
 load("//test_utils:make_file.bzl", "make_fake_component_manifest", "make_file")
 
@@ -345,7 +345,7 @@ def _test_api_levels():
 
     no_repo_default_api_level_failure_test(
         name = "failure_test_pkg_without_api_level_and_no_repo_default",
-        expected_failure_message = '\'pkg_without_api_level_for_test\' does not have a valid API level set. Valid API levels are ["',
+        expected_failure_message = '`@fuchsia_sdk//fuchsia:fuchsia_api_level` has not been set to an API level. Has an API level been specified for this target? Valid API levels are ["',
         target_under_test = ":pkg_without_api_level",
         tags = ["manual"],
     )
@@ -381,16 +381,10 @@ def fuchsia_package_test_suite(name, **kwargs):
             ":dependencies_test_single_driver",
             ":dependencies_test_composite",
             ":next_api_level",
-
-            # The scenario in this test currently succeeds because the SDK ignores API level status.
-            # TODO(https://fxbug.dev/354047162): Enable once the SDK respects API level status.
-            # ":failure_test_retired_api_level",
+            ":failure_test_retired_api_level",
             ":failure_test_unknown_numerical_api_level",
             ":failure_test_lowercase_next_api_level",
-
-            # This test fails as expected but during the transition, which avoids expect_failure.
-            # TODO(https://fxbug.dev/354047162): Enable once the error is not during the transition.
-            # ":failure_test_pkg_without_api_level_and_no_repo_default",
+            ":failure_test_pkg_without_api_level_and_no_repo_default",
             ":pkg_at_next_api_level_and_no_repo_default",
             ":pkg_at_next_api_level_and_unknown_repo_default",
             ":override_api_level_overrides_unknown_repo_default",

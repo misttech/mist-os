@@ -29,25 +29,24 @@ Records consist of a number of 8-byte words and are 8-byte aligned.
 The required metadata for a log record are a record type, the overall length of the record, and a
 timestamp. These are encoded in the first 16 bytes of a record:
 
-Note: For reference on how to read the bit field diagrams, see
-[Bitfield Diagram reference][bitfield-diagram].
-
+```mermaid
+---
+title: "Header"
+---
+packet-beta
+0-3: "type (9)"
+4-15: "size words"
+16-31: "reserved (0)"
+32-53: "reserved (0) (cont.)"
+54-63: "severity"
+64-95: "timestamp"
+96-127: "timestamp (cont)"
 ```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+-----------+-----------------------------------------------|
-| T | SizeWords | Reserved                            | Severity|
-|---------------------------------------------------------------|
-| TimestampNanos                                                |
-'---------------------------------------------------------------'
 
-T (type)       = {0,3}    must be 9
-SizeWords      = {4,15}   includes header word
-Reserved       = {16,55}  must be 0
-Severity       = {56,63}  severity of the log record
-TimestampNanos = {64,127}
-```
+Notes:
+
+- The "size words" field includes the header word.
+- The timestamp is in nanoseconds.
 
 Currently all records are expected to have type=9. This was chosen to mirror the [trace format] but
 may require a change before these records can be processed by tracing tools.
@@ -64,23 +63,29 @@ strings, which supports different types of arguments, and the values can have se
 Each argument has an 8-byte header, followed by the argument name, followed by the argument's value.
 The name is padded with zeroes to 8-byte alignment before the argument's content is written.
 
+```mermaid
+---
+title: "Argument header"
+---
+packet-beta
+0-3: "type"
+4-15: "size words"
+16-29: "name ref"
+30-31: "varies"
+32-63: "varies (cont.)"
+64-95: "name"
+96-127: "name"
+128-159: "name (cont.) (1+ words)"
 ```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+-----------+-----------------------------------------------|
-| T | SizeWords | NameRef     | Varies                          |
-|---------------------------------------------------------------|
-| Name (1+ words)                                               |
-'---------------------------------------------------------------'
 
-T (type)  = {0,3}           see table below
-SizeWords = {4,15}          includes header word
-NameRef   = {16,31}         string ref for the argument name
-Varies    = {32,63}         varies by argument type, must be 0 if unused
-NameLen   = 64*NameRef
-Name      = {64,64+NameLen} name of the argument, padded to 8-byte alignment
-```
+Notes:
+
+- The "size words" field includes the header word.
+- The "name ref" is a string ref for the argument name.
+- The "varies" section varies by argument type and must be 0 if unused.
+- The "name length" is "64 * nameref".
+- The "name" is the name of the argument, the total length (not in diagram) is
+  `namelen` and is padded to 8-byte alignment.
 
 The first 4 bits of the argument header determine which type the argument has:
 
@@ -96,75 +101,60 @@ T (type) | name
 
 Signed integers are appended after the argument name is terminated.
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+-----------+-----------------------------------------------|
-| 3 | SizeWords | NameRef     | Reserved                        |
-|---------------------------------------------------------------|
-| Name (1+ words)                                               |
-'---------------------------------------------------------------'
-| Value                                                         |
-'---------------------------------------------------------------'
-
-T (type)  = {0,3}                  must be 3
-SizeWords = {4,15}                 includes header word
-NameRef   = {16,31}                string ref for the argument name
-Reserved  = {32,63}                must be 0
-NameEnd   = 64+(64*NameRef)
-Name      = {64,NameEnd}           name of the argument, padded to 8-byte alignment
-Value     = {NameEnd+1,SizeWords*64}
+```mermaid
+---
+title: "Signed integer argument"
+---
+packet-beta
+0-3: "type (3)"
+4-15: "size words"
+16-29: "name ref"
+30-31: "reserved"
+32-63: "reserved"
+64-95: "name"
+96-127: "name (cont.) (1+ words)"
+128-159: "value"
+160-191: "value (cont.)"
 ```
 
 ### Unsigned 64-bit integer arguments
 
 Unsigned integers are appended after the argument name is terminated.
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+-----------+-----------------------------------------------|
-| 4 | SizeWords | NameRef     | Reserved                        |
-|---------------------------------------------------------------|
-| Name (1+ words)                                               |
-'---------------------------------------------------------------'
-| Value                                                         |
-'---------------------------------------------------------------'
-
-T (type)  = {0,3}                  must be 4
-SizeWords = {4,15}                 includes header word
-NameRef   = {16,31}                string ref for the argument name
-Reserved  = {32,63}                must be 0
-NameEnd   = 64+(64*NameRef)
-Name      = {64,NameEnd}           name of the argument, padded to 8-byte alignment
-Value     = {NameEnd+1,SizeWords*64}
+```mermaid
+---
+title: "Unsigned integer argument"
+---
+packet-beta
+0-3: "type (4)"
+4-15: "size words"
+16-29: "name ref"
+30-31: "reserved"
+32-63: "reserved"
+64-95: "name"
+96-127: "name (cont.) (1+ words)"
+128-159: "value"
+160-191: "value (cont.)"
 ```
 
 ### 64-bit floating point arguments
 
 Floats are appended after the argument name is terminated.
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+-----------+-----------------------------------------------|
-| 5 | SizeWords | NameRef     | Reserved                        |
-|---------------------------------------------------------------|
-| Name (1+ words)                                               |
-'---------------------------------------------------------------'
-| Value                                                         |
-'---------------------------------------------------------------'
-
-T (type)  = {0,3}                  must be 5
-SizeWords = {4,15}                 includes header word
-NameRef   = {16,31}                string ref for the argument name
-Reserved  = {32,63}                must be 0
-NameEnd   = 64+(64*NameRef)
-Name      = {64,NameEnd}           name of the argument, padded to 8-byte alignment
-Value     = {NameEnd+1,SizeWords*64}
+```mermaid
+---
+title: "Floating point argument"
+---
+packet-beta
+0-3: "type (5)"
+4-15: "size words"
+16-29: "name ref"
+30-31: "reserved"
+32-63: "reserved"
+64-95: "name"
+96-127: "name (cont.) (1+ words)"
+128-159: "value"
+160-191: "value (cont.)"
 ```
 
 ### String arguments
@@ -172,52 +162,40 @@ Value     = {NameEnd+1,SizeWords*64}
 Strings are encoded in UTF-8, padded with zeroes until 8-byte aligned, and appended after the
 argument name.
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+-----------+-----------------------------------------------|
-| 6 | SizeWords | NameRef     | ValueRef      | Reserved        |
-|---------------------------------------------------------------|
-| Name (1+ words)                                               |
-'---------------------------------------------------------------'
-| Value (1+ words)                                              |
-'---------------------------------------------------------------'
-
-T (type)  = {0,3}                  must be 6
-SizeWords = {4,15}                 includes header word
-NameRef   = {16,31}                string ref for the argument name
-ValueRef  = {32,47}                string ref for the argument value
-Reserved  = {48,63}                must be 0
-NameEnd   = 64+(64*NameRef)
-Name      = {64,NameEnd}           name of the argument, padded to 8-byte alignment
-Value     = {NameEnd+1,SizeWords*64}
-```
+```mermaid
 ---
+title: "String argument"
+---
+packet-beta
+0-3: "type (6)"
+4-15: "size words"
+16-29: "name ref"
+30-31: "value ref"
+32-45: "value ref (cont.)"
+46-63: "reserved"
+64-95: "name"
+96-127: "name cont. (1+ words)"
+128-159: "value"
+160-191: "value cont. (1+ words)"
+```
 
 ### Boolean arguments
 
 Booleans are appended after the `NameRef` field in the argument header.
 
-```
-.---------------------------------------------------------------.
-|         |1|1|1|1|1|2|2|2|2|2|3|3|3|3|3|4|4|4|4|4|5|5|5|5|5|6|6|
-|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|4|6|8|0|2|
-|---+-----------+-----------------------------------------------|
-| 9 | SizeWords | NameRef     |B| Reserved                      |
-|---------------------------------------------------------------|
-| Name (1+ words)                                               |
-'---------------------------------------------------------------'
-
-T (type)      = {0,3}                  must be 9
-SizeWords     = {4,15}                 includes header word
-NameRef       = {16,31}                string ref for the argument name
-B (BoolValue) = {32}                   boolean value
-Reserved      = {33,63}                must be 0
-NameEnd       = 64+(64*NameRef)
-Name          = {64,NameEnd}           name of the argument, padded to 8-byte alignment
-```
+```mermaid
 ---
+title: "Floating point argument"
+---
+packet-beta
+0-3: "type (5)"
+4-15: "size words"
+16-29: "name ref"
+30-31: "value"
+32-63: "reserved"
+64-95: "name"
+96-127: "name (cont.) (1+ words)"
+```
 
 # Encoding "legacy" format messages
 
@@ -227,7 +205,6 @@ integers and a mix of length-prefixed and null-terminated UTF-8 strings.
 
 At the moment, this is only used by the [Go logger] implementation.
 
-[bitfield-diagram]: /docs/reference/platform-spec/diagnostics/bitfield-diagram.md
 [Go logger]: /src/lib/syslog/go/logger.go
 [`zx_clock_get_monotonic`]: /reference/syscalls/clock_get_monotonic.md
 [`LogSink.Connect`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#Connect

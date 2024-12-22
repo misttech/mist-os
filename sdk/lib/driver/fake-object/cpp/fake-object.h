@@ -27,7 +27,7 @@
 #define ftracef(...) ;
 #endif
 
-namespace fdf_fake_object {
+namespace fake_object {
 
 class FakeObject {
  public:
@@ -154,6 +154,6 @@ zx::result<zx_handle_t> fake_object_create();
 zx::result<zx_handle_t> fake_object_create_typed(zx_obj_type_t type);
 zx::result<zx_koid_t> fake_object_get_koid(zx_handle_t);
 
-}  // namespace fdf_fake_object
+}  // namespace fake_object
 
 #endif  // LIB_DRIVER_FAKE_OBJECT_CPP_FAKE_OBJECT_H_

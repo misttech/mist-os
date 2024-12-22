@@ -165,8 +165,13 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::Clone { flags, object, control_handle: _ } => {
                 self.handle_clone_deprecated(flags, object);
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::Clone { request, control_handle: _ } => {
+                // Suppress any errors in the event a bad `request` channel was provided.
+                self.handle_clone(ServerEnd::new(request.into_channel()));
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::NodeRequest::Clone2 { request, control_handle: _ } => {
-                // TODO(https://fxbug.dev/324112547): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `request` channel was provided.
                 self.handle_clone(ServerEnd::new(request.into_channel()));
             }

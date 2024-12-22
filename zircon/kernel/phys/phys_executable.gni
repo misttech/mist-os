@@ -39,6 +39,12 @@ phys_toolchain = "//zircon/kernel/phys:kernel.phys_$current_cpu"
 #     - Type: scope
 #     - Default: {}
 #
+#   * release_output
+#     - Optional: Whether to release this artifact, it will appear in the build
+#       api 'exported_files' if set to true
+#     - Type: boolean
+#     - Default: false
+#
 # See executable() for other parameters.
 #
 template("phys_executable") {
@@ -72,6 +78,7 @@ template("phys_executable") {
                                "output_extension",
                                "target_name",
                                "visibility",
+                               "release_output",
                              ])
       deps += [ "//zircon/kernel/phys:phys_executable.deps" ]
       inputs += _phys_linker_scripts
@@ -92,6 +99,7 @@ template("phys_executable") {
                                "output_name",
                                "testonly",
                                "visibility",
+                               "release_output",
                              ])
       if (defined(visibility)) {
         # Make sure it's visible to the environment_redirect() target above.
@@ -137,6 +145,14 @@ template("phys_executable") {
             path = rebase_path(output_path, root_build_dir)
           },
         ]
+        if (defined(release_output) && release_output) {
+          exported_files = [
+            {
+              name = target_name
+              path = rebase_path(output_path, root_build_dir)
+            },
+          ]
+        }
       }
     }
   }

@@ -328,7 +328,7 @@ class I2cHidTest : public zxtest::Test {
       ASSERT_FALSE(expected_reports_.empty());
       auto expected = std::move(expected_reports_.front());
       expected_reports_.pop();
-      auto report = event->report.buf();
+      auto report = event->buf();
       ASSERT_EQ(report.count(), expected.size());
       for (size_t i = 0; i < report.count(); i++) {
         EXPECT_EQ(report[i], expected[i]);

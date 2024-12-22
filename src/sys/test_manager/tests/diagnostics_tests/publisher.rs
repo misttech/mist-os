@@ -11,7 +11,7 @@ use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
 use futures::TryStreamExt;
-use tracing::{debug, info};
+use log::{debug, info};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

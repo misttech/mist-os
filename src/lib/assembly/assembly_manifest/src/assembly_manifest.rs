@@ -24,6 +24,7 @@ use utf8_path::path_relative_from;
 ///             signed: false,
 ///         },
 ///         Image::VBMeta("path/to/fuchsia.vbmeta"),
+///         Image::Dtbo("path/to/dtbo"),
 ///         Image::FVM("path/to/fvm.blk"),
 ///         Image::FVMSparse("path/to/fvm.sparse.blk"),
 ///     ],
@@ -70,6 +71,9 @@ pub enum Image {
     /// Verified Boot Metadata.
     VBMeta(Utf8PathBuf),
 
+    /// Device Tree Blob Overlay.
+    Dtbo(Utf8PathBuf),
+
     /// BlobFS image.
     BlobFS {
         /// Path to the BlobFS image.
@@ -114,6 +118,7 @@ impl Image {
             Image::BasePackage(s) => s.as_path(),
             Image::ZBI { path, signed: _ } => path.as_path(),
             Image::VBMeta(s) => s.as_path(),
+            Image::Dtbo(s) => s.as_path(),
             Image::BlobFS { path, .. } => path.as_path(),
             Image::FVM(s) => s.as_path(),
             Image::FVMSparse(s) => s.as_path(),
@@ -131,6 +136,7 @@ impl Image {
             Image::BasePackage(s) => *s = source,
             Image::ZBI { path, signed: _ } => *path = source,
             Image::VBMeta(s) => *s = source,
+            Image::Dtbo(s) => *s = source,
             Image::BlobFS { path, .. } => *path = source,
             Image::FVM(s) => *s = source,
             Image::FVMSparse(s) => *s = source,
@@ -150,6 +156,7 @@ impl Image {
             Image::BasePackage(_)
             | Image::ZBI { .. }
             | Image::VBMeta(_)
+            | Image::Dtbo(_)
             | Image::FVM(_)
             | Image::FVMSparse(_)
             | Image::FVMFastboot(_)
@@ -172,6 +179,9 @@ impl AssemblyManifest {
                 }
                 Image::VBMeta(path) => {
                     images.push(Image::VBMeta(path_relative_from(path, &base_path)?))
+                }
+                Image::Dtbo(path) => {
+                    images.push(Image::Dtbo(path_relative_from(path, &base_path)?))
                 }
                 Image::FVM(path) => images.push(Image::FVM(path_relative_from(path, &base_path)?)),
                 Image::FVMSparse(path) => {
@@ -217,6 +227,7 @@ impl AssemblyManifest {
                     images.push(Image::BasePackage(manifest_dir.as_ref().join(path)))
                 }
                 Image::VBMeta(path) => images.push(Image::VBMeta(manifest_dir.as_ref().join(path))),
+                Image::Dtbo(path) => images.push(Image::Dtbo(manifest_dir.as_ref().join(path))),
                 Image::FVM(path) => images.push(Image::FVM(manifest_dir.as_ref().join(path))),
                 Image::FVMSparse(path) => {
                     images.push(Image::FVMSparse(manifest_dir.as_ref().join(path)))
@@ -347,6 +358,13 @@ impl Serialize for Image {
             Image::VBMeta(path) => ImageSerializeHelper {
                 partition_type: "vbmeta",
                 name: "zircon-a",
+                path,
+                signed: None,
+                contents: None,
+            },
+            Image::Dtbo(path) => ImageSerializeHelper {
+                partition_type: "dtbo",
+                name: "dtbo-a",
                 path,
                 signed: None,
                 contents: None,
@@ -587,6 +605,7 @@ impl<'de> Deserialize<'de> for Image {
                 Ok(Image::ZBI { path: helper.path, signed: signed.is_some_and(|s| s) })
             }
             ("vbmeta", _, None) => Ok(Image::VBMeta(helper.path)),
+            ("dtbo", _, None) => Ok(Image::Dtbo(helper.path)),
             ("blk", "blob", None) => {
                 if let Some(contents) = helper.contents {
                     let ImageContentsDeserializeHelper::Blobfs(contents) = contents;
@@ -654,6 +673,7 @@ mod tests {
                 Image::BasePackage("base.far".into()),
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("fuchsia.vbmeta".into()),
+                Image::Dtbo("dtbo".into()),
                 Image::BlobFS { path: "blob.blk".into(), contents: Default::default() },
                 Image::FVM("fvm.blk".into()),
                 Image::FVMSparse("fvm.sparse.blk".into()),
@@ -675,6 +695,7 @@ mod tests {
                 Image::BasePackage("base.far".into()),
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("fuchsia.vbmeta".into()),
+                Image::Dtbo("dtbo".into()),
                 Image::Fxfs { path: "fxfs.blk".into(), contents: Default::default() },
                 Image::FxfsSparse { path: "fxfs.sparse.blk".into(), contents: Default::default() },
                 Image::QemuKernel("qemu/kernel".into()),
@@ -694,6 +715,7 @@ mod tests {
                 Image::BasePackage("base.far".into()),
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("fuchsia.vbmeta".into()),
+                Image::Dtbo("dtbo".into()),
                 Image::BlobFS { path: "blob.blk".into(), contents: Default::default() },
                 Image::FVM("fvm.blk".into()),
                 Image::FVMSparse("fvm.sparse.blk".into()),
@@ -715,6 +737,7 @@ mod tests {
                 Image::BasePackage("base.far".into()),
                 Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("fuchsia.vbmeta".into()),
+                Image::Dtbo("dtbo".into()),
                 Image::Fxfs { path: "fxfs.blk".into(), contents: Default::default() },
                 Image::FxfsSparse { path: "fxfs.sparse.blk".into(), contents: Default::default() },
                 Image::QemuKernel("qemu/kernel".into()),
@@ -734,6 +757,7 @@ mod tests {
                 Image::BasePackage("path/to/base.far".into()),
                 Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("path/to/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/dtbo".into()),
                 Image::BlobFS { path: "path/to/blob.blk".into(), contents: Default::default() },
                 Image::FVM("path/to/fvm.blk".into()),
                 Image::FVMSparse("path/to/fvm.sparse.blk".into()),
@@ -760,6 +784,7 @@ mod tests {
                 Image::BasePackage("path/to/base.far".into()),
                 Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
                 Image::VBMeta("path/to/fuchsia.vbmeta".into()),
+                Image::Dtbo("path/to/dtbo".into()),
                 Image::Fxfs { path: "path/to/fxfs.blk".into(), contents: Default::default() },
                 Image::FxfsSparse {
                     path: "path/to/fxfs.sparse.blk".into(),
@@ -812,7 +837,7 @@ mod tests {
     fn deserialize() {
         let manifest: AssemblyManifest = generate_test_manifest();
         assert_eq!(manifest.board_name, "my_board".to_string());
-        assert_eq!(manifest.images.len(), 8);
+        assert_eq!(manifest.images.len(), 9);
 
         for image in &manifest.images {
             let (expected, actual) = match image {
@@ -822,6 +847,7 @@ mod tests {
                     ("path/to/fuchsia.zbi", path)
                 }
                 Image::VBMeta(path) => ("path/to/fuchsia.vbmeta", path),
+                Image::Dtbo(path) => ("path/to/dtbo", path),
                 Image::BlobFS { path, contents } => {
                     assert_eq!(contents, &BlobfsContents::default());
                     ("path/to/blob.blk", path)
@@ -850,7 +876,7 @@ mod tests {
     fn deserialize_fxfs() {
         let manifest: AssemblyManifest = generate_test_manifest_fxfs();
         assert_eq!(manifest.board_name, "my_board".to_string());
-        assert_eq!(manifest.images.len(), 6);
+        assert_eq!(manifest.images.len(), 7);
 
         for image in &manifest.images {
             let (expected, actual) = match image {
@@ -860,6 +886,7 @@ mod tests {
                     ("path/to/fuchsia.zbi", path)
                 }
                 Image::VBMeta(path) => ("path/to/fuchsia.vbmeta", path),
+                Image::Dtbo(path) => ("path/to/dtbo", path),
                 Image::Fxfs { path, contents } => {
                     assert_eq!(contents, &BlobfsContents::default());
                     ("path/to/fxfs.blk", path)
@@ -1154,6 +1181,11 @@ mod tests {
                     "path": "path/to/fuchsia.vbmeta",
                 },
                 {
+                    "type": "dtbo",
+                    "name": "dtbo-a",
+                    "path": "path/to/dtbo",
+                },
+                {
                     "type": "blk",
                     "name": "blob",
                     "path": "path/to/blob.blk",
@@ -1261,6 +1293,11 @@ mod tests {
                     "type": "vbmeta",
                     "name": "zircon-a",
                     "path": "path/to/fuchsia.vbmeta",
+                },
+                {
+                    "type": "dtbo",
+                    "name": "dtbo-a",
+                    "path": "path/to/dtbo",
                 },
                 {
                     "type": "fxfs-blk",

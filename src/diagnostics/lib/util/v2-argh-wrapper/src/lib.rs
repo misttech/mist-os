@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Error};
-use tracing::warn;
+use log::warn;
 
 /// Loads an argh struct from the command line.
 ///

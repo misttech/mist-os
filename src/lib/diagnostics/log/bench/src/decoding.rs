@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use diagnostics_log_encoding::encode::{Encoder, EncoderOpts, TracingEvent, WriteEventParams};
+use diagnostics_log::TracingEvent;
+use diagnostics_log_encoding::encode::{Encoder, EncoderOpts, WriteEventParams};
 use diagnostics_log_encoding::parse::{parse_argument, parse_record};
 use diagnostics_log_encoding::{Argument, Value};
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;

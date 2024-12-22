@@ -8,14 +8,12 @@ import("//build/python/python_library.gni")
 
 if (is_host) {
   python_host_test("sdk_common_unittest") {
-    enable_mypy = true
     main_source = "sdk_common_unittest.py"
     libraries = [ ":sdk_common" ]
   }
 }
 
 python_library("sdk_common") {
-  enable_mypy = true
   sources = [ "__init__.py" ]
   library_deps = [ "//third_party/pyyaml:yaml" ]
 }

@@ -455,8 +455,8 @@ pub fn connect_to_service_instance_at_dir_svc<S: ServiceMarker>(
 /// Opens a FIDL service as a directory, which holds instances of the service.
 pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
     let service_path = format!("{}/{}", SVC_DIR, S::SERVICE_NAME);
-    let flags = fio::PERM_READABLE;
-    fuchsia_fs::directory::open_in_namespace(&service_path, flags).context("namespace open failed")
+    fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())
+        .context("namespace open failed")
 }
 
 /// Opens a FIDL service hosted in `directory` as a directory, which holds
@@ -464,8 +464,7 @@ pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
 pub fn open_service_at_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
 ) -> Result<fio::DirectoryProxy, Error> {
-    let flags = fio::PERM_READABLE;
-    fuchsia_fs::directory::open_directory_async(directory, S::SERVICE_NAME, flags)
+    fuchsia_fs::directory::open_directory_async(directory, S::SERVICE_NAME, fio::Flags::empty())
         .map_err(Into::into)
 }
 
@@ -516,7 +515,7 @@ pub mod test_util {
         let scope = ExecutionScope::new();
         let flags =
             fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::from_bits(fio::R_STAR_DIR.bits()).unwrap();
-        ObjectRequest::new3(flags, &fio::Options::default(), dir_server.into_channel())
+        ObjectRequest::new(flags, &fio::Options::default(), dir_server.into_channel())
             .handle(|request| dir.open3(scope, vfs::path::Path::dot(), flags, request));
         dir_proxy
     }

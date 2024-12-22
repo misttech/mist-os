@@ -83,10 +83,16 @@ group("dl-test-data.deps") {
   visibility = [ ":*" ]
   testonly = true
   deps = [
+    ":init-fini-array",
+    ":init-fini-array-with-deps",
+    ":init-fini-array-with-legacy",
+    ":init-fini-legacy",
     ":static-tls-desc-module",
     ":static-tls-module",
     ":tls-dep-module",
     ":tls-desc-dep-module",
+    ":tls-desc-ld-dep-module",
+    ":tls-ld-dep-module",
   ]
   foreach(suffix, per_test_suffices) {
     foreach(test, per_test_modules + per_test_executables) {
@@ -108,6 +114,7 @@ group("dl-unittest.deps") {
   testonly = true
   deps = [
     ":has-foo-v1.StartupModulesPriorityOverGlobal",
+    ":init-fini-var",
     ":ld-dep-foo-v1.StartupModulesBasic",
     ":ld-dep-foo-v2.StartupModulesBasic",
     ":static-tls-var",
@@ -888,14 +895,13 @@ test_loadable_module("tls-dep-module") {
   configs = [ "//build/config:no-tlsdesc" ]
   deps = [ "//zircon/system/public" ]
 
-  # We need to allow undefined sysmbols, since __tls_get_addr will not be
+  # We need to allow undefined symbols, since __tls_get_addr will not be
   # defined by this module or any link-time dependency, but will be supplied by libc.
   remove_configs = [ "//build/config:symbol_no_undefined" ]
 
   # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs += [ "//build/config/lto" ]
-
   configs += [ "//build/config/lto:no-lto" ]
 }
 
@@ -919,14 +925,38 @@ test_loadable_module("tls-desc-dep-module") {
   configs = [ "//build/config:tlsdesc" ]
   deps = [ "//zircon/system/public" ]
 
-  # We need to allow undefined sysmbols, since __tls_get_addr will not be
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
+}
+
+test_loadable_module("tls-ld-dep-module") {
+  public = [ "tls-ld-dep.h" ]
+  sources = [ "tls-ld-dep.cc" ]
+  configs = [ "//build/config:no-tlsdesc" ]
+  deps = [ "//zircon/system/public" ]
+
+  # We need to allow undefined symbols, since __tls_get_addr will not be
   # defined by this module or any link-time dependency, but will be supplied by libc.
   remove_configs = [ "//build/config:symbol_no_undefined" ]
 
   # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
   # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
   remove_configs += [ "//build/config/lto" ]
+  configs += [ "//build/config/lto:no-lto" ]
+}
 
+# This is the same as tls-dep-ld-module but using TLSDESC, with no __tls_get_addr.
+test_loadable_module("tls-desc-ld-dep-module") {
+  public = [ "tls-ld-dep.h" ]
+  sources = [ "tls-ld-dep.cc" ]
+  configs = [ "//build/config:tlsdesc" ]
+  deps = [ "//zircon/system/public" ]
+
+  # TODO(https://fxbug.dev/42085421): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
   configs += [ "//build/config/lto:no-lto" ]
 }
 
@@ -1525,6 +1555,217 @@ foreach(test, [ "" ] + per_test_suffices) {
     sources = [ "foo.cc" ]
     deps = [ ":ld-dep-foo-v1$suffix" ]
   }
+}
+
+# A collection of DT_INIT_ARRAY/DT_FINI_ARRAY tests. Each entry corresponds to
+# a generated file in the loop below.
+init_fini_array_tests = [
+  # A basic module with multiple ctor and dtor entries.
+  {
+    name = "init-fini-array"
+    type = "test_loadable_module"
+    ctors = [
+      {
+        prio = 101
+        value = 0
+      },
+      {
+        prio = 102
+        value = 1
+      },
+      {
+        prio = 103
+        value = 2
+      },
+    ]
+    dtors = [
+      {
+        prio = 103
+        value = 3
+      },
+      {
+        prio = 102
+        value = 4
+      },
+      {
+        prio = 101
+        value = 5
+      },
+    ]
+    shlib_deps = []
+  },
+
+  # An init-fini-array module with dependencies:
+  # - init-fini-array-root:
+  #   - init-fini-array-a:
+  #     - init-fini-array-a-dep
+  #   - init-fini-array-b:
+  #     - init-fini-array-b-dep
+  #   - init-fini-array-c
+  {
+    name = "init-fini-array-with-deps"
+    type = "test_loadable_module"
+    ctors = [
+      {
+        prio = false
+        value = 5
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 6
+      },
+    ]
+    shlib_deps = [
+      ":init-fini-array-a",
+      ":init-fini-array-b",
+      ":init-fini-array-c",
+    ]
+  },
+  {
+    name = "init-fini-array-a"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 4
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 7
+      },
+    ]
+    shlib_deps = [ ":init-fini-array-a-dep" ]
+  },
+  {
+    name = "init-fini-array-a-dep"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 1
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 10
+      },
+    ]
+    shlib_deps = []
+  },
+  {
+    name = "init-fini-array-b"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 3
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 8
+      },
+    ]
+    shlib_deps = [ ":init-fini-array-b-dep" ]
+  },
+  {
+    name = "init-fini-array-b-dep"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 0
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 11
+      },
+    ]
+    shlib_deps = []
+  },
+  {
+    name = "init-fini-array-c"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 2
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 9
+      },
+    ]
+    shlib_deps = []
+  },
+]
+
+# This will generate files and targets for each entry in `init_fini_array_tests`.
+foreach(case, init_fini_array_tests) {
+  generated_file("${case.name}.cc") {
+    outputs = [ "$target_gen_dir/$target_name" ]
+    label = get_label_info(":$target_name", "label_with_toolchain")
+    contents = [
+      "// Generated by $label. DO NOT EDIT!",
+      "#include \"init-fini-test.h\"",
+    ]
+    foreach(ctor, case.ctors) {
+      if (ctor.prio == false) {
+        prio_attr = ""
+        prio_suffix = ""
+      } else {
+        prio_attr = "(${ctor.prio})"
+        prio_suffix = "_${ctor.prio}"
+      }
+      contents += [ "[[gnu::constructor$prio_attr]] void ctor${prio_suffix}_${ctor.value}() { Check(${ctor.value}); }" ]
+    }
+    foreach(dtor, case.dtors) {
+      if (dtor.prio == false) {
+        prio_attr = ""
+        prio_suffix = ""
+      } else {
+        prio_attr = "(${dtor.prio})"
+        prio_suffix = "_${dtor.prio}"
+      }
+      contents += [ "[[gnu::destructor$prio_attr]] void dtor${prio_suffix}_${dtor.value}() { Check(${dtor.value}); }" ]
+    }
+  }
+  target(case.type, case.name) {
+    deps = [ ":$target_name.cc" ]
+    sources = get_target_outputs(deps[0])
+    include_dirs = [ "//sdk/lib/ld/test/modules" ]
+
+    deps += case.shlib_deps + [ ":init-fini-var" ]
+  }
+}
+
+# A basic module that will run DT_INIT/DT_FINI functions when it is dlopened.
+test_loadable_module("init-fini-legacy") {
+  sources = [ "init-fini-legacy.cc" ]
+  deps = [ ":init-fini-var" ]
+}
+
+# An module that contains both DT_INIT/DT_FINI and DT_INIT_ARRAY/DT_FINI_ARRAY
+test_loadable_module("init-fini-array-with-legacy") {
+  sources = [ "init-fini-array-with-legacy.cc" ]
+  deps = [ ":init-fini-var" ]
+}
+
+# This is a startup module that exports a global variable that gets modified by
+# other targets (e.g :init-fini-legacy, :init-fini-array). This does not need to
+# be suffixed, since its loaded only once at startup.
+test_shared_library("init-fini-var") {
+  sources = [ "init-fini-var.cc" ]
 }
 
 test_shared_library("static-tls-var") {

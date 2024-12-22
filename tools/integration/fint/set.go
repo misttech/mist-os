@@ -103,8 +103,9 @@ func setImpl(
 
 	artifacts := &fintpb.SetArtifacts{
 		Metadata: &fintpb.SetArtifacts_Metadata{
-			Board:      staticSpec.Board,
-			Optimize:   strings.ToLower(staticSpec.Optimize.String()),
+			Board: staticSpec.Board,
+			CompilationMode: strings.ToLower(
+				strings.TrimPrefix(staticSpec.CompilationMode.String(), "COMPILATION_MODE_")),
 			Product:    staticSpec.Product,
 			TargetArch: strings.ToLower(staticSpec.TargetArch.String()),
 			Variants:   staticSpec.Variants,
@@ -183,43 +184,33 @@ func runGen(
 		return "", fmt.Errorf("failed to write args.gn: %w", err)
 	}
 
-	genCmd := []string{
-		gn,
-		"gen",
+	regenCmd := []string{
+		filepath.Join(contextSpec.CheckoutDir, "build", "regenerator"),
+		"--fuchsia-dir",
+		contextSpec.CheckoutDir,
+		"--fuchsia-build-dir",
 		contextSpec.BuildDir,
-		fmt.Sprintf("--root=%s", contextSpec.CheckoutDir),
-		"--check=system",
-		"--fail-on-unused-args",
-		// If --ninja-executable is set, GN runs `ninja -t restat build.ninja`
-		// after generating the ninja files, updating the cached modified
-		// timestamps of files. This avoids extra regens when running ninja
-		// repeatedly under some circumstances.
-		fmt.Sprintf("--ninja-executable=%s", thirdPartyPrebuilt(contextSpec.CheckoutDir, platform, "ninja")),
 	}
-
 	if isatty.IsTerminal() {
-		genCmd = append(genCmd, "--color")
+		regenCmd = append(regenCmd, "--color")
 	}
 	if gnTracePath != "" {
-		genCmd = append(genCmd, fmt.Sprintf("--tracelog=%s", gnTracePath))
+		regenCmd = append(regenCmd, fmt.Sprintf("--gn-tracelog=%s", gnTracePath))
 	}
-	if staticSpec.ExportRustProject {
-		genCmd = append(genCmd, "--export-rust-project")
+	if !staticSpec.ExportRustProject {
+		regenCmd = append(regenCmd, "--no-export-rust-project")
 	}
 	for _, f := range staticSpec.IdeFiles {
-		genCmd = append(genCmd, fmt.Sprintf("--ide=%s", f))
+		regenCmd = append(regenCmd, fmt.Sprintf("--gn-ide=%s", f))
 	}
 	for _, s := range staticSpec.JsonIdeScripts {
-		genCmd = append(genCmd, fmt.Sprintf("--json-ide-script=%s", s))
+		regenCmd = append(regenCmd, fmt.Sprintf("--gn-json-ide-script=%s", s))
 	}
-
-	// Always generate the ninja_outputs.json file used by //build/api/client
-	genCmd = append(genCmd, "--ninja-outputs-file=ninja_outputs.json")
 
 	// When `gn gen` fails, it outputs a brief helpful error message to stdout.
 	var stdoutBuf bytes.Buffer
-	if err := runner.Run(ctx, genCmd, subprocess.RunOptions{Stdout: io.MultiWriter(&stdoutBuf, os.Stdout)}); err != nil {
-		return stdoutBuf.String(), fmt.Errorf("error running gn gen: %w", err)
+	if err := runner.Run(ctx, regenCmd, subprocess.RunOptions{Stdout: io.MultiWriter(&stdoutBuf, os.Stdout)}); err != nil {
+		return stdoutBuf.String(), fmt.Errorf("error running %q: %w", regenCmd[0], err)
 	}
 	return stdoutBuf.String(), nil
 }
@@ -276,11 +267,6 @@ func genArgs(
 	} else {
 		vars["target_cpu"] = strings.ToLower(staticSpec.TargetArch.String())
 	}
-
-	if staticSpec.Optimize == fintpb.Static_OPTIMIZE_UNSPECIFIED {
-		return nil, fmt.Errorf("optimize is unspecified or invalid")
-	}
-	vars["is_debug"] = staticSpec.Optimize == fintpb.Static_DEBUG
 
 	if contextSpec.ClangToolchainDir != "" {
 		vars["clang_prefix"] = filepath.Join(contextSpec.ClangToolchainDir, "bin")
@@ -418,16 +404,34 @@ func genArgs(
 		vars["rust_incremental"] = filepath.Join(contextSpec.CacheDir, "rust_cache")
 	}
 
-	var importArgs, varArgs, targetListArgs, testArgs, localArgs, overridesArgs []string
+	var importArgs, varArgs, targetListArgs, testArgs, localArgs, overridesArgs, compileArgs []string
 
 	// Add comments to make args.gn more readable.
+	compileArgs = append(compileArgs, "\n\n# Compilation args:")
 	varArgs = append(varArgs, "\n\n# Basic args:")
 	targetListArgs = append(targetListArgs, "\n\n# Target lists:")
 	testArgs = append(testArgs, "\n\n# Tests to add to build: (these are validated by test-type)")
 
-	// vars are directly set in the "basic args" block
+	// compilation args are set in a single block
+	if staticSpec.CompilationMode == fintpb.Static_COMPILATION_MODE_UNSPECIFIED {
+		return nil, fmt.Errorf("compilation_mode is unspecified or invalid")
+	}
+	var compilationMode string
+	switch staticSpec.CompilationMode {
+	case fintpb.Static_COMPILATION_MODE_DEBUG:
+		compilationMode = "debug"
+	case fintpb.Static_COMPILATION_MODE_BALANCED:
+		compilationMode = "balanced"
+	case fintpb.Static_COMPILATION_MODE_RELEASE:
+		compilationMode = "release"
+	default:
+		return nil, fmt.Errorf("unknown compilation_mode value: %s", staticSpec.CompilationMode.String())
+	}
+	compileArgs = appendGNArg(compileArgs, "compilation_mode", compilationMode)
+
+	// other vars are directly set in the "basic args" block
 	for k, v := range vars {
-		varArgs = append(varArgs, fmt.Sprintf("%s=%s", k, toGNValue(v)))
+		varArgs = appendGNArg(varArgs, k, v)
 	}
 
 	for _, arg := range staticSpec.GnArgs {
@@ -447,24 +451,24 @@ func genArgs(
 	for k, v := range targetLists {
 		// Products and Boards are now using their own namespace of GN args, and not
 		// using these target lists, which are used only by infra or developers.
-		targetListArgs = append(targetListArgs, fmt.Sprintf("%s=%s", k, toGNValue(v)))
+		targetListArgs = appendGNArg(targetListArgs, k, v)
 	}
 	sort.Strings(targetListArgs)
 
 	// Add the "build_only_labels" to the end of appendArgs so that it stays in
 	// the "#Target lists:" block, which is semantically where it belongs.
-	targetListArgs = append(targetListArgs, fmt.Sprintf("%s=%s", "build_only_labels", toGNValue(staticSpec.BuildOnlyLabels)))
+	targetListArgs = appendGNArg(targetListArgs, "build_only_labels", staticSpec.BuildOnlyLabels)
 
 	// The test vars are kept in a particular order to match the BUILD.gn files.
 	for _, k := range []string{"hermetic_test_package_labels", "test_package_labels", "e2e_test_labels", "host_test_labels"} {
-		testArgs = append(testArgs, fmt.Sprintf("%s=%s", k, toGNValue(testVars[k])))
+		testArgs = appendGNArg(testArgs, k, testVars[k])
 	}
 
 	if len(staticSpec.DeveloperTestLabels) != 0 && skipLocalArgs {
 		return nil, fmt.Errorf("'developer_test_labels' cannot be provided when 'skipLocalArgs' is true")
 	}
 	testArgs = append(testArgs, "\n\n# Additional tests: (not validated by test-type)")
-	testArgs = append(testArgs, fmt.Sprintf("%s=%s", "developer_test_labels", toGNValue(staticSpec.DeveloperTestLabels)))
+	testArgs = appendGNArg(testArgs, "developer_test_labels", staticSpec.DeveloperTestLabels)
 
 	for _, p := range imports {
 		importArgs = append(importArgs, fmt.Sprintf(`import("//%s")`, p))
@@ -486,12 +490,12 @@ func genArgs(
 		}
 	}
 
-	var assemblyOverrides = make(map[string]string)
+	assemblyOverrides := make(map[string]string)
 	// Since map iteration order isn't stable, a separate list is needed to keep a consistent ordering
 	// of the entries (to match user expectations and to allow tests to properly validate which
 	// override target is used by each assembly target).
-	var assemblyTargetOrder = []string{}
-	var mainTargetOverridesLabel = ""
+	var assemblyTargetOrder []string
+	var mainTargetOverridesLabel string
 	for _, overrideString := range assemblyOverridesStrings {
 		pair := strings.Split(overrideString, "=")
 		if len(pair) == 1 {
@@ -528,6 +532,7 @@ func genArgs(
 	// modified by other arguments.
 	var finalArgs []string
 	finalArgs = append(finalArgs, importArgs...)
+	finalArgs = append(finalArgs, compileArgs...)
 	finalArgs = append(finalArgs, varArgs...)
 	finalArgs = append(finalArgs, targetListArgs...)
 	finalArgs = append(finalArgs, testArgs...)
@@ -586,4 +591,11 @@ func toGNValue(x interface{}) string {
 	default:
 		panic(fmt.Sprintf("unsupported arg value type %T", val))
 	}
+}
+
+// appendGNArg appends an argument to a list of GN arguments, which is one per
+// line.  The value is converted from a Go value to a string representation
+// using toGNValue.
+func appendGNArg(varlist []string, name string, value interface{}) []string {
+	return append(varlist, fmt.Sprintf("%s=%s", name, toGNValue(value)))
 }

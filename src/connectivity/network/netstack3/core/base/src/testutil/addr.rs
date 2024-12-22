@@ -6,7 +6,9 @@
 
 use net_declare::{net_ip_v4, net_ip_v6, net_mac, net_subnet_v4, net_subnet_v6};
 use net_types::ethernet::Mac;
-use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
+use net_types::ip::{
+    GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6Scope, Subnet,
+};
 use net_types::{
     MulticastAddr, NonMappedAddr, SpecifiedAddr, UnicastAddr, UnicastAddress, Witness as _,
 };
@@ -86,6 +88,8 @@ impl TestIpExt for Ipv6 {
     fn get_multicast_addr(last: u8) -> MulticastAddr<Self::Addr> {
         assert!((Self::Addr::BYTES * 8 - Self::MULTICAST_SUBNET.prefix()) as u32 > u8::BITS);
         let mut bytes = Self::MULTICAST_SUBNET.network().ipv6_bytes();
+        // Don't use the reserved (0) scope for these addresses.
+        bytes[1] = Ipv6Scope::MULTICAST_SCOPE_ID_GLOBAL;
         bytes[bytes.len() - 1] = last;
         MulticastAddr::new(Ipv6Addr::from_bytes(bytes)).unwrap()
     }

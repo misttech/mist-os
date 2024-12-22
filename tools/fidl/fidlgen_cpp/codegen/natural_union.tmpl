@@ -38,6 +38,10 @@ class {{ .Name }} {
   {{- end }}
   };
 
+  {{- if .Serializable.IsSerializable }}
+  static constexpr char kSerializableName[] = "{{ .Serializable.Name }}";
+  {{ end }}
+
   {{ .Name }}({{ .Name }}&& other) noexcept
       : {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{}) {
     *storage_ = std::move(*other.storage_);

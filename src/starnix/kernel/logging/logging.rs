@@ -4,6 +4,7 @@
 
 use starnix_uapi::errors::Errno;
 use starnix_uapi::pid_t;
+use std::cell::RefCell;
 use std::ffi::CString;
 use std::fmt;
 
@@ -15,77 +16,33 @@ pub use tracing as __tracing;
 pub use tracing::Level;
 
 /// Used to track the current thread's logical context.
-/// The thread with this set is used to service syscalls for a specific user thread, and this
-/// describes the user thread's identity.
-pub struct TaskDebugInfo {
-    pub pid: pid_t,
-    pub tid: pid_t,
-    pub command: CString,
+enum TaskDebugInfo {
+    /// The thread with this set is used for internal logic within the starnix kernel.
+    Kernel,
+    /// The thread with this set is used to service syscalls for a specific user thread, and this
+    /// describes the user thread's identity.
+    User { pid: pid_t, tid: pid_t, command: String },
+    /// Unknown info. This happens when trying to log while in the destructor of a thread local
+    /// variable.
+    Unknown,
+}
+
+thread_local! {
+    /// When a thread in this kernel is started, it is a kthread by default. Once the thread
+    /// becomes aware of the user-level task it is executing, this thread-local should be set to
+    /// include that info.
+    static CURRENT_TASK_INFO: RefCell<TaskDebugInfo> = const { RefCell::new(TaskDebugInfo::Kernel) } ;
 }
 
 impl fmt::Display for TaskDebugInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}[{}]", self.pid, self.tid, self.command.to_string_lossy())
-    }
-}
-
-#[cfg(not(feature = "disable_logging"))]
-mod enabled {
-    use super::TaskDebugInfo;
-    use std::sync::Arc;
-
-    #[derive(Clone)]
-    pub struct Span(Arc<tracing::Span>);
-    pub struct SpanGuard<'a> {
-        _entered: tracing::span::Entered<'a>,
-    }
-
-    impl Span {
-        pub fn new(debug_info: &TaskDebugInfo) -> Self {
-            let tag = debug_info.to_string();
-            // We wrap this in an Arc, since when we enter the span, the lifetimte of the returned
-            // guard is '_ therefore limiting our ability to get exclusive references to the Task
-            // within the scope of the Entered guard.
-            Self(Arc::new(tracing::info_span!("", tag)))
-        }
-
-        pub fn update(&self, debug_info: &TaskDebugInfo) {
-            let debug_info = debug_info.to_string();
-            self.0.record("tag", &debug_info.as_str());
-        }
-
-        pub fn enter(&self) -> SpanGuard<'_> {
-            SpanGuard { _entered: self.0.enter() }
+        match self {
+            Self::Kernel => write!(f, "kthread"),
+            Self::User { pid, tid, command } => write!(f, "{}:{}[{}]", pid, tid, command),
+            Self::Unknown => write!(f, "unknown"),
         }
     }
 }
-
-#[cfg(feature = "disable_logging")]
-mod disabled {
-    use super::TaskDebugInfo;
-
-    #[derive(Clone)]
-    pub struct Span;
-    pub struct SpanGuard;
-
-    impl Span {
-        pub fn new(_: &TaskDebugInfo) -> Self {
-            Span
-        }
-
-        pub fn enter(&self) -> SpanGuard {
-            SpanGuard
-        }
-
-        pub fn update(&self, _: &TaskDebugInfo) {}
-    }
-}
-
-#[cfg(not(feature = "disable_logging"))]
-pub use enabled::*;
-
-#[cfg(feature = "disable_logging")]
-pub use disabled::*;
 
 #[inline]
 pub const fn logs_enabled() -> bool {
@@ -103,7 +60,9 @@ pub const fn trace_debug_logs_enabled() -> bool {
 macro_rules! log_trace {
     ($($arg:tt)*) => {
         if $crate::trace_debug_logs_enabled() {
-            $crate::__tracing::trace!($($arg)*);
+            $crate::with_current_task_info(|_task_info| {
+                $crate::__tracing::trace!(tag = %_task_info, $($arg)*);
+            });
         }
     };
 }
@@ -112,7 +71,9 @@ macro_rules! log_trace {
 macro_rules! log_debug {
     ($($arg:tt)*) => {
         if $crate::trace_debug_logs_enabled() {
-            $crate::__tracing::debug!($($arg)*);
+            $crate::with_current_task_info(|_task_info| {
+                $crate::__tracing::debug!(tag = %_task_info, $($arg)*);
+            });
         }
     };
 }
@@ -121,7 +82,9 @@ macro_rules! log_debug {
 macro_rules! log_info {
     ($($arg:tt)*) => {
         if $crate::logs_enabled() {
-            $crate::__tracing::info!($($arg)*);
+            $crate::with_current_task_info(|_task_info| {
+                $crate::__tracing::info!(tag = %_task_info, $($arg)*);
+            });
         }
     };
 }
@@ -130,7 +93,9 @@ macro_rules! log_info {
 macro_rules! log_warn {
     ($($arg:tt)*) => {
         if $crate::logs_enabled() {
-            $crate::__tracing::warn!($($arg)*);
+            $crate::with_current_task_info(|_task_info| {
+                $crate::__tracing::warn!(tag = %_task_info, $($arg)*);
+            });
         }
     };
 }
@@ -139,7 +104,9 @@ macro_rules! log_warn {
 macro_rules! log_error {
     ($($arg:tt)*) => {
         if $crate::logs_enabled() {
-            $crate::__tracing::error!($($arg)*);
+            $crate::with_current_task_info(|_task_info| {
+                $crate::__tracing::error!(tag = %_task_info, $($arg)*);
+            });
         }
     };
 }
@@ -150,15 +117,13 @@ macro_rules! log_error {
 #[macro_export]
 macro_rules! log {
     ($lvl:expr, $($arg:tt)*) => {
-        if $crate::logs_enabled() {
-            match $lvl {
-                $crate::Level::TRACE => $crate::__tracing::trace!($($arg)*),
-                $crate::Level::DEBUG => $crate::__tracing::debug!($($arg)*),
-                $crate::Level::INFO => $crate::__tracing::info!($($arg)*),
-                $crate::Level::WARN => $crate::__tracing::warn!($($arg)*),
-                $crate::Level::ERROR => $crate::__tracing::error!($($arg)*),
-            }
-        }
+         match $lvl {
+             $crate::Level::TRACE => $crate::log_trace!($($arg)*),
+             $crate::Level::DEBUG => $crate::log_debug!($($arg)*),
+             $crate::Level::INFO => $crate::log_info!($($arg)*),
+             $crate::Level::WARN => $crate::log_warn!($($arg)*),
+             $crate::Level::ERROR => $crate::log_error!($($arg)*),
+         }
     };
 }
 
@@ -171,4 +136,34 @@ pub fn impossible_error(status: zx::Status) -> Errno {
 
 pub fn set_zx_name(obj: &impl zx::AsHandleRef, name: impl AsRef<[u8]>) {
     obj.set_name(&zx::Name::from_bytes_lossy(name.as_ref())).map_err(impossible_error).unwrap();
+}
+
+pub fn with_zx_name<O: zx::AsHandleRef>(obj: O, name: impl AsRef<[u8]>) -> O {
+    set_zx_name(&obj, name);
+    obj
+}
+
+/// Set the context for log messages from this thread. Should only be called when a thread has been
+/// created to execute a user-level task, and should only be called once at the start of that
+/// thread's execution.
+pub fn set_current_task_info(name: &CString, pid: pid_t, tid: pid_t) {
+    set_zx_name(&fuchsia_runtime::thread_self(), name.as_bytes());
+    CURRENT_TASK_INFO.with(|task_info| {
+        *task_info.borrow_mut() =
+            TaskDebugInfo::User { pid, tid, command: name.to_string_lossy().to_string() };
+    });
+}
+
+/// Access this thread's task info for debugging. Intended for use internally by Starnix's log
+/// macros.
+///
+/// *Do not use this for kernel logic.* If you need access to the current pid/tid/etc for the
+/// purposes of writing kernel logic beyond logging for debugging purposes, those should be accessed
+/// through the `CurrentTask` type as an argument explicitly passed to your function.
+#[doc(hidden)]
+pub fn with_current_task_info<T>(f: impl Fn(&(dyn fmt::Display)) -> T) -> T {
+    match CURRENT_TASK_INFO.try_with(|task_info| f(&task_info.borrow())) {
+        Ok(value) => value,
+        Err(_) => f(&TaskDebugInfo::Unknown),
+    }
 }

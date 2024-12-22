@@ -142,7 +142,9 @@ void AmlSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
 }
 
 zx_status_t AmlSuspend::SystemSuspendEnter() {
+  // LINT.IfChange
   TRACE_DURATION("power", "aml-suspend:suspend");
+  // LINT.ThenChange(//src/performance/lib/trace_processing/metrics/suspend.py)
   return zx_system_suspend_enter(cpu_resource_.get(), ZX_TIME_INFINITE);
 }
 

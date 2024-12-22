@@ -23,9 +23,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 single_byte,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.single_byte, encoder, single_byte)?;
+
         Ok(())
     }
 }
@@ -61,6 +64,7 @@ impl ::fidl_next::TakeFrom<WireByteAndBytes> for ByteAndBytes {
     }
 }
 
+/// The wire type corersponding to [`ByteAndBytes`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireByteAndBytes {
@@ -80,9 +84,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut single_byte,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(single_byte.as_mut(), decoder)?;
+
         Ok(())
     }
 }

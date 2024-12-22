@@ -3,5 +3,8 @@
 // found in the LICENSE file.
 
 mod client;
+pub mod playback;
 pub mod sensor_manager;
+pub mod sensor_update_sender;
+mod service_watcher;
 mod utils;

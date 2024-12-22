@@ -48,10 +48,41 @@ if (is_fuchsia) {
       "The bringup product config cannot rely on the fuchsia assembly.  Bringup has it's own in //build/images/bringup")
 
   ##################################################
-  # Shared parameters across assemblies in this file
+  # Fuchsia
   ##################################################
 
-  fuchsia_base = {
+  # The `:fuchsia` target assembles the main Fuchsia image, for the core product only.
+  #
+  # This group only provides GN metadata about the update package(s), none of
+  # packages that are included in the assembled image are present in GN metadata
+  # walks of this target.
+  #
+  # To get the list of packages in this assembly, use the
+  # `package_list_from_assembly()` GN template.
+  group("fuchsia") {
+    testonly = fuchsia_zbi_testonly
+
+    if (!use_bazel_images_only) {
+      public_deps = [
+        ":fuchsia_assembly",
+        ":product_bundle",
+        ":update",
+        ":validate_universe_config_data_entries_empty",
+      ]
+    }
+
+    metadata = {
+      package_barrier = []
+      if (!use_bazel_images_only) {
+        # Only include the update package(s) manifest(s) in metadata collection.
+        # To get a file containing a list of the base & cache packages, use the
+        # `package_list_from_assembly()` GN template.
+        package_barrier = [ ":update" ]
+      }
+    }
+  }
+
+  assembled_system("fuchsia_assembly") {
     testonly = fuchsia_zbi_testonly
     include_legacy_bundle = true
 
@@ -88,46 +119,7 @@ if (is_fuchsia) {
       inputs = vboot_action.inputs
       generate_signed_zbi = true
     }
-  }
 
-  ##################################################
-  # Fuchsia
-  ##################################################
-
-  # The `:fuchsia` target assembles the main Fuchsia image, for all non-bringup
-  # product definitions.
-  #
-  # This group only provides GN metadata about the update package(s), none of
-  # packages that are included in the assembled image are present in GN metadata
-  # walks of this target.
-  #
-  # To get the list of packages in this assembly, use the
-  # `package_list_from_assembly()` GN template.
-  group("fuchsia") {
-    testonly = fuchsia_zbi_testonly
-
-    if (!use_bazel_images_only) {
-      public_deps = [
-        ":fuchsia_assembly",
-        ":product_bundle",
-        ":update",
-        ":validate_universe_config_data_entries_empty",
-      ]
-    }
-
-    metadata = {
-      package_barrier = []
-      if (!use_bazel_images_only) {
-        # Only include the update package(s) manifest(s) in metadata collection.
-        # To get a file containing a list of the base & cache packages, use the
-        # `package_list_from_assembly()` GN template.
-        package_barrier = [ ":update" ]
-      }
-    }
-  }
-
-  assembled_system("fuchsia_assembly") {
-    forward_variables_from(fuchsia_base, "*")
     if (fuchsia_product_assembly_config_label != false) {
       product_assembly_config_label = fuchsia_product_assembly_config_label
     }
@@ -297,8 +289,8 @@ if (is_fuchsia) {
   }
 
   generated_file("universe_config_data_entries") {
-    testonly = fuchsia_base.testonly
-    deps = fuchsia_base.universe_packages
+    testonly = fuchsia_zbi_testonly
+    deps = [ "//:developer_universe_packages" ]
     data_keys = [ "config_package_entries" ]
     walk_keys = [ "config_package_barrier" ]
     output_conversion = "json"
@@ -306,7 +298,7 @@ if (is_fuchsia) {
   }
 
   python_action("validate_universe_config_data_entries_empty") {
-    testonly = fuchsia_base.testonly
+    testonly = fuchsia_zbi_testonly
     binary_label = "//build/assembly/scripts:validate_config_data_is_empty"
     args = [
       "--package-set",
@@ -327,35 +319,5 @@ if (is_fuchsia) {
     ]
     deps = [ ":universe_config_data_entries" ]
     outputs = [ "${target_out_dir}/universe_config_data_entries_empty.txt" ]
-  }
-
-  ##################################################
-  # Netboot
-  ##################################################
-  if (enable_netboot) {
-    assert(
-        fuchsia_product_assembly_config_label != false,
-        "fuchsia_product_assembly_config_label must be defined to use netboot")
-
-    # This rolls the primary ZBI together with a compressed RAMDISK image of
-    # fvm.blk into a fat ZBI that boots the full system without using any real
-    # storage.  The system decompresses the fvm.blk image into memory and then
-    # sees that RAM disk just as if it were a real disk on the device.
-    assembled_system("netboot") {
-      image_name = "fuchsia"
-      namespace = "netboot"
-      forward_variables_from(fuchsia_base, "*")
-      product_assembly_config_label = fuchsia_product_assembly_config_label
-      ramdisk_in_zbi = true
-
-      board_config_label = board_configuration_label
-      image_metadata_overrides = {
-        zbi = {
-          name = "netboot"
-          archive = enable_netboot
-          bootserver_netboot = [ "--boot" ]
-        }
-      }
-    }
   }
 }

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -29,11 +30,15 @@ type fakeSubprocessRunner struct {
 	mockStdout  []byte
 	mockStderr  []byte
 	fail        bool
+	mu          sync.Mutex
 }
 
 var errSubprocessFailure = errors.New("exit status 1")
 
 func (r *fakeSubprocessRunner) Run(_ context.Context, cmd []string, options subprocess.RunOptions) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if options.Stdout == nil {
 		options.Stdout = os.Stdout
 	}
@@ -61,11 +66,11 @@ func TestSet(t *testing.T) {
 		ArtifactDir: "/tmp/fint-set-artifacts",
 	}
 	staticSpec := &fintpb.Static{
-		Board:      "boards/x64.gni",
-		Optimize:   fintpb.Static_DEBUG,
-		Product:    "products/bringup.gni",
-		TargetArch: fintpb.Static_X64,
-		Variants:   []string{"asan"},
+		Board:           "boards/x64.gni",
+		CompilationMode: fintpb.Static_COMPILATION_MODE_DEBUG,
+		Product:         "products/bringup.gni",
+		TargetArch:      fintpb.Static_X64,
+		Variants:        []string{"asan"},
 	}
 
 	t.Run("sets artifacts metadata fields", func(t *testing.T) {
@@ -75,11 +80,11 @@ func TestSet(t *testing.T) {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
 		expectedMetadata := &fintpb.SetArtifacts_Metadata{
-			Board:      staticSpec.Board,
-			Optimize:   "debug",
-			Product:    staticSpec.Product,
-			TargetArch: "x64",
-			Variants:   staticSpec.Variants,
+			Board:           staticSpec.Board,
+			CompilationMode: "debug",
+			Product:         staticSpec.Product,
+			TargetArch:      "x64",
+			Variants:        staticSpec.Variants,
 		}
 
 		if diff := cmp.Diff(expectedMetadata, artifacts.Metadata, protocmp.Transform()); diff != "" {
@@ -194,15 +199,16 @@ func TestRunGen(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name            string
-		staticSpec      *fintpb.Static
-		gnTracePath     string
-		expectedOptions []string
+		name              string
+		staticSpec        *fintpb.Static
+		gnTracePath       string
+		expectedOptions   []string
+		unexpectedOptions []string
 	}{
 		{
 			name:            "gn trace",
 			gnTracePath:     "/tmp/gn_trace.json",
-			expectedOptions: []string{"--tracelog=/tmp/gn_trace.json"},
+			expectedOptions: []string{"--gn-tracelog=/tmp/gn_trace.json"},
 		},
 		{
 			name: "generate IDE files",
@@ -210,8 +216,26 @@ func TestRunGen(t *testing.T) {
 				IdeFiles: []string{"json", "vs"},
 			},
 			expectedOptions: []string{
-				"--ide=json",
-				"--ide=vs",
+				"--gn-ide=json",
+				"--gn-ide=vs",
+			},
+		},
+		{
+			name: "rust-project.json export enabled",
+			staticSpec: &fintpb.Static{
+				ExportRustProject: true,
+			},
+			unexpectedOptions: []string{
+				"--no-export-rust-project",
+			},
+		},
+		{
+			name: "rust-project.json export disabled",
+			staticSpec: &fintpb.Static{
+				ExportRustProject: false,
+			},
+			expectedOptions: []string{
+				"--no-export-rust-project",
 			},
 		},
 		{
@@ -219,7 +243,7 @@ func TestRunGen(t *testing.T) {
 			staticSpec: &fintpb.Static{
 				JsonIdeScripts: []string{"foo.py", "bar.py"},
 			},
-			expectedOptions: []string{"--json-ide-script=foo.py", "--json-ide-script=bar.py"},
+			expectedOptions: []string{"--gn-json-ide-script=foo.py", "--gn-json-ide-script=bar.py"},
 		},
 	}
 
@@ -249,13 +273,19 @@ func TestRunGen(t *testing.T) {
 				t.Fatalf("runGen ran wrong command: %v", cmd)
 			}
 
-			exe, subcommand, buildDir := cmd[0], cmd[1], cmd[2]
-			otherOptions := cmd[3:]
-			if filepath.Base(exe) != "gn" {
-				t.Errorf("runGen ran wrong GN executable: wanted basename %q, got %q", "gn", exe)
+			exe, arg1, fuchsiaDir, arg3, buildDir := cmd[0], cmd[1], cmd[2], cmd[3], cmd[4]
+			otherOptions := cmd[5:]
+			if filepath.Base(exe) != "regenerator" {
+				t.Errorf("runGen ran wrong GN executable: wanted basename %q, got %q", "regenerator", exe)
 			}
-			if subcommand != "gen" {
-				t.Errorf("Expected runGen to run `gn gen`, but got `gn %s`", subcommand)
+			if arg1 != "--fuchsia-dir" {
+				t.Errorf("runGen didn't use --fuchsia-dir as second argument, but: %q", arg1)
+			}
+			if fuchsiaDir != contextSpec.CheckoutDir {
+				t.Errorf("runGen didn't use correct --fuchsia-build-dir argument: %q, expected %q", fuchsiaDir, contextSpec.CheckoutDir)
+			}
+			if arg3 != "--fuchsia-build-dir" {
+				t.Errorf("runGen didn't use --fuchsia-build-dir as third argument, but: %q", arg3)
 			}
 			if buildDir != contextSpec.BuildDir {
 				t.Errorf("Expected runGen to use build dir from context (%s) but got %s", contextSpec.BuildDir, buildDir)
@@ -264,6 +294,9 @@ func TestRunGen(t *testing.T) {
 				t.Errorf("Failed to read args.gn file: %s", err)
 			}
 			assertSubset(t, tc.expectedOptions, otherOptions, false, false)
+			if len(tc.unexpectedOptions) > 0 {
+				assertNotOverlap(t, tc.unexpectedOptions, otherOptions)
+			}
 		})
 	}
 }
@@ -335,16 +368,16 @@ func TestGenArgs(t *testing.T) {
 			name: "minimal specs",
 			expectedArgs: []string{
 				`target_cpu="x64"`,
-				`is_debug=true`,
+				`compilation_mode="debug"`,
 			},
 		},
 		{
 			name: "arm64 release",
 			staticSpec: &fintpb.Static{
-				TargetArch: fintpb.Static_ARM64,
-				Optimize:   fintpb.Static_RELEASE,
+				TargetArch:      fintpb.Static_ARM64,
+				CompilationMode: fintpb.Static_COMPILATION_MODE_RELEASE,
 			},
-			expectedArgs: []string{`target_cpu="arm64"`, `is_debug=false`},
+			expectedArgs: []string{`target_cpu="arm64"`, `compilation_mode="release"`},
 		},
 		{
 			name: "clang toolchain",
@@ -676,8 +709,8 @@ func TestGenArgs(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			baseStaticSpec := &fintpb.Static{
-				TargetArch: fintpb.Static_X64,
-				Optimize:   fintpb.Static_DEBUG,
+				TargetArch:      fintpb.Static_X64,
+				CompilationMode: fintpb.Static_COMPILATION_MODE_DEBUG,
 			}
 			proto.Merge(baseStaticSpec, tc.staticSpec)
 			tc.staticSpec = baseStaticSpec

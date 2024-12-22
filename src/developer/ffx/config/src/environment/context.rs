@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::api::value::ValueStrategy;
-use crate::api::{ConfigError, ConfigValue};
+use crate::api::value::{TryConvert, ValueStrategy};
+use crate::api::ConfigError;
 use crate::storage::{AssertNoEnv, Config};
 use crate::{is_analytics_disabled, ConfigMap, ConfigQuery, Environment};
 use anyhow::{Context, Result};
@@ -396,13 +396,22 @@ impl EnvironmentContext {
 
     /// A shorthand for the very common case of querying a value from the global config
     /// cache and this environment, using the provided value converted into a query.
-    pub fn get<'a, T, U>(&'a self, with: U) -> std::result::Result<T, T::Error>
+    pub fn get<'a, T, U>(&'a self, with: U) -> std::result::Result<T, ConfigError>
     where
-        T: TryFrom<ConfigValue> + ValueStrategy,
-        <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,
+        T: TryConvert + ValueStrategy,
         U: Into<ConfigQuery<'a>>,
     {
         self.query(with).get()
+    }
+
+    /// A shorthand for the very common case of querying a value from the global config
+    /// cache and this environment, using the provided value converted into a query.
+    pub fn get_optional<'a, T, U>(&'a self, with: U) -> std::result::Result<T, ConfigError>
+    where
+        T: TryConvert + ValueStrategy,
+        U: Into<ConfigQuery<'a>>,
+    {
+        self.query(with).get_optional()
     }
 
     /// Find the appropriate sdk root for this invocation of ffx, looking at configuration

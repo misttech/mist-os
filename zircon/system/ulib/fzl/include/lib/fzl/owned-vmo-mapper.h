@@ -41,8 +41,7 @@ class OwnedVmoMapper : protected VmoMapper {
                            uint32_t cache_policy = 0, uint32_t vmo_options = 0);
 
   // See |VmoMapper::Map|.
-  zx_status_t Map(zx::vmo vmo, uint64_t size = 0,
-                  zx_vm_option_t map_options = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
+  zx_status_t Map(zx::vmo vmo, uint64_t offset, uint64_t size, zx_vm_option_t map_options,
                   fbl::RefPtr<VmarManager> vmar_manager = nullptr);
 
   // Reset the VMO from whichever VMAR it was mapped into, then release.

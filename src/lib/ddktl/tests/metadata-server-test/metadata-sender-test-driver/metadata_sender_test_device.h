@@ -5,11 +5,11 @@
 #ifndef SRC_LIB_DDKTL_TESTS_METADATA_SERVER_TEST_METADATA_SENDER_TEST_DRIVER_METADATA_SENDER_TEST_DEVICE_H_
 #define SRC_LIB_DDKTL_TESTS_METADATA_SERVER_TEST_METADATA_SENDER_TEST_DRIVER_METADATA_SENDER_TEST_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.test/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
 #include <ddktl/device.h>
-
-#include "src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test/metadata.h"
+#include <ddktl/metadata_server.h>
 
 namespace ddk::test {
 
@@ -43,7 +43,7 @@ class MetadataSenderTestDevice final : public MetadataSenderTestDeviceType {
 
   async_dispatcher_t* dispatcher_{fdf::Dispatcher::GetCurrent()->async_dispatcher()};
   component::OutgoingDirectory outgoing_{dispatcher_};
-  ddk::test::MetadataServer metadata_server_;
+  ddk::MetadataServer<fuchsia_hardware_test::wire::Metadata> metadata_server_;
   size_t num_metadata_devices_ = 0;
 };
 

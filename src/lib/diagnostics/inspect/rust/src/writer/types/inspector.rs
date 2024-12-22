@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 use crate::writer::private::InspectTypeInternal;
+use crate::writer::state::Stats;
 use crate::writer::{Error, Heap, Node, State};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter};
 use inspect_format::{constants, BlockContainer, Container};
+use log::error;
 use std::borrow::Cow;
 use std::cmp::max;
 use std::fmt;
 use std::sync::Arc;
-use tracing::error;
 
 #[cfg(target_os = "fuchsia")]
 use zx::{self as zx, AsHandleRef, HandleBased};
@@ -43,6 +44,16 @@ impl DiagnosticsHierarchyGetter<String> for Inspector {
         let hierarchy = futures::executor::block_on(async move { crate::reader::read(self).await })
             .expect("failed to get hierarchy");
         Cow::Owned(hierarchy)
+    }
+}
+
+pub trait InspectorIntrospectionExt {
+    fn stats(&self) -> Option<Stats>;
+}
+
+impl InspectorIntrospectionExt for Inspector {
+    fn stats(&self) -> Option<Stats> {
+        self.state().and_then(|outer| outer.try_lock().ok().map(|state| state.stats()))
     }
 }
 

@@ -6,6 +6,7 @@ use crate::error::Error;
 use anyhow::anyhow;
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{Selector, TreeNames};
+use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
 use moniker::ExtendedMoniker;
 use selectors::SelectorExt;
 use std::collections::HashMap;
@@ -115,15 +116,16 @@ fn bucketize_selectors_by_name<'a>(
                     if let Some(mapped_selectors) = names_to_selectors.get_mut(name) {
                         mapped_selectors.push(s);
                     } else {
-                        names_to_selectors.insert(name.into(), vec![s]);
+                        names_to_selectors.insert(name.to_string(), vec![s]);
                     }
                 }
             }
-            // TODO(https://fxbug.dev/355732696): Not specifying a name filter list should
-            // implicitly mean selecting for the root Inspect tree, but for now it means
-            // selecting for all
             None => {
-                selectors_against_all.push(s);
+                if let Some(mapped_selectors) = names_to_selectors.get_mut(DEFAULT_TREE_NAME) {
+                    mapped_selectors.push(s);
+                } else {
+                    names_to_selectors.insert(DEFAULT_TREE_NAME.to_string(), vec![s]);
+                }
             }
             Some(TreeNames::All(_)) => {
                 selectors_against_all.push(s);

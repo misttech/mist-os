@@ -24,7 +24,7 @@ struct DisplayModeConstraints {
   utils::RangeInclusive<int> height_px_range;
   utils::RangeInclusive<int> refresh_rate_millihertz_range;
 
-  bool ModeSatisfiesConstraints(const fuchsia_hardware_display::Mode& mode) const;
+  bool ModeSatisfiesConstraints(const fuchsia_hardware_display_types::Mode& mode) const;
 };
 
 // Discovers and owns the default display coordinator, and waits for and exposes the default

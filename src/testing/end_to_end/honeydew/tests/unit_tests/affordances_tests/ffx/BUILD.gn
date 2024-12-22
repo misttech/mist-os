@@ -6,7 +6,6 @@ import("//build/python/python_host_test.gni")
 
 if (is_host) {
   python_host_test("session_ffx_test") {
-    enable_mypy = true
     main_source = "session_test.py"
     libraries = [ "//src/testing/end_to_end/honeydew" ]
     main_callable = "unittest.main"
@@ -14,7 +13,6 @@ if (is_host) {
   }
 
   python_host_test("screenshot_ffx_test") {
-    enable_mypy = true
     main_source = "screenshot_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -25,7 +23,6 @@ if (is_host) {
   }
 
   python_host_test("inspect_ffx_test") {
-    enable_mypy = true
     main_source = "inspect_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",

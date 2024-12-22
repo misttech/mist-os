@@ -1250,12 +1250,11 @@ mod tests {
             pager.query_dirty_ranges(file.vmo(), 0..page_size * 100, &mut buffer).unwrap();
         assert_eq!(actual, 2);
         assert_eq!(remaining, 0);
-        // Second page must be assumed to contain data so tail is is zeroed.
+        // Second page must be assumed to contain data so tail is zeroed.
         assert_eq!(buffer[0].range(), page_size..page_size * 2);
         assert!(!buffer[0].is_zero_range());
         // All pages after that are marked as zero.
-        // Note that all pages up to the end of the VMO are assumed zero here.
-        assert_eq!(buffer[1].range(), page_size * 2..page_size * 100);
+        assert_eq!(buffer[1].range(), page_size * 2..page_size * 8);
         assert!(buffer[1].is_zero_range());
 
         // We expect the tail page to have been read as part of the zeroing when we grew the size.
@@ -1786,14 +1785,8 @@ mod tests {
             file.vmo().set_stream_size(i * 1024 + page_size / 2).unwrap();
         }
 
-        assert_eq!(pager.query_dirty_ranges(file.vmo(), 0..vmo_size, &mut buffer).unwrap(), (2, 0));
-        assert_eq!(
-            buffer[0..2],
-            [
-                VmoDirtyRange { offset: 0, length: page_size, options: 0 },
-                VmoDirtyRange { offset: page_size, length: vmo_size - page_size, options: 1 },
-            ]
-        );
+        assert_eq!(pager.query_dirty_ranges(file.vmo(), 0..vmo_size, &mut buffer).unwrap(), (1, 0));
+        assert_eq!(buffer[0..1], [VmoDirtyRange { offset: 0, length: page_size, options: 0 },]);
 
         scope.wait().await;
     }
@@ -1833,23 +1826,16 @@ mod tests {
                 file.vmo().set_stream_size(offset).unwrap();
                 assert_eq!(
                     pager.query_dirty_ranges(file.vmo(), offset..vmo_size, &mut buffer).unwrap(),
-                    (2, 0)
+                    (1, 0)
                 );
-                // We expect to see only zero pages beyond content size.
+                // We do not expect to see dirty pages beyond stream size.
                 assert_eq!(
-                    buffer[0..2],
-                    [
-                        VmoDirtyRange {
-                            offset: round_down(offset, page_size),
-                            length: page_size,
-                            options: 0
-                        },
-                        VmoDirtyRange {
-                            offset: round_up(offset, page_size).unwrap(),
-                            length: vmo_size - round_up(offset, page_size).unwrap(),
-                            options: 1
-                        },
-                    ]
+                    buffer[0..1],
+                    [VmoDirtyRange {
+                        offset: round_down(offset, page_size),
+                        length: page_size,
+                        options: 0
+                    },]
                 );
                 offset = offset.saturating_sub(delta);
                 if offset == 0 {

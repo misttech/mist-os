@@ -56,7 +56,6 @@ rustc_library_with_features("netstack3-base") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/lib/explicit",
-    "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",

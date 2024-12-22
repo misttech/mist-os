@@ -8,7 +8,7 @@ use fdf_component::{
 use fidl_fuchsia_hardware_i2c as i2c;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
-use tracing::info;
+use log::info;
 use zx::Status;
 
 /// The implementation of our driver will live in this object, which implements [`Driver`].

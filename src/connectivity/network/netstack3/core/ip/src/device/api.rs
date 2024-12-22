@@ -21,7 +21,8 @@ use netstack3_base::{
 use thiserror::Error;
 
 use crate::internal::device::config::{
-    IpDeviceConfigurationHandler, PendingIpDeviceConfigurationUpdate, UpdateIpConfigurationError,
+    IpDeviceConfigurationAndFlags, IpDeviceConfigurationHandler,
+    PendingIpDeviceConfigurationUpdate, UpdateIpConfigurationError,
 };
 use crate::internal::device::state::{
     CommonAddressProperties, IpDeviceConfiguration, Ipv4AddrConfig, Ipv4AddressState,
@@ -31,6 +32,7 @@ use crate::internal::device::{
     self, AddressRemovedReason, DelIpAddr, IpDeviceAddressContext as _, IpDeviceBindingsContext,
     IpDeviceConfigurationContext, IpDeviceEvent, IpDeviceIpExt, IpDeviceStateContext as _,
 };
+use crate::internal::gmp::{GmpHandler as _, GmpStateContext};
 use crate::internal::routing::IpRoutingDeviceContext;
 use crate::internal::types::RawMetric;
 
@@ -186,12 +188,14 @@ where
     pub fn get_configuration(
         &mut self,
         device_id: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
-    ) -> I::ConfigurationAndFlags {
-        self.core_ctx()
-            .with_ip_device_configuration(device_id, |config, mut core_ctx| {
-                (config.clone(), core_ctx.with_ip_device_flags(device_id, |flags| flags.clone()))
-            })
-            .into()
+    ) -> IpDeviceConfigurationAndFlags<I> {
+        self.core_ctx().with_ip_device_configuration(device_id, |config, mut core_ctx| {
+            IpDeviceConfigurationAndFlags {
+                config: config.clone(),
+                flags: core_ctx.with_ip_device_flags(device_id, |flags| flags.clone()),
+                gmp_mode: core_ctx.gmp_get_mode(device_id),
+            }
+        })
     }
 
     /// Gets the routing metric for the device.
@@ -298,7 +302,9 @@ where
         &mut self,
         device: &<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId,
         inspector: &mut N,
-    ) {
+    ) where
+        C::CoreContext: GmpStateContext<I, C::BindingsContext>,
+    {
         inspector.record_child("Addresses", |inspector| {
             self.core_ctx().with_address_ids(device, |addrs, core_ctx| {
                 for addr in addrs {
@@ -322,6 +328,12 @@ where
                 inspector.record_bool("MulticastForwardingEnabled", *multicast_forwarding_enabled);
             })
         });
+        inspector.record_child("GMP", |inspector| {
+            self.core_ctx().with_gmp_state(device, |groups, gmp_state| {
+                inspector.record_inspectable_value("Mode", gmp_state.mode());
+                inspector.record_inspectable_value("Groups", groups);
+            })
+        })
     }
 }
 /// The device IP API interacting with all IP versions.

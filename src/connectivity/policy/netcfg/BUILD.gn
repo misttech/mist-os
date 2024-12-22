@@ -65,7 +65,6 @@ rustc_library("lib") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
-    "//src/lib/const-unwrap",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",

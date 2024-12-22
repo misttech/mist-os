@@ -189,7 +189,7 @@ pub async fn run_gtest_cases(
         &format!("output={}:{}{}", output_format, OUTPUT_PATH, output_file_name),
     );
 
-    tracing::info!("writing json output to {:?}", output_arg);
+    log::info!("writing json output to {:?}", output_arg);
     append_program_args(
         vec![test_filter_arg, output_arg],
         start_info.program.as_mut().expect("No program."),
@@ -285,9 +285,7 @@ fn resolve_remaining_cases(
     run_listener_proxies: HashMap<String, CaseListenerProxy>,
 ) -> Result<(), Error> {
     for (name, case_listener_proxy) in run_listener_proxies {
-        tracing::warn!(
-            "Did not receive result for {name}. Marking as failed if not a disabled test."
-        );
+        log::warn!("Did not receive result for {name}. Marking as failed if not a disabled test.");
         let status = if name.contains("DISABLED") { Status::Skipped } else { Status::Failed };
         case_listener_proxy.finished(&TestResult { status: Some(status), ..Default::default() })?;
     }

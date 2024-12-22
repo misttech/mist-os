@@ -144,14 +144,22 @@ void HidDevice::OpenSession(OpenSessionRequestView request, OpenSessionCompleter
 }
 
 void HidDevice::OnReportReceived(fidl::WireEvent<fhidbus::Hidbus::OnReportReceived>* event) {
-  if (!event->report.has_buf()) {
+  if (!event->has_buf()) {
     return;
   }
 
-  size_t len = event->report.buf().count();
-  const uint8_t* buf = event->report.buf().data();
-  auto timestamp =
-      event->report.has_timestamp() ? event->report.timestamp() : zx_clock_get_monotonic();
+  if (event->has_wake_lease()) {
+    zx::eventpair wake_lease = std::move(event->wake_lease());
+    for (auto& instance : instance_list_) {
+      zx::eventpair wake_lease_dup;
+      ZX_ASSERT(wake_lease.duplicate(ZX_RIGHT_SAME_RIGHTS, &wake_lease_dup) == ZX_OK);
+      instance.SetWakeLease(std::move(wake_lease_dup));
+    }
+  }
+
+  size_t len = event->buf().count();
+  const uint8_t* buf = event->buf().data();
+  auto timestamp = event->has_timestamp() ? event->timestamp() : zx_clock_get_monotonic();
 
   while (len) {
     // Start by figuring out if this payload either completes a partially

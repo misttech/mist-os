@@ -142,7 +142,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncOk) {
   driver_runtime.RunUntilIdle();
   EXPECT_EQ(mock_coordinator_listener.latest_applied_config_stamp(), kClientStampValue);
 
-  clientproxy.CloseTest();
+  clientproxy.CloseForTesting();
 
   dispatcher.ShutdownAsync();
   shutdown_completion->Wait();
@@ -173,7 +173,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncPeerClosed) {
   listener_client_end.reset();
   EXPECT_OK(
       clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0, display::kInvalidConfigStamp));
-  clientproxy.CloseTest();
+  clientproxy.CloseForTesting();
 
   dispatcher.ShutdownAsync();
   shutdown_completion->Wait();
@@ -202,7 +202,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncNotSupported) {
   fbl::AutoLock lock(controller.mtx());
   EXPECT_STATUS(ZX_ERR_NOT_SUPPORTED, clientproxy.OnDisplayVsync(display::kInvalidDisplayId, 0,
                                                                  display::kInvalidConfigStamp));
-  clientproxy.CloseTest();
+  clientproxy.CloseForTesting();
 
   dispatcher.ShutdownAsync();
   shutdown_completion->Wait();
@@ -251,7 +251,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientMustDrainPendingStamps) {
   EXPECT_EQ(clientproxy.pending_applied_config_stamps().front().controller_stamp,
             display::ConfigStamp(kControllerStampValues.back()));
 
-  clientproxy.CloseTest();
+  clientproxy.CloseForTesting();
 
   dispatcher.ShutdownAsync();
   shutdown_completion->Wait();

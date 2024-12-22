@@ -789,7 +789,7 @@ fn to_core_rule<I: netstack3_core::IpExt>(
     let action = match action {
         RuleAction::Unreachable => netstack3_core::routes::RuleAction::Unreachable,
         RuleAction::Lookup(table_id) => {
-            let table_id = TableId::new(*table_id).ok_or(InvalidTableError)?;
+            let table_id = TableId::new(table_id.get()).ok_or(InvalidTableError)?;
             let core_id = &tables.get(&table_id).ok_or(InvalidTableError)?.core_id;
             let id = match core_id {
                 CoreId::Main => ctx.api().routes::<I>().main_table_id(),

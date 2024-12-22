@@ -42,7 +42,7 @@ inline void CheckedIncrement(uint64_t* a, uint64_t b) {
 }
 
 ktl::optional<Evictor::EvictedPageCounts> ReclaimFromGlobalPageQueues(
-    VmCompressor* compression_instance, Evictor::EvictionLevel eviction_level) {
+    VmCompression* compression, Evictor::EvictionLevel eviction_level) {
   // Avoid evicting from the newest queue to prevent thrashing.
   const size_t lowest_evict_queue = eviction_level == Evictor::EvictionLevel::IncludeNewest
                                         ? PageQueues::kNumActiveQueues
@@ -64,7 +64,11 @@ ktl::optional<Evictor::EvictedPageCounts> ReclaimFromGlobalPageQueues(
     // A valid backlink always has a valid cow
     DEBUG_ASSERT(backlink->cow);
 
-    if (compression_instance) {
+    ktl::optional<VmCompression::CompressorGuard> maybe_instance;
+    VmCompressor* compression_instance = nullptr;
+    if (compression) {
+      maybe_instance.emplace(compression->AcquireCompressor());
+      compression_instance = &maybe_instance->get();
       zx_status_t status = compression_instance->Arm();
       if (status != ZX_OK) {
         return ktl::nullopt;
@@ -331,22 +335,16 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
     return counts;
   }
 
-  ktl::optional<VmCompression::CompressorGuard> maybe_instance;
-  VmCompressor* compression_instance = nullptr;
+  VmCompression* compression = nullptr;
   if (IsCompressionEnabled()) {
-    VmCompression* compression = Pmm::Node().GetPageCompression();
-    if (compression) {
-      maybe_instance.emplace(compression->AcquireCompressor());
-      compression_instance = &maybe_instance->get();
-    }
+    compression = Pmm::Node().GetPageCompression();
   }
 
   // Evict until we've counted enough pages to hit the target_pages. Explicitly do not consider
   // pager_backed_loaned towards our total, as loaned pages do not go to the free memory pool.
   while (counts.pager_backed + counts.compressed + counts.discardable < target_pages) {
     // Use the helper to perform a single 'step' of eviction.
-    ktl::optional<EvictedPageCounts> reclaimed =
-        EvictPageQueuesHelper(compression_instance, eviction_level);
+    ktl::optional<EvictedPageCounts> reclaimed = EvictPageQueuesHelper(compression, eviction_level);
     // An empty return from the helper indicates that there are no more eviction candidates, so
     // regardless of our desired target we must give up.
     if (!reclaimed.has_value()) {
@@ -383,9 +381,9 @@ uint64_t Evictor::CountFreePages() const {
 }
 
 ktl::optional<Evictor::EvictedPageCounts> Evictor::EvictPageQueuesHelper(
-    VmCompressor* compression_instance, EvictionLevel eviction_level) const {
+    VmCompression* compression, EvictionLevel eviction_level) const {
   if (unlikely(test_reclaim_function_)) {
-    return test_reclaim_function_(compression_instance, eviction_level);
+    return test_reclaim_function_(compression, eviction_level);
   }
-  return ReclaimFromGlobalPageQueues(compression_instance, eviction_level);
+  return ReclaimFromGlobalPageQueues(compression, eviction_level);
 }

@@ -149,7 +149,14 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                 },
             ),
             (
-                BpfTypeFilter::default(),
+                vec![
+                    ProgramType::KProbe,
+                    ProgramType::TracePoint,
+                    ProgramType::CgroupSock,
+                    ProgramType::CgroupSockopt,
+                    ProgramType::CgroupSockAddr,
+                ]
+                .into(),
                 EbpfHelperDefinition {
                     index: bpf_func_id_BPF_FUNC_get_current_uid_gid,
                     name: "get_current_uid_gid",

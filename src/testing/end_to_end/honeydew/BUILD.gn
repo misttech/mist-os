@@ -26,7 +26,6 @@ python_library("honeydew_no_testonly") {
     "//src/tests/end_to_end/rtc:*",
   ]
 
-  enable_mypy = true
   library_name = "honeydew"
   source_root = "//src/testing/end_to_end/honeydew/honeydew"
   sources = [
@@ -188,6 +187,7 @@ group("honeydew_ffx_tool_deps") {
   deps = [
     "//src/developer/ffx/plugins/inspect:ffx_inspect_tool_test_data",
     "//src/developer/ffx/plugins/log:ffx_log_tool_test_data",
+    "//src/developer/ffx/plugins/session:ffx_session_tool_test_data",
     "//src/developer/ffx/plugins/test:ffx_test_tool_test_data",
     "//src/developer/ffx/tools/starnix:ffx_starnix_test_data",
   ]

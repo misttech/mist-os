@@ -91,10 +91,14 @@ fx build //sdk:final_fuchsia_idk.exported
 LOCAL_IDK="$(fx get-build-dir)/sdk/exported/fuchsia_idk"
 
 # Run the full test suite
-scripts/bazel_test.py --fuchsia_idk_directory="${LOCAL_IDK}"
+scripts/bazel_test.py \
+    --fuchsia_idk_directory="${LOCAL_IDK}" \
+    --target_cpu=x64
 
 # Run a subset of test targets, and change test output.
-scripts/bazel_test.py --fuchsia_idk_directory="${LOCAL_IDK}" \
+scripts/bazel_test.py \
+    --fuchsia_idk_directory="${LOCAL_IDK}" \
+    --target_cpu=x64 \
     --test_target=:build_only_tests -- --test_output=streamed
 ```
 
@@ -104,10 +108,12 @@ which is only useful for Fuchsia build developers:
 ```
 # Prepare the final Fuchsia in-tree IDK
 fx build //build/bazel:final_fuchsia_in_tree_idk
-LOCAL_IDK="$(fx get-build-dir)/gen/build/bazel/fuchsia_in_tree_idk
+LOCAL_IDK="$(fx get-build-dir)/gen/build/bazel/fuchsia_in_tree_idk"
 
 # Run the full test suite
-scripts/bazel_test.py --fuchsia_idk_directory="${LOCAL_IDK}"
+scripts/bazel_test.py \
+    --fuchsia_idk_directory="${LOCAL_IDK}" \
+    --target_cpu=x64
 
 ```
 
@@ -119,7 +125,7 @@ fx build generate_fuchsia_sdk_repository
 LOCAL_SDK="$(fx get-build-dir)/gen/build/bazel/fuchsia_sdk"
 
 # Run the full test suite
-scripts/bazel_test.py --fuchsia_sdk_directory="${LOCAL_SDK}"
+scripts/bazel_test.py --fuchsia_sdk_dir="${LOCAL_SDK}"
 ```
 
 Alternatively, run it against the Core Bazel SDK
@@ -129,7 +135,7 @@ fx build //sdk:final_fuchsia_sdk
 LOCAL_SDK="$(fx get-build-dir)/obj/sdk/final_fuchsia_sdk"
 
 # Run the full test suite
-scripts/bazel_test.py --fuchsia_sdk_directory="${LOCAL_SDK}"
+scripts/bazel_test.py --fuchsia_sdk_dir="${LOCAL_SDK}"
 ```
 
 ### Running against the in-tree `@fuchsia_sdk` repository:
@@ -139,10 +145,12 @@ or the content of the in-tree IDK/SDK. Testing against the final
 Fuchsia in-tree SDK, as described in the previous section, should be
 equivalent:
 
+[TODO](https://fxbug.dev/383536158): This is currently broken as it uses gen/build/bazel/fuchsia_sdk instead of the in-tree @fuchsia_sdk
+
 ```
 # Prepare the @fuchsia_sdk repository. Only needed once per `jiri update`
 fx build bazel_workspace
-fx bazel --config=quiet query @fuchsia_sdk//:BUILD.bazel
+fx bazel query --config=quiet @fuchsia_sdk//:BUILD.bazel
 
 # Run the full test suite
 scripts/bazel_test.py
@@ -155,6 +163,8 @@ scripts/bazel_test.py --test_target=:build_only_tests -- --test_output=streamed
 
 Finally, it is possible to directly invoke `bazel test` in this directory
 after some necessary preparation.
+
+[TODO](https://fxbug.dev/383498090): Fix Bazel 8.0 invocation.
 
 ### Running against a local IDK:
 
@@ -219,7 +229,9 @@ FUCHSIA_IN_TREE_IDK_REPO="${OUTPUT_BASE}/external/fuchsia_in_tree_idk"
 # Run the test suite
 bazel test \
     --config=fuchsia_x64 \
-    --repository_override=fuchsia_sdk="${FUCHSIA_SDK_REPO}" \
-    --repository_override=fuchsia_in_tree_idk="${FUCHSIA_IN_TREE_IDK}" \
+    --override_repository=fuchsia_sdk="${FUCHSIA_SDK_REPO}" \
+    --override_repository=fuchsia_in_tree_idk="${FUCHSIA_IN_TREE_IDK_REPO}" \
     :tests
 ```
+
+[TODO](https://fxbug.dev/383536158): This fails to build!

@@ -94,6 +94,7 @@ fuchsia_unittest_package("goldfish-sync-device-test-package") {
 }
 
 fuchsia_driver_package("goldfish_sync") {
+  export_to_bazel = true
   driver_components = [ ":goldfish_sync_driver" ]
 }
 

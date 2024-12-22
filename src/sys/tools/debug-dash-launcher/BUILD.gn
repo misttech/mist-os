@@ -19,6 +19,8 @@ rustc_binary("bin") {
   edition = "2021"
   with_unit_tests = true
 
+  configs += [ "//build/config/rust:bootfs" ]
+
   deps = [
     ":debug_dash_launcher_config",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",

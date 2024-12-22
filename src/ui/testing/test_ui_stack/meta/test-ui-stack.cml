@@ -4,12 +4,29 @@
 {
     include: [
         "//sdk/lib/inspect/client.shard.cml",
-        "sys/component/realm_builder.shard.cml",
+
+        // TODO(b/345827642): Remove inline declarations
+        // of RealmBuilder shards once Chromium uses dictionaries.
+        // Use sys/component/realm_builder.shard.cml instead.
+        "syslog/use.shard.cml",
     ],
     program: {
         runner: "elf",
         binary: "bin/test-ui-stack",
     },
+    children: [
+        {
+            name: "realm_builder_server",
+            url: "#meta/realm_builder_server.cm",
+        },
+    ],
+    collections: [
+        {
+            name: "realm_builder",
+            environment: "#realm_builder_env",
+            durability: "transient",
+        },
+    ],
     capabilities: [
         {
             protocol: [
@@ -37,8 +54,75 @@
                 "test.accessibility.Magnifier",
             ],
         },
+        { dictionary: "diagnostics" },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
+        },
     ],
     offer: [
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: [ "#realm_builder_server" ],
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: "all",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "all",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: "self/diagnostics",
+        },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent",
+            to: "self/diagnostics",
+        },
+
+        // [START collection_offers]
+        {
+            protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.inspect.InspectSink",
+            ],
+            from: "parent",
+            to: [ "#realm_builder" ],
+        },
+        {
+            event_stream: [
+                "capability_requested",
+                "destroyed",
+                "started",
+                "stopped",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+
+        // These protocols are used by any nested component managers to
+        // proxy resolve and runner requests to realm builder
+        {
+            protocol: "fuchsia.component.runner.ComponentRunner",
+            from: "#realm_builder_server",
+            as: "fuchsia.component.runner.RealmBuilder",
+            to: [ "#realm_builder" ],
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "#realm_builder_server",
+            as: "fuchsia.component.resolver.RealmBuilder",
+            to: [ "#realm_builder" ],
+        },
         {
             protocol: [
                 "fuchsia.kernel.RootJobForInspect",
@@ -90,6 +174,25 @@
                 "test.accessibility.Magnifier",
             ],
             from: "self",
+        },
+    ],
+    environments: [
+        {
+            name: "realm_builder_env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "realm_builder",
+                    from: "#realm_builder_server",
+                },
+            ],
+            resolvers: [
+                {
+                    resolver: "realm_builder_resolver",
+                    from: "#realm_builder_server",
+                    scheme: "realm-builder",
+                },
+            ],
         },
     ],
     config: {

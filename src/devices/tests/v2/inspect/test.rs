@@ -11,7 +11,7 @@ use {fidl_fuchsia_driver_test as fdt, fuchsia_async as fasync};
 
 async fn get_inspect_hierarchy(moniker: String) -> Result<DiagnosticsHierarchy, Error> {
     ArchiveReader::new()
-        .add_selector(format!("{}:root", moniker))
+        .add_selector(format!("{}:[name=root-driver]root", moniker))
         .snapshot::<Inspect>()
         .await?
         .into_iter()

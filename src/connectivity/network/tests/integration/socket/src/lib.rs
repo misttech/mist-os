@@ -12,7 +12,6 @@ use std::pin::pin;
 use anyhow::{anyhow, Context as _};
 use assert_matches::assert_matches;
 use async_trait::async_trait;
-use const_unwrap::const_unwrap_option;
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _, IpExt as _};
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
@@ -51,7 +50,7 @@ use packet_formats::ethernet::{
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
 use packet_formats::icmp::ndp::NeighborAdvertisement;
 use packet_formats::icmp::{
-    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode,
+    IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpZeroCode,
     Icmpv4DestUnreachableCode, Icmpv4Packet, Icmpv6DestUnreachableCode, Icmpv6Packet, MessageBody,
 };
 use packet_formats::igmp::messages::IgmpPacket;
@@ -2314,7 +2313,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
             src_ip,
             dst_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
         ))
         .encapsulate(Ipv4PacketBuilder::new(src_ip, dst_ip, 1, Ipv4Proto::Icmp))
@@ -2389,7 +2388,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
         .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
         ))
         .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, 1, Ipv6Proto::Icmpv6))
@@ -4370,7 +4369,7 @@ async fn setup_redirect_test<'a>(
     }
 }
 
-const LISTEN_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(11111));
+const LISTEN_PORT: NonZeroU16 = NonZeroU16::new(11111).unwrap();
 
 struct TestCaseV4 {
     original_dst: std::net::SocketAddr,

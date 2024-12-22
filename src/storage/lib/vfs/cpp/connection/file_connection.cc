@@ -64,7 +64,11 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
                                   std::move(request->object));
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
+#else
 void FileConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+#endif
   const fio::Flags flags = fio::Flags::kProtocolFile | fs::internal::RightsToFlags(rights()) |
                            (append() ? fio::Flags::kFileAppend : fio::Flags());
   Connection::NodeClone(flags, request->request.TakeChannel());

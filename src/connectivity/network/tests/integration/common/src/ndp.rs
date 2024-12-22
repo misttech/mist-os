@@ -20,7 +20,7 @@ use packet_formats::icmp::ndp::{
     NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder, RouterAdvertisement,
     RouterSolicitation,
 };
-use packet_formats::icmp::{IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpMessage, IcmpPacketBuilder, IcmpZeroCode};
 use packet_formats::ip::Ipv6Proto;
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
@@ -39,7 +39,7 @@ pub const MESSAGE_TTL: u8 = 255;
 /// transmitted to the fake endpoint's network.
 pub async fn write_message<
     B: SplitByteSlice + Debug,
-    M: IcmpMessage<net_types::ip::Ipv6, Code = IcmpUnusedCode> + Debug,
+    M: IcmpMessage<net_types::ip::Ipv6, Code = IcmpZeroCode> + Debug,
 >(
     src_mac: net_types::ethernet::Mac,
     dst_mac: net_types::ethernet::Mac,
@@ -51,7 +51,7 @@ pub async fn write_message<
 ) -> crate::Result {
     let ser = OptionSequenceBuilder::new(options.iter())
         .into_serializer()
-        .encapsulate(IcmpPacketBuilder::<_, _>::new(src_ip, dst_ip, IcmpUnusedCode, message))
+        .encapsulate(IcmpPacketBuilder::<_, _>::new(src_ip, dst_ip, IcmpZeroCode, message))
         .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, MESSAGE_TTL, Ipv6Proto::Icmpv6))
         .encapsulate(EthernetFrameBuilder::new(
             src_mac,

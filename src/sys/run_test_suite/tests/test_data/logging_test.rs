@@ -4,7 +4,7 @@
 
 #[fuchsia::test(logging_tags = ["logging_test"])]
 async fn log_and_exit() {
-    tracing::debug!("my debug message");
-    tracing::info!("my info message");
-    tracing::warn!("my warn message");
+    log::debug!("my debug message");
+    log::info!("my info message");
+    log::warn!("my warn message");
 }

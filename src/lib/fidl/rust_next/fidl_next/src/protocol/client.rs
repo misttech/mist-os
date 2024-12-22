@@ -6,91 +6,86 @@
 
 use core::future::Future;
 use core::pin::Pin;
-use core::sync::atomic::{AtomicBool, Ordering};
 use core::task::{Context, Poll};
 use std::sync::{Arc, Mutex};
 
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use futures::StreamExt as _;
-
 use crate::protocol::lockers::Lockers;
-use crate::protocol::{encode_buffer, MessageBuffer, ProtocolError, Transport};
-use crate::{Decoder, Encode, EncodeError, Encoder};
+use crate::protocol::{decode_header, encode_header, DispatcherError, Transport};
+use crate::{Encode, EncodeError, EncoderExt};
 
-/// Makes a client endpoint from a transport endpoint.
-pub fn make_client<T: Transport>(transport: T) -> (Dispatcher<T>, Client<T>, Events<T>) {
-    // TODO: this needs a reasonable bound
-    let (events_sender, events_receiver) = unbounded();
-    let (transport_sender, transport_receiver) = transport.split();
-    let shared = Arc::new(Shared::new());
-    (
-        Dispatcher { shared: shared.clone(), receiver: transport_receiver, sender: events_sender },
-        Client { shared, sender: transport_sender },
-        Events { receiver: events_receiver },
-    )
-}
+use super::lockers::LockerError;
 
 struct Shared<T: Transport> {
-    transactions: Mutex<Lockers<MessageBuffer<T>>>,
-    is_stopped: AtomicBool,
+    transactions: Mutex<Lockers<T::RecvBuffer>>,
 }
 
 impl<T: Transport> Shared<T> {
     fn new() -> Self {
-        Self { transactions: Mutex::new(Lockers::new()), is_stopped: AtomicBool::new(false) }
+        Self { transactions: Mutex::new(Lockers::new()) }
     }
+}
+
+/// A type which handles incoming events for a client.
+pub trait ClientHandler<T: Transport> {
+    /// Handles a received client event.
+    ///
+    /// The dispatcher cannot handle more messages until `on_event` completes. If `on_event` may
+    /// block, perform asynchronous work, or take a long time to process a message, it should
+    /// offload work to an async task.
+    fn on_event(&mut self, ordinal: u64, buffer: T::RecvBuffer);
 }
 
 /// A dispatcher for a client endpoint.
 ///
 /// It must be actively polled to receive events and transaction responses.
-pub struct Dispatcher<T: Transport> {
+pub struct ClientDispatcher<T: Transport> {
     shared: Arc<Shared<T>>,
     receiver: T::Receiver,
-    sender: UnboundedSender<Result<MessageBuffer<T>, ProtocolError<T::Error>>>,
 }
 
-impl<T: Transport> Dispatcher<T> {
-    /// Runs the dispatcher.
-    ///
-    /// If the dispatcher encounters an error, it will send the error to the events receiver before
-    /// terminating.
-    pub async fn run(&mut self)
+impl<T: Transport> ClientDispatcher<T> {
+    /// Runs the dispatcher with the provided handler.
+    pub async fn run<H>(&mut self, mut handler: H) -> Result<(), DispatcherError<T::Error>>
     where
-        for<'a> T::Decoder<'a>: Decoder<'a>,
+        H: ClientHandler<T>,
     {
-        if let Err(e) = self.try_run().await {
-            // Ignore errors about the receiver being disconnected, since we still want to pump
-            // the transport even if the user is ignoring events.
-            let _ = self.sender.unbounded_send(Err(e));
-        }
-
-        self.shared.is_stopped.store(true, Ordering::Relaxed);
+        let result = self.run_to_completion(&mut handler).await;
         self.shared.transactions.lock().unwrap().wake_all();
+
+        result
     }
 
-    async fn try_run(&mut self) -> Result<(), ProtocolError<T::Error>>
+    async fn run_to_completion<H>(
+        &mut self,
+        handler: &mut H,
+    ) -> Result<(), DispatcherError<T::Error>>
     where
-        for<'a> T::Decoder<'a>: Decoder<'a>,
+        H: ClientHandler<T>,
     {
-        while let Some(buffer) =
-            T::recv(&mut self.receiver).await.map_err(ProtocolError::TransportError)?
+        while let Some(mut buffer) =
+            T::recv(&mut self.receiver).await.map_err(DispatcherError::TransportError)?
         {
-            let (txid, buffer) = MessageBuffer::parse_header(buffer)?;
+            let (txid, ordinal) =
+                decode_header::<T>(&mut buffer).map_err(DispatcherError::InvalidMessageHeader)?;
             if txid == 0 {
-                // This is an event, send to the receiver
-                // Ignore errors about the receiver being disconnected, since we still want to pump
-                // the transport even if the user is ignoring events.
-                let _ = self.sender.unbounded_send(Ok(buffer));
+                handler.on_event(ordinal, buffer);
             } else {
                 let mut transactions = self.shared.transactions.lock().unwrap();
                 let entry = transactions
                     .get(txid - 1)
-                    .ok_or_else(|| ProtocolError::UnrequestedResponse(txid))?;
+                    .ok_or_else(|| DispatcherError::UnrequestedResponse(txid))?;
 
-                if entry.write(buffer).map_err(|_| ProtocolError::UnrequestedResponse(txid))? {
+                match entry.write(ordinal, buffer) {
+                    // Reader didn't cancel
+                    Ok(false) => (),
                     // Reader canceled, we can drop the entry
-                    transactions.free(txid - 1);
+                    Ok(true) => transactions.free(txid - 1),
+                    Err(LockerError::NotWriteable) => {
+                        return Err(DispatcherError::UnrequestedResponse(txid));
+                    }
+                    Err(LockerError::MismatchedOrdinal { expected, actual }) => {
+                        return Err(DispatcherError::InvalidResponseOrdinal { expected, actual });
+                    }
                 }
             }
         }
@@ -100,44 +95,52 @@ impl<T: Transport> Dispatcher<T> {
 }
 
 /// A client endpoint.
-#[derive(Clone)]
 pub struct Client<T: Transport> {
     shared: Arc<Shared<T>>,
     sender: T::Sender,
 }
 
 impl<T: Transport> Client<T> {
+    /// Creates a new client and dispatcher from a transport.
+    pub fn new(transport: T) -> (Self, ClientDispatcher<T>) {
+        let (sender, receiver) = transport.split();
+        let shared = Arc::new(Shared::new());
+        (Self { shared: shared.clone(), sender }, ClientDispatcher { shared, receiver })
+    }
+
+    /// Closes the channel from the client end.
+    pub fn close(&self) {
+        T::close(&self.sender);
+    }
+
     /// Send a request.
-    pub fn send_request<'s, M>(
-        &'s self,
+    pub fn send_request<M>(
+        &self,
         ordinal: u64,
         request: &mut M,
-    ) -> Result<T::SendFuture<'s>, EncodeError>
+    ) -> Result<T::SendFuture<'_>, EncodeError>
     where
-        for<'a> T::Encoder<'a>: Encoder,
         M: for<'a> Encode<T::Encoder<'a>>,
     {
-        Self::send_message(&self.sender, 0, ordinal, request)
+        self.send_message(0, ordinal, request)
     }
 
     /// Send a request and await for a response.
-    pub fn send_transaction<'s, M>(
-        &'s self,
+    pub fn send_transaction<M>(
+        &self,
         ordinal: u64,
         transaction: &mut M,
-    ) -> Result<TransactionFuture<'s, T>, EncodeError>
+    ) -> Result<TransactionFuture<'_, T>, EncodeError>
     where
-        for<'a> T::Encoder<'a>: Encoder,
         M: for<'a> Encode<T::Encoder<'a>>,
     {
-        let index = self.shared.transactions.lock().unwrap().alloc();
+        let index = self.shared.transactions.lock().unwrap().alloc(ordinal);
 
         // Send with txid = index + 1 because indices start at 0.
-        match Self::send_message(&self.sender, index + 1, ordinal, transaction) {
+        match self.send_message(index + 1, ordinal, transaction) {
             Ok(future) => Ok(TransactionFuture {
                 shared: &self.shared,
                 index,
-                ordinal,
                 state: TransactionFutureState::Sending(future),
             }),
             Err(e) => {
@@ -147,19 +150,25 @@ impl<T: Transport> Client<T> {
         }
     }
 
-    fn send_message<'s, M>(
-        sender: &'s T::Sender,
+    fn send_message<M>(
+        &self,
         txid: u32,
         ordinal: u64,
         message: &mut M,
-    ) -> Result<T::SendFuture<'s>, EncodeError>
+    ) -> Result<T::SendFuture<'_>, EncodeError>
     where
-        for<'a> T::Encoder<'a>: Encoder,
         M: for<'a> Encode<T::Encoder<'a>>,
     {
-        let mut buffer = T::acquire(sender);
-        encode_buffer(&mut buffer, txid, ordinal, message)?;
-        Ok(T::send(sender, buffer))
+        let mut buffer = T::acquire(&self.sender);
+        encode_header::<T>(&mut buffer, txid, ordinal)?;
+        T::encoder(&mut buffer).encode_next(message)?;
+        Ok(T::send(&self.sender, buffer))
+    }
+}
+
+impl<T: Transport> Clone for Client<T> {
+    fn clone(&self) -> Self {
+        Self { shared: self.shared.clone(), sender: self.sender.clone() }
     }
 }
 
@@ -175,7 +184,6 @@ enum TransactionFutureState<'a, T: 'a + Transport> {
 pub struct TransactionFuture<'a, T: Transport> {
     shared: &'a Shared<T>,
     index: u32,
-    ordinal: u64,
     state: TransactionFutureState<'a, T>,
 }
 
@@ -203,14 +211,6 @@ impl<T: Transport> TransactionFuture<'_, T> {
         if let Some(ready) = transactions.get(self.index).unwrap().read(cx.waker()) {
             transactions.free(self.index);
             self.state = TransactionFutureState::Completed;
-
-            if ready.ordinal() != self.ordinal {
-                return Poll::Ready(Err(ProtocolError::InvalidResponseOrdinal {
-                    expected: self.ordinal,
-                    actual: ready.ordinal(),
-                }));
-            }
-
             Poll::Ready(Ok(ready))
         } else {
             Poll::Pending
@@ -219,7 +219,7 @@ impl<T: Transport> TransactionFuture<'_, T> {
 }
 
 impl<T: Transport> Future for TransactionFuture<'_, T> {
-    type Output = Result<MessageBuffer<T>, ProtocolError<T::Error>>;
+    type Output = Result<T::RecvBuffer, T::Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // SAFETY: We treat the state as pinned as long as it is sending.
@@ -231,14 +231,7 @@ impl<T: Transport> Future for TransactionFuture<'_, T> {
                 let pinned = unsafe { Pin::new_unchecked(future) };
                 match pinned.poll(cx) {
                     // The send has not completed yet. Leave the state as sending.
-                    Poll::Pending => {
-                        // If we would pend but the dispatcher is stopped, return an error instead.
-                        if this.shared.is_stopped.load(Ordering::Relaxed) {
-                            return Poll::Ready(Err(ProtocolError::DispatcherStopped));
-                        }
-
-                        Poll::Pending
-                    }
+                    Poll::Pending => Poll::Pending,
                     Poll::Ready(Ok(())) => {
                         // The send completed successfully. Change the state to receiving and poll
                         // for receiving.
@@ -251,7 +244,7 @@ impl<T: Transport> Future for TransactionFuture<'_, T> {
 
                         this.shared.transactions.lock().unwrap().free(this.index);
                         this.state = TransactionFutureState::Completed;
-                        Poll::Ready(Err(ProtocolError::TransportError(e)))
+                        Poll::Ready(Err(e))
                     }
                 }
             }
@@ -260,17 +253,5 @@ impl<T: Transport> Future for TransactionFuture<'_, T> {
             // supposed to happen.
             TransactionFutureState::Completed => unreachable!(),
         }
-    }
-}
-
-/// The events for a client endpoint.
-pub struct Events<T: Transport> {
-    receiver: UnboundedReceiver<Result<MessageBuffer<T>, ProtocolError<T::Error>>>,
-}
-
-impl<T: Transport> Events<T> {
-    /// Returns the next event received by the client, if any.
-    pub async fn next(&mut self) -> Result<Option<MessageBuffer<T>>, ProtocolError<T::Error>> {
-        self.receiver.next().await.transpose()
     }
 }

@@ -33,6 +33,10 @@
 ##  fx rbe ensure_oauth
 ##      Checks for valid OAuth token, and runs gcloud auth if needed.
 ##
+##  fx rbe last_logdir
+##      Prints the path to the most recent RBE log dir corresponding to the
+##      current build output dir.  If none exists, print nothing.
+##
 ##  fx rbe preflight
 ##      Ensure credentials for using remote build services is valid,
 ##      and prompt the user to re-auth if deemed necessary.
@@ -144,8 +148,8 @@ EOF
     # gcert only works in environments that get unrestricted LOAS credentials
     # whereas gcloud auth will always work.
     # https://fuchsia.dev/internal/intree/concepts/remote-builds#authentication
-    gcloud_auth "$@" || {
-      echo "Failed to authenticate with gcloud."
+    ensure_auth_for_reclient "$@" || {
+      echo "Failed to authenticate for reclient."
       return 1
     }
   done
@@ -161,6 +165,14 @@ function setup_bazel_workspace() {
     --topdir="$BAZEL_TEST_DIR"
 }
 
+function get_loas_cert_type_for_bazel() {
+  local loas_cert_type=restricted
+  if [[ "$FX_BUILD_AUTO_AUTH" != 0 ]]
+  then loas_cert_type="$(get_loas_cert_type)"
+  fi
+  echo "$loas_cert_type"
+}
+
 function test_bazel_rbe() {
   setup_bazel_workspace
   # Test authentication to RBE and BES (both share the same gcloud auth).
@@ -168,14 +180,12 @@ function test_bazel_rbe() {
   # stale credentials, and force it to refresh.
   # Limit the number of upload retries to make this operation fail-fast.
 
-  # TODO(b/342026853): using gcert for bazel authentication is opt-in while
-  # it is still experimental.  Opt-in with FX_BUILD_AUTO_AUTH=1.
-  local loas_type=restricted
-  if [[ "$FX_BUILD_AUTO_AUTH" == 1 ]]
-  then loas_type="$(get_loas_cert_type)"
-  fi
+  # TODO(b/342026853): using gcert for bazel authentication is now the default
+  # where applicable.  Opt-out with FX_BUILD_AUTO_AUTH=0.
+  # Eventually this will become permanent.
+  local -r loas_cert_type="$(get_loas_cert_type_for_bazel)"
   local -a auth_config=()
-  if [[ "$loas_type" == "unrestricted" ]]
+  if [[ "$loas_cert_type" == "unrestricted" ]]
   then auth_config+=( --config=gcertauth )
   fi
   (
@@ -183,10 +193,14 @@ function test_bazel_rbe() {
       ../bazel shutdown && \
       ../bazel --nohome_rc \
           test \
+          --nouse_action_cache \
+          --nocache_test_results \
           --config=remote \
           --config=resultstore \
           "${auth_config[@]}" \
           --experimental_build_event_upload_max_retries=1 \
+          --bes_timeout=3s \
+          --bes_upload_mode=wait_for_upload_complete \
           :all
   )
 }
@@ -199,8 +213,10 @@ It will retry until success.
 EOF
   until test_bazel_rbe
   do
-    gcloud_auth "$@" || {
-      echo "Failed to authenticate with gcloud."
+    echo "If the previous build attempt failed due to authentication, follow the prompts to authenticate."
+    suggest_gcert
+    ensure_auth_for_bazel "$@" || {
+      echo "Failed to authenticate for bazel."
       return 1
     }
   done
@@ -303,10 +319,17 @@ function check_loas_subcommand() {
   style::echo --green "$loas_cert_type"
 }
 
-function ensure_loas() {
-  gcertstatus -check_ssh=false --check_remaining=2h > /dev/null || gcert
+function gcert_auth() {
+  gcert
 }
 
+function ensure_loas() {
+  gcertstatus -check_ssh=false --check_remaining=2h > /dev/null || gcert_auth
+}
+
+# With the gcloud auth workflow, there is a risk that the current
+# credentials expire before the end of the build because OAuth tokens
+# only last one hour.
 function ensure_oauth() {
   ensure_gcloud && {
     # Check for the user's id among list of credentialed accounts.
@@ -314,32 +337,70 @@ function ensure_oauth() {
   }
 }
 
-# For builds that use remote services like RBE, ResultStore,
-# ensure that there are valid credentials at the time a build
-# is launched.
-function preflight_subcommand() {
-  if ! fx-build-needs-auth
-  then return 0
-  fi
+function ensure_auth_for_reclient() {
   local -r loas_cert_type="$(get_loas_cert_type)" || {
     exit 1
   }
   case "$loas_cert_type" in
     unrestricted) ensure_loas ;;
     restricted) ensure_oauth ;;
-    # With the gcloud auth workflow, there is a risk that the current
-    # credentials expire before the end of the build because OAuth tokens
-    # only last one hour.
   esac
+}
+
+function ensure_auth_for_bazel() {
+  local -r loas_cert_type="$(get_loas_cert_type_for_bazel)" || {
+    exit 1
+  }
+  case "$loas_cert_type" in
+    unrestricted) ensure_loas ;;
+    restricted) ensure_oauth ;;
+  esac
+}
+
+function suggest_gcert() {
+  [[ "$FX_BUILD_AUTO_AUTH" != 0 ]] || cat <<EOF
+If you continue to see authentication failures, try opting in to
+go/fuchsia-rbe-gcert, by running 'export FX_BUILD_AUTO_AUTH=1' in
+your shell or adding it to your ~/.bashrc file.
+EOF
+}
+
+# For builds that use remote services like RBE, ResultStore,
+# ensure that there are valid credentials at the time a build
+# is launched.
+function preflight_subcommand() {
+  # If no authenticated services are used, this is a no-op.
+  if ! fx-build-needs-auth
+  then return 0
+  fi
+  ensure_auth_for_reclient && ensure_auth_for_bazel
 }
 
 # LINT.IfChange(reproxy_log_dirs)
 # vars.sh:fx-run-ninja writes RBE logs here:
-readonly rbe_logs_dir="${FUCHSIA_DIR}/out/.reproxy_logs"
+readonly rbe_logs_dir_root="${FUCHSIA_DIR}/out/.reproxy_logs"
 # LINT.ThenChange(/tools/devshell/lib/vars.sh:reproxy_log_dirs)
 function cleanlogs_subcommand() {
-  echo "Removing $rbe_logs_dir"
-  rm -rf "$rbe_logs_dir"
+  echo "Removing $rbe_logs_dir_root"
+  rm -rf "$rbe_logs_dir_root"
+}
+
+# Print the path to the most recent reproxy log dir for the current
+# build output directory.  If none exists, print nothing.
+function last_logdir_subcommand() {
+  fx-build-dir-if-present || return
+  # Location based on $FUCHSIA_DIR/build/rbe/fuchsia-reproxy-wrap.sh
+  local -r build_subdir="$(basename "${FUCHSIA_BUILD_DIR}")"
+  local -r out_dir="$(basename "$(dirname "${FUCHSIA_BUILD_DIR}")")"
+  local -r logs_dir="${FUCHSIA_DIR}/${out_dir}/.reproxy_logs/${build_subdir}"
+  if [[ -d "$logs_dir" ]]
+  then
+    local -r recent_rbe_log_dir="$(ls -1 -d "${logs_dir}"/reproxy.* | tail -n 1)"
+    if [[ -d "$recent_rbe_log_dir" ]]
+    then
+      echo "$recent_rbe_log_dir"
+    fi
+  fi
 }
 
 # main
@@ -355,6 +416,7 @@ case "$action" in
   cleanlogs) cleanlogs_subcommand "${action_args[@]}" ;;
   ensure_loas) ensure_loas "${action_args[@]}" ;;
   ensure_oauth) ensure_oauth "${action_args[@]}" ;;
+  last_logdir) last_logdir_subcommand "${action_args[@]}" ;;
   preflight) preflight_subcommand "${action_args[@]}" ;;
 
   *)

@@ -18,6 +18,7 @@ archivist_optimized_binary("logging-bin") {
     "//src/developer/fuchsia-criterion",
     "//src/diagnostics/archivist:lib",
     "//src/lib/diagnostics/log/encoding/rust",
+    "//src/lib/diagnostics/log/types",
     "//src/lib/fuchsia-async",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:futures",

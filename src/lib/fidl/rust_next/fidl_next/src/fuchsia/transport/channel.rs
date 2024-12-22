@@ -8,10 +8,12 @@ use core::future::Future;
 use core::mem::replace;
 use core::pin::Pin;
 use core::slice::from_raw_parts_mut;
-use core::task::{ready, Context, Poll};
+use core::sync::atomic::{AtomicBool, Ordering};
+use core::task::{Context, Poll};
 use std::sync::Arc;
 
 use fuchsia_async::{RWHandle, ReadableHandle as _};
+use futures::task::AtomicWaker;
 use zx::sys::{
     zx_channel_read, zx_channel_write, ZX_ERR_BUFFER_TOO_SMALL, ZX_ERR_PEER_CLOSED,
     ZX_ERR_SHOULD_WAIT, ZX_OK,
@@ -24,17 +26,24 @@ use crate::protocol::Transport;
 use crate::{Chunk, DecodeError, Decoder, Encoder, CHUNK_SIZE};
 
 struct Shared {
+    is_closed: AtomicBool,
+    closed_waker: AtomicWaker,
     channel: RWHandle<Channel>,
     // TODO: recycle send/recv buffers to reduce allocations
 }
 
 impl Shared {
     fn new(channel: Channel) -> Self {
-        Self { channel: RWHandle::new(channel) }
+        Self {
+            is_closed: AtomicBool::new(false),
+            closed_waker: AtomicWaker::new(),
+            channel: RWHandle::new(channel),
+        }
     }
 }
 
 /// A channel sender.
+#[derive(Clone)]
 pub struct Sender {
     shared: Arc<Shared>,
 }
@@ -180,7 +189,13 @@ impl Future for RecvFuture<'_> {
                     buffer.handles.reserve(actual_handles as usize - buffer.handles.capacity());
                 }
                 ZX_ERR_SHOULD_WAIT => {
-                    ready!(this.shared.channel.need_readable(cx)?);
+                    if matches!(this.shared.channel.need_readable(cx)?, Poll::Pending) {
+                        this.shared.closed_waker.register(cx.waker());
+                        if this.shared.is_closed.load(Ordering::Relaxed) {
+                            return Poll::Ready(Ok(None));
+                        }
+                        return Poll::Pending;
+                    }
                 }
                 raw => return Poll::Ready(Err(Status::from_raw(raw))),
             }
@@ -288,6 +303,11 @@ impl Transport for Channel {
         SendFuture { shared: &sender.shared, buffer }
     }
 
+    fn close(sender: &Self::Sender) {
+        sender.shared.is_closed.store(true, Ordering::Relaxed);
+        sender.shared.closed_waker.wake();
+    }
+
     type Receiver = Receiver;
     type RecvFuture<'r> = RecvFuture<'r>;
     type RecvBuffer = RecvBuffer;
@@ -308,6 +328,12 @@ mod tests {
     use zx::Channel;
 
     use crate::testing::transport::*;
+
+    #[fasync::run_singlethreaded(test)]
+    async fn close_on_drop() {
+        let (client_end, server_end) = Channel::create();
+        test_close_on_drop(client_end, server_end).await;
+    }
 
     #[fasync::run_singlethreaded(test)]
     async fn send_receive() {

@@ -49,7 +49,7 @@ class PDevFidl {
                   "|FidlType| cannot be a resource type. Resources cannot be persisted.");
 
     fidl::WireResult encoded_metadata =
-        pdev_->GetMetadata2(fidl::StringView::FromExternal(metadata_id));
+        pdev_->GetMetadata(fidl::StringView::FromExternal(metadata_id));
     if (!encoded_metadata.ok()) {
       return zx::error(encoded_metadata.status());
     }

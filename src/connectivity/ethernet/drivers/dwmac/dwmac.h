@@ -11,7 +11,7 @@
 #include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <fuchsia/hardware/test/c/banjo.h>
 #include <lib/ddk/device.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/interrupt.h>
@@ -105,7 +105,7 @@ class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspen
   static constexpr uint8_t kPortId = 13;
   static constexpr size_t kMtu = MAC_MAX_FRAME_SZ;
 
-  DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev, zx::bti bti,
+  DWMacDevice(zx_device_t* device, fdf::PDev pdev, zx::bti bti,
               fidl::ClientEnd<fuchsia_hardware_ethernet_board::EthBoard> eth_board);
 
   static zx_status_t Create(void* ctx, zx_device_t* device);
@@ -195,7 +195,7 @@ class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspen
   const zx::bti bti_;
   zx::interrupt dma_irq_;
 
-  ddk::PDevFidl pdev_;
+  fdf::PDev pdev_;
   fidl::WireSyncClient<fuchsia_hardware_ethernet_board::EthBoard> eth_board_;
 
   std::optional<fdf::MmioBuffer> mmio_;

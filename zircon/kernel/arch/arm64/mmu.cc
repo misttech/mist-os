@@ -33,7 +33,9 @@
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/mutex.h>
 #include <ktl/algorithm.h>
+#include <ktl/span.h>
 #include <lk/init.h>
+#include <phys/arch/arch-handoff.h>
 #include <vm/arch_vm_aspace.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
@@ -61,19 +63,13 @@
 static_assert((MMU_PTE_ATTR_RES_SOFTWARE & MMU_PTE_ATTR_RES_SOFTWARE_AF) ==
               MMU_PTE_ATTR_RES_SOFTWARE_AF);
 
-static_assert(((long)KERNEL_BASE >> MMU_KERNEL_SIZE_SHIFT) == -1, "");
+static_assert(((long)kArchHandoffVirtualAddress >> MMU_KERNEL_SIZE_SHIFT) == -1, "");
 static_assert(((long)KERNEL_ASPACE_BASE >> MMU_KERNEL_SIZE_SHIFT) == -1, "");
 static_assert(MMU_KERNEL_SIZE_SHIFT <= 48, "");
 static_assert(MMU_KERNEL_SIZE_SHIFT >= 25, "");
 
-// Static relocated base to prepare for KASLR. Used at early boot and by gdb
-// script to know the target relocated address.
 // TODO(https://fxbug.dev/42098994): Choose it randomly.
-#if DISABLE_KASLR
-uint64_t kernel_relocated_base = KERNEL_BASE;
-#else
-uint64_t kernel_relocated_base = 0xffffffff10000000;
-#endif
+uint64_t kernel_relocated_base = kArchHandoffVirtualAddress;
 
 // The main translation table for the kernel. Globally declared because it's reached
 // from assembly.
@@ -2289,6 +2285,25 @@ void ArmArchVmAspace::ContextSwitch(ArmArchVmAspace* old_aspace, ArmArchVmAspace
   if (TRACE_CONTEXT_SWITCH) {
     TRACEF("old aspace %p aspace %p ttbr %#" PRIx64 ", tcr %#" PRIx64 "\n", old_aspace, aspace,
            ttbr, tcr);
+  }
+}
+
+void ArmArchVmAspace::HandoffPageTablesFromPhysboot(list_node_t* mmu_pages) {
+  while (list_node_t* node = list_remove_head(mmu_pages)) {
+    vm_page_t* page = reinterpret_cast<vm_page_t*>(node);
+    page->set_state(vm_page_state::MMU);
+
+    ktl::span entries{
+        reinterpret_cast<pte_t*>(paddr_to_physmap(page->paddr())),
+        PAGE_SIZE / sizeof(pte_t),
+    };
+    page->mmu.num_mappings = 0;
+    for (pte_t entry : entries) {
+      if ((entry & MMU_PTE_VALID) != 0) {
+        page->mmu.num_mappings++;
+      }
+    }
+    page->set_state(vm_page_state::MMU);
   }
 }
 

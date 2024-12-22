@@ -14,23 +14,15 @@ rustc_library("perfetto-consumer") {
   sources = [ "lib.rs" ]
 
   deps = [
-    ":perfetto_consumer_proto",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-observer",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
+    "//src/starnix/lib/perfetto",
+    "//src/starnix/lib/perfetto:perfetto_consumer_proto",
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:prost",
   ]
-}
-
-rust_proto_library("perfetto_consumer_proto") {
-  sources = [
-    "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
-    "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
-  ]
-  packages = [ "perfetto.protos" ]
-  include_dirs = [ "//third_party/perfetto" ]
 }

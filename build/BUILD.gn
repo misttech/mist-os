@@ -166,6 +166,7 @@ group("non_hermetic_deps") {
     "//src/devices/i2c/drivers/aml-i2c:*",
     "//src/devices/spmi/lib/hwreg-spmi:*",
     "//src/devices/usb/drivers/aml-usb-phy:*",
+    "//src/devices/usb/drivers/dwc3:*",
     "//src/media/audio/drivers/aml-g12-tdm:*",
     "//src/starnix/kernel/device/gpu/gfxstream/*",
     "//src/ui/input/drivers/adc-buttons:*",

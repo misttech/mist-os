@@ -148,8 +148,8 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42068210): Unused import error.
       "fidlgen_go",
     ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -159,10 +159,6 @@ fidl_testdata_info = [
     build_denylist = [
       # TODO(https://fxbug.dev/42052603): Fix.
       "fidlgen_libfuzzer",
-    ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
-      "fidlgen_rust_next",
     ]
   },
   {
@@ -187,10 +183,6 @@ fidl_testdata_info = [
     build_denylist = [
       # TODO(https://fxbug.dev/42052603): Fix.
       "fidlgen_libfuzzer",
-    ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
-      "fidlgen_rust_next",
     ]
   },
   {
@@ -275,14 +267,14 @@ fidl_testdata_info = [
     target = "//tools/fidl/fidlc/testdata:test.handles"
     build_denylist = [ "fidlgen_libfuzzer" ]
     denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support bindings denylists yet.
       "fidlgen_rust_next",
     ]
   },
   {
     name = "handles_in_types"
     target = "//tools/fidl/fidlc/testdata:test.handlesintypes"
-    denylist = [
+    host_build_denylist = [
       # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
@@ -311,9 +303,8 @@ fidl_testdata_info = [
 
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
-    ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
+
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -345,10 +336,6 @@ fidl_testdata_info = [
       # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "padding"
@@ -364,10 +351,6 @@ fidl_testdata_info = [
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
     ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "protocol_layouts"
@@ -379,9 +362,6 @@ fidl_testdata_info = [
 
       # TODO(https://fxbug.dev/42068207): Re-enable when fixed.
       "fidlgen_go",
-
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
-      "fidlgen_rust_next",
     ]
   },
   {
@@ -397,10 +377,6 @@ fidl_testdata_info = [
     name = "protocol_payloads"
     target =
         "//tools/fidl/fidlc/testdata/protocol_payloads:test.protocolpayloads"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "protocol_request"
@@ -418,9 +394,8 @@ fidl_testdata_info = [
 
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
-    ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
+
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -437,9 +412,8 @@ fidl_testdata_info = [
 
       # TODO(https://fxbug.dev/42151687): Encode libfuzzer dependency on HLCPP and LLCPP.
       "fidlgen_libfuzzer",
-    ]
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
+
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -506,8 +480,8 @@ fidl_testdata_info = [
   {
     name = "types_in_protocols"
     target = "//tools/fidl/fidlc/testdata:test.typesinprotocols"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
+    host_build_denylist = [
+      # Host-side FIDL doesn't support handles
       "fidlgen_rust_next",
     ]
   },
@@ -530,14 +504,14 @@ fidl_testdata_info = [
   {
     name = "unknown_interactions"
     target = "//tools/fidl/fidlc/testdata:test.unknowninteractions"
-    denylist = [
-      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next doesn't support protocols yet.
-      "fidlgen_rust_next",
-    ]
   },
   {
     name = "vectors"
     target = "//tools/fidl/fidlc/testdata:test.vectors"
+  },
+  {
+    name = "serializable"
+    target = "//tools/fidl/fidlc/testdata:test.serializable"
   },
   {
     name = "versions"

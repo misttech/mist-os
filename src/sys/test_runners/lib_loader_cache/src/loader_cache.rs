@@ -8,9 +8,9 @@ use fidl_fuchsia_ldsvc::{LoaderMarker, LoaderRequest};
 use ftestrunner::LibraryLoaderCacheMarker;
 use futures::lock::Mutex as FutMutex;
 use futures::prelude::*;
+use log::warn;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
-use tracing::warn;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_test_runner as ftestrunner, fuchsia_async as fasync};
 
 /// maps vmo key with vmo result.

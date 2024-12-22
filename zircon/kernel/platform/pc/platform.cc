@@ -152,7 +152,7 @@ void platform_mexec_prep(uintptr_t final_bootimage_addr, size_t final_bootimage_
 }
 
 void platform_mexec(mexec_asm_func mexec_assembly, memmov_ops_t* ops, uintptr_t new_bootimage_addr,
-                    size_t new_bootimage_len, uintptr_t entry64_addr) {
+                    size_t new_bootimage_len, uintptr_t new_kernel_entry) {
   DEBUG_ASSERT(arch_ints_disabled());
   DEBUG_ASSERT(mp_get_online_mask() == cpu_num_to_mask(BOOT_CPU_ID));
 
@@ -189,8 +189,8 @@ void platform_mexec(mexec_asm_func mexec_assembly, memmov_ops_t* ops, uintptr_t 
 
   ptl4[0] = vaddr_to_paddr((void*)ptl3) | X86_KERNEL_PD_FLAGS;
 
-  mexec_assembly((uintptr_t)new_bootimage_addr, vaddr_to_paddr((void*)ptl4), entry64_addr, 0, ops,
-                 0);
+  mexec_assembly((uintptr_t)new_bootimage_addr, vaddr_to_paddr((void*)ptl4), 0, 0, ops,
+                 new_kernel_entry);
 }
 
 void platform_early_init(void) {

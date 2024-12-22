@@ -29,24 +29,24 @@ enum CopyDirection {
 impl CopyDirection {
     fn log_read_fail(&self, err: io::Error) {
         match self {
-            CopyDirection::StdIn => tracing::warn!("Failed receiving data from host: {err:?}"),
-            CopyDirection::StdOut => tracing::warn!("Failed receiving data from RCS: {err:?}"),
+            CopyDirection::StdIn => log::warn!("Failed receiving data from host: {err:?}"),
+            CopyDirection::StdOut => log::warn!("Failed receiving data from RCS: {err:?}"),
         }
     }
 
     fn log_write_fail(&self, err: io::Error) {
         match self {
-            CopyDirection::StdIn => tracing::warn!("Failed sending data to RCS: {err:?}"),
-            CopyDirection::StdOut => tracing::warn!("Failed sending data to host: {err:?}"),
+            CopyDirection::StdIn => log::warn!("Failed sending data to RCS: {err:?}"),
+            CopyDirection::StdOut => log::warn!("Failed sending data to host: {err:?}"),
         }
     }
 
     fn log_write_zero(&self) {
         match self {
-            CopyDirection::StdIn => tracing::error!(
+            CopyDirection::StdIn => log::error!(
                 "Writing to RCS socket returned zero-byte success. This should be impossible?!"
             ),
-            CopyDirection::StdOut => tracing::error!(
+            CopyDirection::StdOut => log::error!(
                 "Writing to RCS socket returned zero-byte success. This should be impossible?!"
             ),
         }
@@ -55,10 +55,10 @@ impl CopyDirection {
     fn log_flush_error(&self, err: io::Error) {
         match self {
             CopyDirection::StdIn => {
-                tracing::warn!("Flushing data toward RCS after shutdown gave {err:?}")
+                log::warn!("Flushing data toward RCS after shutdown gave {err:?}")
             }
             CopyDirection::StdOut => {
-                tracing::warn!("Flushing data toward the host after shutdown gave {err:?}")
+                log::warn!("Flushing data toward the host after shutdown gave {err:?}")
             }
         }
     }
@@ -66,10 +66,10 @@ impl CopyDirection {
     fn log_closed(&self) {
         match self {
             CopyDirection::StdIn => {
-                tracing::info!("Stream from the host toward RCS terminated normally")
+                log::info!("Stream from the host toward RCS terminated normally")
             }
             CopyDirection::StdOut => {
-                tracing::info!("Stream from RCS toward the host terminated normally")
+                log::info!("Stream from RCS toward the host terminated normally")
             }
         }
     }
@@ -166,16 +166,14 @@ async fn main() -> Result<()> {
         let status: CompatibilityState;
         let message = match HISTORY.check_abi_revision_for_runtime(host_overnet_revision) {
             Ok(_) => {
-                tracing::info!(
-                    "Host overnet is running supported revision: {host_overnet_revision}"
-                );
+                log::info!("Host overnet is running supported revision: {host_overnet_revision}");
                 status = CompatibilityState::Supported;
                 "Host overnet is running supported revision".to_string()
             }
             Err(e) => {
                 status = e.clone().into();
                 let warning = format!("abi revision {host_overnet_revision} not supported: {e}");
-                tracing::warn!("{warning}");
+                log::warn!("{warning}");
                 warning
             }
         };
@@ -184,7 +182,7 @@ async fn main() -> Result<()> {
         // This is the legacy caller that does not support compatibility checking. Do not write anything
         // to stdout.
         // messages to stderr will cause the pipe to close as well.
-        tracing::warn!("--abi-revision not present. Compatibility checks are disabled.");
+        log::warn!("--abi-revision not present. Compatibility checks are disabled.");
     }
 
     let rcs_proxy = connect_to_protocol::<ConnectorMarker>()?;

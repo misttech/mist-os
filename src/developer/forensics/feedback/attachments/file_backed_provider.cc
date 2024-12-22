@@ -21,13 +21,13 @@ FileBackedProvider::FileBackedProvider(std::string path) : path_(std::move(path)
     data = content.empty() ? AttachmentValue(Error::kMissingValue)
                            : AttachmentValue(std::move(content));
   } else {
-    FX_LOGS(WARNING) << "Failed to read: " << path_;
+    FX_LOGS_FIRST_N(WARNING, 1) << "Failed to read: " << path_;
     data = AttachmentValue(Error::kFileReadFailure);
   }
 
   if (!data.HasValue()) {
-    FX_LOGS(WARNING) << "Failed to build attachment '" << path_
-                     << "' due to error: " << ToString(data.Error());
+    FX_LOGS_FIRST_N(WARNING, 1) << "Failed to build attachment '" << path_
+                                << "' due to error: " << ToString(data.Error());
   }
   return fpromise::make_ok_promise(std::move(data));
 }

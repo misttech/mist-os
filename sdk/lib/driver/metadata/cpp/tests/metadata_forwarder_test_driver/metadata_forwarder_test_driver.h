@@ -6,9 +6,10 @@
 #define LIB_DRIVER_METADATA_CPP_TESTS_METADATA_FORWARDER_TEST_DRIVER_METADATA_FORWARDER_TEST_DRIVER_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.test/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/driver/metadata/cpp/tests/fuchsia.hardware.test/metadata.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/node/cpp/add_child.h>
 
 namespace fdf_metadata::test {
@@ -44,7 +45,7 @@ class MetadataForwarderTestDriver : public fdf::DriverBase,
   driver_devfs::Connector<fuchsia_hardware_test::MetadataForwarder> devfs_connector_{
       fit::bind_member<&MetadataForwarderTestDriver::Serve>(this)};
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  fuchsia_hardware_test::MetadataServer metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_test::Metadata> metadata_server_;
 #endif
 
   std::optional<fdf::OwnedChildNode> controller_node_;

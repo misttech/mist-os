@@ -4,7 +4,7 @@
 
 //! A minimal script to configure and start a DHCP server.
 
-use tracing::info;
+use log::info;
 use {
     delegated_provisioning_constants as constants, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_dhcp as fnet_dhcp,

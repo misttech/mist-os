@@ -21,7 +21,8 @@ use net_types::{AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_core::device::{ArpConfiguration, ArpConfigurationUpdate, DeviceId, WeakDeviceId};
 use netstack3_core::error::{ExistsError, NotFoundError};
 use netstack3_core::ip::{
-    Lifetime, PreferredLifetime, SlaacConfiguration, SlaacConfigurationUpdate,
+    IgmpConfigMode, Lifetime, MldConfigMode, PreferredLifetime, SlaacConfiguration,
+    SlaacConfigurationUpdate,
 };
 use netstack3_core::neighbor::{NudUserConfig, NudUserConfigUpdate};
 use netstack3_core::routes::{
@@ -1437,10 +1438,28 @@ impl TryFromFidl<fnet_interfaces_ext::PreferredLifetimeInfo>
     }
 }
 
+impl IntoFidl<fnet_interfaces_admin::MldVersion> for MldConfigMode {
+    fn into_fidl(self) -> fnet_interfaces_admin::MldVersion {
+        match self {
+            Self::V1 => fnet_interfaces_admin::MldVersion::V1,
+            Self::V2 => fnet_interfaces_admin::MldVersion::V2,
+        }
+    }
+}
+
+impl IntoFidl<fnet_interfaces_admin::IgmpVersion> for IgmpConfigMode {
+    fn into_fidl(self) -> fnet_interfaces_admin::IgmpVersion {
+        match self {
+            Self::V1 => fnet_interfaces_admin::IgmpVersion::V1,
+            Self::V2 => fnet_interfaces_admin::IgmpVersion::V2,
+            Self::V3 => fnet_interfaces_admin::IgmpVersion::V3,
+        }
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod testutils {
     use crate::bindings::integration_tests::{StackSetupBuilder, TestSetup, TestSetupBuilder};
-    use const_unwrap::const_unwrap_option;
 
     use super::*;
 
@@ -1449,9 +1468,9 @@ pub(crate) mod testutils {
     }
 
     impl FakeConversionContext {
-        pub(crate) const BINDING_ID1: BindingId = const_unwrap_option(NonZeroU64::new(1));
-        pub(crate) const BINDING_ID2: BindingId = const_unwrap_option(NonZeroU64::new(2));
-        pub(crate) const INVALID_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(3));
+        pub(crate) const BINDING_ID1: BindingId = NonZeroU64::new(1).unwrap();
+        pub(crate) const BINDING_ID2: BindingId = NonZeroU64::new(2).unwrap();
+        pub(crate) const INVALID_BINDING_ID: BindingId = NonZeroU64::new(3).unwrap();
 
         pub(crate) async fn shutdown(self) {
             let Self { test_setup } = self;

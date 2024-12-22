@@ -10,7 +10,6 @@ use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::MerkleTree;
 use fuchsia_pkg::PackageManifest;
-use std::collections::BTreeMap;
 use std::fs::File;
 use tracing::info;
 use utf8_path::path_relative_from_current_dir;
@@ -18,12 +17,6 @@ use utf8_path::path_relative_from_current_dir;
 #[derive(Debug)]
 pub struct BasePackage {
     pub merkle: Hash,
-    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub contents: BTreeMap<String, String>,
-    // TODO(https://fxbug.dev/332406669): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub path: Utf8PathBuf,
     pub manifest_path: Utf8PathBuf,
 }
 
@@ -75,13 +68,8 @@ pub fn construct_base_package(
     std::fs::write(merkle_path, hex::encode(base_merkle.as_bytes()))?;
 
     let base_package_path_relative = path_relative_from_current_dir(base_package_path)?;
-    assembly_manifest.images.push(Image::BasePackage(base_package_path_relative.clone()));
-    Ok(BasePackage {
-        merkle: base_merkle,
-        contents: build_results.contents,
-        path: base_package_path_relative,
-        manifest_path: build_results.manifest_path,
-    })
+    assembly_manifest.images.push(Image::BasePackage(base_package_path_relative));
+    Ok(BasePackage { merkle: base_merkle, manifest_path: build_results.manifest_path })
 }
 
 #[cfg(test)]
@@ -110,22 +98,12 @@ mod tests {
         // Construct the base package.
         let mut assembly_manifest =
             AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        let base_package = construct_base_package(
-            &mut assembly_manifest,
-            dir,
-            dir,
-            "system_image",
-            &product_config,
-        )
-        .unwrap();
-
-        assert_eq!(
-            base_package.path,
-            path_relative_from_current_dir(dir.join("base/meta.far")).unwrap()
-        );
+        construct_base_package(&mut assembly_manifest, dir, dir, "system_image", &product_config)
+            .unwrap();
 
         // Read the base package, and assert the contents are correct.
-        let base_package_file = File::open(base_package.path).unwrap();
+        let base_package_path = path_relative_from_current_dir(dir.join("base/meta.far")).unwrap();
+        let base_package_file = File::open(base_package_path).unwrap();
         let mut far_reader = Utf8Reader::new(&base_package_file).unwrap();
         let contents = far_reader.read_file("meta/contents").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();
@@ -155,21 +133,12 @@ mod tests {
         // Construct the base package.
         let mut assembly_manifest =
             AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
-        let base_package = construct_base_package(
-            &mut assembly_manifest,
-            dir,
-            dir,
-            "system_image",
-            &product_config,
-        )
-        .unwrap();
-        assert_eq!(
-            base_package.path,
-            path_relative_from_current_dir(dir.join("base/meta.far")).unwrap()
-        );
+        construct_base_package(&mut assembly_manifest, dir, dir, "system_image", &product_config)
+            .unwrap();
 
         // Read the base package, and assert the contents are correct.
-        let base_package_file = File::open(base_package.path).unwrap();
+        let base_package_path = path_relative_from_current_dir(dir.join("base/meta.far")).unwrap();
+        let base_package_file = File::open(base_package_path).unwrap();
         let mut far_reader = Utf8Reader::new(&base_package_file).unwrap();
         let contents = far_reader.read_file("meta/package").unwrap();
         let contents = std::str::from_utf8(&contents).unwrap();

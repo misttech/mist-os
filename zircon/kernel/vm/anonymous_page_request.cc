@@ -7,6 +7,7 @@
 #include "vm/anonymous_page_request.h"
 
 #include <kernel/lockdep.h>
+#include <kernel/thread.h>
 #include <vm/pmm.h>
 
 zx_status_t AnonymousPageRequest::Wait() {
@@ -16,6 +17,9 @@ zx_status_t AnonymousPageRequest::Wait() {
   // Therefore blanket require no locks here to ensure no accidental lock dependencies. This can be
   // relaxed in the future if necessary.
   lockdep::AssertNoLocksHeld();
+
+  // Time spent waiting is regarded as a memory stall.
+  ScopedMemoryStall memory_stall;
 
   // This should only ever end up waiting momentarily until reclamation catches up. As such if we
   // end up waiting for a long time then this is probably a sign of a bug in reclamation somewhere,

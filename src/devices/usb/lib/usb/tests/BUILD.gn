@@ -35,6 +35,7 @@ test("usb-request-test-bin") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+  defines = [ "DFV1_LOGGING" ]
 }
 
 test("usb-wrapper-test-bin") {

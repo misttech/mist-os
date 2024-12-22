@@ -26,7 +26,6 @@ group("tests") {
 # Run using the following command:
 # fx test //scripts/versioning:update_platform_version_tests
 python_host_test("update_platform_version_tests") {
-  enable_mypy = true
   main_source = "update_platform_version_tests.py"
   sources = [ "update_platform_version.py" ]
 }

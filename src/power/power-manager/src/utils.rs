@@ -15,13 +15,13 @@ use zx::MonotonicDuration;
 macro_rules! log_if_false_and_debug_assert {
     ($cond:expr, $msg:expr) => {
         if !($cond) {
-            tracing::error!($msg);
+            log::error!($msg);
             debug_assert!($cond, $msg);
         }
     };
     ($cond:expr, $fmt:expr, $($arg:tt)+) => {
         if !($cond) {
-            tracing::error!($fmt, $($arg)+);
+            log::error!($fmt, $($arg)+);
             debug_assert!($cond, $fmt, $($arg)+);
         }
     };
@@ -137,7 +137,7 @@ pub async fn get_temperature_driver_proxy(
     }
     // If `sensor_name` is not found, print all the error messages to help with debugging.
     for (i, message) in debug_messages.into_iter().enumerate() {
-        tracing::error!("Failed to find temperature driver debug message [{}]: {:?}", i, message);
+        log::error!("Failed to find temperature driver debug message [{}]: {:?}", i, message);
     }
     return Err(anyhow::anyhow!(
         "Failed to find temperature driver with sensor name: {:?}.",
@@ -169,8 +169,7 @@ async fn get_temperature_driver_proxy_from_dir(
                 .filename
                 .as_path()
                 .to_str()
-                .ok_or_else(|| anyhow::anyhow!("Failed to convert filename to string"))?
-                .to_owned();
+                .ok_or_else(|| anyhow::anyhow!("Failed to convert filename to string"))?;
             if filename != "." {
                 if watch_msg.event == fuchsia_fs::directory::WatchEvent::ADD_FILE
                     || watch_msg.event == fuchsia_fs::directory::WatchEvent::EXISTING
@@ -182,7 +181,10 @@ async fn get_temperature_driver_proxy_from_dir(
                         .get_sensor_name()
                         .await
                         .map_err(|e| anyhow::anyhow!("GetSensorName failed with err: {:?}", e))?;
-                    tracing::debug!(filename, dir_path, sensor_name, "Temperature driver detected");
+                    log::debug!(
+                        filename, dir_path, sensor_name = sensor_name.as_str();
+                        "Temperature driver detected"
+                    );
 
                     if required_sensor_name == sensor_name {
                         return Ok(proxy);

@@ -12,7 +12,7 @@ rustc_test("error_logging_test_bin") {
   name = "error_logging_test"
   deps = [
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   sources = [ "error_logging_test.rs" ]
 }
@@ -23,7 +23,7 @@ rustc_test("logging_test_bin") {
   name = "logging_test"
   deps = [
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   sources = [ "logging_test.rs" ]
 }
@@ -34,7 +34,7 @@ rustc_test("log_then_hang_test_bin") {
   name = "log_then_hang_test"
   deps = [
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   sources = [ "log_then_hang.rs" ]
 }
@@ -65,7 +65,7 @@ rustc_test("stdout_ansi_test_bin") {
   deps = [
     "//src/lib/fuchsia",
     "//third_party/rust_crates:ansi_term",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   sources = [ "stdout_ansi_test.rs" ]
 }

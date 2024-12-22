@@ -4,9 +4,9 @@
 
 use anyhow::Error;
 use futures::StreamExt;
+use log::*;
 use serde_json::Value;
 use std::sync::Arc;
-use tracing::*;
 
 // Sl4f related inclusions
 use crate::common_utils::error::Sl4fError;
@@ -29,7 +29,7 @@ async fn handle_request(sl4f: Arc<Sl4f>, request: AsyncRequest) {
             done.send(()).unwrap();
         }
         AsyncRequest::Command(AsyncCommandRequest { tx, method_id, params }) => {
-            info!(tag = "run_fidl_loop", ?tx, ?method_id, ?params, "Received synchronous request");
+            info!(tag = "run_fidl_loop", tx:?, method_id:?, params:?; "Received synchronous request");
             match method_to_fidl(method_id, params, Arc::clone(&sl4f)).await {
                 Ok(response) => {
                     let async_response = AsyncResponse::new(Ok(response));
@@ -39,7 +39,7 @@ async fn handle_request(sl4f: Arc<Sl4f>, request: AsyncRequest) {
                     let _ = tx.send(async_response);
                 }
                 Err(err) => {
-                    error!(?err, "Error returned from calling method_to_fidl");
+                    error!(err:?; "Error returned from calling method_to_fidl");
                     let async_response = AsyncResponse::new(Err(err));
 
                     // Ignore any tx sending errors since there is not a recovery path.  The

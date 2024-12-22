@@ -6,9 +6,8 @@ mod config_domain;
 mod file_states;
 mod fuchsia_env;
 
-pub use config_domain::*;
-pub use file_states::*;
-pub use fuchsia_env::*;
+pub use config_domain::{ConfigDomain, FileError};
+pub use fuchsia_env::{ConfigMap, ConfigPath, FuchsiaEnv};
 
 #[cfg(test)]
 pub mod tests {

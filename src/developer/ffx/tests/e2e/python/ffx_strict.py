@@ -63,6 +63,20 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
         super().setup_test()
         self.dut.ffx.run(["daemon", "stop"])
 
+    def _get_config_str(self, keys: List[str]) -> str:
+        outputs = []
+        for key in keys:
+            output = json.loads(
+                self.run_ffx(["config", "get", "-s", "first", key])
+            )
+            asserts.assert_true(
+                isinstance(output, Text),
+                f"Value for {key} is not a string: {output}",
+            )
+            output = output.strip().replace('"', "")
+            outputs.append(f"{key}={output}")
+        return ",".join(outputs)
+
     def _get_ssh_key_information(self) -> Tuple[Text, Text]:
         ssh_pub_output = json.loads(
             self.run_ffx(["config", "get", "-s", "first", "ssh.pub"])
@@ -168,8 +182,12 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
     def test_target_list_strict(self) -> None:
         """Test `ffx --strict target list` does not affect daemon state."""
         self._get_ssh_key_information()
+        keys = ["emu.instance_dir"]
+        configs = self._get_config_str(keys)
         output = self._run_strict_ffx(
             [
+                "-c",
+                configs,
                 "target",
                 "list",
                 self.dut_name,

@@ -6,6 +6,8 @@
 #include <lib/driver/power/cpp/wake-lease.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/clock.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
@@ -50,8 +52,16 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name
 bool WakeLease::HandleInterrupt(zx::duration timeout) {
   // Only acquire a wake lease if the system state is appropriate.
   if (!system_suspended_) {
+    // If we don't acquire a wake lease, store the time we would have held it
+    // until. If we start suspension before this time, we'll acquire a wake
+    // lease then and hold it until the timeout.
+    prevent_sleep_before_ = zx::clock::get_monotonic().get() + timeout.to_nsecs();
     return false;
   }
+
+  // Since we're acquiring a wake lease, reset our sleep prevention time since
+  // we don't need to check upon suspension starting.
+  prevent_sleep_before_ = 0;
   return AcquireWakeLease(timeout);
 }
 
@@ -97,7 +107,7 @@ bool WakeLease::AcquireWakeLease(zx::duration timeout) {
 void WakeLease::DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_deadline) {
   if (lease_) {
     if (timeout_deadline < lease_task_.last_deadline()) {
-      // If the current least out lives the new one, don't need to do anything.
+      // If the current lease out lives the new one, don't need to do anything.
       return;
     }
     // If already holding a lease, cancel the current timeout.
@@ -110,10 +120,22 @@ void WakeLease::DepositWakeLease(zx::eventpair wake_lease, zx::time timeout_dead
   lease_task_.PostForTime(dispatcher_, timeout_deadline);
 }
 
-zx::eventpair WakeLease::TakeWakeLease() {
+zx::result<zx::eventpair> WakeLease::TakeWakeLease() {
   lease_task_.Cancel();
   wake_lease_held_.Set(false);
-  return std::move(lease_);
+  if (!lease_.is_valid()) {
+    return zx::error(ZX_ERR_BAD_HANDLE);
+  }
+  return zx::ok(std::move(lease_));
+}
+
+zx::result<zx::eventpair> WakeLease::GetWakeLeaseCopy() {
+  if (!lease_.is_valid()) {
+    return zx::error(ZX_ERR_BAD_HANDLE);
+  }
+  zx::eventpair clone;
+  lease_.duplicate(ZX_RIGHT_SAME_RIGHTS, &clone);
+  return zx::ok(std::move(clone));
 }
 
 void WakeLease::OnResume(OnResumeCompleter::Sync& completer) {
@@ -122,6 +144,16 @@ void WakeLease::OnResume(OnResumeCompleter::Sync& completer) {
 }
 
 void WakeLease::OnSuspendStarted(OnSuspendStartedCompleter::Sync& completer) {
+  // Check if we've moved past any previously set timeout for which we did
+  // NOT acquire a lease because the system wasn't suspended.
+  zx_time_t current_time = zx::clock::get_monotonic().get();
+  if (current_time < prevent_sleep_before_) {
+    if (log_) {
+      fdf::warn("Acquiring lease to honor previously set timeout.");
+    }
+    AcquireWakeLease(zx::nsec(prevent_sleep_before_ - current_time));
+  }
+
   system_suspended_ = true;
   completer.Reply();
 }

@@ -24,6 +24,8 @@ extern "C" {
   gnu::tls_model("global-dynamic")]] extern thread_local int gStaticTlsVar;
 }
 
+[[gnu::visibility("default")]] extern int gInitFiniState;
+
 constexpr int kStaticTlsDataValue = 16;
 
 #endif  // LIB_LD_TEST_MODULES_STARTUP_SYMBOLS_H_

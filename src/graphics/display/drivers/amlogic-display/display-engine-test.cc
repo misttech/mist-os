@@ -555,8 +555,7 @@ TEST_F(FakeSysmemTest, ImportImage) {
 
   // Invalid import: Bad image type.
   static constexpr image_metadata_t kInvalidTilingMetadata = {
-      .width = 1024,
-      .height = 768,
+      .dimensions = {.width = 1024, .height = 768},
       .tiling_type = IMAGE_TILING_TYPE_CAPTURE,
   };
   uint64_t image_handle = 0;
@@ -567,8 +566,7 @@ TEST_F(FakeSysmemTest, ImportImage) {
 
   // Invalid import: Invalid collection ID.
   static constexpr image_metadata_t kDisplayImageMetadata = {
-      .width = 1024,
-      .height = 768,
+      .dimensions = {.width = 1024, .height = 768},
       .tiling_type = IMAGE_TILING_TYPE_LINEAR,
   };
   EXPECT_EQ(display_engine_->DisplayEngineImportImage(&kDisplayImageMetadata,

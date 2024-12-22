@@ -5,12 +5,10 @@
 library fuchsia.hardware.pci;
 
 @available(added=HEAD)
-const METADATA_TYPE_NAME string = "fuchsia.hardware.pci.BoardConfiguration";
-
-@available(added=HEAD)
 type UseIntxWorkaroundType = struct {};
 
 @available(added=HEAD)
+@serializable
 type BoardConfiguration = table {
     /// If set, use legacy interrupt workarounds for systems that don't properly implement
     /// InterruptPin and/or the InterruptStatus bit in device configuration space. Instead, the

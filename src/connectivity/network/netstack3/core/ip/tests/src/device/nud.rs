@@ -18,7 +18,7 @@ use packet_formats::icmp::ndp::options::NdpOptionBuilder;
 use packet_formats::icmp::ndp::{
     NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder, RouterAdvertisement,
 };
-use packet_formats::icmp::{IcmpDestUnreachable, IcmpPacketBuilder, IcmpUnusedCode};
+use packet_formats::icmp::{IcmpDestUnreachable, IcmpPacketBuilder, IcmpZeroCode};
 use packet_formats::ip::{FragmentOffset, IpProto, Ipv4Proto, Ipv6Proto};
 use packet_formats::ipv4::Ipv4PacketBuilder;
 use packet_formats::ipv6::Ipv6PacketBuilder;
@@ -94,7 +94,7 @@ fn router_advertisement_with_source_link_layer_option_should_add_neighbor() {
             .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 RouterAdvertisement::new(0, false, false, 0, 0, 0),
             ))
             .encapsulate(Ipv6PacketBuilder::new(
@@ -202,7 +202,7 @@ fn ns_response(target_addr: Ipv6Addr, dad_transmits: Option<NonZeroU16>, expect_
                 assert_eq!(got_dst_ip, dst_ip.get());
                 assert_eq!(ttl, REQUIRED_NDP_IP_PACKET_HOP_LIMIT);
                 assert_eq!(message.target_address(), &LOCAL_IP);
-                assert_eq!(code, IcmpUnusedCode);
+                assert_eq!(code, IcmpZeroCode);
             }
         );
     }
@@ -240,7 +240,7 @@ fn ns_response(target_addr: Ipv6Addr, dad_transmits: Option<NonZeroU16>, expect_
                 assert_eq!(got_dst_ip, src_ip.into_addr());
                 assert_eq!(ttl, REQUIRED_NDP_IP_PACKET_HOP_LIMIT);
                 assert_eq!(message.target_address(), &target_addr);
-                assert_eq!(code, IcmpUnusedCode);
+                assert_eq!(code, IcmpZeroCode);
             }
         );
 
@@ -364,7 +364,7 @@ fn ipv6_integration() {
             assert_eq!(got_dst_ip, snmc.get());
             assert_eq!(ttl, 255);
             assert_eq!(message.target_address(), &target.get());
-            assert_eq!(code, IcmpUnusedCode);
+            assert_eq!(code, IcmpZeroCode);
         }
     );
 
@@ -466,7 +466,7 @@ fn bind_and_connect_sockets<
     net: &mut FakeNudNetwork<L>,
     local_buffers: tcp::testutil::ProvidedBuffers,
 ) -> TcpSocketId<I, WeakDeviceId<FakeBindingsCtx>, FakeBindingsCtx> {
-    const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
+    const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(33333).unwrap();
 
     net.with_context("remote", |ctx| {
         let mut tcp_api = ctx.core_api().tcp::<I>();
@@ -642,7 +642,7 @@ fn icmp_error_on_address_resolution_failure_tcp_local<I: TestIpExt + IpExt>() {
 
     let mut tcp_api = ctx.core_api().tcp::<I>();
     let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
-    const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
+    const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(33333).unwrap();
     tcp_api
         .connect(&socket, Some(net_types::ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), REMOTE_PORT)
         .unwrap();
@@ -691,7 +691,7 @@ fn icmp_error_on_address_resolution_failure_tcp_forwarding<I: TestIpExt + IpExt>
     let socket = net.with_context("local", |ctx| {
         let mut tcp_api = ctx.core_api().tcp::<I>();
         let socket = tcp_api.create(tcp::testutil::ProvidedBuffers::default());
-        const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
+        const REMOTE_PORT: NonZeroU16 = NonZeroU16::new(33333).unwrap();
         tcp_api
             .connect(
                 &socket,

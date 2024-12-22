@@ -26,12 +26,7 @@ rustc_library("rust") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/rust/zx",
     "//third_party/rust_crates:bitfield",
-    "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-core",
-    "//third_party/rust_crates:tracing-log",
-    "//third_party/rust_crates:tracing-subscriber",
     "//third_party/rust_crates:zerocopy",
   ]
 
@@ -43,10 +38,7 @@ rustc_library("rust") {
     "//src/starnix/kernel/*",
   ]
 
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing-subscriber",
-  ]
+  test_deps = [ "//src/lib/fuchsia" ]
 
   sources = [
     "src/constants.rs",

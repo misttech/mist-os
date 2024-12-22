@@ -226,12 +226,11 @@ func TestParseArgsAndEnv(t *testing.T) {
 		},
 		{
 			name: "simple boolean flags",
-			args: []string{"core.x64", "--include-clippy=false", "--netboot", "--cargo-toml-gen"},
+			args: []string{"core.x64", "--include-clippy=false", "--cargo-toml-gen"},
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
 				includeClippy: false,
-				netboot:       true,
 				cargoTOMLGen:  true,
 			},
 		},
@@ -364,7 +363,7 @@ func TestConstructStaticSpec(t *testing.T) {
 			expected: &fintpb.Static{
 				Board:            "boards/arm64.gni",
 				Product:          "products/bringup.gni",
-				Optimize:         fintpb.Static_RELEASE,
+				CompilationMode:  fintpb.Static_COMPILATION_MODE_RELEASE,
 				BasePackages:     []string{"base"},
 				CachePackages:    []string{"cache"},
 				UniversePackages: []string{"universe"},
@@ -495,16 +494,6 @@ func TestConstructStaticSpec(t *testing.T) {
 			},
 		},
 		{
-			name: "netboot",
-			args: &setArgs{
-				netboot:       true,
-				disableCxxRbe: true,
-			},
-			expected: &fintpb.Static{
-				GnArgs: []string{rbe_mode_off, "enable_netboot=true"},
-			},
-		},
-		{
 			name: "cargo toml gen",
 			args: &setArgs{
 				basePackages:  []string{"foo"},
@@ -520,7 +509,6 @@ func TestConstructStaticSpec(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
 			if tc.args.board == "" {
 				tc.args.board = "x64"
 			}
@@ -534,7 +522,7 @@ func TestConstructStaticSpec(t *testing.T) {
 			expected := &fintpb.Static{
 				Board:             "boards/x64.gni",
 				Product:           "products/core.gni",
-				Optimize:          fintpb.Static_DEBUG,
+				CompilationMode:   fintpb.Static_COMPILATION_MODE_DEBUG,
 				ExportRustProject: true,
 			}
 			proto.Merge(expected, tc.expected)
@@ -547,8 +535,7 @@ func TestConstructStaticSpec(t *testing.T) {
 			createFile(t, checkoutDir, expected.Board)
 			createFile(t, checkoutDir, expected.Product)
 
-			fx := fxRunner{sr: tc.runner, checkoutDir: checkoutDir}
-			got, err := constructStaticSpec(ctx, fx, checkoutDir, tc.args, !tc.cannotUseRbe)
+			got, err := constructStaticSpec(checkoutDir, tc.args, !tc.cannotUseRbe)
 			if err != nil {
 				if tc.expectErr {
 					return

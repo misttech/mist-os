@@ -62,6 +62,8 @@ fidl::UnownedClientEnd<fuchsia_io::Directory> MoonflowerPartitioner::SvcRoot() c
 
 bool MoonflowerPartitioner::SupportsPartition(const PartitionSpec& spec) const {
   constexpr PartitionSpec supported_specs[] = {
+      PartitionSpec(paver::Partition::kBootloaderA, "dtbo"),
+      PartitionSpec(paver::Partition::kBootloaderB, "dtbo"),
       PartitionSpec(paver::Partition::kZirconA), PartitionSpec(paver::Partition::kZirconB),
       PartitionSpec(paver::Partition::kFuchsiaVolumeManager)};
   return std::any_of(std::cbegin(supported_specs), std::cend(supported_specs),
@@ -77,6 +79,14 @@ zx::result<std::string> MoonflowerPartitioner::PartitionNameForSpec(
 
   std::string part_name;
   switch (spec.partition) {
+    case Partition::kBootloaderA:
+      // Check that spec.content_type == "dtbo" if we start using other bootloader components.
+      part_name = "dtbo_a";
+      break;
+    case Partition::kBootloaderB:
+      // Check that spec.content_type == "dtbo" if we start using other bootloader components.
+      part_name = "dtbo_b";
+      break;
     case Partition::kZirconA:
       part_name = "boot_a";
       break;

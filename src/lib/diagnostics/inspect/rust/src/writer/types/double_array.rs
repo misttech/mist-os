@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{ArithmeticArrayProperty, ArrayProperty, Inner, InnerValueType, InspectType};
-use tracing::error;
+use log::error;
 
 /// Inspect double array data type.
 ///
@@ -32,7 +32,7 @@ impl ArrayProperty for DoubleArrayProperty {
                     state.set_array_double_slot(inner_ref.block_index, index, value.into())
                 })
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to set property");
+                    error!(err:?; "Failed to set property");
                 });
         }
     }
@@ -44,7 +44,7 @@ impl ArrayProperty for DoubleArrayProperty {
                 .try_lock()
                 .and_then(|mut state| state.clear_array(inner_ref.block_index, 0))
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to clear property.");
+                    error!(err:?; "Failed to clear property.");
                 });
         }
     }
@@ -60,7 +60,7 @@ impl ArithmeticArrayProperty for DoubleArrayProperty {
                     state.add_array_double_slot(inner_ref.block_index, index, value)
                 })
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to add property");
+                    error!(err:?; "Failed to add property");
                 });
         }
     }
@@ -74,7 +74,7 @@ impl ArithmeticArrayProperty for DoubleArrayProperty {
                     state.subtract_array_double_slot(inner_ref.block_index, index, value)
                 })
                 .unwrap_or_else(|err| {
-                    error!(?err, "Failed to subtract property");
+                    error!(err:?; "Failed to subtract property");
                 });
         }
     }

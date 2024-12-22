@@ -171,14 +171,6 @@ class VmCowPages final : public VmHierarchyBase,
     return high_priority_count_ != 0;
   }
 
-  // When attributing memory hidden nodes must be attributed to either their left or right
-  // descendants. The attribution IDs of all involved determine where attribution goes. For
-  // historical and practical reasons actual user ids are used, although any consistent naming
-  // scheme will have the same effect.
-  void set_page_attribution_user_id_locked(uint64_t id) TA_REQ(lock()) {
-    page_attribution_user_id_ = id;
-  }
-
   // See description on |pinned_page_count_| for meaning.
   uint64_t pinned_page_count_locked() const TA_REQ(lock()) { return pinned_page_count_; }
 
@@ -311,10 +303,12 @@ class VmCowPages final : public VmHierarchyBase,
     }
     stats->modified = pager_stats_modified_ ? ZX_PAGER_VMO_STATS_MODIFIED : 0;
     if (reset) {
-      pager_stats_modified_ = false;
+      ResetPagerVmoStatsLocked();
     }
     return ZX_OK;
   }
+
+  void ResetPagerVmoStatsLocked() TA_REQ(lock()) { pager_stats_modified_ = false; }
 
   // See VmObject::WritebackBegin
   zx_status_t WritebackBeginLocked(uint64_t offset, uint64_t len, bool is_zero_range)
@@ -341,15 +335,6 @@ class VmCowPages final : public VmHierarchyBase,
   // |offset| and |len| should be page-aligned.
   zx_status_t PrepareForWriteLocked(uint64_t offset, uint64_t len, LazyPageRequest* page_request,
                                     uint64_t* dirty_len_out) TA_REQ(lock());
-
-  // See VmObject::SetUserContentSize
-  void SetUserContentSizeLocked(fbl::RefPtr<ContentSizeManager> csm) TA_REQ(lock()) {
-    user_content_size_ = ktl::move(csm);
-  }
-
-  fbl::RefPtr<ContentSizeManager> GetUserContentSizeLocked() TA_REQ(lock()) {
-    return user_content_size_;
-  }
 
   class LookupCursor;
   // See VmObjectPaged::GetLookupCursorLocked
@@ -400,8 +385,10 @@ class VmCowPages final : public VmHierarchyBase,
   // After successful completion the range of pages will all read as zeros. The mechanism used to
   // achieve this is not guaranteed to decommit, but it will try to.
   // |page_start_base| and |page_end_base| must be page aligned offsets within the range of the
-  // object. |zeroed_len_out| will contain the length (in bytes) starting at |page_start_base| that
-  // was successfully zeroed.
+  // object. |dirty_track| specifies whether the range being zeroed subscribes to dirty tracking, if
+  // |true| the range will start out as dirty. |dirty_track| only has meaning if the VMO supports
+  // dirty tracking, otherwise it is ignored. |zeroed_len_out| will contain the length (in bytes)
+  // starting at |page_start_base| that was successfully zeroed.
   //
   // Returns one of the following:
   //  ZX_OK => The whole range was successfully zeroed.
@@ -409,7 +396,7 @@ class VmCowPages final : public VmHierarchyBase,
   //  operation. |zeroed_len_out| will contain the range that was partially zeroed, so the caller
   //  can advance the start offset before retrying.
   //  Any other error code indicates a failure to zero a part of the range or the whole range.
-  zx_status_t ZeroPagesLocked(uint64_t page_start_base, uint64_t page_end_base,
+  zx_status_t ZeroPagesLocked(uint64_t page_start_base, uint64_t page_end_base, bool dirty_track,
                               MultiPageRequest* page_request, uint64_t* zeroed_len_out)
       TA_REQ(lock());
 
@@ -447,9 +434,6 @@ class VmCowPages final : public VmHierarchyBase,
   using AttributionCounts = VmObject::AttributionCounts;
   AttributionCounts GetAttributedMemoryInRangeLocked(uint64_t offset_bytes,
                                                      uint64_t len_bytes) const TA_REQ(lock());
-  AttributionCounts GetAttributedMemoryInRangeUsingSplitsLocked(uint64_t offset_bytes,
-                                                                uint64_t len_bytes) const
-      TA_REQ(lock());
 
   enum class EvictionHintAction : uint8_t {
     Follow,
@@ -518,7 +502,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // VMO_VALIDATION
   bool DebugValidatePageSharingLocked() const TA_REQ(lock());
-  bool DebugValidatePageSplitsLocked() const TA_REQ(lock());
   bool DebugValidateBacklinksLocked() const TA_REQ(lock());
   // Calls DebugValidatePageSharesLocked on this and every parent in the chain, returning true if
   // all return true. Also calls DebugValidateBacklinksLocked on every node in the hierarchy.
@@ -1141,11 +1124,6 @@ class VmCowPages final : public VmHierarchyBase,
                                  vm_page_t* page, uint64_t owner_offset,
                                  AnonymousPageRequest* page_request, vm_page_t** out_page)
       TA_REQ(lock());
-  zx_status_t CloneCowPageUsingSplitsLocked(uint64_t offset, list_node_t* alloc_list,
-                                            VmCowPages* page_owner, vm_page_t* page,
-                                            uint64_t owner_offset,
-                                            AnonymousPageRequest* page_request,
-                                            vm_page_t** out_page) TA_REQ(lock());
 
   // Helper function that 'forks' the page into |offset| of the current node, which must be a
   // visible node. This function is similar to |CloneCowPageLocked|, but instead handles the case
@@ -1171,11 +1149,6 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
                                        VmCowPages* page_owner, vm_page_t* page,
                                        uint64_t owner_offset, AnonymousPageRequest* page_request)
-      TA_REQ(lock());
-  zx_status_t CloneCowPageAsZeroUsingSplitsLocked(uint64_t offset, list_node_t* freed_list,
-                                                  VmCowPages* page_owner, vm_page_t* page,
-                                                  uint64_t owner_offset,
-                                                  AnonymousPageRequest* page_request)
       TA_REQ(lock());
 
   // Helper struct which encapsulates a parent node along with a range and limit relative to it.
@@ -1231,9 +1204,6 @@ class VmCowPages final : public VmHierarchyBase,
   // both new children.
   zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t size,
                                        fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
-  zx_status_t CloneBidirectionalUsingSplitsLocked(uint64_t offset, uint64_t size,
-                                                  fbl::RefPtr<VmCowPages>* cow_child)
-      TA_REQ(lock());
 
   // Helper function for |CreateCloneLocked|.
   //
@@ -1253,36 +1223,16 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t CloneUnidirectionalLocked(uint64_t offset, uint64_t size,
                                         fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
 
-  // Returns true if |page| (located at |offset| in this vmo) is only accessible by one
-  // child, where 'accessible' is defined by ::CloneCowPageLocked.
-  bool IsUniAccessibleLocked(vm_page_t* page, uint64_t offset) const TA_REQ(lock());
-
-  // Releases this node's references to any ancestor node's COW pages that are accessible from the
-  // range [|start|, |end|) in this node.
-  //
-  // If this function releases the last reference to a page, then it will free the page using the
-  // |page_remover|.
-  void ReleaseCowParentPagesLocked(uint64_t start, uint64_t end, BatchPQRemove* page_remover)
-      TA_REQ(lock());
-
   // Release any pages this VMO can reference from the provided start offset till the end of the
   // VMO. This releases both directly owned pages, as well as pages in hidden parents that may be
   // considered owned by this VMO.
   // If applicable this method will update the parent_limit_ to reflect that it has removed any
   // reference to its parent range.
   void ReleaseOwnedPagesLocked(uint64_t start) TA_REQ(lock());
-  void ReleaseOwnedPagesUsingSplitsLocked(uint64_t start) TA_REQ(lock());
-
-  // Helper function for ReleaseCowParentPagesLocked that processes pages which are visible
-  // to at least this VMO, and possibly its sibling, as well as updates parent_(offset_)limit_.
-  void ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end, bool sibling_visible,
-                                         BatchPQRemove* page_remover) TA_REQ(lock());
 
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
   void MergeContentWithChildLocked(VmCowPages* removed) TA_REQ(lock());
-  void MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, bool removed_left)
-      TA_REQ(lock());
 
   // Moves an existing page to the wired queue as a consequence of the page being pinned.
   void MoveToPinnedLocked(vm_page_t* page, uint64_t offset) TA_REQ(lock());
@@ -1330,16 +1280,6 @@ class VmCowPages final : public VmHierarchyBase,
   // Initializes child members based on the passed in values that only have meaning when an object
   // is a child. This updates the parent_ field in child to hold a refptr to |this|.
   void AddChildLocked(VmCowPages* child, uint64_t offset, uint64_t parent_limit) TA_REQ(lock());
-
-  // Outside of initialization/destruction, hidden vmos always have two children. For
-  // clarity, whichever child is first in the list is the 'left' child, and whichever
-  // child is second is the 'right' child. Children of a paged vmo will always be paged
-  // vmos themselves.
-  VmCowPages& left_child_locked() TA_REQ(lock()) TA_ASSERT(left_child_locked().lock());
-  VmCowPages& right_child_locked() TA_REQ(lock()) TA_ASSERT(right_child_locked().lock());
-  const VmCowPages& left_child_locked() const TA_REQ(lock()) TA_ASSERT(left_child_locked().lock());
-  const VmCowPages& right_child_locked() const TA_REQ(lock())
-      TA_ASSERT(right_child_locked().lock());
 
   // Helpers to give convenience locked access to the parent_. Only valid to be called if there is a
   // parent.
@@ -1442,12 +1382,10 @@ class VmCowPages final : public VmHierarchyBase,
   int64_t ChangeSingleHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
 
   // Specialized internal version of ZeroPagesLocked that only operates for a VMO where
-  // |is_source_preserving_page_content| is true. The |only_zero_gaps| flags can be set to true to
-  // indicate that existing pages do not need to be zeroed, in which case no pages requests will be
-  // generated and no pages freed, allowing those respective parameters to be passed as nullptr.
-  // Otherwise the parameters, operation and return values are same as ZeroPagesLocked.
+  // |is_source_preserving_page_content| is true. |dirty_track| can be set to |true| if any zeroes
+  // inserted are to be treated as Dirty, otherwise they are not dirty tracked.
   zx_status_t ZeroPagesPreservingContentLocked(uint64_t page_start_base, uint64_t page_end_base,
-                                               bool only_zero_gaps, list_node_t* freed_list,
+                                               bool dirty_track, list_node_t* freed_list,
                                                MultiPageRequest* page_request,
                                                uint64_t* processed_len_out) TA_REQ(lock());
 
@@ -1466,13 +1404,6 @@ class VmCowPages final : public VmHierarchyBase,
   uint64_t parent_offset_ TA_GUARDED(lock()) = 0;
   // Offset in *this object* above which accesses will no longer access the parent.
   uint64_t parent_limit_ TA_GUARDED(lock()) = 0;
-  // Offset in *this object* below which this vmo stops referring to its parent. This field
-  // is only useful for hidden vmos, where it is used by ::ReleaseCowPagesParentLocked
-  // together with parent_limit_ to reduce how often page split bits need to be set. It is
-  // effectively a summary of the parent_offset_ values of all descendants - unlike
-  // parent_limit_, this value does not directly impact page lookup. See partial_cow_release_ flag
-  // for more details on usage of this limit.
-  uint64_t parent_start_limit_ TA_GUARDED(lock()) = 0;
   // Offset in our root parent where this object would start if projected onto it. This value is
   // used as an efficient summation of accumulated offsets to ensure that an offset projected all
   // the way to the root would not overflow a 64-bit integer. Although actual page resolution
@@ -1488,35 +1419,12 @@ class VmCowPages final : public VmHierarchyBase,
   fbl::TaggedDoublyLinkedList<VmCowPages*, internal::ChildListTag> children_list_
       TA_GUARDED(lock());
 
-  // Flag used for walking back up clone tree without recursion. See ::CloneCowPageLocked.
-  enum class StackDir : bool {
-    Left,
-    Right,
-  };
-  struct {
-    uint64_t scratch : 63;
-    StackDir dir_flag : 1;
-  } stack_ TA_GUARDED(lock());
-
-  // This value is used when determining against which user-visible vmo a hidden vmo's
-  // pages should be attributed. It serves as a tie-breaker for pages that are accessible by
-  // multiple user-visible vmos. See ::HasAttributedAncestorPageLocked for more details.
-  //
-  // For non-hidden vmobjects, this always equals user_id_. For hidden vmobjects, this
-  // is the page_attribution_user_id_ of one of their children (i.e. the user_id_ of one
-  // of their non-hidden descendants).
-  uint64_t page_attribution_user_id_ TA_GUARDED(lock()) = 0;
-
   // Counts the total number of pages pinned by ::CommitRange. If one page is pinned n times, it
   // contributes n to this count.
   uint64_t pinned_page_count_ TA_GUARDED(lock()) = 0;
 
   // The page source, if any.
   const fbl::RefPtr<PageSource> page_source_;
-
-  // A user supplied content size that can be queried. By itself this has no semantic meaning and is
-  // only read and used specifically when requested by the user. See VmObject::SetUserContentSize.
-  fbl::RefPtr<ContentSizeManager> user_content_size_ TA_GUARDED(lock());
 
   // Count reclamation events so that we can report them to the user.
   uint64_t reclamation_event_count_ TA_GUARDED(lock()) = 0;
@@ -1552,20 +1460,6 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // It is an error for this value to ever become negative.
   int64_t high_priority_count_ TA_GUARDED(lock()) = 0;
-
-  // Flag which is true if there was a call to ::ReleaseCowParentPagesLocked which was
-  // not able to update the parent limits. When this is not set, it is sometimes
-  // possible for ::MergeContentWithChildLocked to do significantly less work. This flag acts as a
-  // proxy then for how precise the parent_limit_ and parent_start_limit_ are. It is always an
-  // absolute guarantee that descendants cannot see outside of the limits, but when this flag is
-  // true there is a possibility that there is a sub range inside the limits that they also cannot
-  // see.
-  // Imagine a two siblings that see the parent range [0x1000-0x2000) and [0x3000-0x4000)
-  // respectively. The parent can have the start_limit of 0x1000 and limit of 0x4000, but without
-  // additional allocations it cannot track the free region 0x2000-0x3000, and so
-  // partial_cow_release_ must be set to indicate in the future we need to do more expensive
-  // processing to check for such free regions.
-  bool partial_cow_release_ TA_GUARDED(lock()) = false;
 
   // With this bool we achieve these things:
   //  * Avoid using loaned pages for a VMO that will just get pinned and replace the loaned pages
@@ -1706,10 +1600,6 @@ class VmCowPages::LookupCursor {
   // Indicates that any existing pages that are returned should not be considered accessed and have
   // their accessed times updated.
   void DisableMarkAccessed() { mark_accessed_ = false; }
-
-  // Indicates that pages above the user content size can be assumed/made to be zero. See
-  // VmObject::VmObjectReadWriteOptions::ZeroAboveUserSize.
-  void ZeroAboveUserSize() { zero_above_user_size_ = true; }
 
   // Exposed for lock assertions.
   Lock<CriticalMutex>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
@@ -1933,10 +1823,6 @@ class VmCowPages::LookupCursor {
 
   // Whether existing pages should be have their access time updated when they are returned.
   bool mark_accessed_ = true;
-
-  // Tracks whether any pages above the targets user_content_size_ can be read or set as zero. See
-  // VmObject::VmObjectReadWriteOptions::ZeroAboveUserSize for more.
-  bool zero_above_user_size_ = false;
 
   // Optional allocation list that will be used for any page allocations.
   list_node_t* alloc_list_ = nullptr;

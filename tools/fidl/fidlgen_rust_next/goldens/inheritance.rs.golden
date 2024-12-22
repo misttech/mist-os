@@ -23,9 +23,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 s,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.s, encoder, s)?;
+
         Ok(())
     }
 }
@@ -61,6 +64,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireSuperFooRequest<'buf>> for SuperFooRequest 
     }
 }
 
+/// The wire type corersponding to [`SuperFooRequest`].
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireSuperFooRequest<'buf> {
@@ -80,9 +84,12 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut s,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(s.as_mut(), decoder)?;
+
         Ok(())
     }
 }
@@ -108,9 +115,12 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 y,
+
             } = slot;
         }
+
         ::fidl_next::Encode::encode(&mut self.y, encoder, y)?;
+
         Ok(())
     }
 }
@@ -146,6 +156,7 @@ impl ::fidl_next::TakeFrom<WireSuperFooResponse> for SuperFooResponse {
     }
 }
 
+/// The wire type corersponding to [`SuperFooResponse`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireSuperFooResponse {
@@ -165,9 +176,256 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut y,
+
             } = slot;
         }
+
         ::fidl_next::Decode::decode(y.as_mut(), decoder)?;
+
         Ok(())
+    }
+}
+
+/// The type corresponding to the super protocol.
+#[derive(Debug)]
+pub struct Super;
+
+pub mod super_ {
+
+    pub struct Foo;
+
+    impl ::fidl_next::bind::Method for Foo {
+        const ORDINAL: u64 = 7540745593380780216;
+
+        type Protocol = crate::Super;
+
+        type Request<'buf> = crate::WireSuperFooRequest<'buf>;
+
+        type Response<'buf> = crate::WireSuperFooResponse;
+    }
+}
+
+/// A helper trait for the `super` client protocol.
+pub trait SuperClient<___T: ::fidl_next::protocol::Transport> {
+    fn foo<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<::fidl_next::bind::TransactionFuture<'_, ___T, super_::Foo>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireSuperFooRequest<'buf>,
+        >;
+}
+
+impl<___T> SuperClient<___T> for ::fidl_next::bind::Client<___T, Super>
+where
+    ___T: ::fidl_next::protocol::Transport,
+{
+    fn foo<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<::fidl_next::bind::TransactionFuture<'_, ___T, super_::Foo>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireSuperFooRequest<'buf>,
+        >,
+    {
+        self.untyped()
+            .send_transaction(7540745593380780216, request)
+            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+    }
+}
+
+/// A client handler for the super protocol.
+
+pub trait SuperClientHandler<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Super
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: SuperClientHandler<___T>,
+
+    for<'buf> crate::WireSuperFooResponse:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+}
+
+/// A helper trait for the `super` server protocol.
+pub trait SuperServer<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T> SuperServer<___T> for ::fidl_next::bind::Server<___T, Super> where
+    ___T: ::fidl_next::protocol::Transport
+{
+}
+
+/// A server handler for the super protocol.
+
+pub trait SuperServerHandler<___T: ::fidl_next::protocol::Transport> {
+    fn foo(
+        &mut self,
+        request: ::fidl_next::bind::RequestBuffer<___T, super_::Foo>,
+        responder: ::fidl_next::bind::Responder<super_::Foo>,
+    );
+}
+
+impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for Super
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: SuperServerHandler<___T>,
+
+    for<'buf> crate::WireSuperFooRequest<'buf>:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+
+    fn on_transaction(
+        handler: &mut ___H,
+        ordinal: u64,
+        mut buffer: ___T::RecvBuffer,
+        responder: ::fidl_next::protocol::Responder,
+    ) {
+        match ordinal {
+            7540745593380780216 => {
+                let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+
+                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                handler.foo(buffer, responder);
+            }
+
+            ordinal => todo!(),
+        }
+    }
+}
+
+/// The type corresponding to the sub protocol.
+#[derive(Debug)]
+pub struct Sub;
+
+pub mod sub {
+
+    pub struct Foo;
+
+    impl ::fidl_next::bind::Method for Foo {
+        const ORDINAL: u64 = 7540745593380780216;
+
+        type Protocol = crate::Sub;
+
+        type Request<'buf> = crate::WireSuperFooRequest<'buf>;
+
+        type Response<'buf> = crate::WireSuperFooResponse;
+    }
+}
+
+/// A helper trait for the `sub` client protocol.
+pub trait SubClient<___T: ::fidl_next::protocol::Transport> {
+    fn foo<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<::fidl_next::bind::TransactionFuture<'_, ___T, sub::Foo>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireSuperFooRequest<'buf>,
+        >;
+}
+
+impl<___T> SubClient<___T> for ::fidl_next::bind::Client<___T, Sub>
+where
+    ___T: ::fidl_next::protocol::Transport,
+{
+    fn foo<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<::fidl_next::bind::TransactionFuture<'_, ___T, sub::Foo>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireSuperFooRequest<'buf>,
+        >,
+    {
+        self.untyped()
+            .send_transaction(7540745593380780216, request)
+            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+    }
+}
+
+/// A client handler for the sub protocol.
+
+pub trait SubClientHandler<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Sub
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: SubClientHandler<___T>,
+
+    for<'buf> crate::WireSuperFooResponse:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+}
+
+/// A helper trait for the `sub` server protocol.
+pub trait SubServer<___T: ::fidl_next::protocol::Transport> {}
+
+impl<___T> SubServer<___T> for ::fidl_next::bind::Server<___T, Sub> where
+    ___T: ::fidl_next::protocol::Transport
+{
+}
+
+/// A server handler for the sub protocol.
+
+pub trait SubServerHandler<___T: ::fidl_next::protocol::Transport> {
+    fn foo(
+        &mut self,
+        request: ::fidl_next::bind::RequestBuffer<___T, sub::Foo>,
+        responder: ::fidl_next::bind::Responder<sub::Foo>,
+    );
+}
+
+impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for Sub
+where
+    ___T: ::fidl_next::protocol::Transport,
+    ___H: SubServerHandler<___T>,
+
+    for<'buf> crate::WireSuperFooRequest<'buf>:
+        ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
+{
+    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+        match ordinal {
+            ordinal => todo!(),
+        }
+    }
+
+    fn on_transaction(
+        handler: &mut ___H,
+        ordinal: u64,
+        mut buffer: ___T::RecvBuffer,
+        responder: ::fidl_next::protocol::Responder,
+    ) {
+        match ordinal {
+            7540745593380780216 => {
+                let responder = ::fidl_next::bind::Responder::from_untyped(responder);
+
+                let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
+                handler.foo(buffer, responder);
+            }
+
+            ordinal => todo!(),
+        }
     }
 }

@@ -2,10 +2,14 @@
 #![warn(clippy::all)]
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
-pub const BITS_MEMBER: fidl_test_dependent::MyBits = fidl_test_dependent::MyBits::MEMBER;
+pub const BITS_MEMBER: fidl_next_test_dependent::MyBits = fidl_next_test_dependent::MyBits::MEMBER;
+
 pub const BITS_MEMBER_PRIMITIVE: u8 = 1;
-pub const ENUM_MEMBER: fidl_test_dependent::MyEnum = fidl_test_dependent::MyEnum::Member;
+
+pub const ENUM_MEMBER: fidl_next_test_dependent::MyEnum = fidl_next_test_dependent::MyEnum::Member;
+
 pub const ENUM_MEMBER_PRIMITIVE: u8 = 1;
+
 #[derive(Clone, Debug)]
 pub struct MyStruct {}
 
@@ -21,6 +25,7 @@ impl<___E> ::fidl_next::Encode<___E> for MyStruct {
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
+
             } = slot;
         }
 
@@ -59,6 +64,7 @@ impl ::fidl_next::TakeFrom<WireMyStruct> for MyStruct {
     }
 }
 
+/// The wire type corersponding to [`MyStruct`].
 #[derive(Clone, Debug)]
 #[repr(C)]
 pub struct WireMyStruct {}
@@ -73,6 +79,7 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge! {
             let Self {
+
             } = slot;
         }
 

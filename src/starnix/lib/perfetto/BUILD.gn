@@ -1,0 +1,29 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+import("//tools/protobuf/rust_proto_library.gni")
+
+rustc_library("perfetto") {
+  edition = "2021"
+  sources = [ "src/lib.rs" ]
+  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+  deps = [
+    ":perfetto_consumer_proto",
+    "//src/starnix/kernel:starnix_core",
+    "//src/starnix/lib/starnix-sync",
+    "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:prost",
+  ]
+}
+
+rust_proto_library("perfetto_consumer_proto") {
+  sources = [
+    "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
+    "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
+  ]
+  packages = [ "perfetto.protos" ]
+  include_dirs = [ "//third_party/perfetto" ]
+}

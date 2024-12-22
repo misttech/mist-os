@@ -276,6 +276,12 @@ pub trait Ipv6Header {
     }
 }
 
+impl Ipv6Header for FixedHeader {
+    fn get_fixed_header(&self) -> &FixedHeader {
+        self
+    }
+}
+
 /// An IPv6 packet.
 ///
 /// An `Ipv6Packet` shares its underlying memory with the byte slice it was
@@ -815,6 +821,12 @@ impl<B: SplitByteSliceMut> Ipv6Packet<B> {
     pub fn body_mut(&mut self) -> &mut [u8] {
         &mut self.body
     }
+
+    /// Provides simultaneous access to header, extension headers, and mutable
+    /// body.
+    pub fn parts_with_body_mut(&mut self) -> (&FixedHeader, ExtensionHeaders<'_>, &mut [u8]) {
+        (&self.fixed_hdr, ExtensionHeaders(self.extension_hdrs.as_ref()), &mut self.body)
+    }
 }
 
 impl<B: SplitByteSlice> Debug for Ipv6Packet<B> {
@@ -830,6 +842,16 @@ impl<B: SplitByteSlice> Debug for Ipv6Packet<B> {
             .field("extension headers", &"TODO")
             .field("body", &alloc::format!("<{} bytes>", self.body.len()))
             .finish()
+    }
+}
+
+/// The extension headers in an [`Ipv6Packet`].
+pub struct ExtensionHeaders<'a>(Records<&'a [u8], Ipv6ExtensionHeaderImpl>);
+
+impl<'a> ExtensionHeaders<'a> {
+    /// Returns an iterator over the extension headers.
+    pub fn iter(&self) -> impl Iterator<Item = Ipv6ExtensionHeader<'_>> {
+        self.0.iter()
     }
 }
 

@@ -9,8 +9,6 @@ use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
 use crate::fuchsia::symlink::FxSymlink;
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume, RootDir};
 use anyhow::{bail, Error};
-use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
-use base64::engine::Engine as _;
 use either::{Left, Right};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
@@ -859,111 +857,49 @@ impl VfsDirectory for FxDirectory {
 
         let layer_set = self.store().tree().layer_set();
         let mut merger = layer_set.merger();
-        if self.directory.wrapping_key_id().is_some() {
-            let starting_name = match pos {
-                TraversalPosition::Start => {
-                    // Synthesize a "." entry if we're at the start of the stream.
-                    match sink
-                        .append(&EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory), ".")
-                    {
-                        AppendResult::Ok(new_sink) => sink = new_sink,
-                        AppendResult::Sealed(sealed) => {
-                            // Note that the VFS should have yielded an error since the first entry
-                            // didn't fit. This is defensive in case the VFS' behaviour changes, so
-                            // that we return a reasonable value.
-                            return Ok((TraversalPosition::Start, sealed));
-                        }
-                    }
-                    vec![]
-                }
-                TraversalPosition::Bytes(bytes) => bytes.clone(),
-                _ => unreachable!(),
-            };
-            let mut iter = self
-                .directory
-                .iter_from_encrypted(&mut merger, starting_name)
-                .await
-                .map_err(map_to_status)?;
-            let key = self.directory.get_fscrypt_key().await.map_err(map_to_status)?;
-            while let Some((name_bytes, object_id, object_descriptor)) = iter.get() {
-                let entry_type = match object_descriptor {
-                    ObjectDescriptor::File => fio::DirentType::File,
-                    ObjectDescriptor::Directory => fio::DirentType::Directory,
-                    ObjectDescriptor::Symlink => return Err(zx::Status::NOT_SUPPORTED),
-                    ObjectDescriptor::Volume => return Err(zx::Status::IO_DATA_INTEGRITY),
-                };
-                let mut name_bytes_mut = name_bytes.clone();
-                let name = if let Some(key) = &key {
-                    key.decrypt_filename(self.object_id(), &mut name_bytes_mut)
-                        .map_err(map_to_status)?;
-                    String::from_utf8(name_bytes_mut).map_err(|_| Err(zx::Status::BAD_STATE))?
-                } else {
-                    BASE64_URL_SAFE_NO_PAD.encode(name_bytes_mut)
-                };
-
-                let info = EntryInfo::new(object_id, entry_type);
-                match sink.append(&info, &name) {
+        let starting_name = match pos {
+            TraversalPosition::Start => {
+                // Synthesize a "." entry if we're at the start of the stream.
+                match sink
+                    .append(&EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory), ".")
+                {
                     AppendResult::Ok(new_sink) => sink = new_sink,
                     AppendResult::Sealed(sealed) => {
-                        // We did *not* add the current entry to the sink (e.g. because the sink was
-                        // full), so mark |name| as the next position so that it's the first entry
-                        // we process on a subsequent call of read_dirents. Note that entries
-                        // inserted between the previous entry and this entry before the next call
-                        // to read_dirents would not be included in the results (but there's no
-                        // requirement to include them anyways).
-                        return Ok((TraversalPosition::Bytes(name_bytes), sealed));
+                        // Note that the VFS should have yielded an error since the first entry
+                        // didn't fit. This is defensive in case the VFS' behaviour changes, so that
+                        // we return a reasonable value.
+                        return Ok((TraversalPosition::Start, sealed));
                     }
                 }
-                iter.advance().await.map_err(map_to_status)?;
+                ""
             }
-        } else {
-            let starting_name = match pos {
-                TraversalPosition::Start => {
-                    // Synthesize a "." entry if we're at the start of the stream.
-                    match sink
-                        .append(&EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory), ".")
-                    {
-                        AppendResult::Ok(new_sink) => sink = new_sink,
-                        AppendResult::Sealed(sealed) => {
-                            // Note that the VFS should have yielded an error since the first entry
-                            // didn't fit. This is defensive in case the VFS' behaviour changes, so that
-                            // we return a reasonable value.
-                            return Ok((TraversalPosition::Start, sealed));
-                        }
-                    }
-                    ""
-                }
-                TraversalPosition::Name(name) => name,
-                _ => unreachable!(),
+            TraversalPosition::Name(name) => name,
+            _ => unreachable!(),
+        };
+        let mut iter =
+            self.directory.iter_from(&mut merger, starting_name).await.map_err(map_to_status)?;
+        while let Some((name, object_id, object_descriptor)) = iter.get() {
+            let entry_type = match object_descriptor {
+                ObjectDescriptor::File => fio::DirentType::File,
+                ObjectDescriptor::Directory => fio::DirentType::Directory,
+                ObjectDescriptor::Symlink => fio::DirentType::Symlink,
+                ObjectDescriptor::Volume => return Err(zx::Status::IO_DATA_INTEGRITY),
             };
-            let mut iter = self
-                .directory
-                .iter_from(&mut merger, starting_name)
-                .await
-                .map_err(map_to_status)?;
-            while let Some((name, object_id, object_descriptor)) = iter.get() {
-                let entry_type = match object_descriptor {
-                    ObjectDescriptor::File => fio::DirentType::File,
-                    ObjectDescriptor::Directory => fio::DirentType::Directory,
-                    ObjectDescriptor::Symlink => fio::DirentType::Symlink,
-                    ObjectDescriptor::Volume => return Err(zx::Status::IO_DATA_INTEGRITY),
-                };
 
-                let info = EntryInfo::new(object_id, entry_type);
-                match sink.append(&info, &name) {
-                    AppendResult::Ok(new_sink) => sink = new_sink,
-                    AppendResult::Sealed(sealed) => {
-                        // We did *not* add the current entry to the sink (e.g. because the sink was
-                        // full), so mark |name| as the next position so that it's the first entry we
-                        // process on a subsequent call of read_dirents.
-                        // Note that entries inserted between the previous entry and this entry before
-                        // the next call to read_dirents would not be included in the results (but
-                        // there's no requirement to include them anyways).
-                        return Ok((TraversalPosition::Name(name.to_string()), sealed));
-                    }
+            let info = EntryInfo::new(object_id, entry_type);
+            match sink.append(&info, &name) {
+                AppendResult::Ok(new_sink) => sink = new_sink,
+                AppendResult::Sealed(sealed) => {
+                    // We did *not* add the current entry to the sink (e.g. because the sink was
+                    // full), so mark |name| as the next position so that it's the first entry we
+                    // process on a subsequent call of read_dirents.
+                    // Note that entries inserted between the previous entry and this entry before
+                    // the next call to read_dirents would not be included in the results (but
+                    // there's no requirement to include them anyways).
+                    return Ok((TraversalPosition::Name(name.to_string()), sealed));
                 }
-                iter.advance().await.map_err(map_to_status)?;
             }
+            iter.advance().await.map_err(map_to_status)?;
         }
 
         Ok((TraversalPosition::End, sink.seal()))
@@ -1026,8 +962,6 @@ mod tests {
         open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use assert_matches::assert_matches;
-    use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
-    use base64::engine::Engine as _;
     use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
@@ -2616,9 +2550,9 @@ mod tests {
 
         let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
         zx::Status::ok(status).expect("get_token failed");
-        let new_encrypted_name = BASE64_URL_SAFE_NO_PAD.encode("new_encrypted_name");
+        let new_encrypted_name = "aabbcc";
         parent
-            .rename(&encrypted_name, zx::Event::from(dst_token.unwrap()), &new_encrypted_name)
+            .rename(&encrypted_name, zx::Event::from(dst_token.unwrap()), new_encrypted_name)
             .await
             .expect("FIDL call failed")
             .expect_err("rename should fail on a locked directory");
@@ -3132,7 +3066,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let request = ObjectRequest::new(flags, &options, server_end.into_channel());
             let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = dir
@@ -3175,7 +3109,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let request = ObjectRequest::new(flags, &options, server_end.into_channel());
             let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = dir
@@ -3222,7 +3156,7 @@ mod tests {
             };
 
             // Create directory node.
-            let request = ObjectRequest::new3(flags, &options, server_end.into());
+            let request = ObjectRequest::new(flags, &options, server_end.into());
             let dir = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             // Verify that the node was created with the attributes requested.
@@ -3280,7 +3214,7 @@ mod tests {
                 ..Default::default()
             };
 
-            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let request = ObjectRequest::new(flags, &options, server_end.into_channel());
             let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attributes = file
@@ -3324,7 +3258,7 @@ mod tests {
             let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FLAG_MAYBE_CREATE;
             let options = Default::default();
 
-            let request = ObjectRequest::new3(flags, &options, server_end.into_channel());
+            let request = ObjectRequest::new(flags, &options, server_end.into_channel());
             let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             let attrs = file
@@ -3378,7 +3312,7 @@ mod tests {
             };
 
             // Create file node.
-            let request = ObjectRequest::new3(flags, &options, server_end.into());
+            let request = ObjectRequest::new(flags, &options, server_end.into());
             let file = root_dir.lookup(&flags, path, &request).await.expect("lookup failed");
 
             // Verify that the node was created with the attributes requested.

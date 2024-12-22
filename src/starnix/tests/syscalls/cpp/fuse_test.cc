@@ -34,6 +34,10 @@
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
+#ifndef FUSE_SUPER_MAGIC
+#define FUSE_SUPER_MAGIC 0x65735546
+#endif  // FUSE_SUPER_MAGIC
+
 #define OK_OR_RETURN(x) \
   {                     \
     auto result = (x);  \

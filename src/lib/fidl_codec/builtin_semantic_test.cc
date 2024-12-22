@@ -104,16 +104,16 @@ void BuiltinSemanticTest::ShortDisplay(std::ostream& os, const MethodDisplay* di
   }
 }
 
-// Check Cloneable::Clone2: request.request = handle
+// Check Cloneable::Clone: request.request = handle
 TEST_F(BuiltinSemanticTest, CloneWrite) {
-  // Checks that Cloneable::Clone2 exists in fuchsia.unknown.
+  // Checks that Cloneable::Clone exists in fuchsia.unknown.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.unknown");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.unknown/Cloneable", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Clone2");
+  ProtocolMethod* method = protocol->GetMethodByName("Clone");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Clone.
   ASSERT_NE(method->semantic(), nullptr);
@@ -136,16 +136,16 @@ TEST_F(BuiltinSemanticTest, CloneWrite) {
   ASSERT_EQ(inferred_handle_info->attributes(), "cloned");
 }
 
-// Check Cloneable::Clone2: request.request = handle
+// Check Cloneable::Clone: request.request = handle
 TEST_F(BuiltinSemanticTest, CloneRead) {
-  // Checks that Cloneable::Clone2 exists in fuchsia.unknown.
+  // Checks that Cloneable::Clone exists in fuchsia.unknown.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.unknown");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.unknown/Cloneable", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Clone2");
+  ProtocolMethod* method = protocol->GetMethodByName("Clone");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Clone.
   ASSERT_NE(method->semantic(), nullptr);
@@ -168,16 +168,16 @@ TEST_F(BuiltinSemanticTest, CloneRead) {
   ASSERT_EQ(inferred_handle_info->attributes(), "cloned");
 }
 
-// Check Cloneable::Clone2: request.request = handle
+// Check Cloneable::Clone: request.request = handle
 TEST_F(BuiltinSemanticTest, CloneFd) {
-  // Checks that Cloneable::Clone2 exists in fuchsia.unknown.
+  // Checks that Cloneable::Clone exists in fuchsia.unknown.
   Library* library = library_loader_.GetLibraryFromName("fuchsia.unknown");
   ASSERT_NE(library, nullptr);
   library->DecodeTypes();
   Protocol* protocol = nullptr;
   library->GetProtocolByName("fuchsia.unknown/Cloneable", &protocol);
   ASSERT_NE(protocol, nullptr);
-  ProtocolMethod* method = protocol->GetMethodByName("Clone2");
+  ProtocolMethod* method = protocol->GetMethodByName("Clone");
   ASSERT_NE(method, nullptr);
   // Checks that the builtin semantic is defined for Clone.
   ASSERT_NE(method->semantic(), nullptr);

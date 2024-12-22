@@ -22,6 +22,8 @@ toc:
 - heading: "Guides"
 - title: "Adding a glossary term"
   path: /docs/contribute/docs/glossary-entries.md
+- title: "Adding diagrams to documentation"
+  path: /docs/contribute/docs/adding-diagrams.md
 - title: "Using documentation widgets"
   path: /docs/contribute/docs/widgets.md
 - title: "Update site navigation and TOC"

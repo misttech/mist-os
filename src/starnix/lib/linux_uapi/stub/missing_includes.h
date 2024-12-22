@@ -30,20 +30,6 @@ C(BLKGETSIZE);
 C(BLKFLSBUF);
 C(BLKGETSIZE64);
 
-C(BINDER_WRITE_READ);
-C(BINDER_SET_IDLE_TIMEOUT);
-C(BINDER_SET_MAX_THREADS);
-C(BINDER_SET_IDLE_PRIORITY);
-C(BINDER_SET_CONTEXT_MGR);
-C(BINDER_THREAD_EXIT);
-C(BINDER_VERSION);
-C(BINDER_GET_NODE_DEBUG_INFO);
-C(BINDER_GET_NODE_INFO_FOR_REF);
-C(BINDER_SET_CONTEXT_MGR_EXT);
-C(BINDER_FREEZE);
-C(BINDER_GET_FROZEN_INFO);
-C(BINDER_ENABLE_ONEWAY_SPAM_DETECTION);
-
 C(EVIOCGVERSION);
 C(EVIOCGID);
 
@@ -93,11 +79,8 @@ struct remote_binder_wait_command {
   char spawn_thread;
 };
 
-const __u32 _REMOTE_BINDER_START = _IOR('R', 1, struct remote_binder_start_command);
-const __u32 REMOTE_BINDER_START = _REMOTE_BINDER_START;
-
-const __u32 _REMOTE_BINDER_WAIT = _IOW('R', 2, struct remote_binder_wait_command);
-const __u32 REMOTE_BINDER_WAIT = _REMOTE_BINDER_WAIT;
+const __u32 REMOTE_BINDER_START = _IOR('R', 1, struct remote_binder_start_command);
+const __u32 REMOTE_BINDER_WAIT = _IOW('R', 2, struct remote_binder_wait_command);
 
 C(FIGETBSZ);
 
@@ -193,6 +176,11 @@ typedef __kernel_mode_t mode_t;
 typedef __kernel_off_t off_t;
 
 C(TUNSETIFF);
+
+// Struct only defined in libc and not in the uapi part of bionic
+struct sched_param {
+  int sched_priority;
+};
 
 #ifndef __arm__
 

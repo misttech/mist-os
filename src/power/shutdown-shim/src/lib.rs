@@ -40,7 +40,7 @@ enum IncomingRequest {
 }
 
 pub async fn main(
-    svc: impl Directory + AsRefDirectory + Clone + Send + Sync + 'static,
+    svc: impl Directory + AsRefDirectory + Send + Sync + 'static,
     directory_request: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), anyhow::Error> {
     println!("[shutdown-shim]: started");
@@ -52,21 +52,17 @@ pub async fn main(
 
     let (abort_tx, mut abort_rx) = mpsc::unbounded::<()>();
     let ctx = ProgramContext { svc, abort_tx };
-    let ctx2 = ctx.clone();
     let mut service_fut = service_fs
-        .for_each_concurrent(None, move |request: IncomingRequest| {
-            let ctx = ctx2.clone();
-            async move {
-                match request {
-                    IncomingRequest::Admin(stream) => ctx.handle_admin_request(stream).await,
-                    IncomingRequest::SystemStateTransition(stream) => {
-                        ctx.handle_system_state_transition(stream).await
-                    }
+        .for_each_concurrent(None, |request: IncomingRequest| async {
+            match request {
+                IncomingRequest::Admin(stream) => ctx.handle_admin_request(stream).await,
+                IncomingRequest::SystemStateTransition(stream) => {
+                    ctx.handle_system_state_transition(stream).await
                 }
             }
         })
         .fuse();
-    let reboot_watcher_fut = pin!(async move {
+    let reboot_watcher_fut = pin!(async {
         ctx.run_reboot_watcher().await;
         // Don't terminate the program if the reboot watcher finishes.
         std::future::pending::<()>().await;
@@ -82,13 +78,12 @@ pub async fn main(
     Err(format_err!("exited unexpectedly"))
 }
 
-#[derive(Clone)]
-struct ProgramContext<D: Directory + AsRefDirectory + Clone + Send + Sync> {
+struct ProgramContext<D: Directory + AsRefDirectory + Send + Sync> {
     svc: D,
     abort_tx: mpsc::UnboundedSender<()>,
 }
 
-impl<D: Directory + AsRefDirectory + Clone + Send + Sync> ProgramContext<D> {
+impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
     async fn handle_admin_request(&self, mut stream: AdminRequestStream) {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {

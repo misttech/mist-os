@@ -15,8 +15,8 @@ use fidl_fuchsia_net_filter_ext::{
 };
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
 use fuchsia_runtime::{HandleInfo, HandleType};
+use log::info;
 use test_case::test_case;
-use tracing::info;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcomponent_decl,
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,

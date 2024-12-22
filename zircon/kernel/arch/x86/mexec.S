@@ -22,10 +22,10 @@ FUNCTION_LABEL(mexec_asm)
     cli
 
     /* Stash all the arguments passed in registers R8 - R13 */
-    mov %r9,  %r13   /* Unused Arg */
+    mov %r9,  %r13   /* New Kernel Entry */
     mov %r8,  %r12   /* Memmove Ops */
     mov %rcx, %r11   /* Unused Arg */
-    mov %rdx, %r10   /* ENTRY64_ADDR */
+    mov %rdx, %r10   /* Unused Arg */
     mov %rsi, %r9    /* CR3 for Safe page tables */
     mov %rdi, %r8    /* Bootimage Address */
 
@@ -126,20 +126,8 @@ FUNCTION_LABEL(mexec_asm)
     xor %edi, %edi
     xor %ebp, %ebp
 
-    /* Grab 64bit entrypoint from provided location */
-    mov (%r10), %rax
-
-    // TODO(https://fxbug.dev/42107320): In the legacy format, the entry address is
-    // absolute so we use the value as is.  In the modern format, the entry
-    // address is relative to the (arbitrary) load address.  But this code
-    // still always uses the fixed load address, so add that in.
-    cmp $0x100000, %rax
-    ja 0f
-    add $0x100000, %rax
-0:
-
     /* See you on the other side! */
-    jmp *%rax
+    jmp *%r13
 
     /* Crash, we should never reach here */
     ud2

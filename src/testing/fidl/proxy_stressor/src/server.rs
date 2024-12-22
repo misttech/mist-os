@@ -7,7 +7,7 @@ use fidl_test_proxy_stress as fstress;
 use fuchsia_component::server::ServiceFs;
 use futures::future::TryFutureExt;
 use futures::stream::{StreamExt, TryStreamExt};
-use tracing::{info, warn};
+use log::{info, warn};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

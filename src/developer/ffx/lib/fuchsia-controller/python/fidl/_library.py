@@ -2,6 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """The library module handles creating Python classes and types based on FIDL IR rules."""
+
+# TODO(https://fxbug.dev/346628306): Remove this comment to ignore mypy errors.
+# mypy: ignore-errors
+
 from __future__ import annotations
 
 import dataclasses
@@ -11,8 +15,8 @@ import json
 import keyword
 import os
 import sys
-import types
 import typing
+from types import ModuleType
 from typing import (
     Any,
     Callable,
@@ -1084,7 +1088,7 @@ def get_kind_by_identifier(ident: str, loader_ir) -> str:
 def get_type_by_identifier(ident: str, loader_ir, recurse_guard=None) -> type:
     """Takes a identifier, e.g. foo.bar.baz/Foo and returns its Python type."""
     member_name = fidl_ident_to_py_library_member(ident)
-    mod = load_module(fidl_ident_to_py_import(ident))
+    mod = load_fidl_module(fidl_ident_to_py_import(ident))
     if not hasattr(mod, member_name):
         if recurse_guard is not None:
             return ForwardRef(member_name)
@@ -1105,13 +1109,17 @@ def get_type_by_identifier(ident: str, loader_ir, recurse_guard=None) -> type:
     return getattr(mod, member_name)
 
 
-def load_module(fullname: str) -> types.ModuleType:
+def load_fidl_module(fullname: str) -> FIDLLibraryModule:
     if fullname not in sys.modules:
         sys.modules[fullname] = FIDLLibraryModule(fullname)
-    return sys.modules[fullname]
+    mod = sys.modules[fullname]
+    assert isinstance(
+        mod, FIDLLibraryModule
+    ), "load_fidl_module should only be called to load a FIDLLibraryModule"
+    return mod
 
 
-class FIDLLibraryModule(types.ModuleType):
+class FIDLLibraryModule(ModuleType):
     def __init__(self, fullname: str):
         # Shove ourselves into the import map so that composite types can be looked up as they are
         # exported.
@@ -1138,57 +1146,60 @@ class FIDLLibraryModule(types.ModuleType):
         self._export_aliases()
         self._export_protocols()
 
-    def _export_protocols(self):
+    def _export_protocols(self) -> None:
         for decl in self.__ir__.protocol_declarations():
             if decl.name() not in self.__all__:
                 self._export_type(protocol_type(decl, self.__ir__))
 
-    def _export_structs(self):
+    def _export_structs(self) -> None:
         for decl in self.__ir__.struct_declarations():
             if decl.name() not in self.__all__:
                 self._export_type(struct_type(decl, self.__ir__))
 
-    def _export_tables(self):
+    def _export_tables(self) -> None:
         for decl in self.__ir__.table_declarations():
             if decl.name() not in self.__all__:
                 self._export_type(table_type(decl, self.__ir__))
 
-    def _export_experimental_resources(self):
+    def _export_experimental_resources(self) -> None:
         for decl in self.__ir__.experimental_resource_declarations():
             if decl.name() not in self.__all__:
                 self._export_type(experimental_resource_type(decl, self.__ir__))
 
-    def _export_bits(self):
+    def _export_bits(self) -> None:
         for decl in self.__ir__.bits_declarations():
             if decl.name() not in self.__all__:
                 self._export_type(bits_type(decl))
 
-    def _export_enums(self):
+    def _export_enums(self) -> None:
         for decl in self.__ir__.enum_declarations():
             if decl.name() not in self.__all__:
                 self._export_type(enum_type(decl))
 
-    def _export_consts(self):
+    def _export_consts(self) -> None:
         for decl in self.__ir__.const_declarations():
             if decl.name() not in self.__all__:
                 self._export_fidl_const(const_declaration(decl, self.__ir__))
 
-    def _export_aliases(self):
+    def _export_aliases(self) -> None:
         for decl in self.__ir__.alias_declarations():
             if decl.name() not in self.__all__:
                 self._export_type(alias_declaration(decl, self.__ir__))
 
-    def _export_unions(self):
+    def _export_unions(self) -> None:
         for decl in self.__ir__.union_declarations():
             if decl.name() not in self.__all__:
                 self._export_type(union_type(decl, self.__ir__))
 
-    def _export_fidl_const(self, c):
+    def _export_fidl_const(self, c: FIDLConstant) -> None:
         setattr(self, c.name, c.value)
         self.__all__.append(c.name)
 
-    def _export_type(self, t):
-        def encode_func(obj):
+    def _export_type(self, t: type) -> None:
+        # TODO(https://fxbug.dev/346628306): Use a type more specific than Any if possible.
+        def encode_func(
+            obj: Any,
+        ) -> tuple[bytes, list[tuple[int, int, int, int, int]]]:
             library = obj.__module__
             library = library.removeprefix("fidl.")
             library = library.replace("_", ".")

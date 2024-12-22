@@ -13,21 +13,16 @@ use serde::ser::{Error as _, SerializeSeq};
 use serde::{Serialize, Serializer};
 use std::fmt;
 
-/// Lists all available full selectors (component selector + tree selector).
-/// If a selector is provided, it’ll only print selectors for that component.
-/// If a full selector (component + tree) is provided, it lists all selectors under the given node.
+/// Lists all available selectors for the given input of component queries or partial selectors.
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "selectors")]
 pub struct SelectorsCommand {
     #[argh(positional)]
-    /// selectors for which the selectors should be queried. Minimum: 1 unless `--component` is set.
-    /// When `--component` is provided then the selectors should be tree selectors, otherwise
-    /// they can be component selectors or full selectors.
+    /// component query, component selector, or component and tree selector. Minimum: 1 unless
+    /// `--component` is set. When `--component` is provided then the selectors should be tree
+    /// selectors, otherwise they can be component selectors or component and tree selectors.
+    /// Full selectors (including a property segment) are allowed but not informative.
     pub selectors: Vec<String>,
-
-    #[argh(option)]
-    /// DEPRECATED: use `--component` instead.
-    pub manifest: Option<String>,
 
     #[argh(option)]
     /// a fuzzy-search query. May include URL, moniker, or manifest fragments. No selector-escaping
@@ -47,11 +42,7 @@ impl Command for SelectorsCommand {
     type Result = SelectorsResult;
 
     async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
-        if self.manifest.is_some() {
-            panic!("ERROR: option `--manifest` is deprecated, please use `--component` instead");
-        }
-
-        if self.selectors.is_empty() && self.component.is_none() && self.manifest.is_none() {
+        if self.selectors.is_empty() && self.component.is_none() {
             return Err(Error::invalid_arguments("Expected 1 or more selectors. Got zero."));
         }
 
@@ -59,14 +50,6 @@ impl Command for SelectorsCommand {
             utils::process_component_query_with_partial_selectors(
                 component,
                 self.selectors.into_iter(),
-                provider,
-            )
-            .await?
-        } else if let Some(manifest) = self.manifest {
-            utils::get_selectors_for_manifest(
-                manifest,
-                self.selectors,
-                self.accessor.clone(),
                 provider,
             )
             .await?

@@ -112,11 +112,6 @@ if (is_host) {
       testonly = true
       platform = {
         build_type = "eng"
-        connectivity = {
-          network = {
-            netstack_version = "netstack3"
-          }
-        }
       }
       base_packages = [
         {

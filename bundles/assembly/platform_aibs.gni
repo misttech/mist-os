@@ -16,6 +16,10 @@ bootstrap_user_platform_aib_names = [
   # The embeddable feature-set-level
   "embeddable",
 
+  # component_manager is separate from embeddable so that
+  # component_manager_with_tracing can be used instead.
+  "component_manager",
+
   # The bootstrap feature-set-level
   "bootstrap",
 
@@ -98,11 +102,17 @@ bootstrap_userdebug_platform_aib_names = [
   "paravirtualization_support_bootstrap",
 
   # Power Framework
-  "power_framework",
+  "power_framework_broker",
   "power_framework_sag",
 
   # Trusted application support.
   "trusted_execution_environment",
+
+  # Wake alarms support: generic and then hardware-specific.
+  "timekeeper_wake_alarms",
+
+  # Wake alarms support: hardware-specific.
+  "timekeeper_wake_alarms_aml_hrtimer",
 ]
 
 # These are the eng-buildtype-safe platform AIBs that are used by bootstrap
@@ -125,6 +135,7 @@ bootstrap_eng_platform_aib_names = [
 
   # Power Framework
   "power_framework_testing_sag",
+  "power_framework_testing_sag_bootstrap_shard_deprecated",
 
   # Storage
   "fshost_storage_host_fxfs",
@@ -361,6 +372,10 @@ eng_only_platform_aib_names =
       # SSH Config for eng only
       "core_realm_development_access_eng",
 
+      # This isn't in all eng builds, but is in some,
+      #and not in any non-eng builds.
+      "component_manager_with_tracing",
+
       # The minimal additions for eng build-type assemblies
       "standard_eng",
 
@@ -412,6 +427,7 @@ eng_platform_aib_names =
 
 required_user_aib_names = [
   "embeddable",
+  "component_manager",
   "bootstrap",
   "core_realm",
   "core_realm_user_and_userdebug",
@@ -436,10 +452,17 @@ experimental_aib_names = [
   "fshost_storage_host_fvm_minfs",
   "nanohub_support",
   "paravirtualization_support_bootstrap",
-  "power_framework",
+  "power_framework_broker",
   "power_framework_sag",
   "power_framework_development_support",
   "power_framework_testing_sag",
+  "power_framework_testing_sag_bootstrap_shard_deprecated",
+
+  # Wake alarms support: generic and then hardware-specific.
+  "timekeeper_wake_alarms",
+
+  # Wake alarms support: hardware-specific.
+  "timekeeper_wake_alarms_aml_hrtimer",
   "topology_test_daemon",
   "trusted_execution_environment",
   "session_manager_enable_pkg_cache",

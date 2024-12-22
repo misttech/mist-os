@@ -20,7 +20,6 @@ rustc_library("dense-map") {
   ]
 
   test_deps = [
-    "//src/lib/const-unwrap",
     "//src/lib/proptest-support",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:rand",

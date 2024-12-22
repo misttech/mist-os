@@ -7,8 +7,8 @@ use fidl_fuchsia_io::DirectoryMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::LocalComponentHandles;
 use futures::{StreamExt, TryStreamExt};
+use log::*;
 use std::sync::{Arc, Mutex};
-use tracing::*;
 use {fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync};
 
 /// Mocks the fuchsia.kernel.Stats service to be used in integration tests.

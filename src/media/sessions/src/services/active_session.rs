@@ -9,9 +9,9 @@ use fidl_fuchsia_media_sessions2::*;
 use futures::channel::mpsc;
 use futures::future;
 use futures::stream::{BoxStream, SelectAll, Stream, StreamExt};
+use log::warn;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::RangeFrom;
-use tracing::warn;
 
 const LOG_TAG: &str = "active_session";
 
@@ -151,7 +151,7 @@ impl ActiveSession {
         let active_session_id = self.active_sessions.active_session();
         let active_session = self.active_session()?;
         if let Err(fidl_error) = responder.send(active_session) {
-            warn!(tag = LOG_TAG, "Disconnecting Active Session client: {:?}", fidl_error);
+            warn!(tag = LOG_TAG; "Disconnecting Active Session client: {:?}", fidl_error);
             self.clients.remove(&client_id);
         }
 

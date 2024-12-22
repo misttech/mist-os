@@ -11,8 +11,8 @@ use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParame
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryProxy;
 use log_command::log_formatter::{
-    dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
-    Symbolize, Timestamp, WriterContainer,
+    dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, Symbolize, Timestamp,
+    WriterContainer,
 };
 use log_command::{LogProcessingResult, LogSubCommand, WatchCommand};
 use std::io::Write;
@@ -187,8 +187,8 @@ async fn connect_to_target(
 }
 
 async fn log_loop<W>(
-    cmd: LogCommand,
-    mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
+    mut cmd: LogCommand,
+    mut formatter: DefaultLogFormatter<W>,
     symbolizer: Option<impl Symbolize>,
     rcs_connector: Connector<RemoteControlProxy>,
     include_timestamp: bool,
@@ -242,6 +242,13 @@ where
             fuchsia_async::Timer::new(std::time::Duration::from_secs(backoff)).await;
         }
         prev_boot_id = connection.boot_id;
+
+        formatter.expand_monikers(&connection.realm_query).await?;
+
+        for warning in cmd.validate_cmd_flags_with_warnings()? {
+            writeln!(formatter.writer().stderr(), "{warning}")?;
+        }
+
         cmd.maybe_set_interest(&connection.log_settings_client, &connection.realm_query).await?;
         formatter.set_boot_timestamp(Timestamp::from_nanos(
             connection.boot_timestamp.try_into().unwrap(),

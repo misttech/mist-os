@@ -19,7 +19,19 @@ Breakdown: TypeAlias = list[dict[str, trace_metrics.JSON]]
 
 
 class CpuMetricsProcessor(trace_metrics.MetricsProcessor):
-    """Computes CPU utilization metrics, both structured and freeform."""
+    """Computes CPU utilization metrics, both structured and freeform.
+
+    CPU load metrics are reported as a percentage of the total load across all cores, with 100%
+    mapping to full utilization of every core simultaneously. Some tools will report a process using
+    both cores on a dual core system as taking up 200% of CPU; that is not the case here. Depending
+    on configuration, this module will report a time series of average utiliztion samples taken
+    periodically for the duration of the test, or aggregate measurements-- such as min, max,
+    average, and percentiles -- calculated over that data.
+
+    Freeform CPU load metrics report per-core average load for every thread in every process on the
+    system. These data are not suited for automated changepoint detection, and so are instead
+    piped to a dashboard.
+    """
 
     FREEFORM_METRICS_FILENAME = "cpu_breakdown"
 

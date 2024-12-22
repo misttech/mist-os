@@ -119,7 +119,6 @@ assembly_input_bundle("embeddable") {
   bootfs_files_labels = [
     "//build/info/bootfs",
     "//src/bringup:bootfs",
-    "//src/sys/component_manager:bootfs",
   ]
   bootfs_packages = [
     "//src/bringup/bin/critical-services:package",
@@ -161,6 +160,29 @@ assembly_input_bundle("embeddable") {
   ]
 }
 
+# This AIB contains Component Manager without tracing enabled.
+assembly_input_bundle("component_manager") {
+  bootfs_files_labels = [ "//src/sys/component_manager:bootfs" ]
+}
+
+# This AIB contains Component Manager with tracing, which should not
+# be used in memory-constrained builds.
+assembly_input_bundle("component_manager_with_tracing") {
+  bootfs_files_labels = [ "//src/sys/component_manager:bootfs_with_tracing" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = [ "//src/sys/component_manager/meta/component_manager_root_trace.root_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # The most minimal AIB that is included in assembled systems that are meant to be
 # standalone, regardless of build-type.
 #
@@ -171,6 +193,13 @@ assembly_input_bundle("bootstrap") {
     "//src/sysmem/server:pkg",
     "//src/zircon/bin/role_manager:package",
   ]
+
+  # Enabling profiling fundamentally changes how the platform is
+  # compiled and requires the addition of instrumentation_data_processor
+  # package in bootfs packages to collect and process profiles.
+  if (is_profile) {
+    bootfs_packages += [ "//src/sys/instrumentation_data_processor:instrumentation_data_processor_pkg" ]
+  }
 
   compiled_packages = [
     {
@@ -187,9 +216,6 @@ assembly_input_bundle("bootstrap") {
             "//src/zircon/bin/role_manager/meta/role_manager.bootstrap_shard.cml",
           ]
 
-          # Enabling profiling fundamentally changes how the platform is
-          # compiled and requires the addition of instrumentation_data_processor
-          # component to collect and process profiles.
           if (is_profile) {
             shards += [ "//src/sys/instrumentation_data_processor/meta/instrumentation_data_processor.bootstrap_shard.cml" ]
           }
@@ -1006,6 +1032,39 @@ assembly_input_bundle("timekeeper_persistence") {
           shards = [
             "//src/sys/time/timekeeper/timekeeper-persistence.core_shard.cml",
           ]
+        },
+      ]
+    },
+  ]
+}
+
+# The bundle supporting wake alarms through Timekeeper.
+assembly_input_bundle("timekeeper_wake_alarms") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/sys/time/timekeeper/timekeeper-wake-alarms.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+# The bundle supporting wake alarms through Timekeeper, hardware specific
+# for the vim3's aml-hrtimer.
+assembly_input_bundle("timekeeper_wake_alarms_aml_hrtimer") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/sys/time/timekeeper/timekeeper-wake-alarms-aml-hrtimer.core_shard.cml" ]
         },
       ]
     },
@@ -2884,7 +2943,7 @@ assembly_input_bundle("fshost_storage_host_fxfs") {
   bootfs_packages = [
     "//src/storage/gpt/component:package",
     "//src/storage/fxfs:package",
-    "//src/storage/fxfs-crypt:package",
+    "//src/storage/crypt/fxfs:package",
   ]
 }
 
@@ -2981,7 +3040,7 @@ assembly_input_bundle("fshost_fxfs") {
   memory_buckets = [ "//src/developer/memory/buckets/fxfs_buckets.json5" ]
   bootfs_packages = [
     "//src/storage/fxfs:package",
-    "//src/storage/fxfs-crypt:package",
+    "//src/storage/crypt/fxfs:package",
   ]
 }
 
@@ -3037,7 +3096,7 @@ assembly_input_bundle("fshost_fvm_fxfs") {
   memory_buckets = [ "//src/developer/memory/buckets/fxfs_buckets.json5" ]
   bootfs_packages = [
     "//src/storage/fxfs:package",
-    "//src/storage/fxfs-crypt:package",
+    "//src/storage/crypt/fxfs:package",
   ]
 }
 
@@ -3103,7 +3162,7 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
   ]
   bootfs_packages = [
     "//src/storage/fxfs:package",
-    "//src/storage/fxfs-crypt:package",
+    "//src/storage/crypt/fxfs:package",
     "//src/storage/minfs/bin:package",
   ]
 }
@@ -4289,10 +4348,19 @@ assembly_input_bundle("power_framework_sag") {
   ]
 }
 
+# Power Framework power broker.
+#
+# feature_set_levels: all except embeddable
+# build-types: eng, userdebug
+#
+assembly_input_bundle("power_framework_broker") {
+  bootfs_packages = [ "//src/power/broker:package" ]
+}
+
 # Power Framework System Activity Governor for testing. This provides extra controls over the
 # internal state that should only happen for testing.
 #
-# feature_set_levels: all
+# feature_set_levels: all except embeddable
 # build-types: eng
 #
 assembly_input_bundle("power_framework_testing_sag") {
@@ -4301,6 +4369,17 @@ assembly_input_bundle("power_framework_testing_sag") {
     "//src/power/system-activity-governor/fake:package",
     "//src/power/testing/fake-suspend:fake-suspend-pkg",
   ]
+}
+
+# TODO(https://fxbug.dev/335526423): Remove when migrated to power testing phase 2.
+#
+# Bootstrap shard for the power_framework_testing_sag.
+#
+# feature_set_levels: all except embeddable
+# build-types: eng
+#
+assembly_input_bundle(
+    "power_framework_testing_sag_bootstrap_shard_deprecated") {
   compiled_packages = [
     {
       bootfs_package = true
@@ -4313,15 +4392,6 @@ assembly_input_bundle("power_framework_testing_sag") {
       ]
     },
   ]
-}
-
-# Power Framework Support.
-#
-# feature_set_levels: all
-# build-types: eng, userdebug
-#
-assembly_input_bundle("power_framework") {
-  bootfs_packages = [ "//src/power/broker:package" ]
 }
 
 # Power framework cli tools

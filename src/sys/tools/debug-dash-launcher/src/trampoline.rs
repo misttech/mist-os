@@ -246,7 +246,7 @@ fn directory_to_proxy(dir: Arc<PseudoDirectory>) -> Result<fio::DirectoryProxy, 
     let (client, server) = create_proxy::<fio::DirectoryMarker>();
     let scope = vfs::execution_scope::ExecutionScope::new();
     let flags = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
-    vfs::ObjectRequest::new3(flags, &fio::Options::default(), server.into_channel())
+    vfs::ObjectRequest::new(flags, &fio::Options::default(), server.into_channel())
         .handle(|request| dir.open3(scope.clone(), vfs::path::Path::dot(), flags, request));
     Ok(client)
 }
@@ -392,7 +392,7 @@ mod tests {
         let flags = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let path = vfs::path::Path::validate_and_split(name).unwrap();
         let root = root.clone();
-        vfs::ObjectRequest::new3(flags, &fio::Options::default(), server.into_channel())
+        vfs::ObjectRequest::new(flags, &fio::Options::default(), server.into_channel())
             .handle(|request| root.open3(scope.clone(), path, flags, request));
         PkgDir { url, dir, resource }
     }

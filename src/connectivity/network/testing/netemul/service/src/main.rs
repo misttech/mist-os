@@ -16,13 +16,13 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::{FutureExt as _, SinkExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use log::{debug, error, info, warn};
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, HashMap};
 use std::pin::pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{debug, error, info, warn};
 use vfs::directory::entry::{EntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable as _;
@@ -245,7 +245,7 @@ async fn create_realm_instance(
                         &name,
                         move |mock_handles: LocalComponentHandles| {
                             futures::future::ready(
-                                dir.clone2(mock_handles.outgoing_dir.into_channel().into())
+                                dir.clone(mock_handles.outgoing_dir.into_channel().into())
                                     .context("cloning directory for mock handles"),
                             )
                             // The lifetime of the mock child component is tied

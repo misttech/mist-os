@@ -31,7 +31,7 @@ use anyhow::Error;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    tracing::info!("started");
+    log::info!("started");
 
     // Setup tracing
     fuchsia_trace_provider::trace_provider_create_with_fdio();
@@ -41,6 +41,6 @@ async fn main() -> Result<(), Error> {
 
     // This future should never complete
     let result = cm.run().await;
-    tracing::error!("Unexpected exit with result: {:?}", result);
+    log::error!("Unexpected exit with result: {:?}", result);
     result
 }

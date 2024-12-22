@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "third_party/android/platform/bionic/libc/kernel/uapi/linux/ashmem.h"
+
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -12,7 +14,6 @@
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <linux/ashmem.h>
 
 #include "src/starnix/tests/syscalls/cpp/syscall_matchers.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"

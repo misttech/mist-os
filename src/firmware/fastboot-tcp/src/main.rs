@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Context;
+use log::info;
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr, TcpListener};
-use tracing::info;
 
 pub mod fastboot;
 use self::fastboot::*;
@@ -78,7 +78,7 @@ async fn main() -> Result<(), anyhow::Error> {
         match fastboot_session(&mut stream).await {
             Ok(()) => {}
             Err(err) => {
-                info!(%err, "session error");
+                info!(err:%; "session error");
             }
         }
     }

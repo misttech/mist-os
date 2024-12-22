@@ -383,6 +383,13 @@ pub enum RuleFidlConversionError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RuleSetPriority(u32);
 
+impl RuleSetPriority {
+    /// Create a new [`RuleSetPriority`].
+    pub const fn new(x: u32) -> Self {
+        Self(x)
+    }
+}
+
 /// The priority for the default rule set, where the default rule that points
 /// to the main table lives.
 pub const DEFAULT_RULE_SET_PRIORITY: RuleSetPriority =
@@ -627,13 +634,15 @@ pub enum RuleAction {
     /// Look for a route in the indicated route table. If there is no matching
     /// route in the target table, the lookup will continue to consider the
     /// next rule.
-    Lookup(u32),
+    Lookup(crate::TableId),
 }
 
 impl From<fnet_routes::RuleAction> for RuleAction {
     fn from(action: fnet_routes::RuleAction) -> Self {
         match action {
-            fnet_routes::RuleAction::Lookup(table_id) => RuleAction::Lookup(table_id),
+            fnet_routes::RuleAction::Lookup(table_id) => {
+                RuleAction::Lookup(crate::TableId::new(table_id))
+            }
             fnet_routes::RuleAction::Unreachable(fnet_routes::Unreachable) => {
                 RuleAction::Unreachable
             }
@@ -650,7 +659,7 @@ impl From<RuleAction> for fnet_routes::RuleAction {
             RuleAction::Unreachable => {
                 fnet_routes::RuleAction::Unreachable(fnet_routes::Unreachable)
             }
-            RuleAction::Lookup(table_id) => fnet_routes::RuleAction::Lookup(table_id),
+            RuleAction::Lookup(table_id) => fnet_routes::RuleAction::Lookup(table_id.get()),
         }
     }
 }

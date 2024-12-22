@@ -12,7 +12,6 @@ _common_deps = [
   "//src/connectivity/lib/internet-checksum",
   "//src/connectivity/lib/net-types",
   "//src/connectivity/network/lib/explicit",
-  "//src/lib/const-unwrap",
   "//src/lib/network/packet",
   "//third_party/rust_crates:arrayvec",
   "//third_party/rust_crates:byteorder",

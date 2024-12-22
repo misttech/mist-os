@@ -205,7 +205,7 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
     {
         let Self { ctx, data } = self;
         match request {
-            fpraw::SocketRequest::Clone2 { request, control_handle: _ } => {
+            fpraw::SocketRequest::Clone { request, control_handle: _ } => {
                 let channel = fidl::AsyncChannel::from_channel(request.into_channel());
                 let stream = fpraw::SocketRequestStream::from_channel(channel);
                 return ControlFlow::Continue(Some(stream));

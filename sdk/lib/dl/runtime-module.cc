@@ -43,4 +43,32 @@ bool RuntimeModule::ReifyModuleTree(Diagnostics& diag) {
   return true;
 }
 
+// TODO(https://fxbug.dev/382527519): support synchronization with initializers.
+void RuntimeModule::InitializeModuleTree() {
+  // If this module is already initialized, then all its dependencies are
+  // initialized, so return early.
+  if (initialized_) {
+    return;
+  }
+
+  // Initializers are run in reverse-order of the dependency tree, so that init
+  // funcs for dependencies are run before the init funcs of dependent modules.
+  // The init functions for this module will be run last.
+  for (const RuntimeModule& module : std::ranges::reverse_view(module_tree())) {
+    // TODO(https://fxbug.dev/384514585): Test that initializers aren't run more
+    // than once (e.g. already loaded deps, startup modules).
+    // TODO(https://fxbug.dev/374810148): Introduce non-const version of ModuleTree.
+    const_cast<RuntimeModule&>(module).Initialize();
+  }
+}
+
+void RuntimeModule::Initialize() {
+  // If this module's init functions have already run, don't run them again.
+  if (initialized_) {
+    return;
+  }
+  initialized_ = true;
+  module().init.CallInit(load_bias());
+}
+
 }  // namespace dl

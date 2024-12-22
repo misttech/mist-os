@@ -14,17 +14,17 @@ use core::num::NonZeroU8;
 
 use alloc::collections::hash_map::HashMap;
 use alloc::collections::HashSet;
-use const_unwrap::const_unwrap_option;
 use core::time::Duration;
-use net_types::ip::Ip;
+use net_types::ip::{Ip, IpAddress};
 use net_types::{MulticastAddr, Witness as _};
 use netstack3_base::{Instant as _, LocalTimerHeap};
-use packet_formats::gmp::GroupRecordType;
+use packet_formats::gmp::{GmpReportGroupRecord, GroupRecordType};
 use packet_formats::utils::NonZeroDuration;
 
 use crate::internal::gmp::{
-    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpGroupState, GmpMode, GmpStateRef,
-    GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr, QueryTarget,
+    self, GmpBindingsContext, GmpContext, GmpContextInner, GmpEnabledGroup, GmpGroupState, GmpMode,
+    GmpStateRef, GmpTypeLayout, GroupJoinResult, GroupLeaveResult, IpExt, NotAMemberErr,
+    QueryTarget,
 };
 
 /// The default value for Query Response Interval defined in [RFC 3810
@@ -35,7 +35,7 @@ use crate::internal::gmp::{
 /// [RFC 3376 section 8.3]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.3
 pub(super) const DEFAULT_QUERY_RESPONSE_INTERVAL: NonZeroDuration =
-    const_unwrap_option(NonZeroDuration::from_secs(10));
+    NonZeroDuration::from_secs(10).unwrap();
 
 /// The default value for Unsolicited Report Interval defined in [RFC 3810
 /// section 9.11] and [RFC 3376 section 8.11].
@@ -45,7 +45,7 @@ pub(super) const DEFAULT_QUERY_RESPONSE_INTERVAL: NonZeroDuration =
 /// [RFC 3376 section 8.11]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.3
 pub(super) const DEFAULT_UNSOLICITED_REPORT_INTERVAL: NonZeroDuration =
-    const_unwrap_option(NonZeroDuration::from_secs(1));
+    NonZeroDuration::from_secs(1).unwrap();
 
 /// The default value for the Robustness Variable defined in [RFC 3810
 /// section 9.1] and [RFC 3376 section 8.1].
@@ -54,7 +54,7 @@ pub(super) const DEFAULT_UNSOLICITED_REPORT_INTERVAL: NonZeroDuration =
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-9.1
 /// [RFC 3376 section 8.1]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.1
-pub(super) const DEFAULT_ROBUSTNESS_VARIABLE: NonZeroU8 = const_unwrap_option(NonZeroU8::new(2));
+pub(super) const DEFAULT_ROBUSTNESS_VARIABLE: NonZeroU8 = NonZeroU8::new(2).unwrap();
 
 /// The default value for the Query Interval defined in [RFC 3810
 /// section 9.2] and [RFC 3376 section 8.2].
@@ -63,8 +63,7 @@ pub(super) const DEFAULT_ROBUSTNESS_VARIABLE: NonZeroU8 = const_unwrap_option(No
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-9.2
 /// [RFC 3376 section 8.2]:
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-8.2
-pub(super) const DEFAULT_QUERY_INTERVAL: NonZeroDuration =
-    const_unwrap_option(NonZeroDuration::from_secs(125));
+pub(super) const DEFAULT_QUERY_INTERVAL: NonZeroDuration = NonZeroDuration::from_secs(125).unwrap();
 
 /// A delay to use before issuing state change reports in response to interface
 /// state changes (e.g leaving/joining groups).
@@ -107,7 +106,7 @@ impl<I: Ip> GroupState<I> {
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub(super) enum TimerId<I: Ip> {
     GeneralQuery,
-    MulticastAddress(MulticastAddr<I::Addr>),
+    MulticastAddress(GmpEnabledGroup<I::Addr>),
     StateChange,
 }
 
@@ -149,7 +148,7 @@ pub(super) struct ProtocolState<I: Ip> {
     // introduce SSM. The group membership state-tracking is expected to change
     // and it might become easier to keep left groups alongside still-member
     // groups.
-    pub left_groups: HashMap<MulticastAddr<I::Addr>, NonZeroU8>,
+    pub left_groups: HashMap<GmpEnabledGroup<I::Addr>, NonZeroU8>,
 }
 
 impl<I: Ip> Default for ProtocolState<I> {
@@ -179,6 +178,20 @@ impl<I: Ip> ProtocolState<I> {
         self.query_interval
             .saturating_mul(self.robustness_variable.into())
             .saturating_add(config.query_response_interval().into())
+    }
+
+    /// Updates [`ProtocolState`] due to a GMP mode change out of v2 mode.
+    ///
+    /// `ProtocolState` discards any protocol-specific state but *maintains*
+    /// network-learned parameters on mode changes.
+    pub(super) fn on_enter_v1(&mut self) {
+        let Self { robustness_variable: _, query_interval: _, left_groups } = self;
+        // left_groups are effectively pending responses and, from RFC 3810
+        // section 8.2.1:
+        //
+        // Whenever a host changes its compatibility mode, it cancels all its
+        // pending responses and retransmission timers.
+        *left_groups = HashMap::new();
     }
 }
 
@@ -242,6 +255,74 @@ pub(super) trait QueryMessage<I: Ip> {
     fn sources(&self) -> impl Iterator<Item = I::Addr> + '_;
 }
 
+#[derive(Eq, PartialEq, Debug)]
+pub(super) enum QueryError<I: Ip> {
+    NotAMember(I::Addr),
+    Disabled,
+}
+
+impl<I: Ip> From<NotAMemberErr<I>> for QueryError<I> {
+    fn from(NotAMemberErr(addr): NotAMemberErr<I>) -> Self {
+        Self::NotAMember(addr)
+    }
+}
+
+/// An enhancement to [`GmpReportGroupRecord`] that guarantees the yielded group
+/// address is [`GmpEnabledGroup`].
+pub(super) trait VerifiedReportGroupRecord<A: IpAddress>: GmpReportGroupRecord<A> {
+    // NB: We don't have any use for this method. It exists as a statement that
+    // the type implementing it holds a reference to GmpEnabledGroup.
+    #[allow(unused)]
+    fn gmp_enabled_group_addr(&self) -> &GmpEnabledGroup<A>;
+}
+
+#[derive(Clone)]
+pub(super) struct GroupRecord<A, Iter> {
+    group: GmpEnabledGroup<A>,
+    record_type: GroupRecordType,
+    iter: Iter,
+}
+
+impl<A> GroupRecord<A, core::iter::Empty<A>> {
+    pub(super) fn new(group: GmpEnabledGroup<A>, record_type: GroupRecordType) -> Self {
+        Self { group, record_type, iter: core::iter::empty() }
+    }
+}
+
+impl<A, Iter> GroupRecord<A, Iter> {
+    pub(super) fn new_with_sources(
+        group: GmpEnabledGroup<A>,
+        record_type: GroupRecordType,
+        iter: Iter,
+    ) -> Self {
+        Self { group, record_type, iter }
+    }
+}
+
+impl<A: IpAddress<Version: IpExt>, Iter: Iterator<Item: core::borrow::Borrow<A>> + Clone>
+    GmpReportGroupRecord<A> for GroupRecord<A, Iter>
+{
+    fn group(&self) -> MulticastAddr<A> {
+        self.group.multicast_addr()
+    }
+
+    fn record_type(&self) -> GroupRecordType {
+        self.record_type
+    }
+
+    fn sources(&self) -> impl Iterator<Item: core::borrow::Borrow<A>> + '_ {
+        self.iter.clone()
+    }
+}
+
+impl<A: IpAddress<Version: IpExt>, Iter: Iterator<Item: core::borrow::Borrow<A>> + Clone>
+    VerifiedReportGroupRecord<A> for GroupRecord<A, Iter>
+{
+    fn gmp_enabled_group_addr(&self) -> &GmpEnabledGroup<A> {
+        &self.group
+    }
+}
+
 /// Handles a query message from the network.
 ///
 /// The RFC algorithm is specified on [RFC 3376 section 5.2] and [RFC 3810
@@ -261,9 +342,13 @@ pub(super) fn handle_query_message<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     query: &Q,
-) -> Result<(), NotAMemberErr<I>> {
+) -> Result<(), QueryError<I>> {
     core_ctx.with_gmp_state_mut_and_ctx(device, |mut core_ctx, state| {
-        match &state.gmp.mode {
+        // Ignore queries if we're not in enabled state.
+        if !state.enabled {
+            return Err(QueryError::Disabled);
+        }
+        match state.gmp.gmp_mode() {
             GmpMode::V1 { .. } => {
                 return gmp::v1::handle_query_message_inner(
                     &mut core_ctx,
@@ -271,7 +356,8 @@ pub(super) fn handle_query_message<
                     device,
                     state,
                     &query.as_v1(),
-                );
+                )
+                .map_err(Into::into);
             }
             GmpMode::V2 => {}
         }
@@ -285,7 +371,7 @@ pub(super) fn handle_query_message<
         }
 
         let target = query.group_address();
-        let target = QueryTarget::new(target).ok_or_else(|| NotAMemberErr(target))?;
+        let target = QueryTarget::new(target).ok_or_else(|| QueryError::NotAMember(target))?;
 
         // Common early bailout.
         let target = match target {
@@ -314,7 +400,7 @@ pub(super) fn handle_query_message<
 
                 let group = groups
                     .get_mut(&multicast_addr)
-                    .ok_or_else(|| NotAMemberErr(multicast_addr.get()))?;
+                    .ok_or_else(|| QueryError::NotAMember(multicast_addr.get()))?;
 
                 // `Some` target marks a specific query.
                 Some((group.v2_mut(), multicast_addr))
@@ -386,6 +472,10 @@ pub(super) fn handle_query_message<
         //  new response is scheduled to be sent at the earliest of the
         //  remaining time for the pending report and the selected delay.
 
+        // Ignore any queries to non GMP-enabled groups.
+        let addr = GmpEnabledGroup::try_new(addr)
+            .map_err(|addr| QueryError::NotAMember(addr.into_addr()))?;
+
         let timer_id = TimerId::MulticastAddress(addr).into();
         let scheduled = gmp.timers.get(&timer_id);
         let mut sources = query.sources().peekable();
@@ -434,24 +524,28 @@ pub(super) fn handle_query_message<
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-5.1
 /// [RFC 3810 section 6.1]:
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-6.1
-pub(super) fn join_group<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
+pub(super) fn join_group<I: IpExt, CC: GmpTypeLayout<I, BC>, BC: GmpBindingsContext>(
     bindings_ctx: &mut BC,
     group_addr: MulticastAddr<I::Addr>,
     state: GmpStateRef<'_, I, CC, BC>,
 ) -> GroupJoinResult {
     let GmpStateRef { enabled, groups, gmp, config: _ } = state;
-    debug_assert!(gmp.mode.is_v2());
-    let gmp_enabled = enabled && I::should_perform_gmp(group_addr);
+    debug_assert!(gmp.gmp_mode().is_v2());
     groups.join_group_with(group_addr, || {
-        // We've just joined a group, remove anything any pending state from the
-        // left groups.
-        let _: Option<_> = gmp.v2_proto.left_groups.remove(&group_addr);
+        let filter_mode_retransmission_counter = match GmpEnabledGroup::new(group_addr) {
+            Some(group_addr) => {
+                // We've just joined a group, remove anything any pending state from the
+                // left groups.
+                let _: Option<_> = gmp.v2_proto.left_groups.remove(&group_addr);
 
-        let filter_mode_retransmission_counter = if gmp_enabled {
-            trigger_state_change_report(bindings_ctx, &mut gmp.timers);
-            gmp.v2_proto.robustness_variable.get()
-        } else {
-            0
+                if enabled {
+                    trigger_state_change_report(bindings_ctx, &mut gmp.timers);
+                    gmp.v2_proto.robustness_variable.get()
+                } else {
+                    0
+                }
+            }
+            None => 0,
         };
 
         let state =
@@ -474,15 +568,16 @@ pub(super) fn join_group<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-5.1
 /// [RFC 3810 section
 ///     6.1]:https://datatracker.ietf.org/doc/html/rfc3810#section-6.1
-pub(super) fn leave_group<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
+pub(super) fn leave_group<I: IpExt, CC: GmpTypeLayout<I, BC>, BC: GmpBindingsContext>(
     bindings_ctx: &mut BC,
     group_addr: MulticastAddr<I::Addr>,
     state: GmpStateRef<'_, I, CC, BC>,
 ) -> GroupLeaveResult {
     let GmpStateRef { enabled, groups, gmp, config: _ } = state;
-    debug_assert!(gmp.mode.is_v2());
-    let gmp_enabled = enabled && I::should_perform_gmp(group_addr);
+    debug_assert!(gmp.gmp_mode().is_v2());
     groups.leave_group(group_addr).map(|state| {
+        let group_addr = if let Some(a) = GmpEnabledGroup::new(group_addr) { a } else { return };
+
         // Cancel existing query timers since we've left the group.
         let _: Option<_> =
             gmp.timers.cancel(bindings_ctx, &TimerId::MulticastAddress(group_addr).into());
@@ -492,7 +587,7 @@ pub(super) fn leave_group<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContex
         let GroupState { filter_mode_retransmission_counter: _, recorded_sources: _ } =
             state.into_v2();
 
-        if !gmp_enabled {
+        if !enabled {
             return;
         }
         assert_eq!(
@@ -537,12 +632,12 @@ fn trigger_state_change_report<I: IpExt, BC: GmpBindingsContext>(
 ///     https://datatracker.ietf.org/doc/html/rfc3376#section-5.2
 /// [RFC 3810 section 6.3]:
 ///     https://datatracker.ietf.org/doc/html/rfc3810#section-6.3
-pub(super) fn handle_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
-    core_ctx: &mut CC::Inner<'_>,
+pub(super) fn handle_timer<I: IpExt, CC: GmpContextInner<I, BC>, BC: GmpBindingsContext>(
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     timer: TimerId<I>,
-    state: GmpStateRef<'_, I, CC, BC>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
 ) {
     match timer {
         TimerId::GeneralQuery => handle_general_query_timer(core_ctx, bindings_ctx, device, state),
@@ -564,17 +659,20 @@ pub(super) fn handle_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsConte
 /// > its associated filter mode (MODE_IS_INCLUDE or MODE_IS_EXCLUDE) and Source
 /// > list. Multiple Current State Records are packed into individual Report
 /// > messages, to the extent possible.
-fn handle_general_query_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
-    core_ctx: &mut CC::Inner<'_>,
+fn handle_general_query_timer<I: IpExt, CC: GmpContextInner<I, BC>, BC: GmpBindingsContext>(
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, CC, BC>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
 ) {
     let GmpStateRef { enabled: _, groups, gmp: _, config: _ } = state;
-    let report = groups.iter().map(|(addr, state)| {
+    let report = groups.iter().filter_map(|(addr, state)| {
         // TODO(https://fxbug.dev/381241191): Update to include SSM in group
         // records.
         let _ = state;
+
+        // Ignore any groups that are not enabled for GMP.
+        let group = GmpEnabledGroup::new(*addr)?;
 
         // Given we don't support SSM, all the groups we're currently joined
         // should be reported in exclude mode with an empty source list.
@@ -582,7 +680,8 @@ fn handle_general_query_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsCo
         // See https://datatracker.ietf.org/doc/html/rfc3810#section-5.2.12 and
         // https://datatracker.ietf.org/doc/html/rfc3376#section-4.2.12 for
         // group record type descriptions.
-        (*addr, GroupRecordType::ModeIsExclude, core::iter::empty::<I::Addr>())
+
+        Some(GroupRecord::new(group, GroupRecordType::ModeIsExclude))
     });
     core_ctx.send_report_v2(bindings_ctx, device, report)
 }
@@ -613,18 +712,18 @@ fn handle_general_query_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsCo
 /// >  INCLUDE (A)                   B                IS_IN (A*B)
 /// >
 /// >  EXCLUDE (A)                   B                IS_IN (B-A)
-fn handle_multicast_address_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
-    core_ctx: &mut CC::Inner<'_>,
+fn handle_multicast_address_timer<I: IpExt, CC: GmpContextInner<I, BC>, BC: GmpBindingsContext>(
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    multicast_addr: MulticastAddr<I::Addr>,
-    state: GmpStateRef<'_, I, CC, BC>,
+    multicast_addr: GmpEnabledGroup<I::Addr>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
 ) {
     let GmpStateRef { enabled: _, groups, gmp: _, config: _ } = state;
     // Invariant: multicast address timers are removed when we remove interest
     // from the group.
     let state = groups
-        .get_mut(&multicast_addr)
+        .get_mut(multicast_addr.as_ref())
         .expect("multicast timer fired for removed address")
         .v2_mut();
     let recorded_sources = core::mem::take(&mut state.recorded_sources);
@@ -649,7 +748,7 @@ fn handle_multicast_address_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindin
     core_ctx.send_report_v2(
         bindings_ctx,
         device,
-        core::iter::once((multicast_addr, mode, sources)),
+        core::iter::once(GroupRecord::new_with_sources(multicast_addr, mode, sources)),
     );
 }
 
@@ -675,11 +774,11 @@ fn handle_multicast_address_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindin
 /// > If instead the report should contain Source List Change Records, i.e., the
 /// > Filter Mode Retransmission Counter for that multicast address is zero, an
 /// > ALLOW and a BLOCK record is included.
-fn handle_state_change_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsContext>(
-    core_ctx: &mut CC::Inner<'_>,
+fn handle_state_change_timer<I: IpExt, CC: GmpContextInner<I, BC>, BC: GmpBindingsContext>(
+    core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
-    state: GmpStateRef<'_, I, CC, BC>,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
 ) {
     let GmpStateRef { enabled: _, groups, gmp, config } = state;
 
@@ -688,21 +787,20 @@ fn handle_state_change_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsCon
         if *filter_mode_retransmission_counter == 0 {
             return None;
         }
-        Some((
-            *multicast_addr,
+        let multicast_addr = GmpEnabledGroup::new(*multicast_addr)?;
+        Some(GroupRecord::new(
+            multicast_addr,
             // TODO(https://fxbug.dev/381241191): Take the filter mode from
             // group state. Joined groups for now are always exclude mode.
             GroupRecordType::ChangeToExcludeMode,
-            core::iter::empty::<I::Addr>(),
         ))
     });
     let left_groups = gmp.v2_proto.left_groups.keys().map(|multicast_addr| {
-        (
+        GroupRecord::new(
             *multicast_addr,
             // TODO(https://fxbug.dev/381241191): Take the filter mode from
             // group state. Left groups for now are always include mode.
             GroupRecordType::ChangeToIncludeMode,
-            core::iter::empty::<I::Addr>(),
         )
     });
     let state_change_report = joined_groups.chain(left_groups);
@@ -733,6 +831,76 @@ fn handle_state_change_timer<I: IpExt, CC: GmpContext<I, BC>, BC: GmpBindingsCon
             None
         );
     }
+}
+
+/// Takes GMP actions when GMP becomes enabled.
+///
+/// This happens whenever the GMP switches to on or IP is enabled on an
+/// interface (i.e. interface up). The side-effects here are not _quite_ covered
+/// by the RFC, but the interpretation is that enablement is equivalent to all
+/// the tracked groups becoming newly joined and we want to inform routers on
+/// the network about it.
+pub(super) fn handle_enabled<I: IpExt, CC: GmpTypeLayout<I, BC>, BC: GmpBindingsContext>(
+    bindings_ctx: &mut BC,
+    state: GmpStateRef<'_, I, CC, BC>,
+) {
+    let GmpStateRef { enabled: _, groups, gmp, config: _ } = state;
+
+    let needs_report = groups.iter_mut().fold(false, |needs_report, (multicast_addr, state)| {
+        if !I::should_perform_gmp(*multicast_addr) {
+            return needs_report;
+        }
+        let GroupState { filter_mode_retransmission_counter, recorded_sources: _ } = state.v2_mut();
+        *filter_mode_retransmission_counter = gmp.v2_proto.robustness_variable.get();
+        true
+    });
+    if needs_report {
+        trigger_state_change_report(bindings_ctx, &mut gmp.timers);
+    }
+}
+
+/// Takes GMP actions when GMP becomes disabled.
+///
+/// This happens whenever the GMP switches to off or IP is disabled on an
+/// interface (i.e. interface down). The side-effects here are not _quite_
+/// covered by the RFC, but the interpretation is that disablement is equivalent
+/// to all the tracked groups being left and we want to inform routers on the
+/// network about it.
+///
+/// Unlike [`handle_enabled`], however, given this may be a last-ditch effort to
+/// notify a router that an admin is turning off an interface, we immediately
+/// send a _single_ report saying we've left all our groups. Given the interface
+/// is possibly about to go off, we can't schedule any timers.
+pub(super) fn handle_disabled<I: IpExt, CC: GmpContextInner<I, BC>, BC: GmpBindingsContext>(
+    core_ctx: &mut CC,
+    bindings_ctx: &mut BC,
+    device: &CC::DeviceId,
+    state: GmpStateRef<'_, I, CC::TypeLayout, BC>,
+) {
+    let GmpStateRef { enabled: _, groups, gmp, config: _ } = state;
+    // Clear all group retransmission state and cancel all timers.
+    for (_, state) in groups.iter_mut() {
+        *state.v2_mut() = GroupState {
+            filter_mode_retransmission_counter: 0,
+            recorded_sources: Default::default(),
+        };
+    }
+
+    let member_groups =
+        groups.iter().filter_map(|(multicast_addr, _)| GmpEnabledGroup::new(*multicast_addr));
+    // Also include any non-member groups that might've been waiting
+    // retransmissions.
+    let non_member_groups = gmp.v2_proto.left_groups.keys().copied();
+
+    let mut report = member_groups
+        .chain(non_member_groups)
+        .map(|addr| GroupRecord::new(addr, GroupRecordType::ChangeToIncludeMode))
+        .peekable();
+    if report.peek().is_none() {
+        // Nothing to report.
+        return;
+    }
+    core_ctx.send_report_v2(bindings_ctx, device, report);
 }
 
 #[cfg(test)]
@@ -778,6 +946,12 @@ mod tests {
             );
         }
         core_ctx.inner.v2_messages.clear();
+    }
+
+    impl<I: IpExt> TimerId<I> {
+        fn multicast(addr: MulticastAddr<I::Addr>) -> Self {
+            Self::MulticastAddress(GmpEnabledGroup::new(addr).unwrap())
+        }
     }
 
     #[ip_test(I)]
@@ -832,7 +1006,7 @@ mod tests {
         let query = FakeV2Query { group_addr: I::LOOPBACK_ADDRESS.get(), ..Default::default() };
         assert_eq!(
             handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query,),
-            Err(NotAMemberErr(query.group_addr))
+            Err(QueryError::NotAMember(query.group_addr))
         );
     }
 
@@ -870,10 +1044,7 @@ mod tests {
         let query = FakeV2Query { group_addr: I::GROUP_ADDR1.get(), ..Default::default() };
         handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query)
             .expect("handle query");
-        assert_eq!(
-            core_ctx.gmp.timers.get(&TimerId::MulticastAddress(I::GROUP_ADDR1).into()),
-            None
-        );
+        assert_eq!(core_ctx.gmp.timers.get(&TimerId::multicast(I::GROUP_ADDR1).into()), None);
     }
 
     #[ip_test(I)]
@@ -887,7 +1058,7 @@ mod tests {
         let query = FakeV2Query { group_addr: I::GROUP_ADDR1.get(), ..Default::default() };
         assert_eq!(
             handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query),
-            Err(NotAMemberErr(query.group_addr))
+            Err(QueryError::NotAMember(query.group_addr))
         );
     }
 
@@ -903,17 +1074,14 @@ mod tests {
         handle_query_message(&mut core_ctx, &mut bindings_ctx, &FakeDeviceId, &query)
             .expect("handle query");
         assert_matches!(
-            core_ctx.gmp.timers.get(&TimerId::MulticastAddress(I::GROUP_ADDR1).into()),
+            core_ctx.gmp.timers.get(&TimerId::multicast(I::GROUP_ADDR1).into()),
             Some(_)
         );
         assert_eq!(
             core_ctx.gmp_leave_group(&mut bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
             GroupLeaveResult::Left(())
         );
-        assert_matches!(
-            core_ctx.gmp.timers.get(&TimerId::MulticastAddress(I::GROUP_ADDR1).into()),
-            None
-        );
+        assert_matches!(core_ctx.gmp.timers.get(&TimerId::multicast(I::GROUP_ADDR1).into()), None);
     }
 
     #[ip_test(I)]
@@ -948,7 +1116,7 @@ mod tests {
         // Timer is scheduled.
         let now = bindings_ctx.now();
         let (scheduled, ()) = core_ctx.gmp.timers.assert_range_single(
-            &TimerId::MulticastAddress(I::GROUP_ADDR1).into(),
+            &TimerId::multicast(I::GROUP_ADDR1).into(),
             now..=now.panicking_add(query1.max_response_time),
         );
 
@@ -969,7 +1137,7 @@ mod tests {
             .expect("handle query");
 
         let (new_scheduled, ()) = core_ctx.gmp.timers.assert_range_single(
-            &TimerId::MulticastAddress(I::GROUP_ADDR1).into(),
+            &TimerId::multicast(I::GROUP_ADDR1).into(),
             now..=now.panicking_add(query2.max_response_time),
         );
         // Scheduled time is allowed to change, but always to an earlier time.
@@ -1318,5 +1486,145 @@ mod tests {
         assert_eq!(core_ctx.inner.v2_messages, expected_messages);
         core_ctx.gmp.timers.assert_timers([]);
         assert_eq!(core_ctx.gmp.v2_proto.left_groups, HashMap::new());
+    }
+
+    #[ip_test(I)]
+    fn enable_disable<I: TestIpExt>() {
+        let mut ctx = testutil::new_context_with_mode::<I>(GmpMode::V2);
+        join_and_ignore_unsolicited(&mut ctx, [I::GROUP_ADDR1, I::GROUP_ADDR2]);
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+
+        // We call maybe enable again, but if we're already enabled there
+        // are no side-effects.
+        core_ctx.gmp_handle_maybe_enabled(bindings_ctx, &FakeDeviceId);
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(core_ctx.inner.v2_messages, Vec::<Vec<_>>::new());
+
+        // Disable and observe a single leave report and no timers.
+        core_ctx.enabled = false;
+        core_ctx.gmp_handle_disabled(bindings_ctx, &FakeDeviceId);
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(
+            core::mem::take(&mut core_ctx.inner.v2_messages),
+            vec![vec![
+                (I::GROUP_ADDR1, GroupRecordType::ChangeToIncludeMode, vec![],),
+                (I::GROUP_ADDR2, GroupRecordType::ChangeToIncludeMode, vec![],),
+            ]]
+        );
+
+        // Disable again no side-effects.
+        core_ctx.gmp_handle_disabled(bindings_ctx, &FakeDeviceId);
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(core_ctx.inner.v2_messages, Vec::<Vec<_>>::new());
+
+        // Re-enable and observe robustness_variable state changes.
+        core_ctx.enabled = true;
+        core_ctx.gmp_handle_maybe_enabled(bindings_ctx, &FakeDeviceId);
+        let now = bindings_ctx.now();
+        core_ctx.gmp.timers.assert_range([(
+            &TimerId::StateChange.into(),
+            now..=now.panicking_add(STATE_CHANGE_REPORT_DELAY),
+        )]);
+        // No messages yet, this behaves exactly like joining many groups all
+        // at once.
+        assert_eq!(core_ctx.inner.v2_messages, Vec::<Vec<_>>::new());
+
+        while let Some(timer) = bindings_ctx.trigger_next_timer(core_ctx) {
+            assert_eq!(timer, GmpTimerId::new(FakeWeakDeviceId(FakeDeviceId)));
+        }
+        let expect_messages = core::iter::repeat_with(|| {
+            vec![
+                (I::GROUP_ADDR1, GroupRecordType::ChangeToExcludeMode, vec![]),
+                (I::GROUP_ADDR2, GroupRecordType::ChangeToExcludeMode, vec![]),
+            ]
+        })
+        .take(core_ctx.gmp.v2_proto.robustness_variable.get().into())
+        .collect::<Vec<_>>();
+        assert_eq!(core::mem::take(&mut core_ctx.inner.v2_messages), expect_messages);
+
+        // Disable one more time while we're in the process of leaving one of
+        // the groups to show that we allow it to piggyback on the last report
+        // once.
+        assert_eq!(
+            core_ctx.gmp_leave_group(bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupLeaveResult::Left(())
+        );
+        assert_eq!(
+            core_ctx.gmp.v2_proto.left_groups.get(&GmpEnabledGroup::new(I::GROUP_ADDR1).unwrap()),
+            Some(&core_ctx.gmp.v2_proto.robustness_variable)
+        );
+        // Disable and observe a single leave report INCLUDING the already left
+        // group and no timers.
+        core_ctx.enabled = false;
+        core_ctx.gmp_handle_disabled(bindings_ctx, &FakeDeviceId);
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(
+            core::mem::take(&mut core_ctx.inner.v2_messages),
+            vec![vec![
+                (I::GROUP_ADDR1, GroupRecordType::ChangeToIncludeMode, vec![],),
+                (I::GROUP_ADDR2, GroupRecordType::ChangeToIncludeMode, vec![],),
+            ]]
+        );
+    }
+
+    #[ip_test(I)]
+    fn ignore_query_if_disabled<I: TestIpExt>() {
+        let mut ctx = testutil::new_context_with_mode::<I>(GmpMode::V2);
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        core_ctx.enabled = false;
+        core_ctx.gmp_handle_disabled(bindings_ctx, &FakeDeviceId);
+
+        assert_eq!(
+            core_ctx.gmp_join_group(bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupJoinResult::Joined(())
+        );
+
+        // Receive a general query.
+        assert_eq!(
+            handle_query_message(core_ctx, bindings_ctx, &FakeDeviceId, &FakeV2Query::default()),
+            Err(QueryError::Disabled)
+        );
+        // No side-effects.
+        core_ctx.gmp.timers.assert_timers([]);
+        assert_eq!(core_ctx.inner.v2_messages, Vec::<Vec<_>>::new());
+    }
+
+    #[ip_test(I)]
+    fn clears_v2_proto_state_on_mode_change<I: TestIpExt>() {
+        let mut ctx = testutil::new_context_with_mode::<I>(GmpMode::V2);
+        join_and_ignore_unsolicited(&mut ctx, [I::GROUP_ADDR1]);
+
+        let FakeCtx { core_ctx, bindings_ctx } = &mut ctx;
+        let query = FakeV2Query {
+            robustness_variable: DEFAULT_ROBUSTNESS_VARIABLE.get() + 1,
+            query_interval: DEFAULT_QUERY_INTERVAL.get() + Duration::from_secs(1),
+            ..Default::default()
+        };
+        handle_query_message(core_ctx, bindings_ctx, &FakeDeviceId, &query).expect("handle query");
+        assert_eq!(
+            core_ctx.gmp_leave_group(bindings_ctx, &FakeDeviceId, I::GROUP_ADDR1),
+            GroupLeaveResult::Left(())
+        );
+        let robustness_variable = NonZeroU8::new(query.robustness_variable).unwrap();
+        let query_interval = NonZeroDuration::new(query.query_interval).unwrap();
+        assert_eq!(
+            core_ctx.gmp.v2_proto,
+            ProtocolState {
+                robustness_variable,
+                query_interval,
+                left_groups: [(GmpEnabledGroup::new(I::GROUP_ADDR1).unwrap(), robustness_variable)]
+                    .into_iter()
+                    .collect()
+            }
+        );
+
+        core_ctx.with_gmp_state_mut(&FakeDeviceId, |state| {
+            gmp::enter_mode(bindings_ctx, state, GmpMode::V1 { compat: false });
+        });
+
+        assert_eq!(
+            core_ctx.gmp.v2_proto,
+            ProtocolState { robustness_variable, query_interval, left_groups: HashMap::new() }
+        );
     }
 }

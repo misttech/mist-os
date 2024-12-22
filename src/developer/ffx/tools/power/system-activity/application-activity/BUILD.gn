@@ -96,11 +96,6 @@ if (is_fuchsia && has_board) {
       power = {
         suspend_enabled = true
       }
-      connectivity = {
-        network = {
-          netstack_version = "netstack3"
-        }
-      }
     }
   }
 }

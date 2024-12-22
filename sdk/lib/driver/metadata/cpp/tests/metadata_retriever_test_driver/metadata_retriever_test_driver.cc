@@ -6,6 +6,7 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 
 namespace fdf_metadata::test {
 

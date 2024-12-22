@@ -15,40 +15,6 @@
 
 namespace ddk {
 
-// When converting a driver from DFv1 to DFv2, replace references to `ddk::ObjectDetails` with the
-// `fdf_metadata::ObjectDetails` class found in the //sdk/lib/driver/metadata/cpp library.
-//
-// This template class must be explicitly specialized with the given |FidlType| in order for
-// `ddk::MetadataServer` and `ddk::GetMetadata()` to work. This specialization must define
-// `ddk::ObjectDetails::Name`. `ddk::ObjectDetails::Name` is used by `ddk::MetadataServer` and
-// `ddk::GetMetadata()` in order to correctly identify the name of the FIDL service used to pass
-// metadata. Typically it will be related to the name of |FidlType|.
-//
-// For example, say there exists a FIDL type `fuchsia.hardware.test/Metadata` that is to be sent
-// with `ddk::MetadataServer` and received with `ddk::GetMetadata()`:
-//
-//   library fuchsia.hardware.test;
-//
-//   type Metadata = table {
-//       1: test_property string:MAX;
-//   };
-//
-// There should be a `ddk::ObjectDetails<fuchsia_hardware_test::Metadata>` class that defines
-// `ddk::ObjectDetails::Name`:
-//
-//   namespace ddk {
-//
-//     template <>
-//     struct ObjectDetails<fuchsia_hardware_test::Metadata> {
-//       inline static const char* Name = "fuchsia.hardware.test.Metadata";
-//     };
-//
-//   }  // namespace ddk
-template <typename FidlType>
-struct ObjectDetails {
-  inline static const char* Name;
-};
-
 // Connects to the FIDL service that provides |FidlType|. This service is found within |device|'s
 // incoming namespace at FIDL service instance |instance_name|.
 template <typename FidlType>
@@ -64,7 +30,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadata
   }
 
   zx_status_t status = device_connect_fragment_fidl_protocol(
-      device, instance_name, ObjectDetails<FidlType>::Name,
+      device, instance_name, FidlType::kSerializableName,
       fuchsia_driver_metadata::Service::Metadata::Name, endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to connect to metadata protocol: %s", zx_status_get_string(status));
@@ -78,11 +44,11 @@ zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadata
 // `fdf_metadata::GetMetadata()` function found in the //sdk/lib/driver/metadata/cpp library.
 //
 // Retrieves metadata from the incoming namespace of |device| found at instance |instance_name|.
-// The metadata is expected to be served by `ddk::MetadataServer<|FidlType|>`.
-// `ddk::ObjectDetails<|FidlType|>::Name` must be defined.
+// The metadata is expected to be served by `ddk::MetadataServer<|FidlType|>`. `FidlType` must be
+// annotated with `@serializable`.
 //
 // Make sure that the component manifest declares that it uses the
-// `ddk::ObjectDetails<|FidlType|>::Name` service.
+// `FidlType::kSerializableName` service.
 template <typename FidlType>
 zx::result<FidlType> GetMetadata(
     zx_device_t* device,
@@ -140,7 +106,7 @@ zx::result<std::optional<FidlType>> GetMetadataIfExists(
   }
 
   zx_status_t status = device_connect_fragment_fidl_protocol(
-      device, instance_name, ObjectDetails<FidlType>::Name,
+      device, instance_name, FidlType::kSerializableName,
       fuchsia_driver_metadata::Service::Metadata::Name, endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     zxlogf(DEBUG, "Failed to connect to metadata protocol: %s", zx_status_get_string(status));
@@ -173,30 +139,22 @@ zx::result<std::optional<FidlType>> GetMetadataIfExists(
 // When converting a driver from DFv1 to DFv2, replace usages of the `ddk::MetadataServer` class
 // with the `fdf_metadata::MetadataServer` class found in the //sdk/lib/driver/metadata/cpp library.
 //
-// Serves metadata that can be retrieved using `ddk::GetMetadata<|FidlType|>()`.
-// `ddk::ObjectDetails<|FidlType|>::Name` must be defined. Expected to be used by driver
-// components.
+// Serves metadata that can be retrieved using `ddk::GetMetadata<|FidlType|>()`. `FidlType` must be
+// annotated with `@serializable`.
 //
 // As an example, lets say there exists a FIDl type `fuchsia.hardware.test/Metadata` to be sent from
 // a driver to its child driver:
 //
 //   library fuchsia.hardware.test;
 //
+//   // Make sure to annotate with `@serializable`.
+//   @serializable
 //   type Metadata = table {
 //       1: test_property string:MAX;
 //   };
 //
 // The parent driver can define a `MetadataServer<fuchsia_hardware_test::Metadata>` server
 // instance as one its members:
-//
-//   namespace ddk {
-//
-//     template <>
-//     struct ObjectDetails<fuchsia_hardware_test::Metadata> {
-//       inline static const char* Name = "fuchsia.hardware.test.Metadata";
-//     };
-//
-//   }  // namespace ddk
 //
 //   class ParentDriver : public fdf::DriverBase {
 //    private:
@@ -225,13 +183,11 @@ zx::result<std::optional<FidlType>> GetMetadataIfExists(
 //     },
 //   ],
 //
-// See `ddk::ObjectDetails` for more details about the name of the service. See
-// //src/lib/ddktl/tests/metadata-server-test for more fleshed out examples.
 template <typename FidlType>
 class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Metadata> {
  public:
   // Name of the service directory that will serve the fuchsia.driver.metadata/Service FIDL service.
-  inline static const char* kFidlServiceName = ObjectDetails<FidlType>::Name;
+  inline static const char* kFidlServiceName = FidlType::kSerializableName;
 
   explicit MetadataServer(
       std::string instance_name = component::OutgoingDirectory::kDefaultServiceInstance)
@@ -256,7 +212,7 @@ class MetadataServer final : public fidl::WireServer<fuchsia_driver_metadata::Me
   // Sets the metadata to be served to the metadata found in the incoming namespace of |device|.
   // If the metadata found in |incoming| changes after this function is called then those changes
   // will not be reflected in the metadata to be served. Make sure that the component
-  // manifest specifies that is uses the `ddk::ObjectDetails<|FidlType|>::Name` service
+  // manifest specifies that is uses the `FidlType::kSerializableName` service
   zx_status_t ForwardMetadata(
       zx_device_t* device,
       const char* instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {

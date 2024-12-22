@@ -158,7 +158,7 @@ impl<'a> quote::ToTokens for FfxConfigField<'a> {
                 Ok(if let Some(t) = field {
                     #top_level_return
                 } else {
-                    let cfg_value: Option<#return_type> = ffx_config::get(#config_key)?;
+                    let cfg_value: Option<#return_type> = ffx_config::get_optional(#config_key)?;
                     if let Some(v) = cfg_value {
                         #conversion_res
                     } else {

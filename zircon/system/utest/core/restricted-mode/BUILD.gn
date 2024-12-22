@@ -4,14 +4,24 @@
 
 restricted_blob_name = "\"test/restricted-blob.$current_cpu.so\""
 
+# Encodes the default ELF machine for the blob and indicates that there
+# is no memory allocation upper limit.
+restricted_blob_info =
+    "{ {$restricted_blob_name, elfldltl::ElfMachine::kNative, 0} }"
+
 source_set("restricted-mode") {
   testonly = true
 
   sources = [
     "$current_cpu.S",
+    "arch-register-state.$current_cpu.cc",
     "restricted-mode.cc",
   ]
-  defines = [ "RESTRICTED_BLOB_NAME=$restricted_blob_name" ]
+  defines = [
+    "RESTRICTED_BLOB_COUNT=1",
+    "RESTRICTED_BLOB_INFO=$restricted_blob_info",
+  ]
+
   deps = [
     "..:needs-next",
     "//src/lib/elfldltl",

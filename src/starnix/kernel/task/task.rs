@@ -17,7 +17,7 @@ use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
-use starnix_logging::{log_debug, log_warn, set_zx_name};
+use starnix_logging::{log_debug, log_warn, set_current_task_info, set_zx_name};
 use starnix_sync::{LockBefore, Locked, MmDumpable, Mutex, RwLock, TaskRelease};
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
@@ -31,17 +31,18 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{
     sigaltstack_contains_pointer, SigSet, Signal, UncheckedSignal, SIGCONT,
 };
-use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, robust_list_head, sigaction, sigaltstack, ucred,
-    CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
+    errno, error, from_status_like_fdio, pid_t, robust_list, robust_list_head, sigaction_t,
+    sigaltstack, uapi, ucred, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED,
+    FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
 use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::{cmp, fmt};
 use zx::{
     AsHandleRef, Signals, Task as _, {self as zx},
@@ -321,6 +322,69 @@ pub struct CapturedThreadState {
     pub dirty: bool,
 }
 
+#[cfg(feature = "arch32")]
+#[allow(non_camel_case_types)]
+pub type arch32_robust_list_head = uapi::arch32::robust_list_head;
+#[cfg(not(feature = "arch32"))]
+#[allow(non_camel_case_types)]
+pub type arch32_robust_list_head = uapi::robust_list_head;
+#[cfg(feature = "arch32")]
+#[allow(non_camel_case_types)]
+pub type arch32_robust_list = uapi::arch32::robust_list;
+#[cfg(not(feature = "arch32"))]
+#[allow(non_camel_case_types)]
+pub type arch32_robust_list = uapi::robust_list;
+
+pub type RobustListHeadPtr = MultiArchUserRef<robust_list_head, arch32_robust_list_head>;
+pub type RobustListPtr = MultiArchUserRef<robust_list, arch32_robust_list>;
+
+#[derive(Debug, Default)]
+pub struct RobustListHead {
+    pub list: RobustList,
+    pub futex_offset: isize,
+}
+
+#[derive(Debug, Default)]
+pub struct RobustList {
+    pub next: RobustListPtr,
+}
+
+impl RobustListHead {
+    pub fn read(current_task: &CurrentTask, ptr: RobustListHeadPtr) -> Result<Self, Errno> {
+        match ptr {
+            RobustListHeadPtr::Arch64(user_ref) => {
+                let head = current_task.read_object(user_ref)?;
+                Ok(Self {
+                    list: RobustList { next: RobustListPtr::from(head.list.next) },
+                    futex_offset: head.futex_offset as isize,
+                })
+            }
+            RobustListHeadPtr::Arch32(user_ref) => {
+                let head = current_task.read_object(user_ref)?;
+                Ok(Self {
+                    list: RobustList { next: RobustListPtr::from(head.list.next) },
+                    futex_offset: head.futex_offset as isize,
+                })
+            }
+        }
+    }
+}
+
+impl RobustList {
+    pub fn read(current_task: &CurrentTask, ptr: RobustListPtr) -> Result<Self, Errno> {
+        match ptr {
+            RobustListPtr::Arch64(user_ref) => {
+                let list = current_task.read_object(user_ref)?;
+                Ok(Self { next: RobustListPtr::from(list.next) })
+            }
+            RobustListPtr::Arch32(user_ref) => {
+                let list = current_task.read_object(user_ref)?;
+                Ok(Self { next: RobustListPtr::from(list.next) })
+            }
+        }
+    }
+}
+
 pub struct TaskMutableState {
     // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
     pub clear_child_tid: UserRef<pid_t>,
@@ -372,7 +436,7 @@ pub struct TaskMutableState {
 
     /// A pointer to the head of the robust futex list of this thread in
     /// userspace. See get_robust_list(2)
-    pub robust_list_head: UserRef<robust_list_head>,
+    pub robust_list_head: RobustListHeadPtr,
 
     /// The timer slack used to group timer expirations for the calling thread.
     ///
@@ -395,8 +459,8 @@ pub struct TaskMutableState {
     /// Information that a tracer needs to inspect this process.
     pub captured_thread_state: Option<CapturedThreadState>,
 
-    /// Whether this process is frozen by the cgroup freezer.
-    pub frozen: bool,
+    /// Wait canceler to abort cgroup freeze due to SIGKILL.
+    pub freeze_canceler: Option<WaitCanceler>,
 }
 
 impl TaskMutableState {
@@ -951,9 +1015,6 @@ pub struct Task {
     /// filters without holding a lock
     pub seccomp_filter_state: SeccompState,
 
-    /// Used to ensure that all logs related to this task carry the same metadata about the task.
-    logging_span: OnceLock<starnix_logging::Span>,
-
     /// Tell you whether you are tracing syscall entry / exit without a lock.
     pub trace_syscalls: AtomicBool,
 
@@ -1089,7 +1150,7 @@ impl Task {
         no_new_privs: bool,
         seccomp_filter_state: SeccompState,
         seccomp_filters: SeccompFilterContainer,
-        robust_list_head: UserRef<robust_list_head>,
+        robust_list_head: RobustListHeadPtr,
         timerslack_ns: u64,
         security_state: security::TaskState,
     ) -> Self {
@@ -1122,11 +1183,10 @@ impl Task {
                 default_timerslack_ns: timerslack_ns,
                 ptrace: None,
                 captured_thread_state: None,
-                frozen: false,
+                freeze_canceler: None,
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
-            logging_span: OnceLock::new(),
             trace_syscalls: AtomicBool::new(false),
             proc_pid_directory_cache: Mutex::new(None),
             security_state,
@@ -1461,21 +1521,16 @@ impl Task {
             );
         }
 
-        let debug_info = starnix_logging::TaskDebugInfo {
-            pid: self.thread_group.leader,
-            tid: self.id,
-            command: name,
-        };
-        self.update_logging_span(&debug_info);
+        set_current_task_info(&name, self.thread_group.leader, self.id);
 
         // Truncate to 16 bytes, including null byte.
-        let bytes = debug_info.command.to_bytes();
+        let bytes = name.to_bytes();
 
         self.persistent_info.lock().command = if bytes.len() > 15 {
             // SAFETY: Substring of a CString will contain no null bytes.
             CString::new(&bytes[..15]).unwrap()
         } else {
-            debug_info.command
+            name
         };
     }
 
@@ -1512,24 +1567,7 @@ impl Task {
         }
     }
 
-    pub fn logging_span(&self) -> starnix_logging::Span {
-        let logging_span = self.logging_span.get_or_init(|| {
-            starnix_logging::Span::new(&starnix_logging::TaskDebugInfo {
-                pid: self.thread_group.leader,
-                tid: self.id,
-                command: self.command(),
-            })
-        });
-        logging_span.clone()
-    }
-
-    fn update_logging_span(&self, debug_info: &starnix_logging::TaskDebugInfo) {
-        let logging_span =
-            self.logging_span.get_or_init(|| starnix_logging::Span::new(&debug_info));
-        logging_span.update(debug_info);
-    }
-
-    pub fn get_signal_action(&self, signal: Signal) -> sigaction {
+    pub fn get_signal_action(&self, signal: Signal) -> sigaction_t {
         self.thread_group.signal_actions.get(signal)
     }
 }

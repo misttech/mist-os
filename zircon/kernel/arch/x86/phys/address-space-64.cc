@@ -14,6 +14,7 @@
 #include <hwreg/x86msr.h>
 #include <ktl/array.h>
 #include <ktl/byte.h>
+#include <ktl/limits.h>
 #include <ktl/optional.h>
 #include <ktl/span.h>
 #include <phys/address-space.h>
@@ -22,6 +23,8 @@
 #include <ktl/enforce.h>
 
 namespace {
+
+using Paging = AddressSpace::LowerPaging;
 
 // On x86-64, we don't have any guarantee that all the memory in our address
 // space is actually mapped in.
@@ -69,7 +72,32 @@ void ArchSetUpAddressSpace(AddressSpace& aspace) {
   aspace.SetPageTableAllocationBounds(bootstrap_start, bootstrap_end);
   SetUpAddressSpace(aspace);
 
-  // Now that all RAM is mapped in, we no longer have any allocation
+  // Our root page table will need to be installed on secondary CPUs in 32-bit
+  // protected mode: accordingly we'll want it to be 32-bit addressable. Our
+  // root page table though was allocated out of .bss, and this might
+  // naturally exceed 4GiB depending on where we were loaded; if so, relocate
+  // it to a lower address.
+  constexpr uint64_t k4GiB = uint64_t{1} << 32;
+  if (aspace.root_paddr() >= k4GiB) {
+    constexpr size_t kRootTableSize = Paging::kTableSize<Paging::kFirstLevel>;
+    auto result =
+        pool.Allocate(memalloc::Type::kKernelPageTables, kRootTableSize, Paging::kTableAlignment,
+                      /*min_addr=*/ktl::nullopt,
+                      /*max_addr=*/k4GiB);
+    ZX_ASSERT(result.is_ok());
+    uint64_t new_root_paddr = result.value();
+    uint64_t bootstrap_root_paddr = aspace.root_paddr();
+    memcpy(reinterpret_cast<void*>(new_root_paddr), reinterpret_cast<void*>(bootstrap_root_paddr),
+           kRootTableSize);
+    aspace.InstallNewRootTable(new_root_paddr);
+
+    if (pool.Free(bootstrap_root_paddr, kRootTableSize).is_error()) {
+      ZX_PANIC("Failed to free the bootstrap root page table at [%#" PRIx64 ", %#" PRIx64 ")",
+               bootstrap_root_paddr, bootstrap_root_paddr + kRootTableSize);
+    }
+  }
+
+  // Now that we've bootstrapped, we no longer have any allocation
   // restrictions.
   aspace.SetPageTableAllocationBounds(ktl::nullopt, ktl::nullopt);
 }

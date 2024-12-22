@@ -92,12 +92,12 @@ async fn forwarded_twice_to_separate_nodes(run: usize) -> Result<(), Error> {
     let c = Overnet::new_circuit_router(&mut node_id_gen)?;
     let d = Overnet::new_circuit_router(&mut node_id_gen)?;
     let e = Overnet::new(&mut node_id_gen)?;
-    tracing::info!(
+    log::info!(
         a = a.node_id().0,
         b = b.node_id().0,
         c = c.node_id().0,
         d = d.node_id().0,
-        e = e.node_id().0,
+        e = e.node_id().0;
         "NODEIDS"
     );
     super::connect(&a, &b)?;
@@ -177,19 +177,19 @@ async fn exec_captain(
             .next()
             .await
             .ok_or_else(|| anyhow::format_err!("Peer receiver hung up"))?;
-        tracing::info!(node_id = overnet.node_id().0, "Got peers: {:?}", peers);
+        log::info!(node_id = overnet.node_id().0; "Got peers: {:?}", peers);
         if has_peer_conscript(&peers, client) && has_peer_conscript(&peers, server) {
             let client = connect_peer(&overnet, client)?;
             let server = connect_peer(&overnet, server)?;
             let (s, p) = fidl::Channel::create();
-            tracing::info!(node_id = overnet.node_id().0, "server/proxy hdls: {:?} {:?}", s, p);
-            tracing::info!(node_id = overnet.node_id().0, "ENGAGE CONSCRIPTS");
+            log::info!(node_id = overnet.node_id().0; "server/proxy hdls: {:?} {:?}", s, p);
+            log::info!(node_id = overnet.node_id().0; "ENGAGE CONSCRIPTS");
             server.serve(ServerEnd::new(s))?;
             let response = client
                 .issue(ClientEnd::new(p), text)
                 .await
                 .context(format!("awaiting issue response for captain {:?}", overnet.node_id()))?;
-            tracing::info!(node_id = overnet.node_id().0, "Captain got response: {:?}", response);
+            log::info!(node_id = overnet.node_id().0; "Captain got response: {:?}", response);
             assert_eq!(response, text.map(|s| s.to_string()));
             return Ok(());
         }
@@ -201,15 +201,15 @@ async fn exec_captain(
 
 async fn exec_server(node_id: NodeId, server: ServerEnd<echo::EchoMarker>) -> Result<(), Error> {
     let mut stream = server.into_stream();
-    tracing::info!(node_id = node_id.0, "server begins");
+    log::info!(node_id = node_id.0; "server begins");
     while let Some(echo::EchoRequest::EchoString { value, responder }) =
         stream.try_next().await.context("error running echo server")?
     {
-        tracing::info!(node_id = node_id.0, "Received echo request for string {:?}", value);
+        log::info!(node_id = node_id.0; "Received echo request for string {:?}", value);
         responder.send(value.as_ref().map(|s| &**s)).context("error sending response")?;
-        tracing::info!(node_id = node_id.0, "echo response sent successfully");
+        log::info!(node_id = node_id.0; "echo response sent successfully");
     }
-    tracing::info!(node_id = node_id.0, "server done");
+    log::info!(node_id = node_id.0; "server done");
     Ok(())
 }
 
@@ -219,9 +219,9 @@ async fn exec_client(
     text: Option<String>,
     responder: triangle::ConscriptIssueResponder,
 ) -> Result<(), Error> {
-    tracing::info!(node_id = node_id.0, "CLIENT SEND REQUEST: {:?}", text);
+    log::info!(node_id = node_id.0; "CLIENT SEND REQUEST: {:?}", text);
     let response = client.into_proxy().echo_string(text.as_deref()).await.unwrap();
-    tracing::info!(node_id = node_id.0, "CLIENT GETS RESPONSE: {:?}", response);
+    log::info!(node_id = node_id.0; "CLIENT GETS RESPONSE: {:?}", response);
     responder.send(response.as_deref())?;
     Ok(())
 }
@@ -244,20 +244,20 @@ async fn exec_conscript<
         .try_for_each_concurrent(None, |chan| {
             let action = action.clone();
             async move {
-                tracing::info!(node_id = node_id.0, "Received service request for service");
+                log::info!(node_id = node_id.0; "Received service request for service");
                 let chan = fidl::AsyncChannel::from_channel(chan);
-                tracing::info!(node_id = node_id.0, "Started service handler");
+                log::info!(node_id = node_id.0; "Started service handler");
                 triangle::ConscriptRequestStream::from_channel(chan)
                     .map_err(Into::into)
                     .try_for_each_concurrent(None, |request| {
                         let action = action.clone();
                         async move {
-                            tracing::info!(node_id = node_id.0, "Received request {:?}", request);
+                            log::info!(node_id = node_id.0; "Received request {:?}", request);
                             action(request).await
                         }
                     })
                     .await?;
-                tracing::info!(node_id = node_id.0, "Finished service handler");
+                log::info!(node_id = node_id.0; "Finished service handler");
                 Ok(())
             }
         })
@@ -268,7 +268,7 @@ async fn conscript_leaf_action(
     own_id: NodeId,
     request: triangle::ConscriptRequest,
 ) -> Result<(), Error> {
-    tracing::info!(node_id = own_id.0, "Handling it");
+    log::info!(node_id = own_id.0; "Handling it");
     match request {
         triangle::ConscriptRequest::Serve { iface, control_handle: _ } => {
             exec_server(own_id, iface)
@@ -289,14 +289,14 @@ async fn conscript_forward_action(
     request: triangle::ConscriptRequest,
     target: triangle::ConscriptProxy,
 ) -> Result<(), Error> {
-    tracing::info!(node_id = own_id.0, "Forwarding request to {:?}", node_id);
+    log::info!(node_id = own_id.0; "Forwarding request to {:?}", node_id);
     match request {
         triangle::ConscriptRequest::Serve { iface, control_handle: _ } => {
             target.serve(iface)?;
         }
         triangle::ConscriptRequest::Issue { iface, request, responder } => {
             let response = target.issue(iface, request.as_deref()).await?;
-            tracing::info!("Forwarder got response: {:?}", response);
+            log::info!("Forwarder got response: {:?}", response);
             responder.send(response.as_deref())?;
         }
     }
@@ -326,7 +326,7 @@ async fn run_triangle_echo_test(
                         .next()
                         .await
                         .ok_or_else(|| anyhow::format_err!("List peers hung up"))?;
-                    tracing::info!(
+                    log::info!(
                         "Waiting for forwarding target {:?}; got peers {:?}",
                         target_node_id,
                         peers
@@ -342,7 +342,7 @@ async fn run_triangle_echo_test(
                 })
                 .await
             }
-            .unwrap_or_else(|e: Error| tracing::warn!("{:?}", e)),
+            .unwrap_or_else(|e: Error| log::warn!("{:?}", e)),
         ));
     }
     for conscript in conscripts.into_iter() {
@@ -356,9 +356,9 @@ async fn run_triangle_echo_test(
     }
     exec_captain(client, server, captain, text).await?;
     for (i, task) in background_tasks.into_iter().enumerate() {
-        tracing::info!(node_id = captain_node_id.0, "drop background task {}", i);
+        log::info!(node_id = captain_node_id.0; "drop background task {}", i);
         drop(task);
     }
-    tracing::info!(node_id = captain_node_id.0, "returning from test driver");
+    log::info!(node_id = captain_node_id.0; "returning from test driver");
     Ok(())
 }

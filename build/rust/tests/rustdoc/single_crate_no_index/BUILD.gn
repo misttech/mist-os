@@ -17,7 +17,6 @@ group("single_crate_no_index") {
 
 if (is_host) {
   python_host_test("host-test") {
-    enable_mypy = true
     main_source = "test.py"
     deps = [ ":host-test-data" ]
     extra_args =

@@ -1,0 +1,15 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    // Generic addition for wake alarms support.  This shard will eventually
+    // be used always.
+    offer: [
+        {
+            // Wake alarms handling.
+            protocol: [ "fuchsia.time.alarms.Wake" ],
+            from: "#timekeeper",
+            to: [ "#starnix_runner" ],
+        },
+    ],
+}

@@ -57,19 +57,14 @@ struct ArchPhysHandoff {
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_MOTMOT_POWER) payload.
   bool motmot_power_driver = false;
 
+  // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_MOONFLOWER_POWER) payload.
+  bool moonflower_power_driver = false;
+
   // See ArchPatchInfo, above.
   Arm64AlternateVbar alternate_vbar = Arm64AlternateVbar::kNone;
 };
 
-// This must match what the kernel's page-table bootstrapping actually uses as
-// the virtual address of the kernel load image.
-// TODO(https://fxbug.dev/42164859): Matches //zircon/kernel/arch/arm64/mmu.cc, which
-// will no longer need to define it when the ELF kernel is the only kernel.
-#if DISABLE_KASLR
-inline constexpr uint64_t kArchHandoffVirtualAddress = KERNEL_BASE;
-#else
 inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffff10000000;
-#endif
 
 // Whether a peripheral range for the UART needs to be synthesized.
 inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = true;

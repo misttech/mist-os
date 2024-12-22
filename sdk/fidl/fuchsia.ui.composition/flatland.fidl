@@ -246,6 +246,11 @@ type TransformId = struct {
     value uint64;
 };
 
+/// A maximum of 64 child transforms is enough for the expected usage of these APIs. Callers may
+/// beyond this limit using [`AddChild`].
+@available(added=NEXT)
+const MAX_CHILD_TRANSFORMS int32 = 64;
+
 /// A user-defined identifier for a particular piece of Content. See Content creation functions
 /// (e.g. [`CreateViewport`], [`CreateImage`]) for more information.
 type ContentId = struct {
@@ -414,7 +419,7 @@ type HitRegion = struct {
 ///
 /// All functions in this protocol are feed-forward. The operations they represent are not fully
 /// executed until [`Present`] is called.
-@discoverable
+@discoverable(server="platform")
 closed protocol Flatland {
     /// Complete execution of all feed-forward operations.
     ///
@@ -656,6 +661,14 @@ closed protocol Flatland {
     strict RemoveChild(struct {
         parent_transform_id TransformId;
         child_transform_id TransformId;
+    });
+
+    /// Removes all child Transforms from a parent Transform and replaces them with the new child
+    /// transforms in `new_child_transform_ids`.
+    @available(added=NEXT)
+    strict ReplaceChildren(struct {
+        parent_transform_id TransformId;
+        new_child_transform_ids vector<TransformId>:MAX_CHILD_TRANSFORMS;
     });
 
     /// Sets the Root Transform for the graph.

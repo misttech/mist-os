@@ -14,7 +14,7 @@ use packet::{Buf, Serializer};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::{
     IcmpDestUnreachable, IcmpEchoRequest, IcmpMessage, IcmpPacket, IcmpPacketBuilder,
-    IcmpTimeExceeded, IcmpUnusedCode, Icmpv4DestUnreachableCode, Icmpv4TimeExceededCode,
+    IcmpTimeExceeded, IcmpZeroCode, Icmpv4DestUnreachableCode, Icmpv4TimeExceededCode,
     Icmpv4TimestampRequest, Icmpv6DestUnreachableCode, Icmpv6TimeExceededCode, MessageBody,
     OriginalPacket,
 };
@@ -152,7 +152,7 @@ fn test_receive_echo() {
             .encapsulate(IcmpPacketBuilder::<I, _>::new(
                 I::TEST_ADDRS.remote_ip.get(),
                 I::TEST_ADDRS.local_ip.get(),
-                IcmpUnusedCode,
+                IcmpZeroCode,
                 req,
             ))
             .serialize_vec_outer()
@@ -165,7 +165,7 @@ fn test_receive_echo() {
             64,
             I::ICMP_IP_PROTO,
             assert_counters,
-            Some((req.reply(), IcmpUnusedCode)),
+            Some((req.reply(), IcmpZeroCode)),
             |packet| {
                 let (inner_header, inner_body) = packet.original_packet().bytes();
                 assert!(inner_body.is_none());
@@ -187,7 +187,7 @@ fn test_receive_timestamp() {
         .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
             TEST_ADDRS_V4.remote_ip,
             TEST_ADDRS_V4.local_ip,
-            IcmpUnusedCode,
+            IcmpZeroCode,
             req,
         ))
         .serialize_vec_outer()
@@ -203,7 +203,7 @@ fn test_receive_timestamp() {
         64,
         Ipv4Proto::Icmp,
         &["timestamp_request", "send_ipv4_packet"],
-        Some((req.reply(0x80000000, 0x80000000), IcmpUnusedCode)),
+        Some((req.reply(0x80000000, 0x80000000), IcmpZeroCode)),
         |_| {},
     );
 }

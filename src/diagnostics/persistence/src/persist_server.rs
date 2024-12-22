@@ -10,10 +10,10 @@ use fuchsia_async::TaskGroup;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_sync::Mutex;
 use futures::StreamExt;
+use log::*;
 use persistence_config::{ServiceName, Tag};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tracing::*;
 
 pub struct PersistServerData {
     // Service name that this persist server is hosting.

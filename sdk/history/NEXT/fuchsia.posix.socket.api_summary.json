@@ -31,11 +31,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.posix.socket/BaseDatagramSocket.Clone2",
+        "name": "fuchsia.posix.socket/BaseDatagramSocket.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",
@@ -800,11 +800,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.posix.socket/BaseNetworkSocket.Clone2",
+        "name": "fuchsia.posix.socket/BaseNetworkSocket.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",
@@ -2000,11 +2000,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.posix.socket/BaseSocket.Clone2",
+        "name": "fuchsia.posix.socket/BaseSocket.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",
@@ -2611,11 +2611,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.posix.socket/DatagramSocket.Clone2",
+        "name": "fuchsia.posix.socket/DatagramSocket.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",
@@ -4262,11 +4262,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.posix.socket/StreamSocket.Clone2",
+        "name": "fuchsia.posix.socket/StreamSocket.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",
@@ -5634,11 +5634,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.posix.socket/SynchronousDatagramSocket.Clone2",
+        "name": "fuchsia.posix.socket/SynchronousDatagramSocket.Clone",
         "strictness": "strict",
         "ordinal": "2366825959783828089",
         "direction": "one_way",
-        "request": "fuchsia.unknown/CloneableClone2Request"
+        "request": "fuchsia.unknown/CloneableCloneRequest"
     },
     {
         "kind": "protocol/member",

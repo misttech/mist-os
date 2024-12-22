@@ -267,7 +267,7 @@ pub(crate) struct InterfacesWorkerState<
     route_clients: ClientTable<NetlinkRoute, S>,
     /// The table of interfaces and associated state discovered through the
     /// interfaces watcher.
-    interface_properties: BTreeMap<
+    pub(crate) interface_properties: BTreeMap<
         u64,
         fnet_interfaces_ext::PropertiesAndState<InterfaceState, fnet_interfaces_ext::AllInterest>,
     >,
@@ -299,7 +299,7 @@ pub(crate) enum InterfacesNetstackError {
 }
 
 #[derive(Debug, Default, Clone)]
-struct InterfaceState {
+pub(crate) struct InterfaceState {
     // `BTreeMap` so that addresses are iterated in deterministic order
     // (useful for tests).
     addresses: BTreeMap<fnet::IpAddress, NetlinkAddressMessage>,
@@ -1571,6 +1571,8 @@ pub(crate) mod testutil {
         type InterfacesWorker = Required;
         type RoutesV4Worker = Optional;
         type RoutesV6Worker = Optional;
+        type RuleV4Worker = Optional;
+        type RuleV6Worker = Optional;
     }
 
     pub(crate) struct Setup<E, W> {
@@ -1606,6 +1608,8 @@ pub(crate) mod testutil {
             v6_main_route_table: EventLoopComponent::Absent(Optional),
             v4_route_table_provider: EventLoopComponent::Absent(Optional),
             v6_route_table_provider: EventLoopComponent::Absent(Optional),
+            v4_rule_table: EventLoopComponent::Absent(Optional),
+            v6_rule_table: EventLoopComponent::Absent(Optional),
 
             unified_request_stream: request_stream,
         };
@@ -1630,6 +1634,8 @@ pub(crate) mod testutil {
                         interfaces: EventLoopComponent::Present(()),
                         routes_v4: EventLoopComponent::Absent(Optional),
                         routes_v6: EventLoopComponent::Absent(Optional),
+                        rules_v4: EventLoopComponent::Absent(Optional),
+                        rules_v6: EventLoopComponent::Absent(Optional),
                     })
                     .await?;
                 event_loop.run().await

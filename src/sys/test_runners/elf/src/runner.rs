@@ -4,11 +4,11 @@
 
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
+use log::{info, warn};
 use test_runners_lib::elf;
 use test_runners_lib::elf::SuiteServer;
 use test_runners_lib::errors::*;
 use thiserror::Error;
-use tracing::{info, warn};
 use {fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync};
 
 pub fn add_runner_service<F, U, S>(
@@ -66,7 +66,7 @@ where
                 };
             }
             fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown ComponentRunner request");
+                warn!(ordinal:%; "Unknown ComponentRunner request");
             }
         }
     }

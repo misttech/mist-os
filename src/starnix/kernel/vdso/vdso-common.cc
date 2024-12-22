@@ -4,14 +4,16 @@
 
 #include "vdso-common.h"
 
+#include <errno.h>
 #include <sys/syscall.h>
 #include <zircon/time.h>
 
-#include "vdso-calculate-time.h"
 #include "vdso-platform.h"
 
 #if !defined(__arm__)
 #include <lib/fasttime/time.h>
+
+#include "vdso-calculate-time.h"
 #endif
 
 #if !defined(__arm__)
@@ -70,7 +72,7 @@ int clock_gettime_impl(int clock_id, timespec* tp) {
     }
     to_nanoseconds(static_cast<uint64_t>(boot_nsec), &tp->tv_sec, &tp->tv_nsec);
   } else if (clock_id == CLOCK_REALTIME) {
-    uint64_t utc_nsec = calculate_utc_time_nsec();
+    int64_t utc_nsec = calculate_utc_time_nsec();
     if (utc_nsec == kUtcInvalid) {
       // The syscall is used instead of endlessly retrying to acquire the seqlock. This gives the
       // writer thread of the seqlock a chance to run, even if it happens to have a lower priority
@@ -79,7 +81,7 @@ int clock_gettime_impl(int clock_id, timespec* tp) {
                     reinterpret_cast<intptr_t>(tp), 0);
       return ret;
     }
-    to_nanoseconds(utc_nsec, &tp->tv_sec, &tp->tv_nsec);
+    to_nanoseconds(static_cast<uint64_t>(utc_nsec), &tp->tv_sec, &tp->tv_nsec);
   } else {
     ret = syscall(__NR_clock_gettime, static_cast<intptr_t>(clock_id),
                   reinterpret_cast<intptr_t>(tp), 0);

@@ -90,6 +90,8 @@ std::optional<ExceptionReason> DetectExceptionReason(
         return ExceptionReason::kPageFaultBadState;
       case ZX_ERR_NO_MEMORY:
         return ExceptionReason::kPageFaultNoMemory;
+      case ZX_ERR_TIMED_OUT:
+        return ExceptionReason::kPageFaultTimedOut;
       default:
         return std::nullopt;
     }

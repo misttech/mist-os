@@ -26,8 +26,7 @@ async fn test_selectors_no_parameters() {
     let expected_responses = Rc::new(vec![]);
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
-    let cmd =
-        SelectorsCommand { component: None, manifest: None, selectors: vec![], accessor: None };
+    let cmd = SelectorsCommand { component: None, selectors: vec![], accessor: None };
     assert!(run_command(
         setup_fake_rcs(vec![]),
         setup_fake_archive_accessor(vec![FakeAccessorData::new(
@@ -57,7 +56,6 @@ async fn test_selectors_with_unknown_component_search() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand {
         component: Some(String::from("some-bad-moniker")),
-        manifest: None,
         selectors: vec![],
         accessor: None,
     };
@@ -89,7 +87,6 @@ async fn test_selectors_with_unknown_manifest() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand {
-        manifest: None,
         component: Some(String::from("some-bad-moniker")),
         selectors: vec![],
         accessor: None,
@@ -115,7 +112,6 @@ async fn test_selectors_with_succesful_component_search() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand {
         component: Some(String::from("moniker1")),
-        manifest: None,
         selectors: vec![],
         accessor: None,
     };
@@ -158,7 +154,6 @@ async fn test_selectors_with_manifest_that_exists() {
     let test_buffers = TestBuffers::default();
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand {
-        manifest: None,
         component: Some(String::from("moniker1")),
         selectors: vec![],
         accessor: None,
@@ -203,7 +198,6 @@ async fn test_selectors_with_selectors() {
     let mut writer = MachineWriter::new_test(Some(Format::Json), &test_buffers);
     let cmd = SelectorsCommand {
         component: None,
-        manifest: None,
         selectors: vec![String::from("test/moniker1:name:hello_3")],
         accessor: None,
     };

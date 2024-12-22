@@ -284,7 +284,7 @@ Resulting product is not supported and may misbehave!
 
     // Add product-specified memory buckets.
     if let Some(buckets) = platform.diagnostics.memory_monitor.buckets {
-        builder.add_memory_buckets(&vec![buckets])?;
+        builder.add_memory_buckets(&vec![buckets.into()])?;
     }
 
     // Add any packages compiled by the assembly process itself
@@ -303,6 +303,11 @@ Resulting product is not supported and may misbehave!
         builder
             .add_devicetree(devicetree_path.as_utf8_pathbuf())
             .context("Adding devicetree binary")?;
+    }
+    if let Some(devicetree_overlay_path) = &board_info.devicetree_overlay {
+        builder
+            .add_devicetree_overlay(devicetree_overlay_path.as_utf8_pathbuf())
+            .context("Adding devicetree binary overlay")?;
     }
 
     // Construct and set the images config
@@ -516,6 +521,9 @@ fn print_developer_overrides_banner(
             }
         }
     }
+    println!();
+    // And an additional empty line to make sure that any /r's don't attempt to overwrite the last
+    // line of this warning.
     println!();
     Ok(())
 }

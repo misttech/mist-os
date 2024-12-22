@@ -5,7 +5,7 @@
 #[fuchsia::test]
 async fn client_integration_test() {
     sc_client_integration_support::run_test_case(
-        "cpp_driver_shim/*/driver_test_realm/*/base-drivers*:root",
+        "cpp_driver_shim/*/driver_test_realm/*/base-drivers*:[name=receiver]root",
     )
     .await;
 }

@@ -159,6 +159,7 @@ template("sherlock_driver") {
 
   fuchsia_driver_package("${invoker.target_name}-package") {
     package_name = "${invoker.target_name}"
+    export_to_bazel = true
     driver_components = [
       ":${invoker.target_name}-component",
       "post-init",

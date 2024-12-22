@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _};
+use log::{debug, info};
 use std::collections::{hash_map, HashMap, HashSet};
 use std::str::FromStr;
-use tracing::{debug, info};
 use {
     fidl_fuchsia_data as fdata, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_netemul as fnetemul,

@@ -34,13 +34,13 @@ use assert_matches::assert_matches;
 use async_utils::futures::{FutureExt as _, ReplaceValue};
 use byteorder::{NetworkEndian, WriteBytesExt as _};
 use dns_server_watcher::DEFAULT_DNS_PORT;
+use log::{debug, error, warn};
 use net_types::ip::{Ip as _, Ipv6, Ipv6Addr, Subnet, SubnetError};
 use net_types::MulticastAddress as _;
 use packet::ParsablePacket;
 use packet_formats_dhcp::v6;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
-use tracing::{debug, error, warn};
 
 /// A thin wrapper around `zx::MonotonicInstant` that implements `dhcpv6_core::Instant`.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]

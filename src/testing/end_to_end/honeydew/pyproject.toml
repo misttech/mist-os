@@ -41,11 +41,6 @@ include = ["honeydew*"]  # package names should match these glob patterns (["*"]
 profile = "black"
 line_length = 80
 
-# Honeydew uses the MyPy config in fuchsia/pyproject.toml for type checking.
-# To enable MyPy type checking on a Python target:
-# 1. Add `enable_mypy = true` to the python build target configuration
-# 2. Run `fx build` to generate type checking results
-
 # Honeydew uses `fx format-code` to format the code.
 # `fx format-code` uses `black` underneath to format the python code, using the
 # configuration specified in $FUCHSIA_DIR/pyproject.toml.

@@ -4,6 +4,8 @@
 
 // The complexity of a separate struct doesn't seem universally better than having many arguments
 #![allow(clippy::too_many_arguments)]
+// The readability of redundant closures is preferred over the small compiler optimization.
+#![allow(clippy::redundant_closure)]
 
 pub mod access_point;
 pub mod client;

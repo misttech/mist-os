@@ -112,7 +112,7 @@ impl SyscallHandler {
                 self.name(),
                 &error_string
             );
-            tracing::error!("{}", &verbose_string);
+            log::error!("{}", &verbose_string);
             return Err(format_err!("{}", &verbose_string).into());
         }
 
@@ -149,7 +149,7 @@ impl SyscallHandler {
                 self.name(),
                 &error_string
             );
-            tracing::error!("{}", &verbose_string);
+            log::error!("{}", &verbose_string);
             return Err(format_err!("{}", &verbose_string).into());
         }
 
@@ -172,7 +172,7 @@ impl SyscallHandler {
                 self.name(),
                 &error_string
             );
-            tracing::error!("{}", &verbose_string);
+            log::error!("{}", &verbose_string);
             return Err(format_err!("{}", &verbose_string).into());
         }
 

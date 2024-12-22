@@ -6,6 +6,7 @@ pub mod binding_stubs;
 pub mod mem;
 pub mod props;
 pub mod storage;
+pub mod time;
 
 // Must be called by the runtime as a prologue to TA_CreateEntryPoint() for
 // each TA to set up Fuchsia-specific state.

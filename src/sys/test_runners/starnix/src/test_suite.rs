@@ -13,10 +13,10 @@ use fidl::endpoints::create_proxy;
 use fidl_fuchsia_test::{self as ftest};
 use frunner::{ComponentRunnerMarker, ComponentRunnerProxy, ComponentStartInfo};
 use futures::TryStreamExt;
+use log::debug;
 use namespace::Namespace;
 use rust_measure_tape_for_case::Measurable as _;
 use test_runners_lib::elf::SuiteServerError;
-use tracing::debug;
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata};
 
@@ -60,7 +60,7 @@ pub async fn handle_suite_requests(
     mut start_info: frunner::ComponentStartInfo,
     mut stream: ftest::SuiteRequestStream,
 ) -> Result<(), Error> {
-    debug!(?start_info, "got suite request stream");
+    debug!(start_info:?; "got suite request stream");
     let test_type = get_test_type(start_info.program.as_ref().unwrap())?;
 
     // The kernel start info is largely the same as that of the test component. The main difference
@@ -99,7 +99,7 @@ pub async fn handle_suite_requests(
                 handle_case_iterator(test_cases, stream).await?
             }
             ftest::SuiteRequest::Run { tests, options, listener, .. } => {
-                debug!(?tests, "running tests");
+                debug!(tests:?; "running tests");
                 let run_listener_proxy = listener.into_proxy();
 
                 if tests.is_empty() {
@@ -115,7 +115,7 @@ pub async fn handle_suite_requests(
                     replace_program_args(test_args, &mut program);
                 }
                 test_start_info.program = Some(program);
-                debug!(?test_start_info, "running tests with info");
+                debug!(test_start_info:?; "running tests with info");
 
                 match test_type {
                     TestType::Gunit => {
@@ -221,7 +221,7 @@ async fn run_test_case(
     let component_controller = start_test_component(start_info, component_runner)?;
 
     let result = read_result(component_controller.take_event_stream()).await;
-    debug!(?result, "notifying client test case finished");
+    debug!(result:?; "notifying client test case finished");
     case_listener_proxy.finished(&result)?;
 
     Ok(())
@@ -312,7 +312,7 @@ mod tests {
                             .expect("Could not close with epitaph");
                     }
                     frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                        tracing::warn!(%ordinal, "Unknown ComponentRunner request");
+                        log::warn!(ordinal:%; "Unknown ComponentRunner request");
                     }
                 }
             }

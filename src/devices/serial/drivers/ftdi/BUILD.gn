@@ -12,42 +12,53 @@ driver_bind_rules("ftdi_bind") {
   deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 
-fuchsia_cc_driver("ftdi-driver") {
-  output_name = "ftdi"
+source_set("common") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
     "ftdi-i2c.cc",
+    "ftdi-i2c.h",
     "ftdi-mpsse.cc",
+    "ftdi-mpsse.h",
     "ftdi.cc",
+    "ftdi.h",
   ]
   deps = [
-    ":ftdi_bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.ftdi:fuchsia.hardware.ftdi_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
-    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
-    "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
-    "//sdk/lib/driver/outgoing/cpp",
     "//sdk/lib/stdcompat",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/usb/lib/usb",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",
+  ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.ftdi:fuchsia.hardware.ftdi_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
+    "//sdk/fidl/fuchsia.hardware.serialimpl:fuchsia.hardware.serialimpl_cpp",
+    "//sdk/lib/driver/outgoing/cpp",
+    "//src/devices/usb/lib/usb",
+    "//src/lib/ddktl",
     "//zircon/system/ulib/zx",
   ]
 
   # TODO(https://fxbug.dev/42176699): This target uses mutable tables which are deprecated,
   # rather than builders.
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
+}
+
+fuchsia_cc_driver("ftdi-driver") {
+  output_name = "ftdi"
+  deps = [
+    ":common",
+    ":ftdi_bind",
+  ]
 }
 
 fuchsia_driver_component("ftdi") {

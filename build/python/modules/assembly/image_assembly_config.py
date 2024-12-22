@@ -57,6 +57,7 @@ class ImageAssemblyConfig:
     bootfs_packages: Set[FilePath] = field(default_factory=set)
     board_driver_arguments: Optional[BoardDriverArguments] = None
     devicetree: Optional[FilePath] = None
+    devicetree_overlay: Optional[FilePath] = None
     netboot_mode: bool = False
     board_name: str = None
     image_mode: str = None

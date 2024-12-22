@@ -11,7 +11,7 @@
 #![allow(unused_variables)]
 
 use crate::props::is_propset_pseudo_handle;
-use crate::{mem, props, storage};
+use crate::{mem, props, storage, time};
 use num_traits::FromPrimitive;
 use tee_internal::binding::{
     TEE_Attribute, TEE_BigInt, TEE_BigIntFMM, TEE_BigIntFMMContext, TEE_Identity,
@@ -1442,27 +1442,48 @@ extern "C" fn TEE_GenerateRandom(
 
 #[no_mangle]
 extern "C" fn TEE_GetSystemTime(time: *mut TEE_Time) {
-    unimplemented!()
+    assert!(!time.is_null());
+    let now = time::get_system_time();
+    // SAFETY: `data` is non-null and the library must assume that it points to
+    // valid memory.
+    unsafe { *time = now };
 }
 
 #[no_mangle]
 extern "C" fn TEE_Wait(timeout: u32) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(time::wait(timeout))
 }
 
 #[no_mangle]
 extern "C" fn TEE_GetTAPersistentTime(time: *mut TEE_Time) -> TEE_Result {
-    unimplemented!()
+    assert!(!time.is_null());
+    to_tee_result(|| -> TeeResult {
+        let now = time::get_ta_persistent_time()?;
+        // SAFETY: `data` is non-null and the library must assume that it points to
+        // valid memory.
+        unsafe { *time = now };
+        Ok(())
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_SetTAPersistentTime(time: *mut TEE_Time) -> TEE_Result {
-    unimplemented!()
+    assert!(!time.is_null());
+    to_tee_result(|| -> TeeResult {
+        // SAFETY: `data` is non-null and the library must assume that it points to
+        // valid memory.
+        let time = unsafe { *time };
+        time::set_ta_persistent_time(&time)
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_GetREETime(time: *mut TEE_Time) {
-    unimplemented!()
+    assert!(!time.is_null());
+    let now = time::get_ree_time();
+    // SAFETY: `data` is non-null and the library must assume that it points to
+    // valid memory.
+    unsafe { *time = now };
 }
 
 #[no_mangle]

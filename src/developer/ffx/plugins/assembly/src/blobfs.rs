@@ -69,7 +69,6 @@ mod tests {
     use camino::Utf8Path;
     use fuchsia_hash::Hash;
     use serde_json::json;
-    use std::collections::BTreeMap;
     use std::fs::File;
     use std::io::Write;
     use std::str::FromStr;
@@ -110,8 +109,6 @@ mod tests {
                 "0000000000000000000000000000000000000000000000000000000000000000",
             )
             .unwrap(),
-            contents: BTreeMap::default(),
-            path: base_path,
             manifest_path: base_package_manifest_path,
         };
 
@@ -190,8 +187,6 @@ mod tests {
                 "0000000000000000000000000000000000000000000000000000000000000000",
             )
             .unwrap(),
-            contents: BTreeMap::default(),
-            path: base_path,
             manifest_path: base_package_manifest_path,
         };
 

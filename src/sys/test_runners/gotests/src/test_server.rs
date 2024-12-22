@@ -11,6 +11,7 @@ use futures::future::{abortable, AbortHandle, Future};
 use futures::lock::Mutex;
 use futures::{stream, AsyncReadExt as _, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use lazy_static::lazy_static;
+use log::{debug, error};
 use namespace::NamespaceError;
 use regex::bytes::Regex;
 use std::collections::HashSet;
@@ -24,7 +25,6 @@ use test_runners_lib::elf::{
 use test_runners_lib::errors::*;
 use test_runners_lib::launch;
 use test_runners_lib::logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter};
-use tracing::{debug, error};
 use zx::HandleBased as _;
 use {fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 

@@ -28,7 +28,6 @@ fuchsia_cc_driver("driver") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddktl",
     "//src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test:fuchsia.hardware.test_cpp",
-    "//src/lib/ddktl/tests/metadata-server-test/fuchsia.hardware.test:metadata",
   ]
 }
 

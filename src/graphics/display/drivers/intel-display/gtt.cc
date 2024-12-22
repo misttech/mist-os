@@ -259,7 +259,7 @@ void GttRegionImpl::SetRotation(uint32_t rotation, const image_metadata_t& image
                         width);
     return static_cast<uint32_t>(width);
   }();
-  uint32_t height = height_in_tiles(image_metadata.tiling_type, image_metadata.height);
+  uint32_t height = height_in_tiles(image_metadata.tiling_type, image_metadata.dimensions.height);
 
   auto mmio_space = &gtt_->buffer_.value();
   uint32_t pte_offset = static_cast<uint32_t>(base() / PAGE_SIZE);

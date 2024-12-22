@@ -438,8 +438,7 @@ void Image::RenderTiled(T pixel_generator, uint32_t start_y, uint32_t end_y) {
 
 fuchsia_hardware_display_types::wire::ImageMetadata Image::GetMetadata() const {
   fuchsia_hardware_display_types::wire::ImageMetadata image_metadata = {
-      .width = width_,
-      .height = height_,
+      .dimensions = {.width = width_, .height = height_},
   };
   if (modifier_ != fuchsia_images2::wire::PixelFormatModifier::kIntelI915YTiled) {
     image_metadata.tiling_type = IMAGE_TILING_TYPE_LINEAR;

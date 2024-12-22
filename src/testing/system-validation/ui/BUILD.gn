@@ -22,7 +22,7 @@ rustc_binary("bin") {
     "//src/lib/ui/fuchsia-scenic",
     "//src/testing/system-validation:system_validation_lib",
     "//third_party/rust_crates:argh",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 

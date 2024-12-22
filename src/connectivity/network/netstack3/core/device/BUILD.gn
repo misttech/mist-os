@@ -32,7 +32,6 @@ rustc_library_with_features("netstack3-device") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/netstack3/core/lock-order",
-    "//src/lib/const-unwrap",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",

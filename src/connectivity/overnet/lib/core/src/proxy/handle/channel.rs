@@ -164,7 +164,7 @@ impl Serializer for ChannelMessageParser {
         router: &mut RouterHolder<'_>,
         fut_ctx: &mut Context<'_>,
     ) -> Poll<Result<(), Error>> {
-        tracing::trace!(?msg, ?serialized, ?self, "ChannelMessageParser::poll_ser",);
+        log::trace!(msg:?, serialized:?, self:?; "ChannelMessageParser::poll_ser",);
         match self {
             ChannelMessageParser::New => {
                 let ZirconChannelMessage { mut bytes, handles: unbound_handles } =
@@ -232,7 +232,7 @@ impl Serializer for ChannelMessageSerializer {
             ChannelMessageSerializer::Pending { .. } => "Pending",
             ChannelMessageSerializer::Done => "Done",
         };
-        tracing::trace!(?msg, ?serialized, self = self_val, "ChannelMessageSerializer::poll_ser");
+        log::trace!(msg:?, serialized:?, self = self_val; "ChannelMessageSerializer::poll_ser");
         match self {
             ChannelMessageSerializer::New => {
                 let handles = std::mem::replace(&mut msg.handles, Vec::new());

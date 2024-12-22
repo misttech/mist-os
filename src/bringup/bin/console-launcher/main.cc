@@ -252,7 +252,7 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
   while (true) {
     auto [client, server] = fidl::Endpoints<fuchsia_hardware_pty::Device>::Create();
 
-    const fidl::Status result = fidl::WireCall(stdio)->Clone2(
+    const fidl::Status result = fidl::WireCall(stdio)->Clone(
         fidl::ServerEnd<fuchsia_unknown::Cloneable>(server.TakeChannel()));
     if (!result.ok()) {
       FX_PLOGS(FATAL, result.status()) << "failed to clone stdio handle";

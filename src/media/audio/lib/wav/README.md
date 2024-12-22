@@ -2,7 +2,7 @@
 
 This library enables clients to save audio stream(s) to WAV audio files. This is
 intended for use during development only: it allows developers to analyze and
-improve audio fidelity in their components (including Fuchsia OS itself).
+improve audio fidelity in their components (including Fuchsia itself).
 
 This functionality can be toggled by the bool template parameter on the
 WavWriter object itself. When false, it results in zero additional code added

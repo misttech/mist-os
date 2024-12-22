@@ -4,7 +4,9 @@
 
 use crate::filter::LogFilterCriteria;
 use crate::log_socket_stream::{JsonDeserializeError, LogsDataStream};
-use crate::{DetailedDateTime, LogCommand, LogError, LogProcessingResult, TimeFormat};
+use crate::{
+    DetailedDateTime, InstanceGetter, LogCommand, LogError, LogProcessingResult, TimeFormat,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use diagnostics_data::{
@@ -337,6 +339,10 @@ where
     /// Creates a new DefaultLogFormatter with the given writer and options.
     pub fn new(filters: LogFilterCriteria, writer: W, options: LogFormatterOptions) -> Self {
         Self { filters, writer, options, boot_ts_nanos: None }
+    }
+
+    pub async fn expand_monikers(&mut self, getter: &impl InstanceGetter) -> Result<(), LogError> {
+        self.filters.expand_monikers(getter).await
     }
 
     /// Creates a new DefaultLogFormatter from command-line arguments.

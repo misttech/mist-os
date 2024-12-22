@@ -14,7 +14,6 @@ use common::connect_to_rcs;
 
 mod adb;
 mod console;
-mod suspend;
 mod vmo;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -24,8 +23,6 @@ pub enum StarnixSubCommand {
     #[cfg(feature = "enable_console_tool")]
     Console(console::StarnixConsoleCommand),
     Vmo(vmo::StarnixVmoCommand),
-    Suspend(suspend::StarnixSuspendCommand),
-    Resume(suspend::StarnixResumeCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -60,14 +57,6 @@ impl FfxMain for StarnixTool {
             StarnixSubCommand::Vmo(command) => {
                 let rcs = connect_to_rcs(&self.rcs_connector).await?;
                 vmo::starnix_vmo(command, &rcs, writer).await.map_err(|e| Error::User(e))
-            }
-            StarnixSubCommand::Suspend(command) => {
-                let rcs = connect_to_rcs(&self.rcs_connector).await?;
-                suspend::starnix_suspend(command, &rcs, writer).await
-            }
-            StarnixSubCommand::Resume(command) => {
-                let rcs = connect_to_rcs(&self.rcs_connector).await?;
-                suspend::starnix_resume(command, &rcs, writer).await
             }
         }
     }

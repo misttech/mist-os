@@ -20,7 +20,6 @@ if (is_host) {
   }
 
   python_host_test("fidl_api_mapper_test") {
-    enable_mypy = true
     main_source = "fidl_api_mapper_test.py"
     sources = [ "fidl_api_mapper.py" ]
     extra_args = [

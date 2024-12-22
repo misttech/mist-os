@@ -146,14 +146,14 @@ impl StreamConfig {
                     match stream_config_request {
                         Some(Ok(request)) => {
                             if let Err(e) = self.handle_stream_request(request).await {
-                                tracing::warn!("stream config request error: {:?}", e)
+                                log::warn!("stream config request error: {:?}", e)
                             }
                         },
                         Some(Err(e)) => {
-                            tracing::warn!("stream config error: {:?}, stopping", e);
+                            log::warn!("stream config error: {:?}, stopping", e);
                         },
                         None => {
-                            tracing::warn!("no stream config error");
+                            log::warn!("no stream config error");
                         },
                     }
                 }
@@ -168,17 +168,17 @@ impl StreamConfig {
     ) -> std::result::Result<(), anyhow::Error> {
         match request {
             StreamConfigRequest::GetHealthState { responder } => {
-                tracing::trace!("StreamConfig get health state");
+                log::trace!("StreamConfig get health state");
                 responder.send(&HealthState::default())?;
             }
 
             StreamConfigRequest::SignalProcessingConnect { protocol: _, control_handle } => {
-                tracing::trace!("StreamConfig signal processing connect");
+                log::trace!("StreamConfig signal processing connect");
                 control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
             }
 
             StreamConfigRequest::GetProperties { responder } => {
-                tracing::trace!("StreamConfig properties: {:?}", self.properties);
+                log::trace!("StreamConfig properties: {:?}", self.properties);
                 responder.send(&self.properties)?;
             }
 
@@ -193,19 +193,19 @@ impl StreamConfig {
                     .await
                 {
                     Err(e) => {
-                        tracing::warn!("Couldn't get DAI ring buffer formats for device: {:?}", e);
+                        log::warn!("Couldn't get DAI ring buffer formats for device: {:?}", e);
                         responder.send(&[])?;
                         return Ok(());
                     }
                     Ok(formats) => formats.map_err(|e| anyhow!(e.to_string()))?,
                 };
-                tracing::trace!("StreamConfig ring buffer formats: {:?}", formats);
+                log::trace!("StreamConfig ring buffer formats: {:?}", formats);
                 responder.send(&formats)?;
             }
 
             StreamConfigRequest::CreateRingBuffer { format, ring_buffer, control_handle: _ } => {
                 let mut inner = self.inner.lock().await;
-                tracing::trace!(
+                log::trace!(
                     "StreamConfig create ring buffer DAI format: {:?}  ring buffer format: {:?}",
                     inner.dai_format,
                     format
@@ -216,7 +216,7 @@ impl StreamConfig {
             }
 
             StreamConfigRequest::WatchGainState { responder } => {
-                tracing::trace!("StreamConfig watch gain state");
+                log::trace!("StreamConfig watch gain state");
                 let mut state = self.inner.lock().await;
                 if state.gain_state_first_watch_replied == true {
                     // We will never change gain state.
@@ -242,7 +242,7 @@ impl StreamConfig {
                     plug_state_time: Some(time),
                     ..Default::default()
                 };
-                tracing::trace!("StreamConfig watch plug state: {:?}", plug_state.plugged);
+                log::trace!("StreamConfig watch plug state: {:?}", plug_state.plugged);
                 if state.plug_state_updated {
                     state.plug_state_updated = false;
                     responder.send(&plug_state)?;
@@ -251,16 +251,14 @@ impl StreamConfig {
                     state.plug_state_responder = Some(responder);
                     return Ok(());
                 } else {
-                    tracing::warn!(
-                        "Client watched plug state when another hanging get was pending"
-                    );
+                    log::warn!("Client watched plug state when another hanging get was pending");
                     // We drop responder which causes a shutdown (no call to drop_without_shutdown).
                 }
             }
 
             StreamConfigRequest::SetGain { target_state: _, control_handle: _ } => {
                 // We ignore this API since we report no gain change support.
-                tracing::trace!("Set gain state");
+                log::trace!("Set gain state");
             }
         }
         Ok(())
@@ -278,7 +276,7 @@ impl StreamConfig {
             stream_config_state.dai_format,
             stream_config_state.ring_buffer_format.as_ref(),
         ) {
-            tracing::info!("DAI {:?} {:?} setup", dai_state.manufacturer, dai_state.product);
+            log::info!("DAI {:?} {:?} setup", dai_state.manufacturer, dai_state.product);
             let _ = dai_state
                 .interface
                 .create_ring_buffer(dai_format, ring_buffer_format.clone(), ring_buffer)
@@ -388,7 +386,7 @@ impl DefaultConfigurator {
                 if !found {
                     continue;
                 }
-                tracing::trace!("Found common DAI format {:?}", dai_format);
+                log::trace!("Found common DAI format {:?}", dai_format);
                 return Some(dai_format);
             }
         }
@@ -405,7 +403,7 @@ impl DefaultConfigurator {
         // TODO(https://fxbug.dev/42177443): Add flexibility instead of only allowing one DAI channel per codec.
         let bitmask: u64 = 1 << (dai_channel as u32 % codec_dai_format.number_of_channels);
         codec_dai_format.channels_to_use_bitmask = bitmask;
-        tracing::debug!(
+        log::debug!(
             "Setting Codec {:?} {:?} to DAI format {:?}",
             manufacturer,
             product,
@@ -429,7 +427,7 @@ impl DefaultConfigurator {
             let plug_detect = match plug_detect {
                 Some(v) => v,
                 None => {
-                    tracing::warn!("Watch stream got no plug state");
+                    log::warn!("Watch stream got no plug state");
                     break;
                 }
             };
@@ -438,7 +436,7 @@ impl DefaultConfigurator {
                     stream_config_state.plugged = match v.plugged {
                         Some(v) => v,
                         None => {
-                            tracing::warn!("Plug state from codec with no plugged field");
+                            log::warn!("Plug state from codec with no plugged field");
                             break;
                         }
                     };
@@ -448,16 +446,14 @@ impl DefaultConfigurator {
                         match v.plug_state_time {
                             Some(v) => v,
                             None => {
-                                tracing::warn!(
-                                    "Plug state from codec with no plug_state_time field"
-                                );
+                                log::warn!("Plug state from codec with no plug_state_time field");
                                 break;
                             }
                         }
                     };
                 }
                 Err(e) => {
-                    tracing::warn!("Error getting plug state from codec: {:?}", e);
+                    log::warn!("Error getting plug state from codec: {:?}", e);
                     break;
                 }
             }
@@ -470,7 +466,7 @@ impl DefaultConfigurator {
                 match responder.send(&plug_state) {
                     Ok(()) => continue,
                     Err(e) => {
-                        tracing::warn!("Could not respond to plug state: {:?}", e);
+                        log::warn!("Could not respond to plug state: {:?}", e);
                         continue;
                     }
                 };
@@ -478,7 +474,7 @@ impl DefaultConfigurator {
                 stream_config_state.plug_state_updated = true;
             }
         }
-        tracing::warn!("Exiting watch plug detect");
+        log::warn!("Exiting watch plug detect");
     }
 }
 
@@ -552,7 +548,7 @@ impl Configurator for DefaultConfigurator {
             }
             Err(e) => {
                 // We allow to continue if the Signal Processing API is not supported.
-                tracing::debug!("Couldn't get elements from signal processing: {:?}", e)
+                log::debug!("Couldn't get elements from signal processing: {:?}", e)
             }
         }
 
@@ -576,7 +572,7 @@ impl Configurator for DefaultConfigurator {
         {
             return Err(anyhow!("Codec with bad format reported"));
         }
-        tracing::debug!("Codec properties {:?} formats {:?}", properties, codec_formats);
+        log::debug!("Codec properties {:?} formats {:?}", properties, codec_formats);
         // Use an empty string if no manufacturer reported.
         let mut manufacturer = "".to_string();
         if let Some(value) = properties.manufacturer {
@@ -641,7 +637,7 @@ impl Configurator for DefaultConfigurator {
 
                 StreamConfig::try_to_create_ring_buffer(&mut stream_config_state2).await?;
             } else {
-                tracing::warn!(
+                log::warn!(
                     "Codec ({:?} {:?}) formats ({:?}) not found in DAI ({:?} {:?}) formats ({:?})",
                     device.manufacturer,
                     device.product,
@@ -652,7 +648,7 @@ impl Configurator for DefaultConfigurator {
                 );
             }
         } else {
-            tracing::debug!("When codec was found, there was no format reported by the DAI yet");
+            log::debug!("When codec was found, there was no format reported by the DAI yet");
         }
 
         let proxy = interface.get_proxy()?.clone();
@@ -737,12 +733,7 @@ impl Configurator for DefaultConfigurator {
         {
             return Err(anyhow!("DAI with bad format reported"));
         }
-        tracing::debug!(
-            "DAI {:?} {:?} formats {:?}",
-            device.manufacturer,
-            device.product,
-            dai_formats
-        );
+        log::debug!("DAI {:?} {:?} formats {:?}", device.manufacturer, device.product, dai_formats);
 
         let dai_state = DaiState {
             manufacturer: device.manufacturer.clone(),
@@ -791,7 +782,7 @@ impl Configurator for DefaultConfigurator {
                     // given Stream Config.
                     StreamConfig::try_to_create_ring_buffer(&mut stream_config_state2).await?;
                 } else {
-                    tracing::warn!(
+                    log::warn!(
                         "DAI ({:?} {:?}) formats ({:?}) not found in\
                              Codec ({:?} {:?}) formats ({:?})",
                         device.manufacturer,
@@ -1445,14 +1436,14 @@ mod tests {
                         match request {
                             Some(Ok(request)) => {
                                 if let Err(e) = self.handle_codec_request(request, true).await {
-                                    tracing::warn!("codec request error: {:?}", e)
+                                    log::warn!("codec request error: {:?}", e)
                                 }
                             },
                             Some(Err(e)) => {
-                                tracing::warn!("codec error: {:?}, stopping", e);
+                                log::warn!("codec error: {:?}, stopping", e);
                             },
                             None => {
-                                tracing::warn!("no codec error");
+                                log::warn!("no codec error");
                             },
                         }
                     },
@@ -1461,14 +1452,14 @@ mod tests {
                         match request {
                             Some(Ok(request)) => {
                                 if let Err(e) = self.handle_signal_request(request).await {
-                                    tracing::warn!("signal processing request error: {:?}", e)
+                                    log::warn!("signal processing request error: {:?}", e)
                                 }
                             },
                             Some(Err(e)) => {
-                                tracing::warn!("signal processing error: {:?}, stopping", e);
+                                log::warn!("signal processing error: {:?}, stopping", e);
                             },
                             None => {
-                                tracing::warn!("no signal processing error");
+                                log::warn!("no signal processing error");
                             },
                         }
                     },
@@ -1860,14 +1851,14 @@ mod tests {
                         match request {
                             Some(Ok(request)) => {
                                 if let Err(e) = self.handle_codec_request(request).await {
-                                    tracing::warn!("codec request error: {:?}", e)
+                                    log::warn!("codec request error: {:?}", e)
                                 }
                             },
                             Some(Err(e)) => {
-                                tracing::warn!("codec error: {:?}, stopping", e);
+                                log::warn!("codec error: {:?}, stopping", e);
                             },
                             None => {
-                                tracing::warn!("no codec error");
+                                log::warn!("no codec error");
                             },
                         }
                     }

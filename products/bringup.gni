@@ -26,4 +26,5 @@
 use_bringup_assembly = true
 bootfs_only = true
 
+fuchsia_product_assembly_config_label = "//products/bringup"
 zedboot_product_assembly_config_label = "//products/zedboot"

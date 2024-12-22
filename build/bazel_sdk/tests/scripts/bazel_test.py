@@ -22,8 +22,8 @@ import platform
 import shlex
 import subprocess
 import sys
+import typing as T
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Sequence, Set, Union
 
 _HAS_FX = None
 
@@ -31,7 +31,7 @@ _VERBOSE = False
 
 # Type alias for string or Path type.
 # NOTE: With python 3.10+, it is possible to use 'str | Path' directly.
-StrOrPath = Union[str, Path]
+StrOrPath = T.Union[str, Path]
 
 
 def _force_symlink(target_path: Path, link_path: Path) -> None:
@@ -47,7 +47,9 @@ def _force_symlink(target_path: Path, link_path: Path) -> None:
             raise
 
 
-def _generate_command_string(args: Sequence[StrOrPath], **kwargs: Any) -> str:
+def _generate_command_string(
+    args: T.Sequence[StrOrPath], **kwargs: T.Any
+) -> str:
     """Generate a string that prints a command to be run.
 
     Args:
@@ -83,9 +85,9 @@ def _generate_command_string(args: Sequence[StrOrPath], **kwargs: Any) -> str:
 
 
 def _run_command(
-    cmd_args: Sequence[StrOrPath],
+    cmd_args: T.Sequence[StrOrPath],
     check_failure: bool = True,
-    **kwargs: Any,
+    **kwargs: T.Any,
 ) -> "subprocess.CompletedProcess[str]":
     """Run a given command.
 
@@ -117,10 +119,10 @@ def _run_command(
 
 
 def _get_command_output_lines(
-    args: Sequence[StrOrPath],
-    extra_env: Optional[Dict[str, str]] = None,
-    **kwargs: Any,
-) -> Sequence[str]:
+    args: T.Sequence[StrOrPath],
+    extra_env: T.Optional[T.Dict[str, str]] = None,
+    **kwargs: T.Any,
+) -> T.Sequence[str]:
     """Run a given command, then return its standard output as text lines.
 
     Args:
@@ -149,7 +151,7 @@ def _print_error(msg: str) -> int:
     return 1
 
 
-def _find_fuchsia_source_dir_from(path: Path) -> Optional[Path]:
+def _find_fuchsia_source_dir_from(path: Path) -> T.Optional[Path]:
     """Try to find the Fuchsia source directory from a starting location.
 
     Args:
@@ -170,7 +172,7 @@ def _find_fuchsia_source_dir_from(path: Path) -> Optional[Path]:
         path = path.parent
 
 
-def _find_fuchsia_build_dir(fuchsia_source_dir: Path) -> Optional[Path]:
+def _find_fuchsia_build_dir(fuchsia_source_dir: Path) -> T.Optional[Path]:
     """Find the current Fuchsia build directory.
 
     Args:
@@ -208,7 +210,7 @@ def _depfile_quote(path: str) -> str:
     return path.replace("\\", "\\\\").replace(" ", "\\ ")
 
 
-def _flatten_comma_list(items: Iterable[str]) -> Iterable[str]:
+def _flatten_comma_list(items: T.Iterable[str]) -> T.Iterable[str]:
     """Flatten ["a,b", "c,d"] -> ["a", "b", "c", "d"].
 
     This is useful for merging repeatable flags, which also
@@ -222,13 +224,13 @@ def _flatten_comma_list(items: Iterable[str]) -> Iterable[str]:
         yield from item.split(",")
 
 
-def build_metadata_flags(siblings_link_template: str) -> Sequence[str]:
+def build_metadata_flags(siblings_link_template: str) -> T.Sequence[str]:
     """Convert environment variables into build metadata flags."""
     result_flags = []
 
     # Propagate some build metadata from the environment.
     # Some of these values are set by infra.
-    def forward_build_metadata_from_env(var: str) -> Optional[str]:
+    def forward_build_metadata_from_env(var: str) -> T.Optional[str]:
         env_value = os.environ.get(var)  # set by infra
         if env_value is None:
             return None
@@ -272,7 +274,7 @@ class BazelRepositoryMap(object):
     def __init__(
         self,
         fuchsia_source_dir: Path,
-        fuchsia_sdk_dir: Optional[Path],
+        fuchsia_sdk_dir: T.Optional[Path],
         workspace_dir: Path,
         output_base: Path,
     ):
@@ -281,7 +283,7 @@ class BazelRepositoryMap(object):
         self._output_base = output_base
 
         # These repository overrides are passed to the Bazel invocation.
-        self._overrides: Dict[str, Path] = {
+        self._overrides: T.Dict[str, Path] = {
             "rules_cc": fuchsia_source_dir / "third_party/bazel_rules_cc",
             "rules_license": fuchsia_source_dir
             / "third_party/bazel_rules_license",
@@ -332,14 +334,14 @@ class BazelRepositoryMap(object):
         self._overrides[name] = path
         self._internal_overrides[name] = path
 
-    def get_repository_overrides_flags(self) -> Sequence[str]:
+    def get_repository_overrides_flags(self) -> T.Sequence[str]:
         """Return a sequence command-line flags for overriding Bazel external repositories."""
         return [
             f"--override_repository={name}={path}"
             for name, path in self._overrides.items()
         ]
 
-    def resolve_bazel_path(self, bazel_path: str) -> Optional[Path]:
+    def resolve_bazel_path(self, bazel_path: str) -> T.Optional[Path]:
         """Convert a Bazel path label to a real Path or None if it should be ignored."""
         if bazel_path.startswith("//"):
             target_path = bazel_path[2:]
@@ -656,7 +658,7 @@ def main() -> int:
     # Bazel will track changes to these files properly, as repository rules
     # cannot track changes to files outside the workspace :-(
 
-    def setup_version_file(name: str, source_path: Path) -> Optional[str]:
+    def setup_version_file(name: str, source_path: Path) -> T.Optional[str]:
         if not source_path.exists():
             return None
 
@@ -741,7 +743,7 @@ def main() -> int:
             )[0]
         )
 
-    fuchsia_sdk_dir: Optional[Path] = None
+    fuchsia_sdk_dir: T.Optional[Path] = None
     if args.fuchsia_sdk_dir:
         fuchsia_sdk_dir = Path(args.fuchsia_sdk_dir)
 
@@ -987,7 +989,7 @@ def main() -> int:
 
     if args.depfile:
 
-        def find_build_files() -> Set[Path]:
+        def find_build_files() -> T.Set[Path]:
             # Perform a query to retrieve all build files.
             build_files = _get_command_output_lines(
                 args=(
@@ -1008,7 +1010,7 @@ def main() -> int:
 
             return result
 
-        def find_source_files() -> Set[Path]:
+        def find_source_files() -> T.Set[Path]:
             # Perform a cquery to find all input source files.
             lines = _get_command_output_lines(
                 args=(

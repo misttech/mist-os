@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
-use ffx_core::ffx_command;
 
-#[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "efi", description = "Manipulate efi partition")]
 pub struct EfiCommand {

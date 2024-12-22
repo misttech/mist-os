@@ -10,7 +10,6 @@ python_library("snapshots") {
     "__init__.py",
     "snapshots.py",
   ]
-  enable_mypy = true
   library_deps = [
     "//scripts/memory/debug_json",
     "//scripts/memory/images_json",

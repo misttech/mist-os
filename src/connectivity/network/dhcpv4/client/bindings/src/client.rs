@@ -44,7 +44,7 @@ impl Error {
                     Self::Exit(ClientExitReason::InvalidInterface)
                 }
                 dhcp_client_core::deps::SocketError::FailedToOpen(e) => {
-                    tracing::error!("error while trying to open socket: {:?}", e);
+                    log::error!("error while trying to open socket: {:?}", e);
                     Self::Exit(ClientExitReason::UnableToOpenSocket)
                 }
                 dhcp_client_core::deps::SocketError::HostUnreachable
@@ -99,12 +99,12 @@ pub(crate) async fn serve_client(
                             Err(try_send_error) => {
                                 // Note that `try_send_error` cannot be exhaustively matched on.
                                 if try_send_error.is_disconnected() {
-                                    tracing::warn!(
+                                    log::warn!(
                                         "{debug_log_prefix} tried to send shutdown request on \
                                         already-closed channel to client core"
                                     );
                                 } else {
-                                    tracing::error!(
+                                    log::error!(
                                         "{debug_log_prefix} error while sending shutdown request \
                                         to client core: {:?}",
                                         try_send_error
@@ -189,7 +189,7 @@ impl Client {
         debug_log_prefix: dhcp_client_core::client::DebugLogPrefix,
     ) -> Result<Self, Error> {
         if !request_ip_address.unwrap_or(false) {
-            tracing::error!(
+            log::error!(
                 "{debug_log_prefix} client creation failed: \
                 DHCPINFORM is unimplemented"
             );
@@ -269,7 +269,7 @@ impl Client {
         }
 
         if !unrequested_options.is_empty() {
-            tracing::warn!(
+            log::warn!(
                 "{debug_log_prefix} Received options from core that we didn't ask for: {:#?}",
                 unrequested_options
             );
@@ -345,7 +345,7 @@ impl Client {
         for option in parameters {
             match option {
                 dhcp_protocol::DhcpOption::SubnetMask(len) => {
-                    tracing::info!(
+                    log::info!(
                         "{debug_log_prefix} ignoring prefix length={:?} for renewed lease",
                         len
                     );
@@ -363,7 +363,7 @@ impl Client {
         }
 
         if !unrequested_options.is_empty() {
-            tracing::warn!(
+            log::warn!(
                 "{debug_log_prefix} Received options from core that we didn't ask for: {:#?}",
                 unrequested_options
             );
@@ -399,7 +399,7 @@ impl Client {
 
         match watch_result {
             Err(e) => {
-                tracing::error!(
+                log::error!(
                     "{debug_log_prefix} error watching for \
                      AddressRemovalReason after explicitly removing address \
                      {}: {:?}",
@@ -414,7 +414,7 @@ impl Client {
                 | fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
                 | fnet_interfaces_admin::AddressRemovalReason::DadFailed
                 | fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
-                    tracing::error!(
+                    log::error!(
                         "{debug_log_prefix} unexpected removal reason \
                         after explicitly removing address {}: {:?}",
                         ip_address,
@@ -454,23 +454,23 @@ impl Client {
                                 panic!("used invalid properties")
                             }
                             fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved => {
-                                tracing::warn!("{debug_log_prefix} interface removed; stopping");
+                                log::warn!("{debug_log_prefix} interface removed; stopping");
                                 return Err(Error::Exit(ClientExitReason::InvalidInterface));
                             }
                             fnet_interfaces_admin::AddressRemovalReason::UserRemoved => {
-                                tracing::warn!(
+                                log::warn!(
                                     "{debug_log_prefix} address \
                                     administratively removed; stopping"
                                 );
                                 return Err(Error::Exit(ClientExitReason::AddressRemovedByUser));
                             }
                             fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned => {
-                                tracing::warn!(
+                                log::warn!(
                                     "{debug_log_prefix} address already assigned; notifying core"
                                 );
                             }
                             fnet_interfaces_admin::AddressRemovalReason::DadFailed => {
-                                tracing::warn!(
+                                log::warn!(
                                     "{debug_log_prefix} duplicate address detected; notifying core"
                                 );
                             }
@@ -573,7 +573,7 @@ impl Client {
                     Ok(reason) => (Some(reason), current_lease.ip_address),
                     Err(e) => {
                         let debug_log_prefix = &config.debug_log_prefix;
-                        tracing::error!(
+                        log::error!(
                             "{debug_log_prefix} observed error {:?} while watching for removal \
                             of address {} on interface {}; \
                             removing address",

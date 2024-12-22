@@ -26,6 +26,12 @@ import("//zircon/kernel/phys/qemu.gni")
 #     - Type: string
 #     - Default: "phys_executable"
 #
+#   * release_output
+#     - Optional: Whether to release this artifact, it will appear in the build
+#       api 'exported_files' if set to true
+#     - Type: boolean
+#     - Default: false
+#
 # See phys_executable() (or the passed $target_type() template) for other
 # parameters and details.
 template("shim_executable") {
@@ -47,6 +53,9 @@ template("shim_executable") {
                              "import",
                              "target_type",
                            ])
+    if (target_type == "phys_executable") {
+      release_output = defined(invoker.release_output) && invoker.release_output
+    }
 
     if (qemu_boot_shim.name == target_name) {
       # This marks it as the official default boot shim for using QEMU.

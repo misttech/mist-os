@@ -30,7 +30,6 @@ rustc_test("dhcpv6") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:uuid",
   ]
   sources = [ "src/lib.rs" ]

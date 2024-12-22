@@ -608,12 +608,18 @@ void PmmNode::InitReservedRange(const memalloc::Range& range) {
   dprintf(INFO, "PMM: reserved [%#" PRIx64 ", %#" PRIx64 "): %.*s\n", range.addr, range.end(),
           static_cast<int>(what.size()), what.data());
 
-  // Update state and then merge into the main reserved list.
-  vm_page_state state =
-      range.type == memalloc::Type::kKernelPageTables ? vm_page_state::MMU : vm_page_state::WIRED;
+  // Kernel page tables belong to the arch-specific VM backend, just as they'd
+  // be if they were created post-Physboot.
+  if (range.type == memalloc::Type::kKernelPageTables) {
+    ArchVmAspace::HandoffPageTablesFromPhysboot(&reserved);
+    return;
+  }
+
+  // Otherwise, mark it as wired and merge it into the appropriate reserved
+  // list.
   vm_page_t* p;
   list_for_every_entry (&reserved, p, vm_page_t, queue_node) {
-    p->set_state(state);
+    p->set_state(vm_page_state::WIRED);
   }
 
   list_node_t* list;

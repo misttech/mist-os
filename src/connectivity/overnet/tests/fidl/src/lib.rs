@@ -50,7 +50,7 @@ async fn link(a: Arc<Router>, b: Arc<Router>) {
         "a".to_string(),
     );
     if let Err(error) = futures::try_join!(a, b) {
-        tracing::warn!(?error, "Link forward returned an error");
+        log::warn!(error:?; "Link forward returned an error");
     }
 }
 
@@ -77,18 +77,18 @@ impl Fixture {
         let service_task = Task::spawn(futures::future::join3(l1, l2, l3).map(drop));
         let service = format!("distribute_handle_for_{}", test_name);
         let (send_handle, mut recv_handle) = futures::channel::mpsc::channel(1);
-        tracing::info!(%test_name, %fixture_id, "register 2");
+        log::info!(test_name:%, fixture_id:%; "register 2");
         let spawn_service = &|chan,
                               mut sender: futures::channel::mpsc::Sender<fidl::Channel>,
                               test_name: String| {
-            tracing::info!(%test_name, "got connection {:?}", chan);
+            log::info!(test_name:%; "got connection {:?}", chan);
             Task::spawn(log_errors(
                 {
                     let test_name = test_name.clone();
                     async move {
-                        tracing::info!(%test_name, "sending the thing");
+                        log::info!(test_name:%; "sending the thing");
                         sender.send(chan).await?;
-                        tracing::info!(%test_name, "sent the thing");
+                        log::info!(test_name:%; "sent the thing");
                         Ok(())
                     }
                 },
@@ -105,7 +105,7 @@ impl Fixture {
             })
             .await
             .unwrap();
-        tracing::info!(%test_name, %fixture_id, "register 3");
+        log::info!(test_name:%, fixture_id:%; "register 3");
         router3
             .register_service(service.clone(), {
                 let sender = send_handle.clone();
@@ -133,13 +133,13 @@ impl Fixture {
         }
         let (dist_a_to_b, dist_b) = fidl::Channel::create();
         let (dist_a_to_c, dist_c) = fidl::Channel::create();
-        tracing::info!(%test_name, %fixture_id, "connect 2");
+        log::info!(test_name:%, fixture_id:%; "connect 2");
         router1.connect_to_service(router2.node_id(), &service, dist_b).await.unwrap();
-        tracing::info!(%test_name, %fixture_id,"get 2");
+        log::info!(test_name:%, fixture_id:%; "get 2");
         let dist_b = recv_handle.next().await.unwrap();
-        tracing::info!(%test_name, %fixture_id, "connect 3");
+        log::info!(test_name:%, fixture_id:%; "connect 3");
         router1.connect_to_service(router3.node_id(), &service, dist_c).await.unwrap();
-        tracing::info!(%test_name, %fixture_id, "get 3");
+        log::info!(test_name:%, fixture_id:%; "get 3");
         let dist_c = recv_handle.next().await.unwrap();
         let dist_b = fidl::AsyncChannel::from_channel(dist_b);
         let dist_c = fidl::AsyncChannel::from_channel(dist_c);
@@ -148,7 +148,7 @@ impl Fixture {
 
     async fn distribute_handle<H: HandleBased>(&self, h: H, target: Target) -> H {
         let h = h.into_handle();
-        tracing::info!(test_name = %self.test_name, "distribute_handle: make {:?} on {:?}", h, target);
+        log::info!(test_name:% = self.test_name; "distribute_handle: make {:?} on {:?}", h, target);
         let (dist_local, dist_remote) = match target {
             Target::A => return H::from_handle(h),
             Target::B => (&self.dist_a_to_b, &self.dist_b),
@@ -161,11 +161,11 @@ impl Fixture {
         assert_eq!(bytes.len(), 0);
         assert_eq!(handles.len(), 1);
         let h = std::mem::replace(handles, vec![]).into_iter().next().unwrap();
-        tracing::info!(test_name = %self.test_name, "distribute_handle: remote is {:?}", h);
+        log::info!(test_name:% = self.test_name; "distribute_handle: remote is {:?}", h);
         return H::from_handle(h.handle);
     }
 
     pub fn log(&mut self, msg: &str) {
-        tracing::info!(test_name = %self.test_name, "{}", msg);
+        log::info!(test_name:% = self.test_name; "{}", msg);
     }
 }

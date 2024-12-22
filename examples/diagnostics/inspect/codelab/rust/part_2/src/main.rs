@@ -9,7 +9,7 @@ use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use futures::future::try_join;
 use futures::{FutureExt, StreamExt};
-use tracing::info;
+use log::info;
 
 // [START part_1_use_inspect]
 use fuchsia_inspect::component;
@@ -58,7 +58,7 @@ async fn main() -> Result<(), Error> {
         match fizzbuzz.execute(30u32).await {
             Ok(result) => {
                 // CODELAB: Add Inspect here to see if there is a response.
-                info!(%result, "Got FizzBuzz");
+                info!(result:%; "Got FizzBuzz");
             }
             Err(_) => {
                 // CODELAB: Add Inspect here to see if there is an error

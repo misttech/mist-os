@@ -6,8 +6,7 @@ use anyhow::Error;
 use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_examples_inspect::ReverserMarker;
 use fuchsia_component::client;
-
-use tracing::{error, info};
+use log::{error, info};
 
 struct Args {
     strings: Vec<String>,
@@ -52,7 +51,7 @@ async fn main() -> Result<(), Error> {
         info!("Input: {}", string);
         match reverser.reverse(&string).await {
             Ok(output) => info!("Output: {}", output),
-            Err(e) => error!(error = ?e, "Failed to reverse string"),
+            Err(e) => error!(error:? = e; "Failed to reverse string"),
         }
     }
     // [END reverse_loop]

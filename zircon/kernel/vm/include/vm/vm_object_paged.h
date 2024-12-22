@@ -73,12 +73,11 @@ class VmObjectPaged final : public VmObject {
   // the user changing the value via a syscall, so multiple calls under the same lock acquisition
   // can have different results.
   ktl::optional<uint64_t> user_content_size_locked() TA_REQ(lock()) {
-    auto csm = cow_pages_locked()->GetUserContentSizeLocked();
-    if (!csm) {
+    if (!user_content_size_) {
       return ktl::nullopt;
     }
 
-    return csm->GetContentSize();
+    return user_content_size_->GetContentSize();
   }
 
   bool is_contiguous() const override { return (options_ & kContiguous); }
@@ -114,11 +113,6 @@ class VmObjectPaged final : public VmObject {
     }
     return 0;
   }
-  void set_user_id(uint64_t user_id) override {
-    VmObject::set_user_id(user_id);
-    Guard<CriticalMutex> guard{lock()};
-    cow_pages_locked()->set_page_attribution_user_id_locked(user_id);
-  }
 
   uint64_t HeapAllocationBytes() const override {
     Guard<CriticalMutex> guard{lock()};
@@ -151,7 +145,17 @@ class VmObjectPaged final : public VmObject {
   }
   zx_status_t PrefetchRange(uint64_t offset, uint64_t len) override;
   zx_status_t DecommitRange(uint64_t offset, uint64_t len) override;
-  zx_status_t ZeroRange(uint64_t offset, uint64_t len) override;
+  zx_status_t ZeroRange(uint64_t offset, uint64_t len) override {
+    return ZeroRangeInternal(offset, len, /*dirty_track=*/true);
+  }
+  zx_status_t ZeroRangeUntracked(uint64_t offset, uint64_t len) override {
+    // We don't expect any committed pages to remain at the end of this call, so we should be
+    // operating on whole pages.
+    if (!IS_PAGE_ALIGNED(offset) || !IS_PAGE_ALIGNED(len)) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    return ZeroRangeInternal(offset, len, /*dirty_track=*/false);
+  }
 
   void Unpin(uint64_t offset, uint64_t len) override {
     Guard<CriticalMutex> guard{lock()};
@@ -199,6 +203,11 @@ class VmObjectPaged final : public VmObject {
     return cow_pages_locked()->QueryPagerVmoStatsLocked(reset, stats);
   }
 
+  void ResetPagerVmoStats() {
+    Guard<CriticalMutex> guard{lock()};
+    cow_pages_locked()->ResetPagerVmoStatsLocked();
+  }
+
   zx_status_t WritebackBegin(uint64_t offset, uint64_t len, bool is_zero_range) override {
     Guard<CriticalMutex> guard{lock()};
     return cow_pages_locked()->WritebackBeginLocked(offset, len, is_zero_range);
@@ -211,7 +220,7 @@ class VmObjectPaged final : public VmObject {
   // See VmObject::SetUserContentSize
   void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) override {
     Guard<CriticalMutex> guard{lock()};
-    cow_pages_locked()->SetUserContentSizeLocked(ktl::move(csm));
+    user_content_size_ = ktl::move(csm);
   }
 
   void Dump(uint depth, bool verbose) override {
@@ -390,6 +399,9 @@ class VmObjectPaged final : public VmObject {
                                     uint64_t zero_end_offset, Guard<CriticalMutex>* guard)
       TA_REQ(lock());
 
+  // Internal helper for ZeroRange*.
+  zx_status_t ZeroRangeInternal(uint64_t offset, uint64_t len, bool dirty_track);
+
   // Internal implementations that assume lock is already held.
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock());
 
@@ -436,6 +448,10 @@ class VmObjectPaged final : public VmObject {
   // consequence if this is null it implies that the VMO is *not* in the global list. Otherwise it
   // can generally be assumed that this is non-null.
   fbl::RefPtr<VmCowPages> cow_pages_ TA_GUARDED(lock());
+
+  // A user supplied content size that can be queried. By itself this has no semantic meaning and is
+  // only read and used specifically when requested by the user. See VmObject::SetUserContentSize.
+  fbl::RefPtr<ContentSizeManager> user_content_size_ TA_GUARDED(lock());
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_OBJECT_PAGED_H_

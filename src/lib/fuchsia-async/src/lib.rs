@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! A futures-rs executor design specifically for Fuchsia OS.
+//! A futures-rs executor designed specifically for Fuchsia.
 //!
 //! # Example:
 //! A simple, singlethreaded print server:

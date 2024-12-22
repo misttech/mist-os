@@ -20,7 +20,6 @@ use {
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
-use assert_matches::assert_matches;
 use derivative::Derivative;
 use futures::channel::oneshot;
 use futures::StreamExt as _;
@@ -48,8 +47,9 @@ use crate::netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
 use crate::route_tables::{
-    FidlRouteMap, NetlinkRouteTableIndex, NonZeroNetlinkRouteTableIndex, RouteRemoveResult,
-    RouteTable, RouteTableKey, RouteTableLookup, RouteTableMap, UnmanagedTableError,
+    FidlRouteMap, MainRouteTable, NetlinkRouteTableIndex, NonZeroNetlinkRouteTableIndex,
+    RouteRemoveResult, RouteTable, RouteTableKey, RouteTableLookup, RouteTableMap,
+    TableNeedsCleanup,
 };
 use crate::util::respond_to_completer;
 
@@ -366,7 +366,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         route_table_map: &mut RouteTableMap<I>,
         route_clients: &ClientTable<NetlinkRoute, S>,
         event: fnet_routes_ext::Event<I>,
-    ) -> Result<(), RouteEventHandlerError<I>> {
+    ) -> Result<Option<TableNeedsCleanup>, RouteEventHandlerError<I>> {
         handle_route_watcher_event::<I, S>(
             route_table_map,
             &mut self.fidl_route_map,
@@ -486,12 +486,13 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         let (real_route_set, backup_route_set) =
             match route_tables.get(&table).expect("should have just been populated") {
                 RouteTableLookup::Managed(RouteTable {
-                    _route_table_proxy: _,
                     route_set_proxy,
-                    fidl_table_id: _,
                     route_set_from_main_table_proxy,
+                    ..
                 }) => (route_set_proxy, Some(route_set_from_main_table_proxy)),
-                RouteTableLookup::Unmanaged(real_route_set) => (real_route_set, None),
+                RouteTableLookup::Unmanaged(MainRouteTable { route_set_proxy, .. }) => {
+                    (route_set_proxy, None)
+                }
             };
 
         let route: I::Route =
@@ -563,12 +564,13 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             None => return Err(RequestError::NotFound),
             Some(lookup) => match lookup {
                 RouteTableLookup::Managed(RouteTable {
-                    _route_table_proxy: _,
                     route_set_proxy,
-                    fidl_table_id: _,
                     route_set_from_main_table_proxy,
+                    ..
                 }) => (route_set_proxy, Some(route_set_from_main_table_proxy)),
-                RouteTableLookup::Unmanaged(real_route_set) => (real_route_set, None),
+                RouteTableLookup::Unmanaged(MainRouteTable { route_set_proxy, .. }) => {
+                    (route_set_proxy, None)
+                }
             },
         };
 
@@ -704,7 +706,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             RequestArgs::Route(args) => match args {
                 RouteRequestArgs::Get(args) => match args {
                     GetRouteArgs::Dump => {
-                        let main_route_table_id = route_tables.main_route_table_id;
+                        let main_route_table_id = route_tables.main_route_table.fidl_table_id;
                         self.fidl_route_map
                             .iter()
                             .flat_map(|(route, tables)| {
@@ -859,6 +861,13 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             Some(pending_route_request)
         }
     }
+
+    pub(crate) fn any_routes_reference_table(
+        &self,
+        TableNeedsCleanup(table_id, _table_index): TableNeedsCleanup,
+    ) -> bool {
+        self.fidl_route_map.table_is_present(table_id)
+    }
 }
 
 /// Returns `true` if the new route conflicts with an existing route.
@@ -910,8 +919,8 @@ fn handle_route_watcher_event<
     fidl_route_map: &mut FidlRouteMap<I>,
     route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_routes_ext::Event<I>,
-) -> Result<(), RouteEventHandlerError<I>> {
-    let message_for_clients = match event {
+) -> Result<Option<TableNeedsCleanup>, RouteEventHandlerError<I>> {
+    let (message_for_clients, table_no_routes) = match event {
         fnet_routes_ext::Event::Added(added_installed_route) => {
             let fnet_routes_ext::InstalledRoute { route, table_id, effective_properties } =
                 added_installed_route;
@@ -935,7 +944,7 @@ fn handle_route_watcher_event<
                     );
                     // Because we'll never be able to map this FIDL table ID to a netlink table
                     // index, we have no choice but to avoid notifying netlink clients about this.
-                    None
+                    (None, None)
                 }
                 Some(table) => {
                     let table = match table {
@@ -943,10 +952,14 @@ fn handle_route_watcher_event<
                         RouteTableKey::NetlinkManaged { table_id } => table_id.get(),
                     };
 
-                    NetlinkRouteMessage::optionally_from(added_installed_route, table).map(
-                        |route_message| {
-                            route_message.into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false)
-                        },
+                    (
+                        NetlinkRouteMessage::optionally_from(added_installed_route, table).map(
+                            |route_message| {
+                                route_message
+                                    .into_rtnl_new_route(UNSPECIFIED_SEQUENCE_NUMBER, false)
+                            },
+                        ),
+                        None,
                     )
                 }
             }
@@ -965,7 +978,7 @@ fn handle_route_watcher_event<
                 RouteRemoveResult::RemovedAndTableNewlyEmpty(_properties) => true,
             };
 
-            let notify_message =
+            let (notify_message, table_index) =
                 match route_table_map.lookup_route_table_key_from_fidl_table_id(table_id) {
                     None => {
                         // This is a FIDL table ID that the netlink worker didn't know about, and is
@@ -976,7 +989,7 @@ fn handle_route_watcher_event<
                     );
                         // Because we'll never be able to map this FIDL table ID to a netlink table
                         // index, we have no choice but to avoid notifying netlink clients about this.
-                        None
+                        (None, None)
                     }
                     Some(table) => {
                         let table = match table {
@@ -984,20 +997,25 @@ fn handle_route_watcher_event<
                             RouteTableKey::NetlinkManaged { table_id } => table_id.get(),
                         };
 
-                        NetlinkRouteMessage::optionally_from(removed_installed_route, table)
-                            .map(|route_message| route_message.into_rtnl_del_route())
+                        (
+                            NetlinkRouteMessage::optionally_from(removed_installed_route, table)
+                                .map(|route_message| route_message.into_rtnl_del_route()),
+                            Some(table),
+                        )
                     }
                 };
 
-            // We need to do this in order to drop the RouteTable proxy so that netstack
-            // can reclaim associated resources.
-            if need_clean_up_empty_table {
-                let remove_result: Option<Result<RouteTable<I>, UnmanagedTableError>> =
-                    route_table_map.remove_table_by_fidl_id(table_id);
-                assert_matches!(remove_result, Some(_));
-            }
-
-            notify_message
+            (
+                notify_message,
+                if need_clean_up_empty_table {
+                    Some(TableNeedsCleanup(
+                        table_id,
+                        table_index.expect("must have known about table if we're cleaning it up"),
+                    ))
+                } else {
+                    None
+                },
+            )
         }
         // We don't expect to observe any existing events, because the route watchers were drained
         // of existing events prior to starting the event loop.
@@ -1015,7 +1033,7 @@ fn handle_route_watcher_event<
         route_clients.send_message_to_group(message_for_clients, route_group);
     }
 
-    Ok(())
+    Ok(table_no_routes)
 }
 
 /// A wrapper type for the netlink_packet_route `RouteMessage` to enable conversions
@@ -1656,10 +1674,11 @@ mod tests {
                 route_table.insert(
                     table_id,
                     RouteTable {
-                        _route_table_proxy: route_table_proxy,
+                        route_table_proxy,
                         route_set_proxy,
                         route_set_from_main_table_proxy,
                         fidl_table_id: OTHER_FIDL_TABLE_ID,
+                        rule_set_authenticated: false,
                     },
                 );
             }
@@ -1686,7 +1705,7 @@ mod tests {
                 &route_clients,
                 add_event1,
             ),
-            Ok(())
+            Ok(None)
         );
         assert_eq!(
             fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
@@ -1728,7 +1747,7 @@ mod tests {
                 &route_clients,
                 add_event2,
             ),
-            Ok(())
+            Ok(None)
         );
         assert_eq!(
             fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
@@ -1752,7 +1771,7 @@ mod tests {
                 &route_clients,
                 remove_event,
             ),
-            Ok(())
+            Ok(None)
         );
         assert_eq!(
             fidl_route_map.iter_messages(&route_table, table_index).collect::<HashSet<_>>(),
@@ -1883,8 +1902,9 @@ mod tests {
             RouteTable {
                 route_set_from_main_table_proxy,
                 route_set_proxy,
-                _route_table_proxy: route_table_proxy,
+                route_table_proxy,
                 fidl_table_id: OTHER_FIDL_TABLE_ID,
+                rule_set_authenticated: false,
             },
         );
 
@@ -1899,7 +1919,7 @@ mod tests {
                 &route_clients,
                 add_events1[0],
             ),
-            Ok(())
+            Ok(None)
         );
 
         // Shouldn't be counted yet, as we haven't seen the route added to its own table yet.
@@ -1919,7 +1939,7 @@ mod tests {
                 &route_clients,
                 add_events1[1],
             ),
-            Ok(())
+            Ok(None)
         );
 
         // Now the route should have been added.
@@ -1952,7 +1972,7 @@ mod tests {
                 &route_clients,
                 add_event2,
             ),
-            Ok(())
+            Ok(None)
         );
 
         // Should also contain the route from before.
@@ -1988,7 +2008,7 @@ mod tests {
                 &route_clients,
                 remove_event,
             ),
-            Ok(())
+            Ok(Some(TableNeedsCleanup(OTHER_FIDL_TABLE_ID, MANAGED_ROUTE_TABLE_INDEX)))
         );
         assert_eq!(
             &fidl_route_map
@@ -2133,6 +2153,8 @@ mod tests {
         type InterfacesWorker = Optional;
         type RoutesV4Worker = Optional;
         type RoutesV6Worker = Optional;
+        type RuleV4Worker = Optional;
+        type RuleV6Worker = Optional;
     }
 
     struct Setup<W, R> {
@@ -2183,6 +2205,8 @@ mod tests {
             v6_main_route_table: EventLoopComponent::Absent(Optional),
             v4_route_table_provider: EventLoopComponent::Absent(Optional),
             v6_route_table_provider: EventLoopComponent::Absent(Optional),
+            v4_rule_table: EventLoopComponent::Absent(Optional),
+            v6_rule_table: EventLoopComponent::Absent(Optional),
 
             unified_request_stream: request_stream,
         };
@@ -2452,11 +2476,15 @@ mod tests {
                 routes_v4: EventLoopComponent::Present(()),
                 routes_v6: EventLoopComponent::Absent(Optional),
                 interfaces: EventLoopComponent::Absent(Optional),
+                rules_v4: EventLoopComponent::Absent(Optional),
+                rules_v6: EventLoopComponent::Absent(Optional),
             },
             IpVersion::V6 => crate::eventloop::IncludedWorkers {
                 routes_v4: EventLoopComponent::Absent(Optional),
                 routes_v6: EventLoopComponent::Present(()),
                 interfaces: EventLoopComponent::Absent(Optional),
+                rules_v4: EventLoopComponent::Absent(Optional),
+                rules_v6: EventLoopComponent::Absent(Optional),
             },
         };
 
@@ -4477,10 +4505,11 @@ mod tests {
         route_table_map.insert(
             ManagedNetlinkRouteTableIndex::new(MANAGED_ROUTE_TABLE_INDEX).unwrap(),
             RouteTable {
-                _route_table_proxy: own_route_table_proxy,
+                route_table_proxy: own_route_table_proxy,
                 route_set_proxy,
                 route_set_from_main_table_proxy,
                 fidl_table_id: OTHER_FIDL_TABLE_ID,
+                rule_set_authenticated: false,
             },
         );
 
@@ -4803,11 +4832,15 @@ mod tests {
                     routes_v4: EventLoopComponent::Present(()),
                     routes_v6: EventLoopComponent::Absent(Optional),
                     interfaces: EventLoopComponent::Absent(Optional),
+                    rules_v4: EventLoopComponent::Absent(Optional),
+                    rules_v6: EventLoopComponent::Absent(Optional),
                 },
                 IpVersion::V6 => crate::eventloop::IncludedWorkers {
                     routes_v4: EventLoopComponent::Absent(Optional),
                     routes_v6: EventLoopComponent::Present(()),
                     interfaces: EventLoopComponent::Absent(Optional),
+                    rules_v4: EventLoopComponent::Absent(Optional),
+                    rules_v6: EventLoopComponent::Absent(Optional),
                 },
             };
 

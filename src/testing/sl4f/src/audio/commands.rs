@@ -13,8 +13,8 @@ use fidl_fuchsia_media_sounds::{PlayerMarker, PlayerProxy};
 use fidl_fuchsia_test_audio_recording::{AudioRecordingControlMarker, AudioRecordingControlProxy};
 use fuchsia_component::client::connect_to_protocol;
 use futures::lock::Mutex;
+use log::info;
 use serde_json::{to_value, Value};
-use tracing::info;
 
 #[async_trait(?Send)]
 impl Facade for AudioFacade {

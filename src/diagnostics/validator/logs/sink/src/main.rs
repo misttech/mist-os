@@ -26,6 +26,7 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::prelude::*;
+use log::*;
 use proptest::collection::vec;
 use proptest::prelude::{any, Arbitrary, Just, ProptestConfig, Strategy, TestCaseError};
 use proptest::prop_oneof;
@@ -34,7 +35,6 @@ use proptest_derive::Arbitrary;
 use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::ops::Range;
-use tracing::*;
 
 /// Validate Log VMO formats written by 'puppet' programs controlled by
 /// this Validator program.

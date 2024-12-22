@@ -11,9 +11,9 @@ use fidl_fuchsia_testing_sl4f::{
     FacadeIteratorRequest, FacadeProviderRequest, FacadeProviderRequestStream,
 };
 use futures::stream::{StreamExt, TryStreamExt};
+use log::{error, info, warn};
 use serde_json::Value;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 
 /// Trait for the implementation of the FacadeProvider protocol.
 #[async_trait(?Send)]
@@ -57,7 +57,7 @@ pub trait FacadeProvider {
             Ok::<(), Error>(())
         };
         if let Err(error) = get_facades_fut.await {
-            error!(%error, "Failed to handle GetFacades()");
+            error!(error:%; "Failed to handle GetFacades()");
         }
     }
 
@@ -93,7 +93,7 @@ pub trait FacadeProvider {
                 if let Err(send_error) =
                     responder.send(None, Some(&format!("Failed to extract params: {}", error)))
                 {
-                    error!(error = %send_error, "Failed to send response");
+                    error!(error:% = send_error; "Failed to send response");
                 }
                 return;
             }
@@ -103,14 +103,14 @@ pub trait FacadeProvider {
         let result = match facade.handle_request(command, params).await {
             Ok(Value::Null) => {
                 if let Err(error) = responder.send(None, None) {
-                    error!(%error, "Failed to send response");
+                    error!(error:%; "Failed to send response");
                 }
                 return;
             }
             Ok(result) => result,
             Err(error) => {
                 if let Err(error) = responder.send(None, Some(&error.to_string())) {
-                    error!(%error, "Failed to send response");
+                    error!(error:%; "Failed to send response");
                 }
                 return;
             }
@@ -121,7 +121,7 @@ pub trait FacadeProvider {
             Ok(()) => responder.send(Some(params_blob), None),
             Err(error) => responder.send(None, Some(&format!("Failed to write result: {}", error))),
         } {
-            error!(error = %send_error, "Failed to send response");
+            error!(error:% = send_error; "Failed to send response");
         }
     }
 
@@ -164,13 +164,13 @@ pub trait FacadeProvider {
             FacadeProviderRequest::Cleanup { responder } => {
                 self.cleanup_impl();
                 if let Err(error) = responder.send() {
-                    warn!(%error, "Failed to notify completion of Cleanup()");
+                    warn!(error:%; "Failed to notify completion of Cleanup()");
                 }
             }
             FacadeProviderRequest::Print { responder } => {
                 self.print_impl();
                 if let Err(error) = responder.send() {
-                    error!(%error, "Failed to notify completion of Print()");
+                    error!(error:%; "Failed to notify completion of Print()");
                 }
             }
         }

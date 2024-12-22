@@ -42,6 +42,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
+#include <src/lib/timekeeper/clock.h>
 #include <src/ui/testing/util/fidl_cpp_helpers.h>
 #include <src/ui/testing/util/portable_ui_test.h>
 
@@ -132,9 +133,7 @@ constexpr auto kMoveEventCount = 5;
 constexpr auto kDisplayWidth = 1280;
 constexpr auto kDisplayHeight = 800;
 
-// The type used to measure UTC time. The integer value here does not matter so
-// long as it differs from the ZX_CLOCK_MONOTONIC=0 defined by Zircon.
-using time_utc = zx::basic_time<1>;
+using time_utc = timekeeper::time_utc;
 
 constexpr auto kMockResponseListener = "response_listener";
 

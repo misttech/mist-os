@@ -652,6 +652,7 @@ class EfiDevicePartitionerWithStorageHostTests : public EfiDevicePartitionerTest
     IsolatedDevmgr::Args args;
     args.enable_storage_host = true;
     args.netboot = true;
+    args.disable_block_watcher = true;
     return args;
   }
 
@@ -1103,7 +1104,8 @@ TEST_F(MoonflowerPartitionerTests, FindPartition) {
       CreateDiskWithGpt(&gpt_dev, kBlockCount * block_size_,
                         {
                             {GUID_ABR_META_NAME, Uuid(kAbrMetaType), 0x10400, 0x10000},
-                            {"boot", Uuid(kDummyType), 0x30400, 0x20000},
+                            {"dtbo_a", Uuid(kDummyType), 0x30400, 0x10000},
+                            {"dtbo_b", Uuid(kDummyType), 0x40400, 0x10000},
                             {"boot_a", Uuid(kZirconAType), 0x50400, 0x10000},
                             {"boot_b", Uuid(kZirconBType), 0x60400, 0x10000},
                             {"system_a", Uuid(kDummyType), 0x70400, 0x10000},
@@ -1122,6 +1124,8 @@ TEST_F(MoonflowerPartitionerTests, FindPartition) {
   std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
 
   // Make sure we can find the important partitions.
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderA, "dtbo")));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderB, "dtbo")));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconA)));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconB)));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
@@ -1135,6 +1139,10 @@ TEST_F(MoonflowerPartitionerTests, SupportsPartition) {
   ASSERT_OK(status);
   std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
 
+  EXPECT_TRUE(
+      partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderA, "dtbo")));
+  EXPECT_TRUE(
+      partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderB, "dtbo")));
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconA)));
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconB)));
   EXPECT_TRUE(
@@ -1424,11 +1432,11 @@ TEST_F(NelsonPartitionerTests, InitializeWithoutGptFails) {
   ASSERT_NOT_OK(CreatePartitioner({}));
 }
 
-TEST_F(NelsonPartitionerTests, InitializeWithoutFvmFails) {
+TEST_F(NelsonPartitionerTests, InitializeWithoutFvmSucceeds) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&gpt_dev, 32 * kGibibyte));
 
-  ASSERT_NOT_OK(CreatePartitioner({}));
+  ASSERT_OK(CreatePartitioner({}));
 }
 
 TEST_F(NelsonPartitionerTests, FindPartition) {

@@ -10,9 +10,9 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
+#include <mutex>
 #include <queue>
 
-#include <fbl/auto_lock.h>
 #include <zxtest/zxtest.h>
 
 namespace fake_usb_endpoint {
@@ -35,7 +35,7 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
   // RequestComplete: responds to the next request. If there are any requests in the request queue,
   // respond to that. If not, save this response and respond with the next incoming request.
   void RequestComplete(zx_status_t status, size_t actual) {
-    fbl::AutoLock _(&lock_);
+    std::lock_guard<std::mutex> _(lock_);
     auto completion = RequestCompleteLocked(status, actual);
     if (completion.has_value()) {
       ASSERT_TRUE(binding_ref_);
@@ -65,7 +65,7 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
   // called or if there is already a completion saved from before.
   void QueueRequests(QueueRequestsRequest& request,
                      QueueRequestsCompleter::Sync& completer) override {
-    fbl::AutoLock _(&lock_);
+    std::lock_guard<std::mutex> _(lock_);
     // Add request to queue.
     requests_.insert(requests_.end(), std::make_move_iterator(request.req().begin()),
                      std::make_move_iterator(request.req().end()));
@@ -117,7 +117,7 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
   }
 
   size_t pending_request_count() {
-    fbl::AutoLock _(&lock_);
+    std::lock_guard<std::mutex> _(lock_);
     return requests_.size();
   }
 
@@ -142,7 +142,7 @@ class FakeEndpoint : public fidl::Server<fuchsia_hardware_usb_endpoint::Endpoint
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_usb_endpoint::Endpoint>> binding_ref_;
 
-  fbl::Mutex lock_;
+  std::mutex lock_;
   std::queue<std::pair<zx_status_t, fuchsia_hardware_usb_endpoint::EndpointInfo>>
       expected_get_info_;
   std::vector<fuchsia_hardware_usb_request::Request> requests_ __TA_GUARDED(lock_);

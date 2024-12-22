@@ -27,7 +27,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/vector.h>
 
-#include "metadata.h"
 #include "src/devices/bus/drivers/pci/bridge.h"
 #include "src/devices/bus/drivers/pci/config.h"
 #include "src/devices/bus/drivers/pci/device.h"

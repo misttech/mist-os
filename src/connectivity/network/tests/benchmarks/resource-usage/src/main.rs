@@ -4,7 +4,6 @@
 
 use argh::FromArgs;
 use async_trait::async_trait;
-use const_unwrap::const_unwrap_option;
 use humansize::FileSize as _;
 use netstack_testing_common::realms::{
     KnownServiceProvider, Netstack, ProdNetstack2, ProdNetstack3, TestSandboxExt as _,
@@ -36,8 +35,8 @@ struct Args {
     output_path: String,
 }
 
-const UNIT_TEST_MODE_RUNS: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(1));
-const PERF_TEST_MODE_RUNS: NonZeroUsize = const_unwrap_option(NonZeroUsize::new(5));
+const UNIT_TEST_MODE_RUNS: NonZeroUsize = NonZeroUsize::new(1).unwrap();
+const PERF_TEST_MODE_RUNS: NonZeroUsize = NonZeroUsize::new(5).unwrap();
 
 #[fuchsia::main]
 async fn main() {

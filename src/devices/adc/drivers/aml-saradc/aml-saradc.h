@@ -12,8 +12,7 @@
 #include <lib/zx/interrupt.h>
 
 #include <fbl/mutex.h>
-
-#include "src/devices/adc/metadata/metadata.h"
+#include <sdk/lib/driver/metadata/cpp/metadata_server.h>
 
 namespace aml_saradc {
 
@@ -67,7 +66,7 @@ class AmlSaradc : public fdf::DriverBase {
   fdf::ServerBindingGroup<fuchsia_hardware_adcimpl::Device> bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   compat::SyncInitializedDeviceServer compat_server_;
-  adc::MetadataServer metadata_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_adcimpl::Metadata> metadata_server_;
 };
 
 }  // namespace aml_saradc

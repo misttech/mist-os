@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use byteorder::{BigEndian, ByteOrder};
+use log::*;
 use std::io::{Read, Write};
 use std::os::raw::c_void as void;
 use std::slice;
-use tracing::*;
 
 mod fastboot_c;
 use self::fastboot_c::*;
@@ -30,7 +30,7 @@ extern "C" fn write_packet_callback<T: Read + Write>(
     match stream.write_all(packet.as_slice()) {
         Ok(()) => {}
         Err(err) => {
-            warn!(%err, "write_cb error");
+            warn!(err:%; "write_cb error");
             return 1;
         }
     }
@@ -38,7 +38,7 @@ extern "C" fn write_packet_callback<T: Read + Write>(
     match stream.flush() {
         Ok(()) => {}
         Err(err) => {
-            warn!(%err, "write_cb flush error");
+            warn!(err:%; "write_cb flush error");
             return 1;
         }
     }
@@ -60,7 +60,7 @@ extern "C" fn read_packet_callback<T: Read + Write>(
     match stream.read_exact(slice) {
         Ok(()) => {}
         Err(err) => {
-            warn!(%err, "read_packet error");
+            warn!(err:%; "read_packet error");
             return 1;
         }
     }

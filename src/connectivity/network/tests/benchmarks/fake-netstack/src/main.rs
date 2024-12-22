@@ -8,25 +8,24 @@
 
 use anyhow::Context as _;
 use async_utils::stream::{Tagged, WithTag as _};
-use const_unwrap::const_unwrap_option;
 use fidl::endpoints::{ControlHandle as _, RequestStream as _};
 use fidl::{HandleBased as _, Peered as _};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::io::AsyncReadExt as _;
 use futures::stream::SelectAll;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
+use log::{error, info};
 use net_types::ip::{Ip, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use packet::{ParseBuffer as _, Serializer as _};
 use packet_formats::icmp::{
-    IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpPacketRaw, IcmpUnusedCode,
+    IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacketBuilder, IcmpPacketRaw, IcmpZeroCode,
 };
 use rand::Rng as _;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::convert::{TryFrom as _, TryInto as _};
 use std::rc::Rc;
-use tracing::{error, info};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_posix as fposix,
     fidl_fuchsia_posix_socket as fposix_socket,
@@ -154,11 +153,11 @@ async fn handle_provider_request(
 const DEFAULT_BUFFER_SIZE: u64 = 32 << 10; // 32KiB
 
 const ZXSIO_SIGNAL_DATAGRAM_INCOMING: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(fposix_socket::SIGNAL_DATAGRAM_INCOMING));
+    zx::Signals::from_bits(fposix_socket::SIGNAL_DATAGRAM_INCOMING).unwrap();
 const ZXSIO_SIGNAL_DATAGRAM_OUTGOING: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(fposix_socket::SIGNAL_DATAGRAM_OUTGOING));
+    zx::Signals::from_bits(fposix_socket::SIGNAL_DATAGRAM_OUTGOING).unwrap();
 const ZXSIO_SIGNAL_STREAM_CONNECTED: zx::Signals =
-    const_unwrap_option(zx::Signals::from_bits(fposix_socket::SIGNAL_STREAM_CONNECTED));
+    zx::Signals::from_bits(fposix_socket::SIGNAL_STREAM_CONNECTED).unwrap();
 
 // The IANA suggests this range for ephemeral ports in RFC 6335, section 6.
 const EPHEMERAL_PORTS: std::ops::RangeInclusive<u16> = 49152..=65535;
@@ -463,12 +462,12 @@ fn serialize_icmp_echo_reply<I>(buf: packet::Buf<Vec<u8>>, reply: IcmpEchoReply)
 where
     I: packet_formats::icmp::IcmpIpExt,
     <I as Ip>::Addr: From<SpecifiedAddr<<I as Ip>::Addr>>,
-    IcmpEchoReply: IcmpMessage<I, Code = IcmpUnusedCode>,
+    IcmpEchoReply: IcmpMessage<I, Code = IcmpZeroCode>,
 {
     buf.encapsulate(IcmpPacketBuilder::<I, _>::new(
         I::LOOPBACK_ADDRESS,
         I::LOOPBACK_ADDRESS,
-        IcmpUnusedCode,
+        IcmpZeroCode,
         reply,
     ))
     .serialize_no_alloc_outer()

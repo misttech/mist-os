@@ -11,12 +11,12 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::error;
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use tracing::error;
 
 use {fidl_test_sagcontrol as fctrl, fuchsia_async as fasync};
 
@@ -47,7 +47,6 @@ pub struct SystemActivityGovernorControl {
 
     application_activity_lease: RefCell<Option<fbroker::LeaseControlProxy>>,
 
-    boot_complete: Rc<Mutex<bool>>,
     current_state: Rc<Mutex<fctrl::SystemActivityGovernorState>>,
     required_state: Rc<Mutex<fctrl::SystemActivityGovernorState>>,
     sag_proxy: Arc<fsystem::ActivityGovernorProxy>,
@@ -87,8 +86,6 @@ impl SystemActivityGovernorControl {
             .await;
         })
         .detach();
-
-        let boot_complete = Rc::new(Mutex::new(false));
 
         let element_info_provider = fclient::connect_to_service_instance::<
             fbroker::ElementInfoProviderServiceMarker,
@@ -133,7 +130,7 @@ impl SystemActivityGovernorControl {
                  res: fctrl::StateWatchResponder|
                  -> bool {
                     if let Err(error) = res.send(state) {
-                        tracing::warn!(?error, "Failed to send SAG state to client");
+                        log::warn!(error:?; "Failed to send SAG state to client");
                     }
                     true
                 },
@@ -160,7 +157,6 @@ impl SystemActivityGovernorControl {
         })
         .detach();
 
-        let boot_complete_clone = boot_complete.clone();
         let publisher = state_publisher.clone();
         let current_state_clone = current_state.clone();
         let required_state_clone = required_state.clone();
@@ -175,12 +171,6 @@ impl SystemActivityGovernorControl {
                 if state == *required_state_clone.lock().await {
                     publisher.set(state);
                 }
-
-                if new_status == ApplicationActivityLevel::Active
-                    && *boot_complete_clone.lock().await == false
-                {
-                    *boot_complete_clone.lock().await = true;
-                }
             }
         })
         .detach();
@@ -189,7 +179,6 @@ impl SystemActivityGovernorControl {
             application_activity_controller: application_activity_controller.into(),
             hanging_get: RefCell::new(hanging_get),
             application_activity_lease: RefCell::new(None),
-            boot_complete,
             current_state,
             required_state,
             sag_proxy,
@@ -214,11 +203,11 @@ impl SystemActivityGovernorControl {
                         }
                         fctrl::StateRequest::Watch { responder } => {
                             if let Err(error) = sub.register(responder) {
-                                tracing::warn!(?error, "Failed to register for Watch call");
+                                log::warn!(error:?; "Failed to register for Watch call");
                             }
                         }
                         fctrl::StateRequest::_UnknownMethod { ordinal, .. } => {
-                            tracing::warn!(?ordinal, "Unknown StateRequest method");
+                            log::warn!(ordinal:?; "Unknown StateRequest method");
                         }
                     }
                 }
@@ -274,23 +263,22 @@ impl SystemActivityGovernorControl {
 
         match required_execution_state_level {
             ExecutionStateLevel::Inactive => {
-                if *self.boot_complete.lock().await == false
-                    || required_application_activity_level != ApplicationActivityLevel::Inactive
-                {
+                // TODO: https://fxbug.dev/333699275 Consider to add SetBootComplete in the test
+                // fidl so that the test could use the api to notify the fake SAG know about the
+                // boot complete state.
+                if required_application_activity_level != ApplicationActivityLevel::Inactive {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
                 drop(self.suspending_token.borrow_mut().take());
                 self.handle_application_activity_changes(required_application_activity_level)
                     .await
                     .map_err(|err| {
-                        error!(%err, "Request failed with internal error");
+                        error!(err:%; "Request failed with internal error");
                         fctrl::SetSystemActivityGovernorStateError::Internal
                     })?;
             }
             ExecutionStateLevel::Suspending => {
-                if *self.boot_complete.lock().await == false
-                    || required_application_activity_level != ApplicationActivityLevel::Inactive
-                {
+                if required_application_activity_level != ApplicationActivityLevel::Inactive {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
 
@@ -300,14 +288,12 @@ impl SystemActivityGovernorControl {
                 self.handle_application_activity_changes(required_application_activity_level)
                     .await
                     .map_err(|err| {
-                        error!(%err, "Request failed with internal error");
+                        error!(err:%; "Request failed with internal error");
                         fctrl::SetSystemActivityGovernorStateError::Internal
                     })?;
             }
             ExecutionStateLevel::Active => {
-                if *self.boot_complete.lock().await == true
-                    && required_application_activity_level != ApplicationActivityLevel::Active
-                {
+                if required_application_activity_level != ApplicationActivityLevel::Active {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
 
@@ -315,7 +301,7 @@ impl SystemActivityGovernorControl {
                 self.handle_application_activity_changes(required_application_activity_level)
                     .await
                     .map_err(|err| {
-                        error!(%err, "Request failed with internal error");
+                        error!(err:%; "Request failed with internal error");
                         fctrl::SetSystemActivityGovernorStateError::Internal
                     })?;
             }

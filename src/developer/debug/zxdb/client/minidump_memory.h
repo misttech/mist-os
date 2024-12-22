@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "src/developer/debug/ipc/records.h"
+#include "src/developer/debug/zxdb/client/file_memory_region.h"
 #include "src/developer/debug/zxdb/symbols/build_id_index.h"
 #include "src/lib/unwinder/memory.h"
 #include "src/lib/unwinder/module.h"
@@ -38,18 +39,6 @@ class MinidumpMemory {
 
    private:
     const crashpad::MemorySnapshot* snapshot_;
-  };
-
-  // Memory region backed by a file, e.g., .text and .rodata of a module.
-  class FileMemoryRegion : public Region {
-   public:
-    FileMemoryRegion(uint64_t load_address, const std::string& path)
-        : load_address_(load_address), file_(fopen(path.c_str(), "rb"), fclose) {}
-    unwinder::Error ReadBytes(uint64_t addr, uint64_t size, void* dst) override;
-
-   private:
-    uint64_t load_address_;
-    std::unique_ptr<FILE, decltype(&fclose)> file_;
   };
 
   MinidumpMemory(const crashpad::ProcessSnapshotMinidump& minidump, BuildIDIndex& build_id_index);

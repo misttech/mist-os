@@ -22,6 +22,8 @@
 
 #include <cstdlib>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/designware/platform/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 #include <usb/usb-request.h>
@@ -1053,10 +1055,18 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
     return result.status_value();
   }
 
+  const zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_VID_DESIGNWARE),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC2),
+  };
+
   std::array offers = {
       fdci::UsbDciService::Name,
   };
   status = DdkAdd(ddk::DeviceAddArgs("dwc2")
+                      .set_str_props(props)
                       .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS)
                       .forward_metadata(parent(), DEVICE_METADATA_SERIAL_NUMBER)
                       .set_fidl_service_offers(offers)
