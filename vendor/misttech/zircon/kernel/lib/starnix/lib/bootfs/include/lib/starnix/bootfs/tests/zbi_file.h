@@ -32,15 +32,14 @@ class ZbiFile {
     return static_cast<int>(str.size());
   }
 
+  // Move the VMO into a handle and return it.
   HandleOwner Finish() && {
     KernelHandle<VmObjectDispatcher> handle;
     zx_rights_t rights;
     zx_status_t status = VmObjectDispatcher::Create(
-        ktl::move(vmo_), 0, VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
+        ktl::move(vmo_), pos_, VmObjectDispatcher::InitialMutability::kMutable, &handle, &rights);
     ZX_ASSERT(status == ZX_OK);
     status = handle.dispatcher()->set_name(name_.data(), name_.size());
-    DEBUG_ASSERT(status == ZX_OK);
-    status = handle.dispatcher()->SetContentSize(pos_);
     DEBUG_ASSERT(status == ZX_OK);
     return Handle::Make(ktl::move(handle), rights);
   }
