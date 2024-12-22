@@ -132,7 +132,7 @@ void asan_map_shadow_for(uintptr_t start, size_t size) {
   if (!g_asan_can_map_shadow_for) {
     return;
   }
-  asan_remap_shadow_internal(pdp_high, start, size);
+  asan_remap_shadow_internal(x86_upper_512gib_page_table(), start, size);
 }
 
 void arch_asan_reallocate_shadow() {

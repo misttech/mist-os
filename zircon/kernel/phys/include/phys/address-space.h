@@ -113,6 +113,16 @@ class AddressSpace {
     return {.access = access, .memory = kArchNormalMemoryType};
   }
 
+  static void PanicIfError(const fit::result<MapError>& result) {
+    if (result.is_ok()) {
+      return;
+    }
+    const MapError& error = result.error_value();
+    ktl::string_view reason = arch::ToString(error.type);
+    ZX_PANIC("Error mapping %#" PRIx64 " to %#" PRIx64 ": %.*s", error.vaddr, error.paddr,
+             static_cast<int>(reason.size()), reason.data());
+  }
+
   // Restricts the memory out of which page tables may be allocated. A bound of
   // ktl::nullopt indicates that the corresponding default bound on the global
   // memalloc::Pool should be respected instead (i.e., the default behaviour).

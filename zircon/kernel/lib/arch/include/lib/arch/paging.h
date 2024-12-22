@@ -324,6 +324,20 @@ struct MapError {
   Type type = Type::kUnknown;
 };
 
+constexpr std::string_view ToString(MapError::Type type) {
+  using namespace std::string_view_literals;
+
+  switch (type) {
+    case MapError::Type::kAllocationFailure:
+      return "allocation failure"sv;
+    case MapError::Type::kAlreadyMapped:
+      return "virtual address is already mapped"sv;
+    case MapError::Type::kUnknown:
+      return "unknown error"sv;
+  }
+  __UNREACHABLE;
+}
+
 /// Paging provides paging-related operations for a given a set of paging
 /// traits.
 template <class PagingTraits>

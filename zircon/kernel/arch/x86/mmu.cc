@@ -73,8 +73,13 @@ static pt_entry_t* root_page_table() {
   return reinterpret_cast<pt_entry_t*>(paddr_to_physmap(root_page_table_phys));
 }
 
-/* top level pdp needed to map the -512GB..0 space */
-volatile pt_entry_t pdp_high[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);
+// The physical address of the last entry of the root page table, which covers
+// the upper 512 GiB of the address space.
+paddr_t upper_512gib_page_table_phys;
+
+volatile pt_entry_t* x86_upper_512gib_page_table() {
+  return reinterpret_cast<pt_entry_t*>(paddr_to_physmap(upper_512gib_page_table_phys));
+}
 
 #if __has_feature(address_sanitizer)
 volatile pt_entry_t kasan_shadow_pt[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);  // Leaf page tables
@@ -1118,7 +1123,6 @@ static void unwire_boot_mmu_page(const volatile pt_entry_t* table) {
 void x86_mmu_prevm_init() {
   // Unwire and mark as in use by the MMU all the page tables that might be part of the kernel
   // aspace as created by start.S.
-  unwire_boot_mmu_page(pdp_high);
   for (size_t i = 0; i < sizeof(linear_map_pdp) / sizeof(pt_entry_t); i += NO_OF_PT_ENTRIES) {
     unwire_boot_mmu_page(&linear_map_pdp[i]);
   }

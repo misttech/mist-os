@@ -19,33 +19,10 @@
 #include <lib/instrumentation/asan.h>
 #include <zircon/tls.h>
 
-#define ADDR_OFFSET_MASK ((1 << ADDR_OFFSET)-1)
-#define SHIFT_OFFSET(_s) ((_s) >> 3)
-#define SHIFT_REMAIN(_s) ((_s) - (SHIFT_OFFSET(_s) << 3))
-
-// Calculate the offset into `pdp_high` based on `KERNEL_ASPACE_SIZE`.
-#define PDP_HIGH_OFFSET (512 - (KERNEL_ASPACE_SIZE >> 30))
 // We assume `KERNEL_ASPACE_SIZE` <= 512GB.
 .if KERNEL_ASPACE_SIZE > 0x0000008000000000
 .err "KERNEL_ASPACE_SIZE must be less than or equal to 512GB"
 .endif
-
-// Set a page table entry for the kernel module relocated 64-bit virtual
-// address in 32-bit code. Clobbers the %ecx register.
-.macro set_relocated_page_table_entry table_reg, shift, value
-    // Extract 32-bit chunk of kernel_relocated_base containing the index bits
-    // for this page level shift.
-    mov (kernel_relocated_base + SHIFT_OFFSET(\shift))(%rip), %rcx
-
-    // Get the exact portion of the 32-bit value that is the index
-    shrl $SHIFT_REMAIN(\shift), %ecx
-    andl $ADDR_OFFSET_MASK, %ecx
-
-    // Get the address on the page table of index * 8 and set the value
-    shll $3, %ecx
-    addl \table_reg, %ecx
-    movl \value, (%ecx)
-.endm
 
 // Clobbers %rax, %rdx.
 .macro sample_ticks out
@@ -114,42 +91,19 @@ FUNCTION_LABEL(_start)
     lea __executable_start(%rip), %rax
     mov %rax, kernel_base_phys(%rip)
 
-    // We modify the currently live address space below. Store the address of
-    // the root page table in %rdx.
+    // We modify the currently live address space below.
     mov $X86_CR3_BASE_MASK, %rax
-    mov %cr3, %rdx
-    andq %rax, %rdx
+    mov %cr3, %rcx
+    andq %rax, %rcx  // %rcx now holds the root page table address.
 
-    // Link the table called `pdp_high` as the last entry in the root, which
-    // covers [-512GiB, 0). %rdx still holds the address of the root table.
-    lea pdp_high(%rip), %rax
-    orl  $X86_KERNEL_PD_FLAGS, %eax
-    set_relocated_page_table_entry %edx, PML4_SHIFT, %eax
-
-    // We want to link the table that identity maps the first 1GiB to the
-    // fourth-last entry pdp_high, effecting a mapping of [-4GiB, -3GiB]
-    // virtual also to [0, 1GiB] physical.
-    //
-    // We first pick out the table mapping the first 1GiB by descending from
-    // the root table, picking out the first entries.
-    //
-    // Note that %rdx still holds the address of the root table.
-
-    mov (%rdx), %rax
-    movabs $X86_PT_BASE_ADDRESS_MASK, %rbx
-    and %rbx, %rax
-
-    // %rax now holds the address of the table covering [0, 512GiB); descend
-    // down the first entry again. %rbx still holds the address mask for a
-    // table entry.
-    mov (%rax), %rax
-    and %rbx, %rax
-
-    // %rax now holds the address of the table covering [0, 1GiB) and we make
-    // the [-4GiB, -3GiB) -> [0, 1GiB) mapping.
-    orl  $X86_KERNEL_PD_FLAGS, %eax
-    lea pdp_high(%rip), %rbx
-    set_relocated_page_table_entry %ebx, PDP_SHIFT, %eax
+    // Pick out the table pointed to by the last entry, covering [-512GiB, 0);
+    // save it for reference later both outside of this and below to link in
+    // the following table.
+    add $(NO_OF_PT_ENTRIES - 1) * 8, %rcx
+    mov (%rcx), %rcx
+    mov $X86_PT_BASE_ADDRESS_MASK, %rax
+    and %rax, %rcx
+    mov %rcx, upper_512gib_page_table_phys(%rip)
 
     /* set up a linear map of the first 64GB */
     lea linear_map_pdp(%rip), %rsi
@@ -169,8 +123,8 @@ FUNCTION_LABEL(_start)
     inc  %eax
     loop 0b
 
-    /* point the high pdp at our linear mapping page tables */
-    lea (pdp_high + PDP_HIGH_OFFSET * 8)(%rip), %rsi
+    // Point the high pdp at our linear mapping page tables
+    mov upper_512gib_page_table_phys(%rip), %rsi
     movl $64, %ecx
     lea linear_map_pdp(%rip), %eax
     orl  $X86_KERNEL_PD_FLAGS, %eax
@@ -208,11 +162,12 @@ FUNCTION_LABEL(_start)
     or $X86_KERNEL_KASAN_INITIAL_PD_FLAGS, %rax
     rep stosq
 
-    // Put the page directory entry into the pdp_high. It's 64 entries starting from
+    // Put the page directory entry into the upper 512 GiB table. It's 64 entries starting from
     // the index corresponding to the KASAN_SHADOW_OFFSET virtual address.
     // 64 pdp entries span 64GB of shadow map, covering 512 GB of kernel address space
 #define PDP_HIGH_SHADOW_OFFSET (((KASAN_SHADOW_OFFSET) >> 30) & 0x1ff)
-    lea (pdp_high + PDP_HIGH_SHADOW_OFFSET * 8)(%rip), %rdi
+    mov upper_512gib_page_table_phys(%rip), %rdi
+    add $PDP_HIGH_SHADOW_OFFSET * 8, %rdi
     movl $X86_KERNEL_KASAN_PDP_ENTRIES, %ecx
     lea kasan_shadow_pd(%rip), %rax
     or $X86_KERNEL_KASAN_INITIAL_PD_FLAGS, %rax

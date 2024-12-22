@@ -884,6 +884,7 @@ if (is_kernel) {
     public_deps = [ ":physboot.h" ]
     sources = [ "physboot.cc" ]
     deps = [
+      ":address-space",
       ":allocation",
       ":boot-zbi",
       ":handoff",
