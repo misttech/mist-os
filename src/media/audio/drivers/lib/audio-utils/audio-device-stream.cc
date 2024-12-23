@@ -166,8 +166,8 @@ zx_status_t AudioDeviceStream::GetUniqueId(audio_stream_cmd_get_unique_id_resp_t
   if (out_id == nullptr)
     return ZX_ERR_INVALID_ARGS;
   auto result = fidl::WireCall(stream_ch_)->GetProperties();
-  memcpy(out_id->unique_id.data, result.value().properties.unique_id().data(),
-         std::min(result.value().properties.unique_id().size(), sizeof(out_id->unique_id)));
+  auto id = result.value().properties.unique_id();
+  memcpy(out_id->unique_id.data, id.data(), std::min(id.size(), sizeof(out_id->unique_id)));
   return ZX_OK;
 }
 
