@@ -27,6 +27,7 @@ use {
     fuchsia_async as fasync,
 };
 
+mod composite_helper;
 mod composite_node_spec_manager;
 mod driver_loading_fuzzer;
 mod escrow_support;

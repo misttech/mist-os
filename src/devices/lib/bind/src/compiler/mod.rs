@@ -16,3 +16,5 @@ pub use self::symbol_table::{
     get_deprecated_key_identifier, get_deprecated_key_identifiers, get_deprecated_key_value,
     Symbol, SymbolTable,
 };
+
+pub mod test_lib;
