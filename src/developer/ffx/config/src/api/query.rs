@@ -148,7 +148,7 @@ impl<'a> ConfigQuery<'a> {
                 .map_err(|e| ConfigError::new(e))?
                 .recursive_map(&|val| build(&ctx, val))
                 .recursive_map(&|val| workspace(&ctx, val));
-            if let Some(ref v) = cv.0 {
+            let cv = if let Some(ref v) = cv.0 {
                 // We want recursive mapping here, so that arrays that contain
                 // env variables get handled correctly.
                 let ev_res = cv.clone().recursive_map(&|val| env_var_strict(val));
@@ -163,9 +163,13 @@ impl<'a> ConfigQuery<'a> {
                         self.name.unwrap(),
                     )});
                 }
-            }
+                ev_res
+            } else {
+                cv
+            };
             // The problem is not with an env variable; keep going
-            let cv = cv.recursive_map(&T::handle_arrays).recursive_map(&validate_type::<T>);
+            let cv = cv.recursive_map(&T::handle_arrays);
+            let cv = cv.recursive_map(&validate_type::<T>);
             T::try_convert(cv)
         } else {
             let cv = self
@@ -202,7 +206,7 @@ impl<'a> ConfigQuery<'a> {
                 .map_err(|e| ConfigError::new(e))?
                 .recursive_map(&|val| build(&ctx, val))
                 .recursive_map(&|val| workspace(&ctx, val));
-            if let Some(ref v) = cv.0 {
+            let cv = if let Some(ref v) = cv.0 {
                 let ev_res = cv.clone().recursive_map(&|val| env_var_strict(val));
                 if ev_res.0.is_none() {
                     return Err(ConfigError::BadValue{ value: v.clone(), reason: format!(
@@ -210,7 +214,10 @@ impl<'a> ConfigQuery<'a> {
                         self.name.unwrap(),
                     )});
                 }
-            }
+                ev_res
+            } else {
+                cv
+            };
             // The problem is not with an env variable; keep going
             let cv = cv.recursive_map(&T::handle_arrays).recursive_map(&file_check);
             T::try_convert(cv)
