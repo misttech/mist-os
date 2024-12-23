@@ -811,7 +811,7 @@ impl Journal {
             if checkpoint.file_offset >= valid_to {
                 last_checkpoint = checkpoint.clone();
 
-                // Truncate the transactions so we don't need to worry about them on the next pass.
+                // Truncate the transactions so we don't need to worry about on the next pass.
                 transactions.truncate(index);
                 break;
             }
@@ -1664,9 +1664,13 @@ impl Journal {
                 }
                 checkpoint
             };
+            // The call here isn't drop-safe.  If the future gets dropped, it will leave things in a
+            // bad state and subsequent threads might try and commit another transaction which has
+            // the potential to fire assertions.  With that said, this should only occur if there
+            // has been another panic, since we take care not to drop futures at other other times.
             let maybe_mutation =
                 self.objects.apply_transaction(transaction, &checkpoint_before).expect(
-                    "apply_transaction should not fail in live mode; \
+                    "apply_transaction should not fail in live mode;\
                      filesystem will be in an inconsistent state",
                 );
             checkpoint_after = {
