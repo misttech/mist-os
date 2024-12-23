@@ -12,7 +12,8 @@ use crate::qemu_based::QemuBasedEngine;
 use async_trait::async_trait;
 use emulator_instance::{
     write_to_disk, CpuArchitecture, EmulatorConfiguration, EmulatorInstanceData,
-    EmulatorInstanceInfo, EmulatorInstances, EngineState, EngineType, PointingDevice,
+    EmulatorInstanceInfo, EmulatorInstances, EngineState, EngineType, NetworkingMode,
+    PointingDevice,
 };
 use ffx_config::EnvironmentContext;
 use ffx_emulator_common::config::QEMU_TOOL;
@@ -62,6 +63,14 @@ impl EmulatorEngine for QemuEngine {
     }
 
     async fn stage(&mut self) -> Result<()> {
+        // QEMU 9+ does not support auto-assignment of host port
+        // when forwarding guest ports mapped via user networking.
+        // So we need to assign any missing host ports now, before
+        // continuing to stage the instance.
+        if self.emu_config().host.networking == NetworkingMode::User {
+            crate::finalize_port_mapping(self.emu_config_mut())?;
+        }
+
         let result = <Self as QemuBasedEngine>::stage(&mut self)
             .await
             .and_then(|()| self.validate_staging());
