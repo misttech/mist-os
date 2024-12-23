@@ -4,11 +4,12 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
-    fs_node_set_label_with_task, has_file_permissions, todo_check_permission, FsNode,
-    PermissionCheck, ProcessPermission, TaskAttrs,
+    fs_node_set_label_with_task, has_file_permissions, todo_check_permission, PermissionCheck,
+    ProcessPermission, TaskAttrs,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
+use crate::vfs::FsNode;
 use crate::TODO_DENY;
 use selinux::{FilePermission, NullessByteStr, ObjectClass};
 use starnix_types::ownership::TempRef;

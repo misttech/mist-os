@@ -178,6 +178,18 @@ pub struct FsNodeSecurityXattr {
     pub value: FsString,
 }
 
+/// Checks whether the `current_task` has the specified `permission_flags` to the `file`.
+/// Corresponds to the `file_permission()` LSM hook.
+pub fn file_permission(
+    current_task: &CurrentTask,
+    file: &FileObject,
+    permission_flags: PermissionFlags,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::file_permission(security_server, current_task, file, permission_flags)
+    })
+}
+
 /// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
 /// `dir_entry`.
 /// If the `FsNode` security state had already been initialized, or no policy is yet loaded, then
