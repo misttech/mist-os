@@ -6,13 +6,11 @@ use crate::commands::LibraryCommand;
 use crate::ext_buffer::ExtBuffer;
 use anyhow::Result;
 use async_lock::Mutex as AsyncMutex;
-use byteorder::{NativeEndian, WriteBytesExt};
 use fuchsia_async::{LocalExecutor, Task};
-use futures_lite::AsyncWriteExt;
-use netext::TokioAsyncReadExt;
 use std::ops::DerefMut;
-use std::os::fd::{FromRawFd, RawFd};
+use std::os::fd::{IntoRawFd, RawFd};
 use std::sync::{Arc, Mutex};
+use tokio::io::AsyncWriteExt;
 use tokio::net::UnixStream;
 use zx_types;
 
@@ -101,27 +99,18 @@ fn new_command_thread(
 pub(crate) struct LibNotifier {
     _pipe_reader_task: Task<()>,
     handle_notification_sender: async_channel::Sender<zx_types::zx_handle_t>,
-    pipe_rx: RawFd,
-}
-
-fn unix_stream(fd: RawFd) -> Result<UnixStream, std::io::Error> {
-    let std_str = unsafe { std::os::unix::net::UnixStream::from_raw_fd(fd) };
-    UnixStream::from_std(std_str)
+    stream_fd: RawFd,
 }
 
 impl LibNotifier {
     // This function isn't actually async, but it should be called inside an
     // executor to ensure spawned tasks are scheduled correctly.
     async fn new() -> Result<Self> {
-        let (pipe_rx, pipe_tx) = nix::unistd::pipe()?;
-        let stream = unix_stream(pipe_tx)?;
+        let (stream_rx, mut stream_tx) = UnixStream::pair()?;
         let (tx, rx) = async_channel::unbounded::<zx_types::zx_handle_t>();
         let pipe_reader_task = fuchsia_async::Task::local(async move {
-            let mut bytes: [u8; 4] = [0, 0, 0, 0];
-            let mut stream = stream.into_futures_stream();
             while let Ok(raw_handle) = rx.recv().await {
-                bytes.as_mut().write_u32::<NativeEndian>(raw_handle).unwrap();
-                match stream.write_all(&bytes).await {
+                match stream_tx.write_u32_le(raw_handle).await {
                     Ok(_) => {}
                     Err(e) => {
                         tracing::info!("Exiting pipe reader task. Error: {e:?}");
@@ -130,11 +119,15 @@ impl LibNotifier {
                 }
             }
         });
-        Ok(Self { handle_notification_sender: tx, _pipe_reader_task: pipe_reader_task, pipe_rx })
+        Ok(Self {
+            handle_notification_sender: tx,
+            _pipe_reader_task: pipe_reader_task,
+            stream_fd: stream_rx.into_std()?.into_raw_fd(),
+        })
     }
 
     fn receiver(&self) -> RawFd {
-        self.pipe_rx
+        self.stream_fd
     }
 
     fn sender(&self) -> async_channel::Sender<zx_types::zx_handle_t> {

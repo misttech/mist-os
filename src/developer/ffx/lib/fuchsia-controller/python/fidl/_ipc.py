@@ -5,8 +5,7 @@
 
 import asyncio
 import logging
-import os
-import sys
+import socket
 import typing
 from abc import ABC, abstractmethod
 
@@ -81,7 +80,8 @@ def enqueue_ready_zx_handle_from_fd(
     fd: int, handle_ready_queues: typing.Dict[int, _QueueWrapper]
 ) -> None:
     """Reads zx_handle that is ready for reading, and enqueues it in the appropriate ready queue."""
-    handle_no = int.from_bytes(os.read(fd, 4), sys.byteorder)
+    s = socket.fromfd(fd, socket.AF_UNIX, socket.SOCK_STREAM)
+    handle_no = int.from_bytes(s.recv(4), "little")
     queue = handle_ready_queues.get(handle_no)
     if queue:
         queue.put_nowait(handle_no)
