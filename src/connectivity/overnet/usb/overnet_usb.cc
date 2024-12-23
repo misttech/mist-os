@@ -327,7 +327,7 @@ void OvernetUsb::HandleSocketReadable(async_dispatcher_t*, async::WaitBase*, zx_
 
   std::visit(
       [this](auto& state) __TA_REQUIRES(lock_) {
-        if (std::forward<decltype(state)>(state).ReadsWaiting()) {
+        if (state.ReadsWaiting()) {
           ProcessReadsFromSocket();
         }
       },
@@ -366,7 +366,7 @@ void OvernetUsb::HandleSocketWritable(async_dispatcher_t*, async::WaitBase*, zx_
              std::move(state_));
   std::visit(
       [this](auto& state) __TA_REQUIRES(lock_) {
-        if (std::forward<decltype(state)>(state).WritesWaiting()) {
+        if (state.WritesWaiting()) {
           ProcessWritesToSocket();
         }
       },
@@ -610,14 +610,14 @@ void OvernetUsb::ReadComplete(fendpoint::Completion completion) {
         std::move(state_));
     std::visit(
         [this](auto& state) __TA_REQUIRES(lock_) {
-          if (std::forward<decltype(state)>(state).NewSocket()) {
+          if (state.NewSocket()) {
             auto request = PrepareTx();
 
             if (request) {
               SendMagicReply(std::move(*request));
             }
           }
-          if (std::forward<decltype(state)>(state).WritesWaiting()) {
+          if (state.WritesWaiting()) {
             ProcessWritesToSocket();
           }
         },
