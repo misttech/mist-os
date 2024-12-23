@@ -754,14 +754,16 @@ zx_status_t BtTransportUart::ServeProtocols() {
   auto hci_transport_protocol = [this](fidl::ServerEnd<fhbt::HciTransport> server_end) mutable {
     if (hci_transport_binding_) {
       FDF_LOG(WARNING, "HciTransport binding exists, replacing it.");
+      // Don't queue another read task for the new binding.
+    } else {
+      FDF_LOG(INFO, "HciTransport server binding.");
+      queue_read_task_.Post(dispatcher_);
     }
     hci_transport_binding_.emplace(dispatcher_, std::move(server_end), this,
                                    [this](fidl::UnbindInfo) {
                                      hci_transport_binding_.reset();
                                      FDF_LOG(INFO, "HciTransport server binding unbound.");
                                    });
-    FDF_LOG(INFO, "HciTransport server binding emplaced.");
-    queue_read_task_.Post(dispatcher_);
   };
   auto snoop_protocol = [this](fidl::ServerEnd<fhbt::Snoop> server_end) mutable {
     if (snoop_server_.has_value()) {
