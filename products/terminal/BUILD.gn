@@ -43,7 +43,8 @@ bazel_inputs = [
   "//src/tests/fidl/compatibility/go:go.bazel_input",
   "//src/tests/fidl/compatibility/rust:rust.bazel_input",
 ]
-if (board_configuration_label != false) {
+if (board_configuration_label != false &&
+    get_label_info(board_configuration_label, "dir") != "//boards/vim3") {
   bazel_inputs += [ get_label_info(board_configuration_label,
                                    "label_no_toolchain") + ".bazel_input" ]
 }
@@ -124,7 +125,7 @@ if (target_cpu == "arm64") {
     bazel_product_image_target = ":image.vim3"
     bazel_recovery_image_target = "//products/zedboot:vim3"
     bazel_elf_sizes_target = ":elf_sizes.vim3"
-    bazel_inputs_from_gn = bazel_inputs
+    bazel_inputs_from_gn = bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
   }
 
   bazel_product_bundle("product_bundle.vim3_reduced_perf_variation") {
@@ -135,7 +136,7 @@ if (target_cpu == "arm64") {
     bazel_recovery_image_target =
         "//products/zedboot:vim3_reduced_perf_variation"
     bazel_elf_sizes_target = ":elf_sizes.vim3_reduced_perf_variation"
-    bazel_inputs_from_gn = bazel_inputs
+    bazel_inputs_from_gn = bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
   }
 
   bazel_product_bundle("product_bundle_with_netstack2.arm64") {
@@ -155,7 +156,7 @@ if (target_cpu == "arm64") {
     bazel_product_image_target = ":image_with_netstack2.vim3"
     bazel_recovery_image_target = "//products/zedboot:vim3"
     bazel_elf_sizes_target = ":elf_sizes_with_netstack2.vim3"
-    bazel_inputs_from_gn = bazel_inputs
+    bazel_inputs_from_gn = bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
   }
 
   bazel_product_bundle(
@@ -170,6 +171,6 @@ if (target_cpu == "arm64") {
         "//products/zedboot:vim3_reduced_perf_variation"
     bazel_elf_sizes_target =
         ":elf_sizes_with_netstack2.vim3_reduced_perf_variation"
-    bazel_inputs_from_gn = bazel_inputs
+    bazel_inputs_from_gn = bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
   }
 }
