@@ -492,7 +492,6 @@ async fn run_single_suite_for_suite_runner(
                 }
             }
         };
-
         diagnostics.set_property(EXECUTION_PROPERTY, "launch");
         match running_suite::RunningSuite::launch(
             &test_url,
@@ -503,7 +502,7 @@ async fn run_single_suite_for_suite_runner(
             debug_data_sender,
             &diagnostics,
             &suite_realm,
-            !options.no_exception_channel.unwrap_or(false), // use_debug_agent
+            false, // use_debug_agent
         )
         .await
         {
@@ -592,7 +591,6 @@ pub(crate) async fn run_single_suite(
             }
         };
         diagnostics.set_property(EXECUTION_PROPERTY, "launch");
-
         match running_suite::RunningSuite::launch(
             &test_url,
             facets,
@@ -602,7 +600,7 @@ pub(crate) async fn run_single_suite(
             debug_data_sender,
             &diagnostics,
             &suite_realm,
-            !options.no_exception_channel.unwrap_or(false), // use_debug_agent
+            false, // use_debug_agent
         )
         .await
         {
