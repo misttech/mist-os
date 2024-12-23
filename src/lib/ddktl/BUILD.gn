@@ -206,6 +206,7 @@ source_set("ddktl") {
     "//src/devices/rtc/drivers/aml-rtc:*",
     "//src/devices/rtc/drivers/intel-rtc:*",
     "//src/devices/rtc/drivers/pl031-rtc:*",
+    "//src/devices/securemem/drivers/aml-securemem:*",
     "//src/devices/serial/drivers/aml-uart:*",
     "//src/devices/serial/drivers/ftdi:*",
     "//src/devices/serial/drivers/ftdi/test:*",

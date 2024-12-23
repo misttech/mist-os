@@ -8,10 +8,9 @@
 #include <fidl/fuchsia.hardware.securemem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async_patterns/cpp/dispatcher_bound.h>
 #include <lib/async_patterns/cpp/receiver.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/fpromise/result.h>
 #include <lib/zx/bti.h>
 #include <zircon/types.h>
@@ -61,7 +60,6 @@ class AmlogicSecureMemDevice : public AmlogicSecureMemDeviceBase,
   // The dispatcher that this |AmlogicSecureMemDevice| lives on.
   fdf_dispatcher_t* const fdf_dispatcher_;
 
-  ddk::PDevFidl pdev_proto_client_;
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
   fidl::WireSyncClient<fuchsia_hardware_tee::DeviceConnector> tee_proto_client_;
 

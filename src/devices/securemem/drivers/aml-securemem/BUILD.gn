@@ -58,8 +58,9 @@ source_set("common") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
     "//sdk/lib/async-loop:async-loop-cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/lib/ddk",
+    "//src/lib/ddktl",
     "//src/security/lib/tee/tee-client-api:tee-client-api-headers",
   ]
 }
@@ -98,8 +99,8 @@ test("aml-securemem-test-bin") {
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/fit-promise",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync:sync-cpp",
