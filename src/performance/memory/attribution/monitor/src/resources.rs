@@ -38,17 +38,52 @@ struct KernelResourcesBuilder {
 
 struct Cache {
     /// Cache for `zx_info_vmo_t` objects, to speed up related syscalls.
-    vmos_cache: Vec<MaybeUninit<zx::VmoInfo>>,
+    vmos_cache_internal: Vec<MaybeUninit<zx::VmoInfo>>,
     /// Cache for `zx_info_maps_t` objects, to speed up related syscalls.
-    maps_cache: Vec<MaybeUninit<zx::MapInfo>>,
+    maps_cache_internal: Vec<MaybeUninit<zx::MapInfo>>,
 }
 
 impl Default for Cache {
     fn default() -> Self {
-        Self {
-            vmos_cache: vec![MaybeUninit::uninit(); ZX_INFO_CACHE_INITIAL_SIZE],
-            maps_cache: vec![MaybeUninit::uninit(); ZX_INFO_CACHE_INITIAL_SIZE],
+        let mut result = Self { vmos_cache_internal: vec![], maps_cache_internal: vec![] };
+        result.vmos_cache(ZX_INFO_CACHE_INITIAL_SIZE);
+        result.maps_cache(ZX_INFO_CACHE_INITIAL_SIZE);
+        result
+    }
+}
+
+impl Cache {
+    /// Returns a buffer with enough space to hold at least `minimum_size` [zx::VmoInfo] objects.
+    fn vmos_cache(&mut self, minimum_size: usize) -> &mut Vec<MaybeUninit<zx::VmoInfo>> {
+        if self.vmos_cache_internal.len() > minimum_size {
+            return &mut self.vmos_cache_internal;
         }
+
+        // Having all entries inititialized to a non-zero value ensures their page are committed to
+        // memory. This avoids the issue described in https://fxbug.dev/383401884, where faulting
+        // pages during the syscall is much more expensive than faulting them in userspace.
+        let mut base = zx::VmoInfo::default();
+        base.size_bytes = 1;
+        self.vmos_cache_internal =
+            vec![MaybeUninit::new(base); minimum_size * ZX_INFO_CACHE_GROWTH_FACTOR];
+
+        return &mut self.vmos_cache_internal;
+    }
+
+    /// Returns a buffer with enough space to hold at least `minimum_size` [zx::MapInfo] objects.
+    fn maps_cache(&mut self, minimum_size: usize) -> &mut Vec<MaybeUninit<zx::MapInfo>> {
+        if self.maps_cache_internal.len() > minimum_size {
+            return &mut self.maps_cache_internal;
+        }
+
+        // Having all entries inititialized to a non-zero value ensures their page are committed to
+        // memory. This avoids the issue described in https://fxbug.dev/383401884, where faulting
+        // pages during the syscall is much more expensive than faulting them in userspace.
+        let base = zx::MapInfo::new(Default::default(), 1, 0, 0, zx::MapDetails::None).unwrap();
+        self.maps_cache_internal =
+            vec![MaybeUninit::new(base); minimum_size * ZX_INFO_CACHE_GROWTH_FACTOR];
+
+        return &mut self.maps_cache_internal;
     }
 }
 
@@ -315,14 +350,12 @@ impl KernelResourcesBuilder {
 
         let vmo_koids = if collection.is_none() || collection.is_some_and(|c| c.collect_vmos) {
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos");
-            let (mut info_vmos, available) = process.info_vmos(&mut cache.vmos_cache)?;
+            let (mut info_vmos, available) = process.info_vmos(cache.vmos_cache(0))?;
 
             if info_vmos.len() < available {
                 duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos:grow",
                     "initial_length" => info_vmos.len(), "target_length" => available);
-                cache.vmos_cache =
-                    vec![MaybeUninit::uninit(); available * ZX_INFO_CACHE_GROWTH_FACTOR];
-                (info_vmos, _) = process.info_vmos(&mut cache.vmos_cache)?;
+                (info_vmos, _) = process.info_vmos(cache.vmos_cache(available))?;
             }
 
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:vmos:insert");
@@ -362,13 +395,11 @@ impl KernelResourcesBuilder {
 
         let process_maps = if collection.is_some_and(|c| c.collect_maps) {
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps");
-            let (mut info_maps, available) = process.info_maps(&mut cache.maps_cache)?;
+            let (mut info_maps, available) = process.info_maps(cache.maps_cache(0))?;
 
             if info_maps.len() < available {
                 duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps:grow", "initial_length" => info_maps.len(), "target_length" => available);
-                cache.maps_cache =
-                    vec![MaybeUninit::uninit(); available * ZX_INFO_CACHE_GROWTH_FACTOR];
-                (info_maps, _) = process.info_maps(&mut cache.maps_cache)?;
+                (info_maps, _) = process.info_maps(cache.maps_cache(available))?;
             }
 
             duration!(CATEGORY_MEMORY_CAPTURE, c"explore_process:maps:insert");
