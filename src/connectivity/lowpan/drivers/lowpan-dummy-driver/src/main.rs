@@ -14,7 +14,7 @@ use lowpan_driver_common::{
 };
 
 #[allow(unused_imports)]
-use tracing::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 
 async fn run_driver<N, RP, RFP>(
     name: N,

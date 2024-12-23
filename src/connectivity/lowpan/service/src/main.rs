@@ -21,7 +21,7 @@ use std::sync::Arc;
 use {fidl_fuchsia_factory_lowpan, fuchsia_async as fasync};
 
 #[allow(unused_imports)]
-use tracing::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 
 enum IncomingService {
     DeviceWatcher(DeviceWatcherRequestStream),

@@ -11,7 +11,7 @@ const RETRY_COUNTER_PERIOD_MAX_SEC: i64 = 180;
 
 #[fuchsia::main(logging_tags = ["lowpan", "monitor"])]
 async fn main() -> Result<(), Error> {
-    tracing::info!("lowpan-monitor started");
+    log::info!("lowpan-monitor started");
     let mut retry_counter: u32 = 0;
 
     // Attempt to launch lowpan-ot-driver
@@ -23,7 +23,7 @@ async fn main() -> Result<(), Error> {
         >()
         .context("failed to connect to fuchsia.component.Binder in lowpan-ot-driver")?;
 
-        tracing::info!("lowpan-monitor connected");
+        log::info!("lowpan-monitor connected");
 
         binder_proxy.on_closed().await?;
 
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Error> {
         let retry_delay_backoff_sec =
             if retry_counter < 6 { 1 << retry_counter } else { RETRY_COUNTER_PERIOD_MAX_SEC };
 
-        tracing::info!("lowpan-monitor detects the termination of lowpan-ot-driver (failed {} times), restarting in {} sec", retry_counter, retry_delay_backoff_sec);
+        log::info!("lowpan-monitor detects the termination of lowpan-ot-driver (failed {} times), restarting in {} sec", retry_counter, retry_delay_backoff_sec);
 
         fasync::Timer::new(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
             retry_delay_backoff_sec,

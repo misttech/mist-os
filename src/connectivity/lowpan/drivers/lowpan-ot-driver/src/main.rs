@@ -43,12 +43,12 @@ mod prelude {
     pub use fasync::TimeoutExt as _;
     pub use futures::future::BoxFuture;
     pub use futures::stream::BoxStream;
+    pub use log::{debug, error, info, trace, warn};
     pub use lowpan_driver_common::pii::MarkPii;
     pub use lowpan_driver_common::ZxResult;
     pub use net_declare::{fidl_ip, fidl_ip_v6};
     pub use std::convert::TryInto;
     pub use std::fmt::Debug;
-    pub use tracing::{debug, error, info, trace, warn};
     pub use zx_status::Status as ZxStatus;
     pub use {fidl_fuchsia_net_ext as fnet_ext, fuchsia_async as fasync, zx as fz};
 

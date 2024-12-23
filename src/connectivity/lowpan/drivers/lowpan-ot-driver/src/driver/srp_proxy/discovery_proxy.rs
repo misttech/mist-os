@@ -86,12 +86,12 @@ impl DiscoveryProxy {
             move |subscribed: bool, name_srp_domain: &CStr| {
                 if subscribed {
                     debug!(
-                        tag = "srp_discovery_proxy",
+                        tag = "srp_discovery_proxy";
                         "Subscribing to DNS-SD query: {:?}", name_srp_domain
                     );
                 } else {
                     debug!(
-                        tag = "srp_discovery_proxy",
+                        tag = "srp_discovery_proxy";
                         "Unsubscribing from DNS-SD query: {:?}", name_srp_domain
                     );
                 }
@@ -101,7 +101,7 @@ impl DiscoveryProxy {
                     match replace_domain_cstr(&name_srp_domain, &srp_domain, LOCAL_DOMAIN) {
                         Ok(x) => x,
                         Err(err) => {
-                            error!(tag = "srp_discovery_proxy", "dnssd_query_callback: {:?}", err);
+                            error!(tag = "srp_discovery_proxy"; "dnssd_query_callback: {:?}", err);
                             return;
                         }
                     };
@@ -114,12 +114,12 @@ impl DiscoveryProxy {
                     &subscriptions_clone,
                     &update_sender,
                 ) {
-                    error!(tag = "srp_discovery_proxy", "dnssd_subscribed_to: {:?}", err);
+                    error!(tag = "srp_discovery_proxy"; "dnssd_subscribed_to: {:?}", err);
                 }
             },
         ));
 
-        info!(tag = "srp_discovery_proxy", "DiscoveryProxy Started");
+        info!(tag = "srp_discovery_proxy"; "DiscoveryProxy Started");
 
         Ok(DiscoveryProxy {
             update_receiver: Mutex::new(update_receiver),
@@ -166,7 +166,7 @@ impl DiscoveryProxy {
         let (client, server) = create_endpoints::<HostNameSubscriptionListenerMarker>();
 
         debug!(
-            tag = "srp_discovery_proxy",
+            tag = "srp_discovery_proxy";
             "DNS-SD subscription to {:?} as host name, will proxy to {:?}", name_srp_domain, name
         );
 
@@ -203,7 +203,7 @@ impl DiscoveryProxy {
                         name_local_domain: name_local_domain_copy_0.clone(),
                     };
                     debug!(
-                        tag = "srp_discovery_proxy",
+                        tag = "srp_discovery_proxy";
                         "DNS-SD host subscription update: {:?}", dnssd_update
                     );
                     async move {
@@ -219,7 +219,7 @@ impl DiscoveryProxy {
                 #[allow(clippy::redundant_clone)]
                 let _ = subscriber.clone();
 
-                error!(tag = "srp_discovery_proxy", "host_name_subscription: {:?}", err);
+                error!(tag = "srp_discovery_proxy"; "host_name_subscription: {:?}", err);
             });
 
         // TODO(https://fxbug.dev/42176255): It is unclear why this step still appears to be necessary,
@@ -247,14 +247,14 @@ impl DiscoveryProxy {
                         Ok(())
                     })
                     .inspect_err(|err| {
-                        error!(tag = "srp_discovery_proxy", "resolve_host_name: {:?}", err);
+                        error!(tag = "srp_discovery_proxy"; "resolve_host_name: {:?}", err);
                     })
                     .map(|_| ());
                 fasync::Task::spawn(initial_resolution_future).detach();
             }
             Err(err) => {
                 error!(
-                    tag = "srp_discovery_proxy",
+                    tag = "srp_discovery_proxy";
                     "connect_to_protocol::<ResolverMarker>(): {:?}", err
                 );
             }
@@ -282,7 +282,7 @@ impl DiscoveryProxy {
         let service_name = name_local_domain.trim_end_matches(LOCAL_DOMAIN);
 
         debug!(
-            tag = "srp_discovery_proxy",
+            tag = "srp_discovery_proxy";
             "DNS-SD subscription to {:?} as service, will proxy to {:?}",
             name_srp_domain,
             service_name
@@ -328,7 +328,7 @@ impl DiscoveryProxy {
                 #[allow(clippy::redundant_clone)]
                 let _ = subscriber.clone();
 
-                error!(tag = "srp_discovery_proxy", "service_subscription: {:?}", err);
+                error!(tag = "srp_discovery_proxy"; "service_subscription: {:?}", err);
             });
 
         subscriptions.lock().insert(name_srp_domain, fasync::Task::spawn(future));
@@ -432,14 +432,14 @@ impl DiscoveryProxy {
 
             if addresses.is_empty() {
                 warn!(
-                    tag = "srp_discovery_proxy",
+                    tag = "srp_discovery_proxy";
                     "Unable to resolve {:?} to an IPv6 address for service {:?}.",
                     host_name,
                     instance_name_srp
                 );
             } else {
                 debug!(
-                    tag = "srp_discovery_proxy",
+                    tag = "srp_discovery_proxy";
                     "Resolved {:?} to {:?} for service {:?}.",
                     host_name,
                     addresses,
@@ -460,7 +460,7 @@ impl DiscoveryProxy {
             }
         } else {
             warn!(
-                tag = "srp_discovery_proxy",
+                tag = "srp_discovery_proxy";
                 "Unable to handle discovered service instance: {:?}", service_instance
             );
         }
@@ -500,7 +500,7 @@ impl DiscoveryProxy {
                 // TODO(https://fxbug.dev/42176249): It is not entirely clear how to handle this case,
                 //                        so for the time being we are ignoring it.
                 info!(
-                    tag = "srp_discovery_proxy",
+                    tag = "srp_discovery_proxy";
                     "Ignoring loss of service instance {:?}", service_instance
                 );
 
@@ -520,12 +520,12 @@ impl DiscoveryProxy {
         while let Poll::Ready(ready) = self.update_receiver.lock().poll_next_unpin(cx) {
             match ready {
                 Some(DnssdUpdate::Service(request)) => {
-                    debug!(tag = "srp_discovery_proxy", "DnssdUpdate::Service: {:?}", request);
+                    debug!(tag = "srp_discovery_proxy"; "DnssdUpdate::Service: {:?}", request);
                     if let Err(err) =
                         self.handle_service_subscription_listener_request(instance, request)
                     {
                         error!(
-                            tag = "srp_discovery_proxy",
+                            tag = "srp_discovery_proxy";
                             "handle_service_subscription_listener_request: {:?}", err
                         );
                     }
@@ -536,29 +536,29 @@ impl DiscoveryProxy {
 
                     if ot_ip_addresses.is_empty() {
                         warn!(
-                            tag = "srp_discovery_proxy",
+                            tag = "srp_discovery_proxy";
                             "Unable to resolve {:?} to an IPv6 address.", &name_local_domain
                         );
                         debug!(
-                            tag = "srp_discovery_proxy",
+                            tag = "srp_discovery_proxy";
                             "Full list for {:?} was {:?}", &name_local_domain, addresses
                         );
                     } else {
                         debug!(
-                            tag = "srp_discovery_proxy",
+                            tag = "srp_discovery_proxy";
                             "Resolved {:?} to {:?}", &name_local_domain, ot_ip_addresses
                         );
                     }
 
                     debug!(
-                        tag = "srp_discovery_proxy",
+                        tag = "srp_discovery_proxy";
                         "DnssdUpdate::Host: {:?}, {:?}, {}", host_name, ot_ip_addresses, ttl
                     );
                     instance.dnssd_query_handle_discovered_host(&host_name, &ot_ip_addresses, ttl);
                 }
                 None => {
                     warn!(
-                        tag = "srp_discovery_proxy",
+                        tag = "srp_discovery_proxy";
                         "update_receiver stream has finished unexpectedly."
                     );
                 }
@@ -568,7 +568,7 @@ impl DiscoveryProxy {
         self.subscriptions.lock().retain(|k, v| {
             if let Poll::Ready(ret) = v.poll_unpin(cx) {
                 warn!(
-                    tag = "srp_discovery_proxy",
+                    tag = "srp_discovery_proxy";
                     "Subscription to {:?} has stopped unexpectedly: {:?}", k, ret
                 );
                 false
@@ -600,7 +600,7 @@ impl DiscoveryProxy {
                         ret_port = Some(port);
                     } else if ret_port != Some(port) {
                         warn!(
-                            tag = "srp_discovery_proxy",
+                            tag = "srp_discovery_proxy";
                             "mDNS service has multiple ports for the same service, {:?} != {:?}",
                             ret_port.unwrap(),
                             port

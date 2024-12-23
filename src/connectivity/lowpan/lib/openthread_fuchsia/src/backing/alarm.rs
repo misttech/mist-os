@@ -62,7 +62,7 @@ impl AlarmInstance {
         }
 
         trace!(
-            tag = "alarm",
+            tag = "alarm";
             "on_alarm_milli_start_at: scheduling alarm for {:?}ms after {:?}",
             dt,
             t0
@@ -82,12 +82,12 @@ impl AlarmInstance {
                 Duration::ZERO
             };
             trace!(
-                tag = "alarm",
+                tag = "alarm";
                 "on_alarm_milli_start_at: helper task now waiting {:?}",
                 duration
             );
             fasync::Timer::new(duration).await;
-            trace!(tag="alarm", "on_alarm_milli_start_at: helper task finished waiting, now sending ot_instance_ptrval");
+            trace!(tag="alarm"; "on_alarm_milli_start_at: helper task finished waiting, now sending ot_instance_ptrval");
             timer_sender.send(ot_instance_ptrval).await.unwrap();
         };
 
@@ -111,12 +111,12 @@ impl AlarmInstance {
         }
 
         if self.task_alarm.take().is_some() {
-            trace!(tag = "alarm", "on_alarm_milli_stop: Alarm cancelled");
+            trace!(tag = "alarm"; "on_alarm_milli_stop: Alarm cancelled");
         }
     }
 
     fn on_alarm_fired(&self, instance: &ot::Instance, value: usize) {
-        trace!(tag = "alarm", "on_alarm_fired");
+        trace!(tag = "alarm"; "on_alarm_fired");
 
         let instance_ptr = instance.as_ot_ptr();
         assert_eq!(instance_ptr as usize, value, "Got wrong pointer from timer receiver");

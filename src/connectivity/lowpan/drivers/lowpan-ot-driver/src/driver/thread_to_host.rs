@@ -6,8 +6,8 @@ use super::*;
 
 use futures::prelude::*;
 
+use log::{debug, error, info, trace, warn};
 use lowpan_driver_common::spinel::Subnet;
-use tracing::{debug, error, info, trace, warn};
 
 impl<OT, NI, BI> OtDriver<OT, NI, BI>
 where

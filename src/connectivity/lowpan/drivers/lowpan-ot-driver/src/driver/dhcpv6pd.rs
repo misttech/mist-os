@@ -133,7 +133,7 @@ fn dhcp_v6_pd_prefix_unassigned<T: ot::BorderRouter>(instance: &T, prefix: ot::I
 impl DhcpV6PdInner {
     fn abandon_current_prefix(&mut self, instance: &ot::Instance) {
         if let Some(prefix) = self.prefix {
-            info!(tag = "dhcp_v6_pd", "Abandoning current prefix `{}`", prefix);
+            info!(tag = "dhcp_v6_pd"; "Abandoning current prefix `{}`", prefix);
 
             dhcp_v6_pd_prefix_unassigned(instance, prefix);
 
@@ -169,7 +169,7 @@ impl DhcpV6Pd {
     pub fn start(&self) -> Result<(), anyhow::Error> {
         self.stop(); // ensure stop in case the online task is not terminated
 
-        info!(tag = "dhcp_v6_pd", "Starting attempt to lease a prefix via DHCPv6-PD...");
+        info!(tag = "dhcp_v6_pd"; "Starting attempt to lease a prefix via DHCPv6-PD...");
         let prefix_provider =
             connect_to_protocol::<PrefixProviderMarker>().context("dhcpv6pd.start")?;
 
@@ -215,7 +215,7 @@ impl DhcpV6Pd {
                 // Lock our inner.
                 let mut inner = inner_clone.lock();
 
-                info!(tag = "dhcp_v6_pd", "Refreshing DHCPv6-PD RA for OpenThread");
+                info!(tag = "dhcp_v6_pd"; "Refreshing DHCPv6-PD RA for OpenThread");
 
                 // Make sure our `poll()` method gets called by waking up the waker.
                 inner.waker.take().and_then(|waker| {
@@ -234,7 +234,7 @@ impl DhcpV6Pd {
         // To stop, we simply dispose of the control endpoint for the prefix.
         // The prefix will be removed the next time `poll()` is called.
         if let Some(_) = inner.prefix_control.take() {
-            info!(tag = "dhcp_v6_pd", "STOPPING attempt to lease a prefix via DHCPv6-PD.");
+            info!(tag = "dhcp_v6_pd"; "STOPPING attempt to lease a prefix via DHCPv6-PD.");
             // Make sure our `poll()` method gets called.
             inner.waker.take().and_then(|waker| {
                 waker.wake();
@@ -262,7 +262,7 @@ impl DhcpV6Pd {
                 if inner.prefix_watch.is_some() {
                     match inner.prefix_watch.as_mut().unwrap().poll_unpin(cx) {
                         Poll::Ready(Ok(PrefixEvent::Unassigned(_))) => {
-                            info!(tag = "dhcp_v6_pd", "DHCPv6 Prefix Unassigned");
+                            info!(tag = "dhcp_v6_pd"; "DHCPv6 Prefix Unassigned");
                             inner.abandon_current_prefix(instance);
                         }
                         Poll::Ready(Ok(PrefixEvent::Assigned(prefix))) => {
@@ -279,7 +279,7 @@ impl DhcpV6Pd {
                                 zx::MonotonicInstant::from_nanos(prefix.lifetimes.preferred_until);
 
                             info!(
-                                tag = "dhcp_v6_pd",
+                                tag = "dhcp_v6_pd";
                                 "DHCPv6 Prefix Assigned: {:?}, valid: {}s, preferred: {}s",
                                 prefix_prefix,
                                 convert_zx_time_into_seconds_until(inner.valid),
@@ -290,7 +290,7 @@ impl DhcpV6Pd {
                         }
                         Poll::Ready(Err(fidl_error)) => {
                             error!(
-                                tag = "dhcp_v6_pd",
+                                tag = "dhcp_v6_pd";
                                 "Error watching prefix control: {:?}", fidl_error
                             );
 

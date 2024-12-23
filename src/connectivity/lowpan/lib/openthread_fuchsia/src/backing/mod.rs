@@ -15,7 +15,7 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 #[allow(unused_imports)]
-use tracing::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 
 mod alarm;
 mod infra_if;

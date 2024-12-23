@@ -46,15 +46,15 @@ impl<OT: Send, NI, BI: Send> OtDriver<OT, NI, BI> {
             move |mut last_state: InternalState<'_, R, L>| async move {
                 last_state = match last_state {
                     InternalState::Init(init_task, stream) => {
-                        debug!(tag = "api", "ongoing_stream_process: Initializing. . .");
+                        debug!(tag = "api"; "ongoing_stream_process: Initializing. . .");
                         match init_task.await {
                             Ok(lock) => {
-                                debug!(tag = "api", "ongoing_stream_process: Initialized.");
+                                debug!(tag = "api"; "ongoing_stream_process: Initialized.");
                                 InternalState::Running(lock, stream)
                             }
                             Err(err) => {
                                 debug!(
-                                    tag = "api",
+                                    tag = "api";
                                     "ongoing_stream_process: Initialization failed: {:?}", err
                                 );
                                 return Some((Err(err), InternalState::Done));
@@ -65,11 +65,11 @@ impl<OT: Send, NI, BI: Send> OtDriver<OT, NI, BI> {
                 };
 
                 if let InternalState::Running(lock, mut stream) = last_state {
-                    debug!(tag = "api", "ongoing_stream_process: getting next");
+                    debug!(tag = "api"; "ongoing_stream_process: getting next");
                     if let Some(next) = stream
                         .next()
                         .on_timeout(timeout, move || {
-                            error!(tag = "api", "ongoing_stream_process: Timeout");
+                            error!(tag = "api"; "ongoing_stream_process: Timeout");
                             Some(Err(ZxStatus::TIMED_OUT))
                         })
                         .await
@@ -78,7 +78,7 @@ impl<OT: Send, NI, BI: Send> OtDriver<OT, NI, BI> {
                     }
                 }
 
-                debug!(tag = "api", "ongoing_stream_process: Done");
+                debug!(tag = "api"; "ongoing_stream_process: Done");
 
                 None
             },
@@ -95,10 +95,9 @@ where
     NI: NetworkInterface,
     BI: BackboneInterface,
 {
-    #[tracing::instrument(level = "info", skip_all)]
     async fn provision_network(&self, params: ProvisioningParams) -> ZxResult<()> {
-        info!(tag = "api", "Got \"provision network\" request");
-        debug!(tag = "api", "provision command: {:?}", params);
+        info!(tag = "api"; "Got \"provision network\" request");
+        debug!(tag = "api"; "provision command: {:?}", params);
 
         // Wait until we are not busy.
         self.wait_for_state(|x| !x.is_busy()).await;
@@ -111,7 +110,7 @@ where
         if let Some(ref net_type) = params.identity.net_type {
             if !self.is_net_type_supported(net_type.as_str()) {
                 error!(
-                    tag = "api",
+                    tag = "api";
                     "Network type {:?} is not supported by this interface.", net_type
                 );
                 return Err(ZxStatus::NOT_SUPPORTED);
@@ -144,11 +143,8 @@ where
         self.apply_standard_combinators(task.boxed()).await
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
     async fn leave_network(&self) -> ZxResult<()> {
-        let span = tracing::span!(tracing::Level::INFO, "leave_network");
-        let _ = span.enter();
-        info!(tag = "api", "Got leave command");
+        info!(tag = "api"; "Got leave command");
 
         let task = async {
             {
@@ -175,9 +171,8 @@ where
         self.apply_standard_combinators(task.boxed()).await
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
     async fn set_active(&self, enabled: bool) -> ZxResult<()> {
-        info!(tag = "api", "Got set active command: {:?}", enabled);
+        info!(tag = "api"; "Got set active command: {:?}", enabled);
 
         // Wait until we are not busy.
         self.wait_for_state(|x| !x.is_busy()).await;
@@ -314,8 +309,8 @@ where
         &self,
         params: ProvisioningParams,
     ) -> BoxStream<'_, ZxResult<Result<ProvisioningProgress, ProvisionError>>> {
-        info!(tag = "api", "Got \"form network\" request");
-        debug!(tag = "api", "form command: {:?}", params);
+        info!(tag = "api"; "Got \"form network\" request");
+        debug!(tag = "api"; "form command: {:?}", params);
 
         ready(Err(ZxStatus::NOT_SUPPORTED)).into_stream().boxed()
     }
@@ -324,8 +319,8 @@ where
         &self,
         params: JoinParams,
     ) -> BoxStream<'_, ZxResult<Result<ProvisioningProgress, ProvisionError>>> {
-        info!(tag = "api", "Got \"join network\" request");
-        debug!(tag = "api", "join command: {:?}", params);
+        info!(tag = "api"; "Got \"join network\" request");
+        debug!(tag = "api"; "join command: {:?}", params);
 
         match params {
             JoinParams::JoinerParameter(joiner_params) => self.joiner_start(joiner_params),
@@ -337,7 +332,7 @@ where
     }
 
     async fn get_credential(&self) -> ZxResult<Option<Credential>> {
-        info!(tag = "api", "Got get credential command");
+        info!(tag = "api"; "Got get credential command");
         let driver_state = self.driver_state.lock();
         let ot_instance = &driver_state.ot_instance;
         let mut operational_dataset = Default::default();
@@ -354,7 +349,7 @@ where
         &self,
         params: &EnergyScanParameters,
     ) -> BoxStream<'_, ZxResult<Vec<fidl_fuchsia_lowpan_device::EnergyScanResult>>> {
-        info!(tag = "api", "Got energy scan command: {:?}", params);
+        info!(tag = "api"; "Got energy scan command: {:?}", params);
 
         let driver_state = self.driver_state.lock();
         let ot_instance = &driver_state.ot_instance;
@@ -388,7 +383,7 @@ where
                 channels?,
                 dwell_time,
                 move |x| {
-                    trace!(tag = "api", "energy_scan_callback: Got result {:?}", x);
+                    trace!(tag = "api"; "energy_scan_callback: Got result {:?}", x);
                     if let Some(x) = x {
                         if sender.unbounded_send(x.clone()).is_err() {
                             // If this is an error then that just means the
@@ -396,7 +391,7 @@ where
                             // not even worth logging.
                         }
                     } else {
-                        trace!(tag = "api", "energy_scan_callback: Closing scan stream");
+                        trace!(tag = "api"; "energy_scan_callback: Closing scan stream");
                         sender.close_channel();
 
                         // Make sure the rest of the state machine knows we finished scanning.
@@ -426,7 +421,7 @@ where
         &self,
         params: &NetworkScanParameters,
     ) -> BoxStream<'_, ZxResult<Vec<BeaconInfo>>> {
-        info!(tag = "api", "Got network scan command: {:?}", params);
+        info!(tag = "api"; "Got network scan command: {:?}", params);
 
         let driver_state = self.driver_state.lock();
         let ot_instance = &driver_state.ot_instance;
@@ -460,7 +455,7 @@ where
                 channels?,
                 dwell_time,
                 move |x| {
-                    trace!(tag = "api", "active_scan_callback: Got result {:?}", x);
+                    trace!(tag = "api"; "active_scan_callback: Got result {:?}", x);
                     if let Some(x) = x {
                         if sender.unbounded_send(x.clone()).is_err() {
                             // If this is an error then that just means the
@@ -468,7 +463,7 @@ where
                             // not even worth logging.
                         }
                     } else {
-                        trace!(tag = "api", "active_scan_callback: Closing scan stream");
+                        trace!(tag = "api"; "active_scan_callback: Closing scan stream");
                         sender.close_channel();
 
                         // Make sure the rest of the state machine knows we finished scanning.
@@ -488,9 +483,8 @@ where
         self.start_ongoing_stream_process(init_task, stream, timeout)
     }
 
-    #[tracing::instrument(level = "info", skip_all)]
     async fn reset(&self) -> ZxResult<()> {
-        warn!(tag = "api", "Got API request to reset");
+        warn!(tag = "api"; "Got API request to reset");
         self.driver_state.lock().ot_instance.reset();
         Ok(())
     }
@@ -530,14 +524,13 @@ where
         self.get_thread_rloc16().await.map(ot::rloc16_to_router_id)
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
     async fn send_mfg_command(&self, command: &str) -> ZxResult<String> {
         // For this method we are sending manufacturing commands to the normal
         // OpenThread CLI interface one at a time
         const WAIT_FOR_RESPONSE_TIMEOUT: zx::MonotonicDuration =
             zx::MonotonicDuration::from_seconds(120);
 
-        info!(tag = "api", "CLI command: {:?}", command);
+        info!(tag = "api"; "CLI command: {:?}", command);
 
         let mut cmd = std::string::String::from(command);
         cmd.push('\n');
@@ -569,7 +562,7 @@ where
         };
 
         fut.on_timeout(fasync::MonotonicInstant::after(WAIT_FOR_RESPONSE_TIMEOUT), || {
-            error!(tag = "api", "Timeout");
+            error!(tag = "api"; "Timeout");
             Err(ZxStatus::TIMED_OUT)
         })
         .await?;
@@ -581,7 +574,7 @@ where
     }
 
     async fn setup_ot_cli(&self, server_socket: fidl::Socket) -> ZxResult<()> {
-        info!(tag = "api", "Got \"setup OT CLI\" request");
+        info!(tag = "api"; "Got \"setup OT CLI\" request");
         let driver_state = self.driver_state.lock();
         let ot_instance = &driver_state.ot_instance;
         let ot_ctl = &driver_state.ot_ctl;
@@ -646,7 +639,7 @@ where
     }
 
     async fn register_on_mesh_prefix(&self, net: OnMeshPrefix) -> ZxResult<()> {
-        info!(tag = "api", "Got \"register on mesh prefix\" request");
+        info!(tag = "api"; "Got \"register on mesh prefix\" request");
         let prefix = if let Some(subnet) = net.subnet {
             Ok(ot::Ip6Prefix::new(subnet.addr.addr, subnet.prefix_len))
         } else {
@@ -672,7 +665,7 @@ where
         omp.set_stable(net.stable.unwrap_or(true));
 
         Ok(self.driver_state.lock().ot_instance.add_on_mesh_prefix(&omp).map_err(|e| {
-            warn!(tag = "api", "register_on_mesh_prefix: Error: {:?}", e);
+            warn!(tag = "api"; "register_on_mesh_prefix: Error: {:?}", e);
             ZxStatus::from(ErrorAdapter(e))
         })?)
     }
@@ -681,17 +674,17 @@ where
         &self,
         subnet: fidl_fuchsia_net::Ipv6AddressWithPrefix,
     ) -> ZxResult<()> {
-        info!(tag = "api", "Got \"unregister on mesh prefix\" request");
+        info!(tag = "api"; "Got \"unregister on mesh prefix\" request");
         let prefix = ot::Ip6Prefix::new(subnet.addr.addr, subnet.prefix_len);
 
         Ok(self.driver_state.lock().ot_instance.remove_on_mesh_prefix(&prefix).map_err(|e| {
-            warn!(tag = "api", "unregister_on_mesh_prefix: Error: {:?}", e);
+            warn!(tag = "api"; "unregister_on_mesh_prefix: Error: {:?}", e);
             ZxStatus::from(ErrorAdapter(e))
         })?)
     }
 
     async fn register_external_route(&self, net: ExternalRoute) -> ZxResult<()> {
-        info!(tag = "api", "Got \"register external route\" request");
+        info!(tag = "api"; "Got \"register external route\" request");
         let prefix = if let Some(subnet) = net.subnet {
             Ok(ot::Ip6Prefix::new(subnet.addr.addr, subnet.prefix_len))
         } else {
@@ -709,7 +702,7 @@ where
         }
 
         Ok(self.driver_state.lock().ot_instance.add_external_route(&er).map_err(|e| {
-            warn!(tag = "api", "register_external_route: Error: {:?}", e);
+            warn!(tag = "api"; "register_external_route: Error: {:?}", e);
             ZxStatus::from(ErrorAdapter(e))
         })?)
     }
@@ -718,11 +711,11 @@ where
         &self,
         subnet: fidl_fuchsia_net::Ipv6AddressWithPrefix,
     ) -> ZxResult<()> {
-        info!(tag = "api", "Got \"unregister external route\" request");
+        info!(tag = "api"; "Got \"unregister external route\" request");
         let prefix = ot::Ip6Prefix::new(subnet.addr.addr, subnet.prefix_len);
 
         Ok(self.driver_state.lock().ot_instance.remove_external_route(&prefix).map_err(|e| {
-            warn!(tag = "api", "unregister_external_route: Error: {:?}", e);
+            warn!(tag = "api"; "unregister_external_route: Error: {:?}", e);
             ZxStatus::from(ErrorAdapter(e))
         })?)
     }
@@ -752,11 +745,10 @@ where
     }
 
     async fn make_joinable(&self, _duration: zx::MonotonicDuration, _port: u16) -> ZxResult<()> {
-        warn!(tag = "api", "make_joinable: NOT_SUPPORTED");
+        warn!(tag = "api"; "make_joinable: NOT_SUPPORTED");
         return Err(ZxStatus::NOT_SUPPORTED);
     }
 
-    #[tracing::instrument(level = "info", skip(self))]
     async fn get_active_dataset_tlvs(&self) -> ZxResult<Vec<u8>> {
         self.driver_state
             .lock()
@@ -768,29 +760,27 @@ where
                 err => Err(err),
             })
             .map_err(|e| {
-                warn!(tag = "api", "get_active_dataset_tlvs: Error: {:?}", e);
+                warn!(tag = "api"; "get_active_dataset_tlvs: Error: {:?}", e);
                 ZxStatus::from(ErrorAdapter(e))
             })
     }
 
-    #[tracing::instrument(skip_all)]
     async fn set_active_dataset_tlvs(&self, dataset: &[u8]) -> ZxResult {
-        info!(tag = "api", "Got \"set active dataset\" request, dataset len:{}", dataset.len());
+        info!(tag = "api"; "Got \"set active dataset\" request, dataset len:{}", dataset.len());
         let dataset = ot::OperationalDatasetTlvs::try_from_slice(dataset).map_err(|e| {
-            warn!(tag = "api", "set_active_dataset_tlvs: Error: {:?}", e);
+            warn!(tag = "api"; "set_active_dataset_tlvs: Error: {:?}", e);
             ZxStatus::from(ErrorAdapter(e))
         })?;
 
         self.driver_state.lock().ot_instance.dataset_set_active_tlvs(&dataset).map_err(|e| {
-            warn!(tag = "api", "set_active_dataset_tlvs: Error: {:?}", e);
+            warn!(tag = "api"; "set_active_dataset_tlvs: Error: {:?}", e);
             ZxStatus::from(ErrorAdapter(e))
         })
     }
 
-    #[tracing::instrument(skip_all)]
     async fn attach_all_nodes_to(&self, dataset_raw: &[u8]) -> ZxResult<i64> {
         info!(
-            tag = "api",
+            tag = "api";
             "Got \"attach all nodes to\" request, raw dataset len:{}",
             dataset_raw.len()
         );
@@ -798,30 +788,30 @@ where
 
         let dataset_tlvs =
             ot::OperationalDatasetTlvs::try_from_slice(dataset_raw).map_err(|e| {
-                warn!(tag = "api", "attach_all_nodes_to: WrongSize");
+                warn!(tag = "api"; "attach_all_nodes_to: WrongSize");
                 ZxStatus::from(ErrorAdapter(e))
             })?;
 
         let mut dataset = dataset_tlvs.try_to_dataset().map_err(|e| {
-            warn!(tag = "api", "attach_all_nodes_to: Unable to parse: {e:?}");
+            warn!(tag = "api"; "attach_all_nodes_to: Unable to parse: {e:?}");
             ZxStatus::from(ErrorAdapter(e))
         })?;
 
         if !dataset.is_complete() {
-            warn!(tag = "api", "attach_all_nodes_to: Given dataset not complete: {:?}", dataset);
+            warn!(tag = "api"; "attach_all_nodes_to: Given dataset not complete: {:?}", dataset);
             return Err(ZxStatus::INVALID_ARGS);
         }
 
         if dataset.get_pending_timestamp().is_some() {
             warn!(
-                tag = "api",
+                tag = "api";
                 "attach_all_nodes_to: Dataset contains pending timestamp: {:?}", dataset
             );
             return Err(ZxStatus::INVALID_ARGS);
         }
 
         if dataset.get_delay().is_some() {
-            warn!(tag = "api", "attach_all_nodes_to: Dataset contains delay timer: {:?}", dataset);
+            warn!(tag = "api"; "attach_all_nodes_to: Dataset contains delay timer: {:?}", dataset);
             return Err(ZxStatus::INVALID_ARGS);
         }
 
@@ -829,7 +819,7 @@ where
             let driver_state = self.driver_state.lock();
 
             if !driver_state.is_active() {
-                warn!(tag = "api", "attach_all_nodes_to: Driver is not active, cannot continue.");
+                warn!(tag = "api"; "attach_all_nodes_to: Driver is not active, cannot continue.");
                 return Err(ZxStatus::BAD_STATE);
             }
 
@@ -840,7 +830,7 @@ where
                     .ot_instance
                     .dataset_set_active_tlvs(&dataset_tlvs)
                     .map_err(|e| {
-                        warn!(tag = "api", "attach_all_nodes_to: Error: {:?}", e);
+                        warn!(tag = "api"; "attach_all_nodes_to: Error: {:?}", e);
                         ZxStatus::from(ErrorAdapter(e))
                     })
                     .map(|()| 0i64);
@@ -858,25 +848,24 @@ where
             .map(|result| match result {
                 Ok(Ok(())) => Ok(i64::from(DELAY_TIMER_MS)),
                 Ok(Err(e)) => {
-                    warn!(tag = "api", "attach_all_nodes_to: Error: {:?}", e);
+                    warn!(tag = "api"; "attach_all_nodes_to: Error: {:?}", e);
                     Err(ZxStatus::from(ErrorAdapter(e)))
                 }
                 Err(e) => {
-                    warn!(tag = "api", "attach_all_nodes_to: Error: {:?}", e);
+                    warn!(tag = "api"; "attach_all_nodes_to: Error: {:?}", e);
                     Err(ZxStatus::from(ErrorAdapter(e)))
                 }
             })
             .on_timeout(fasync::MonotonicInstant::after(DEFAULT_TIMEOUT), || {
-                error!(tag = "api", "attach_all_nodes_to: Timeout");
+                error!(tag = "api"; "attach_all_nodes_to: Timeout");
                 Err(ZxStatus::TIMED_OUT)
             })
             .await
     }
 
-    #[tracing::instrument(skip_all)]
     async fn meshcop_update_txt_entries(&self, txt_entries: Vec<(String, Vec<u8>)>) -> ZxResult {
         info!(
-            tag = "api",
+            tag = "api";
             "Got \"meshcop update txt entries\" request, txt entries size:{}",
             txt_entries.len()
         );
@@ -888,7 +877,6 @@ where
     }
 
     /// Returns telemetry information of the device.
-    #[tracing::instrument(skip_all)]
     async fn get_telemetry(&self) -> ZxResult<Telemetry> {
         let driver_state = self.driver_state.lock();
 
@@ -1093,7 +1081,6 @@ where
         })
     }
 
-    #[tracing::instrument(skip_all)]
     async fn get_feature_config(&self) -> ZxResult<FeatureConfig> {
         let driver_state = self.driver_state.lock();
 
@@ -1114,9 +1101,8 @@ where
         })
     }
 
-    #[tracing::instrument(skip_all)]
     async fn update_feature_config(&self, config: FeatureConfig) -> ZxResult<()> {
-        info!(tag = "api", "Got \"update feature config\" request");
+        info!(tag = "api"; "Got \"update feature config\" request");
         let mut driver_state = self.driver_state.lock();
 
         if let Some(trel_enabled) = config.trel_enabled {
@@ -1149,7 +1135,6 @@ where
         Ok(())
     }
 
-    #[tracing::instrument(skip_all)]
     async fn get_capabilities(&self) -> ZxResult<Capabilities> {
         // The values are hardcoded here intentionally as we currently have
         // conflicts with configs defined in openthread. Once we resolve that

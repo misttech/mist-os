@@ -287,7 +287,6 @@ where
     }
 
     /// Called whenever the driver state has changed.
-    #[tracing::instrument(level = "info", skip(self))]
     pub(super) fn on_connectivity_state_change(
         &self,
         new_state: ConnectivityState,

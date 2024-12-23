@@ -30,16 +30,16 @@ pub(crate) struct InfraIfInstance {
 impl InfraIfInstance {
     pub fn new(infra_if_idx: ot::NetifIndex) -> Option<InfraIfInstance> {
         if infra_if_idx == 0 {
-            info!(tag = "infra_if", "InfraIfInstance failed to initialize: invalid infra_if_idx");
+            info!(tag = "infra_if"; "InfraIfInstance failed to initialize: invalid infra_if_idx");
             return None;
         }
         let raw_fd_int: i32 = unsafe { platformInfraIfInit(infra_if_idx) };
         if raw_fd_int <= 0 {
-            info!(tag = "infra_if", "InfraIfInstance failed to initialize: invalid raw_fd_int");
+            info!(tag = "infra_if"; "InfraIfInstance failed to initialize: invalid raw_fd_int");
             return None;
         }
         let raw_fd: OtRawSocket = raw_fd_int.into();
-        info!(tag = "infra_if", "InfraIfInstance initialized");
+        info!(tag = "infra_if"; "InfraIfInstance initialized");
         Some(InfraIfInstance { event_fd: Some(unsafe { EventedFd::new(raw_fd).unwrap() }) })
     }
 
@@ -51,7 +51,7 @@ impl InfraIfInstance {
                 },
                 Poll::Ready(Err(x)) => {
                     error!(
-                        tag = "infra_if",
+                        tag = "infra_if";
                         "InfraIfInstance: Error poll readable from raw socket: {:?}", x
                     );
                 }

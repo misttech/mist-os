@@ -138,19 +138,19 @@ impl AdvertisingProxy {
                   host: &ot::SrpServerHost,
                   timeout: u32| {
                 debug!(
-                    tag = "srp_advertising_proxy",
+                    tag = "srp_advertising_proxy";
                     "srp_server_set_service_update: Update for {:?}, timeout: {}", host, timeout
                 );
                 let result = inner.lock().push_srp_host_changes(instance, host);
 
                 if let Err(err) = &result {
                     warn!(
-                        tag = "srp_advertising_proxy",
+                        tag = "srp_advertising_proxy";
                         "srp_server_set_service_update: Error publishing {:?}: {:?}", host, err
                     );
                 } else {
                     debug!(
-                        tag = "srp_advertising_proxy",
+                        tag = "srp_advertising_proxy";
                         "srp_server_set_service_update: Finished publishing {:?}", host
                     );
                 }
@@ -162,7 +162,7 @@ impl AdvertisingProxy {
             },
         ));
 
-        info!(tag = "srp_advertising_proxy", "AdvertisingProxy Started");
+        info!(tag = "srp_advertising_proxy"; "AdvertisingProxy Started");
 
         Ok(ret)
     }
@@ -173,7 +173,7 @@ impl AdvertisingProxyInner {
         for host in instance.srp_server_hosts() {
             if let Err(err) = self.push_srp_host_changes(instance, host) {
                 warn!(
-                    tag = "srp_advertising_proxy",
+                    tag = "srp_advertising_proxy";
                     "Unable to fully publish SRP host {:?} to mDNS: {:?}",
                     host.full_name_cstr(),
                     err
@@ -188,7 +188,7 @@ impl AdvertisingProxyInner {
     pub fn verify_mdns_connection(&mut self) -> Result<(), anyhow::Error> {
         if self.mdns_proxy_host_publisher.is_closed() {
             warn!(
-                tag = "srp_advertising_proxy",
+                tag = "srp_advertising_proxy";
                 "self.mdns_proxy_host_publisher has closed unexpectedly."
             );
 
@@ -208,7 +208,7 @@ impl AdvertisingProxyInner {
         if srp_host.is_deleted() {
             // Delete the host.
             debug!(
-                tag = "srp_advertising_proxy",
+                tag = "srp_advertising_proxy";
                 "No longer advertising host {:?} on {:?}",
                 srp_host.full_name_cstr(),
                 LOCAL_DOMAIN
@@ -238,7 +238,7 @@ impl AdvertisingProxyInner {
             if host.addresses != addresses {
                 // Addresses do not match.
                 info!(
-                    tag = "srp_advertising_proxy",
+                    tag = "srp_advertising_proxy";
                     "IP addresses for host [PII]({:?}) has changed. Was {:?}, now {:?}.",
                     srp_host.full_name_cstr(),
                     host.addresses,
@@ -250,7 +250,7 @@ impl AdvertisingProxyInner {
                 // The service publisher was closed for some reason. We will need
                 // to re-open it before we can update any services.
                 warn!(
-                    tag="srp_advertising_proxy", "ServiceInstancePublisherProxy for host [PII]({:?}) was closed. Will restart it.",
+                    tag="srp_advertising_proxy"; "ServiceInstancePublisherProxy for host [PII]({:?}) was closed. Will restart it.",
                     srp_host.full_name_cstr()
                 );
                 // Delete the host so we can re-create it below.
@@ -262,7 +262,7 @@ impl AdvertisingProxyInner {
         // help prevent some spurious and confusing error logs.
         if addresses.is_empty() {
             info!(
-                tag = "srp_advertising_proxy",
+                tag = "srp_advertising_proxy";
                 "No suitable addresses for host [PII]({:?}). Skipping advertising it for now.",
                 srp_host.full_name_cstr()
             );
@@ -273,7 +273,7 @@ impl AdvertisingProxyInner {
             if let Some(host) = self.hosts.get_mut(srp_host.full_name_cstr()) {
                 // Use the existing host.
                 debug!(
-                    tag = "srp_advertising_proxy",
+                    tag = "srp_advertising_proxy";
                     "Updating advertisement of {:?} on {:?}",
                     srp_host.full_name_cstr(),
                     LOCAL_DOMAIN
@@ -290,7 +290,7 @@ impl AdvertisingProxyInner {
                     .trim_end_matches('.');
 
                 info!(
-                    tag = "srp_advertising_proxy",
+                    tag = "srp_advertising_proxy";
                     "Advertising host [PII]({:?}) on {:?} as [PII]({:?})",
                     srp_host.full_name_cstr(),
                     LOCAL_DOMAIN,
@@ -308,7 +308,7 @@ impl AdvertisingProxyInner {
                     })
                 {
                     warn!(
-                        tag = "srp_advertising_proxy",
+                        tag = "srp_advertising_proxy";
                         "Host [PII]({local_name:?}) contains forbidden characters"
                     );
                 }
@@ -345,19 +345,19 @@ impl AdvertisingProxyInner {
                     .map(move |x| match x {
                         Ok(Ok(())) => {
                             debug!(
-                                tag = "srp_advertising_proxy",
+                                tag = "srp_advertising_proxy";
                                 "publish_proxy_host: {:?}: Successfully published", local_name_copy
                             );
                         }
                         Ok(Err(err)) => {
                             error!(
-                                tag = "srp_advertising_proxy",
+                                tag = "srp_advertising_proxy";
                                 "publish_proxy_host: {:?}: {:?}", err, local_name_copy
                             );
                         }
                         Err(err) => {
                             error!(
-                                tag = "srp_advertising_proxy",
+                                tag = "srp_advertising_proxy";
                                 "publish_proxy_host: {:?}: {:?}", err, local_name_copy
                             );
                         }
@@ -381,7 +381,7 @@ impl AdvertisingProxyInner {
                     for real_host in instance.srp_server_hosts() {
                         if srp_host.full_name_cstr() == real_host.full_name_cstr() {
                             info!(
-                                tag = "srp_advertising_proxy",
+                                tag = "srp_advertising_proxy";
                                 "Using [PII]({:?}) instead of [PII]({:?}).", real_host, srp_host
                             );
 
@@ -417,7 +417,7 @@ impl AdvertisingProxyInner {
                 // Delete the service.
                 if services.remove(srp_service.instance_name_cstr()).is_some() {
                     debug!(
-                        tag = "srp_advertising_proxy",
+                        tag = "srp_advertising_proxy";
                         "No longer advertising service {:?} on {:?}",
                         srp_service.instance_name_cstr(),
                         LOCAL_DOMAIN
@@ -434,14 +434,14 @@ impl AdvertisingProxyInner {
                     // Update the service.
                     if let Err(err) = service.update(service_info) {
                         warn!(
-                            tag = "srp_advertising_proxy",
+                            tag = "srp_advertising_proxy";
                             "Unable to update service {:?}: {:?}. Will try re-adding.",
                             local_service_name,
                             err
                         );
                     } else {
                         debug!(
-                            tag = "srp_advertising_proxy",
+                            tag = "srp_advertising_proxy";
                             "Updated service {:?} on {:?} as {:?}",
                             local_service_name,
                             LOCAL_DOMAIN,
@@ -453,7 +453,7 @@ impl AdvertisingProxyInner {
                 } else {
                     // No update necessary.
                     debug!(
-                        tag = "srp_advertising_proxy",
+                        tag = "srp_advertising_proxy";
                         "Service {:?} is up to date on {:?} as {:?}",
                         local_service_name,
                         LOCAL_DOMAIN,
@@ -469,7 +469,7 @@ impl AdvertisingProxyInner {
             let service_info = AdvertisingProxyServiceInfo::new(srp_service);
 
             debug!(
-                tag = "srp_advertising_proxy",
+                tag = "srp_advertising_proxy";
                 "Adding service {:?} on {:?} as {:?}",
                 local_service_name,
                 LOCAL_DOMAIN,
@@ -478,7 +478,7 @@ impl AdvertisingProxyInner {
 
             if local_service_name.len() > MAX_DNSSD_SERVICE_LEN {
                 warn!(
-                    tag = "srp_advertising_proxy",
+                    tag = "srp_advertising_proxy";
                     "Unable to publish service instance {:?}: Service too long (max {} chars)",
                     local_service_name,
                     MAX_DNSSD_SERVICE_LEN
@@ -488,9 +488,9 @@ impl AdvertisingProxyInner {
 
             if local_instance_name.len() > MAX_DNSSD_INSTANCE_LEN {
                 warn!(
-                tag="srp_advertising_proxy", "Unable to publish service instance {:?}: Instance name too long (max {} chars)",
-                local_instance_name, MAX_DNSSD_INSTANCE_LEN
-            );
+                    tag="srp_advertising_proxy"; "Unable to publish service instance {:?}: Instance name too long (max {} chars)",
+                    local_instance_name, MAX_DNSSD_INSTANCE_LEN
+                );
                 continue;
             }
 
@@ -506,19 +506,19 @@ impl AdvertisingProxyInner {
                 )
                 .map(|x| match x {
                     Ok(Ok(())) => {
-                        debug!(tag = "srp_advertising_proxy", "publish_service_instance: success");
+                        debug!(tag = "srp_advertising_proxy"; "publish_service_instance: success");
                         Ok(())
                     }
                     Ok(Err(err)) => {
                         error!(
-                            tag = "srp_advertising_proxy",
+                            tag = "srp_advertising_proxy";
                             "publish_service_instance: {:?}", err
                         );
                         Err(format_err!("publish_service_instance: {:?}", err))
                     }
                     Err(err) => {
                         error!(
-                            tag = "srp_advertising_proxy",
+                            tag = "srp_advertising_proxy";
                             "publish_service_instance: {:?}", err
                         );
                         Err(format_err!("publish_service_instance: {:?}", err))
@@ -559,7 +559,7 @@ impl AdvertisingProxyInner {
                     let result =
                         if should_skip {
                             debug!(
-                                tag = "srp_advertising_proxy",
+                                tag = "srp_advertising_proxy";
                                 "publish_responder_future: {:?}, {service_name:?}, returning DO_NOT_RESPOND, does not have subtype {subtype:?}",
                                 publication_cause
                             );
@@ -567,7 +567,7 @@ impl AdvertisingProxyInner {
                             Err(OnPublicationError::DoNotRespond)
                         } else {
                             debug!(
-                                tag = "srp_advertising_proxy",
+                                tag = "srp_advertising_proxy";
                                 "publish_responder_future: {:?}, {service_name:?}, subtype {subtype:?}",
                                 publication_cause
                             );
@@ -612,7 +612,7 @@ impl AdvertisingProxyInner {
                             Ok(x) => Some(x[0..x.find('.').unwrap_or(x.len())].to_string()),
                             Err(err) => {
                                 warn!(
-                                    tag = "srp_advertising_proxy",
+                                    tag = "srp_advertising_proxy";
                                     "Unacceptable subtype {x:?}: {err:?}"
                                 );
                                 None
@@ -623,7 +623,7 @@ impl AdvertisingProxyInner {
                         Ok(()) => {}
                         Err(err) => {
                             warn!(
-                                tag = "srp_advertising_proxy",
+                                tag = "srp_advertising_proxy";
                                 "Can't set subtypes on {service_name:?}: {err:?}"
                             );
                             continue;

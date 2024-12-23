@@ -66,7 +66,7 @@ fn process_addresses_from_socket_addresses<
                         ret_port = Some(port);
                     } else if ret_port != Some(port) {
                         warn!(
-                            tag = "trel",
+                            tag = "trel";
                             "mDNS service has multiple ports for the same service, {:?} != {:?}",
                             ret_port.unwrap(),
                             port
@@ -93,7 +93,7 @@ fn ipv6addr_is_unicast_link_local(addr: &std::net::Ipv6Addr) -> bool {
 
 // Splits the TXT record into individual values.
 fn split_txt(txt: &[u8]) -> Vec<Vec<u8>> {
-    info!(tag = "trel", "trel:split_txt: Splitting TXT record: {:?}", hex::encode(txt));
+    info!(tag = "trel"; "trel:split_txt: Splitting TXT record: {:?}", hex::encode(txt));
     let txt =
         ot::DnsTxtEntryIterator::try_new(txt).expect("can't parse TXT records from OpenThread");
     txt.map(|x| x.expect("can't parse TXT records from OpenThread").to_vec()).collect::<Vec<_>>()
@@ -205,7 +205,7 @@ impl TrelInstance {
                 let (addresses, port) = process_addresses_from_socket_addresses(addresses);
 
                 info!(
-                    tag = "trel",
+                    tag = "trel";
                     "ServiceSubscriptionListenerRequest::OnInstanceDiscovered: [PII]({instance_name:?}) port:{port:?} addresses:{addresses:?}"
                 );
 
@@ -215,7 +215,7 @@ impl TrelInstance {
                     self.peer_instance_sockaddr_map.insert(instance_name, sockaddr);
 
                     let info = ot::PlatTrelPeerInfo::new(false, &txt, sockaddr);
-                    info!(tag = "trel", "otPlatTrelHandleDiscoveredPeerInfo: Adding {:?}", info);
+                    info!(tag = "trel"; "otPlatTrelHandleDiscoveredPeerInfo: Adding {:?}", info);
                     ot_instance.plat_trel_handle_discovered_peer_info(&info);
                 };
 
@@ -237,7 +237,7 @@ impl TrelInstance {
                 let (addresses, port) = process_addresses_from_socket_addresses(addresses);
 
                 info!(
-                    tag = "trel",
+                    tag = "trel";
                     "ServiceSubscriptionListenerRequest::OnInstanceChanged: [PII]({instance_name:?}) port:{port:?} addresses:{addresses:?}"
                 );
 
@@ -251,7 +251,7 @@ impl TrelInstance {
                             // Remove old sockaddr with the same instance name
                             let info_old = ot::PlatTrelPeerInfo::new(true, &[], old_sockaddr);
                             info!(
-                                tag = "trel",
+                                tag = "trel";
                                 "otPlatTrelHandleDiscoveredPeerInfo: Removing {:?}", info_old
                             );
                             ot_instance.plat_trel_handle_discovered_peer_info(&info_old);
@@ -259,7 +259,7 @@ impl TrelInstance {
 
                         let info = ot::PlatTrelPeerInfo::new(false, &txt, sockaddr);
                         info!(
-                            tag = "trel",
+                            tag = "trel";
                             "otPlatTrelHandleDiscoveredPeerInfo: Updating {:?}", info
                         );
                         ot_instance.plat_trel_handle_discovered_peer_info(&info);
@@ -272,12 +272,12 @@ impl TrelInstance {
             // A DNS-SD IPv6 service instance has been lost.
             ServiceSubscriptionListenerRequest::OnInstanceLost { instance, responder, .. } => {
                 info!(
-                    tag = "trel",
+                    tag = "trel";
                     "ServiceSubscriptionListenerRequest::OnInstanceLost [PII]({instance:?})"
                 );
                 if let Some(sockaddr) = self.peer_instance_sockaddr_map.remove(&instance) {
                     let info = ot::PlatTrelPeerInfo::new(true, &[], sockaddr);
-                    info!(tag = "trel", "otPlatTrelHandleDiscoveredPeerInfo: Removing {:?}", info);
+                    info!(tag = "trel"; "otPlatTrelHandleDiscoveredPeerInfo: Removing {:?}", info);
                     ot_instance.plat_trel_handle_discovered_peer_info(&info);
                 }
 
@@ -286,7 +286,7 @@ impl TrelInstance {
 
             ServiceSubscriptionListenerRequest::OnInstanceChanged { instance, responder } => {
                 warn!(
-                    tag = "trel",
+                    tag = "trel";
                     "ServiceSubscriptionListenerRequest::OnInstanceChanged: [PII]({instance:?})"
                 );
                 // Skip changes without an IPv6 address.
@@ -299,7 +299,7 @@ impl TrelInstance {
                 ..
             } => {
                 warn!(
-                    tag = "trel",
+                    tag = "trel";
                     "ServiceSubscriptionListenerRequest::OnInstanceDiscovered: [PII]({instance:?})"
                 );
                 // Skip discoveries without an IPv6 address.
@@ -308,7 +308,7 @@ impl TrelInstance {
 
             ServiceSubscriptionListenerRequest::OnQuery { resource_type, responder, .. } => {
                 info!(
-                    tag = "trel",
+                    tag = "trel";
                     "ServiceSubscriptionListenerRequest::OnQuery: {resource_type:?}"
                 );
 
@@ -336,7 +336,7 @@ impl TrelInstance {
             match self.socket.async_recv_from(&mut buffer, cx) {
                 Poll::Ready(Ok((len, sockaddr))) => {
                     let sockaddr: ot::SockAddr = sockaddr.as_socket_ipv6().unwrap().into();
-                    debug!(tag = "trel", "Incoming {} byte TREL packet from {:?}", len, sockaddr);
+                    debug!(tag = "trel"; "Incoming {} byte TREL packet from {:?}", len, sockaddr);
                     {
                         let mut counters = self.counters.borrow_mut();
                         counters.update_rx_bytes(len.try_into().unwrap());
@@ -345,7 +345,7 @@ impl TrelInstance {
                     instance.plat_trel_handle_received(&buffer[..len])
                 }
                 Poll::Ready(Err(err)) => {
-                    warn!(tag = "trel", "Error receiving packet: {:?}", err);
+                    warn!(tag = "trel"; "Error receiving packet: {:?}", err);
                     break;
                 }
                 _ => {
@@ -360,7 +360,7 @@ impl TrelInstance {
         if let Some(task) = &mut self.publication_responder {
             if let Poll::Ready(x) = task.poll_unpin(cx) {
                 warn!(
-                    tag = "trel",
+                    tag = "trel";
                     "TrelInstance: publication_responder finished unexpectedly: {:?}", x
                 );
                 self.publication_responder = None;
@@ -374,13 +374,13 @@ impl TrelInstance {
                     Ok(event) => {
                         if let Err(err) = self.handle_service_subscriber_request(instance, event) {
                             error!(
-                                tag = "trel",
+                                tag = "trel";
                                 "Error handling service subscriber request: {err:?}"
                             );
                         }
                     }
                     Err(err) => {
-                        error!(tag = "trel", "subscriber_request_stream FIDL error: {:?}", err);
+                        error!(tag = "trel"; "subscriber_request_stream FIDL error: {:?}", err);
                     }
                 }
             }
@@ -410,14 +410,14 @@ impl PlatformBacking {
         let mut trel = self.trel.borrow_mut();
         if let Some(trel) = trel.as_mut() {
             info!(
-                tag = "trel",
+                tag = "trel";
                 "otPlatTrelRegisterService: port:{} txt:{:?}",
                 port,
                 txt.to_escaped_string()
             );
             trel.register_service(port, txt);
         } else {
-            debug!(tag = "trel", "otPlatTrelRegisterService: TREL is disabled, cannot register.");
+            debug!(tag = "trel"; "otPlatTrelRegisterService: TREL is disabled, cannot register.");
         }
     }
 
@@ -425,7 +425,7 @@ impl PlatformBacking {
         let trel = self.trel.borrow();
         if let Some(trel) = trel.as_ref() {
             let mut counters = trel.counters.borrow_mut();
-            debug!(tag = "trel", "otPlatTrelSend: {:?} -> {}", sockaddr, hex::encode(payload));
+            debug!(tag = "trel"; "otPlatTrelSend: {:?} -> {}", sockaddr, hex::encode(payload));
             match trel.socket.send_to(payload, (*sockaddr).into()).now_or_never() {
                 Some(Ok(_)) => {
                     counters.update_tx_bytes(payload.len().try_into().unwrap());
@@ -433,14 +433,14 @@ impl PlatformBacking {
                 }
                 Some(Err(err)) => {
                     counters.update_tx_failure(1);
-                    warn!(tag = "trel", "otPlatTrelSend: send_to failed: {:?}", err);
+                    warn!(tag = "trel"; "otPlatTrelSend: send_to failed: {:?}", err);
                 }
                 None => {
-                    warn!(tag = "trel", "otPlatTrelSend: send_to didn't finish immediately");
+                    warn!(tag = "trel"; "otPlatTrelSend: send_to didn't finish immediately");
                 }
             }
         } else {
-            debug!(tag = "trel", "otPlatTrelSend: TREL is disabled, cannot send.");
+            debug!(tag = "trel"; "otPlatTrelSend: TREL is disabled, cannot send.");
         }
     }
 }
@@ -455,11 +455,11 @@ unsafe extern "C" fn otPlatTrelEnable(instance: *mut otInstance, port_ptr: *mut 
         ot::Instance::ref_from_ot_ptr(instance).unwrap(),
     ) {
         Ok(port) => {
-            info!(tag = "trel", "otPlatTrelEnable: Ready on port {}", port);
+            info!(tag = "trel"; "otPlatTrelEnable: Ready on port {}", port);
             *port_ptr = port;
         }
         Err(err) => {
-            warn!(tag = "trel", "otPlatTrelEnable: Unable to start TREL: {:?}", err);
+            warn!(tag = "trel"; "otPlatTrelEnable: Unable to start TREL: {:?}", err);
         }
     }
 }
@@ -473,7 +473,7 @@ unsafe extern "C" fn otPlatTrelDisable(instance: *mut otInstance) {
         //         which is guaranteed by the caller.
         ot::Instance::ref_from_ot_ptr(instance).unwrap(),
     );
-    info!(tag = "trel", "otPlatTrelDisable: Closed.");
+    info!(tag = "trel"; "otPlatTrelDisable: Closed.");
 }
 
 #[no_mangle]
