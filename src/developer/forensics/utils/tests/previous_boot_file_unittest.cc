@@ -21,28 +21,13 @@ constexpr const char* kFileContent = "file content";
 inline auto CleanUpFile(const std::string& dir) {
   ASSERT_TRUE(files::DeletePath(files::JoinPath(dir, kFileName), /*recursive=*/false));
 }
-inline auto CleanUpDataFile() { return CleanUpFile("/data"); }
 inline auto CleanUpCacheFile() { return CleanUpFile("/cache"); }
 inline auto CleanUpTmpFile() { return CleanUpFile("/tmp"); }
 
 inline auto WriteFile(const std::string& dir) {
   ASSERT_TRUE(files::WriteFile(files::JoinPath(dir, kFileName), kFileContent));
 }
-inline auto WriteDataFile() { return WriteFile("/data"); }
 inline auto WriteCacheFile() { return WriteFile("/cache"); }
-
-TEST(PreviousBootFileTest, MoveDataFile) {
-  WriteDataFile();
-  auto previous_boot_file = PreviousBootFile::FromData(/*is_first_instance=*/true, kFileName);
-
-  std::string read_file_content;
-  ASSERT_TRUE(files::ReadFileToString(previous_boot_file.PreviousBootPath(), &read_file_content));
-
-  EXPECT_EQ(kFileContent, read_file_content);
-
-  CleanUpDataFile();
-  CleanUpTmpFile();
-}
 
 TEST(PreviousBootFileTest, MoveCacheFile) {
   WriteCacheFile();
@@ -54,15 +39,6 @@ TEST(PreviousBootFileTest, MoveCacheFile) {
   EXPECT_EQ(kFileContent, read_file_content);
 
   CleanUpCacheFile();
-  CleanUpTmpFile();
-}
-
-TEST(PreviousBootFileTest, DataFileDoesNotExist) {
-  auto previous_boot_file = PreviousBootFile::FromData(/*is_first_instance=*/true, kFileName);
-
-  ASSERT_FALSE(files::IsFile(previous_boot_file.PreviousBootPath()));
-
-  CleanUpDataFile();
   CleanUpTmpFile();
 }
 
