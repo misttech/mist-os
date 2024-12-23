@@ -93,7 +93,7 @@ Add the `tracing` crate to the `deps` entry of your `BUILD.gn` file:
 
 ```gn
 deps = [
-  "//third_party/rust_crates:tracing",
+  "//third_party/rust_crates:log",
 ]
 ```
 
@@ -106,11 +106,11 @@ severity level:
 use tracing;
 
 fn main() {
-    tracing::trace!("something happened: {}", 5); // maps to TRACE
-    tracing::debug!("something happened: {}", 4); // maps to DEBUG
-    tracing::info!("something happened: {}", 3);  // maps to INFO
-    tracing::warn!("something happened: {}", 2);  // maps to WARN
-    tracing::error!("something happened: {}", 1); // maps to ERROR
+    log::trace!("something happened: {}", 5); // maps to TRACE
+    log::debug!("something happened: {}", 4); // maps to DEBUG
+    log::info!("something happened: {}", 3);  // maps to INFO
+    log::warn!("something happened: {}", 2);  // maps to WARN
+    log::error!("something happened: {}", 1); // maps to ERROR
 }
 ```
 
