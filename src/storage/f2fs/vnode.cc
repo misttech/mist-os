@@ -259,6 +259,18 @@ void VnodeF2fs::ReportPagerErrorUnsafe(const uint32_t op, const uint64_t offset,
 void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
   ZX_ASSERT_MSG(open_count() == 0, "RecycleNode[%s:%u]: open_count must be zero (%lu)",
                 GetNameView().data(), GetKey(), open_count());
+  auto delete_this = fit::defer([&]() TA_NO_THREAD_SAFETY_ANALYSIS {
+    Deactivate();
+    file_cache_->Reset();
+    ReleasePagedVmoUnsafe();
+    delete this;
+  });
+  // During PagedVfs::Teardown, f2fs object is not available. In this case, we just release
+  // resource. Orphans will be purged at next mount time.
+  if (fs()->IsTearDown()) {
+    return;
+  }
+
   if (GetNlink()) {
     // It should not happen since f2fs removes the last reference of dirty vnodes at checkpoint time
     // during which any file operations are not allowed.
@@ -275,16 +287,9 @@ void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
       CleanupCache();
     }
     fs()->GetVCache().Downgrade(this);
+    delete_this.cancel();
   } else {
-    // During PagedVfs::Teardown, f2fs object is not available. In this case, we purge orphans at
-    // next mount time.
-    if (!fs()->IsTearDown()) {
-      EvictVnode();
-    }
-    Deactivate();
-    file_cache_->Reset();
-    ReleasePagedVmoUnsafe();
-    delete this;
+    EvictVnode();
   }
 }
 
