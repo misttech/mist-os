@@ -588,6 +588,13 @@ void SegmentManager::UpdateSitEntry(block_t blkaddr, int del) {
   if (del > 0) {
     ZX_ASSERT(!segment_entry.cur_valid_map.GetOne(ToMsbFirst(offset)));
     segment_entry.cur_valid_map.SetOne(ToMsbFirst(offset));
+    // Make sure to use invalid node blocks just once after each checkpoint write and keep node
+    // chain.
+    if (IsNodeSeg(static_cast<CursegType>(segment_entry.type)) &&
+        !segment_entry.ckpt_valid_map.GetOne(ToMsbFirst(offset))) {
+      segment_entry.ckpt_valid_map.SetOne(ToMsbFirst(offset));
+      ++segment_entry.ckpt_valid_blocks;
+    }
   } else {
     ZX_ASSERT(segment_entry.cur_valid_map.GetOne(ToMsbFirst(offset)));
     segment_entry.cur_valid_map.ClearOne(ToMsbFirst(offset));

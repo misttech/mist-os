@@ -275,6 +275,7 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
     memory_pressure_watcher_.reset();
     // Flush every dirty Pages.
     size_t target_vnodes = 0;
+    uint32_t to_write = kDefaultBlocksPerSegment;
     do {
       // If CpFlag::kCpErrorFlag is set, it cannot be synchronized to disk. So we will drop all
       // dirty pages.
@@ -282,7 +283,7 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
         return ZX_ERR_INTERNAL;
       }
       target_vnodes = 0;
-      WritebackOperation op = {.bReclaim = true};
+      WritebackOperation op = {.to_write = to_write, .bReclaim = true};
       op.if_vnode = [&target_vnodes](fbl::RefPtr<VnodeF2fs>& vnode) {
         if ((!vnode->IsDir() && vnode->GetDirtyPageCount()) || !vnode->IsValid()) {
           ++target_vnodes;
@@ -290,6 +291,7 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
         }
         return ZX_ERR_NEXT;
       };
+      AllocateFreeSections(to_write);
       FlushDirtyDataPages(op);
     } while (superblock_info_->GetPageCount(CountType::kDirtyData) && target_vnodes);
   }
@@ -628,24 +630,21 @@ void F2fs::BalanceFs(uint32_t needed) {
   if (segment_manager_->HasNotEnoughFreeSecs(0, needed)) {
     // Wait for writeback before gc.
     std::lock_guard lock(f2fs::GetGlobalLock());
+    AllocateFreeSections(needed);
+  }
+}
+
+void F2fs::AllocateFreeSections(uint32_t needed) {
+  if (IsOnRecovery()) {
+    return;
+  }
+  if (segment_manager_->HasNotEnoughFreeSecs(0, needed)) {
     if (auto ret = StartGc(needed); ret.is_error()) {
       // StartGc() returns ZX_ERR_UNAVAILABLE when there is no available victim section.
       ZX_DEBUG_ASSERT(ret.error_value() == ZX_ERR_UNAVAILABLE ||
                       superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag));
     }
   }
-}
-
-zx_status_t F2fs::SyncFile(VnodeF2fs& vnode) {
-  std::lock_guard lock(f2fs::GetGlobalLock());
-  WritebackOperation op;
-  vnode.Writeback(op);
-  vnode.ClearFlag(InodeInfoFlag::kNeedCp);
-  WriteCheckpointUnsafe(false);
-  if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
-    return ZX_ERR_BAD_STATE;
-  }
-  return ZX_OK;
 }
 
 zx::result<uint32_t> F2fs::StartGc(uint32_t needed) {
@@ -659,7 +658,7 @@ zx::result<uint32_t> F2fs::StartGc(uint32_t needed) {
   }
 
   GcType gc_type = GcType::kBgGc;
-  uint32_t sec_freed = segment_manager_->FreeSections(), prefree = 0;
+  uint32_t before = segment_manager_->FreeSections(), prefree = 0;
 
   // If there are prefree_segments, do checkpoint to make them free.
   if (segment_manager_->PrefreeSegments()) {
@@ -696,7 +695,7 @@ zx::result<uint32_t> F2fs::StartGc(uint32_t needed) {
       }
     }
   }
-  sec_freed = segment_manager_->FreeSections() - sec_freed;
+  uint32_t sec_freed = segment_manager_->FreeSections() - before + prefree;
   if (!sec_freed) {
     return zx::error(ZX_ERR_UNAVAILABLE);
   }

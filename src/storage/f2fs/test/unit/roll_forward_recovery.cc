@@ -132,7 +132,7 @@ void CheckFsyncedFile(F2fs *fs, ino_t ino, pgoff_t data_page_count, pgoff_t node
 
 TEST(FsyncRecoveryTest, FsyncInode) {
   std::unique_ptr<BcacheMapper> bc;
-  FileTester::MkfsOnFakeDev(&bc);
+  FileTester::MkfsOnFakeDev(&bc, kSectorCount100MiB);
 
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
@@ -196,7 +196,7 @@ TEST(FsyncRecoveryTest, FsyncInode) {
 
 TEST(FsyncRecoveryTest, FsyncDnode) {
   std::unique_ptr<BcacheMapper> bc;
-  FileTester::MkfsOnFakeDev(&bc);
+  FileTester::MkfsOnFakeDev(&bc, kSectorCount100MiB);
 
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
@@ -260,7 +260,7 @@ TEST(FsyncRecoveryTest, FsyncDnode) {
 
 TEST(FsyncRecoveryTest, FsyncIndirectDnode) {
   std::unique_ptr<BcacheMapper> bc;
-  FileTester::MkfsOnFakeDev(&bc);
+  FileTester::MkfsOnFakeDev(&bc, kSectorCount100MiB);
 
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
@@ -452,7 +452,7 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
 
 TEST(FsyncRecoveryTest, FsyncRecoveryIndirectDnode) {
   std::unique_ptr<BcacheMapper> bc;
-  FileTester::MkfsOnFakeDev(&bc);
+  FileTester::MkfsOnFakeDev(&bc, kSectorCount100MiB);
 
   std::unique_ptr<F2fs> fs;
   MountOptions options{};
@@ -696,10 +696,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   inline_file_ptr = static_cast<File *>(inline_vnode.get());
   FileTester::CheckInlineFile(inline_vnode.get());
 
-  // Files using pager migrate inline data to regular data blocks when they need to handle stream.
-  // Thus, |inline_vnode| moves inline data to data block during ReadFromFile().
-  FileTester::ReadFromFile(inline_file_ptr, r_buf.get(), target_size, 0);
-  ASSERT_EQ(memcmp(r_buf.get(), w_buf.get(), target_size), 0);
+  inline_file_ptr->ConvertInlineData();
   FileTester::CheckNonInlineFile(inline_vnode.get());
 
   // fsync()
@@ -1224,7 +1221,7 @@ TEST(FsyncRecoveryTest, AtomicFsync) {
 
 TEST(FsyncRecoveryTest, Fdatasync) {
   std::unique_ptr<BcacheMapper> bc;
-  FileTester::MkfsOnFakeDev(&bc);
+  FileTester::MkfsOnFakeDev(&bc, kSectorCount100MiB);
 
   std::unique_ptr<F2fs> fs;
   MountOptions options{};

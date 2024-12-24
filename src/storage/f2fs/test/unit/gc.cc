@@ -64,6 +64,45 @@ class GcTest : public F2fsFakeDevTestFixture {
   }
 };
 
+TEST_F(GcTest, TruncateAndLargeFsync) {
+  fs_->GetSuperblockInfo().ClearOpt(MountOption::kForceLfs);
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  auto file = fbl::RefPtr<File>::Downcast(*std::move(test_file));
+  std::array<uint8_t, kPageSize> buf;
+  size_t num_blocks = 0;
+  size_t out;
+  // Append |file| until the out of space
+  while (true) {
+    zx_status_t ret =
+        FileTester::Write(file.get(), buf.data(), sizeof(buf), num_blocks * sizeof(buf), &out);
+    if (ret == ZX_OK) {
+      LockedPage page;
+      zx_status_t ret = file->GrabLockedPage(num_blocks, &page);
+      ASSERT_EQ(ret, ZX_OK);
+      ASSERT_TRUE(page->IsDirty());
+      ++num_blocks;
+      continue;
+    }
+    ASSERT_EQ(ret, ZX_ERR_NO_SPACE);
+    break;
+  }
+  ASSERT_EQ(file->GetSize(), num_blocks * sizeof(buf));
+  file->SyncFile();
+  // 4KiB Rand W. & fsync() for 10 * the size of |file|
+  for (uint32_t j = 1; j <= 10; ++j) {
+    for (size_t i = 0; i < num_blocks; ++i) {
+      zx_status_t ret =
+          FileTester::Write(file.get(), buf.data(), sizeof(buf), i * sizeof(buf), &out);
+      ASSERT_EQ(ret, ZX_OK);
+    }
+    file->Truncate((num_blocks - j) * kBlockSize);
+    file->SyncFile();
+  }
+
+  file->Close();
+}
+
 TEST_F(GcTest, CpError) TA_NO_THREAD_SAFETY_ANALYSIS {
   fs_->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
   auto result = fs_->StartGc();
