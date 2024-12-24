@@ -2,35 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// Generic types of supported input devices.
-#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 // LINT.IfChange
+/// Generic types of supported input devices.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Deserialize, Serialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum InputDeviceType {
     Keyboard,
     LightSensor,
+    #[serde(rename = "button")]
     ConsumerControls,
     Mouse,
+    #[serde(rename = "touchscreen")]
     Touch,
 }
-// LINT.ThenChange(/src/lib/assembly/config_schema/src/product_config.rs)
+// LINT.ThenChange(/build/bazel_sdk/bazel_rules_fuchsia/fuchsia/private/assembly/fuchsia_product_configuration.bzl)
 
 impl InputDeviceType {
-    /// Parses an `InputDeviceType` string that has been serialized from
-    /// `src/lib/assembly/config_schema/src/product_config.rs`: `InputDeviceType`, which has
-    /// slightly different names.
-    ///
-    /// If a device string isn't recognized, returns `None`.
-    pub fn try_from_assembly_config_entry(device: impl AsRef<str>) -> Option<Self> {
-        match device.as_ref() {
-            "button" => Some(Self::ConsumerControls),
-            "keyboard" => Some(Self::Keyboard),
-            "lightsensor" => Some(Self::LightSensor),
-            "mouse" => Some(Self::Mouse),
-            "touchscreen" => Some(Self::Touch),
-            _ => None,
-        }
-    }
-
     /// Parses a list of supported `InputDeviceType`s from a structured configuration
     /// `supported_input_devices` list. Unknown device types are logged and skipped.
     pub fn list_from_structured_config_list<'a, V, T>(list: V) -> Vec<Self>
@@ -39,9 +29,13 @@ impl InputDeviceType {
         T: AsRef<str> + 'a,
     {
         list.into_iter()
-            .filter_map(|device| match Self::try_from_assembly_config_entry(device) {
-                Some(d) => Some(d),
-                None => {
+            .filter_map(|device| match device.as_ref() {
+                "button" => Some(InputDeviceType::ConsumerControls),
+                "keyboard" => Some(InputDeviceType::Keyboard),
+                "lightsensor" => Some(InputDeviceType::LightSensor),
+                "mouse" => Some(InputDeviceType::Mouse),
+                "touchscreen" => Some(InputDeviceType::Touch),
+                _ => {
                     tracing::warn!(
                         "Ignoring unsupported device configuration: {}",
                         device.as_ref()
