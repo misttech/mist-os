@@ -25,5 +25,6 @@
     sample-bti-device2 {
         compatible = "fuchsia,sample-bti-device";
         iommus = <&dummy_iommu TEST_BTI_ID2>;
+        iommu-names = TEST_BTI_ID2_NAME;
     };
 };

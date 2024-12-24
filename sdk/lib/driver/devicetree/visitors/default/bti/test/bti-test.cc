@@ -60,6 +60,7 @@ TEST(BtiVisitorTest, TestBtiProperty) {
       // iommu index is 0, as there is only one iommu provider.
       ASSERT_EQ(0u, *(*bti2)[0].iommu_index());
       ASSERT_EQ((uint32_t)TEST_BTI_ID2, *(*bti2)[0].bti_id());
+      ASSERT_EQ(TEST_BTI_ID2_NAME, *(*bti2)[0].name());
 
       node_tested_count++;
     }

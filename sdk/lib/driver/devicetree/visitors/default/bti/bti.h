@@ -25,7 +25,8 @@ class BtiVisitor : public Visitor {
 
  private:
   zx::result<> ReferenceChildVisit(Node& child, ReferenceNode& parent,
-                                   PropertyCells reference_cells);
+                                   PropertyCells reference_cells,
+                                   std::optional<std::string> iommu_name);
 
   std::vector<Phandle> iommu_nodes_;
   std::unique_ptr<PropertyParser> reference_parser_;
