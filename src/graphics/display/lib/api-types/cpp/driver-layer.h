@@ -6,7 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DRIVER_LAYER_H_
 
 #include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
-#include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fuchsia/hardware/display/controller/cpp/banjo.h>
 
 #include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
 #include "src/graphics/display/lib/api-types/cpp/color.h"

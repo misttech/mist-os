@@ -4,7 +4,9 @@
 
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 
+#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
 #include <cstdint>
@@ -19,6 +21,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 
 namespace display {
@@ -28,10 +31,10 @@ namespace {
 constexpr DriverImageId kImageId(4242);
 constexpr DriverImageId kImageId2(4242);
 
-constexpr Color kFuchsiaRgba({.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+constexpr Color kFuchsiaRgba({.format = PixelFormat::kR8G8B8A8,
                               .bytes = std::initializer_list<uint8_t>{0xff, 0, 0xff, 0xff, 0, 0, 0,
                                                                       0}});
-constexpr Color kRedRgba({.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+constexpr Color kRedRgba({.format = PixelFormat::kR8G8B8A8,
                           .bytes = std::initializer_list<uint8_t>{0xff, 0, 0, 0xff, 0, 0, 0, 0}});
 
 constexpr DriverLayer kUpscaledLayer({
@@ -217,7 +220,7 @@ TEST(DriverLayerTest, FromDesignatedInitializer) {
       .image_metadata =
           ImageMetadata({.width = 700, .height = 800, .tiling_type = ImageTilingType::kLinear}),
       .fallback_color =
-          Color({.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+          Color({.format = PixelFormat::kR8G8B8A8,
                  .bytes = std::initializer_list<uint8_t>{0xff, 0, 0xff, 0xff, 0, 0, 0, 0}}),
       .alpha_mode = AlphaMode::kPremultiplied,
       .alpha_coefficient = 0.25f,
@@ -240,7 +243,7 @@ TEST(DriverLayerTest, FromDesignatedInitializer) {
   EXPECT_EQ(800, layer.image_metadata().height());
   EXPECT_EQ(ImageTilingType::kLinear, layer.image_metadata().tiling_type());
 
-  EXPECT_EQ(fuchsia_images2::wire::PixelFormat::kR8G8B8A8, layer.fallback_color().format());
+  EXPECT_EQ(PixelFormat::kR8G8B8A8, layer.fallback_color().format());
   EXPECT_THAT(
       layer.fallback_color().bytes(),
       testing::ElementsAreArray(std::initializer_list<uint8_t>{0xff, 0, 0xff, 0xff, 0, 0, 0, 0}));
@@ -283,7 +286,7 @@ TEST(DriverLayerTest, FromFidlLayer) {
   EXPECT_EQ(800, layer.image_metadata().height());
   EXPECT_EQ(ImageTilingType::kLinear, layer.image_metadata().tiling_type());
 
-  EXPECT_EQ(fuchsia_images2::wire::PixelFormat::kR8G8B8A8, layer.fallback_color().format());
+  EXPECT_EQ(PixelFormat::kR8G8B8A8, layer.fallback_color().format());
   EXPECT_THAT(
       layer.fallback_color().bytes(),
       testing::ElementsAreArray(std::initializer_list<uint8_t>{0xff, 0, 0xff, 0xff, 0, 0, 0, 0}));
@@ -300,8 +303,8 @@ TEST(DriverLayerTest, FromBanjoLayer) {
       .image_handle = 4242,
       .image_metadata = {.dimensions = {.width = 700, .height = 800},
                          .tiling_type = IMAGE_TILING_TYPE_LINEAR},
-      .fallback_color = {.format =
-                             static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+      .fallback_color = {.format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+                             fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
       .alpha_mode = ALPHA_PREMULTIPLIED,
       .alpha_layer_val = 0.25f,
@@ -325,7 +328,7 @@ TEST(DriverLayerTest, FromBanjoLayer) {
   EXPECT_EQ(800, layer.image_metadata().height());
   EXPECT_EQ(ImageTilingType::kLinear, layer.image_metadata().tiling_type());
 
-  EXPECT_EQ(fuchsia_images2::wire::PixelFormat::kR8G8B8A8, layer.fallback_color().format());
+  EXPECT_EQ(PixelFormat::kR8G8B8A8, layer.fallback_color().format());
   EXPECT_THAT(
       layer.fallback_color().bytes(),
       testing::ElementsAreArray(std::initializer_list<uint8_t>{0xff, 0, 0xff, 0xff, 0, 0, 0, 0}));
@@ -343,7 +346,7 @@ TEST(DriverLayerTest, ToFidlLayer) {
       .image_metadata =
           ImageMetadata({.width = 700, .height = 800, .tiling_type = ImageTilingType::kLinear}),
       .fallback_color =
-          Color({.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+          Color({.format = PixelFormat::kR8G8B8A8,
                  .bytes = std::initializer_list<uint8_t>{0xff, 0, 0xff, 0xff, 0, 0, 0, 0}}),
       .alpha_mode = AlphaMode::kPremultiplied,
       .alpha_coefficient = 0.25f,
@@ -387,7 +390,7 @@ TEST(DriverLayerTest, ToBanjoLayer) {
       .image_metadata =
           ImageMetadata({.width = 700, .height = 800, .tiling_type = ImageTilingType::kLinear}),
       .fallback_color =
-          Color({.format = fuchsia_images2::wire::PixelFormat::kR8G8B8A8,
+          Color({.format = PixelFormat::kR8G8B8A8,
                  .bytes = std::initializer_list<uint8_t>{0xff, 0, 0xff, 0xff, 0, 0, 0, 0}}),
       .alpha_mode = AlphaMode::kPremultiplied,
       .alpha_coefficient = 0.25f,
@@ -411,7 +414,8 @@ TEST(DriverLayerTest, ToBanjoLayer) {
   EXPECT_EQ(800u, banjo_layer.image_metadata.dimensions.height);
   EXPECT_EQ(IMAGE_TILING_TYPE_LINEAR, banjo_layer.image_metadata.tiling_type);
 
-  EXPECT_EQ(static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+  EXPECT_EQ(static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+                fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
             banjo_layer.fallback_color.format);
   EXPECT_THAT(
       banjo_layer.fallback_color.bytes,
@@ -446,8 +450,8 @@ TEST(DriverLayerTest, IsValidBanjoScaledLayer) {
       .image_handle = 4242,
       .image_metadata = {.dimensions = {.width = 700, .height = 800},
                          .tiling_type = IMAGE_TILING_TYPE_LINEAR},
-      .fallback_color = {.format =
-                             static_cast<uint32_t>(fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
+      .fallback_color = {.format = static_cast<fuchsia_images2_pixel_format_enum_value_t>(
+                             fuchsia_images2::wire::PixelFormat::kR8G8B8A8),
                          .bytes = {0xff, 0, 0xff, 0xff, 0, 0, 0, 0}},
       .alpha_mode = ALPHA_DISABLE,
       .alpha_layer_val = 0.25f,
