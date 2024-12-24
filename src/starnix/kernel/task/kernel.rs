@@ -491,7 +491,7 @@ impl Kernel {
                 Netlink::new(InterfacesHandlerImpl(Arc::downgrade(self)));
             self.kthreads.spawn(move |_, _| {
                 fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
-                log_error!(tag = NETLINK_LOG_TAG, "Netlink async worker unexpectedly exited");
+                log_error!(tag = NETLINK_LOG_TAG; "Netlink async worker unexpectedly exited");
             });
             network_netlink
         })

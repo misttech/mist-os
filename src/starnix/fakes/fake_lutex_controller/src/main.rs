@@ -7,10 +7,10 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::{pin_mut, select, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use log::{error, warn};
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::sync::Arc;
-use tracing::{error, warn};
 use {
     fidl_fuchsia_posix as fposix, fidl_fuchsia_starnix_binder as fbinder, fuchsia_async as fasync,
     zx,

@@ -42,6 +42,6 @@ rustc_binary("hello_debian_verifier") {
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }

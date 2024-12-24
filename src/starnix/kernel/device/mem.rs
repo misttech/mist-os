@@ -379,21 +379,21 @@ impl FileOps for DevKmsg {
         let bytes = data.read_all()?;
         let extract_result = syslog::extract_level(&bytes);
         let (level, msg_bytes) = match extract_result {
-            None => (Level::INFO, bytes.as_slice()),
+            None => (Level::Info, bytes.as_slice()),
             Some((level, bytes_after_level)) => match level {
                 // An error but keep the <level> str.
                 KmsgLevel::Emergency | KmsgLevel::Alert | KmsgLevel::Critical => {
-                    (Level::ERROR, bytes.as_slice())
+                    (Level::Error, bytes.as_slice())
                 }
-                KmsgLevel::Error => (Level::ERROR, bytes_after_level),
-                KmsgLevel::Warning => (Level::WARN, bytes_after_level),
+                KmsgLevel::Error => (Level::Error, bytes_after_level),
+                KmsgLevel::Warning => (Level::Warn, bytes_after_level),
                 // Log as info but show the <level>.
-                KmsgLevel::Notice => (Level::INFO, bytes.as_slice()),
-                KmsgLevel::Info => (Level::INFO, bytes_after_level),
-                KmsgLevel::Debug => (Level::DEBUG, bytes_after_level),
+                KmsgLevel::Notice => (Level::Info, bytes.as_slice()),
+                KmsgLevel::Info => (Level::Info, bytes_after_level),
+                KmsgLevel::Debug => (Level::Debug, bytes_after_level),
             },
         };
-        log!(level, tag = "kmsg", "{}", String::from_utf8_lossy(msg_bytes).trim_end_matches('\n'));
+        log!(level, tag = "kmsg"; "{}", String::from_utf8_lossy(msg_bytes).trim_end_matches('\n'));
         Ok(bytes.len())
     }
 }

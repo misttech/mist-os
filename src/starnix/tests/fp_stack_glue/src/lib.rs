@@ -11,7 +11,7 @@ use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route,
 };
 use futures::StreamExt;
-use tracing::{info, warn};
+use log::{info, warn};
 use zx::{AsHandleRef, Task};
 use {
     fidl_fuchsia_buildinfo as fbuildinfo, fidl_fuchsia_component_runner as frunner,

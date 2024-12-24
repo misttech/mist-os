@@ -19,9 +19,9 @@ use fuchsia_component_test::{
 use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::StreamExt;
+use log::info;
 use serde::Deserialize;
 use std::collections::BTreeMap;
-use tracing::info;
 use zx::{self as zx, AsHandleRef};
 
 #[fuchsia::main]

@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use component_events::events::{EventStream, Started, Stopped};
 use component_events::matcher::EventMatcher;
 use diagnostics_reader::{ArchiveReader, Inspect};
-use tracing::info;
+use log::info;
 use {
     fidl_fuchsia_test_suspend as fftsu, fuchsia_async as fasync, fuchsia_component as fxc,
     fuchsia_component_test as fxct, fuchsia_driver_test as _,

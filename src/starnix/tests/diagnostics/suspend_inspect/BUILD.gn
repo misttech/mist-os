@@ -38,7 +38,7 @@ rustc_test("bin") {
     "//src/starnix/tests/diagnostics/suspend_inspect/testing/suspend_driver_realm_proxy/fidl/fuchsia.test.suspend:fuchsia.test.suspend_rust",
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 

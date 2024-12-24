@@ -843,7 +843,7 @@ async fn serve_runtime_dir(runtime_dir: ServerEnd<fio::DirectoryMarker>) {
             fs.add_fidl_service(|job_requests: TaskProviderRequestStream| {
                 fuchsia_async::Task::local(async move {
                     if let Err(e) = serve_task_provider(job_requests).await {
-                        log_warn!(?e, "Error serving TaskProvider");
+                        log_warn!(e:?; "Error serving TaskProvider");
                     }
                 })
                 .detach();

@@ -36,7 +36,7 @@ impl FileOps for SyslogFile {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         data.read_each(&mut |bytes| {
-            log_info!(tag = "stdio", "{}", String::from_utf8_lossy(bytes));
+            log_info!(tag = "stdio"; "{}", String::from_utf8_lossy(bytes));
             Ok(bytes.len())
         })
     }

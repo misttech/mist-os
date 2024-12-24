@@ -601,7 +601,7 @@ where
     // Now that the task has a thread handle, update the thread's role using the policy configured.
     drop(task_thread_guard);
     if let Err(err) = ref_task.sync_scheduler_policy_to_role() {
-        log_warn!(?err, "Couldn't update freshly spawned thread's profile.");
+        log_warn!(err:?; "Couldn't update freshly spawned thread's profile.");
     }
 
     Ok(())

@@ -47,7 +47,7 @@ impl Pager {
             backing_vmo,
             block_size,
             pager: zx::Pager::create(zx::PagerOptions::empty()).map_err(|error| {
-                log_error!(?error, "Pager::create failed");
+                log_error!(error:?; "Pager::create failed");
                 errno!(EINVAL)
             })?,
             port: zx::Port::create(),
@@ -177,13 +177,13 @@ impl Pager {
                                                 self.watch_for_zero_children(vmo, inode_num)
                                             {
                                                 log_error!(
-                                                    ?error,
+                                                    error:?;
                                                     "watch_for_zero_children failed"
                                                 );
                                             }
                                         }
                                     }
-                                    Err(error) => log_error!(?error, "Vmo::info failed"),
+                                    Err(error) => log_error!(error:?; "Vmo::info failed"),
                                 }
                             }
                         }
@@ -191,7 +191,7 @@ impl Pager {
                         _ => log_error!("Unexpected port packet: {:?}", packet.contents()),
                     }
                 }
-                Err(error) => log_error!(?error, "Port::wait failed"),
+                Err(error) => log_error!(error:?; "Port::wait failed"),
             }
         }
         log_debug!("Pager thread terminating");
@@ -416,7 +416,7 @@ impl<'a> SupplyHelper<'a> {
     /// Fails the request up to the given offset with `error`.
     fn fail_to(&mut self, end: u64, error: zx::Status) {
         if self.offset < end {
-            log_warn!(?error, "Failing page-in, range: {:?}", self.offset..end);
+            log_warn!(error:?; "Failing page-in, range: {:?}", self.offset..end);
             // The pager is fussy about what errors we can return here, so we always return IO.
             match self.pager.pager.op_range(
                 zx::PagerOp::Fail(zx::Status::IO),
@@ -424,7 +424,7 @@ impl<'a> SupplyHelper<'a> {
                 self.offset..end,
             ) {
                 Ok(()) => {}
-                Err(error) => log_error!(?error, "Failed to report error"),
+                Err(error) => log_error!(error:?; "Failed to report error"),
             }
             self.offset = end;
             self.buf_len = 0;

@@ -60,10 +60,7 @@ impl Kernels {
             {
                 Ok(l) => Some(l),
                 Err(e) => {
-                    tracing::warn!(
-                        "Failed to acquire application activity lease for kernel: {:?}",
-                        e
-                    );
+                    log::warn!("Failed to acquire application activity lease for kernel: {:?}", e);
                     None
                 }
             }
@@ -75,7 +72,7 @@ impl Kernels {
         let kernel_koid = kernel.job.get_koid()?;
 
         *kernel.wake_lease.lock() = wake_lease;
-        tracing::info!("Acquired wake lease for {:?}", kernel_job);
+        log::info!("Acquired wake lease for {:?}", kernel_job);
 
         self.kernels.lock().insert(kernel_koid, kernel);
 
@@ -83,7 +80,7 @@ impl Kernels {
         self.background_tasks.spawn(async move {
             on_stop.await;
             if let Some(kernel) = kernels.lock().remove(&kernel_koid) {
-                _ = kernel.destroy().await.inspect_err(|e| tracing::error!("{e:?}"));
+                _ = kernel.destroy().await.inspect_err(|e| log::error!("{e:?}"));
             }
         });
 
@@ -107,7 +104,7 @@ impl Kernels {
         let job_koid = container_job.get_koid()?;
         if let Some(kernel) = self.kernels.lock().get(&job_koid) {
             kernel.wake_lease.lock().take();
-            tracing::info!("Dropped wake lease for {:?}", container_job);
+            log::info!("Dropped wake lease for {:?}", container_job);
         }
         Ok(())
     }
@@ -126,15 +123,12 @@ impl Kernels {
             {
                 Ok(l) => l,
                 Err(e) => {
-                    tracing::warn!(
-                        "Failed to acquire application activity lease for kernel: {:?}",
-                        e
-                    );
+                    log::warn!("Failed to acquire application activity lease for kernel: {:?}", e);
                     return Ok(());
                 }
             };
             *kernel.wake_lease.lock() = Some(wake_lease);
-            tracing::info!("Acquired wake lease for {:?}", container_job);
+            log::info!("Acquired wake lease for {:?}", container_job);
         }
         Ok(())
     }

@@ -100,7 +100,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
             multicast: Some(client_end),
             ..Default::default()
         }) {
-            log_error!(tag = NETLINK_LOG_TAG, "Failed to request multicast stream: {}", e,);
+            log_error!(tag = NETLINK_LOG_TAG; "Failed to request multicast stream: {}", e,);
             return;
         }
         loop {
@@ -113,14 +113,14 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
                             Ok(m) => {
                                 if let Err(e) = message_sink.unbounded_send(m) {
                                     log_error!(
-                                        tag = NETLINK_LOG_TAG,
+                                        tag = NETLINK_LOG_TAG;
                                         "Failed to send multicast message to handler: {}",
                                         e,
                                     );
                                 }
                             }
                             Err(e) => log_error!(
-                                tag = NETLINK_LOG_TAG,
+                                tag = NETLINK_LOG_TAG;
                                 "Failed to forward multicast message: {}",
                                 e,
                             ),
@@ -129,21 +129,21 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
                 }
                 Some(Ok(unexpected)) => {
                     log_error!(
-                        tag = NETLINK_LOG_TAG,
+                        tag = NETLINK_LOG_TAG;
                         "Received unexpected message from multicast protocol: {:?}",
                         unexpected,
                     );
                 }
                 None => {
                     log_warn!(
-                        tag = NETLINK_LOG_TAG,
+                        tag = NETLINK_LOG_TAG;
                         "Nl80211 multicast stream {} terminated",
                         group
                     );
                     return;
                 }
                 Some(Err(e)) => log_error!(
-                    tag = NETLINK_LOG_TAG,
+                    tag = NETLINK_LOG_TAG;
                     "Nl80211 multicast stream returned an error: {}",
                     e
                 ),
@@ -158,7 +158,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
         sender: &mut S,
     ) {
         log_debug!(
-            tag = NETLINK_LOG_TAG,
+            tag = NETLINK_LOG_TAG;
             "Received nl80211 netlink protocol message: {:?}  -- {:?}",
             netlink_header,
             payload
@@ -177,11 +177,11 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
             .await
         {
             Err(e) => {
-                log_error!(tag = NETLINK_LOG_TAG, "Failed to send nl80211 message: {}", e,);
+                log_error!(tag = NETLINK_LOG_TAG; "Failed to send nl80211 message: {}", e,);
                 return;
             }
             Ok(Err(e)) => {
-                log_error!(tag = NETLINK_LOG_TAG, "Nl80211 message returned an error: {}", e,);
+                log_error!(tag = NETLINK_LOG_TAG; "Nl80211 message returned an error: {}", e,);
                 return;
             }
             Ok(Ok(response)) => response,
@@ -197,7 +197,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
                 match fidl_message_to_netlink(netlink_header, resp_message) {
                     Ok(resp) => sender.send(resp, None),
                     Err(e) => {
-                        log_error!(tag = NETLINK_LOG_TAG, "Failed to send response message: {}", e)
+                        log_error!(tag = NETLINK_LOG_TAG; "Failed to send response message: {}", e)
                     }
                 }
             }

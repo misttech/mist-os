@@ -16,8 +16,8 @@ use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
 };
 use futures::StreamExt;
+use log::info;
 use std::collections::BTreeMap;
-use tracing::info;
 
 // LINT.IfChange
 const SYSRQ_PANIC_MESSAGE: &str = "crashing from SysRq";
@@ -37,7 +37,7 @@ async fn c_crash() {
     info!("starting realm");
     let kernel_with_container = builder.build().await.unwrap();
     let realm_moniker = format!("realm_builder:{}", kernel_with_container.root.child_name());
-    info!(%realm_moniker, "started");
+    info!(realm_moniker:%; "started");
     let container_moniker = format!("{realm_moniker}/debian_container");
     let kernel_moniker = format!("{realm_moniker}/kernel");
 
@@ -49,7 +49,7 @@ async fn c_crash() {
     // Open sysrq-trigger to start the kernel, then make sure we see its logs.
     let sysrq = open_sysrq_trigger(&kernel_with_container).await;
     let first_kernel_log = kernel_logs.next().await.unwrap().unwrap();
-    info!(?first_kernel_log, "receiving logs from starnix kernel now that it's started");
+    info!(first_kernel_log:?; "receiving logs from starnix kernel now that it's started");
 
     info!("writing c to sysrq");
     fuchsia_fs::file::write(&sysrq, "c")
@@ -73,7 +73,7 @@ async fn c_crash() {
         }
         if let Some(m) = next.msg() {
             if m.contains("STARNIX KERNEL PANIC") {
-                info!(?next, "found panic message");
+                info!(next:?; "found panic message");
                 break next;
             }
         }
@@ -128,7 +128,7 @@ async fn c_reboot() {
     info!("starting realm");
     let kernel_with_container = builder.build().await.unwrap();
     let realm_moniker = format!("realm_builder:{}", kernel_with_container.root.child_name());
-    info!(%realm_moniker, "started");
+    info!(realm_moniker:%; "started");
 
     let sysrq = open_sysrq_trigger(&kernel_with_container).await;
 
@@ -167,7 +167,7 @@ async fn wait_for_exit_status<const N: usize>(
     events: &mut EventStream,
     monikers: [&str; N],
 ) -> [ExitStatus; N] {
-    info!(monikers = %monikers.join(","), "waiting for exit status");
+    info!(monikers:% = monikers.join(","); "waiting for exit status");
     let mut statuses = BTreeMap::new();
 
     // Wait for all the provided monikers to stop.
@@ -176,7 +176,7 @@ async fn wait_for_exit_status<const N: usize>(
         let stopped = EventMatcher::ok().monikers(monikers).wait::<Stopped>(events).await.unwrap();
         let moniker = stopped.target_moniker().to_string();
         let status = stopped.result().unwrap().status;
-        info!(%moniker, ?status, "component stopped");
+        info!(moniker:%, status:?; "component stopped");
         statuses.insert(moniker, status);
         num_stopped += 1;
     }

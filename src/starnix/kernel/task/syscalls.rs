@@ -213,7 +213,7 @@ pub fn sys_execveat(
 
     let path = &current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
 
-    log_trace!(?argv, ?environ, ?flags, "execveat({dir_fd}, {path})");
+    log_trace!(argv:?, environ:?, flags:?; "execveat({dir_fd}, {path})");
 
     let mut open_flags = OpenFlags::RDONLY;
 

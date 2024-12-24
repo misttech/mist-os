@@ -14,9 +14,9 @@ use fidl_fuchsia_tracing_controller::{
 use fuchsia_async::{Socket as AsyncSocket, Task};
 use fuchsia_component::client::connect_to_protocol;
 use futures::{AsyncReadExt, StreamExt};
+use log::info;
 use parse_starnix_inspect::CoredumpReport;
 use std::io::Write;
-use tracing::info;
 
 #[fuchsia::main]
 async fn main() {

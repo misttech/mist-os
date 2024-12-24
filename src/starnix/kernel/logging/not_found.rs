@@ -56,7 +56,7 @@ pub fn track_file_not_found(path: BString) {
             Entry::Vacant(v) => {
                 crate::log_warn!(
                     tag = "not_found",
-                    path = %v.key(),
+                    path:% = v.key();
                     "couldn't resolve",
                 );
                 v.insert(1);

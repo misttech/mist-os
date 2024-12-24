@@ -12,8 +12,8 @@ use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route,
 };
 use futures::StreamExt;
+use log::info;
 use std::collections::BTreeMap;
-use tracing::info;
 
 #[fuchsia::main]
 async fn main() {
@@ -58,14 +58,14 @@ async fn main() {
     let kernel_with_container_and_crasher = builder.build().await.unwrap();
     let realm_moniker =
         format!("realm_builder:{}", kernel_with_container_and_crasher.root.child_name());
-    info!(%realm_moniker, "started");
+    info!(realm_moniker:%; "started");
     let crasher_moniker = format!("{realm_moniker}/crasher");
 
-    info!(%crasher_moniker, "waiting for crasher to exit");
+    info!(crasher_moniker:%; "waiting for crasher to exit");
     let stopped =
         EventMatcher::ok().moniker(&crasher_moniker).wait::<Stopped>(&mut events).await.unwrap();
     let status = stopped.result().unwrap().status;
-    info!(?status, "crasher stopped");
+    info!(status:?; "crasher stopped");
     assert_eq!(status, ExitStatus::Crash(11));
 
     info!("waiting for crash report");
