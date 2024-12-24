@@ -53,7 +53,7 @@ fuchsia_sdk_repository(
 )
 
 # Register the fuchsia_sdk toolchain
-load("@rules_fuchsia//fuchsia:defs.bzl", "register_fuchsia_sdk_toolchain")
+load("@rules_fuchsia//fuchsia:deps.bzl", "register_fuchsia_sdk_toolchain")
 
 register_fuchsia_sdk_toolchain()
 

@@ -160,7 +160,6 @@ load(
     "//fuchsia/private:fuchsia_toolchains.bzl",
     _FUCHSIA_TOOLCHAIN_DEFINITION = "FUCHSIA_TOOLCHAIN_DEFINITION",
     _get_fuchsia_sdk_toolchain = "get_fuchsia_sdk_toolchain",
-    _register_fuchsia_sdk_toolchain = "register_fuchsia_sdk_toolchain",
 )
 
 # Workspace-dependent rules.
@@ -223,7 +222,6 @@ get_component_manifests = _get_component_manifests
 get_driver_component_manifests = _get_driver_component_manifests
 get_fuchsia_api_levels = _get_fuchsia_api_levels
 get_fuchsia_sdk_toolchain = _get_fuchsia_sdk_toolchain
-register_fuchsia_sdk_toolchain = _register_fuchsia_sdk_toolchain
 variant_select = _variant_select
 # keep-sorted end
 
