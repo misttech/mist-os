@@ -2,30 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This manifest shard corresponds to both the "real" and "test" engines used in
-// fuzzers and fuzzer tests, respectively.
+// This manifest shard provides the portions of the engine component description
+// shared between both the fuzzing engine and the integration tests.
 {
     include: [
-        "//sdk/lib/inspect/client.shard.cml",
+        "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     children: [
         {
-            name: "fuzzer",
-            url: "#meta/fuzzer.cm",
+            name: "coverage",
+            url: "#meta/coverage.cm",
         },
     ],
     use: [
         {
             protocol: "fuchsia.fuzzer.TargetAdapter",
-            from: "#fuzzer",
+            from: "#adapter",
         },
+        {
+            protocol: "fuchsia.fuzzer.CoverageDataProvider",
+            from: "#coverage",
+        },
+        { protocol: "fuchsia.process.Launcher" },
     ],
     offer: [
         {
             protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
-            to: "#fuzzer",
+            to: "#adapter",
         },
     ],
 }

@@ -4,22 +4,33 @@
 
 // This manifest shard corresponds to the fuzz target adapter component, which
 // maps test inputs from the engine to the target component(s) being fuzzed.
+//
+// To create a realm fuzzer adapter component, include this shard and specify
+// the program name, arguments, and capability routes.
+//
+// Example:
+//    {
+//        include: [ "//src/sys/fuzzing/realmfuzzer/adapter/llvm.shard.cml" ],
+//        program: {
+//            name: "adapter",
+//        },
+//        use: [
+//            { protocol: "foo.bar.Baz" },
+//        ],
+//    }
+//
+// See also //src/sys/fuzzing/realmfuzzer/fuzzer.shard.cml.
 {
-    include: [
-        "//sdk/lib/inspect/client.shard.cml",
-        "syslog/client.shard.cml",
-    ],
+    include: [ "//src/sys/fuzzing/realmfuzzer/target/default.shard.cml" ],
     program: {
         runner: "elf",
     },
     capabilities: [
-        {
-            protocol: [ "fuchsia.fuzzer.TargetAdapter" ],
-        },
+        { protocol: "fuchsia.fuzzer.TargetAdapter" },
     ],
     expose: [
         {
-            protocol: [ "fuchsia.fuzzer.TargetAdapter" ],
+            protocol: "fuchsia.fuzzer.TargetAdapter",
             from: "self",
         },
     ],
