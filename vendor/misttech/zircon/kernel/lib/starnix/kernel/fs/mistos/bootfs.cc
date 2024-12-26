@@ -240,8 +240,8 @@ fit::result<Errno, struct statfs> BootFs::statfs(const FileSystem& fs,
   return fit::ok(stat);
 }
 
-BootFs::BootFs(zx::unowned<zx::vmar> vmar, zx::unowned_vmo bootfs) {
-  ZbiView zbi(zx::unowned_vmo{bootfs});
+BootFs::BootFs(zx::unowned<zx::vmar> vmar, zx::unowned_vmo boot_vmo) {
+  ZbiView zbi(ktl::move(boot_vmo));
 
   zx::vmo bootfs_vmo;
   for (auto it = zbi.begin(); it != zbi.end(); ++it) {
@@ -273,7 +273,6 @@ BootFs::BootFs(zx::unowned<zx::vmar> vmar, zx::unowned_vmo bootfs) {
       break;
     }
   }
-
   if (bootfs_vmo.is_valid()) {
     if (auto result = BootfsReader::Create(ktl::move(bootfs_vmo)); result.is_error()) {
       zbitl::PrintBootfsError(result.error_value(), [&](const char* fmt, ...) {
@@ -285,6 +284,17 @@ BootFs::BootFs(zx::unowned<zx::vmar> vmar, zx::unowned_vmo bootfs) {
       ZX_PANIC("Failed to create bootfs");
     } else {
       bootfs_reader_ = ktl::move(result.value());
+    }
+  } else {
+    if (auto check = zbi.take_error(); check.is_error()) {
+      printf("invalid ZBI: ");
+      zbitl::PrintViewError(check.error_value(), [&](const char* fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        vprintf(fmt, args);
+        va_end(args);
+      });
+      ZX_PANIC("Invalid ZBI");
     }
   }
 }
