@@ -216,8 +216,8 @@ mod tests {
     use futures::task::Poll;
     use futures::{StreamExt, TryStreamExt};
     use ieee80211::Ssid;
-
     use std::convert::TryFrom;
+    use std::io::Write;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use wlan_common::assert_variant;
@@ -907,5 +907,65 @@ mod tests {
             exec.run_until_stalled(&mut test_values.cobalt_stream.next()),
             Poll::Pending
         );
+    }
+
+    #[fuchsia::test]
+    pub fn load_wpa2_and_open_network_golden_file_test() {
+        // This tests that this example persisted file with one WPA2 network and one open network
+        // can still be read by the code, even if the corresponding write logic changes.
+        // This test should NOT change even if the way data is saved changes, unless there has been
+        // a stepping stone version that migrates this format, since the purpose is to test that
+        // this format can be read after an update.
+
+        let file_contents =
+            "{\"saved_networks\":[\
+                {\
+                    \"ssid\":[115,111,109,101,45,110,101,116,119,111,114,107],\
+                    \"security_type\":\"Wpa2\",\
+                    \"credential\":{\"Password\":[115,111,109,101,45,112,97,115,115,119,111,114,100]},\
+                    \"has_ever_connected\":false
+                },\
+                {
+                    \"ssid\":[111,112,101,110,45,110,101,116,119,111,114,107],\
+                    \"security_type\":\"None\",\
+                    \"credential\":\"None\",\
+                    \"has_ever_connected\":true\
+                }],\
+                \"version\":1\
+            }"
+        .as_bytes();
+        let store_id = &rand_string();
+
+        let network_configs = vec![
+            PersistentStorageData {
+                ssid: vec![115, 111, 109, 101, 45, 110, 101, 116, 119, 111, 114, 107],
+                security_type: SecurityType::Wpa2,
+                credential: Credential::Password(vec![100, 100, 100, 100, 100, 100]),
+                has_ever_connected: false,
+            },
+            PersistentStorageData {
+                ssid: vec![111, 112, 101, 110, 45, 110, 101, 116, 119, 111, 114, 107],
+                security_type: SecurityType::None,
+                credential: Credential::None,
+                has_ever_connected: true,
+            },
+        ];
+
+        // Write the data to the StorageStore's backing file.
+        let path = format!("/data/config.{}", store_id);
+        let mut file = std::fs::File::create(&path).expect("failed to open file for writing");
+        assert_eq!(
+            file.write(&file_contents).expect("Failed to write to file"),
+            file_contents.len()
+        );
+        file.flush().expect("failed to flush contents of file");
+
+        // Load the file data and check that the expected networks are there.
+        let store = StorageStore::new(&path);
+        let loaded_configs = store.load().expect("load failed");
+        assert_eq!(loaded_configs.len(), network_configs.len());
+        for config in network_configs.iter() {
+            assert!(network_configs.contains(config));
+        }
     }
 }
