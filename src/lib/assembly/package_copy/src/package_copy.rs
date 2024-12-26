@@ -320,9 +320,6 @@ mod tests {
         files
     }
 
-    // TODO(b/307977827): Re-enable this, making it not depend on the
-    // in-development API level.
-    #[ignore]
     #[test]
     fn test_package_copy() {
         let temp_dir = TempDir::new().unwrap();
@@ -393,15 +390,10 @@ mod tests {
         // Validate that the expected files in are in the destination directories
 
         assert_eq!(sorted_file_list(&packages_dir), vec!["package_a", "package_d"]);
-        assert_eq!(
-            sorted_file_list(&subpackages_dir),
-            vec![
-                // package_c
-                "84a68a4335e597250729fc4bc65e7b148bc7ea84041a136bc0a3f3a68b47fe9b",
-                // package_b
-                "d16342a35b7c9bdf1dc4c5c39c828605ad46b6b5a04dbe800b91c4f1ed1f8a54"
-            ]
-        );
+        let mut expected_subpackages =
+            vec![package_b.hash().to_string(), package_c.hash().to_string()];
+        expected_subpackages.sort();
+        assert_eq!(sorted_file_list(&subpackages_dir), expected_subpackages);
         assert_eq!(
             sorted_file_list(&blobstore),
             expected_blobs.iter().map(ToString::to_string).collect::<Vec<String>>()
@@ -416,41 +408,32 @@ mod tests {
 
         // Validate that the package manifest contains the right name and merkle
         assert_eq!(copied_package_d.name().to_string(), "package_d");
-        assert_eq!(
-            copied_package_d.hash().to_string(),
-            "2f438bcc778ca3eed0b5a0532db67affad9f36ecfc7bbe482f93763cf7cc64a5"
-        );
+        assert_eq!(copied_package_d.hash(), package_d.hash());
 
         // Validate that the path to the subpackage manifest is the copied
         // manifest, in the dst directory.
         assert_eq!(
             copied_package_d.subpackages().get(0).unwrap().manifest_path,
-            working_dir.join(
-                "dst/subpackages/84a68a4335e597250729fc4bc65e7b148bc7ea84041a136bc0a3f3a68b47fe9b"
-            )
+            working_dir.join(format!("dst/subpackages/{}", package_c.hash()))
         );
 
         assert_eq!(
             copied_package_d.blobs().get(0).unwrap().source_path,
-            working_dir
-                .join("dst/blobs/2f438bcc778ca3eed0b5a0532db67affad9f36ecfc7bbe482f93763cf7cc64a5")
+            working_dir.join(format!("dst/blobs/{}", package_d.hash()))
         );
 
         // Validate that a subpackage is using the right paths as well
-        let copied_subpackage_c = PackageManifest::try_load_from(working_dir.join(
-            "dst/subpackages/84a68a4335e597250729fc4bc65e7b148bc7ea84041a136bc0a3f3a68b47fe9b",
-        ))
+        let copied_subpackage_c = PackageManifest::try_load_from(
+            working_dir.join(format!("dst/subpackages/{}", package_c.hash())),
+        )
         .unwrap();
         assert_eq!(
             copied_subpackage_c.blobs().get(1).unwrap().source_path,
-            working_dir
-                .join("dst/blobs/8500503769c7da89d201a3b102472ee98dfa164e420639af94a1eca863d1812c")
+            working_dir.join(format!("dst/blobs/{}", package_c.blobs().get(1).unwrap().merkle))
         );
         assert_eq!(
             copied_subpackage_c.subpackages().get(0).unwrap().manifest_path,
-            working_dir.join(
-                "dst/subpackages/d16342a35b7c9bdf1dc4c5c39c828605ad46b6b5a04dbe800b91c4f1ed1f8a54"
-            )
+            working_dir.join(format!("dst/subpackages/{}", package_b.hash()))
         );
 
         let inputs_for_depfile: Vec<Utf8PathBuf> = inputs_for_depfile.into_iter().collect();
