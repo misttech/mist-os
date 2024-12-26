@@ -5,6 +5,7 @@
 """Tool for setting up the work_on runner."""
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(
     ":utils.bzl",
     "collect_runfiles",
@@ -12,7 +13,7 @@ load(
 )
 
 def _fuchsia_work_on_runner_impl(ctx):
-    sdk = ctx.toolchains["//fuchsia:toolchain"]
+    sdk = get_fuchsia_sdk_toolchain(ctx)
     invocation, runner_runfiles = wrap_executable(
         ctx,
         ctx.attr._runner_tool,
@@ -34,7 +35,7 @@ def _fuchsia_work_on_runner_impl(ctx):
 
 fuchsia_work_on_runner = rule(
     implementation = _fuchsia_work_on_runner_impl,
-    toolchains = ["//fuchsia:toolchain"],
+    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
     executable = True,
     attrs = {
         "_runner_tool": attr.label(
