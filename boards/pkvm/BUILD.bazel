@@ -1,0 +1,65 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@rules_fuchsia//fuchsia:assembly.bzl",
+    "fuchsia_board_configuration",
+    "fuchsia_board_input_bundle",
+)
+
+package(default_visibility = ["//visibility:public"])
+
+fuchsia_board_input_bundle(
+    name = "x64_bib",
+    bootfs_driver_packages = [
+        "//src/devices/misc/drivers/virtio-socket:package",
+        "//src/devices/board/drivers/x86:package",
+    ],
+    power_manager_config = "//src/power/power-manager/node_config:base_node_config.json5",
+)
+
+fuchsia_board_configuration(
+    name = "x64",
+    board_input_bundles = [":x64_bib"],
+    board_name = "pkvm-x64",
+    hardware_info = {
+        "name": "default-board",
+    },
+    kernel = {
+        "serial_mode": "legacy",
+    },
+    provided_features = [
+        "fuchsia::bus_pci",
+        "fuchsia::driver_framework_v2_support",
+        "fuchsia::paravirtualization",
+        "fuchsia::pmm_checker_auto",
+    ],
+)
+
+fuchsia_board_input_bundle(
+    name = "arm64_bib",
+    bootfs_driver_packages = [
+        "//src/devices/misc/drivers/virtio-socket:package",
+        "//src/devices/board/drivers/crosvm:package",
+    ],
+    power_manager_config = "//src/power/power-manager/node_config:base_node_config.json5",
+)
+
+fuchsia_board_configuration(
+    name = "arm64",
+    board_input_bundles = [":arm64_bib"],
+    board_name = "pkvm-arm64",
+    hardware_info = {
+        "name": "crosvm",
+        "product_id": 2,
+        "vendor_id": 2,
+        "revision": 1,
+    },
+    provided_features = [
+        "fuchsia::bus_pci",
+        "fuchsia::driver_framework_v2_support",
+        "fuchsia::paravirtualization",
+        "fuchsia::pmm_checker_auto",
+    ],
+)

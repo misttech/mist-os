@@ -131,6 +131,7 @@ fuchsia_driver_component("platform-bus-x86") {
 fuchsia_driver_package("package") {
   package_name = "platform-bus-x86"
   driver_components = [ ":platform-bus-x86" ]
+  export_to_bazel = true
 }
 
 test("x86-ec-test-bin") {

@@ -321,6 +321,7 @@ group("tests") {
 group("bazel_action_allowlist") {
   # Bazel assembly
   visibility = [
+    "//boards/pkvm:*",
     "//boards/vim3:*",
     "//products/microfuchsia:*",
     "//products/minimal:*",

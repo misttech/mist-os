@@ -58,6 +58,7 @@ fuchsia_driver_component("virtio_socket") {
 fuchsia_driver_package("package") {
   package_name = "virtio_socket"
   driver_components = [ ":virtio_socket" ]
+  export_to_bazel = true
 }
 
 test("test") {
