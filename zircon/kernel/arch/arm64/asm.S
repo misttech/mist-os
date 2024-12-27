@@ -96,19 +96,12 @@ FUNCTION(arm64_elX_to_el1)
     beq .Ltarget
     cmp x9, CURRENTEL_EL2
     beq .Lin_el2
+
     // Otherwise, we are in EL3.
-
-    // Set EL2 to 64bit and enable the HVC instruction.
-    mrs x9, scr_el3
-    mov x10, SCR_EL3_NS | SCR_EL3_HCE | SCR_EL3_RW
-    orr x9, x9, x10
-    msr scr_el3, x9
-
-    // Set the return address and exception level.
-    adr x9, .Ltarget
-    msr elr_el3, x9
-    mov x9, SPSR_ELX_DAIF | SPSR_ELX_EL1H
-    msr spsr_el3, x9
+    //
+    // Throw a fatal exception for now; support will be added for this case when
+    // it can be developed against hardware that drops us there.
+    brk #0
 
 .Lin_el2:
     // Set the init vector table for EL2.

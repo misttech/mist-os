@@ -67,11 +67,6 @@ struct ArmCurrentEl : public SysRegBase<ArmCurrentEl, uint64_t> {
 };
 ARCH_ARM64_SYSREG(ArmCurrentEl, "CurrentEL");
 
-// This is only available on actual AArch64 hardware.  This fetches the current
-// EL, and if it's EL3 then drops to EL2 (if possible) or EL1.  It returns the
-// newly-current EL that ArmCurrentEl::Read() will return afterwards.
-ArmCurrentEl ArmDropEl3();
-
 // This type covers three register formats:
 //  * [arm/sysreg]/sctlr_el1: System Control Register (EL1)
 //  * [arm/sysreg]/sctlr_el2: System Control Register (EL2)

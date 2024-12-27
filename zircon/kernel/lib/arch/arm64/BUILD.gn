@@ -44,7 +44,6 @@ static_library("arm64") {
     sources += [
       "cache-ops.S",
       "cache.cc",
-      "drop-el3.cc",
     ]
 
     deps = [
