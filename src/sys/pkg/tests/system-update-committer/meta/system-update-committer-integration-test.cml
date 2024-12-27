@@ -17,12 +17,5 @@
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
             from: "parent",
         },
-        {
-            event_stream: [
-                "started",
-                "stopped",
-            ],
-            from: "parent",
-        },
     ],
 }
