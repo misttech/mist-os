@@ -58,10 +58,14 @@ golden_files("e2e_test") {
       golden = "classes.h.md"
       candidate = "$generated_doc_dir/classes.h.md"
     },
-    {
-      golden = "functions.h.md"
-      candidate = "$generated_doc_dir/functions.h.md"
-    },
+
+    # TODO(https://fxbug.dev/386380474): This soft-transitions an upstream change
+    # from clang-doc that expects a change to the golden format. Uncomment this
+    # after next clang roll.
+    # {
+    #   golden = "functions.h.md"
+    #   candidate = "$generated_doc_dir/functions.h.md"
+    # },
     {
       golden = "grouping.h.md"
       candidate = "$generated_doc_dir/grouping.h.md"
