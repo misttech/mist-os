@@ -28,6 +28,7 @@ ignore_policy = struct(
             "@fuchsia_sdk//:meta/manifest.json",  # SDK metadata, not shipping to clients.
             "@platforms//os:os",  # Constraint
             "@platforms//os:fuchsia",  # Constraint
+            "@rules_cc//cc:current_cc_toolchain",  # Alias
         ]
     ]),
 
