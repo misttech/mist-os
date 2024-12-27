@@ -21,7 +21,7 @@ This function has a custom title and two parameters.
 
 <pre class="devsite-disable-click-to-copy">
 <span class="typ">std::string</span> <b>GetStringFromVectors</b>(<span class="typ">const std::vector&lt;int&gt; &amp;</span> vector1 = std::vector<int>(),
-                                 <span class="typ">std::vector&lt;double, std::allocator&lt;double&gt;&gt; *</span> v2 = {},
+                                 <span class="typ">std::vector&lt;double, std::allocator&lt;double&gt; &gt; *</span> v2 = {},
                                  <span class="typ">int</span> max_count = -1);
 </pre>
 
