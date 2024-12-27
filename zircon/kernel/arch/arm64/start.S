@@ -98,8 +98,8 @@ FUNCTION(_start)
     str     x2, [tmp2, #:lo12:arch_boot_el]
 
 .Lno_save_bootinfo:
-    // If we entered at a higher EL than 1, drop to EL1.
-    bl      ArmDropToEl1WithoutEl2Monitor
+    /* if we entered at a higher EL than 1, drop to EL1 */
+    bl      arm64_elX_to_el1
 
     // Make sure no old exception handlers are installed.
     msr     vbar_el1, xzr
