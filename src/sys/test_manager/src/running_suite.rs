@@ -225,7 +225,17 @@ impl RunningSuite {
             .root
             .connect_to_protocol_at_exposed_dir::<fdiagnostics::ArchiveAccessorMarker>()
         {
-            Ok(accessor) => accessor,
+            Ok(accessor) => match accessor.wait_for_ready().await {
+                Ok(()) => accessor,
+                Err(e) => {
+                    warn!("Error connecting to ArchiveAccessor");
+                    sender
+                        .send(Err(LaunchTestError::ConnectToArchiveAccessor(e.into()).into()))
+                        .await
+                        .unwrap();
+                    return;
+                }
+            },
             Err(e) => {
                 warn!("Error connecting to ArchiveAccessor");
                 sender

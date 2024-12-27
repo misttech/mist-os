@@ -475,16 +475,23 @@ impl ArchiveAccessorTranslator for ArchiveAccessorRequestStream {
     type InnerDataRequestChannel = Peekable<BatchIteratorRequestStream>;
 
     async fn next(&mut self) -> Option<ArchiveIteratorRequest<Self::InnerDataRequestChannel>> {
-        match StreamExt::next(self).await {
-            Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
-                control_handle: _,
-                result_stream,
-                stream_parameters,
-            })) => Some(ArchiveIteratorRequest {
-                iterator: result_stream.into_stream().peekable(),
-                parameters: stream_parameters,
-            }),
-            _ => None,
+        loop {
+            match StreamExt::next(self).await {
+                Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
+                    control_handle: _,
+                    result_stream,
+                    stream_parameters,
+                })) => {
+                    return Some(ArchiveIteratorRequest {
+                        iterator: result_stream.into_stream().peekable(),
+                        parameters: stream_parameters,
+                    })
+                }
+                Some(Ok(ArchiveAccessorRequest::WaitForReady { responder })) => {
+                    let _ = responder.send();
+                }
+                _ => return None,
+            }
         }
     }
 }
