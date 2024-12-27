@@ -97,7 +97,7 @@ void UberStructSystem::ForceUpdateAllSessions(size_t max_updates_per_queue) {
   }
 }
 
-UberStruct::InstanceMap UberStructSystem::Snapshot() { return uber_struct_map_; }
+const UberStruct::InstanceMap& UberStructSystem::Snapshot() { return uber_struct_map_; }
 
 size_t UberStructSystem::GetSessionCount() { return pending_structs_queues_.size(); }
 

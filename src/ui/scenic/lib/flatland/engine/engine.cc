@@ -8,14 +8,14 @@
 #include <lib/async/cpp/time.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <sstream>
+#include <string>
+
 #include "src/ui/scenic/lib/flatland/global_image_data.h"
 #include "src/ui/scenic/lib/flatland/global_matrix_data.h"
 #include "src/ui/scenic/lib/flatland/global_topology_data.h"
 #include "src/ui/scenic/lib/flatland/scene_dumper.h"
 #include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
-
-#include <sstream>
-#include <string>
 
 // Hardcoded double buffering.
 // TODO(https://fxbug.dev/42156567): make this configurable.  Even fancier: is it worth considering
@@ -153,7 +153,7 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
 view_tree::SubtreeSnapshot Engine::GenerateViewTreeSnapshot(
     const TransformHandle& root_transform) const {
   TRACE_DURATION("gfx", "flatland::Engine::GenerateViewTreeSnapshot");
-  const auto uber_struct_snapshot = uber_struct_system_->Snapshot();
+  const auto& uber_struct_snapshot = uber_struct_system_->Snapshot();
   const auto link_child_to_parent_transform_map = link_system_->GetLinkChildToParentTransformMap();
   const auto& topology_data = last_global_topology_data_;
 

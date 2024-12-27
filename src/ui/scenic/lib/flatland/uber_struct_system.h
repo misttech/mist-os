@@ -86,7 +86,9 @@ class UberStructSystem {
       const std::unordered_map<scheduling::SessionId, scheduling::PresentId>& instances_to_update);
 
   // Snapshots the current map of UberStructs and returns the copy.
-  UberStruct::InstanceMap Snapshot();
+  // Note that this function returns a reference. This structure may only be modified on main
+  // thread.
+  const UberStruct::InstanceMap& Snapshot();
 
   // For pushing all pending UberStructs in tests.
   void ForceUpdateAllSessions(size_t max_updates_per_queue = 10);
