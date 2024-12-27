@@ -47,8 +47,10 @@ void Queue::InitFromStore() {
   for (const auto& report_id : report_store_->GetReports()) {
     const std::string uuid = report_store_->GetSnapshotUuid(report_id);
 
-    // It could technically be an hourly snapshot, but the snapshot has not been persisted so it is
-    // okay to have another one here.
+    // It could technically be an hourly snapshot, but either a) the snapshot has not been persisted
+    // so it is okay to have another one here, or b) the snapshot was persisted, indicating that
+    // we're likely on a device with enough storage space such that taking another hourly snapshot
+    // wouldn't be detrimental.
     blocked_reports_.emplace_back(report_id, uuid, false /*not a known hourly report*/);
     AddReportUsingSnapshot(uuid, report_id);
   }
