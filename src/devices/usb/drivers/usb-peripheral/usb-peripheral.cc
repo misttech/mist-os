@@ -459,7 +459,7 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
   uint8_t type = request_type & USB_TYPE_MASK;
 
   if (type != USB_TYPE_STANDARD) {
-    zxlogf(DEBUG, "%s unsupported value: %d index: %d", __func__, value, index);
+    zxlogf(DEBUG, "%s unsupported request type: %d", __func__, request_type);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
