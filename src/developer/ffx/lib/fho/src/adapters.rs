@@ -11,7 +11,7 @@ macro_rules! embedded_plugin {
     ($tool:ty) => {
         pub async fn ffx_plugin_impl(
             injector: &Option<::std::sync::Arc<dyn ffx_core::Injector>>,
-            cmd: <$tool as $crate::FfxTool>::Command,
+            cmd: <$tool as $crate::subtool::FfxTool>::Command,
         ) -> $crate::Result<()> {
             #[allow(unused_imports)]
             use $crate::macro_deps::{
@@ -23,7 +23,7 @@ macro_rules! embedded_plugin {
             let ffx = FfxCommandLine::from_env()?;
             $crate::macro_deps::check_strict_constraints(
                 &ffx.global,
-                <$tool as $crate::FfxTool>::requires_target(),
+                <$tool as $crate::subtool::FfxTool>::requires_target(),
             )?;
             let context = if let Some(gc) = global_env_context() {
                 gc
@@ -56,7 +56,7 @@ macro_rules! embedded_plugin {
                 return Ok(());
             }
 
-            let tool = <$tool as $crate::FfxTool>::from_env(env.clone(), cmd).await?;
+            let tool = <$tool as $crate::subtool::FfxTool>::from_env(env.clone(), cmd).await?;
             env.update_log_file(tool.log_basename())?;
             let res = $crate::FfxMain::main(tool, writer).await;
             // The env must not be dropped entirely until after the main function has completed, as
@@ -80,7 +80,7 @@ macro_rules! embedded_plugin {
 #[cfg(test)]
 mod tests {
     use crate::subtool::{FhoHandler, ToolCommand};
-    use crate::testing::*;
+    use crate::testing::{FakeTool, ToolEnv, SIMPLE_CHECK_COUNTER};
     use argh::FromArgs;
     use ffx_command::FfxCommandLine;
     use std::sync::Arc;

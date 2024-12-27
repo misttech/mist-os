@@ -2,18 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod adapters;
-pub mod connector;
+mod adapters;
+mod connector;
 mod from_env;
-mod subtool;
+pub mod subtool;
+
 pub mod testing;
 
-pub use from_env::*;
-pub use subtool::*;
+pub use subtool::{FfxMain, FfxTool};
+
+// Re-export TryFromEnv related symbols
+pub use from_env::{
+    connection_behavior, daemon_protocol, deferred, moniker, moniker_f, AvailabilityFlag, CheckEnv,
+    Connector, Deferred, DeviceLookupDefaultImpl, FhoConnectionBehavior, FhoEnvironment,
+    TryFromEnv, TryFromEnvWith,
+};
+
+pub use from_env::{toolbox, toolbox_or};
 
 // Used for deriving an FFX tool.
 pub use fho_macro::FfxTool;
-pub use fho_metadata::*;
+
+// Direct connection to a target device
+pub use connector::{DirectConnector, MockDirectConnector};
 
 // Re-expose the Error, Result, and FfxContext types from ffx_command
 // so you don't have to pull both in all the time.

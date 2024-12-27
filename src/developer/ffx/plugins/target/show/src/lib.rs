@@ -7,8 +7,9 @@ use addr::TargetAddr;
 use anyhow::{anyhow, bail, Result};
 use async_lock::Mutex;
 use async_trait::async_trait;
-use fho::connector::DirectConnector;
-use fho::{deferred, moniker, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
+use fho::{
+    deferred, moniker, Deferred, DirectConnector, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter,
+};
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetProxy};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -592,7 +593,7 @@ mod tests {
     }
 
     fn setup_fake_direct_connector() -> Rc<dyn DirectConnector> {
-        let mut dc = fho::connector::MockDirectConnector::new();
+        let mut dc = fho::MockDirectConnector::new();
         dc.expect_connection().return_once(|| {
             let device_address = std::net::SocketAddr::new("127.0.0.1".parse().unwrap(), 22);
             let fidl_pipe = FidlPipe::fake(Some(device_address));

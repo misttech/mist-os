@@ -76,6 +76,8 @@ pub fn toolbox_or<P: Proxy>(
 }
 
 /// Same as [`toolbox`] but for FDomain
+//TODO(sadmac): This will be used soon, as FDomain is implemented.
+#[allow(dead_code)]
 pub fn toolbox_f<P: FProxy>() -> WithToolbox<P, FDomainResourceDialect> {
     WithToolbox { backup: None, _p: PhantomData::default() }
 }
