@@ -14,7 +14,6 @@ use crate::vfs::{
     DirEntry, DirEntryHandle, FileHandle, FileObject, FileSystem, FileSystemHandle, FsNode, FsStr,
     FsString, PathBuilder, UnlinkKind, ValueOrSize, XattrOp,
 };
-use crate::TODO_DENY;
 use audit::{audit_log, AuditContext};
 use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
@@ -32,7 +31,6 @@ use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ENODATA};
 use starnix_uapi::file_mode::FileMode;
-use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{
     errno, error, FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION,
     FS_IOC_SETFLAGS, FS_IOC_SETVERSION,
@@ -43,29 +41,6 @@ use std::sync::{Arc, OnceLock};
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
 const SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE: usize = 4096;
-
-/// Returns the set of `Permissions` on `class`, corresponding to the specified `flags`.
-fn permissions_from_flags(flags: PermissionFlags, class: FileClass) -> Vec<Permission> {
-    let mut result = Vec::new();
-    if flags.contains(PermissionFlags::READ) {
-        result.push(CommonFilePermission::Read.for_class(class));
-    }
-    // SELinux uses the `APPEND` bit to distinguish which of the "append" or the more general
-    // "write" permission to check for.
-    if flags.contains(PermissionFlags::APPEND) {
-        result.push(CommonFilePermission::Append.for_class(class));
-    } else if flags.contains(PermissionFlags::WRITE) {
-        result.push(CommonFilePermission::Write.for_class(class));
-    }
-    if flags.contains(PermissionFlags::EXEC) {
-        if class == FileClass::Dir {
-            result.push(DirPermission::Search.into());
-        } else {
-            result.push(CommonFilePermission::Execute.for_class(class));
-        }
-    }
-    result
-}
 
 /// Checks that `current_task` has permission to "use" the specified `file`, and the specified
 /// `permissions` to the underlying [`crate::vfs::FsNode`].
@@ -78,8 +53,7 @@ fn has_file_permissions(
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
     // If the file and task security domains are identical then `fd { use }` is implicitly granted.
     let file_sid = file.security_state.state.sid;
-    // TODO: https://fxbug.dev/385121365 - Should the kernel be implicitly allowed to "use" all FDs?
-    if subject_sid != SecurityId::initial(InitialSid::Kernel) && subject_sid != file_sid {
+    if subject_sid != file_sid {
         check_permission(permission_check, subject_sid, file_sid, FdPermission::Use)?;
     }
 
@@ -132,31 +106,6 @@ fn todo_has_fs_node_permissions(
     }
 
     Ok(())
-}
-
-/// Checks whether the `current_task`` has the permissions specified by `mask` to the `file`.
-pub fn file_permission(
-    security_server: &SecurityServer,
-    current_task: &CurrentTask,
-    file: &FileObject,
-    mut permission_flags: PermissionFlags,
-) -> Result<(), Errno> {
-    let current_sid = current_task.security_state.lock().current_sid;
-    let file_mode = file.name.entry.node.info().mode;
-    let file_class = file_class_from_file_mode(file_mode)?;
-
-    if file.flags().contains(OpenFlags::APPEND) {
-        permission_flags |= PermissionFlags::APPEND;
-    }
-
-    has_file_permissions(&security_server.as_permission_check(), current_sid, file, &[])?;
-    todo_has_fs_node_permissions(
-        TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
-        &security_server.as_permission_check(),
-        current_sid,
-        file.node(),
-        &permissions_from_flags(permission_flags, file_class),
-    )
 }
 
 /// Returns the relative path from the root of the file system containing this `DirEntry`.
@@ -351,8 +300,7 @@ fn make_fs_node_security_xattr(
 }
 
 fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
-    let file_type = mode.bits() & starnix_uapi::S_IFMT;
-    match file_type {
+    match mode.bits() & starnix_uapi::S_IFMT {
         starnix_uapi::S_IFLNK => Ok(FileClass::Link),
         starnix_uapi::S_IFREG => Ok(FileClass::File),
         starnix_uapi::S_IFDIR => Ok(FileClass::Dir),
@@ -831,14 +779,70 @@ pub fn fs_node_permission(
     permission_flags: PermissionFlags,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let file_class = fs_node.security_state.lock().class;
-    todo_has_fs_node_permissions(
-        TODO_DENY!("https://fxbug.dev/380855359", "Enforce fs_node_permission checks."),
-        &security_server.as_permission_check(),
-        current_sid,
-        fs_node,
-        &permissions_from_flags(permission_flags, file_class),
-    )
+    let FsNodeSidAndClass { sid: file_sid, class: file_class } =
+        fs_node_effective_sid_and_class(fs_node);
+    if permission_flags.contains(PermissionFlags::READ) {
+        todo_check_permission(
+            TODO_DENY!(
+                "https://fxbug.dev/380855359",
+                "Check read permission when calling fs_node_permission."
+            ),
+            &security_server.as_permission_check(),
+            current_sid,
+            file_sid,
+            CommonFilePermission::Read.for_class(file_class),
+        )?;
+    }
+
+    if permission_flags.contains(PermissionFlags::WRITE) {
+        todo_check_permission(
+            TODO_DENY!(
+                "https://fxbug.dev/380855359",
+                "Check write permission when calling fs_node_permission."
+            ),
+            &security_server.as_permission_check(),
+            current_sid,
+            file_sid,
+            CommonFilePermission::Write.for_class(file_class),
+        )?;
+    }
+
+    if permission_flags.contains(PermissionFlags::APPEND) {
+        check_permission(
+            &security_server.as_permission_check(),
+            current_sid,
+            file_sid,
+            CommonFilePermission::Append.for_class(file_class),
+        )?;
+    }
+
+    if permission_flags.contains(PermissionFlags::EXEC) {
+        if file_class == FileClass::Dir {
+            todo_check_permission(
+                TODO_DENY!(
+                    "https://fxbug.dev/380855359",
+                    "Check search permission when calling fs_node_permission."
+                ),
+                &security_server.as_permission_check(),
+                current_sid,
+                file_sid,
+                DirPermission::Search,
+            )?;
+        } else {
+            todo_check_permission(
+                TODO_DENY!(
+                    "https://fxbug.dev/380855359",
+                    "Check execute permission when calling fs_node_permission."
+                ),
+                &security_server.as_permission_check(),
+                current_sid,
+                file_sid,
+                CommonFilePermission::Execute.for_class(file_class),
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 pub(super) fn check_fs_node_getattr_access(

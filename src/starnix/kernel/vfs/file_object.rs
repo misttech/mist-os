@@ -19,7 +19,6 @@ use crate::vfs::{
     FdNumber, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
     FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
-
 use fidl::HandleBased;
 use fidl_fuchsia_fxfs::CryptManagementMarker;
 use fuchsia_inspect_contrib::profile_duration;
@@ -202,7 +201,6 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>;
-
     /// Write to the file with an offset. If the file does not have persistent offsets (either
     /// directly, or because it is not seekable), offset will be 0 and can be ignored.
     /// Returns the number of bytes written.
@@ -1659,12 +1657,10 @@ impl FileObject {
     }
 
     /// Common implementation for `read` and `read_at`.
-    fn read_internal<R>(&self, current_task: &CurrentTask, read: R) -> Result<usize, Errno>
+    fn read_internal<R>(&self, read: R) -> Result<usize, Errno>
     where
         R: FnOnce() -> Result<usize, Errno>,
     {
-        security::file_permission(current_task, self, security::PermissionFlags::READ)?;
-
         if !self.can_read() {
             return error!(EBADF);
         }
@@ -1689,7 +1685,7 @@ impl FileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.read_internal(current_task, || {
+        self.read_internal(|| {
             let mut locked = locked.cast_locked::<FileOpsCore>();
             if !self.ops().has_persistent_offsets() {
                 if data.available() > MAX_LFS_FILESIZE {
@@ -1722,9 +1718,7 @@ impl FileObject {
         }
         checked_add_offset_and_length(offset, data.available())?;
         let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.read_internal(current_task, || {
-            self.ops.read(&mut locked, self, current_task, offset, data)
-        })
+        self.read_internal(|| self.ops.read(&mut locked, self, current_task, offset, data))
     }
 
     /// Common checks before calling ops().write.
@@ -1738,8 +1732,6 @@ impl FileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        security::file_permission(current_task, self, security::PermissionFlags::WRITE)?;
-
         // We need to cap the size of `data` to prevent us from growing the file too large,
         // according to <https://man7.org/linux/man-pages/man2/write.2.html>:
         //
