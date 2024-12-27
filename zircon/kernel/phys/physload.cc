@@ -6,6 +6,7 @@
 
 #include "physload.h"
 
+#include <inttypes.h>
 #include <lib/boot-options/boot-options.h>
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/dynamic.h>
@@ -53,8 +54,6 @@ void LogSerial(FILE* out = stdout) {
     symbolize.Context();
     LogSerial();
   }
-
-  ArchPhysloadBeforeInitMemory();
 
   AddressSpace aspace;
   InitMemory(zbi_ptr, &aspace);

@@ -70,10 +70,6 @@ extern "C" [[noreturn]] PhysLoadHandoffFunction PhysLoadHandoff;
 extern "C" [[noreturn]] void PhysLoadModuleMain(UartDriver& uart, PhysBootTimes boot_times,
                                                 KernelStorage kernel_storage);
 
-// Arch-specific preparation in physload for heap and address space set-up (
-// i.e., before calling InitMemory()).
-void ArchPhysloadBeforeInitMemory();
-
 // This should be run early in the handoff function to reinitialize
 // arch-specific state that's not included in the handoff data.
 // PhysLoadHandoff calls it before PhysLoadModuleMain.
