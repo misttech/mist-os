@@ -28,7 +28,7 @@ void DisplayEngineEventsBanjo::SetListener(
     const display_engine_listener_protocol_t* display_engine_listener) {
   fbl::AutoLock event_lock(&event_mutex_);
   if (display_engine_listener == nullptr) {
-    display_engine_listener = {};
+    display_engine_listener_ = {};
     return;
   }
 
