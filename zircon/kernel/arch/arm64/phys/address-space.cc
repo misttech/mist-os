@@ -129,16 +129,11 @@ void ArchSetUpAddressSpace(AddressSpace& aspace) {
   if (gBootOptions && !gBootOptions->arm64_phys_mmu) {
     return;
   }
-
-  // The following two attributes and indices must be kept in sync with those
-  // used in the kernel proper
-  //
-  // LINT.IfChange
   auto mair = arch::ArmMemoryAttrIndirectionRegister::Get()
                   .FromValue(0)
-                  .SetAttribute(1, ArchMmioMemoryType())
-                  .SetAttribute(2, kArchNormalMemoryType);
-  // LINT.ThenChange(/zircon/kernel/arch/arm64/include/arch/arm64/mmu.h)
+                  .SetAttribute(0, kArchNormalMemoryType)
+                  .SetAttribute(1, ArchMmioMemoryType());
+
   aspace.Init(mair);
   aspace.SetUpIdentityMappings();
   aspace.Install();
