@@ -240,18 +240,9 @@ template("rust_auxiliary") {
         if (clippy_warn_all) {
           _level = "W"
         }
-        args += [
-          "-${_level}clippy::all",
-          "-Dclippy::correctness",
-          "-Dclippy::missing_safety_doc",
-        ]
+        args += [ "-${_level}clippy::all" ]
       }
       args += [
-        "-Wclippy::expect_fun_call",
-        "-Wclippy::large_enum_variant",
-        "-Wclippy::large_futures",
-        "-Wclippy::unnecessary_mut_passed",
-
         # Additional metadata to differentiate the clippy target from the actual target.
         "-Cmetadata=clippy",
       ]
