@@ -485,6 +485,45 @@ impl TicTacToeProxyInterface for FakeTicTacToeProxy {
 }
 ```
 
+##### Handle Conversions {#protocols-client-asynchronous-conversions}
+
+This flowchart illustrates the various conversions available between handle
+wrapper types for asynchronous clients in the Rust FIDL ecosystem. Note that
+dotted lines indicate fallible methods or functions.
+
+```mermaid
+graph BT
+  raw_handle[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/sys/type.zx_handle_t.html'>zx_handle_t</a>]
+  owned_handle[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Handle.html'>zx::Handle</a>]
+  owned_channel[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Channel.html'>zx::Channel</a>]
+  client_end[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ClientEnd.html'>ClientEnd&lt;TicTacToeMarker&gt;</a>]
+  async_channel[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Channel.html'>AsyncChannel</a>]
+  proxy[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl_fuchsia_examples/struct.TicTacToeProxy.html'><b>TicTacToeProxy</b></a>]
+
+  raw_handle-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Handle.html#method.from_raw'>zx::Handle::from_raw()</a> -->owned_handle
+  owned_handle-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/trait.HandleBased.html#method.into_raw'>.into_raw()</a> -->raw_handle
+
+  owned_handle-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Channel.html#impl-From%3CHandle%3E-for-Channel'>zx::Channel::from()</a> -->owned_channel
+  owned_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Handle.html#impl-From%3CChannel%3E-for-Handle'>zx::Handle::from()</a> -->owned_handle
+
+  owned_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Channel.html#method.from_channel'>AsyncChannel::from_channel()</a> -->async_channel
+  async_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Channel.html#method.into_zx_channel'>.into_zx_channel()</a> -->owned_channel
+
+  owned_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ClientEnd.html#impl-From%3CChannel%3E-for-ClientEnd%3CT%3E'>ClientEnd::from()</a> -->client_end
+  client_end-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ClientEnd.html#method.into_proxy'>.into_proxy()</a> -->proxy
+  client_end-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ClientEnd.html#method.into_channel'>.into_channel()</a> -->owned_channel
+
+  async_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/trait.Proxy.html#tymethod.from_channel'>Proxy::from_channel()</a> -->proxy
+  proxy-. "<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/trait.Proxy.html#method.into_client_end'>.into_client_end()</a>" .-> client_end
+  proxy-. "<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/trait.Proxy.html#tymethod.into_channel'>.into_channel()</a>" .->async_channel
+
+  %% following edges help disambiguate clientend and proxy in layout
+  client_end ~~~ async_channel
+  async_channel ~~~ client_end
+  client_end ~~~ owned_channel
+  owned_channel ~~~ client_end
+```
+
 #### Synchronous {#protocols-client-synchronous}
 
 For synchronous clients of the `TicTacToe` protocol, the FIDL toolchain
@@ -511,6 +550,32 @@ generates a `TicTacToeSynchronousProxy` struct with the following methods:
 An example of setting up a synchronous proxy is available in the
 [Rust tutorial][tutorial].
 
+##### Handle Conversions {#protocols-client-synchronous-conversions}
+
+This flowchart illustrates the various conversions available between handle
+wrapper types for synchronous clients in the Rust FIDL ecosystem.
+
+```mermaid
+graph BT
+  raw_handle[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/sys/type.zx_handle_t.html'>zx_handle_t</a>]
+  owned_handle[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Handle.html'>zx::Handle</a>]
+  owned_channel[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Channel.html'>zx::Channel</a>]
+  client_end[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ClientEnd.html'>fidl::endpoints::ClientEnd&lt;TicTacToeMarker&gt;</a>]
+  sync_proxy[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl_fuchsia_examples/struct.TicTacToeSynchronousProxy.html'><b>TicTacToeSynchronousProxy</b></a>]
+
+  raw_handle-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Handle.html#method.from_raw'>zx::Handle::from_raw()</a> -->owned_handle
+  owned_handle-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/trait.HandleBased.html#method.into_raw'>.into_raw()</a> -->raw_handle
+
+  owned_handle-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Channel.html#impl-From%3CHandle%3E-for-Channel'>zx::Channel::from()</a> -->owned_channel
+  owned_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Handle.html#impl-From%3CChannel%3E-for-Handle'>zx::Handle::from()</a> -->owned_handle
+
+  owned_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ClientEnd.html#impl-From%3CChannel%3E-for-ClientEnd%3CT%3E'>ClientEnd::from()</a> -->client_end
+  client_end-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ClientEnd.html#method.into_channel'>.into_channel()</a> -->owned_channel
+  client_end-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ClientEnd.html#method.into_sync_proxy'>.into_sync_proxy()</a> -->sync_proxy
+  sync_proxy-- "<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/trait.SynchronousProxy.html#tymethod.into_channel'>.into_channel()</a>" -->owned_channel
+  owned_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/trait.SynchronousProxy.html#tymethod.from_channel'>SynchronousProxy::from_channel()</a> -->sync_proxy
+```
+
 ### Server {#protocols-server}
 
 #### Protocol request stream {#protocol-request-stream}
@@ -520,6 +585,42 @@ generates a `TicTacToeRequestStream` type that implements `futures::Stream<Item
 = Result<TicTacToeRequest, fidl::Error>>` as well as
 `fidl::endpoints::RequestStream`. Each protocol has a corresponding request
 stream type.
+
+##### Handle Conversions {#protocol-request-stream-conversions}
+
+This flowchart illustrates the various conversions available between handle
+wrapper types for asynchronous servers in the Rust FIDL ecosystem.
+
+```mermaid
+graph BT
+  raw_handle[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/sys/type.zx_handle_t.html'>zx_handle_t</a>]
+  owned_handle[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Handle.html'>zx::Handle</a>]
+  owned_channel[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Channel.html'>zx::Channel</a>]
+  server_end[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ServerEnd.html'>ServerEnd&lt;TicTacToeMarker&gt;</a>]
+  async_channel[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Channel.html'>AsyncChannel</a>]
+  serve_inner[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/server/struct.ServeInner.html'>ServeInner</a>]
+  request_stream[<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl_fuchsia_examples/struct.TicTacToeRequestStream.html'><b>TicTacToeRequestStream</b></a>]
+
+  raw_handle-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Handle.html#method.from_raw'>zx::Handle::from_raw()</a> -->owned_handle
+  owned_handle-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/trait.HandleBased.html#method.into_raw'>.into_raw()</a> -->raw_handle
+
+  owned_handle-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Channel.html#impl-From%3CHandle%3E-for-Channel'>zx::Channel::from()</a> -->owned_channel
+  owned_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/zx/struct.Handle.html#impl-From%3CChannel%3E-for-Handle'>zx::Handle::from()</a> -->owned_handle
+
+  owned_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Channel.html#method.from_channel'>AsyncChannel::from_channel()</a> -->async_channel
+  async_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fuchsia_async/struct.Channel.html#method.into_zx_channel'>.into_zx_channel()</a> -->owned_channel
+
+  owned_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ServerEnd.html#impl-From%3CChannel%3E-for-ServerEnd%3CT%3E'>ServerEnd::from()</a> -->server_end
+  server_end-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ServerEnd.html#method.into_channel'>.into_channel()</a> -->owned_channel
+
+  async_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/server/struct.ServeInner.html#method.new'>ServeInner::new()</a> -->serve_inner
+  serve_inner-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/server/struct.ServeInner.html#method.into_channel'>.into_channel()</a> -->async_channel
+
+  serve_inner-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/trait.RequestStream.html#tymethod.from_inner'>RequestStream::from_inner()</a> -->request_stream
+  server_end-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/struct.ServerEnd.html#method.into_stream'>.into_stream()</a> -->request_stream
+  request_stream-- "<a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/trait.RequestStream.html#tymethod.into_inner'>.into_inner()</a>" -->serve_inner
+  async_channel-- <a target="_blank" href='https://fuchsia-docs.firebaseapp.com/rust/fidl/endpoints/trait.RequestStream.html#tymethod.from_channel'>RequestStream::from_channel()</a> -->request_stream
+```
 
 #### Request enum {#request-enum}
 
