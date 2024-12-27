@@ -61,10 +61,6 @@ void Queue::InitFromStore() {
             });
 
   if (!blocked_reports_.empty()) {
-    std::vector<std::string> report_id_strs;
-    for (const auto& pending_report : blocked_reports_) {
-      report_id_strs.push_back(std::to_string(pending_report.report_id));
-    }
     FX_LOGS(INFO) << "Initializing queue with reports: " << ReportIdsStr(blocked_reports_);
   }
 
