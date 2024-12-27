@@ -99,6 +99,8 @@
                 This tag makes it explicit that we always want the single-thread version, even if
                 it may be slower. }}
             {{#if (eq device.cpu.architecture "riscv64")}}
+            "-accel",
+            "tcg,thread=multi",
             {{else}}
             "-accel",
             "tcg,thread=single",
