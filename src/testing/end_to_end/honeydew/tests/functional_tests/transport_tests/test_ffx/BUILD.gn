@@ -104,8 +104,7 @@ group("test_ffx_on_nelson") {
 group("tests") {
   testonly = true
   public_deps = [
-    # TODO(https://fxbug.dev/375341470): This test is flaky on VIM3. Fix the flakes.
-    # ":ffx_wait_for_rcs_disconnection_test($host_toolchain)",
+    ":ffx_wait_for_rcs_disconnection_test($host_toolchain)",
     ":test_ffx_on_nelson",
     ":test_ffx_on_vim3",
     ":test_ffx_on_x64",
