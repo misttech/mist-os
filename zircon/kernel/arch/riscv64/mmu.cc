@@ -293,6 +293,7 @@ struct SfenceVmaArgs {
   };
   ktl::optional<Range> range;
   ktl::optional<uint16_t> asid;
+  ktl::optional<uint16_t> unified_asid;
 };
 
 // Issues a sequence of sfence.vma instructions as specified by SfenceVmaArgs.
@@ -309,6 +310,11 @@ void SfenceVma(void* _args) {
       const uint16_t asid = args->asid.value();
       for (vaddr_t va = base; va < end; va += PAGE_SIZE) {
         riscv64_tlb_flush_address_one_asid(va, asid);
+        // If a unified ASID was provided, then this is a restricted aspace, so flush the same
+        // address in the unified ASID as well.
+        if (args->unified_asid.has_value()) {
+          riscv64_tlb_flush_address_one_asid(va, args->unified_asid.value());
+        }
       }
     } else {
       // With range, all ASIDs.
@@ -321,6 +327,10 @@ void SfenceVma(void* _args) {
       // All addresses, one ASID.
       const uint16_t asid = args->asid.value();
       riscv64_tlb_flush_asid(asid);
+      // If this is a restricted aspace, we must also flush the unified aspace's ASID.
+      if (args->unified_asid.has_value()) {
+        riscv64_tlb_flush_asid(args->unified_asid.value());
+      }
     } else {
       // All addresses, all ASIDs.
       riscv64_tlb_flush_all();
@@ -424,25 +434,17 @@ class Riscv64ArchVmAspace::ConsistencyManager {
 
     // Check if we should just be performing a full ASID invalidation.
     if (full_flush_) {
+      // If this is a restricted aspace, FlushAsid will also flush the associated unified aspace's
+      // ASID.
       aspace_.FlushAsid();
-      // If this is a restricted aspace, invalidate the associated unified aspace's ASID.
-      if (aspace_.IsRestricted() && aspace_.referenced_aspace_ != nullptr) {
-        Guard<Mutex> b{AssertOrderedLock, &aspace_.referenced_aspace_->lock_,
-                       aspace_.referenced_aspace_->LockOrder()};
-        aspace_.referenced_aspace_->FlushAsid();
-      }
     } else {
       for (size_t i = 0; i < num_pending_tlb_runs_; i++) {
         const vaddr_t va = pending_tlbs_[i].va;
         const size_t count = pending_tlbs_[i].count;
 
+        // If this is a restricted aspace, FlushTLBEntryRun will also flush the given range in the
+        // associated unified aspace.
         aspace_.FlushTLBEntryRun(va, count);
-        // If this is a restricted aspace, invalidate the same run in the unified aspace.
-        if (aspace_.IsRestricted() && aspace_.referenced_aspace_ != nullptr) {
-          Guard<Mutex> b{AssertOrderedLock, &aspace_.referenced_aspace_->lock_,
-                         aspace_.referenced_aspace_->LockOrder()};
-          aspace_.referenced_aspace_->FlushTLBEntryRun(va, count);
-        }
       }
     }
 
@@ -630,8 +632,12 @@ void Riscv64ArchVmAspace::FlushTLBEntryRun(vaddr_t vaddr, size_t count) const {
     SfenceVmaArgs args{.range = SfenceVmaArgs::Range{.base = vaddr, .size = size}};
     mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
   } else if (IsUser()) {
-    // Flush just the aspace's asid
+    // Flush just the aspace's asid.
     SfenceVmaArgs args{.range = SfenceVmaArgs::Range{.base = vaddr, .size = size}, .asid = asid_};
+    // If this is a restricted aspace, we must also flush the associated unified aspace's ASID.
+    if (IsRestricted()) {
+      args.unified_asid = get_unified_aspace()->asid();
+    }
     mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
   } else {
     PANIC_UNIMPLEMENTED;
@@ -650,6 +656,10 @@ void Riscv64ArchVmAspace::FlushAsid() const {
   } else {
     // Perform a full flush of all cpus of a single ASID
     SfenceVmaArgs args{.asid = asid_};
+    // If this is a restricted aspace, we must also flush the associated unified aspace's ASID.
+    if (IsRestricted()) {
+      args.unified_asid = get_unified_aspace()->asid();
+    }
     mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, &SfenceVma, &args);
     kcounter_add(cm_asid_invalidate, 1);
   }

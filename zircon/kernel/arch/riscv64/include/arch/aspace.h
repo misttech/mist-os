@@ -79,6 +79,7 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
 
   paddr_t arch_table_phys() const override { return 0; }
   uint16_t arch_asid() const { return 0; }
+  uint16_t asid() const { return asid_; }
   void arch_set_asid(uint16_t asid) {}
 
   static void ContextSwitch(Riscv64ArchVmAspace* from, Riscv64ArchVmAspace* to);
@@ -187,6 +188,13 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
     return referenced_aspace_;
   }
 
+  // Accessor for the unified aspace associated with a specific restricted aspace.
+  // Thread safety analysis is required for this because the referenced_aspace_ pointer is set
+  // after the restricted aspace is created during unified aspace creation.
+  Riscv64ArchVmAspace* get_unified_aspace() const TA_REQ(lock_) {
+    DEBUG_ASSERT(IsRestricted());
+    return referenced_aspace_;
+  }
   // data fields
   fbl::Canary<fbl::magic("VAAS")> canary_;
 
