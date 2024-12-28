@@ -44,6 +44,7 @@ std::optional<size_t> GetViewRefIndex(
     zx_koid_t view_ref_koid, const std::vector<flatland::TransformHandle>& transforms,
     const std::unordered_map<flatland::TransformHandle,
                              std::shared_ptr<const fuchsia::ui::views::ViewRef>>& view_refs) {
+  TRACE_DURATION("gfx", "flatland::HitTest[GetViewRefIndex]");
   for (const auto& [transform, view_ref] : view_refs) {
     if (view_ref != nullptr && view_ref_koid == utils::ExtractKoid(*view_ref)) {
       // Found |view_ref_koid|, now calculate the index of its root transform in |transforms|.
@@ -65,6 +66,7 @@ std::optional<size_t> GetViewRefIndex(
 // Prerequisite: |start| was returned from `GetViewRefIndex()`
 size_t GetSubtreeEndIndex(size_t start, const std::vector<flatland::TransformHandle>& transforms,
                           const std::vector<size_t>& parent_indices) {
+  TRACE_DURATION("gfx", "flatland::HitTest[GetSubtreeEndIndex]");
   FX_DCHECK(start < transforms.size()) << "precondition";
 
   // We need to be careful about the case where start == 0, since in that case hitting the global
@@ -111,7 +113,7 @@ size_t GetSubtreeEndIndex(size_t start, const std::vector<flatland::TransformHan
 // 00 00 00 01
 glm::mat4 Convert2DTransformTo3D(glm::mat3 in_matrix) {
   // Construct identity matrix.
-  glm::mat4 out_matrix = glm::mat4(1.f);
+  glm::mat4 out_matrix(1.f);
   // Assign the rotation and scale values to the 2x2 submatrix.
   out_matrix[0][0] = in_matrix[0][0];
   out_matrix[0][1] = in_matrix[0][1];
@@ -145,6 +147,7 @@ struct HitTestingData {
 
 view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t start_node,
                                         glm::vec2 world_point, bool is_semantic_hit_test) {
+  TRACE_DURATION("gfx", "flatland::HitTest");
   const auto& [transforms, parent_indices, root_transforms, view_refs, hit_regions,
                global_clip_regions] = data;
   FX_DCHECK(transforms.size() == parent_indices.size());
@@ -165,6 +168,7 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
   const auto y = world_point[1];
 
   std::vector<zx_koid_t> hits = {};
+  hits.reserve(end - start);
 
   for (size_t i = start; i < end; ++i) {
     const auto& transform = transforms[i];
@@ -204,7 +208,7 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
   }
 
   std::reverse(hits.begin(), hits.end());
-  return view_tree::SubtreeHitTestResult{.hits = hits};
+  return view_tree::SubtreeHitTestResult{.hits = std::move(hits)};
 }
 
 // Returns whether the transform at |index| has an anonymous ancestor.
@@ -256,7 +260,7 @@ zx_koid_t FindParentView(const size_t index, const zx_koid_t view_ref_koid, cons
   zx_koid_t parent_koid = ZX_KOID_INVALID;
   if (view_ref_koid != root) {
     size_t parent_index = parent_indices[index];
-    while (view_refs.count(topology_vector[parent_index]) == 0) {
+    while (!view_refs.contains(topology_vector[parent_index])) {
       parent_index = parent_indices[parent_index];
     }
     parent_koid = GetViewRefKoid(topology_vector[parent_index], view_refs).value();
@@ -595,7 +599,7 @@ view_tree::SubtreeSnapshot GlobalTopologyData::GenerateViewTreeSnapshot(
   for (const auto& [_, view_ref] : data.view_refs) {
     if (view_ref != nullptr) {
       const zx_koid_t koid = utils::ExtractKoid(*view_ref);
-      if (view_tree.count(koid) == 0) {
+      if (!view_tree.contains(koid)) {
         unconnected_views.emplace(koid);
       }
     }
@@ -604,11 +608,11 @@ view_tree::SubtreeSnapshot GlobalTopologyData::GenerateViewTreeSnapshot(
   // Copy all non-anonymous ViewRefs from the ViewRefMap.
   ViewRefMap named_view_refs;
   named_view_refs.reserve(data.view_refs.size());
-  std::copy_if(data.view_refs.begin(), data.view_refs.end(),
-               std::inserter(named_view_refs, named_view_refs.end()),
-               [&anonymous = implicitly_anonymous_views](const auto& kv) {
-                 return anonymous.count(kv.first) == 0;
-               });
+  for (auto& [key, value] : data.view_refs) {
+    if (!implicitly_anonymous_views.contains(key)) {
+      named_view_refs.emplace(key, value);
+    }
+  }
 
   // Note: The ViewTree represents a snapshot of the scene at a specific time. Because of this it's
   // important that it contains no references to live data. This means the hit testing closure must
