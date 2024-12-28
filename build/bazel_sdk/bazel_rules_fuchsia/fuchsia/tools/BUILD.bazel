@@ -146,12 +146,6 @@ py_binary(
 )
 
 py_binary(
-    name = "create_pave_script",
-    srcs = ["create_pave_script.py"],
-    python_version = "PY3",
-)
-
-py_binary(
     name = "rebase_flash_manifest",
     srcs = ["rebase_flash_manifest.py"],
     python_version = "PY3",
