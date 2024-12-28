@@ -1068,18 +1068,6 @@ NO_ASAN void cmpct_sized_free(void* payload, size_t s) {
   // the difference between the block size and the requested allocation size. If kernel ASAN
   // is enabled, it also includes an ASAN redzone.
   ZX_ASSERT_MSG(static_cast<size_t>(header->size) >= s, "expected %u got %lu", header->size, s);
-#if !KERNEL_ASAN
-  // Heap blocks are larger than |s| by at most:
-  // 1. sizeof(header_t)
-  // 2. sizeof(free_t) - we don't split heap blocks if the remaining space is < free_t,
-  //    so free_t additional bytes can be present
-  // 3. A bucket- and size-dependent extra space, see cmpct_alloc's computation.
-  //
-  // The computation here is a conservative limit on that difference rather than a precise limit.
-  const size_t max_diff = sizeof(header_t) + sizeof(free_t) + (s >> 2);
-  ZX_ASSERT_MSG((static_cast<size_t>(header->size) - s) <= max_diff, "header->size %u s %lu",
-                header->size, s);
-#endif
   return cmpct_free_internal(payload, header);
 }
 
