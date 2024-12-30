@@ -767,15 +767,6 @@ bool VnodeF2fs::NeedInodeWrite() const {
   return TestFlag(InodeInfoFlag::kSyncInode) || GetSize() != checkpointed_size_;
 }
 
-pgoff_t VnodeF2fs::FlushDirtyPages() {
-  pgoff_t written = 0;
-  if (!fs_->GetSegmentManager().HasNotEnoughFreeSecs(0, GetDirtyPageCount())) {
-    WritebackOperation op;
-    written = Writeback(op);
-  }
-  return written;
-}
-
 zx_status_t VnodeF2fs::SyncFile(bool datasync) {
   if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
@@ -784,9 +775,7 @@ zx_status_t VnodeF2fs::SyncFile(bool datasync) {
   if (!IsDirty()) {
     return ZX_OK;
   }
-  fs::SharedLock lock(f2fs::GetGlobalLock());
-  if (!FlushDirtyPages() || NeedToCheckpoint()) {
-    lock.unlock();
+  if (fs_->GetSegmentManager().HasNotEnoughFreeSecs(0, GetDirtyPageCount()) || NeedToCheckpoint()) {
     std::lock_guard lock(f2fs::GetGlobalLock());
     do {
       uint32_t to_write = std::min(kDefaultBlocksPerSegment, GetDirtyPageCount());
@@ -800,6 +789,9 @@ zx_status_t VnodeF2fs::SyncFile(bool datasync) {
     }
     return ret;
   }
+  fs::SharedLock lock(f2fs::GetGlobalLock());
+  WritebackOperation op;
+  Writeback(op);
   if (!datasync || NeedInodeWrite()) {
     LockedPage page;
     if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(ino_, &page); ret != ZX_OK) {
