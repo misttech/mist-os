@@ -53,6 +53,7 @@ type Config = struct {
     baud_rate uint32;
 };
 
+@serializable
 type SerialPortInfo = struct {
     serial_class Class;
     /// Vendor and product ID of hardware attached to this serial port,
