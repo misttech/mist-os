@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use ffx_command::Result;
+use ffx_command_error::Result;
 use fho::{FhoEnvironment, TryFromEnv, TryFromEnvWith};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;

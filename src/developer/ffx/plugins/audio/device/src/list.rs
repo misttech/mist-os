@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use ffx_audio_device_args::DeviceCommand;
-use ffx_command::FfxContext;
+use ffx_command_error::{FfxContext as _, Result};
 use fuchsia_audio::device::{
     DevfsSelector, HardwareType as HardwareDeviceType, Info as DeviceInfo, Selector,
     Type as DeviceType,
@@ -209,7 +209,7 @@ impl Display for ListResult {
 pub async fn get_devices(
     dev_class: &fio::DirectoryProxy,
     registry: Option<&Registry>,
-) -> fho::Result<Devices> {
+) -> Result<Devices> {
     // Try the registry first.
     if let Some(registry) = registry {
         let infos = registry.device_infos().await.into_values().collect();

@@ -341,7 +341,7 @@ async fn daemon_try_connect<T: TryFromEnv>(
 ) -> Result<T> {
     loop {
         return match T::try_from_env(env).await {
-            Err(ffx_command::Error::User(e)) => {
+            Err(ffx_command_error::Error::User(e)) => {
                 match e.downcast::<target_errors::FfxTargetError>() {
                     Ok(target_errors::FfxTargetError::DaemonError {
                         err: ffx_fidl::DaemonError::Timeout,
