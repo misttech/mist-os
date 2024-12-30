@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ffx_command::{
+use crate::{
     CliArgsInfo, FfxCommandLine, FfxContext, FfxToolInfo, FfxToolSource, MetricsSession, Result,
-    ToolRunner, ToolSuite,
+    SubCommandInfo, ToolRunner, ToolSuite,
 };
+use ffx_command_error::bug;
 use ffx_config::{EnvironmentContext, Sdk, SelectMode};
 use fho_metadata::FhoToolMetadata;
 use serde::{Deserialize, Serialize};
@@ -171,8 +172,8 @@ impl ToolSuite for ExternalSubToolSuite {
         &[]
     }
 
-    async fn get_args_info(&self) -> Result<ffx_command::CliArgsInfo> {
-        let mut external_args_info: ffx_command::CliArgsInfo = Default::default();
+    async fn get_args_info(&self) -> Result<CliArgsInfo> {
+        let mut external_args_info: CliArgsInfo = Default::default();
 
         // Pass the same command line to each of the external subcommands which
         // prints the json encoded args info.
@@ -187,7 +188,7 @@ impl ToolSuite for ExternalSubToolSuite {
             let cmdline =
                 FfxCommandLine::from_args_for_help(&argv).bug_context("cmd line for help")?;
             let mut c = std::process::Command::new(
-                &tool.path.clone().ok_or(ffx_command::bug!("could not get tool path"))?,
+                &tool.path.clone().ok_or(bug!("could not get tool path"))?,
             );
             let help_cmd = c
                 .env(
@@ -204,7 +205,7 @@ impl ToolSuite for ExternalSubToolSuite {
                     String::from_utf8_lossy(&output.stderr)
                 ))?;
 
-            external_args_info.commands.push(ffx_command::SubCommandInfo {
+            external_args_info.commands.push(SubCommandInfo {
                 name: subcmd_args_info.name.clone(),
                 command: subcmd_args_info.clone(),
             });
@@ -339,7 +340,7 @@ impl SubToolLocation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_command::Ffx;
+    use crate::Ffx;
     use fho_metadata::{FhoDetails, Only};
     use serde_json::json;
     use std::collections::HashSet;

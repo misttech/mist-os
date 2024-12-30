@@ -69,7 +69,6 @@ group("tests") {
     ":lib_test",
     "macro:lib_test",
     "metadata:lib_test",
-    "search:lib_test",
   ]
 }
 

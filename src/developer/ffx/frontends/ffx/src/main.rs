@@ -7,15 +7,14 @@ use async_utils::async_once;
 use errors::ffx_error;
 use ffx_command::{
     analytics_command, return_bug, return_user_error, send_enhanced_analytics, CliArgsInfo, Error,
-    FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession, Optionality, Result, ToolRunner,
-    ToolSuite,
+    ExternalSubToolSuite, FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession, Optionality,
+    Result, ToolRunner, ToolSuite,
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
 use ffx_lib_args::FfxBuiltIn;
 use ffx_lib_sub_command::SubCommand;
 use fho::FhoEnvironment;
-use fho_search::ExternalSubToolSuite;
 use std::collections::HashSet;
 use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;

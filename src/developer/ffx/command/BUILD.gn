@@ -10,10 +10,29 @@ rustc_library("lib") {
   edition = "2021"
   with_unit_tests = true
 
+  visibility = [
+    ":*",
+    "//src/developer/ffx/frontends/*",
+
+    # TODO(b/386792198) Move ToolSuite to internal crate.
+    "//src/developer/ffx/lib/fho:*",
+
+    # E2E tests that parse the JSON ArgsInfo
+    "//src/developer/ffx/tests/cli-goldens:*",
+    "//src/developer/ffx/tests/help-json:*",
+
+    # Reference doc generation based on JSON
+    "//tools/clidoc:*",
+
+    # TODO(b/386416011): Deprecate fuchsia-sdk-run.
+    "//tools/fuchsia-sdk-run:*",
+  ]
+
   deps = [
     "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho/metadata:lib",
     "//src/developer/ffx/lib/metrics:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/timeout:lib",
@@ -33,6 +52,7 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:tempfile",
   ]
@@ -43,6 +63,7 @@ rustc_library("lib") {
     "src/ffx.rs",
     "src/lib.rs",
     "src/metrics.rs",
+    "src/subcommand.rs",
     "src/tools.rs",
   ]
 }
