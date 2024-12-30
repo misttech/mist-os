@@ -107,10 +107,10 @@ test("aml-uart-test-bin") {
     ":aml-uart-source",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/power/cpp/testing",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_cpp",
-    "//src/devices/bus/testing/fake-pdev",
     "//src/devices/testing/fake-mmio-reg",
     "//src/lib/ddk",  # needed for metadata.h
     "//src/lib/fxl/test:gtest_main",

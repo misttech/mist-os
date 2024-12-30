@@ -4,12 +4,13 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.serial/cpp/wire.h>
+#include <fidl/fuchsia.hardware.serial/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/markers.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/syslog/cpp/macros.h>
@@ -17,19 +18,12 @@
 #include <bind/fuchsia/broadcom/platform/cpp/bind.h>
 #include <gtest/gtest.h>
 
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/serial/drivers/aml-uart/aml-uart-dfv2.h"
 #include "src/devices/serial/drivers/aml-uart/tests/device_state.h"
 
 namespace {
 
 using fuchsia_power_system::LeaseToken;
-
-static constexpr fuchsia_hardware_serial::wire::SerialPortInfo kSerialInfo = {
-    .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
-    .serial_vid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM,
-    .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
-};
 
 class FakeSystemActivityGovernor
     : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
@@ -132,21 +126,29 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
 class Environment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    static const fuchsia_hardware_serial::SerialPortInfo kSerialPortInfo{{
+        .serial_class = fuchsia_hardware_serial::Class::kBluetoothHci,
+        .serial_vid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_VID_BROADCOM,
+        .serial_pid = bind_fuchsia_broadcom_platform::BIND_PLATFORM_DEV_PID_BCM43458,
+    }};
+
     // Configure pdev.
-    fake_pdev::FakePDevFidl::Config config;
+    fdf_fake::FakePDev::Config config;
     config.irqs[0] = {};
     EXPECT_EQ(ZX_OK,
               zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
     state_.set_irq_signaller(config.irqs[0].borrow());
     config.mmios[0] = state_.GetMmio();
-    pdev_server_.SetConfig(std::move(config));
+    pdev_.SetConfig(std::move(config));
+    pdev_.AddFidlMetadata(fuchsia_hardware_serial::SerialPortInfo::kSerializableName,
+                          kSerialPortInfo);
 
     // Add pdev.
     async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
     constexpr std::string_view kInstanceName = "pdev";
     zx::result add_service_result =
         to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
-            pdev_server_.GetInstanceHandler(dispatcher), kInstanceName);
+            pdev_.GetInstanceHandler(dispatcher), kInstanceName);
     ZX_ASSERT(add_service_result.is_ok());
 
     // Add power protocols.
@@ -155,14 +157,7 @@ class Environment : public fdf_testing::Environment {
             system_activity_governor_.CreateHandler());
     EXPECT_EQ(ZX_OK, result_sag.status_value());
 
-    // Configure and add compat.
-    compat_server_.Initialize("default");
-
-    fit::result encoded = fidl::Persist(kSerialInfo);
-    ZX_ASSERT(encoded.is_ok());
-
-    compat_server_.AddMetadata(DEVICE_METADATA_SERIAL_PORT_INFO, encoded->data(), encoded->size());
-    return zx::make_result(compat_server_.Serve(dispatcher, &to_driver_vfs));
+    return zx::ok();
   }
 
   DeviceState& device_state() { return state_; }
@@ -170,9 +165,8 @@ class Environment : public fdf_testing::Environment {
 
  private:
   DeviceState state_;
-  fake_pdev::FakePDevFidl pdev_server_;
+  fdf_fake::FakePDev pdev_;
   FakeSystemActivityGovernor system_activity_governor_;
-  compat::DeviceServer compat_server_;
 };
 
 class AmlUartTestConfig {
