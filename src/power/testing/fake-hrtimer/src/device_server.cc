@@ -108,6 +108,11 @@ void DeviceServer::StartAndWait(StartAndWaitRequest& request,
   auto fut = std::async(
       std::launch::async,
       [&]() -> zx::result<fuchsia_hardware_hrtimer::DeviceStartAndWaitResponse> {
+        // The StartAndWait protocol requires this signal when the alarm has
+        // been scheduled.  This is not strictly correct here since it should be signaled only
+        // *after* the sleep has been scheduled, but should be enough for tests.
+        request.setup_event().signal(0, ZX_EVENT_SIGNALED);
+
         std::this_thread::sleep_for(std::chrono::nanoseconds(
             request.resolution().duration().value() * (request.ticks() + 1)));
         if (!lessor_.has_value()) {
