@@ -81,8 +81,6 @@ bool exclusive_region_overlaps(zx_rsrc_kind_t kind, zx_paddr_t new_rsrc_base,
           if ((new_rsrc_base <= rsrc->base() && new_rsrc_end > rsrc->base()) ||
               // If we start inside the existing resource
               (new_rsrc_base >= rsrc->base() && new_rsrc_base < rsrc_end)) {
-            ftracef("new [ %#lx - %#lx ] existing [ %#lx - %#lx ]\n", new_rsrc_base,
-                    new_rsrc_base + new_rsrc_size, rsrc->base(), rsrc_end);
             overlaps = true;
             return false;
           }
