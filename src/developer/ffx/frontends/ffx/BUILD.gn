@@ -35,7 +35,10 @@ ffx("ffx") {
     plugin_deps += dual_mode_plugins  # from config.gni
   }
 
-  deps = [ "//third_party/rust_crates:anyhow" ]
+  deps = [
+    "//src/developer/ffx/lib/fho:lib",
+    "//third_party/rust_crates:anyhow",
+  ]
 
   ffx_deps = [
     ":ffx_lib_args",
@@ -43,15 +46,13 @@ ffx("ffx") {
     ":ffx_lib_suite",
     "//src/developer/ffx/command:lib",
     "//src/developer/ffx/config:lib",
-    "//src/developer/ffx/core:lib",
-    "//src/developer/ffx/daemon/proxy:lib",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fho/search:lib",
     "//src/lib/async-utils",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
-    "//third_party/rust_crates:tracing",
   ]
 
   args_sources = [ "src/args.rs" ]

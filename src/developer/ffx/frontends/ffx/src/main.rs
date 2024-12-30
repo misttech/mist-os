@@ -12,14 +12,13 @@ use ffx_command::{
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
-use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use ffx_lib_args::FfxBuiltIn;
 use ffx_lib_sub_command::SubCommand;
+use fho::FhoEnvironment;
 use fho_search::ExternalSubToolSuite;
 use std::collections::HashSet;
 use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
-use std::sync::Arc;
 
 /// The command to be invoked and everything it needs to invoke
 struct FfxSubCommand {
@@ -268,16 +267,12 @@ fn find_info_from_cmd(args: &[&str], all_info: &CliArgsInfo) -> Option<CliArgsIn
 }
 
 async fn run_legacy_subcommand(
-    _app: FfxCommandLine,
+    ffx: FfxCommandLine,
     context: EnvironmentContext,
     subcommand: FfxBuiltIn,
 ) -> Result<()> {
-    let daemon_version_string = DaemonVersionCheck::SameBuildId(context.daemon_version_string()?);
-    tracing::debug!("initializing overnet");
-    let injector = Injection::initialize_overnet(context, None, daemon_version_string).await?;
-    tracing::debug!("Overnet initialized, creating injector");
-    let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
-    ffx_lib_suite::ffx_plugin_impl(&Some(injector), subcommand).await
+    let env = FhoEnvironment::new(&context, &ffx).await?;
+    ffx_lib_suite::ffx_plugin_impl(&env, subcommand).await
 }
 
 #[fuchsia_async::run_singlethreaded]
@@ -290,7 +285,6 @@ async fn main() {
 mod test {
     use super::*;
     use ffx_command::{FlagInfo, FlagKind, PositionalInfo, SubCommandInfo};
-    use ffx_core as _;
 
     #[fuchsia::test]
     async fn test_try_runner_from_name() {

@@ -47,5 +47,5 @@ pub mod macro_deps {
     };
     pub use ffx_config::{global_env_context, EnvironmentContext};
     pub use ffx_core::Injector;
-    pub use {anyhow, argh, async_lock, ffx_writer, futures, serde};
+    pub use {crate as fho, anyhow, argh, async_lock, ffx_writer, futures, serde};
 }

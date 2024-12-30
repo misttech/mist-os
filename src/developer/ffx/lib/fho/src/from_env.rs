@@ -102,10 +102,6 @@ pub struct FhoEnvironment {
     pub context: EnvironmentContext,
     pub behavior: FhoConnectionBehavior,
     pub lookup: Arc<dyn DeviceLookup>,
-
-    /// This should not be public, as the daemon is (slowly) being phased out where possible.
-    #[deprecated]
-    pub injector: Option<Arc<dyn Injector>>,
 }
 
 impl FhoEnvironment {
@@ -213,10 +209,19 @@ impl FhoEnvironment {
             behavior: crate::from_env::connection_behavior(&ffx, &injector, &context).await?,
             ffx: ffx.clone(),
             context: context.clone(),
-            injector,
             lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
         };
         Ok(env)
+    }
+
+    pub fn new_for_test(
+        context: &EnvironmentContext,
+        ffx: &FfxCommandLine,
+        behavior: FhoConnectionBehavior,
+        lookup: Arc<dyn DeviceLookup>,
+    ) -> Self {
+        #[allow(deprecated)] // injector field.
+        FhoEnvironment { behavior, ffx: ffx.clone(), context: context.clone(), lookup }
     }
 }
 
