@@ -40,10 +40,10 @@ fn handle_sensor_event(
                 for client in &sensor.clients {
                     if !client.control_handle.is_closed() {
                         if let Err(e) = client.control_handle.send_on_sensor_event(&event) {
-                            tracing::warn!("Failed to send sensor event: {:#?}", e);
+                            log::warn!("Failed to send sensor event: {:#?}", e);
                         }
                     } else {
-                        tracing::error!("Client was PEER_CLOSED! Removing from clients list");
+                        log::error!("Client was PEER_CLOSED! Removing from clients list");
                         clients_to_remove.push(client.clone());
                     }
                 }
@@ -53,14 +53,14 @@ fn handle_sensor_event(
             }
         }
         Some(Ok(DriverEvent::_UnknownEvent { ordinal, .. })) => {
-            tracing::warn!("SensorManager received an UnknownEvent with ordinal: {:#?}", ordinal);
+            log::warn!("SensorManager received an UnknownEvent with ordinal: {:#?}", ordinal);
         }
         Some(Err(e)) => {
-            tracing::error!("Received an error from sensor driver: {:#?}", e);
+            log::error!("Received an error from sensor driver: {:#?}", e);
             should_send_more_events = false;
         }
         None => {
-            tracing::error!("Got None from driver");
+            log::error!("Got None from driver");
             should_send_more_events = false;
         }
     }
@@ -94,7 +94,7 @@ pub async fn handle_sensor_event_streams(mut update_receiver: mpsc::Receiver<Sen
                         event_streams.push(stream.into_future());
                     }
                     None => {
-                        tracing::error!("Channel has hung up! Will no longer receive sensor updates.");
+                        log::error!("Channel has hung up! Will no longer receive sensor updates.");
                     }
                 }
             },
@@ -109,7 +109,7 @@ impl SensorUpdateSender {
 
     async fn send_update(&self, update: SensorUpdate) {
         if let Err(e) = self.sender.lock().await.try_send(update) {
-            tracing::warn!("Failed to send sensor update! {:#?}", e);
+            log::warn!("Failed to send sensor update! {:#?}", e);
         }
     }
 

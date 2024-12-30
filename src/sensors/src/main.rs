@@ -19,7 +19,7 @@ async fn connect_to_playback() -> Option<(driver_fidl::DriverProxy, driver_fidl:
     let playback_proxy = if let Ok(playback_proxy) = playback_proxy_res {
         playback_proxy
     } else {
-        tracing::warn!(
+        log::warn!(
             "Failed to connect to sensor playback driver protocol. {:#?}",
             playback_proxy_res
         );
@@ -53,7 +53,7 @@ async fn connect_to_playback() -> Option<(driver_fidl::DriverProxy, driver_fidl:
     if let Some(driver_proxy) = playback_driver_proxy {
         Some((driver_proxy, playback_proxy))
     } else {
-        tracing::warn!("Failed to connect to sensor playback driver service.");
+        log::warn!("Failed to connect to sensor playback driver service.");
         None
     }
 }
@@ -69,7 +69,7 @@ fn connect_to_instance(
         if let Ok(driver) = service_proxy.connect_to_driver() {
             return Some(driver);
         } else {
-            tracing::error!("service proxy failed to connect to driver");
+            log::error!("service proxy failed to connect to driver");
             return None;
         }
     } else {
@@ -79,7 +79,7 @@ fn connect_to_instance(
 
 #[fuchsia::main(logging_tags = [ "sensors" ])]
 async fn main() -> Result<(), Error> {
-    tracing::info!("Sensors Server Started");
+    log::info!("Sensors Server Started");
 
     let playback_proxies = connect_to_playback().await;
 
@@ -100,6 +100,6 @@ async fn main() -> Result<(), Error> {
 
     // This should run forever.
     let result = sensor_manager.run().await;
-    tracing::error!("Unexpected exit with result: {:?}", result);
+    log::error!("Unexpected exit with result: {:?}", result);
     result
 }
