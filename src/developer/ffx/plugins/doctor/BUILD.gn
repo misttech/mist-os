@@ -11,7 +11,6 @@ ffx_plugin("ffx_doctor") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/connectivity/overnet/lib/core",
-    "//src/developer/ffx/command:lib",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/daemon:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
@@ -29,7 +28,6 @@ ffx_plugin("ffx_doctor") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-lockfile:lib",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
