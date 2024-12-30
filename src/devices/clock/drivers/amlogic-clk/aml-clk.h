@@ -8,10 +8,12 @@
 #include <fidl/fuchsia.hardware.clock.measure/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clockimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.clockimpl/cpp/natural_types.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -153,6 +155,11 @@ class AmlClock : public fdf::DriverBase,
       fit::bind_member<&AmlClock::DevfsConnect>(this)};
   fidl::ServerBindingGroup<fuchsia_hardware_clock_measure::Measurer> measurer_binding_group_;
   fdf::ServerBindingGroup<fuchsia_hardware_clockimpl::ClockImpl> clock_impl_binding_group_;
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  fdf_metadata::MetadataServer<fuchsia_hardware_clockimpl::ClockIdsMetadata>
+      clock_ids_metadata_server_;
+#endif
 };
 
 }  // namespace amlogic_clock

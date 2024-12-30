@@ -274,6 +274,7 @@ zx::result<> ClockDriver::Start() {
 }
 
 zx_status_t ClockDriver::CreateClockDevices() {
+  // TODO(b/373903133): Retrieve clock ID's via FIDL once available.
   zx::result clock_ids =
       compat::GetMetadataArray<clock_id_t>(incoming(), DEVICE_METADATA_CLOCK_IDS);
   if (clock_ids.is_error()) {

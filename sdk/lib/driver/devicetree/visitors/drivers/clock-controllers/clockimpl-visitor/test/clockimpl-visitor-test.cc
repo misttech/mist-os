@@ -61,7 +61,11 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+      ASSERT_EQ(3lu, metadata->size());
+#else
       ASSERT_EQ(2lu, metadata->size());
+#endif
 
       // ID metadata
       std::vector<uint8_t> metadata_blob_1 = std::move(*(*metadata)[0].data());
@@ -90,6 +94,20 @@ TEST(ClockImplVisitorTest, TestClocksProperty) {
       EXPECT_EQ(init_steps->steps()[2].id(), static_cast<uint32_t>(CLK_ID3));
       EXPECT_EQ(init_steps->steps()[2].call()->Which(),
                 fuchsia_hardware_clockimpl::InitCall::Tag::kEnable);
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+      // Clock ID's metadata
+      std::vector<uint8_t> metadata_blob_3 = std::move(*(*metadata)[2].data());
+      fit::result clock_ids_metadata =
+          fidl::Unpersist<fuchsia_hardware_clockimpl::ClockIdsMetadata>(
+              cpp20::span(metadata_blob_3));
+      const auto& clock_ids2 = clock_ids_metadata->clock_ids();
+      ASSERT_TRUE(clock_ids2.has_value());
+      ASSERT_EQ(clock_ids2.value().size(), 3lu);
+      EXPECT_EQ(clock_ids2.value()[0], static_cast<uint32_t>(CLK_ID1));
+      EXPECT_EQ(clock_ids2.value()[1], static_cast<uint32_t>(CLK_ID2));
+      EXPECT_EQ(clock_ids2.value()[2], static_cast<uint32_t>(CLK_ID6));
+#endif
 
       node_tested_count++;
     }

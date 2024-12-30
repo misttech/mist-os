@@ -6,6 +6,13 @@ library fuchsia.hardware.clockimpl;
 
 using zx;
 
+/// Metadata containing the IDs of the available clocks.
+@available(added=HEAD)
+@serializable
+type ClockIdsMetadata = table {
+    1: clock_ids vector<uint32>:MAX;
+};
+
 /// Each method in this protocol has a corresponding method in clock.fidl
 /// with an additional ID parameter.
 /// The ID parameter in each method below designates the clock in the system

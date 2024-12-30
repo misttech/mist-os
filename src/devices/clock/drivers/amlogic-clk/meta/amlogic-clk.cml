@@ -16,6 +16,7 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.clockimpl.Service" },
+        { service: "fuchsia.hardware.clockimpl.ClockIdsMetadata" },
     ],
     use: [
         { service: "fuchsia.hardware.platform.device.Service" },
@@ -23,6 +24,10 @@
     expose: [
         {
             service: "fuchsia.hardware.clockimpl.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.clockimpl.ClockIdsMetadata",
             from: "self",
         },
     ],

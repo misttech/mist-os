@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.clockimpl/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
@@ -32,7 +33,8 @@ static const std::vector<fpbus::Mmio> clk_mmios{
     }},
 };
 
-constexpr clock_id_t clock_ids[] = {
+// TODO(b/373903133): Remove once no longer referenced.
+constexpr clock_id_t kClockIds[] = {
     // For CPU device.
     {g12a_clk::CLK_SYS_PLL_DIV16},
     {g12a_clk::CLK_SYS_CPU_CLK_DIV16},
@@ -57,12 +59,43 @@ zx_status_t Astro::ClkInit() {
     return encoded_metadata.error_value().status();
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  const fuchsia_hardware_clockimpl::ClockIdsMetadata kClockIdsMetadata{{
+      .clock_ids{{
+          // For CPU device.
+          g12a_clk::CLK_SYS_PLL_DIV16,
+          g12a_clk::CLK_SYS_CPU_CLK_DIV16,
+          g12a_clk::CLK_SYS_CPU_CLK,
+
+          // For video decoder
+          g12a_clk::CLK_DOS_GCLK_VDEC,
+          g12a_clk::CLK_DOS,
+
+          // For GPU
+          g12a_clk::CLK_GP0_PLL,
+      }},
+  }};
+  const fit::result encoded_clock_ids_metadata = fidl::Persist(kClockIdsMetadata);
+  if (!encoded_clock_ids_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode clock ID's: %s",
+           encoded_clock_ids_metadata.error_value().FormatDescription().c_str());
+    return encoded_clock_ids_metadata.error_value().status();
+  }
+#endif
+
   const std::vector<fpbus::Metadata> clock_metadata{
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+      {{
+          .id = fuchsia_hardware_clockimpl::wire::ClockIdsMetadata::kSerializableName,
+          .data = encoded_clock_ids_metadata.value(),
+      }},
+#endif
+      // TODO(b/373903133): Remove once no longer referenced.
       {{
           .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
           .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&clock_ids),
-              reinterpret_cast<const uint8_t*>(&clock_ids) + sizeof(clock_ids)),
+              reinterpret_cast<const uint8_t*>(&kClockIds),
+              reinterpret_cast<const uint8_t*>(&kClockIds) + sizeof(kClockIds)),
       }},
       {{
           .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),

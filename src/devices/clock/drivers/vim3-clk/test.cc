@@ -47,8 +47,7 @@ class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_de
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {}
 
-  void GetMmioById(fuchsia_hardware_platform_device::wire::DeviceGetMmioByIdRequest* request,
-                   GetMmioByIdCompleter::Sync& completer) override {
+  void GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) override {
     zx::vmo vmo;
     zx_status_t st;
     size_t sz;
@@ -79,6 +78,25 @@ class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_de
                       .Build();
 
     completer.ReplySuccess(std::move(result));
+  }
+
+  void GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer) override {
+    auto metadata_id = request->id.get();
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    if (metadata_id == fuchsia_hardware_clockimpl::ClockIdsMetadata::kSerializableName) {
+      fuchsia_hardware_clockimpl::ClockIdsMetadata metadata{{.clock_ids{}}};
+      fit::result encoded_metadata = fidl::Persist(metadata);
+      if (encoded_metadata.is_error()) {
+        completer.ReplyError(encoded_metadata.error_value().status());
+        return;
+      }
+      completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(encoded_metadata.value()));
+      return;
+    }
+#endif
+
+    completer.ReplyError(ZX_ERR_NOT_FOUND);
   }
 
  private:

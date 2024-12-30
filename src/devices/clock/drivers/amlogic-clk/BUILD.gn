@@ -58,6 +58,7 @@ source_set("amlogic-clk-driver-source") {
     "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/amlogic",
     "//src/lib/ddk",
