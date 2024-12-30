@@ -150,6 +150,10 @@ impl ObjectManager {
         }
     }
 
+    pub fn required_reservation(&self) -> u64 {
+        self.inner.read().unwrap().required_reservation()
+    }
+
     pub fn root_parent_store_object_id(&self) -> u64 {
         self.inner.read().unwrap().root_parent_store_object_id
     }
@@ -643,6 +647,10 @@ impl ObjectManager {
 
     pub fn update_reservation(&self, object_id: u64, amount: u64) {
         self.inner.write().unwrap().reservations.insert(object_id, amount);
+    }
+
+    pub fn reservation(&self, object_id: u64) -> Option<u64> {
+        self.inner.read().unwrap().reservations.get(&object_id).cloned()
     }
 
     pub fn last_end_offset(&self) -> u64 {
