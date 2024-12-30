@@ -1710,6 +1710,7 @@ def _merge_rules_fuchsia(runtime, use_rules_fuchsia):
         # Another special case if @fuchsia_sdk//fuchsia:toolchain which is still referenced
         # directly in @rules_fuchsia at the moment.
         content = content.replace("@rules_fuchsia//fuchsia:toolchain", "@fuchsia_sdk//fuchsia:toolchain")
+        content = content.replace("@rules_fuchsia//fuchsia/toolchains:sdk", "@fuchsia_sdk//fuchsia/toolchains:sdk")
 
         return content
 
@@ -1769,6 +1770,11 @@ alias(
 
         # Needed by the SDK test suite.
         ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "tools"), "fuchsia/tools")
+
+        # Until we completely remove the toolchain types from the fuchsia_sdk we need
+        # to make sure we have them defined. We copy over the build file for the
+        # toolchains for now.
+        ctx.symlink(rules_fuchsia_root.get_child("fuchsia", "toolchains", "BUILD.bazel"), "fuchsia/toolchains/BUILD.bazel")
     else:
         # Simply symlink the content of @rules_fuchsia into the current
         # repository instead.

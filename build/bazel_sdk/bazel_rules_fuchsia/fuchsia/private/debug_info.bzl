@@ -6,7 +6,7 @@
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 def _print_debug_info_impl(ctx):
-    sdk = ctx.toolchains["//fuchsia:toolchain"]
+    sdk = ctx.toolchains["//fuchsia/toolchains:sdk"]
 
     executable_file = ctx.actions.declare_file(ctx.label.name + "_dump.sh")
     content = """#!/bin/bash
@@ -74,7 +74,7 @@ def _print_debug_info_impl(ctx):
 print_debug_info = rule(
     doc = """ Creates an action which gathers debug information and prints it.""",
     implementation = _print_debug_info_impl,
-    toolchains = ["//fuchsia:toolchain"],
+    toolchains = ["//fuchsia/toolchains:sdk"],
     attrs = {
         "_clang_bin": attr.label(
             default = "@fuchsia_clang//:bin/clang",

@@ -12,7 +12,7 @@ def _fuchsia_toolchain_decl_impl(ctx):
 toolchain(
   name = "{toolchain_name}",
   toolchain = "{toolchain_path}",
-  toolchain_type = "@rules_fuchsia//fuchsia:toolchain",
+  toolchain_type = "@rules_fuchsia//fuchsia/toolchains:sdk",
   visibility = ["//visibility:public"],
 )
 """.format(toolchain_name = ctx.name + "_toolchain", toolchain_path = ctx.attr.toolchain_path),
@@ -39,8 +39,8 @@ def get_fuchsia_sdk_toolchain(ctx):
         The fuchsia sdk tool chain.
     """
     sdk = (
-        ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"] or
-        ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+        ctx.toolchains["@rules_fuchsia//fuchsia/toolchains:sdk"] or
+        ctx.toolchains["@fuchsia_sdk//fuchsia/toolchains:sdk"]
     )
     if not sdk:
         fail("No fuchsia toolchain registered. Please call register_fuchsia_sdk_toolchain in your WORKSPACE file.")
@@ -49,8 +49,8 @@ def get_fuchsia_sdk_toolchain(ctx):
 # These toolchain definitions should be used in conjunction with get_fuchsia_sdk_toolchain
 # when working with fuchsia toolchains.
 FUCHSIA_TOOLCHAIN_DEFINITION = [
-    config_common.toolchain_type("@rules_fuchsia//fuchsia:toolchain", mandatory = False),
-    config_common.toolchain_type("@fuchsia_sdk//fuchsia:toolchain", mandatory = False),
+    config_common.toolchain_type("@rules_fuchsia//fuchsia/toolchains:sdk", mandatory = False),
+    config_common.toolchain_type("@fuchsia_sdk//fuchsia/toolchains:sdk", mandatory = False),
 ]
 
 def register_fuchsia_sdk_toolchain(
