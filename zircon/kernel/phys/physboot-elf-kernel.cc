@@ -115,12 +115,7 @@ PhysBootTimes gBootTimes;
         static_cast<size_t>(KERNEL_IMAGE_MAX_SIZE));
   }
 
-  // Prepare the handoff data structures.  Repurpose the storage item as a
-  // place to put the handoff payload.  The KERNEL_STORAGE payload was already
-  // decompressed elsewhere, so it's no longer in use.
-  debugf("%s: Preparing handoff data in payload at [%p, %p)\n", gSymbolize->name(),
-         kernel_storage.item()->payload.data(),
-         kernel_storage.item()->payload.data() + kernel_storage.item()->payload.size());
+  // Prepare the handoff data structures.
   HandoffPrep prep;
   prep.Init();
 
