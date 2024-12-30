@@ -1,0 +1,94 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/test.gni")
+
+source_set("cpp") {
+  sources = [
+    "display-engine-banjo-adapter.cc",
+    "display-engine-banjo-adapter.h",
+    "display-engine-events-banjo.cc",
+    "display-engine-events-banjo.h",
+    "display-engine-events-interface.h",
+    "display-engine-interface.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
+    "//sdk/lib/driver/logging/cpp",
+  ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/stdcompat",
+    "//src/graphics/display/lib/api-types/cpp",
+  ]
+}
+
+test_sources = [
+  "display-engine-banjo-adapter-test.cc",
+  "display-engine-events-banjo-test.cc",
+  "display-engine-events-interface-test.cc",
+  "display-engine-interface-test.cc",
+]
+
+group("test-deps") {
+  testonly = true
+  visibility = [ ":*" ]
+  public_deps = [
+    ":cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/image-format",
+  ]
+}
+
+test("unittests") {
+  sources = test_sources
+  output_name = "display-api-protocols-cpp-tests"
+  deps = [ ":test-deps" ]
+  visibility = [ ":*" ]
+}
+
+# TODO(https://fxbug.dev/378965477): Remove once C++17 support is dropped.
+test("unittests-cxx17") {
+  sources = test_sources
+  output_name = "display-api-protocols-cpp17-tests"
+  deps = [ ":test-deps" ]
+  visibility = [ ":*" ]
+
+  # Remove the C++ language specifier.
+  configs -= [ "//build/config:language" ]
+  configs += [ ":cxx17" ]
+}
+
+# TODO(https://fxbug.dev/378965477): Remove once C++17 support is dropped.
+config("cxx17") {
+  visibility = [ ":*" ]
+  cflags_cc = [ "-std=c++17" ]
+}
+
+fuchsia_unittest_package("unittests-package") {
+  package_name = "display-api-protocols-cpp-tests"
+  deps = [ ":unittests" ]
+}
+
+# TODO(https://fxbug.dev/378965477): Remove once C++17 support is dropped.
+fuchsia_unittest_package("unittests-cxx17-package") {
+  package_name = "display-api-protocols-cpp17-tests"
+  deps = [ ":unittests-cxx17" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    ":unittests-cxx17-package",
+    ":unittests-package",
+  ]
+}
