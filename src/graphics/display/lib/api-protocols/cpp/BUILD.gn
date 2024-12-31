@@ -35,6 +35,8 @@ test_sources = [
   "display-engine-events-banjo-test.cc",
   "display-engine-events-interface-test.cc",
   "display-engine-interface-test.cc",
+  "mock-banjo-display-engine-listener.cc",
+  "mock-banjo-display-engine-listener.h",
 ]
 
 group("test-deps") {
@@ -42,6 +44,7 @@ group("test-deps") {
   visibility = [ ":*" ]
   public_deps = [
     ":cpp",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
