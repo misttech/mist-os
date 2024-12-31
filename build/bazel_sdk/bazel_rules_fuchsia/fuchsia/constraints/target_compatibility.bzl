@@ -38,7 +38,9 @@ define_host_can_build_fuchsia_flag = rule(
     implementation = _define_host_can_build_fuchsia_flag_impl,
     attrs = {
         "_fuchsia_targets_enabled": attr.label(
-            default = "//fuchsia:fuchsia_targets_enabled",
+            # Note: we need to mark this as being on rules_fuchsia explicitly while
+            # we continue to transition from fuchsia_sdk to rules_fuchsia
+            default = "@rules_fuchsia//fuchsia/flags:fuchsia_targets_enabled",
         ),
     },
 )
