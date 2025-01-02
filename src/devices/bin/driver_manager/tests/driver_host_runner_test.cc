@@ -94,9 +94,10 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
   fidl::WireSharedClient<fuchsia_driver_loader::DriverHostLauncher> launcher(
       ConnectToDynamicLinker(), dispatcher());
 
+  std::shared_ptr<bool> connected = std::make_shared<bool>(false);
   bool got_cb = false;
   driver_host_runner_->StartDriverHost(
-      std::move(launcher), std::move(endpoints.server),
+      std::move(launcher), std::move(endpoints.server), connected,
       [&](zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) {
         ASSERT_EQ(ZX_OK, result.status_value());
         ASSERT_TRUE(result->is_valid());
@@ -113,6 +114,7 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
                                                                   std::move(pkg_endpoints.client)));
   ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(got_cb);
+  ASSERT_TRUE(*connected);
 
   std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
       driver_host_runner_->DriverHosts();

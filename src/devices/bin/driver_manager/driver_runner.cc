@@ -545,19 +545,22 @@ void DriverRunner::CreateDriverHostDynamicLinker(
     driver_host_launcher_ = fidl::WireSharedClient<fuchsia_driver_loader::DriverHostLauncher>(
         std::move(*client), dispatcher_);
   }
+  std::shared_ptr<bool> connected = std::make_shared<bool>(false);
   dynamic_linker_args_->driver_host_runner->StartDriverHost(
-      driver_host_launcher_->Clone(), std::move(endpoints.server),
-      [this, completion_cb = std::move(completion_cb), client_end = std::move(client_end)](
+      driver_host_launcher_->Clone(), std::move(endpoints.server), connected,
+      [this, completion_cb = std::move(completion_cb), client_end = std::move(client_end),
+       connected = std::move(connected)](
           zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) mutable {
         if (result.is_error()) {
           completion_cb(result.take_error());
           return;
         }
-        auto driver_host = std::make_unique<DynamicLinkerDriverHostComponent>(
-            std::move(*client_end), std::move(*result), dispatcher_, &dynamic_linker_driver_hosts_);
+
+        auto driver_host = std::make_unique<DriverHostComponent>(
+            std::move(*client_end), dispatcher_, &driver_hosts_, connected, std::move(*result));
 
         auto driver_host_ptr = driver_host.get();
-        dynamic_linker_driver_hosts_.push_back(std::move(driver_host));
+        driver_hosts_.push_back(std::move(driver_host));
         completion_cb(zx::ok(driver_host_ptr));
       });
 }

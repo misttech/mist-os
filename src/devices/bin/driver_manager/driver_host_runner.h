@@ -50,7 +50,8 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   void StartDriverHost(
       fidl::WireSharedClient<fuchsia_driver_loader::DriverHostLauncher> driver_host_launcher,
-      fidl::ServerEnd<fuchsia_io::Directory> exposed_dir, StartDriverHostCallback callback);
+      fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
+      std::shared_ptr<bool> exposed_dir_connected, StartDriverHostCallback callback);
 
   // Returns all started driver hosts. This will be used by tests.
   std::unordered_set<const DriverHost*> DriverHosts();
@@ -71,6 +72,7 @@ class DriverHostRunner : public fidl::WireServer<fuchsia_component_runner::Compo
 
   void StartDriverHostComponent(std::string_view moniker, std::string_view url,
                                 fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
+                                std::shared_ptr<bool> exposed_dir_connected,
                                 StartComponentCallback callback);
 
   void LoadDriverHost(

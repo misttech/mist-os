@@ -204,9 +204,6 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   std::shared_ptr<BootupTracker> bootup_tracker_;
 
   fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>> driver_hosts_;
-  // Driver hosts started using dynamic linking.
-  fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>
-      dynamic_linker_driver_hosts_;
 
   // True if the driver manager should inject test delays in the shutdown process. Set by the
   // structured config.

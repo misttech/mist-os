@@ -148,12 +148,13 @@ zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_p
 
 void DriverHostRunner::StartDriverHost(
     fidl::WireSharedClient<fuchsia_driver_loader::DriverHostLauncher> driver_host_launcher,
-    fidl::ServerEnd<fuchsia_io::Directory> exposed_dir, StartDriverHostCallback callback) {
+    fidl::ServerEnd<fuchsia_io::Directory> exposed_dir, std::shared_ptr<bool> exposed_dir_connected,
+    StartDriverHostCallback callback) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
   std::string name = "driver-host-new-" + std::to_string(next_driver_host_id_++);
 
   StartDriverHostComponent(
-      name, kUrl, std::move(exposed_dir),
+      name, kUrl, std::move(exposed_dir), std::move(exposed_dir_connected),
       [this, name, launcher = std::move(driver_host_launcher), callback = std::move(callback)](
           zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
         if (component.is_error()) {
@@ -268,6 +269,7 @@ void DriverHostRunner::LoadDriverHost(
 
 void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::string_view url,
                                                 fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
+                                                std::shared_ptr<bool> exposed_dir_connected,
                                                 StartComponentCallback callback) {
   zx::event token;
   zx_status_t status = zx::event::create(0, &token);
@@ -309,7 +311,9 @@ void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::s
       fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(&handle_info, 1));
   auto create_callback =
       [this, child_moniker = std::string(moniker.data()), koid = koid.value(),
-       exposed_dir = std::move(exposed_dir), open_callback = std::move(open_callback)](
+       exposed_dir = std::move(exposed_dir),
+       exposed_dir_connected = std::move(exposed_dir_connected),
+       open_callback = std::move(open_callback)](
           fidl::WireUnownedResult<fcomponent::Realm::CreateChild>& result) mutable {
         bool is_error = false;
         if (!result.ok()) {
@@ -335,6 +339,7 @@ void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::s
         };
         realm_->OpenExposedDir(child_ref, std::move(exposed_dir))
             .ThenExactlyOnce(std::move(open_callback));
+        *exposed_dir_connected = true;
       };
   realm_
       ->CreateChild(
