@@ -31,6 +31,7 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/imported-image.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -296,7 +297,7 @@ zx::result<> DisplayEngine::SetMinimumRgb(uint8_t minimum_rgb) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-DisplayEngine::DisplayEngine(DisplayEngineEventsInterface* engine_events,
+DisplayEngine::DisplayEngine(display::DisplayEngineEventsInterface* engine_events,
                              fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
                              std::unique_ptr<VirtioGpuDevice> gpu_device)
     : imported_images_(std::move(sysmem_client)),
@@ -311,7 +312,8 @@ DisplayEngine::~DisplayEngine() = default;
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
     fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client, zx::bti bti,
-    std::unique_ptr<virtio::Backend> backend, DisplayEngineEventsInterface* engine_events) {
+    std::unique_ptr<virtio::Backend> backend,
+    display::DisplayEngineEventsInterface* engine_events) {
   zx::result<std::unique_ptr<VirtioPciDevice>> virtio_device_result =
       VirtioPciDevice::Create(std::move(bti), std::move(backend));
   if (!virtio_device_result.is_ok()) {

@@ -24,15 +24,15 @@
 #include <bind/fuchsia/display/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-banjo-adapter.h"
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 
 namespace virtio_display {
 
 zx::result<> GpuDeviceDriver::InitResources() {
   fbl::AllocChecker alloc_checker;
-  engine_events_ = fbl::make_unique_checked<DisplayEngineEventsBanjo>(&alloc_checker);
+  engine_events_ = fbl::make_unique_checked<display::DisplayEngineEventsBanjo>(&alloc_checker);
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineEventsBanjo");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -69,8 +69,9 @@ zx::result<> GpuDeviceDriver::InitResources() {
   }
   display_engine_ = std::move(display_engine_result).value();
 
-  engine_banjo_adapter_ = fbl::make_unique_checked<DisplayEngineBanjoAdapter>(
-      &alloc_checker, display_engine_.get(), engine_events_.get());
+  engine_banjo_adapter_ =
+      fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
+          &alloc_checker, display_engine_.get(), engine_events_.get());
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineBanjoAdapter");
     return zx::error(ZX_ERR_NO_MEMORY);

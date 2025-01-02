@@ -22,9 +22,9 @@
 
 #include <virtio/virtio.h>
 
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-banjo-adapter.h"
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/lib/virtio/virtio-abi.h"
 
@@ -236,7 +236,8 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
     device_ = std::make_unique<DisplayEngine>(&engine_events_, std::move(sysmem_client),
                                               std::move(gpu_device));
 
-    banjo_controller_ = std::make_unique<DisplayEngineBanjoAdapter>(device_.get(), &engine_events_);
+    banjo_controller_ = std::make_unique<display::DisplayEngineBanjoAdapter>(
+        device_.get(), &engine_events_);
     ASSERT_OK(device_->Init());
 
     RunLoopUntilIdle();
@@ -264,9 +265,9 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   std::vector<uint8_t> virtio_cursor_queue_buffer_pool_;
   std::unique_ptr<MockAllocator> fake_sysmem_;
 
-  DisplayEngineEventsBanjo engine_events_;
+  display::DisplayEngineEventsBanjo engine_events_;
   std::unique_ptr<DisplayEngine> device_;
-  std::unique_ptr<DisplayEngineBanjoAdapter> banjo_controller_;
+  std::unique_ptr<display::DisplayEngineBanjoAdapter> banjo_controller_;
 };
 
 TEST_F(VirtioGpuTest, ImportVmo) {

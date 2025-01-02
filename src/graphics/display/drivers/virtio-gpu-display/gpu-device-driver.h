@@ -7,17 +7,20 @@
 
 #include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <thread>
 
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-banjo-adapter.h"
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/gpu-control-server.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 
 namespace virtio_display {
 
@@ -53,12 +56,12 @@ class GpuDeviceDriver : public fdf::DriverBase, public GpuControlServer::Owner {
   zx::result<> InitGpuControlNode();
 
   // Must outlive `display_engine_` and `engine_banjo_adapter_`.
-  std::unique_ptr<DisplayEngineEventsBanjo> engine_events_;
+  std::unique_ptr<display::DisplayEngineEventsBanjo> engine_events_;
 
   // Must outlive `engine_banjo_adapter_`.
   std::unique_ptr<DisplayEngine> display_engine_;
 
-  std::unique_ptr<DisplayEngineBanjoAdapter> engine_banjo_adapter_;
+  std::unique_ptr<display::DisplayEngineBanjoAdapter> engine_banjo_adapter_;
 
   std::unique_ptr<GpuControlServer> gpu_control_server_;
 
