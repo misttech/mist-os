@@ -310,11 +310,11 @@ void Loader::ProcessState::LoadDriver(LoadDriverRequestView request,
   }
   fidl::Arena arena;
   completer.ReplySuccess(fuchsia_driver_loader::wire::DriverHostLoadDriverResponse::Builder(arena)
-                             .runtime_load_address(*result)
+                             .dynamic_linking_abi(*result)
                              .Build());
 }
 
-zx::result<Loader::DriverStartAddr> Loader::ProcessState::LoadDriverModule(
+zx::result<Loader::DynamicLinkingPassiveAbi> Loader::ProcessState::LoadDriverModule(
     std::string driver_name, zx::vmo driver_module,
     fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
   auto diag = MakeDiagnostics();
@@ -388,22 +388,15 @@ zx::result<Loader::DriverStartAddr> Loader::ProcessState::LoadDriverModule(
 
   linker.Commit();
 
-  // Look up the module's entry-point symbol.
-  // TODO(https://fxbug.dev/365155458): we should return abi_vaddr() instead.
-  constexpr elfldltl::SymbolName kDriverStart{kDriverStartSymbol};
-  auto* symbol = kDriverStart.Lookup(linker.main_module().module().symbols);
-  if (!symbol) {
-    LOGF(ERROR, "Could not find driver start symbol");
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-  DriverStartAddr addr = symbol->value + linker.main_module().load_bias();
-  ZX_ASSERT_MSG(addr != 0u, "Got null for driver start address");
+  DynamicLinkingPassiveAbi passive_abi = linker.abi_vaddr();
+
+  ZX_ASSERT_MSG(passive_abi != 0u, "Got null for dynamic linking passive abi address");
 
   if (load_driver_handler_for_testing_) {
-    load_driver_handler_for_testing_(bootstrap_sender_.borrow(), addr);
+    load_driver_handler_for_testing_(bootstrap_sender_.borrow(), passive_abi);
   }
 
-  return zx::ok(addr);
+  return zx::ok(passive_abi);
 }
 
 }  // namespace driver_loader

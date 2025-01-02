@@ -261,17 +261,20 @@ void DriverRunnerTestBase::SetupDriverRunnerWithDynamicLinker(
     std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner,
     FakeDriverIndex driver_index, std::optional<uint32_t> wait_for_num_drivers) {
   driver_index_.emplace(std::move(driver_index));
-  auto load_driver_handler = [num_drivers_loaded = 0, wait_for_num_drivers](
-                                 zx::unowned_channel bootstrap_sender,
-                                 driver_loader::Loader::DriverStartAddr addr) mutable {
-    ASSERT_EQ(ZX_OK, bootstrap_sender->write(0, &addr, sizeof(addr), nullptr, 0));
-    num_drivers_loaded++;
-    if (wait_for_num_drivers.has_value() && (wait_for_num_drivers == num_drivers_loaded)) {
-      // Send a message for the driver host to exit.
-      addr = 0;
-      ASSERT_EQ(ZX_OK, bootstrap_sender->write(0, &addr, sizeof(addr), nullptr, 0));
-    }
-  };
+  auto load_driver_handler =
+      [num_drivers_loaded = 0, wait_for_num_drivers](
+          zx::unowned_channel bootstrap_sender,
+          driver_loader::Loader::DynamicLinkingPassiveAbi dl_passive_abi) mutable {
+        ASSERT_EQ(ZX_OK,
+                  bootstrap_sender->write(0, &dl_passive_abi, sizeof(dl_passive_abi), nullptr, 0));
+        num_drivers_loaded++;
+        if (wait_for_num_drivers.has_value() && (wait_for_num_drivers == num_drivers_loaded)) {
+          // Send a message for the driver host to exit.
+          dl_passive_abi = 0;
+          ASSERT_EQ(ZX_OK, bootstrap_sender->write(0, &dl_passive_abi, sizeof(dl_passive_abi),
+                                                   nullptr, 0));
+        }
+      };
   dynamic_linker_ =
       driver_loader::Loader::Create(loader_dispatcher, std::move(load_driver_handler));
   driver_runner_.emplace(

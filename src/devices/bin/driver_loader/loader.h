@@ -29,9 +29,11 @@ namespace driver_loader {
 class Loader : public fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher> {
  public:
   using Linker = ld::RemoteDynamicLinker<>;
-  using DriverStartAddr = Linker::size_type;
-  using LoadDriverHandler =
-      fit::function<void(zx::unowned_channel bootstrap_sender, DriverStartAddr addr)>;
+  // This is the ABI returned from dynamic linking that provides immutable access to
+  // the data structures and symbols of loaded modules.
+  using DynamicLinkingPassiveAbi = Linker::size_type;
+  using LoadDriverHandler = fit::function<void(zx::unowned_channel bootstrap_sender,
+                                               DynamicLinkingPassiveAbi passive_abi)>;
 
   // If |load_driver_handler_for_testing| is provided, it will be called each time a driver has been
   // loaded. This allows tests to inject custom bootstrap behavior.
@@ -97,9 +99,10 @@ class Loader : public fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher
     ProcessState() = default;
 
     // Loads a driver module into the driver host process.
-    // Returns the start address of the driver.
-    zx::result<DriverStartAddr> LoadDriverModule(std::string driver_name, zx::vmo driver_module,
-                                                 fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
+    // Returns the dynamic linking passive ABI for the loaded modules.
+    zx::result<DynamicLinkingPassiveAbi> LoadDriverModule(
+        std::string driver_name, zx::vmo driver_module,
+        fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
 
     // Allocates the stack for the initial thread of the process.
     zx_status_t AllocateStack();

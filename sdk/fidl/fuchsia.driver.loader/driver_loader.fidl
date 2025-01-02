@@ -7,6 +7,10 @@ library fuchsia.driver.loader;
 using fuchsia.io;
 using zx;
 
+/// ABI that exports the immutable dynamic linking data structures
+/// for the loaded modules.
+alias DynamicLinkingPassiveAbi = uint64;
+
 /// Protocol through which drivers can be loaded into a driver host process
 /// using out-of-process dynamic linking.
 @discoverable
@@ -20,8 +24,8 @@ open protocol DriverHost {
         /// Library dependencies of the driver.
         3: driver_libs client_end:fuchsia.io.Directory;
     }) -> (table {
-        /// Entry address for the driver returned by the dynamic linker.
-        1: runtime_load_address uint64;
+        /// The dynamic linking passive ABI for the loaded modules.
+        1: dynamic_linking_abi DynamicLinkingPassiveAbi;
     }) error zx.Status;
 };
 

@@ -124,6 +124,8 @@ executable("fake_driver_host_with_bootstrap") {
   deps = [
     ":dh-deps-a",
     ":entry_point",
+    "//sdk/lib/ld",
+    "//sdk/lib/ld:standalone",
     "//src/zircon/lib/zircon",
     "//zircon/system/public",
     "//zircon/system/ulib/zx",
