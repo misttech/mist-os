@@ -70,6 +70,9 @@
 
                 // TODO(https://fxbug.dev/371550616)
                 "CapsTest.AmbientCapabilitiesRequirePermittedAndInheritable",
+
+                // TODO(https://fxbug.dev/365763270)
+                "EpollTest.EpollIsPollable",
             ],
         },
         {

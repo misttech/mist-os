@@ -251,3 +251,25 @@ TEST(EpollTest, AliasArgumentWithDup) {
   EXPECT_EQ(-1, epoll_ctl(epoll_fd.get(), 1, another_fd.get(), &event));
   EXPECT_EQ(EINVAL, errno);
 }
+
+TEST(EpollTest, EpollIsPollable) {
+  fbl::unique_fd epoll_fd(epoll_create(1));
+  ASSERT_TRUE(epoll_fd.is_valid());
+
+  fbl::unique_fd side_a, side_b;
+  {
+    int sockets[2];
+    int result = socketpair(AF_UNIX, SOCK_STREAM, 0, sockets);
+    ASSERT_EQ(0, result);
+    side_a.reset(sockets[0]);
+    side_b.reset(sockets[1]);
+  }
+
+  // Register side_a for writability. It will be immediately asserted.
+  ASSERT_EQ(0, EpollAdd(epoll_fd.get(), side_a.get(), EPOLLOUT, 0));
+
+  // Verify that epoll_fd reports that it's readable.
+  pollfd pfd = {.fd = epoll_fd.get(), .events = POLLIN};
+  ASSERT_EQ(1, poll(&pfd, 1, 0));
+  EXPECT_EQ(POLLIN, pfd.revents);
+}
