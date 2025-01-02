@@ -237,14 +237,16 @@ void DriverHostRunner::LoadDriverHost(
     return;
   }
 
-  auto loader_result = loader->Start(std::move(process), std::move(root_vmar), std::move(exec_vmo),
-                                     std::move(vdso_vmo), std::move(*lib_dir));
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_driver_loader::DriverHost>::Create();
+  auto loader_result =
+      loader->Start(std::move(process), std::move(root_vmar), std::move(exec_vmo),
+                    std::move(vdso_vmo), std::move(*lib_dir), std::move(server_end));
   if (loader_result.is_error()) {
     LOGF(ERROR, "Loader failed to start driver host: %s", loader_result.status_string());
     callback(loader_result.take_error());
     return;
   }
-  callback(std::move(loader_result));
+  callback(zx::ok(std::move(client_end)));
 }
 
 void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::string_view url,

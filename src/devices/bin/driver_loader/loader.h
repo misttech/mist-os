@@ -26,7 +26,7 @@
 
 namespace driver_loader {
 
-class Loader {
+class Loader : public fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher> {
  public:
   using Linker = ld::RemoteDynamicLinker<>;
   using DriverStartAddr = Linker::size_type;
@@ -38,10 +38,23 @@ class Loader {
   static std::unique_ptr<Loader> Create(async_dispatcher_t* dispatcher,
                                         LoadDriverHandler load_driver_handler_for_testing = {});
 
+  void Connect(fidl::ServerEnd<fuchsia_driver_loader::DriverHostLauncher> server_end);
+
   // Launches the |exec| driver host binary into |process|.
-  zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Start(
-      zx::process process, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
-      fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
+  // TODO(https://fxbug.dev/341997294): make this function private once all callers
+  // have been migrated to the |Launch| FIDL protocol.
+  zx::result<> Start(zx::process process, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
+                     fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+                     fidl::ServerEnd<fuchsia_driver_loader::DriverHost> driver_host);
+
+  // fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher>
+  void Launch(LaunchRequestView request, LaunchCompleter::Sync& completer) override;
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_driver_loader::DriverHostLauncher> md,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    completer.Close(ZX_ERR_UNAVAILABLE);
+  }
 
  private:
   using RemoteModule = ld::RemoteLoadModule<>;
@@ -157,6 +170,8 @@ class Loader {
   ld::RemoteAbiStub<>::Ptr remote_abi_stub_;
 
   fbl::DoublyLinkedList<std::unique_ptr<ProcessState>> started_processes_;
+
+  fidl::ServerBindingGroup<fuchsia_driver_loader::DriverHostLauncher> bindings_;
 };
 
 }  // namespace driver_loader

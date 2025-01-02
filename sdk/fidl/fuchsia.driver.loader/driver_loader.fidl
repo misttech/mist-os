@@ -24,3 +24,30 @@ open protocol DriverHost {
         1: runtime_load_address uint64;
     }) error zx.Status;
 };
+
+/// Protocol through which a driver host can be launched into a process,
+/// with loading done using remote dynamic linking.
+@discoverable
+open protocol DriverHostLauncher {
+    /// Launches |driver_host_binary| into |process|. This includes:
+    ///  - Setting up the address space for driver host module and dependencies
+    ///    using remote dynamic linking.
+    ///  - Creating the stack for the process.
+    ///  - Starting the process.
+    ///  - Sending the bootstrap messages to the process.
+    flexible Launch(resource table {
+        /// Process to load the driver host into.
+        /// This process must not already be running.
+        1: process zx.Handle:PROCESS;
+        /// Vmar object that was created when the process was created.
+        2: root_vmar zx.Handle:VMAR;
+        /// Binary to load.
+        3: driver_host_binary zx.Handle:VMO;
+        /// vDSO to use for the driver host.
+        4: vdso zx.Handle:VMO;
+        /// /pkg/lib directory from the driver host package, where library dependencies are found.
+        5: driver_host_libs client_end:fuchsia.io.Directory;
+        /// Server end of the driver host that will be used to load drivers.
+        6: driver_host server_end:DriverHost;
+    }) -> () error zx.Status;
+};

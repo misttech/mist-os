@@ -58,9 +58,13 @@ std::unique_ptr<Loader> Loader::Create(async_dispatcher_t* dispatcher,
                                             diag, std::move(*stub_ld_vmo)));
 }
 
-zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
-    zx::process process, zx::vmar root_vmar, zx::vmo exec_vmo, zx::vmo vdso_vmo,
-    fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
+void Loader::Connect(fidl::ServerEnd<fuchsia_driver_loader::DriverHostLauncher> server_end) {
+  bindings_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+}
+
+zx::result<> Loader::Start(zx::process process, zx::vmar root_vmar, zx::vmo exec_vmo,
+                           zx::vmo vdso_vmo, fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+                           fidl::ServerEnd<fuchsia_driver_loader::DriverHost> server_end) {
   auto diag = MakeDiagnostics();
 
   Linker linker;
@@ -171,7 +175,6 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
     return process_state.take_error();
   }
 
-  auto [client_end, server_end] = fidl::Endpoints<fuchsia_driver_loader::DriverHost>::Create();
   status = process_state->BindServer(dispatcher_, std::move(server_end));
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to bind server endpoint to process state: %s",
@@ -185,7 +188,18 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
     return zx::error(status);
   }
   started_processes_.push_back(std::move(*process_state));
-  return zx::ok(std::move(client_end));
+  return zx::ok();
+}
+
+void Loader::Launch(LaunchRequestView request, LaunchCompleter::Sync& completer) {
+  auto result = Start(std::move(request->process()), std::move(request->root_vmar()),
+                      std::move(request->driver_host_binary()), std::move(request->vdso()),
+                      std::move(request->driver_host_libs()), std::move(request->driver_host()));
+  if (result.is_error()) {
+    completer.ReplyError(result.status_value());
+    return;
+  }
+  completer.ReplySuccess();
 }
 
 // static
