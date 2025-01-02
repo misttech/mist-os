@@ -266,12 +266,10 @@ zx::result<> DriverHostComponent::InstallLoader(
 DynamicLinkerDriverHostComponent::DynamicLinkerDriverHostComponent(
     fidl::ClientEnd<fuchsia_driver_host::DriverHost> driver_host,
     fidl::ClientEnd<fuchsia_driver_loader::DriverHost> client, async_dispatcher_t* dispatcher,
-    std::unique_ptr<driver_loader::Loader> loader,
     fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>* driver_hosts)
     : driver_host_(std::move(driver_host), dispatcher,
                    fidl::ObserveTeardown([this, driver_hosts] { driver_hosts->erase(*this); })),
-      driver_host_loader_(std::move(client), dispatcher),
-      loader_(std::move(loader)) {}
+      driver_host_driver_loader_(std::move(client), dispatcher) {}
 
 void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
     fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
@@ -285,7 +283,7 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
                   .Build();
 
   std::string driver_name = std::string(load_args.driver_soname);
-  driver_host_loader_->LoadDriver(args).ThenExactlyOnce(
+  driver_host_driver_loader_->LoadDriver(args).ThenExactlyOnce(
       [driver = std::move(driver), node = std::move(node), node_name,
        start_args = std::move(start_args), driver_name, cb = std::move(cb)](auto& result) mutable {
         if (!result.ok()) {

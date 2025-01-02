@@ -121,7 +121,6 @@ class DynamicLinkerDriverHostComponent final
   DynamicLinkerDriverHostComponent(
       fidl::ClientEnd<fuchsia_driver_host::DriverHost> driver_host,
       fidl::ClientEnd<fuchsia_driver_loader::DriverHost> client, async_dispatcher_t* dispatcher,
-      std::unique_ptr<driver_loader::Loader> loader,
       fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>* driver_hosts);
 
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
@@ -141,12 +140,9 @@ class DynamicLinkerDriverHostComponent final
 
   zx::result<uint64_t> GetProcessKoid() const override { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
-  driver_loader::Loader* loader() { return loader_.get(); }
-
  private:
   fidl::WireSharedClient<fuchsia_driver_host::DriverHost> driver_host_;
-  fidl::WireClient<fuchsia_driver_loader::DriverHost> driver_host_loader_;
-  std::unique_ptr<driver_loader::Loader> loader_;
+  fidl::WireClient<fuchsia_driver_loader::DriverHost> driver_host_driver_loader_;
 };
 
 }  // namespace driver_manager

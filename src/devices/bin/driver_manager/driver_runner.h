@@ -48,8 +48,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
                      public NodeRemover {
   using LoaderServiceFactory = fit::function<zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>>()>;
 
-  // TODO(https://fxbug.dev/341997294): replace pointer with a FIDL channel.
-  using DynamicLinkerServiceFactory = fit::function<std::unique_ptr<driver_loader::Loader>()>;
+  using DynamicLinkerServiceFactory =
+      fit::function<zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHostLauncher>>()>;
 
  public:
   // Args required to enable dynamic linking
@@ -218,6 +218,11 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   // Set if dynamic linking is available.
   std::optional<DynamicLinkerArgs> dynamic_linker_args_;
+
+  // TODO(https://fxbug.dev/349831408): for now we use the same dynamic linker client
+  // channel for each driver host.
+  std::optional<fidl::WireSharedClient<fuchsia_driver_loader::DriverHostLauncher>>
+      driver_host_launcher_;
 };
 
 Collection ToCollection(const Node& node, fuchsia_driver_framework::DriverPackageType package_type);

@@ -35,7 +35,7 @@ int64_t WaitForProcessExit(const zx::process& process);
 
 class DriverHostRunnerTest : public gtest::TestLoopFixture {
   void SetUp() {
-    loader_ = driver_loader::Loader::Create(dispatcher());
+    dynamic_linker_ = driver_loader::Loader::Create(dispatcher());
     driver_host_runner_ =
         std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
   }
@@ -53,13 +53,15 @@ class DriverHostRunnerTest : public gtest::TestLoopFixture {
 
   fidl::ClientEnd<fuchsia_component::Realm> ConnectToRealm();
 
+  fidl::ClientEnd<fuchsia_driver_loader::DriverHostLauncher> ConnectToDynamicLinker();
+
   driver_runner::TestRealm& realm() { return realm_; }
 
  private:
   driver_runner::TestRealm realm_;
   std::optional<fidl::ServerBinding<fuchsia_component::Realm>> realm_binding_;
 
-  std::unique_ptr<driver_loader::Loader> loader_;
+  std::unique_ptr<driver_loader::Loader> dynamic_linker_;
   std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner_;
 
   driver_runner::TestDirectory driver_host_dir_{dispatcher()};
@@ -89,11 +91,12 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
         driver_host_dir_.Bind(std::move(exposed_dir));
       });
 
-  // TODO(https://fxbug.dev/340928556): we should pass a channel to the loader rather than the
-  // entire thing.
+  fidl::WireSharedClient<fuchsia_driver_loader::DriverHostLauncher> launcher(
+      ConnectToDynamicLinker(), dispatcher());
+
   bool got_cb = false;
   driver_host_runner_->StartDriverHost(
-      loader_.get(), std::move(endpoints.server),
+      std::move(launcher), std::move(endpoints.server),
       [&](zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) {
         ASSERT_EQ(ZX_OK, result.status_value());
         ASSERT_TRUE(result->is_valid());
@@ -108,6 +111,7 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
                                "bin/driver_host2", expected_libs);
   ASSERT_NO_FATAL_FAILURE(driver_runner::DriverHostComponentStart(realm(), *driver_host_runner_,
                                                                   std::move(pkg_endpoints.client)));
+  ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(got_cb);
 
   std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
@@ -123,6 +127,14 @@ fidl::ClientEnd<fuchsia_component::Realm> DriverHostRunnerTest::ConnectToRealm()
   realm_binding_.emplace(dispatcher(), std::move(realm_endpoints.server), &realm_,
                          fidl::kIgnoreBindingClosure);
   return std::move(realm_endpoints.client);
+}
+
+fidl::ClientEnd<fuchsia_driver_loader::DriverHostLauncher>
+DriverHostRunnerTest::ConnectToDynamicLinker() {
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_driver_loader::DriverHostLauncher>::Create();
+  dynamic_linker_->Connect(std::move(server_end));
+  return std::move(client_end);
 }
 
 int64_t WaitForProcessExit(const zx::process& process) {

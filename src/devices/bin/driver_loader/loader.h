@@ -40,13 +40,6 @@ class Loader : public fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher
 
   void Connect(fidl::ServerEnd<fuchsia_driver_loader::DriverHostLauncher> server_end);
 
-  // Launches the |exec| driver host binary into |process|.
-  // TODO(https://fxbug.dev/341997294): make this function private once all callers
-  // have been migrated to the |Launch| FIDL protocol.
-  zx::result<> Start(zx::process process, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
-                     fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
-                     fidl::ServerEnd<fuchsia_driver_loader::DriverHost> driver_host);
-
   // fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher>
   void Launch(LaunchRequestView request, LaunchCompleter::Sync& completer) override;
 
@@ -138,6 +131,11 @@ class Loader : public fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher
       : dispatcher_(dispatcher),
         load_driver_handler_for_testing_(std::move(load_driver_handler_for_testing)),
         remote_abi_stub_(ld::RemoteAbiStub<>::Create(diag, std::move(stub_ld_vmo), kPageSize)) {}
+
+  // Launches the |exec| driver host binary into |process|.
+  zx::result<> Start(zx::process process, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
+                     fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+                     fidl::ServerEnd<fuchsia_driver_loader::DriverHost> driver_host);
 
   // Retrieves the vmo for |libname| from |lib_dir|.
   static zx::result<zx::vmo> GetDepVmo(fidl::UnownedClientEnd<fuchsia_io::Directory> lib_dir,

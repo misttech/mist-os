@@ -325,6 +325,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   InspectManager inspect_{dispatcher()};
   std::optional<FakeDriverIndex> driver_index_;
   std::optional<DriverRunner> driver_runner_;
+  std::unique_ptr<driver_loader::Loader> dynamic_linker_;
 };
 
 }  // namespace driver_runner
