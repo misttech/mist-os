@@ -17,6 +17,10 @@ pub(crate) struct Flags {
     /// if true, all logs are printed. Otherwise only errors are shown.
     #[argh(option, short = 'v', default = "false")]
     pub verbose_logging: bool,
+
+    /// if set, override the year of generated files to this value
+    #[argh(option)]
+    pub year_override: Option<String>,
 }
 
 #[derive(FromArgs, PartialEq, Debug)]

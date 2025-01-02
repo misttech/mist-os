@@ -38,7 +38,6 @@ if (is_host) {
       "//third_party/rust_crates:chrono",
       "//third_party/rust_crates:handlebars",
       "//third_party/rust_crates:serde",
-      "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tempfile",
       "//third_party/rust_crates:tracing",
       "//third_party/rust_crates:walkdir",
@@ -58,6 +57,8 @@ if (is_host) {
       label = ":testgen"
       test_root = "$target_gen_dir/$target_name"
       args = [
+        "--year-override",
+        "2024",
         "integration_test",
         "--test-root",
         rebase_path(test_root, root_build_dir),
