@@ -73,9 +73,10 @@ bool zxr_thread_detached(zxr_thread_t* thread);
 // zx_vmar_unmap(vmar, addr, len) first, but in a way that permits
 // unmapping the caller's own stack.  Iff it has been detached, then
 // (*if_detached)(if_detached_arg) is called before unmapping the stack.
-__NO_RETURN void zxr_thread_exit_unmap_if_detached(zxr_thread_t* thread, void (*if_detached)(void*),
-                                                   void* if_detached_arg, zx_handle_t vmar,
-                                                   uintptr_t addr, size_t len);
+[[noreturn]] void zxr_thread_exit_unmap_if_detached(zxr_thread_t* thread,
+                                                    void (*if_detached)(void*),
+                                                    void* if_detached_arg, zx_handle_t vmar,
+                                                    uintptr_t addr, size_t len);
 
 // Destroy a thread structure that is either created but unstarted or is
 // known to belong to a thread that has been zx_task_kill'd and has not been
