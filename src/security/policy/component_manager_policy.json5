@@ -290,10 +290,6 @@
 
                     // TODO(https://fxbug.dev/42181129): Remove once fixed.
                     "/core/sl4f",
-
-                    // TODO(https://fxbug.dev/42077029): Remove once session_manager gets autolaunch
-                    // override from structured configuration.
-                    "/core/session-manager",
                 ],
             },
             {
