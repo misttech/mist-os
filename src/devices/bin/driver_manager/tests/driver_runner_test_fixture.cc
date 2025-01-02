@@ -259,8 +259,8 @@ void DriverRunnerTest::SetupDriverRunner(FakeDriverIndex driver_index) {
 void DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(
     async_dispatcher_t* loader_dispatcher,
     std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner,
-    std::optional<uint32_t> wait_for_num_drivers) {
-  driver_index_.emplace(CreateDriverIndex());
+    FakeDriverIndex driver_index, std::optional<uint32_t> wait_for_num_drivers) {
+  driver_index_.emplace(std::move(driver_index));
   auto load_driver_handler = [num_drivers_loaded = 0, wait_for_num_drivers](
                                  zx::unowned_channel bootstrap_sender,
                                  driver_loader::Loader::DriverStartAddr addr) mutable {
@@ -280,6 +280,14 @@ void DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(
           [loader = dynamic_linker_.get()]() { return DynamicLinkerFactory(loader); },
           std::move(driver_host_runner)});
   SetupDevfs();
+}
+
+void DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(
+    async_dispatcher_t* loader_dispatcher,
+    std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner,
+    std::optional<uint32_t> wait_for_num_drivers) {
+  SetupDriverRunnerWithDynamicLinker(loader_dispatcher, std::move(driver_host_runner),
+                                     CreateDriverIndex(), wait_for_num_drivers);
 }
 
 void DriverRunnerTest::SetupDriverRunner() { SetupDriverRunner(CreateDriverIndex()); }

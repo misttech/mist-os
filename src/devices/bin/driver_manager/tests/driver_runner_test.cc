@@ -38,16 +38,18 @@ class DriverRunnerTest2 : public DriverRunnerTest, public ::testing::WithParamIn
  public:
   void SetUp() override { use_dynamic_linker_ = GetParam(); }
 
-  void SetupDriverRunner() {
+  void SetupDriverRunner(FakeDriverIndex fake_driver_index) {
     if (use_dynamic_linker_) {
       auto driver_host_runner =
           std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
-      DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(dispatcher(),
-                                                           std::move(driver_host_runner));
+      DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(
+          dispatcher(), std::move(driver_host_runner), std::move(fake_driver_index));
     } else {
-      DriverRunnerTest::SetupDriverRunner();
+      DriverRunnerTest::SetupDriverRunner(std::move(fake_driver_index));
     }
   }
+
+  void SetupDriverRunner() { SetupDriverRunner(CreateDriverIndex()); }
 
   zx::result<StartDriverResult> StartRootDriver() {
     if (use_dynamic_linker_) {
@@ -808,7 +810,7 @@ TEST_P(DriverRunnerTest2, StartSecondDriver_UnknownNode) {
 }
 
 // Start the root driver, and then add a child node that only binds to a base driver.
-TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_BindOrphanToBaseDriver) {
   bool base_drivers_loaded = false;
   FakeDriverIndex fake_driver_index(
       dispatcher(), [&base_drivers_loaded](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
