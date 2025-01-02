@@ -127,7 +127,7 @@ impl RunningSuite {
         let child_decl = fdecl::Child {
             name: Some(TEST_ROOT_REALM_NAME.into()),
             url: Some(test_url.into()),
-            startup: Some(fdecl::StartupMode::Lazy),
+            startup: Some(fdecl::StartupMode::Eager),
             environment: None,
             ..Default::default()
         };
