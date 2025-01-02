@@ -587,25 +587,31 @@ inspect::Hierarchy DriverRunnerTest::Inspect() {
 void DriverRunnerTest::SetupDevfs() { driver_runner().root_node()->SetupDevfsForRootNode(devfs_); }
 DriverRunnerTest::StartDriverResult DriverRunnerTest::StartSecondDriver(bool colocate,
                                                                         bool host_restart_on_crash,
-                                                                        bool use_next_vdso) {
-  StartDriverHandler start_handler = [colocate, host_restart_on_crash, use_next_vdso](
-                                         TestDriver* driver, fdfw::DriverStartArgs start_args) {
+                                                                        bool use_next_vdso,
+                                                                        bool use_dynamic_linker) {
+  auto second_driver_config = kDefaultSecondDriverPkgConfig;
+  std::string binary = std::string(second_driver_config.module_open_path);
+  StartDriverHandler start_handler = [colocate, host_restart_on_crash, use_next_vdso, binary,
+                                      use_dynamic_linker](TestDriver* driver,
+                                                          fdfw::DriverStartArgs start_args) {
     if (!colocate) {
       EXPECT_FALSE(start_args.symbols().has_value());
     }
 
-    ValidateProgram(start_args.program(), second_driver_binary, colocate ? "true" : "false",
-                    host_restart_on_crash ? "true" : "false", use_next_vdso ? "true" : "false");
+    ValidateProgram(start_args.program(), binary, colocate ? "true" : "false",
+                    host_restart_on_crash ? "true" : "false", use_next_vdso ? "true" : "false",
+                    use_dynamic_linker ? "true" : "false");
   };
-  return StartDriver(
+  return StartDriverWithConfig(
       {
           .url = second_driver_url,
-          .binary = second_driver_binary,
+          .binary = binary,
           .colocate = colocate,
           .host_restart_on_crash = host_restart_on_crash,
           .use_next_vdso = use_next_vdso,
+          .use_dynamic_linker = use_dynamic_linker,
       },
-      std::move(start_handler));
+      std::move(start_handler), second_driver_config);
 }
 void TestDirectory::Bind(fidl::ServerEnd<fio::Directory> request) {
   bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);

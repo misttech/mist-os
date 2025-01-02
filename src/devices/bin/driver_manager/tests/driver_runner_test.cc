@@ -59,6 +59,12 @@ class DriverRunnerTest2 : public DriverRunnerTest, public ::testing::WithParamIn
     }
   }
 
+  StartDriverResult StartSecondDriver(bool colocate = false, bool host_restart_on_crash = false,
+                                      bool use_next_vdso = false) {
+    return DriverRunnerTest::StartSecondDriver(colocate, host_restart_on_crash, use_next_vdso,
+                                               use_dynamic_linker());
+  }
+
   // If |use_dynamic_linker| is not provided, it will be generated from the test configuration.
   void ValidateProgram(std::optional<::fuchsia_data::Dictionary>& program, std::string_view binary,
                        std::string_view colocate, std::string_view host_restart_on_crash,
@@ -316,7 +322,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingName) {
 }
 
 // Start the root driver, and then start a second driver in a new driver host.
-TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_NewDriverHost) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();

@@ -328,7 +328,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
       test_utils::TestPkg::Config driver_config = kDefaultRootDriverPkgConfig);
 
   StartDriverResult StartSecondDriver(bool colocate = false, bool host_restart_on_crash = false,
-                                      bool use_next_vdso = false);
+                                      bool use_next_vdso = false, bool use_dynamic_linker = false);
 
   void Unbind();
 
