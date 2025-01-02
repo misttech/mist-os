@@ -3,6 +3,3 @@ felizardo@google.com
 ihuh@google.com
 olivernewman@google.com
 rahulbn@google.com
-
-# Allow roller service account to roll changes to the testproject submodule.
-global-integration-roller@fuchsia-infra.iam.gserviceaccount.com #{LAST_RESORT_SUGGESTION}

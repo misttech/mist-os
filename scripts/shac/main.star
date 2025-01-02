@@ -99,32 +99,6 @@ def _gn_format(ctx):
                 finding = res.stdout
                 fail("{}: {}".format(f, finding))
 
-# TODO(https://fxbug.dev/326595281): Delete this check once submodules are
-# source-of-truth and enabled unconditionally.
-def test_submodule_contents(ctx):
-    """Spits out the contents of the test submodule's README."""
-    if ctx.scm.root != get_fuchsia_dir(ctx):
-        return
-    readme_path = "infra/testproject/README.md"
-    msg = os_exec(
-        ctx,
-        [
-            "%s/prebuilt/third_party/python3/%s/bin/python3" % (
-                get_fuchsia_dir(ctx),
-                cipd_platform_name(ctx),
-            ),
-            "scripts/shac/test_submodule_contents.py",
-            readme_path,
-        ],
-    ).wait().stdout
-    ctx.emit.finding(
-        level = "notice",
-        message = msg,
-        # Arbitrary file that's in the main checkout so that top-level comments
-        # for this check don't get added to CLs.
-        filepath = "infra/README.md",
-    )
-
 def register_all_checks():
     """Register all checks that should run.
 
@@ -135,7 +109,6 @@ def register_all_checks():
     shac.register_check(shac.check(_gn_format, formatter = True))
     shac.register_check(keep_sorted)
     shac.register_check(bug_urls)
-    shac.register_check(test_submodule_contents)
 
     # keeps-sorted start
     register_cml_checks()

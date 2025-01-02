@@ -638,9 +638,6 @@
 	url = https://fuchsia.googlesource.com/third_party/gitlab.com/drj11/pypng
 	name = third_party/pypng
 	ignore = all
-[submodule "infra/testproject"]
-	path = infra/testproject
-	url = https://fuchsia.googlesource.com/infra/testproject
 [submodule "third_party/fuchsia-infra-bazel-rules/src"]
 	path = third_party/fuchsia-infra-bazel-rules/src
 	url = https://fuchsia.googlesource.com/fuchsia-infra-bazel-rules
