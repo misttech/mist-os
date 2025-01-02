@@ -250,7 +250,7 @@ fdecl::ChildRef CreateChildRef(std::string name, std::string collection);
 
 struct Driver;
 
-class DriverRunnerTest : public gtest::TestLoopFixture {
+class DriverRunnerTestBase : public gtest::TestLoopFixture {
  public:
   void TearDown() override { Unbind(); }
 

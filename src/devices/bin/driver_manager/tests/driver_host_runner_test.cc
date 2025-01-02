@@ -173,7 +173,7 @@ TEST_F(DriverHostRunnerTest, StartFakeDriverHost) {
   StartDriverHost(kDriverHostPath, kExpectedLibs);
 }
 
-class DynamicLinkingTest : public driver_runner::DriverRunnerTest {};
+class DynamicLinkingTest : public driver_runner::DriverRunnerTestBase {};
 
 TEST_F(DynamicLinkingTest, StartRootDriver) {
   auto driver_host_runner =
