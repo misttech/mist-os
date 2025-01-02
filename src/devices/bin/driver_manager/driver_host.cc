@@ -272,7 +272,7 @@ void DriverHostComponent::StartWithDynamicLinker(
     fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
     DriverLoadArgs load_args, DriverStartArgs start_args,
     fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) {
-  if (!SupportsDynamicLinking()) {
+  if (!IsDynamicLinkingEnabled()) {
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));
     return;
   }

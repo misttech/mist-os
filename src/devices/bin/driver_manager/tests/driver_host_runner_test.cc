@@ -173,18 +173,15 @@ TEST_F(DriverHostRunnerTest, StartFakeDriverHost) {
   StartDriverHost(kDriverHostPath, kExpectedLibs);
 }
 
-class DynamicLinkingTest : public driver_runner::DriverRunnerTest {
- public:
-  void SetUp() {
-    auto driver_host_runner =
-        std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
-
-    SetupDriverRunnerWithDynamicLinker(dispatcher(), std::move(driver_host_runner),
-                                       1u /* wait_for_num_drivers */);
-  }
-};
+class DynamicLinkingTest : public driver_runner::DriverRunnerTest {};
 
 TEST_F(DynamicLinkingTest, StartRootDriver) {
+  auto driver_host_runner =
+      std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
+
+  SetupDriverRunnerWithDynamicLinker(dispatcher(), std::move(driver_host_runner),
+                                     1u /* wait_for_num_drivers */);
+
   auto root_driver = StartRootDriverDynamicLinking();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
@@ -194,6 +191,38 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
 
   const zx::process& process = (*driver_hosts.begin())->process();
   ASSERT_EQ(24, WaitForProcessExit(process));
+
+  StopDriverComponent(std::move(root_driver->controller));
+  realm().AssertDestroyedChildren({driver_runner::CreateChildRef("dev", "boot-drivers")});
+}
+
+// Starts the root driver with dynamic linking and attempts to start the colocated second driver
+// without.
+TEST_F(DynamicLinkingTest, StartColocatedSecondDriverNoDynamicLinking) {
+  auto driver_host_runner =
+      std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
+
+  SetupDriverRunnerWithDynamicLinker(dispatcher(), std::move(driver_host_runner));
+
+  auto root_driver = StartRootDriverDynamicLinking();
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  PrepareRealmForSecondDriverComponentStart();
+  fdfw::NodeAddArgs args({
+      .name = "second",
+  });
+
+  bool did_bind = false;
+  auto on_bind = [&did_bind]() { did_bind = true; };
+  std::shared_ptr<driver_runner::CreatedChild> child =
+      root_driver->driver->AddChild(std::move(args), false, false, std::move(on_bind));
+  EXPECT_TRUE(RunLoopUntilIdle());
+  EXPECT_TRUE(did_bind);
+
+  auto [driver, controller] =
+      StartSecondDriver(true /* colocate */, false, false, false /* use_dynamic_linker */);
+  // Starting the driver should fail, as the driver host is configured to use dynamic linking.
+  EXPECT_EQ(nullptr, driver);
 
   StopDriverComponent(std::move(root_driver->controller));
   realm().AssertDestroyedChildren({driver_runner::CreateChildRef("dev", "boot-drivers")});

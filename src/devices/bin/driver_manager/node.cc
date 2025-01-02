@@ -1246,6 +1246,19 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
     offers_for_start_wire[i] = fidl::ToWire(arena_, fidl::ToNatural(offer));
   }
 
+  if (colocate) {
+    // Whether dynamic linking is enabled for a driver host is determined by the first driver in the
+    // host. Otherwise for colocated drivers, we need to match what has been set for the driver
+    // host.
+    if (use_dynamic_linker != driver_host()->IsDynamicLinkingEnabled()) {
+      LOGF(ERROR,
+           "Failed to start driver '%.*s', driver is colocated and set use_dynamic_linker=%s "
+           "but its driver host is not configured for this",
+           static_cast<int>(url.size()), url.data(), use_dynamic_linker ? "true" : "false");
+      cb(zx::error(ZX_ERR_INVALID_ARGS));
+      return;
+    }
+  }
   std::optional<DriverHost::DriverLoadArgs> dynamic_linker_load_args;
   std::optional<DriverHost::DriverStartArgs> dynamic_linker_start_args;
   if (use_dynamic_linker) {

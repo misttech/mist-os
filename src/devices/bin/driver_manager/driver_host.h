@@ -75,6 +75,8 @@ class DriverHost {
   }
 
   virtual zx::result<uint64_t> GetProcessKoid() const = 0;
+
+  virtual bool IsDynamicLinkingEnabled() const { return false; }
 };
 
 class DriverHostComponent final
@@ -109,7 +111,7 @@ class DriverHostComponent final
  private:
   void InitializeElfDir();
 
-  bool SupportsDynamicLinking() { return dynamic_linker_driver_loader_.is_valid(); }
+  bool IsDynamicLinkingEnabled() const override { return dynamic_linker_driver_loader_.is_valid(); }
 
   fidl::WireSharedClient<fuchsia_driver_host::DriverHost> driver_host_;
   mutable std::optional<fuchsia_driver_host::ProcessInfo> process_info_;
