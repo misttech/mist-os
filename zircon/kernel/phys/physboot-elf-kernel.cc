@@ -18,6 +18,7 @@
 #include <ktl/initializer_list.h>
 #include <ktl/move.h>
 #include <ktl/string_view.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>
 #include <phys/elf-image.h>
@@ -118,6 +119,13 @@ PhysBootTimes gBootTimes;
   // Prepare the handoff data structures.
   HandoffPrep prep;
   prep.Init();
+
+  // Set up the kernel's final page protections.
+  //
+  // TODO(https://fxbug.dev/42164859): Eventually we'll want to hand off more
+  // metadata relating to the mapped sections of the image, at which point this
+  // call should be reframed into machinery that updates PhysHandoff as well.
+  AddressSpace::PanicIfError(elf_kernel.MapInto(*gAddressSpace));
 
   // For now we're loading an ELF kernel in physical address mode at an
   // arbitrary load address, even though it's been relocated for its final
