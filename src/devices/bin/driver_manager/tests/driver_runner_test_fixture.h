@@ -61,13 +61,31 @@ static const test_utils::TestPkg::Config kDefaultRootDriverPkgConfig = {
         },
 };
 
-// The tests that use this config don't actually run the driver, so we can
+// The tests that use these configs don't actually run the driver, so we can
 // just point it at the placeholder fake_driver.so that will be accepted
 // by the loader library. We can replace them in future with a custom .so
 // if needed.
 static const test_utils::TestPkg::Config kDefaultSecondDriverPkgConfig = {
     .module_test_pkg_path = "/pkg/lib/fake_driver.so",
     .module_open_path = second_driver_binary,
+    .expected_libs = {},
+};
+
+static const test_utils::TestPkg::Config kDefaultThirdDriverPkgConfig = {
+    .module_test_pkg_path = "/pkg/lib/fake_driver.so",
+    .module_open_path = "driver/third-driver.so",
+    .expected_libs = {},
+};
+
+static const test_utils::TestPkg::Config kDefaultDriverPkgConfig = {
+    .module_test_pkg_path = "/pkg/lib/fake_driver.so",
+    .module_open_path = "driver/driver.so",
+    .expected_libs = {},
+};
+
+static const test_utils::TestPkg::Config kDefaultCompositeDriverPkgConfig = {
+    .module_test_pkg_path = "/pkg/lib/fake_driver.so",
+    .module_open_path = "driver/composite-driver.so",
     .expected_libs = {},
 };
 
@@ -301,7 +319,8 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   // the driver component's namespace.
   StartDriverResult StartDriverWithConfig(
       Driver driver, std::optional<StartDriverHandler> start_handler = std::nullopt,
-      test_utils::TestPkg::Config driver_config = kDefaultRootDriverPkgConfig);
+      test_utils::TestPkg::Config driver_config = kDefaultRootDriverPkgConfig,
+      test_utils::TestPkg::Config driver_host_config = kDefaultDriverHostPkgConfig);
 
   zx::result<StartDriverResult> StartRootDriver();
   zx::result<StartDriverResult> StartRootDriverDynamicLinking(

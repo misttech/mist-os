@@ -461,7 +461,7 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
 
 DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriverWithConfig(
     Driver driver, std::optional<StartDriverHandler> start_handler,
-    test_utils::TestPkg::Config driver_config) {
+    test_utils::TestPkg::Config driver_config, test_utils::TestPkg::Config driver_host_config) {
   fidl::Endpoints<fuchsia_io::Directory> child_pkg_endpoints;
   std::unique_ptr<test_utils::TestPkg> child_test_pkg;
   if (driver.use_dynamic_linker) {
@@ -469,7 +469,15 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriverWithConfig(
     child_test_pkg =
         std::make_unique<test_utils::TestPkg>(std::move(child_pkg_endpoints.server), driver_config);
   }
-  return StartDriver(driver, std::move(start_handler), std::move(child_pkg_endpoints.client));
+  fidl::Endpoints<fuchsia_io::Directory> driver_host_pkg_endpoints;
+  std::unique_ptr<test_utils::TestPkg> driver_host_test_pkg;
+  if (!driver.colocate) {
+    driver_host_pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    driver_host_test_pkg = std::make_unique<test_utils::TestPkg>(
+        std::move(driver_host_pkg_endpoints.server), driver_host_config);
+  }
+  return StartDriver(driver, std::move(start_handler), std::move(child_pkg_endpoints.client),
+                     std::move(driver_host_pkg_endpoints.client));
 }
 
 zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDriver() {

@@ -708,7 +708,7 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
 
 // The root driver adds a node that only binds after a RequestBind() call. Then Restarts through
 // RequestBind() with force_rebind, once without a url suffix, and another with the url suffix.
-TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
+TEST_P(DriverRunnerTest2, BindAndRestartThroughRequest) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -771,16 +771,19 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
   EXPECT_TRUE(RunLoopUntilIdle());
 
   // Get the third-driver running.
+  auto third_driver_config = kDefaultThirdDriverPkgConfig;
+  std::string binary = std::string(third_driver_config.module_open_path);
   StartDriverHandler start_handler = [&](TestDriver* driver, fdfw::DriverStartArgs start_args) {
     EXPECT_FALSE(start_args.symbols().has_value());
-    ValidateProgram(start_args.program(), "driver/third-driver.so", "false", "false", "false");
+    ValidateProgram(start_args.program(), binary, "false", "false", "false");
   };
-  auto third_driver = StartDriver(
+  auto third_driver = StartDriverWithConfig(
       {
           .url = "fuchsia-boot:///#meta/third-driver.cm",
-          .binary = "driver/third-driver.so",
+          .binary = binary,
+          .use_dynamic_linker = use_dynamic_linker(),
       },
-      std::move(start_handler));
+      std::move(start_handler), third_driver_config);
 
   StopDriverComponent(std::move(root_driver->controller));
   realm().AssertDestroyedChildren({
@@ -918,7 +921,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_CloseSecondDriver) {
 }
 
 // Start a chain of drivers, and then unbind the second driver's node.
-TEST_F(DriverRunnerTest, StartDriverChain_UnbindSecondNode) {
+TEST_P(DriverRunnerTest2, StartDriverChain_UnbindSecondNode) {
   FakeDriverIndex driver_index(dispatcher(),
                                [](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
                                  std::string name(args.name().get());
@@ -950,16 +953,20 @@ TEST_F(DriverRunnerTest, StartDriverChain_UnbindSecondNode) {
     children.emplace_back(drivers.back().driver->AddChild(child_name, false, false));
     EXPECT_TRUE(RunLoopUntilIdle());
 
-    StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
+    auto driver_config = kDefaultDriverPkgConfig;
+    std::string binary = std::string(driver_config.module_open_path);
+    StartDriverHandler start_handler = [this, binary](TestDriver* driver,
+                                                      fdfw::DriverStartArgs start_args) {
       EXPECT_FALSE(start_args.symbols().has_value());
-      ValidateProgram(start_args.program(), "driver/driver.so", "false", "false", "false");
+      ValidateProgram(start_args.program(), binary, "false", "false", "false");
     };
-    drivers.emplace_back(StartDriver(
+    drivers.emplace_back(StartDriverWithConfig(
         {
             .url = "fuchsia-boot:///#meta/node-" + std::to_string(i) + "-driver.cm",
-            .binary = "driver/driver.so",
+            .binary = binary,
+            .use_dynamic_linker = use_dynamic_linker(),
         },
-        std::move(start_handler)));
+        std::move(start_handler), driver_config));
   }
 
   // Unbinding the second node stops all drivers bound in the sub-tree, in a
@@ -1116,7 +1123,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BlockOnSecondDriver) {
   EXPECT_THAT(indices, ElementsAre(1, 0));
 }
 
-TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
+TEST_P(DriverRunnerTest2, CreateAndBindCompositeNodeSpec) {
   SetupDriverRunner();
 
   // Add a match for the composite node spec that we are creating.
@@ -1174,16 +1181,20 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
 
   ASSERT_TRUE(driver_runner().composite_node_spec_manager().specs().at(name)->parent_nodes().at(1));
 
-  StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
-    ValidateProgram(start_args.program(), "driver/composite-driver.so", "true", "false", "false");
+  auto composite_driver_config = kDefaultCompositeDriverPkgConfig;
+  std::string binary = std::string(composite_driver_config.module_open_path);
+  StartDriverHandler start_handler = [this, binary](TestDriver* driver,
+                                                    fdfw::DriverStartArgs start_args) {
+    ValidateProgram(start_args.program(), binary, "true", "false", "false");
   };
-  auto composite_driver = StartDriver(
+  auto composite_driver = StartDriverWithConfig(
       {
           .url = "fuchsia-boot:///#meta/composite-driver.cm",
-          .binary = "driver/composite-driver.so",
+          .binary = binary,
           .colocate = true,
+          .use_dynamic_linker = use_dynamic_linker(),
       },
-      std::move(start_handler));
+      std::move(start_handler), composite_driver_config);
 
   auto hierarchy = Inspect();
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
