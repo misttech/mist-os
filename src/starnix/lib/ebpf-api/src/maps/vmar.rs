@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_uapi::errors::Errno;
-use starnix_uapi::from_status_like_fdio;
 use std::ops::Deref;
 
 /// A RAII container for a vmar. The vmar mapping will be destroyed when the container is dropped.
@@ -26,11 +24,8 @@ impl AllocatedVmar {
         offset: usize,
         size: usize,
         flags: zx::VmarFlags,
-    ) -> Result<(Self, usize), Errno> {
-        parent
-            .allocate(offset, size, flags)
-            .map(|(vmar, base)| (Self { vmar }, base))
-            .map_err(|s| from_status_like_fdio!(s))
+    ) -> Result<(Self, usize), zx::Status> {
+        parent.allocate(offset, size, flags).map(|(vmar, base)| (Self { vmar }, base))
     }
 }
 

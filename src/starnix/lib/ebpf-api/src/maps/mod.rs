@@ -4,16 +4,15 @@
 
 #![allow(non_upper_case_globals)]
 
-use crate::mm::vmar::AllocatedVmar;
-use crate::mm::PAGE_SIZE;
+mod vmar;
+
+use vmar::AllocatedVmar;
+
 use dense_map::DenseMap;
 use ebpf::MapSchema;
-
 use fuchsia_sync::Mutex;
-use starnix_logging::{track_stub, with_zx_name};
-use starnix_uapi::errors::Errno;
-use starnix_uapi::math::round_up_to_increment;
-use starnix_uapi::{
+use inspect_stubs::track_stub;
+use linux_uapi::{
     bpf_map_type_BPF_MAP_TYPE_ARRAY, bpf_map_type_BPF_MAP_TYPE_ARRAY_OF_MAPS,
     bpf_map_type_BPF_MAP_TYPE_BLOOM_FILTER, bpf_map_type_BPF_MAP_TYPE_CGROUP_ARRAY,
     bpf_map_type_BPF_MAP_TYPE_CGROUP_STORAGE, bpf_map_type_BPF_MAP_TYPE_CGRP_STORAGE,
@@ -30,9 +29,8 @@ use starnix_uapi::{
     bpf_map_type_BPF_MAP_TYPE_STACK, bpf_map_type_BPF_MAP_TYPE_STACK_TRACE,
     bpf_map_type_BPF_MAP_TYPE_STRUCT_OPS, bpf_map_type_BPF_MAP_TYPE_TASK_STORAGE,
     bpf_map_type_BPF_MAP_TYPE_UNSPEC, bpf_map_type_BPF_MAP_TYPE_USER_RINGBUF,
-    bpf_map_type_BPF_MAP_TYPE_XSKMAP, errno, error, from_status_like_fdio, BPF_EXIST, BPF_NOEXIST,
-    BPF_RB_FORCE_WAKEUP, BPF_RB_NO_WAKEUP, BPF_RINGBUF_BUSY_BIT, BPF_RINGBUF_DISCARD_BIT,
-    BPF_RINGBUF_HDR_SZ,
+    bpf_map_type_BPF_MAP_TYPE_XSKMAP, BPF_EXIST, BPF_NOEXIST, BPF_RB_FORCE_WAKEUP,
+    BPF_RB_NO_WAKEUP, BPF_RINGBUF_BUSY_BIT, BPF_RINGBUF_DISCARD_BIT, BPF_RINGBUF_HDR_SZ,
 };
 use static_assertions::const_assert;
 use std::collections::btree_map::Entry;
@@ -40,11 +38,33 @@ use std::collections::BTreeMap;
 use std::ops::{Bound, Deref, DerefMut, Range};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use zx::AsHandleRef;
+
+static PAGE_SIZE: LazyLock<usize> = LazyLock::new(|| zx::system_get_page_size() as usize);
 
 /// Counter for map identifiers.
 static MAP_IDS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(1);
+
+pub enum MapError {
+    // Equivalent of EINVAL.
+    InvalidParam,
+
+    // No entry with the specified key,
+    InvalidKey,
+
+    // Entry already exists..
+    EntryExists,
+
+    // Map size limit has been reached.
+    SizeLimit,
+
+    // Cannot allocate memory.
+    NoMemory,
+
+    // An internal issue, e.g. failed to allocate VMO.
+    Internal,
+}
 
 /// A BPF map. This is a hashtable that can be accessed both by BPF programs and userspace.
 #[derive(Debug)]
@@ -65,7 +85,7 @@ pub type PinnedMap = Pin<Arc<Map>>;
 pub type MapKey = smallvec::SmallVec<[u8; 16]>;
 
 impl Map {
-    pub fn new(schema: MapSchema, flags: u32) -> Result<Self, Errno> {
+    pub fn new(schema: MapSchema, flags: u32) -> Result<Self, MapError> {
         let id = MAP_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed).into();
         let store = MapStore::new(&schema)?;
         Ok(Self { id, schema, flags, entries: Mutex::new(store) })
@@ -76,16 +96,16 @@ impl Map {
         Self::get(&mut entries, &self.schema, key).map(|s| s.as_mut_ptr())
     }
 
-    pub fn lookup(&self, key: &[u8]) -> Result<Vec<u8>, Errno> {
+    pub fn lookup(&self, key: &[u8]) -> Result<Vec<u8>, MapError> {
         let mut entries = self.entries.lock();
         if let Some(value) = Self::get(&mut entries, &self.schema, key) {
             Ok(value.to_vec())
         } else {
-            error!(ENOENT)
+            Err(MapError::InvalidKey)
         }
     }
 
-    pub fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), Errno> {
+    pub fn update(&self, key: MapKey, value: &[u8], flags: u64) -> Result<(), MapError> {
         let mut entries = self.entries.lock();
         match entries.deref_mut() {
             MapStore::Hash(ref mut storage) => {
@@ -94,25 +114,25 @@ impl Map {
             MapStore::Array(ref mut entries) => {
                 let index = array_key_to_index(&key);
                 if index >= self.schema.max_entries {
-                    return error!(E2BIG);
+                    return Err(MapError::SizeLimit);
                 }
                 if flags == BPF_NOEXIST as u64 {
-                    return error!(EEXIST);
+                    return Err(MapError::EntryExists);
                 }
                 entries[array_range_for_index(self.schema.value_size, index)]
                     .copy_from_slice(&value);
             }
-            MapStore::RingBuffer(_) => return error!(EINVAL),
+            MapStore::RingBuffer(_) => return Err(MapError::InvalidParam),
         }
         Ok(())
     }
 
-    pub fn delete(&self, key: &[u8]) -> Result<(), Errno> {
+    pub fn delete(&self, key: &[u8]) -> Result<(), MapError> {
         let mut entries = self.entries.lock();
         match entries.deref_mut() {
             MapStore::Hash(ref mut entries) => {
                 if !entries.remove(key) {
-                    return error!(ENOENT);
+                    return Err(MapError::InvalidKey);
                 }
             }
             MapStore::Array(_) => {
@@ -120,25 +140,25 @@ impl Map {
                 //
                 //  map_delete_elem() fails with the error EINVAL, since
                 //  elements cannot be deleted.
-                return error!(EINVAL);
+                return Err(MapError::InvalidParam);
             }
-            MapStore::RingBuffer(_) => return error!(EINVAL),
+            MapStore::RingBuffer(_) => return Err(MapError::InvalidParam),
         }
         Ok(())
     }
 
-    pub fn get_next_key(&self, key: Option<&[u8]>) -> Result<MapKey, Errno> {
+    pub fn get_next_key(&self, key: Option<&[u8]>) -> Result<MapKey, MapError> {
         let entries = self.entries.lock();
         match entries.deref() {
             MapStore::Hash(ref entries) => entries.get_next_key(key),
             MapStore::Array(_) => {
                 let next_index = if let Some(key) = key { array_key_to_index(&key) + 1 } else { 0 };
                 if next_index >= self.schema.max_entries {
-                    return error!(ENOENT);
+                    return Err(MapError::InvalidKey);
                 }
                 Ok(MapKey::from_slice(&next_index.to_ne_bytes()))
             }
-            MapStore::RingBuffer(_) => error!(EINVAL),
+            MapStore::RingBuffer(_) => Err(MapError::InvalidParam),
         }
     }
 
@@ -154,11 +174,11 @@ impl Map {
         }
     }
 
-    pub fn ringbuf_reserve(&self, size: u32, flags: u64) -> Result<usize, Errno> {
+    pub fn ringbuf_reserve(&self, size: u32, flags: u64) -> Result<usize, MapError> {
         if flags != 0 {
-            return error!(EINVAL);
+            return Err(MapError::InvalidParam);
         }
-        self.entries.lock().as_ringbuf().ok_or_else(|| errno!(EINVAL))?.reserve(size)
+        self.entries.lock().as_ringbuf().ok_or_else(|| MapError::InvalidParam)?.reserve(size)
     }
 
     /// Submit the data.
@@ -208,7 +228,7 @@ impl Map {
     unsafe fn ringbuf_get_storage_and_header(
         addr: usize,
     ) -> (&'static RingBufferStorage, &'static RingBufferRecordHeader) {
-        let page_size = *PAGE_SIZE as usize;
+        let page_size = *PAGE_SIZE;
         // addr is the data section. First access the header.
         let header = &*((addr - std::mem::size_of::<RingBufferRecordHeader>())
             as *const RingBufferRecordHeader);
@@ -233,14 +253,14 @@ enum MapStore {
 }
 
 impl MapStore {
-    pub fn new(schema: &MapSchema) -> Result<Self, Errno> {
+    pub fn new(schema: &MapSchema) -> Result<Self, MapError> {
         match schema.map_type {
             bpf_map_type_BPF_MAP_TYPE_ARRAY => {
                 // From <https://man7.org/linux/man-pages/man2/bpf.2.html>:
                 //   The key is an array index, and must be exactly four
                 //   bytes.
                 if schema.key_size != 4 {
-                    return error!(EINVAL);
+                    return Err(MapError::InvalidParam);
                 }
                 let buffer_size = compute_map_storage_size(schema)?;
                 Ok(MapStore::Array(new_pinned_buffer(buffer_size)))
@@ -255,7 +275,7 @@ impl MapStore {
             }
             bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
                 if schema.key_size != 0 || schema.value_size != 0 {
-                    return error!(EINVAL);
+                    return Err(MapError::InvalidParam);
                 }
                 Ok(MapStore::RingBuffer(RingBufferStorage::new(schema.max_entries as usize)?))
             }
@@ -265,7 +285,7 @@ impl MapStore {
                 //   The key is an array index, and must be exactly four
                 //   bytes.
                 if schema.key_size != 4 {
-                    return error!(EINVAL);
+                    return Err(MapError::InvalidParam);
                 }
                 let buffer_size = compute_map_storage_size(schema)?;
                 Ok(MapStore::Array(new_pinned_buffer(buffer_size)))
@@ -274,121 +294,121 @@ impl MapStore {
             // Unimplemented types
             bpf_map_type_BPF_MAP_TYPE_UNSPEC => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_UNSPEC");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_PROG_ARRAY => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PROG_ARRAY");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_PERF_EVENT_ARRAY => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERF_EVENT_ARRAY");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_PERCPU_HASH => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_PERCPU_HASH");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_STACK_TRACE => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_STACK_TRACE");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_CGROUP_ARRAY => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_CGROUP_ARRAY");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_LRU_HASH => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_LRU_HASH");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_LRU_PERCPU_HASH => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_LRU_PERCPU_HASH");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_LPM_TRIE => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_LPM_TRIE");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_ARRAY_OF_MAPS => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_ARRAY_OF_MAPS");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_HASH_OF_MAPS => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_HASH_OF_MAPS");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_DEVMAP => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_DEVMAP");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_SOCKMAP => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_SOCKMAP");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_CPUMAP => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_CPUMAP");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_XSKMAP => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_XSKMAP");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_SOCKHASH => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_SOCKHASH");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_CGROUP_STORAGE => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_CGROUP_STORAGE");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_REUSEPORT_SOCKARRAY => {
                 track_stub!(
                     TODO("https://fxbug.dev/323847465"),
                     "BPF_MAP_TYPE_REUSEPORT_SOCKARRAY"
                 );
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE => {
                 track_stub!(
                     TODO("https://fxbug.dev/323847465"),
                     "BPF_MAP_TYPE_PERCPU_CGROUP_STORAGE"
                 );
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_QUEUE => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_QUEUE");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_STACK => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_STACK");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_SK_STORAGE => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_SK_STORAGE");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_STRUCT_OPS => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_STRUCT_OPS");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_INODE_STORAGE => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_INODE_STORAGE");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_TASK_STORAGE => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_TASK_STORAGE");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_BLOOM_FILTER => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_BLOOM_FILTER");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_USER_RINGBUF => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_USER_RINGBUF");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             bpf_map_type_BPF_MAP_TYPE_CGRP_STORAGE => {
                 track_stub!(TODO("https://fxbug.dev/323847465"), "BPF_MAP_TYPE_CGRP_STORAGE");
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
             _ => {
                 track_stub!(
@@ -396,7 +416,7 @@ impl MapStore {
                     "unknown bpf map type",
                     schema.map_type
                 );
-                error!(EINVAL)
+                Err(MapError::InvalidParam)
             }
         }
     }
@@ -409,12 +429,12 @@ impl MapStore {
     }
 }
 
-pub fn compute_map_storage_size(schema: &MapSchema) -> Result<usize, Errno> {
+pub fn compute_map_storage_size(schema: &MapSchema) -> Result<usize, MapError> {
     schema
         .value_size
         .checked_mul(schema.max_entries)
         .map(|v| v as usize)
-        .ok_or_else(|| errno!(ENOMEM))
+        .ok_or_else(|| MapError::NoMemory)
 }
 
 #[derive(Debug)]
@@ -425,7 +445,7 @@ struct HashStorage {
 }
 
 impl HashStorage {
-    fn new(schema: &MapSchema) -> Result<Self, Errno> {
+    fn new(schema: &MapSchema) -> Result<Self, MapError> {
         let buffer_size = compute_map_storage_size(schema)?;
         let data = new_pinned_buffer(buffer_size);
         Ok(Self { index_map: Default::default(), data, free_list: Default::default() })
@@ -443,14 +463,14 @@ impl HashStorage {
         }
     }
 
-    pub fn get_next_key(&self, key: Option<&[u8]>) -> Result<MapKey, Errno> {
+    pub fn get_next_key(&self, key: Option<&[u8]>) -> Result<MapKey, MapError> {
         let next_entry = match key {
             Some(key) if self.index_map.contains_key(key) => {
                 self.index_map.range::<[u8], _>((Bound::Excluded(key), Bound::Unbounded)).next()
             }
             _ => self.index_map.iter().next(),
         };
-        let key = next_entry.ok_or_else(|| errno!(ENOENT))?.0;
+        let key = next_entry.ok_or_else(|| MapError::InvalidKey)?.0;
         Ok(MapKey::from_slice(&key[..]))
     }
 
@@ -469,15 +489,15 @@ impl HashStorage {
         key: MapKey,
         value: &[u8],
         flags: u64,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), MapError> {
         let map_is_full = self.len() >= schema.max_entries as usize;
         match self.index_map.entry(key) {
             Entry::Vacant(entry) => {
                 if map_is_full {
-                    return error!(E2BIG);
+                    return Err(MapError::SizeLimit);
                 }
                 if flags == BPF_EXIST as u64 {
-                    return error!(ENOENT);
+                    return Err(MapError::InvalidKey);
                 }
                 let data_index = self.free_list.push(());
                 entry.insert(data_index);
@@ -486,7 +506,7 @@ impl HashStorage {
             }
             Entry::Occupied(entry) => {
                 if flags == BPF_NOEXIST as u64 {
-                    return error!(EEXIST);
+                    return Err(MapError::EntryExists);
                 }
                 self.data[array_range_for_index(schema.value_size, *entry.get() as u32)]
                     .copy_from_slice(value);
@@ -540,13 +560,13 @@ impl RingBufferStorage {
     ///
     /// The returns value is a `Pin<Box>`, because the structure is self referencing and is
     /// required never to move in memory.
-    fn new(size: usize) -> Result<Pin<Box<Self>>, Errno> {
-        let page_size: usize = *PAGE_SIZE as usize;
-        // Size must be a power of 2 and a multiple of PAGE_SIZE
+    fn new(size: usize) -> Result<Pin<Box<Self>>, MapError> {
+        let page_size = *PAGE_SIZE;
+        // Size must be a power of 2 and a multiple of page_size.
         if size == 0 || size % page_size != 0 || size & (size - 1) != 0 {
-            return error!(EINVAL);
+            return Err(MapError::InvalidParam);
         }
-        let mask: u32 = (size - 1).try_into().map_err(|_| errno!(EINVAL))?;
+        let mask: u32 = (size - 1).try_into().map_err(|_| MapError::InvalidParam)?;
         // Add the 2 control pages
         let vmo_size = 2 * page_size + size;
         let kernel_root_vmar = fuchsia_runtime::vmar_root_self();
@@ -564,12 +584,11 @@ impl RingBufferStorage {
                 zx::VmarFlags::CAN_MAP_SPECIFIC
                     | zx::VmarFlags::CAN_MAP_READ
                     | zx::VmarFlags::CAN_MAP_WRITE,
-            )?
+            )
+            .map_err(|_| MapError::Internal)?
         };
-        let technical_vmo = with_zx_name(
-            zx::Vmo::create(page_size as u64).map_err(|e| from_status_like_fdio!(e))?,
-            b"starnix:bpf",
-        );
+        let technical_vmo = zx::Vmo::create(page_size as u64).map_err(|_| MapError::Internal)?;
+        technical_vmo.set_name(&zx::Name::new_lossy("starnix:bpf")).unwrap();
         vmar.map(
             0,
             &technical_vmo,
@@ -577,12 +596,10 @@ impl RingBufferStorage {
             page_size,
             zx::VmarFlags::SPECIFIC | zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
         )
-        .map_err(|e| from_status_like_fdio!(e))?;
+        .map_err(|_| MapError::Internal)?;
 
-        let vmo = with_zx_name(
-            zx::Vmo::create(vmo_size as u64).map_err(|e| from_status_like_fdio!(e))?,
-            b"starnix:bpf",
-        );
+        let vmo = zx::Vmo::create(vmo_size as u64).map_err(|_| MapError::Internal)?;
+        vmo.set_name(&zx::Name::new_lossy("starnix:bpf")).unwrap();
         vmar.map(
             page_size,
             &vmo,
@@ -590,7 +607,7 @@ impl RingBufferStorage {
             vmo_size,
             zx::VmarFlags::SPECIFIC | zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
         )
-        .map_err(|e| from_status_like_fdio!(e))?;
+        .map_err(|_| MapError::Internal)?;
         vmar.map(
             page_size + vmo_size,
             &vmo,
@@ -598,7 +615,8 @@ impl RingBufferStorage {
             size,
             zx::VmarFlags::SPECIFIC | zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
         )
-        .map_err(|e| from_status_like_fdio!(e))?;
+        .map_err(|_| MapError::Internal)?;
+
         // SAFETY
         //
         // This is safe as long as the vmar mapping stays alive. This will be ensured by the
@@ -623,29 +641,36 @@ impl RingBufferStorage {
     }
 
     /// Reserve `size` bytes on the ringbuffer.
-    fn reserve(&mut self, size: u32) -> Result<usize, Errno> {
+    fn reserve(&mut self, size: u32) -> Result<usize, MapError> {
         //  The top two bits are used as special flags.
         if size & (BPF_RINGBUF_BUSY_BIT | BPF_RINGBUF_DISCARD_BIT) > 0 {
-            return error!(EINVAL);
+            return Err(MapError::InvalidParam);
         }
         let consumer_position = self.consumer_position.load(Ordering::Acquire);
         let producer_position = self.producer_position.load(Ordering::Acquire);
         let max_size = self.mask + 1;
         // Available size on the ringbuffer.
-        let consumed_size =
-            producer_position.checked_sub(consumer_position).ok_or_else(|| errno!(EINVAL))?;
-        let available_size = max_size.checked_sub(consumed_size).ok_or_else(|| errno!(EINVAL))?;
-        // Total size of the message to write. This is the requested size + the header.
-        let total_size: u32 =
-            round_up_to_increment(size + BPF_RINGBUF_HDR_SZ, std::mem::size_of::<u64>())?;
+        let consumed_size = producer_position
+            .checked_sub(consumer_position)
+            .ok_or_else(|| MapError::InvalidParam)?;
+        let available_size =
+            max_size.checked_sub(consumed_size).ok_or_else(|| MapError::InvalidParam)?;
+
+        const HEADER_ALIGNMENT: u32 = std::mem::size_of::<u64>() as u32;
+
+        // Total size of the message to write. This is the requested size + the header, rounded up
+        // to align the next header.
+        let total_size: u32 = (size + BPF_RINGBUF_HDR_SZ + HEADER_ALIGNMENT - 1) / HEADER_ALIGNMENT
+            * HEADER_ALIGNMENT;
+
         if total_size > available_size {
-            return error!(ENOMEM);
+            return Err(MapError::SizeLimit);
         }
         let data_position = self.data_position(producer_position + BPF_RINGBUF_HDR_SZ);
         let data_length = size | BPF_RINGBUF_BUSY_BIT;
-        let page_count = ((data_position - self.data) / (*PAGE_SIZE as usize) + 3)
+        let page_count = ((data_position - self.data) / *PAGE_SIZE + 3)
             .try_into()
-            .map_err(|_| errno!(EFBIG))?;
+            .map_err(|_| MapError::SizeLimit)?;
         let header = self.header_mut(producer_position);
         *header.length.get_mut() = data_length;
         header.page_count = page_count;

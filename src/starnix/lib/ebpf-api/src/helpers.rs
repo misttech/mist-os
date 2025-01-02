@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::map::{Map, MapKey, RingBufferWakeupPolicy};
+use crate::maps::{Map, MapKey, RingBufferWakeupPolicy};
 use ebpf::{BpfValue, EbpfHelperImpl, EbpfRunContext};
+use inspect_stubs::track_stub;
 use linux_uapi::{
     bpf_func_id_BPF_FUNC_get_socket_cookie, bpf_func_id_BPF_FUNC_get_socket_uid,
     bpf_func_id_BPF_FUNC_ktime_get_boot_ns, bpf_func_id_BPF_FUNC_ktime_get_ns,
@@ -12,7 +13,6 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_ringbuf_reserve, bpf_func_id_BPF_FUNC_ringbuf_submit,
     bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_trace_printk, uid_t,
 };
-use starnix_logging::track_stub;
 
 fn bpf_map_lookup_elem<C: EbpfRunContext>(
     _context: &mut C::Context<'_>,
