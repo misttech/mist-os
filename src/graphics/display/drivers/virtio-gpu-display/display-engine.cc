@@ -244,11 +244,13 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
   // TODO(costan): fidl::Arena may allocate memory and crash. Find a way to get
   // control over memory allocation.
   fidl::Arena arena;
-  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
-  constraints.usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
-                        .display(fuchsia_sysmem2::wire::kDisplayUsageLayer)
-                        .Build());
-  constraints.buffer_memory_constraints(
+  auto buffer_collection_constraints_builder =
+      fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  buffer_collection_constraints_builder.usage(
+      fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+          .display(fuchsia_sysmem2::wire::kDisplayUsageLayer)
+          .Build());
+  buffer_collection_constraints_builder.buffer_memory_constraints(
       fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
           .min_size_bytes(0)
           .max_size_bytes(std::numeric_limits<uint32_t>::max())
@@ -258,18 +260,19 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
           .cpu_domain_supported(true)
           .Build());
 
-  constraints.image_format_constraints(
-      std::vector{fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
-                      .pixel_format(kSupportedPixelFormat.ToFidl())
-                      .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
-                      .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
-                      .bytes_per_row_divisor(4)
-                      .Build()});
+  const fuchsia_sysmem2::wire::ImageFormatConstraints image_format_constraints[] = {
+      fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
+          .pixel_format(kSupportedPixelFormat.ToFidl())
+          .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
+          .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
+          .bytes_per_row_divisor(4)
+          .Build()};
+  buffer_collection_constraints_builder.image_format_constraints(image_format_constraints);
 
   fidl::OneWayStatus set_constraints_status =
       imported_buffer_collection->sysmem_client()->SetConstraints(
           fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
-              .constraints(constraints.Build())
+              .constraints(buffer_collection_constraints_builder.Build())
               .Build());
   if (!set_constraints_status.ok()) {
     FDF_LOG(ERROR, "SetConstraints() FIDL call failed: %s", set_constraints_status.status_string());

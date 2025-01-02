@@ -101,7 +101,7 @@ zx::result<> GpuDeviceDriver::InitDisplayNode() {
     return compat_server_init_result.take_error();
   }
 
-  const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
+  const fuchsia_driver_framework::NodeProperty node_properties[] = {
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_ENGINE),
   };
   const std::vector<fuchsia_driver_framework::Offer> node_offers =
@@ -133,13 +133,13 @@ zx::result<> GpuDeviceDriver::InitGpuControlNode() {
 
   static constexpr std::string_view kGpuControlChildNodeName = "virtio-gpu-control";
 
-  const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {};
-  const std::vector<fuchsia_driver_framework::Offer> node_offers = {
+  const fuchsia_driver_framework::Offer node_offers[] = {
       fdf::MakeOffer2<fuchsia_gpu_virtio::Service>(component::kDefaultInstance),
   };
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
-      gpu_control_node_controller_client_result =
-          AddChild(kGpuControlChildNodeName, node_properties, node_offers);
+      gpu_control_node_controller_client_result = AddChild(
+          kGpuControlChildNodeName, cpp20::span<const fuchsia_driver_framework::NodeProperty>(),
+          cpp20::span<const fuchsia_driver_framework::Offer>(node_offers, 1));
   if (gpu_control_node_controller_client_result.is_error()) {
     FDF_LOG(ERROR, "Failed to add child node: %s",
             gpu_control_node_controller_client_result.status_string());
