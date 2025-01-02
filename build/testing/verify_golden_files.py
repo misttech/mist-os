@@ -196,7 +196,9 @@ def main():
         )
         dead_goldens = dir_files - goldens
         if dead_goldens and args.bless:
-            subprocess.check_call(["git", "rm", "-f"] + sorted(dead_goldens))
+            subprocess.check_call(
+                ["git", "rm", "-f", "--ignore-unmatch"] + sorted(dead_goldens)
+            )
             dead_goldens = []
             subprocess.check_call(["git", "add", args.golden_dir])
 
