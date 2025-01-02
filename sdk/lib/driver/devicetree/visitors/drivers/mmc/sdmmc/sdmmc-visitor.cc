@@ -90,15 +90,8 @@ zx::result<> SdmmcVisitor::Visit(fdf_devicetree::Node& node,
     return zx::error(encoded_metadata.error_value().status());
   }
 
-  // TODO(b/356905181): Remove once no longer retrieved.
-  fuchsia_hardware_platform_bus::Metadata metadata = {
-      {.id = std::to_string(DEVICE_METADATA_SDMMC), .data = encoded_metadata.value()}};
-  node.AddMetadata(std::move(metadata));
-
-  fuchsia_hardware_platform_bus::Metadata metadata2 = {
-      {.id = fuchsia_hardware_sdmmc::SdmmcMetadata::kSerializableName,
-       .data = encoded_metadata.value()}};
-  node.AddMetadata(std::move(metadata2));
+  node.AddMetadata({{.id = fuchsia_hardware_sdmmc::SdmmcMetadata::kSerializableName,
+                     .data = encoded_metadata.value()}});
   FDF_LOG(DEBUG, "SDMMC metadata added to node '%s'", node.name().c_str());
 
   return zx::ok();

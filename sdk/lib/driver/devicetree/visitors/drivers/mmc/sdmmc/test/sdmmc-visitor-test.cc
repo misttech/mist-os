@@ -55,24 +55,12 @@ TEST(SdmmcVisitorTest, TestClocksProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
-      ASSERT_EQ(2lu, metadata->size());
+      ASSERT_EQ(1lu, metadata->size());
 
       // sdmmc metadata
-      std::vector<uint8_t> metadata_blob1 = std::move(*(*metadata)[0].data());
+      std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[0].data());
       fit::result sdmmc_metadata =
-          fidl::Unpersist<fuchsia_hardware_sdmmc::SdmmcMetadata>(metadata_blob1);
-      ASSERT_TRUE(sdmmc_metadata.is_ok());
-      EXPECT_EQ(sdmmc_metadata->instance_identifier(), "mmc@ff000000");
-      EXPECT_EQ(sdmmc_metadata->max_frequency(), static_cast<uint32_t>(MAX_FREQUENCY));
-      EXPECT_EQ(sdmmc_metadata->removable(), true);
-      EXPECT_EQ(sdmmc_metadata->speed_capabilities(),
-                fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400 |
-                    fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr);
-      EXPECT_EQ(sdmmc_metadata->use_fidl(), false);
-
-      // sdmmc metadata
-      std::vector<uint8_t> metadata_blob2 = std::move(*(*metadata)[1].data());
-      sdmmc_metadata = fidl::Unpersist<fuchsia_hardware_sdmmc::SdmmcMetadata>(metadata_blob2);
+          fidl::Unpersist<fuchsia_hardware_sdmmc::SdmmcMetadata>(metadata_blob);
       ASSERT_TRUE(sdmmc_metadata.is_ok());
       EXPECT_EQ(sdmmc_metadata->instance_identifier(), "mmc@ff000000");
       EXPECT_EQ(sdmmc_metadata->max_frequency(), static_cast<uint32_t>(MAX_FREQUENCY));

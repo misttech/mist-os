@@ -12,7 +12,7 @@
 #include "sdhci.h"
 
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
@@ -1166,68 +1166,58 @@ zx_status_t Sdhci::Init() {
   irq_thread_started_ = true;
 
   // Set controller preferences
-  fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities{};
+  fuchsia_hardware_sdmmc::SdmmcHostPrefs default_speed_capabilities{};
   if (quirks_ & fuchsia_hardware_sdhci::Quirk::kNonStandardTuning) {
     // Disable HS200 and HS400 if tuning cannot be performed as per the spec.
-    speed_capabilities |= fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200 |
-                          fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400;
+    default_speed_capabilities |= fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200 |
+                                  fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400;
   }
   if (quirks_ & fuchsia_hardware_sdhci::Quirk::kNoDdr) {
-    speed_capabilities |= fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr |
-                          fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400;
+    default_speed_capabilities |= fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr |
+                                  fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400;
   }
 
-  fidl::Arena<> fidl_arena;
-  auto builder = fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena).use_fidl(false);
+  fuchsia_hardware_sdmmc::SdmmcMetadata metadata{{
+      .speed_capabilities = default_speed_capabilities,
+      .use_fidl = false,
+  }};
 
-  zx::result existing_metadata = compat::GetMetadata<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
-      incoming(), fidl_arena, DEVICE_METADATA_SDMMC);
+  zx::result existing_metadata =
+      fdf_metadata::GetMetadataIfExists<fuchsia_hardware_sdmmc::SdmmcMetadata>(incoming());
   if (existing_metadata.is_error()) {
-    builder.speed_capabilities(speed_capabilities);
-  } else {
-    if (existing_metadata->has_max_frequency()) {
-      builder.max_frequency(existing_metadata->max_frequency());
-    }
+    FDF_LOG(ERROR, "Failed to get metadata: %s", existing_metadata.status_string());
+    return existing_metadata.status_value();
+  }
+  if (existing_metadata.value().has_value()) {
+    metadata.max_frequency() = existing_metadata->max_frequency();
+    metadata.enable_cache() = existing_metadata->enable_cache();
+    metadata.removable() = existing_metadata->removable();
+    metadata.max_command_packing() = existing_metadata->max_command_packing();
 
-    if (existing_metadata->has_speed_capabilities()) {
+    const auto& speed_capabilities = existing_metadata->speed_capabilities();
+    if (speed_capabilities.has_value()) {
       // OR the speed capabilities reported by the parent with the ones reported by the host
       // controller, which limits us to speed modes supported by both.
-      builder.speed_capabilities(existing_metadata->speed_capabilities() | speed_capabilities);
-    } else {
-      builder.speed_capabilities(speed_capabilities);
-    }
-
-    if (existing_metadata->has_enable_cache()) {
-      builder.enable_cache(existing_metadata->enable_cache());
-    }
-
-    if (existing_metadata->has_removable()) {
-      builder.removable(existing_metadata->removable());
-    }
-
-    if (existing_metadata->has_max_command_packing()) {
-      builder.max_command_packing(existing_metadata->max_command_packing());
+      metadata.speed_capabilities() = speed_capabilities.value() | default_speed_capabilities;
     }
   }
 
   if (!SupportsAdma2()) {
     // Non-DMA requests are only allowed to use a single buffer, so tell the core driver to disable
     // command packing. This limitation could be removed in the future.
-    builder.max_command_packing(0);
+    metadata.max_command_packing() = 0;
   }
 
-  fit::result metadata = fidl::Persist(builder.Build());
-  if (!metadata.is_ok()) {
-    FDF_LOG(ERROR, "Failed to encode SDMMC metadata: %s",
-            metadata.error_value().FormatDescription().c_str());
-    return metadata.error_value().status();
+  if (zx::result result = metadata_server_.SetMetadata(metadata); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to set metadata for metadata server: %s", result.status_string());
+    return result.status_value();
   }
-  status = compat_server_.inner().AddMetadata(DEVICE_METADATA_SDMMC, metadata.value().data(),
-                                              metadata.value().size());
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to add SDMMC metadata: %s", zx_status_get_string(status));
+  if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+    FDF_LOG(ERROR, "Failed to serve metadata server: %s", result.status_string());
+    return result.status_value();
   }
-  return status;
+
+  return ZX_OK;
 }
 
 zx_status_t Sdhci::InitMmio() {
@@ -1322,9 +1312,9 @@ zx::result<> Sdhci::Start() {
   {
     compat::DeviceServer::BanjoConfig banjo_config;
     banjo_config.callbacks[ZX_PROTOCOL_SDMMC] = sdmmc_server_.callback();
-    zx::result<> result = compat_server_.Initialize(
-        incoming(), outgoing(), node_name(), name(),
-        compat::ForwardMetadata::Some({DEVICE_METADATA_SDMMC}), std::move(banjo_config));
+    zx::result<> result =
+        compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
+                                  compat::ForwardMetadata::None(), std::move(banjo_config));
     if (result.is_error()) {
       return result.take_error();
     }
@@ -1343,32 +1333,18 @@ zx::result<> Sdhci::Start() {
     return zx::error(status);
   }
 
-  parent_node_.Bind(std::move(node()));
-
-  auto [controller_client_end, controller_server_end] =
-      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-
-  node_controller_.Bind(std::move(controller_client_end));
-
-  fidl::Arena arena;
-
-  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_sdmmc::SDMMCSERVICE,
-                                    bind_fuchsia_hardware_sdmmc::SDMMCSERVICE_DRIVERTRANSPORT);
-
-  std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
-
-  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                        .name(arena, name())
-                        .offers2(arena, std::move(offers))
-                        .properties(properties)
-                        .Build();
-
-  auto result = parent_node_->AddChild(args, std::move(controller_server_end), {});
-  if (!result.ok()) {
+  const auto kChildNodeName = name();
+  const std::vector<fuchsia_driver_framework::NodeProperty> kProperties{
+      fdf::MakeProperty(bind_fuchsia_hardware_sdmmc::SDMMCSERVICE,
+                        bind_fuchsia_hardware_sdmmc::SDMMCSERVICE_DRIVERTRANSPORT)};
+  std::vector<fuchsia_driver_framework::Offer> offers = compat_server_.CreateOffers2();
+  offers.emplace_back(metadata_server_.MakeOffer());
+  zx::result result = AddChild(kChildNodeName, kProperties, offers);
+  if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
-    return zx::error(result.status());
+    return result.take_error();
   }
+  node_controller_.Bind(std::move(result.value()));
 
   cleanup.cancel();
   return zx::ok();

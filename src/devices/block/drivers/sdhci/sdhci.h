@@ -6,10 +6,12 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_SDHCI_SDHCI_H_
 
 #include <fidl/fuchsia.hardware.sdhci/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/fidl.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/dma-buffer/buffer.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sdmmc/hw.h>
 #include <lib/sync/completion.h>
@@ -259,11 +261,11 @@ class Sdhci : public fdf::DriverBase, public ddk::SdmmcProtocol<Sdhci> {
 
   std::optional<PendingRequest> pending_request_ TA_GUARDED(mtx_);
 
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 
   compat::BanjoServer sdmmc_server_{ZX_PROTOCOL_SDMMC, this, &sdmmc_protocol_ops_};
   compat::SyncInitializedDeviceServer compat_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata_server_;
 };
 
 }  // namespace sdhci

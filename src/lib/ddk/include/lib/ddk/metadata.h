@@ -110,6 +110,7 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: FIDL fuchsia.hardware.tee/TeeMetadata
 #define DEVICE_METADATA_TEE_THREAD_CONFIG 0x43454554  // TEEC
 
+// TODO(b/356905181): Remove once no longer referenced.
 // type: FIDL fuchsia.hardware.sdmmc/SdmmcMetadata
 #define DEVICE_METADATA_SDMMC 0x4D4D4453  // SDMM
 
