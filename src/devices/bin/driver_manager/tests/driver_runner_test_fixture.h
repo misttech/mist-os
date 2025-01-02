@@ -35,7 +35,7 @@ const std::string root_driver_url = "fuchsia-boot:///#meta/root-driver.cm";
 const std::string root_driver_binary = "driver/root-driver.so";
 
 const std::string second_driver_url = "fuchsia-boot:///#meta/second-driver.cm";
-const std::string second_driver_binary = "driver/second-driver.so-";
+const std::string second_driver_binary = "driver/second-driver.so";
 
 using driver_manager::Devfs;
 using driver_manager::DriverRunner;
@@ -52,13 +52,23 @@ static const test_utils::TestPkg::Config kDefaultDriverHostPkgConfig = {
         },
 };
 
-static const test_utils::TestPkg::Config kDefaultDriverPkgConfig = {
+static const test_utils::TestPkg::Config kDefaultRootDriverPkgConfig = {
     .module_test_pkg_path = "/pkg/lib/fake_root_driver.so",
-    .module_open_path = "driver/fake_root_driver.so",
+    .module_open_path = root_driver_binary,
     .expected_libs =
         {
             "libfake_root_driver_deps.so",
         },
+};
+
+// The tests that use this config don't actually run the driver, so we can
+// just point it at the placeholder fake_driver.so that will be accepted
+// by the loader library. We can replace them in future with a custom .so
+// if needed.
+static const test_utils::TestPkg::Config kDefaultSecondDriverPkgConfig = {
+    .module_test_pkg_path = "/pkg/lib/fake_driver.so",
+    .module_open_path = second_driver_binary,
+    .expected_libs = {},
 };
 
 struct NodeChecker {
@@ -241,9 +251,13 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
 
   void SetupDriverRunner(FakeDriverIndex driver_index);
 
+  // If |wait_for_num_drivers| is set , the driver host will be sent a message to exit after that
+  // many drivers have been loaded. This only needs to be set if the test is explicitly waiting for
+  // the driver host process to exit, usually to verify the exit value.
   void SetupDriverRunnerWithDynamicLinker(
       async_dispatcher_t* loader_dispatcher,
-      std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner);
+      std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner,
+      std::optional<uint32_t> wait_for_num_drivers = std::nullopt);
 
   void SetupDriverRunner();
 
@@ -276,10 +290,17 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
       fidl::ClientEnd<fuchsia_io::Directory> driver_host_pkg =
           fidl::ClientEnd<fuchsia_io::Directory>());
 
+  // Variant of |StartDriver| that takes in a test pkg config rather than the pkg directory client.
+  // If the driver has opted into dynamic linking, the fake /pkg directory will be provided to
+  // the driver component's namespace.
+  StartDriverResult StartDriverWithConfig(
+      Driver driver, std::optional<StartDriverHandler> start_handler = std::nullopt,
+      test_utils::TestPkg::Config driver_config = kDefaultRootDriverPkgConfig);
+
   zx::result<StartDriverResult> StartRootDriver();
   zx::result<StartDriverResult> StartRootDriverDynamicLinking(
       test_utils::TestPkg::Config driver_host_config = kDefaultDriverHostPkgConfig,
-      test_utils::TestPkg::Config driver_config = kDefaultDriverPkgConfig);
+      test_utils::TestPkg::Config driver_config = kDefaultRootDriverPkgConfig);
 
   StartDriverResult StartSecondDriver(bool colocate = false, bool host_restart_on_crash = false,
                                       bool use_next_vdso = false);

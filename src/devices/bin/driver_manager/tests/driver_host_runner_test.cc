@@ -179,7 +179,8 @@ class DynamicLinkingTest : public driver_runner::DriverRunnerTest {
     auto driver_host_runner =
         std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
 
-    SetupDriverRunnerWithDynamicLinker(dispatcher(), std::move(driver_host_runner));
+    SetupDriverRunnerWithDynamicLinker(dispatcher(), std::move(driver_host_runner),
+                                       1u /* wait_for_num_drivers */);
   }
 };
 

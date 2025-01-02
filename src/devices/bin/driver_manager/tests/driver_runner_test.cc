@@ -57,6 +57,19 @@ class DriverRunnerTest2 : public DriverRunnerTest, public ::testing::WithParamIn
     }
   }
 
+  // If |use_dynamic_linker| is not provided, it will be generated from the test configuration.
+  void ValidateProgram(std::optional<::fuchsia_data::Dictionary>& program, std::string_view binary,
+                       std::string_view colocate, std::string_view host_restart_on_crash,
+                       std::string_view use_next_vdso,
+                       std::optional<std::string_view> use_dynamic_linker = std::nullopt) {
+    std::string use_dynamic_linker_str = use_dynamic_linker_ ? "true" : "false";
+    if (use_dynamic_linker.has_value()) {
+      use_dynamic_linker_str = use_dynamic_linker.value();
+    }
+    return DriverRunnerTest::ValidateProgram(program, binary, colocate, host_restart_on_crash,
+                                             use_next_vdso, use_dynamic_linker_str);
+  }
+
   bool use_dynamic_linker() const { return use_dynamic_linker_; }
 
  private:
@@ -371,7 +384,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
 
 // Start the root driver, and then start a second driver in the same driver
 // host.
-TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_SameDriverHost) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -408,20 +421,24 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   EXPECT_TRUE(RunLoopUntilIdle());
   EXPECT_TRUE(did_bind);
 
-  StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
+  auto second_driver_config = kDefaultSecondDriverPkgConfig;
+  std::string binary = std::string(second_driver_config.module_open_path);
+  StartDriverHandler start_handler = [this, binary](TestDriver* driver,
+                                                    fdfw::DriverStartArgs start_args) {
     auto& symbols = start_args.symbols().value();
     EXPECT_EQ(1u, symbols.size());
     EXPECT_EQ("sym", symbols[0].name().value());
     EXPECT_EQ(0xfeedu, symbols[0].address());
-    ValidateProgram(start_args.program(), second_driver_binary, "true", "false", "false");
+    ValidateProgram(start_args.program(), binary, "true", "false", "false");
   };
-  auto [driver, controller] = StartDriver(
+  auto [driver, controller] = StartDriverWithConfig(
       {
           .url = second_driver_url,
-          .binary = second_driver_binary,
+          .binary = binary,
           .colocate = true,
+          .use_dynamic_linker = use_dynamic_linker(),
       },
-      std::move(start_handler));
+      std::move(start_handler), second_driver_config);
 
   driver->CloseBinding();
   driver->DropNode();

@@ -258,11 +258,19 @@ void DriverRunnerTest::SetupDriverRunner(FakeDriverIndex driver_index) {
 
 void DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(
     async_dispatcher_t* loader_dispatcher,
-    std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner) {
+    std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner,
+    std::optional<uint32_t> wait_for_num_drivers) {
   driver_index_.emplace(CreateDriverIndex());
-  auto load_driver_handler = [](zx::unowned_channel bootstrap_sender,
-                                driver_loader::Loader::DriverStartAddr addr) {
+  auto load_driver_handler = [num_drivers_loaded = 0, wait_for_num_drivers](
+                                 zx::unowned_channel bootstrap_sender,
+                                 driver_loader::Loader::DriverStartAddr addr) mutable {
     ASSERT_EQ(ZX_OK, bootstrap_sender->write(0, &addr, sizeof(addr), nullptr, 0));
+    num_drivers_loaded++;
+    if (wait_for_num_drivers.has_value() && (wait_for_num_drivers == num_drivers_loaded)) {
+      // Send a message for the driver host to exit.
+      addr = 0;
+      ASSERT_EQ(ZX_OK, bootstrap_sender->write(0, &addr, sizeof(addr), nullptr, 0));
+    }
   };
   dynamic_linker_ =
       driver_loader::Loader::Create(loader_dispatcher, std::move(load_driver_handler));
@@ -442,6 +450,20 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
 
   return {std::move(started_driver), std::move(controller_endpoints.client)};
 }
+
+DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriverWithConfig(
+    Driver driver, std::optional<StartDriverHandler> start_handler,
+    test_utils::TestPkg::Config driver_config) {
+  fidl::Endpoints<fuchsia_io::Directory> child_pkg_endpoints;
+  std::unique_ptr<test_utils::TestPkg> child_test_pkg;
+  if (driver.use_dynamic_linker) {
+    child_pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    child_test_pkg =
+        std::make_unique<test_utils::TestPkg>(std::move(child_pkg_endpoints.server), driver_config);
+  }
+  return StartDriver(driver, std::move(start_handler), std::move(child_pkg_endpoints.client));
+}
+
 zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDriver() {
   realm().SetCreateChildHandler(
       [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {

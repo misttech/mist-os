@@ -16,6 +16,7 @@ group("modules") {
   visibility = [ ":*" ]
   testonly = true
   deps = [
+    ":fake_driver",
     ":fake_driver_host",
     ":fake_driver_host_with_bootstrap",
     ":fake_root_driver",
@@ -91,6 +92,13 @@ shared_library("fake_root_driver_deps") {
   testonly = true
   sources = [ "fake_root_driver_deps.cc" ]
   deps = [ "//zircon/system/public" ]
+}
+
+loadable_module("fake_driver") {
+  visibility = [ ":*" ]
+  testonly = true
+  sources = [ "fake_driver.cc" ]
+  public = [ "driver_entry_point.h" ]
 }
 
 ifs_shared_library("fake_runtime.lib") {
