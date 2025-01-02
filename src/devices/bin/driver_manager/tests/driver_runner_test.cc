@@ -96,7 +96,7 @@ TEST_P(DriverRunnerTest2, StartRootDriver) {
 }
 
 // Start the root driver. Make sure that the driver is stopped before the Component is exited.
-TEST_F(DriverRunnerTest, StartRootDriver_DriverStopBeforeComponentExit) {
+TEST_P(DriverRunnerTest2, StartRootDriver_DriverStopBeforeComponentExit) {
   SetupDriverRunner();
 
   std::vector<size_t> event_order;
@@ -114,7 +114,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_DriverStopBeforeComponentExit) {
 }
 
 // Start the root driver, and add a child node owned by the root driver.
-TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild) {
+TEST_P(DriverRunnerTest2, StartRootDriver_AddOwnedChild) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -128,7 +128,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild) {
 }
 
 // Start the root driver, add a child node, then remove it.
-TEST_F(DriverRunnerTest, StartRootDriver_RemoveOwnedChild) {
+TEST_P(DriverRunnerTest2, StartRootDriver_RemoveOwnedChild) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -153,7 +153,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_RemoveOwnedChild) {
 }
 
 // Start the root driver, and add two child nodes with duplicate names.
-TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild_DuplicateNames) {
+TEST_P(DriverRunnerTest2, StartRootDriver_AddOwnedChild_DuplicateNames) {
   SetupDriverRunner();
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
@@ -174,7 +174,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild_DuplicateNames) {
 
 // Start the root driver, and add a child node with an offer that is missing a
 // source.
-TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferMissingSource) {
+TEST_P(DriverRunnerTest2, StartRootDriver_AddUnownedChild_OfferMissingSource) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -202,7 +202,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferMissingSource) {
 
 // Start the root driver, and add a child node with one offer that has a source
 // and another that has a target.
-TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferHasRef) {
+TEST_P(DriverRunnerTest2, StartRootDriver_AddUnownedChild_OfferHasRef) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -237,7 +237,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferHasRef) {
 // Start the root driver, and add a child node with duplicate symbols. The child
 // node is unowned, so if we did not have duplicate symbols, the second driver
 // would bind to it.
-TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_DuplicateSymbols) {
+TEST_P(DriverRunnerTest2, StartRootDriver_AddUnownedChild_DuplicateSymbols) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -269,7 +269,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_DuplicateSymbols) {
 
 // Start the root driver, and add a child node that has a symbol without an
 // address.
-TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingAddress) {
+TEST_P(DriverRunnerTest2, StartRootDriver_AddUnownedChild_SymbolMissingAddress) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -295,7 +295,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingAddress) {
 }
 
 // Start the root driver, and add a child node that has a symbol without a name.
-TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingName) {
+TEST_P(DriverRunnerTest2, StartRootDriver_AddUnownedChild_SymbolMissingName) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -457,7 +457,7 @@ TEST_P(DriverRunnerTest2, StartSecondDriver_SameDriverHost) {
 
 // Start the root driver, and then start a second driver that we match based on
 // node properties.
-TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_UseProperties) {
   FakeDriverIndex driver_index(
       dispatcher(), [](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
         if (args.has_properties() && args.properties()[0].key.is_string_value() &&
@@ -509,7 +509,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
 
 // Start the second driver, and then disable and rematch it which should make it available for
 // matching. Undisable the driver and then restart with rematch, which should get the node again.
-TEST_F(DriverRunnerTest, StartSecondDriver_DisableAndRematch_UndisableAndRestart) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_DisableAndRematch_UndisableAndRestart) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -563,7 +563,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_DisableAndRematch_UndisableAndRestart
 // Start the second driver with host_restart_on_crash enabled, and then kill the driver host, and
 // observe the node start the driver again in another host. Done by both a node client drop, and a
 // driver host server binding close.
-TEST_F(DriverRunnerTest, StartSecondDriverHostRestartOnCrash) {
+TEST_P(DriverRunnerTest2, StartSecondDriverHostRestartOnCrash) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -658,7 +658,7 @@ TEST_F(DriverRunnerTest, StartSecondDriverHostRestartOnCrash) {
 }
 
 // Start the second driver with use_next_vdso enabled,
-TEST_F(DriverRunnerTest, StartSecondDriver_UseNextVdso) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_UseNextVdso) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -678,7 +678,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseNextVdso) {
 }
 
 // The root driver adds a node that only binds after a RequestBind() call.
-TEST_F(DriverRunnerTest, BindThroughRequest) {
+TEST_P(DriverRunnerTest2, BindThroughRequest) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -875,7 +875,7 @@ TEST_P(DriverRunnerTest2, StartSecondDriver_BindOrphanToBaseDriver) {
 }
 
 // Start the second driver, and then unbind its associated node.
-TEST_F(DriverRunnerTest, StartSecondDriver_UnbindSecondNode) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_UnbindSecondNode) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -901,7 +901,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnbindSecondNode) {
 
 // Start the second driver, and then close the associated Driver protocol
 // channel.
-TEST_F(DriverRunnerTest, StartSecondDriver_CloseSecondDriver) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_CloseSecondDriver) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1008,7 +1008,7 @@ TEST_P(DriverRunnerTest2, StartDriverChain_UnbindSecondNode) {
 }
 
 // Start the second driver, and then unbind the root node.
-TEST_F(DriverRunnerTest, StartSecondDriver_UnbindRootNode) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_UnbindRootNode) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1031,7 +1031,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnbindRootNode) {
 }
 
 // Start the second driver, and then Stop the root node.
-TEST_F(DriverRunnerTest, StartSecondDriver_StopRootNode) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_StopRootNode) {
   SetupDriverRunner();
 
   // These represent the order that Driver::Stop is called
@@ -1067,7 +1067,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_StopRootNode) {
 }
 
 // Start the second driver, and then stop the root driver.
-TEST_F(DriverRunnerTest, StartSecondDriver_StopRootDriver) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_StopRootDriver) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1091,7 +1091,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_StopRootDriver) {
 
 // Start the second driver, stop the root driver, and block while waiting on the
 // second driver to shut down.
-TEST_F(DriverRunnerTest, StartSecondDriver_BlockOnSecondDriver) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_BlockOnSecondDriver) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1234,7 +1234,7 @@ TEST_P(DriverRunnerTest2, CreateAndBindCompositeNodeSpec) {
 }
 
 // Start a driver and inspect the driver runner.
-TEST_F(DriverRunnerTest, StartAndInspect) {
+TEST_P(DriverRunnerTest2, StartAndInspect) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1308,7 +1308,7 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
   realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
 }
 
-TEST_F(DriverRunnerTest, TestTearDownNodeTreeWithManyChildren) {
+TEST_P(DriverRunnerTest2, TestTearDownNodeTreeWithManyChildren) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1323,7 +1323,7 @@ TEST_F(DriverRunnerTest, TestTearDownNodeTreeWithManyChildren) {
   Unbind();
 }
 
-TEST_F(DriverRunnerTest, TestBindResultTracker) {
+TEST_P(DriverRunnerTest2, TestBindResultTracker) {
   bool callback_called = false;
   bool* callback_called_ptr = &callback_called;
 
@@ -1406,7 +1406,7 @@ TEST_F(DriverRunnerTest, TestBindResultTracker) {
 
 // Start the root driver, add a child node, and verify that the child node's device controller is
 // reachable.
-TEST_F(DriverRunnerTest, ConnectToDeviceController) {
+TEST_P(DriverRunnerTest2, ConnectToDeviceController) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1431,7 +1431,7 @@ TEST_F(DriverRunnerTest, ConnectToDeviceController) {
 
 // Start the root driver, add a child node, and verify that calling the child's device controller's
 // `ConnectToController` FIDL method works.
-TEST_F(DriverRunnerTest, ConnectToControllerFidlMethod) {
+TEST_P(DriverRunnerTest2, ConnectToControllerFidlMethod) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1477,7 +1477,7 @@ TEST_F(DriverRunnerTest, ConnectToControllerFidlMethod) {
 }
 
 // Verify that device controller's Bind FIDL method works.
-TEST_F(DriverRunnerTest, DeviceControllerBind) {
+TEST_P(DriverRunnerTest2, DeviceControllerBind) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
