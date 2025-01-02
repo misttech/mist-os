@@ -774,7 +774,7 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
 
 // Start the root driver, and then add a child node that does not bind to a
 // second driver.
-TEST_F(DriverRunnerTest, StartSecondDriver_UnknownNode) {
+TEST_P(DriverRunnerTest2, StartSecondDriver_UnknownNode) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -783,7 +783,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnknownNode) {
   std::shared_ptr<CreatedChild> child = root_driver->driver->AddChild("unknown-node", false, false);
   EXPECT_TRUE(RunLoopUntilIdle());
 
-  StartDriver({.close = true});
+  StartDriver({.close = true, .use_dynamic_linker = use_dynamic_linker()});
   ASSERT_EQ(1u, driver_runner().bind_manager().NumOrphanedNodes());
 
   StopDriverComponent(std::move(root_driver->controller));

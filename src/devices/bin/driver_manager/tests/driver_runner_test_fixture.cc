@@ -431,7 +431,10 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
   // The driver manager is waiting for the component framework to call the driver
   // host runner's component Start implementation. We need to call it
   // now to continue with starting the driver host and subsequently the driver.
-  if (!driver.colocate && driver.use_dynamic_linker) {
+  //
+  // If the driver |Start| request is expected to fail (|driver.close| is true),
+  // then we should not start the driver host.
+  if (!driver.colocate && driver.use_dynamic_linker && !driver.close) {
     DriverHostComponentStart(realm(), *driver_runner().driver_host_runner_for_tests(),
                              std::move(driver_host_pkg));
     RunLoopUntilIdle();
