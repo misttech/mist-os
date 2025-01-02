@@ -36,12 +36,6 @@ void AmlUartV2::Start(fdf::StartCompleter completer) {
 
   parent_node_client_.Bind(std::move(node()), dispatcher());
 
-  // pdev is our primary node so that is what this will be connecting to for the compat connection.
-  auto compat_connection = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
-  if (compat_connection.is_error()) {
-    CompleteStart(compat_connection.take_error());
-    return;
-  }
   device_server_.Begin(incoming(), outgoing(), node_name(), kChildName,
                        fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
                        compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
