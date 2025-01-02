@@ -113,8 +113,11 @@ CloneHelper::CloneHelper() {
   // Stack setup
   this->_childStack = (uint8_t *)mmap(NULL, CloneHelper::_childStackSize, PROT_WRITE | PROT_READ,
                                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-  assert(errno == 0);
-  assert(this->_childStack != (uint8_t *)(-1));
+  if (this->_childStack == MAP_FAILED) {
+    std::cerr << "CloneHelper mmap failed, errno was set to '" << strerror(errno) << "' (" << errno
+              << ").\n";
+    assert(false);
+  }
   this->_childStackBegin = this->_childStack + CloneHelper::_childStackSize;
 }
 
