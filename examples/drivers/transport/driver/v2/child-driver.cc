@@ -23,7 +23,8 @@ zx::result<> ChildTransportDriver::Start() {
     return result.take_error();
   }
 
-  zx::result child_result = AddChild("transport-child", {}, {});
+  std::vector<fuchsia_driver_framework::NodeProperty2> properties = {};
+  zx::result child_result = AddChild("transport-child", properties, {});
   if (child_result.is_error()) {
     return child_result.take_error();
   }

@@ -24,8 +24,9 @@ zx::result<> ParentTransportDriver::Start() {
   }
 
   // Add a child with a `fuchsia.examples.gizmo.Service` offer.
+  std::vector<fuchsia_driver_framework::NodeProperty2> properties = {};
   zx::result child_result =
-      AddChild("driver_transport_child", {},
+      AddChild("driver_transport_child", properties,
                std::array{fdf::MakeOffer2<fuchsia_hardware_i2cimpl::Service>()});
   if (child_result.is_error()) {
     return child_result.take_error();
