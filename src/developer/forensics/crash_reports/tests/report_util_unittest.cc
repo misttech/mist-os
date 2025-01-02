@@ -20,6 +20,7 @@ namespace forensics {
 namespace crash_reports {
 namespace {
 
+using ::testing::IsEmpty;
 using ::testing::IsSupersetOf;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAreArray;
@@ -160,6 +161,7 @@ TEST(MakeReport, AddsRequiredAnnotations) {
 
   ASSERT_TRUE(report.is_ok());
   EXPECT_EQ(report.value().Annotations().Get(feedback::kOSNameKey), "Fuchsia");
+  EXPECT_THAT(report.value().Annotations().Get(feedback::kDebugReportUuid), Not(IsEmpty()));
 }
 
 TEST(SnapshotAnnotationsTest, GetReportAnnotations_EmptySnapshotAnnotations) {

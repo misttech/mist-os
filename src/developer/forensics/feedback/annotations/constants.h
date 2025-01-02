@@ -28,6 +28,7 @@ constexpr const char kBuildLatestCommitDateKey[] = "build.latest-commit-date";
 constexpr const char kBuildIsDebugKey[] = "build.is_debug";
 constexpr const char kDebugReportUploadBootId[] = "debug.report.upload.boot-id";
 constexpr const char kDebugReportUploadUptime[] = "debug.report.upload.uptime";
+constexpr const char kDebugReportUuid[] = "debug.report.uuid";
 constexpr const char kDebugSnapshotErrorKey[] = "debug.snapshot.error";
 constexpr const char kDebugSnapshotPresentKey[] = "debug.snapshot.present";
 constexpr const char kDeviceBoardNameKey[] = "device.board-name";
