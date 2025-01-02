@@ -8,7 +8,7 @@ use fidl::endpoints::{create_endpoints, create_proxy, ServerEnd};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
-    Capability, ChildOptions, ChildRef, DirectoryContents, RealmBuilder, RealmInstance, Ref, Route,
+    Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
 };
 use futures::{select, FutureExt, StreamExt};
 use realm_proxy_client::RealmProxyClient;
@@ -120,8 +120,8 @@ async fn test_autolaunch_launches() -> anyhow::Result<()> {
     add_session_manager(
         &builder,
         "hello-world-session#meta/hello-world-session.cm".to_string(),
-        true,
-        false,
+        /* autolaunch= */ true,
+        /* suspend_enabled= */ false,
     )
     .await?;
 
@@ -150,41 +150,10 @@ async fn test_noautolaunch_does_not_launch() -> anyhow::Result<()> {
     add_session_manager(
         &builder,
         "hello-world-session#meta/hello-world-session.cm".to_string(),
-        false,
-        false,
+        /* autolaunch= */ false,
+        /* suspend_enabled= */ false,
     )
     .await?;
-
-    let realm = builder.build().await?;
-
-    let inspect = get_session_manager_inspect(&realm, "root/session_started_at").await?;
-
-    // No sessions should have launched.
-    assert_eq!(0, inspect.get_child("session_started_at").unwrap().children.len());
-
-    realm.destroy().await?;
-    Ok(())
-}
-
-#[fuchsia::test]
-async fn noautolaunch_file_overrides_structured_config() -> anyhow::Result<()> {
-    let builder = RealmBuilder::new().await?;
-
-    let session_manager = add_session_manager(
-        &builder,
-        "hello-world-session#meta/hello-world-session.cm".to_string(),
-        true,
-        false,
-    )
-    .await?;
-
-    builder
-        .read_only_directory(
-            "root-data",
-            vec![&session_manager],
-            DirectoryContents::new().add_file("session-manager/noautolaunch", ""),
-        )
-        .await?;
 
     let realm = builder.build().await?;
 
@@ -247,8 +216,13 @@ impl SessionManagerPowerTest {
                     .to(Ref::parent()),
             )
             .await?;
-        let session_manager =
-            add_session_manager(&builder, "".to_string(), false, suspend_enabled).await?;
+        let session_manager = add_session_manager(
+            &builder,
+            "".to_string(),
+            /* autolaunch= */ false,
+            suspend_enabled,
+        )
+        .await?;
 
         // Route power protocols to `session-manager` using a proxying local child.
         let sag_realm_1 = sag_realm.clone();
@@ -463,7 +437,13 @@ async fn test_launch_with_config_capabilities() -> anyhow::Result<()> {
     let builder = RealmBuilder::new().await?;
 
     // Add a session manager but don't launch the session yet.
-    let session_manager = add_session_manager(&builder, "".to_string(), false, false).await?;
+    let session_manager = add_session_manager(
+        &builder,
+        "".to_string(),
+        /* autolaunch= */ false,
+        /* suspend_enabled= */ false,
+    )
+    .await?;
 
     // Obtain a `Launcher` capability.
     builder
