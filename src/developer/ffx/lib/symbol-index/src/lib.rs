@@ -17,7 +17,7 @@ pub fn global_symbol_index_path() -> Result<String> {
 }
 
 // Ensures that symbols in sdk.root are registered in the global symbol index.
-pub async fn ensure_symbol_index_registered(sdk: &Sdk) -> Result<()> {
+pub fn ensure_symbol_index_registered(sdk: &Sdk) -> Result<()> {
     let symbol_index_path = if sdk.get_version() == &sdk::SdkVersion::InTree {
         let symbol_index_path = sdk.get_path_prefix().join(".symbol-index.json");
         if !symbol_index_path.exists() {
