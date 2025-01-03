@@ -14,6 +14,7 @@
 
 #include <fbl/auto_lock.h>
 
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/zxio.h"
 
@@ -182,7 +183,7 @@ int timerfd_create(int clockid, int flags) {
     io->ioflag() |= IOFLAG_NONBLOCK;
   }
 
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     return fd.value();
   }
@@ -205,7 +206,7 @@ void fdio_timer_get_current_timespec(fdio_timer_t* timer, struct itimerspec* out
 
 __EXPORT int timerfd_settime(int fd, int flags, const struct itimerspec* new_value,
                              struct itimerspec* old_value) {
-  fdio_ptr io = fd_to_io(fd);
+  fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -259,7 +260,7 @@ __EXPORT int timerfd_settime(int fd, int flags, const struct itimerspec* new_val
 
 __EXPORT
 int timerfd_gettime(int fd, struct itimerspec* curr_value) {
-  fdio_ptr io = fd_to_io(fd);
+  fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }

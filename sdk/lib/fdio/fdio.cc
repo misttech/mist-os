@@ -11,6 +11,7 @@
 
 #include <fbl/auto_lock.h>
 
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/internal.h"
 #include "sdk/lib/fdio/zxio.h"
@@ -51,7 +52,7 @@ int fdio_fd_create_null(void) {
   if (io.is_error()) {
     return ERROR(io.status_value());
   }
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     return fd.value();
   }
@@ -72,25 +73,26 @@ int fdio_bind_to_fd(fdio_t* io, int fd, int starting_fd) {
   // Don't release under lock.
   fdio_ptr io_to_close = nullptr;
   {
-    fbl::AutoLock lock(&fdio_lock);
+    fdio_state_t& gstate = fdio_global_state();
+    fbl::AutoLock lock(&gstate.lock);
     if (fd < 0) {
       // A negative fd implies that any free fd value can be used
       // TODO: bitmap, ffs, etc
       for (fd = starting_fd; fd < FDIO_MAX_FD; fd++) {
-        if (fdio_fdtab[fd].try_set(owned)) {
+        if (gstate.fdtab[fd].try_set(owned)) {
           return fd;
         }
       }
       return ERRNO(EMFILE);
     }
-    io_to_close = fdio_fdtab[fd].replace(owned);
+    io_to_close = gstate.fdtab[fd].replace(owned);
   }
   return fd;
 }
 
 __EXPORT
 zx_status_t fdio_unbind_from_fd(int fd, fdio_t** out) {
-  fdio_ptr io = unbind_from_fd(fd);
+  fdio_ptr io = fdio_global_state().unbind_from_fd(fd);
   if (io == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -117,9 +119,10 @@ fdio_t* fdio_zxio_create(zxio_storage_t** out_storage) {
 __EXPORT
 size_t fdio_currently_allocated_fd_count(void) {
   size_t count = 0;
-  fbl::AutoLock lock(&fdio_lock);
+  fdio_state_t& gstate = fdio_global_state();
+  fbl::AutoLock lock(&gstate.lock);
   for (size_t fd = 0; fd < FDIO_MAX_FD; ++fd) {
-    if (fdio_fdtab[fd].allocated()) {
+    if (gstate.fdtab[fd].allocated()) {
       ++count;
     }
   }

@@ -13,6 +13,7 @@
 
 #include <fbl/auto_lock.h>
 
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/zxio.h"
 
@@ -210,7 +211,7 @@ int eventfd(unsigned int initval, int flags) {
     io->ioflag() |= IOFLAG_NONBLOCK;
   }
 
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     return fd.value();
   }

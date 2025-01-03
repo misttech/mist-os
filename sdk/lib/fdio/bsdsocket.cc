@@ -24,6 +24,7 @@
 #include <fbl/ref_ptr.h>
 #include <fbl/unique_fd.h>
 
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/get_client.h"
 #include "sdk/lib/fdio/internal.h"
@@ -95,7 +96,7 @@ int socket(int domain, int type, int protocol) {
     io->ioflag() |= IOFLAG_CLOEXEC;
   }
 
-  std::optional fd = bind_to_fd(io);
+  std::optional fd = fdio_global_state().bind_to_fd(io);
   if (fd.has_value()) {
     return fd.value();
   }
@@ -104,7 +105,7 @@ int socket(int domain, int type, int protocol) {
 
 __EXPORT
 int connect(int fd, const struct sockaddr* addr, socklen_t len) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -139,7 +140,7 @@ int connect(int fd, const struct sockaddr* addr, socklen_t len) {
 namespace {
 template <typename F>
 int delegate(int fd, F fn) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -178,10 +179,11 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
     return ERRNO(EINVAL);
   }
 
-  std::optional reservation = []() -> std::optional<std::pair<int, void (fdio_slot::*)()>> {
-    const fbl::AutoLock lock(&fdio_lock);
+  fdio_state_t& gstate = fdio_global_state();
+  std::optional reservation = [&]() -> std::optional<std::pair<int, void (fdio_slot::*)()>> {
+    const fbl::AutoLock lock(&gstate.lock);
     for (int i = 0; i < FDIO_MAX_FD; ++i) {
-      std::optional cleanup = fdio_fdtab[i].try_reserve();
+      std::optional cleanup = gstate.fdtab[i].try_reserve();
       if (cleanup.has_value()) {
         return std::make_pair(i, cleanup.value());
       }
@@ -193,9 +195,9 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
   }
   auto [nfd, cleanup_getter] = reservation.value();
   // Lambdas are not allowed to reference local bindings.
-  auto release = fit::defer([nfd = nfd, cleanup_getter = cleanup_getter]() {
-    const fbl::AutoLock lock(&fdio_lock);
-    (fdio_fdtab[nfd].*cleanup_getter)();
+  auto release = fit::defer([&, nfd = nfd, cleanup_getter = cleanup_getter]() {
+    const fbl::AutoLock lock(&gstate.lock);
+    (gstate.fdtab[nfd].*cleanup_getter)();
   });
 
   const fdio_ptr accepted_io = fdio_socket_allocate();
@@ -206,7 +208,7 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
     zx_status_t status;
     int16_t out_code;
 
-    const fdio_ptr io = fd_to_io(fd);
+    const fdio_ptr io = gstate.fd_to_io(fd);
     if (io == nullptr) {
       return ERRNO(EBADF);
     }
@@ -252,8 +254,8 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
     accepted_io->ioflag() |= IOFLAG_CLOEXEC;
   }
 
-  const fbl::AutoLock lock(&fdio_lock);
-  if (fdio_fdtab[nfd].try_fill(accepted_io)) {
+  const fbl::AutoLock lock(&gstate.lock);
+  if (gstate.fdtab[nfd].try_fill(accepted_io)) {
     return nfd;
   }
 
@@ -269,7 +271,7 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
   //
   // Ownership of reservations isn't maintained, but that should be OK as long as it isn't assumed.
   for (int i = 0; i < FDIO_MAX_FD; ++i) {
-    if (fdio_fdtab[nfd].try_set(accepted_io)) {
+    if (gstate.fdtab[nfd].try_set(accepted_io)) {
       return i;
     }
   }
@@ -377,7 +379,7 @@ int getpeername(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict 
 __EXPORT
 int getsockopt(int fd, int level, int optname, void* __restrict optval,
                socklen_t* __restrict optlen) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -423,7 +425,7 @@ int getsockopt(int fd, int level, int optname, void* __restrict optval,
 
 __EXPORT
 int setsockopt(int fd, int level, int optname, const void* optval, socklen_t optlen) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }

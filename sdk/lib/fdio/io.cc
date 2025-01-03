@@ -5,12 +5,13 @@
 #include <lib/fdio/io.h>
 #include <lib/zx/socket.h>
 
+#include "fdio_state.h"
 #include "fdio_unistd.h"
 #include "zxio.h"
 
 __EXPORT
 zx_status_t fdio_wait_fd(int fd, uint32_t events, uint32_t* out_pending, zx_time_t deadline) {
-  fdio_ptr io = fd_to_io(fd);
+  fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -30,7 +31,7 @@ int fdio_handle_fd(zx_handle_t h, zx_signals_t signals_in, zx_signals_t signals_
   if (io.is_error()) {
     return ERROR(io.status_value());
   }
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     return fd.value();
   }
@@ -48,7 +49,7 @@ zx_status_t fdio_pipe_half(int* out_fd, zx_handle_t* out_handle) {
   if (io.is_error()) {
     return io.status_value();
   }
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     *out_fd = fd.value();
     *out_handle = h1.release();
@@ -72,7 +73,7 @@ zx_status_t fdio_transferable_fd(int* out_fd, zx_handle_t* out_handle) {
   if (status != ZX_OK) {
     return status;
   }
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     *out_fd = fd.value();
     *out_handle = h1.release();
@@ -85,7 +86,7 @@ namespace {
 
 template <typename F>
 zx_status_t with_zxio(int fd, F fn, zx_handle_t* out_vmo) {
-  fdio_ptr io = fd_to_io(fd);
+  fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ZX_ERR_BAD_HANDLE;
   }
