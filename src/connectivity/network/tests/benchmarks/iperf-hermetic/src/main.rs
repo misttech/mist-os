@@ -310,12 +310,21 @@ mod test {
             .snapshot_then_subscribe()
             .expect("subscribe to logs");
 
-        let ((), status) = futures::future::join(
-            wait_for_log(stream, "iperf 3.7-FUCHSIA"),
-            watch_for_exit(&realm, IPERF_MONIKER),
-        )
-        .await;
-        assert_eq!(status, component_events::events::ExitStatus::Clean,);
+        let watch_exit_fut = async move {
+            tracing::info!("waiting for {:?} to exit", IPERF_MONIKER);
+            let status = watch_for_exit(&realm, IPERF_MONIKER).await;
+            tracing::info!("observed {:?} exit", IPERF_MONIKER);
+            assert_eq!(status, component_events::events::ExitStatus::Clean);
+        };
+
+        let watch_log_fut = async move {
+            const WAIT_FOR_LOG: &str = "iperf 3.7-FUCHSIA";
+            tracing::info!("waiting for log {:?}", WAIT_FOR_LOG);
+            wait_for_log(stream, WAIT_FOR_LOG).await;
+            tracing::info!("observed log {:?}", WAIT_FOR_LOG);
+        };
+
+        let ((), ()) = futures::future::join(watch_exit_fut, watch_log_fut).await;
     }
 
     #[netstack_test]

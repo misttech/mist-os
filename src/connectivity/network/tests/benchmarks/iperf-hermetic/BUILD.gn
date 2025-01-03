@@ -36,6 +36,7 @@ rustc_binary("bin") {
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/diagnostics/reader/rust",
     "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:tracing",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
