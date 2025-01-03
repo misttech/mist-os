@@ -46,10 +46,10 @@ pub struct MyProtocol;
 
 pub mod my_protocol {}
 
-/// A helper trait for the `MyProtocol` client protocol.
-pub trait MyProtocolClient<___T: ::fidl_next::protocol::Transport> {}
+/// A helper trait for the `MyProtocol` client sender.
+pub trait MyProtocolClientSender<___T: ::fidl_next::protocol::Transport> {}
 
-impl<___T> MyProtocolClient<___T> for ::fidl_next::bind::Client<___T, MyProtocol> where
+impl<___T> MyProtocolClientSender<___T> for ::fidl_next::bind::ClientSender<___T, MyProtocol> where
     ___T: ::fidl_next::protocol::Transport
 {
 }
@@ -65,22 +65,22 @@ where
 {
     fn on_event(
         handler: &mut ___H,
-        client: &::fidl_next::bind::Client<___T, Self>,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             ordinal => {
-                client.close();
+                sender.close();
             }
         }
     }
 }
 
-/// A helper trait for the `MyProtocol` server protocol.
-pub trait MyProtocolServer<___T: ::fidl_next::protocol::Transport> {}
+/// A helper trait for the `MyProtocol` server sender.
+pub trait MyProtocolServerSender<___T: ::fidl_next::protocol::Transport> {}
 
-impl<___T> MyProtocolServer<___T> for ::fidl_next::bind::Server<___T, MyProtocol> where
+impl<___T> MyProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, MyProtocol> where
     ___T: ::fidl_next::protocol::Transport
 {
 }
@@ -96,27 +96,27 @@ where
 {
     fn on_one_way(
         handler: &mut ___H,
-        server: &::fidl_next::bind::Server<___T, Self>,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             ordinal => {
-                server.close();
+                sender.close();
             }
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
-        server: &::fidl_next::bind::Server<___T, Self>,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
             ordinal => {
-                server.close();
+                sender.close();
             }
         }
     }

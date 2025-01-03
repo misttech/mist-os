@@ -6080,8 +6080,8 @@ pub mod protocol {
     }
 }
 
-/// A helper trait for the `Protocol` client protocol.
-pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `Protocol` client sender.
+pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     fn one_way_basic<___R>(
         &self,
         request: &mut ___R,
@@ -6333,7 +6333,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     >;
 }
 
-impl<___T> ProtocolClient<___T> for ::fidl_next::bind::Client<___T, Protocol>
+impl<___T> ProtocolClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Protocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -6701,63 +6701,63 @@ where
 pub trait ProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn event_basic(
         &mut self,
-        client: &::fidl_next::bind::Client<___T, Protocol>,
+        sender: &::fidl_next::bind::ClientSender<___T, Protocol>,
 
         message: ::fidl_next::bind::ResponseBuffer<___T, protocol::EventBasic>,
     );
 
     fn event_compound(
         &mut self,
-        client: &::fidl_next::bind::Client<___T, Protocol>,
+        sender: &::fidl_next::bind::ClientSender<___T, Protocol>,
 
         message: ::fidl_next::bind::ResponseBuffer<___T, protocol::EventCompound>,
     );
 
     fn event_array_basic(
         &mut self,
-        client: &::fidl_next::bind::Client<___T, Protocol>,
+        sender: &::fidl_next::bind::ClientSender<___T, Protocol>,
 
         message: ::fidl_next::bind::ResponseBuffer<___T, protocol::EventArrayBasic>,
     );
 
     fn event_array_compound(
         &mut self,
-        client: &::fidl_next::bind::Client<___T, Protocol>,
+        sender: &::fidl_next::bind::ClientSender<___T, Protocol>,
 
         message: ::fidl_next::bind::ResponseBuffer<___T, protocol::EventArrayCompound>,
     );
 
     fn event_vector_basic(
         &mut self,
-        client: &::fidl_next::bind::Client<___T, Protocol>,
+        sender: &::fidl_next::bind::ClientSender<___T, Protocol>,
 
         message: ::fidl_next::bind::ResponseBuffer<___T, protocol::EventVectorBasic>,
     );
 
     fn event_vector_compound(
         &mut self,
-        client: &::fidl_next::bind::Client<___T, Protocol>,
+        sender: &::fidl_next::bind::ClientSender<___T, Protocol>,
 
         message: ::fidl_next::bind::ResponseBuffer<___T, protocol::EventVectorCompound>,
     );
 
     fn event_vector_optional(
         &mut self,
-        client: &::fidl_next::bind::Client<___T, Protocol>,
+        sender: &::fidl_next::bind::ClientSender<___T, Protocol>,
 
         message: ::fidl_next::bind::ResponseBuffer<___T, protocol::EventVectorOptional>,
     );
 
     fn event_array_vector_nested(
         &mut self,
-        client: &::fidl_next::bind::Client<___T, Protocol>,
+        sender: &::fidl_next::bind::ClientSender<___T, Protocol>,
 
         message: ::fidl_next::bind::ResponseBuffer<___T, protocol::EventArrayVectorNested>,
     );
 
     fn event_resource(
         &mut self,
-        client: &::fidl_next::bind::Client<___T, Protocol>,
+        sender: &::fidl_next::bind::ClientSender<___T, Protocol>,
 
         message: ::fidl_next::bind::ResponseBuffer<___T, protocol::EventResource>,
     );
@@ -6851,65 +6851,65 @@ where
 {
     fn on_event(
         handler: &mut ___H,
-        client: &::fidl_next::bind::Client<___T, Self>,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             5892309624949902400 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.event_basic(client, buffer);
+                handler.event_basic(sender, buffer);
             }
 
             7024581948727571669 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.event_compound(client, buffer);
+                handler.event_compound(sender, buffer);
             }
 
             5888282827283820590 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.event_array_basic(client, buffer);
+                handler.event_array_basic(sender, buffer);
             }
 
             2189769767733851157 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.event_array_compound(client, buffer);
+                handler.event_array_compound(sender, buffer);
             }
 
             4583890770109526006 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.event_vector_basic(client, buffer);
+                handler.event_vector_basic(sender, buffer);
             }
 
             6026375226599919603 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.event_vector_compound(client, buffer);
+                handler.event_vector_compound(sender, buffer);
             }
 
             1684763340073130077 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.event_vector_optional(client, buffer);
+                handler.event_vector_optional(sender, buffer);
             }
 
             1228201560727880574 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.event_array_vector_nested(client, buffer);
+                handler.event_array_vector_nested(sender, buffer);
             }
 
             5745997765922613643 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.event_resource(client, buffer);
+                handler.event_resource(sender, buffer);
             }
 
             ordinal => {
-                client.close();
+                sender.close();
             }
         }
     }
 }
 
-/// A helper trait for the `Protocol` server protocol.
-pub trait ProtocolServer<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `Protocol` server sender.
+pub trait ProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn event_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
     fn event_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
@@ -6929,7 +6929,7 @@ pub trait ProtocolServer<___T: ::fidl_next::protocol::Transport> {
     fn event_resource(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> ProtocolServer<___T> for ::fidl_next::bind::Server<___T, Protocol>
+impl<___T> ProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Protocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -6975,14 +6975,14 @@ where
 pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_basic(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::OneWayBasic>,
     );
 
     fn two_way_basic(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::TwoWayBasic>,
 
@@ -6991,21 +6991,21 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn error_basic(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         responder: ::fidl_next::bind::Responder<protocol::ErrorBasic>,
     );
 
     fn one_way_compound(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::OneWayCompound>,
     );
 
     fn two_way_compound(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::TwoWayCompound>,
 
@@ -7014,21 +7014,21 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn error_compound(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         responder: ::fidl_next::bind::Responder<protocol::ErrorCompound>,
     );
 
     fn one_way_array_basic(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::OneWayArrayBasic>,
     );
 
     fn two_way_array_basic(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::TwoWayArrayBasic>,
 
@@ -7037,21 +7037,21 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn error_array_basic(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         responder: ::fidl_next::bind::Responder<protocol::ErrorArrayBasic>,
     );
 
     fn one_way_array_compound(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::OneWayArrayCompound>,
     );
 
     fn two_way_array_compound(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::TwoWayArrayCompound>,
 
@@ -7060,21 +7060,21 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn error_array_compound(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         responder: ::fidl_next::bind::Responder<protocol::ErrorArrayCompound>,
     );
 
     fn one_way_vector_basic(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::OneWayVectorBasic>,
     );
 
     fn two_way_vector_basic(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::TwoWayVectorBasic>,
 
@@ -7083,21 +7083,21 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn error_vector_basic(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         responder: ::fidl_next::bind::Responder<protocol::ErrorVectorBasic>,
     );
 
     fn one_way_vector_compound(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::OneWayVectorCompound>,
     );
 
     fn two_way_vector_compound(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::TwoWayVectorCompound>,
 
@@ -7106,21 +7106,21 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn error_vector_compound(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         responder: ::fidl_next::bind::Responder<protocol::ErrorVectorCompound>,
     );
 
     fn one_way_vector_optional(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::OneWayVectorOptional>,
     );
 
     fn two_way_vector_optional(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::TwoWayVectorOptional>,
 
@@ -7129,21 +7129,21 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn error_vector_optional(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         responder: ::fidl_next::bind::Responder<protocol::ErrorVectorOptional>,
     );
 
     fn one_way_array_vector_nested(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::OneWayArrayVectorNested>,
     );
 
     fn two_way_array_vector_nested(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::TwoWayArrayVectorNested>,
 
@@ -7152,21 +7152,21 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn error_array_vector_nested(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         responder: ::fidl_next::bind::Responder<protocol::ErrorArrayVectorNested>,
     );
 
     fn one_way_resource(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::OneWayResource>,
     );
 
     fn two_way_resource(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::TwoWayResource>,
 
@@ -7175,7 +7175,7 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn error_resource(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         responder: ::fidl_next::bind::Responder<protocol::ErrorResource>,
     );
@@ -7242,65 +7242,65 @@ where
 {
     fn on_one_way(
         handler: &mut ___H,
-        server: &::fidl_next::bind::Server<___T, Self>,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             8948968077914418681 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_basic(server, buffer);
+                handler.one_way_basic(sender, buffer);
             }
 
             3153289648860022476 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_compound(server, buffer);
+                handler.one_way_compound(sender, buffer);
             }
 
             7125516817014311449 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_array_basic(server, buffer);
+                handler.one_way_array_basic(sender, buffer);
             }
 
             5064659223443251357 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_array_compound(server, buffer);
+                handler.one_way_array_compound(sender, buffer);
             }
 
             5733220720079947351 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_vector_basic(server, buffer);
+                handler.one_way_vector_basic(sender, buffer);
             }
 
             1853985797298830992 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_vector_compound(server, buffer);
+                handler.one_way_vector_compound(sender, buffer);
             }
 
             1530215841195476271 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_vector_optional(server, buffer);
+                handler.one_way_vector_optional(sender, buffer);
             }
 
             5912603762133524183 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_array_vector_nested(server, buffer);
+                handler.one_way_array_vector_nested(sender, buffer);
             }
 
             6553996787849601058 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_resource(server, buffer);
+                handler.one_way_resource(sender, buffer);
             }
 
             ordinal => {
-                server.close();
+                sender.close();
             }
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
-        server: &::fidl_next::bind::Server<___T, Self>,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -7310,121 +7310,121 @@ where
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_basic(server, buffer, responder);
+                handler.two_way_basic(sender, buffer, responder);
             }
 
             5016634351643393939 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.error_basic(server, responder);
+                handler.error_basic(sender, responder);
             }
 
             8787219719097524529 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_compound(server, buffer, responder);
+                handler.two_way_compound(sender, buffer, responder);
             }
 
             2990809657626249085 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.error_compound(server, responder);
+                handler.error_compound(sender, responder);
             }
 
             5309034178175279380 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_array_basic(server, buffer, responder);
+                handler.two_way_array_basic(sender, buffer, responder);
             }
 
             1084731895342694265 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.error_array_basic(server, responder);
+                handler.error_array_basic(sender, responder);
             }
 
             849744466051983995 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_array_compound(server, buffer, responder);
+                handler.two_way_array_compound(sender, buffer, responder);
             }
 
             5919277476782807556 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.error_array_compound(server, responder);
+                handler.error_array_compound(sender, responder);
             }
 
             8674156353091415668 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_vector_basic(server, buffer, responder);
+                handler.two_way_vector_basic(sender, buffer, responder);
             }
 
             875941614196965234 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.error_vector_basic(server, responder);
+                handler.error_vector_basic(sender, responder);
             }
 
             3968024057912959924 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_vector_compound(server, buffer, responder);
+                handler.two_way_vector_compound(sender, buffer, responder);
             }
 
             8506780203315865989 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.error_vector_compound(server, responder);
+                handler.error_vector_compound(sender, responder);
             }
 
             1030024737742222323 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_vector_optional(server, buffer, responder);
+                handler.two_way_vector_optional(sender, buffer, responder);
             }
 
             6406191217027936606 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.error_vector_optional(server, responder);
+                handler.error_vector_optional(sender, responder);
             }
 
             5351275678438791132 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_array_vector_nested(server, buffer, responder);
+                handler.two_way_array_vector_nested(sender, buffer, responder);
             }
 
             9085604921605802151 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.error_array_vector_nested(server, responder);
+                handler.error_array_vector_nested(sender, responder);
             }
 
             1802709005492464987 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_resource(server, buffer, responder);
+                handler.two_way_resource(sender, buffer, responder);
             }
 
             6568609240497354166 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.error_resource(server, responder);
+                handler.error_resource(sender, responder);
             }
 
             ordinal => {
-                server.close();
+                sender.close();
             }
         }
     }

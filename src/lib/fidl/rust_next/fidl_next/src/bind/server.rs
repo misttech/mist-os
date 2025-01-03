@@ -4,26 +4,26 @@
 
 use core::marker::PhantomData;
 
-use crate::protocol::{self, DispatcherError, Transport};
+use crate::protocol::{self, ProtocolError, Transport};
 use crate::{Encode, EncodeError};
 
 use super::{Method, ServerEnd};
 
-/// A storngly typed protocol server.
-pub struct Server<T: Transport, P> {
-    server: protocol::Server<T>,
+/// A storngly typed server sender.
+pub struct ServerSender<T: Transport, P> {
+    sender: protocol::ServerSender<T>,
     _protocol: PhantomData<P>,
 }
 
-impl<T: Transport, P> Server<T, P> {
-    /// Wraps an untyped server reference, returning a typed server reference.
-    pub fn wrap_untyped(client: &protocol::Server<T>) -> &Self {
-        unsafe { &*(client as *const protocol::Server<T>).cast() }
+impl<T: Transport, P> ServerSender<T, P> {
+    /// Wraps an untyped sender reference, returning a typed sender reference.
+    pub fn wrap_untyped(client: &protocol::ServerSender<T>) -> &Self {
+        unsafe { &*(client as *const protocol::ServerSender<T>).cast() }
     }
 
-    /// Returns the underlying untyped server.
-    pub fn as_untyped(&self) -> &protocol::Server<T> {
-        &self.server
+    /// Returns the underlying untyped sender.
+    pub fn as_untyped(&self) -> &protocol::ServerSender<T> {
+        &self.sender
     }
 
     /// Closes the channel from the server end.
@@ -32,21 +32,26 @@ impl<T: Transport, P> Server<T, P> {
     }
 }
 
-impl<T: Transport, P> Clone for Server<T, P> {
+impl<T: Transport, P> Clone for ServerSender<T, P> {
     fn clone(&self) -> Self {
-        Self { server: self.server.clone(), _protocol: PhantomData }
+        Self { sender: self.sender.clone(), _protocol: PhantomData }
     }
 }
 
 /// A protocol which supports servers.
 pub trait ServerProtocol<T: Transport, H>: Sized {
     /// Handles a received server one-way message with the given handler.
-    fn on_one_way(handler: &mut H, server: &Server<T, Self>, ordinal: u64, buffer: T::RecvBuffer);
+    fn on_one_way(
+        handler: &mut H,
+        server: &ServerSender<T, Self>,
+        ordinal: u64,
+        buffer: T::RecvBuffer,
+    );
 
     /// Handles a received server two-way message with the given handler.
     fn on_two_way(
         handler: &mut H,
-        server: &Server<T, Self>,
+        server: &ServerSender<T, Self>,
         ordinal: u64,
         buffer: T::RecvBuffer,
         responder: protocol::Responder,
@@ -71,50 +76,60 @@ where
     T: Transport,
     P: ServerProtocol<T, H>,
 {
-    fn on_one_way(&mut self, server: &protocol::Server<T>, ordinal: u64, buffer: T::RecvBuffer) {
-        P::on_one_way(&mut self.handler, Server::wrap_untyped(server), ordinal, buffer)
+    fn on_one_way(
+        &mut self,
+        server: &protocol::ServerSender<T>,
+        ordinal: u64,
+        buffer: T::RecvBuffer,
+    ) {
+        P::on_one_way(&mut self.handler, ServerSender::wrap_untyped(server), ordinal, buffer)
     }
 
     fn on_two_way(
         &mut self,
-        server: &protocol::Server<T>,
+        server: &protocol::ServerSender<T>,
         ordinal: u64,
         buffer: <T as Transport>::RecvBuffer,
         responder: protocol::Responder,
     ) {
-        P::on_two_way(&mut self.handler, Server::wrap_untyped(server), ordinal, buffer, responder)
+        P::on_two_way(
+            &mut self.handler,
+            ServerSender::wrap_untyped(server),
+            ordinal,
+            buffer,
+            responder,
+        )
     }
 }
 
-/// A strongly typed server dispatcher.
-pub struct ServerDispatcher<T: Transport, P> {
-    dispatcher: protocol::ServerDispatcher<T>,
+/// A strongly typed server.
+pub struct Server<T: Transport, P> {
+    server: protocol::Server<T>,
     _protocol: PhantomData<P>,
 }
 
-impl<T: Transport, P> ServerDispatcher<T, P> {
-    /// Creates a new server dispatcher from a server end.
-    pub fn new(server_end: ServerEnd<T, P>) -> ServerDispatcher<T, P> {
-        let dispatcher = protocol::ServerDispatcher::new(server_end.into_untyped());
-        Self { dispatcher, _protocol: PhantomData }
+impl<T: Transport, P> Server<T, P> {
+    /// Creates a new server from a server end.
+    pub fn new(server_end: ServerEnd<T, P>) -> Server<T, P> {
+        Self { server: protocol::Server::new(server_end.into_untyped()), _protocol: PhantomData }
     }
 
-    /// Returns the server for the dispatcher.
-    pub fn server(&self) -> &Server<T, P> {
-        Server::wrap_untyped(self.dispatcher.server())
+    /// Returns the sender for the server.
+    pub fn sender(&self) -> &ServerSender<T, P> {
+        ServerSender::wrap_untyped(self.server.sender())
     }
 
-    /// Creates a new server dispathcer from an untyped server dispatcher.
-    pub fn from_untyped(dispatcher: protocol::ServerDispatcher<T>) -> Self {
-        Self { dispatcher, _protocol: PhantomData }
+    /// Creates a new server from an untyped server.
+    pub fn from_untyped(server: protocol::Server<T>) -> Self {
+        Self { server, _protocol: PhantomData }
     }
 
-    /// Runs the dispatcher with the provided handler.
-    pub async fn run<H>(&mut self, handler: H) -> Result<(), DispatcherError<T::Error>>
+    /// Runs the server with the provided handler.
+    pub async fn run<H>(&mut self, handler: H) -> Result<(), ProtocolError<T::Error>>
     where
         P: ServerProtocol<T, H>,
     {
-        self.dispatcher.run(ServerAdapter { handler, _protocol: PhantomData::<P> }).await
+        self.server.run(ServerAdapter { handler, _protocol: PhantomData::<P> }).await
     }
 }
 
@@ -134,7 +149,7 @@ impl<M> Responder<M> {
     /// Responds to the client.
     pub fn respond<'s, T, P, R>(
         self,
-        server: &'s Server<T, P>,
+        server: &'s ServerSender<T, P>,
         response: &mut R,
     ) -> Result<T::SendFuture<'s>, EncodeError>
     where

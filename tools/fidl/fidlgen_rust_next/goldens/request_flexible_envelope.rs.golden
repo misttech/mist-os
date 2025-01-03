@@ -943,8 +943,8 @@ pub mod protocol {
     }
 }
 
-/// A helper trait for the `Protocol` client protocol.
-pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `Protocol` client sender.
+pub trait ProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     fn request_strict_response_flexible<___R>(
         &self,
         request: &mut ___R,
@@ -972,7 +972,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         >;
 }
 
-impl<___T> ProtocolClient<___T> for ::fidl_next::bind::Client<___T, Protocol>
+impl<___T> ProtocolClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Protocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -1030,22 +1030,22 @@ where
 {
     fn on_event(
         handler: &mut ___H,
-        client: &::fidl_next::bind::Client<___T, Self>,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             ordinal => {
-                client.close();
+                sender.close();
             }
         }
     }
 }
 
-/// A helper trait for the `Protocol` server protocol.
-pub trait ProtocolServer<___T: ::fidl_next::protocol::Transport> {}
+/// A helper trait for the `Protocol` server sender.
+pub trait ProtocolServerSender<___T: ::fidl_next::protocol::Transport> {}
 
-impl<___T> ProtocolServer<___T> for ::fidl_next::bind::Server<___T, Protocol> where
+impl<___T> ProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Protocol> where
     ___T: ::fidl_next::protocol::Transport
 {
 }
@@ -1055,7 +1055,7 @@ impl<___T> ProtocolServer<___T> for ::fidl_next::bind::Server<___T, Protocol> wh
 pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn request_strict_response_flexible(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::RequestStrictResponseFlexible>,
 
@@ -1064,7 +1064,7 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn request_flexible_response_strict(
         &mut self,
-        server: &::fidl_next::bind::Server<___T, Protocol>,
+        sender: &::fidl_next::bind::ServerSender<___T, Protocol>,
 
         request: ::fidl_next::bind::RequestBuffer<___T, protocol::RequestFlexibleResponseStrict>,
 
@@ -1085,20 +1085,20 @@ where
 {
     fn on_one_way(
         handler: &mut ___H,
-        server: &::fidl_next::bind::Server<___T, Self>,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
         match ordinal {
             ordinal => {
-                server.close();
+                sender.close();
             }
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
-        server: &::fidl_next::bind::Server<___T, Self>,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -1108,18 +1108,18 @@ where
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.request_strict_response_flexible(server, buffer, responder);
+                handler.request_strict_response_flexible(sender, buffer, responder);
             }
 
             5191655763393883319 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.request_flexible_response_strict(server, buffer, responder);
+                handler.request_flexible_response_strict(sender, buffer, responder);
             }
 
             ordinal => {
-                server.close();
+                sender.close();
             }
         }
     }

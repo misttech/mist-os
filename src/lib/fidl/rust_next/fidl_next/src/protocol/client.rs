@@ -10,7 +10,7 @@ use core::task::{Context, Poll};
 use std::sync::{Arc, Mutex};
 
 use crate::protocol::lockers::Lockers;
-use crate::protocol::{decode_header, encode_header, DispatcherError, Transport};
+use crate::protocol::{decode_header, encode_header, ProtocolError, Transport};
 use crate::{Encode, EncodeError, EncoderExt};
 
 use super::lockers::LockerError;
@@ -25,13 +25,13 @@ impl<T: Transport> Shared<T> {
     }
 }
 
-/// A client endpoint.
-pub struct Client<T: Transport> {
+/// A sender for a client endpoint.
+pub struct ClientSender<T: Transport> {
     shared: Arc<Shared<T>>,
     sender: T::Sender,
 }
 
-impl<T: Transport> Client<T> {
+impl<T: Transport> ClientSender<T> {
     /// Closes the channel from the client end.
     pub fn close(&self) {
         T::close(&self.sender);
@@ -90,7 +90,7 @@ impl<T: Transport> Client<T> {
     }
 }
 
-impl<T: Transport> Clone for Client<T> {
+impl<T: Transport> Clone for ClientSender<T> {
     fn clone(&self) -> Self {
         Self { shared: self.shared.clone(), sender: self.sender.clone() }
     }
@@ -184,63 +184,60 @@ impl<T: Transport> Future for ResponseFuture<'_, T> {
 pub trait ClientHandler<T: Transport> {
     /// Handles a received client event.
     ///
-    /// The dispatcher cannot handle more messages until `on_event` completes. If `on_event` may
-    /// block, perform asynchronous work, or take a long time to process a message, it should
-    /// offload work to an async task.
-    fn on_event(&mut self, client: &Client<T>, ordinal: u64, buffer: T::RecvBuffer);
+    /// The client cannot handle more messages until `on_event` completes. If `on_event` may block,
+    /// perform asynchronous work, or take a long time to process a message, it should offload work
+    /// to an async task.
+    fn on_event(&mut self, sender: &ClientSender<T>, ordinal: u64, buffer: T::RecvBuffer);
 }
 
-/// A dispatcher for a client endpoint.
+/// A client for an endpoint.
 ///
 /// It must be actively polled to receive events and two-way message responses.
-pub struct ClientDispatcher<T: Transport> {
-    client: Client<T>,
+pub struct Client<T: Transport> {
+    sender: ClientSender<T>,
     receiver: T::Receiver,
 }
 
-impl<T: Transport> ClientDispatcher<T> {
-    /// Creates a new client and dispatcher from a transport.
+impl<T: Transport> Client<T> {
+    /// Creates a new client from a transport.
     pub fn new(transport: T) -> Self {
         let (sender, receiver) = transport.split();
         let shared = Arc::new(Shared::new());
-        Self { client: Client { shared, sender }, receiver }
+        Self { sender: ClientSender { shared, sender }, receiver }
     }
 
-    /// Returns the client for the dispatcher.
-    pub fn client(&self) -> &Client<T> {
-        &self.client
+    /// Returns the sender for the client.
+    pub fn sender(&self) -> &ClientSender<T> {
+        &self.sender
     }
 
-    /// Runs the dispatcher with the provided handler.
-    pub async fn run<H>(&mut self, mut handler: H) -> Result<(), DispatcherError<T::Error>>
+    /// Runs the client with the provided handler.
+    pub async fn run<H>(&mut self, mut handler: H) -> Result<(), ProtocolError<T::Error>>
     where
         H: ClientHandler<T>,
     {
         let result = self.run_to_completion(&mut handler).await;
-        self.client.shared.responses.lock().unwrap().wake_all();
+        self.sender.shared.responses.lock().unwrap().wake_all();
 
         result
     }
 
-    async fn run_to_completion<H>(
-        &mut self,
-        handler: &mut H,
-    ) -> Result<(), DispatcherError<T::Error>>
+    async fn run_to_completion<H>(&mut self, handler: &mut H) -> Result<(), ProtocolError<T::Error>>
     where
         H: ClientHandler<T>,
     {
         while let Some(mut buffer) =
-            T::recv(&mut self.receiver).await.map_err(DispatcherError::TransportError)?
+            T::recv(&mut self.receiver).await.map_err(ProtocolError::TransportError)?
         {
             let (txid, ordinal) =
-                decode_header::<T>(&mut buffer).map_err(DispatcherError::InvalidMessageHeader)?;
+                decode_header::<T>(&mut buffer).map_err(ProtocolError::InvalidMessageHeader)?;
             if txid == 0 {
-                handler.on_event(&self.client, ordinal, buffer);
+                handler.on_event(&self.sender, ordinal, buffer);
             } else {
-                let mut responses = self.client.shared.responses.lock().unwrap();
+                let mut responses = self.sender.shared.responses.lock().unwrap();
                 let locker = responses
                     .get(txid - 1)
-                    .ok_or_else(|| DispatcherError::UnrequestedResponse(txid))?;
+                    .ok_or_else(|| ProtocolError::UnrequestedResponse(txid))?;
 
                 match locker.write(ordinal, buffer) {
                     // Reader didn't cancel
@@ -248,10 +245,10 @@ impl<T: Transport> ClientDispatcher<T> {
                     // Reader canceled, we can drop the entry
                     Ok(true) => responses.free(txid - 1),
                     Err(LockerError::NotWriteable) => {
-                        return Err(DispatcherError::UnrequestedResponse(txid));
+                        return Err(ProtocolError::UnrequestedResponse(txid));
                     }
                     Err(LockerError::MismatchedOrdinal { expected, actual }) => {
-                        return Err(DispatcherError::InvalidResponseOrdinal { expected, actual });
+                        return Err(ProtocolError::InvalidResponseOrdinal { expected, actual });
                     }
                 }
             }

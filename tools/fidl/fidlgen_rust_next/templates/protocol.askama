@@ -42,11 +42,11 @@ pub mod {{ module_name }} {
     {% endfor %}
 }
 
-{% let client_trait_name = format!("{protocol_base_name}Client") %}
+{% let client_sender_name = format!("{protocol_base_name}ClientSender") %}
 {% let client_handler_name = format!("{protocol_base_name}ClientHandler") %}
 
-/// A helper trait for the `{{ non_canonical_name }}` client protocol.
-pub trait {{ client_trait_name }}<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `{{ non_canonical_name }}` client sender.
+pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.snake())? %}
         {% let method_type_name = filters::ident(method.name.camel())? %}
@@ -106,7 +106,7 @@ pub trait {{ client_trait_name }}<___T: ::fidl_next::protocol::Transport> {
     {% endfor %}
 }
 
-impl<___T> {{ client_trait_name }}<___T> for ::fidl_next::bind::Client<___T, {{ protocol_name }}>
+impl<___T> {{ client_sender_name }}<___T> for ::fidl_next::bind::ClientSender<___T, {{ protocol_name }}>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -189,7 +189,7 @@ pub trait {{ client_handler_name }}<___T: ::fidl_next::protocol::Transport> {
             {% endif %}
             fn {{ method_name }}(
                 &mut self,
-                client: &::fidl_next::bind::Client<___T, {{ protocol_name }}>,
+                sender: &::fidl_next::bind::ClientSender<___T, {{ protocol_name }}>,
                 {% if let Some(response) = method.maybe_response_payload %}
                     message: ::fidl_next::bind::ResponseBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
                 {% endif %}
@@ -200,11 +200,11 @@ pub trait {{ client_handler_name }}<___T: ::fidl_next::protocol::Transport> {
     {% if protocol.openness != ProtocolOpenness::Closed %}
         fn on_unknown_interaction(
             &mut self,
-            client: &::fidl_next::bind::Client<___T, {{ protocol_name }}>,
+            sender: &::fidl_next::bind::ClientSender<___T, {{ protocol_name }}>,
             ordinal: u64,
         ) {
             {# TODO: send epitaph before closing #}
-            client.close();
+            sender.close();
         }
     {% endif %}
 }
@@ -222,7 +222,7 @@ where
 {
     fn on_event(
         handler: &mut ___H,
-        client: &::fidl_next::bind::Client<___T, Self>,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -233,30 +233,30 @@ where
                     {{ method.ordinal }} => {
                         {% if let Some(response) = method.maybe_response_payload %}
                             let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(client, buffer);
+                            handler.{{ method_name }}(sender, buffer);
                         {% else %}
-                            handler.{{ method_name}}(client);
+                            handler.{{ method_name}}(sender);
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.on_unknown_interaction(client, ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal),
             {% else %}
                 ordinal => {
                     {# TODO: send epitaph #}
-                    client.close();
+                    sender.close();
                 }
             {% endif %}
         }
     }
 }
 
-{% let server_trait_name = format!("{protocol_base_name}Server") %}
+{% let server_sender_name = format!("{protocol_base_name}ServerSender") %}
 {% let server_handler_name = format!("{protocol_base_name}ServerHandler") %}
 
-/// A helper trait for the `{{ non_canonical_name }}` server protocol.
-pub trait {{ server_trait_name }}<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `{{ non_canonical_name }}` server sender.
+pub trait {{ server_sender_name }}<___T: ::fidl_next::protocol::Transport> {
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.snake())? %}
 
@@ -283,7 +283,7 @@ pub trait {{ server_trait_name }}<___T: ::fidl_next::protocol::Transport> {
     {% endfor %}
 }
 
-impl<___T> {{ server_trait_name }}<___T> for ::fidl_next::bind::Server<___T, {{ protocol_name }}>
+impl<___T> {{ server_sender_name }}<___T> for ::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -335,7 +335,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::protocol::Transport> {
                 {% endif %}
                 fn {{ method_name }}(
                     &mut self,
-                    server: &::fidl_next::bind::Server<___T, {{ protocol_name }}>,
+                    sender: &::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>,
                     {% if let Some(request) = method.maybe_request_payload %}
                         request: ::fidl_next::bind::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
                     {% endif %}
@@ -346,7 +346,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::protocol::Transport> {
                 {% endif %}
                 fn {{ method_name }}(
                     &mut self,
-                    server: &::fidl_next::bind::Server<___T, {{ protocol_name }}>,
+                    sender: &::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>,
                     {% if let Some(request) = method.maybe_request_payload %}
                         request: ::fidl_next::bind::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
                     {% endif %}
@@ -359,11 +359,11 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::protocol::Transport> {
     {% if protocol.openness != ProtocolOpenness::Closed %}
         fn on_unknown_interaction(
             &mut self,
-            server: &::fidl_next::bind::Server<___T, {{ protocol_name }}>,
+            sender: &::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>,
             ordinal: u64,
         ) {
             {# TODO: send epitaph before closing #}
-            server.close();
+            sender.close();
         }
     {% endif %}
 }
@@ -381,7 +381,7 @@ where
 {
     fn on_one_way(
         handler: &mut ___H,
-        server: &::fidl_next::bind::Server<___T, Self>,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -392,19 +392,19 @@ where
                     {{ method.ordinal }} => {
                         {% if let Some(request) = method.maybe_request_payload %}
                             let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(server, buffer);
+                            handler.{{ method_name }}(sender, buffer);
                         {% else %}
-                            handler.{{ method_name}}(server);
+                            handler.{{ method_name}}(sender);
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.on_unknown_interaction(server, ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal),
             {% else %}
                 ordinal => {
                     {# TODO: send epitaph #}
-                    server.close();
+                    sender.close();
                 }
             {% endif %}
         }
@@ -412,7 +412,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        server: &::fidl_next::bind::Server<___T, Self>,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -426,19 +426,19 @@ where
 
                         {% if let Some(request) = method.maybe_request_payload %}
                             let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(server, buffer, responder);
+                            handler.{{ method_name }}(sender, buffer, responder);
                         {% else %}
-                            handler.{{ method_name}}(server, responder);
+                            handler.{{ method_name}}(sender, responder);
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.on_unknown_interaction(server, ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal),
             {% else %}
                 ordinal => {
                     {# TODO: send epitaph #}
-                    server.close();
+                    sender.close();
                 }
             {% endif %}
         }
