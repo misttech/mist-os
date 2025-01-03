@@ -14,7 +14,6 @@
 
 #include "sdk/lib/fdio/cleanpath.h"
 #include "sdk/lib/fdio/fdio_slot.h"
-#include "sdk/lib/fdio/internal.h"
 
 struct fdio_state_t {
   std::optional<int> bind_to_fd_locked(const fbl::RefPtr<fdio>& io) __TA_REQUIRES(lock);

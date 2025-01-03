@@ -7,17 +7,17 @@
 #include "sdk/lib/fdio/internal.h"
 
 fbl::RefPtr<fdio> fdio_slot::get() {
-  fdio_t** ptr = std::get_if<fdio_t*>(&inner_);
+  fbl::RefPtr<fdio_t>* ptr = std::get_if<fbl::RefPtr<fdio_t>>(&inner_);
   if (ptr != nullptr) {
-    return fbl::RefPtr(*ptr);
+    return *ptr;
   }
   return nullptr;
 }
 
 fbl::RefPtr<fdio> fdio_slot::release() {
-  fdio_t** ptr = std::get_if<fdio_t*>(&inner_);
+  fbl::RefPtr<fdio_t>* ptr = std::get_if<fbl::RefPtr<fdio_t>>(&inner_);
   if (ptr != nullptr) {
-    fbl::RefPtr<fdio> io = fbl::ImportFromRawPtr(*ptr);
+    fbl::RefPtr<fdio> io = std::move(*ptr);
     inner_ = available{};
     return io;
   }
@@ -26,17 +26,17 @@ fbl::RefPtr<fdio> fdio_slot::release() {
 
 bool fdio_slot::try_set(fbl::RefPtr<fdio> io) {
   if (std::holds_alternative<available>(inner_)) {
-    inner_ = fbl::ExportToRawPtr(&io);
+    inner_ = std::move(io);
     return true;
   }
   return false;
 }
 
 fbl::RefPtr<fdio> fdio_slot::replace(fbl::RefPtr<fdio> io) {
-  auto previous = std::exchange(inner_, fbl::ExportToRawPtr(&io));
-  fdio_t** ptr = std::get_if<fdio_t*>(&previous);
+  auto previous = std::exchange(inner_, std::move(io));
+  fbl::RefPtr<fdio_t>* ptr = std::get_if<fbl::RefPtr<fdio_t>>(&previous);
   if (ptr != nullptr) {
-    return fbl::ImportFromRawPtr(*ptr);
+    return std::move(*ptr);
   }
   return nullptr;
 }
@@ -51,7 +51,7 @@ std::optional<void (fdio_slot::*)()> fdio_slot::try_reserve() {
 
 bool fdio_slot::try_fill(fbl::RefPtr<fdio> io) {
   if (std::holds_alternative<reserved>(inner_)) {
-    inner_ = fbl::ExportToRawPtr(&io);
+    inner_ = std::move(io);
     return true;
   }
   return false;
