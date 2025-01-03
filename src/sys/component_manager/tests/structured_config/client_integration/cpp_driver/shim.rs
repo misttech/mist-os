@@ -7,41 +7,14 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use futures::StreamExt;
-use std::time::Duration;
 use tracing::info;
 use {
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
-    fidl_test_structuredconfig_receiver as scr, fidl_test_structuredconfig_receiver_shim as scrs,
-    fuchsia_async as fasync,
+    fidl_fuchsia_driver_test as fdt, fidl_test_structuredconfig_receiver as scr,
+    fidl_test_structuredconfig_receiver_shim as scrs,
 };
 
 enum IncomingRequest {
     Puppet(scr::ConfigReceiverPuppetRequestStream),
-}
-
-async fn connect_to_config_service(
-    expose_dir: &fio::DirectoryProxy,
-) -> anyhow::Result<scrs::ConfigServiceProxy> {
-    // Find an instance of `ConfigService`.
-    let instance_name;
-    let service =
-        fuchsia_component::client::open_service_at_dir::<scrs::ConfigServiceMarker>(expose_dir)?;
-    loop {
-        // TODO(https://fxbug.dev/42124541): Once component manager supports watching for
-        // service instances, this loop should be replaced by a watcher.
-        let entries = fuchsia_fs::directory::readdir(&service).await?;
-        if let Some(entry) = entries.iter().next() {
-            instance_name = entry.name.clone();
-            break;
-        }
-        fasync::Timer::new(Duration::from_millis(100)).await;
-    }
-
-    // Connect to `ConfigService`.
-    fuchsia_component::client::connect_to_service_instance_at_dir::<scrs::ConfigServiceMarker>(
-        expose_dir,
-        &instance_name,
-    )
 }
 
 #[fuchsia::main]
@@ -65,7 +38,12 @@ async fn main() -> anyhow::Result<()> {
     realm.driver_test_realm_start(args).await?;
     info!("started driver test realm");
 
-    let config_service = connect_to_config_service(realm.root.get_exposed_dir()).await?;
+    let config_service = fuchsia_component::client::Service::open_from_dir(
+        realm.root.get_exposed_dir(),
+        scrs::ConfigServiceMarker,
+    )?
+    .watch_for_any()
+    .await?;
 
     // Serve this configuration back to the test
     let mut fs = ServiceFs::new_local();
