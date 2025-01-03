@@ -15,6 +15,7 @@
 #include <arch/x86/descriptor.h>
 #include <arch/x86/mmu.h>
 #include <arch/x86/registers.h>
+#include <lib/arch/asm.h>
 #include <lib/code-patching/asm.h>
 #include <lib/instrumentation/asan.h>
 #include <zircon/tls.h>
@@ -38,6 +39,7 @@
 .section .text.boot, "ax", @progbits
 .align 8
 FUNCTION_LABEL(_start)
+.label PhysbootHandoff, global
     // As early as possible collect the time stamp.
     sample_ticks %r15
 
@@ -51,6 +53,11 @@ FUNCTION_LABEL(_start)
     lea _kstack_end(%rip), %rsp
 
     // Save off the handoff pointer in a register that won't get clobbered.
+    // When ELF-loaded, it will be passed in %rdi per the calling convention;
+    // when ZBI-loaded, it will be passed in %rsi per the protocol.
+#ifdef ELF_KERNEL
+    mov %rdi, %r14
+#else
     mov %rsi, %r14
 
     // The fixup code in image.S runs in 64-bit mode with paging enabled,
@@ -85,6 +92,7 @@ FUNCTION_LABEL(_start)
     sub %edi, %ecx              // Compute the length of the bss in bytes.
     xor %eax, %eax
     rep stosb // while (ecx-- > 0) *edi++ = al;
+#endif
 
     // These variables are in the .bss, so now it's safe to set them.
     mov %r15, kernel_entry_ticks(%rip)
@@ -175,20 +183,31 @@ FUNCTION_LABEL(_start)
 #endif  // __has_feature(address_sanitizer)
 
     // Long jump to our code selector and the high address relocated.
+#ifdef ELF_KERNEL
+    jmp *.Lhigh_entry_addr(%rip)
+
+.pushsection .data.rel.ro, "aw", %progbits
+.Lhigh_entry_addr:
+    .quad .Lhigh_entry
+.popsection
+#else
     lea .Lhigh_entry(%rip), %rax
     addq kernel_relocated_base(%rip), %rax
     jmp *%rax
+#endif
 
 // This code runs at the final virtual address, so it should be pure PIC.
 .Lhigh_entry:
     // load the high kernel stack
     lea _kstack_end(%rip), %rsp
 
+#ifndef ELF_KERNEL
     // move_fixups_and_zero_bss copied the fixup code to _end.
     // It expects %rdi to contain the actual runtime address of __executable_start.
     lea __executable_start(%rip), %rdi
     call _end
     // The fixup code won't be used again, so the memory can be reused now.
+#endif
 
     // Load our new GDT before touching the segment registers, as the latter
     // will cause the CPU to verify the GDTR points to valid memory for the
