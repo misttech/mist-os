@@ -162,11 +162,19 @@ TEST_F(CgroupFreezerTest, SIGKILLAfterFrozen) {
     test_helper::SignalMaskHelper mask_helper;
     mask_helper.blockSignal(SIGUSR1);
 
-    // Wait for the SIGUSR1
+    // Notify the parent that the child starts running.
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
+
+    // Wait for the SIGUSR1 that should never be received.
     mask_helper.waitForSignal(SIGUSR1);
     kill(parent_pid, SIGUSR1);
   });
   test_pids_.push_back(child_pid);
+
+  // Make sure the child starts running.
+  kill(child_pid, SIGUSR1);
+  mask_helper.waitForSignal(SIGUSR1);
 
   // Write the child PID to the cgroup
   files::WriteFile(procs_path(), std::to_string(child_pid));
@@ -183,7 +191,7 @@ TEST_F(CgroupFreezerTest, SIGKILLAfterFrozen) {
   // Kill the child process without thawing
   EXPECT_EQ(0, kill(child_pid, SIGKILL));
   // Wait for the child process to terminate
-  fork_helper.WaitForChildren();
+  EXPECT_FALSE(fork_helper.WaitForChildren());
 }
 
 TEST_F(CgroupFreezerTest, AddProcAfterFrozen) {
