@@ -22,13 +22,21 @@ source "${_script_dir}/../lib/bazel_utils.sh" || exit $?
 
 # We need to figure out our compilation mode to pass to bazel
 fx-build-dir-if-present || return 1
-optimization=$(fx-command-run gn args ${FUCHSIA_BUILD_DIR} --list=optimize --json | fx-command-run jq ".[0] | if .current then .current else .default end |  .value")
+optimization=$(
+  fx-command-run gn args "${FUCHSIA_BUILD_DIR}" --list=optimize --json |  \
+  # Sometimes fx will print warnings so we pass it through sed to only grab the json between
+  # the [].
+  sed 's/.*\[\([^]]*\)\].*/\1/' | \
+  fx-command-run jq '.[0] | if .current then .current else .default end |  .value'
+)
 
+# TODO: figure out the --platform to build
 BAZEL_EXE="$(fx-get-bazel)"
 "${_script_dir}/refresh-bazel-compdb-bin.py" \
-  --bazel $BAZEL_EXE \
+  --bazel "$BAZEL_EXE" \
   --optimization "${optimization}" \
   --build-dir "${FUCHSIA_BUILD_DIR}" \
+  --target_cpu "$FUCHSIA_ARCH" \
   "$@"
 
 

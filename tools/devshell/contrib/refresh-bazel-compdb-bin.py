@@ -16,6 +16,19 @@ _OPT_PATTERN = re.compile("[\W]+")
 
 _SHOULD_LOG = False
 
+_CPU_ALIASES = {
+    "k8": "x86_64",
+    "x86_64": "x86_64",
+    "aarch64": "aarch64",
+    "arm64": "aarch64",
+    "riscv64": "riscv64",
+}
+_FUCHSIA_PLATFORMS_MAP = {
+    "x86_64": "fuchsia_x64",
+    "aarch64": "fuchsia_arm64",
+    "riscv64": "fuchsia_riscv64",
+}
+
 
 class Action:
     """Represents an action that comes from aquery"""
@@ -145,8 +158,19 @@ def collect_actions(action_graph: Sequence[Dict]) -> Sequence[Action]:
     return actions
 
 
+def platform_arg_for_target_cpu(target_cpu) -> str:
+    cpu = _CPU_ALIASES[target_cpu]
+    platform = _FUCHSIA_PLATFORMS_MAP[cpu]
+    return (
+        f"--platforms=@rules_fuchsia//fuchsia/constraints/platforms:{platform}"
+    )
+
+
 def get_action_graph_from_labels(
-    bazel_exe: str, compilation_mode, labels: Sequence[str]
+    bazel_exe: str,
+    compilation_mode: str,
+    target_cpu: str,
+    labels: Sequence[str],
 ) -> Sequence[Dict]:
     labels_set = "set({})".format(" ".join(labels))
     info("Getting action graph for {}".format(labels_set))
@@ -156,6 +180,7 @@ def get_action_graph_from_labels(
             "aquery",
             "mnemonic('CppCompile',deps({}))".format(labels_set),
             compilation_mode,
+            platform_arg_for_target_cpu(target_cpu),
             "--output=jsonproto",
             "--ui_event_filters=-info,-warning",
             "--noshow_loading_progress",
@@ -266,6 +291,9 @@ def main(argv: Sequence[str]):
         "--optimization", required=True, help="The build level optimization"
     )
     parser.add_argument(
+        "--target_cpu", required=True, help="The target cpu we are building for"
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         required=False,
@@ -292,6 +320,7 @@ def main(argv: Sequence[str]):
     actions = get_action_graph_from_labels(
         args.bazel,
         compilation_mode(args),
+        args.target_cpu,
         labels,
     )
 
