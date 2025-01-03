@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.driver.host/cpp/fidl.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
+#include <fidl/fuchsia.driver.loader/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
 
@@ -26,14 +27,20 @@ class DriverHost {
         fuchsia_component_runner::wire::ComponentStartInfo start_info);
 
     DriverLoadArgs(std::string_view driver_soname, zx::vmo driver_file,
-                   fidl::ClientEnd<fuchsia_io::Directory> lib_dir)
+                   fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+                   std::vector<fuchsia_driver_loader::RootModule> additional_root_modules)
         : driver_soname(driver_soname),
           driver_file(std::move(driver_file)),
-          lib_dir(std::move(lib_dir)) {}
+          lib_dir(std::move(lib_dir)),
+          additional_root_modules(std::move(additional_root_modules)) {}
 
     std::string driver_soname;
     zx::vmo driver_file;
     fidl::ClientEnd<fuchsia_io::Directory> lib_dir;
+
+    // Additional modules that should be loaded together with the driver.
+    // e.g. the DFv1 driver to be loaded with the compatibility shim.
+    std::vector<fuchsia_driver_loader::RootModule> additional_root_modules;
   };
 
   // Components that will be sent to the driver host when requesting to start a driver.

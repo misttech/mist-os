@@ -184,6 +184,8 @@ struct Driver {
   bool host_restart_on_crash = false;
   bool use_next_vdso = false;
   bool use_dynamic_linker = false;
+  // The driver to load under the compatibility shim.
+  std::string compat;
 };
 
 class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
@@ -345,7 +347,8 @@ class DriverRunnerTestBase : public gtest::TestLoopFixture {
                               std::string_view binary, std::string_view colocate,
                               std::string_view host_restart_on_crash,
                               std::string_view use_next_vdso,
-                              std::string_view use_dynamic_linker = "false");
+                              std::string_view use_dynamic_linker = "false",
+                              std::string_view compat = "");
 
   static void AssertNodeBound(const std::shared_ptr<CreatedChild>& child);
 

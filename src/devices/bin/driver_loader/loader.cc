@@ -301,9 +301,13 @@ zx_status_t Loader::ProcessState::Start(zx::channel bootstrap_receiver) {
 
 void Loader::ProcessState::LoadDriver(LoadDriverRequestView request,
                                       LoadDriverCompleter::Sync& completer) {
-  auto result =
-      LoadDriverModule(std::string(request->driver_soname().get()),
-                       std::move(request->driver_binary()), std::move(request->driver_libs()));
+  fidl::VectorView<fuchsia_driver_loader::wire::RootModule> additional_root_modules;
+  if (request->has_additional_root_modules()) {
+    additional_root_modules = request->additional_root_modules();
+  }
+  auto result = LoadDriverModule(std::string(request->driver_soname().get()),
+                                 std::move(request->driver_binary()),
+                                 std::move(request->driver_libs()), additional_root_modules);
   if (result.is_error()) {
     completer.ReplyError(result.status_value());
     return;
@@ -315,8 +319,8 @@ void Loader::ProcessState::LoadDriver(LoadDriverRequestView request,
 }
 
 zx::result<Loader::DynamicLinkingPassiveAbi> Loader::ProcessState::LoadDriverModule(
-    std::string driver_name, zx::vmo driver_module,
-    fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
+    std::string driver_name, zx::vmo driver_module, fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+    fidl::VectorView<fuchsia_driver_loader::wire::RootModule> additional_root_modules) {
   auto diag = MakeDiagnostics();
 
   Linker::Soname root_module_name{driver_name};
@@ -336,6 +340,20 @@ zx::result<Loader::DynamicLinkingPassiveAbi> Loader::ProcessState::LoadDriverMod
   Linker::InitModuleList initial_modules = preloaded_modules_;
   initial_modules.emplace_back(Linker::RootModule(decoded_module, root_module_name));
 
+  // We need to keep these strings alive for |Linker.Init|.
+  std::vector<std::string> additional_root_modules_names;
+  for (auto& module : additional_root_modules) {
+    additional_root_modules_names.emplace_back(std::string(module.name().get()));
+    Linker::Soname name{additional_root_modules_names.back()};
+    Linker::Module::DecodedPtr decoded_module =
+        Linker::Module::Decoded::Create(diag, std::move(module.binary()), kPageSize);
+    if (!decoded_module) {
+      LOGF(ERROR, "Failed to decode additional root module module %s", name.c_str());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    initial_modules.emplace_back(Linker::RootModule(decoded_module, name));
+  }
+
   auto init_result =
       linker.Init(diag, std::move(initial_modules), GetDepFunction(diag, std::move(lib_dir)));
   if (!init_result) {
@@ -347,9 +365,13 @@ zx::result<Loader::DynamicLinkingPassiveAbi> Loader::ProcessState::LoadDriverMod
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  ZX_ASSERT_MSG(init_result->size() == 3u,
-                "Linker.Init returned an unexpected number of elements, want %u got %lu", 3u,
-                init_result->size());
+  // We expect the |init_result| vector to be the same size as the number of |initial_modules|.
+  // This includes the driver module, the two preloaded modules (driver host and vdso),
+  // and any additional root modules.
+  size_t expected_init_result_size = 3u + additional_root_modules.count();
+  ZX_ASSERT_MSG(init_result->size() == expected_init_result_size,
+                "Linker.Init returned an unexpected number of elements, want %lu got %lu",
+                expected_init_result_size, init_result->size());
 
   if (!linker.Allocate(diag, root_vmar_.borrow())) {
     // As |Init| has succeeded, |Allocate| should only fail due to system errors such as resource

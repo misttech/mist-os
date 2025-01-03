@@ -196,6 +196,69 @@ TEST_F(DynamicLinkingTest, StartRootDriver) {
   realm().AssertDestroyedChildren({driver_runner::CreateChildRef("dev", "boot-drivers")});
 }
 
+TEST_F(DynamicLinkingTest, StartCompatDriver) {
+  auto driver_host_runner =
+      std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
+
+  SetupDriverRunnerWithDynamicLinker(dispatcher(), std::move(driver_host_runner),
+                                     2u /* wait_for_num_drivers */);
+
+  auto root_driver = StartRootDriverDynamicLinking();
+  ASSERT_EQ(ZX_OK, root_driver.status_value());
+
+  driver_index().set_match_callback([](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
+    return zx::ok(FakeDriverIndex::MatchResult{
+        .url = driver_runner::compat_driver_url,
+    });
+  });
+
+  PrepareRealmForDriverComponentStart("dev.compat", driver_runner::compat_driver_url);
+  fdfw::NodeAddArgs args({
+      .name = "compat",
+  });
+
+  bool did_bind = false;
+  auto on_bind = [&did_bind]() { did_bind = true; };
+  std::shared_ptr<driver_runner::CreatedChild> child =
+      root_driver->driver->AddChild(std::move(args), false, false, std::move(on_bind));
+  EXPECT_TRUE(RunLoopUntilIdle());
+  EXPECT_TRUE(did_bind);
+
+  auto compat_driver_config = driver_runner::kCompatDriverPkgConfig;
+  std::string binary = std::string(compat_driver_config.main_module.open_path);
+  std::string v1_binary = std::string(compat_driver_config.additional_modules[0].open_path);
+  StartDriverHandler start_handler = [&](driver_runner::TestDriver* driver,
+                                         fdfw::DriverStartArgs start_args) {
+    EXPECT_FALSE(start_args.symbols().has_value());
+    ValidateProgram(start_args.program(), binary, "true" /* colocate */, "false", "false",
+                    "true" /* use_dynamic_linker */, v1_binary);
+  };
+  auto [driver, controller] = StartDriverWithConfig(
+      {
+          .url = "fuchsia-boot:///#meta/compat-driver.cm",
+          .binary = binary,
+          .colocate = true,
+          .use_dynamic_linker = true,
+          .compat = v1_binary,
+      },
+      std::move(start_handler), compat_driver_config);
+
+  // Check the driver host process exited with the expected value.
+  std::unordered_set<const driver_manager::DriverHostRunner::DriverHost*> driver_hosts =
+      driver_runner().driver_host_runner_for_tests()->DriverHosts();
+  ASSERT_EQ(1u, driver_hosts.size());
+
+  const zx::process& process = (*driver_hosts.begin())->process();
+  // The root driver will return 24, and the compat driver will return 5.
+  ASSERT_EQ(29, WaitForProcessExit(process));
+
+  driver->CloseBinding();
+  driver->DropNode();
+  StopDriverComponent(std::move(root_driver->controller));
+  realm().AssertDestroyedChildren({driver_runner::CreateChildRef("dev", "boot-drivers"),
+                                   driver_runner::CreateChildRef("dev.compat", "boot-drivers")});
+}
+
 // Starts the root driver with dynamic linking and attempts to start the colocated second driver
 // without.
 TEST_F(DynamicLinkingTest, StartColocatedSecondDriverNoDynamicLinking) {

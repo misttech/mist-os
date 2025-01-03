@@ -45,6 +45,8 @@ std::string_view GetFilename(std::string_view path) {
 
 }  // namespace
 
+static constexpr std::string_view kCompatDriverRelativePath = "driver/compat.so";
+
 // static
 zx::result<DriverHost::DriverLoadArgs> DriverHost::DriverLoadArgs::Create(
     fuchsia_component_runner::wire::ComponentStartInfo start_info) {
@@ -73,8 +75,25 @@ zx::result<DriverHost::DriverLoadArgs> DriverHost::DriverLoadArgs::Create(
     return lib_dir.take_error();
   }
 
+  std::vector<fuchsia_driver_loader::RootModule> additional_root_modules;
+  if (binary == kCompatDriverRelativePath) {
+    zx::result<std::string> compat = fdf_internal::ProgramValue(wire_program, "compat");
+    if (compat.is_error()) {
+      LOGF(ERROR, "Failed to start driver with compat shim, missing 'compat' argument: %s",
+           compat.status_string());
+      return compat.take_error();
+    }
+    auto v1_driver_file = pkg_utils::OpenPkgFile(*pkg, *compat);
+    if (v1_driver_file.is_error()) {
+      LOGF(ERROR, "Failed to open v1 driver file: %s", driver_file.status_string());
+      return v1_driver_file.take_error();
+    }
+    additional_root_modules.push_back(
+        fuchsia_driver_loader::RootModule{{.name = *compat, .binary = std::move(*v1_driver_file)}});
+  }
   return zx::ok(DriverHost::DriverLoadArgs(GetFilename(*binary), std::move(*driver_file),
-                                           std::move(*lib_dir)));
+                                           std::move(*lib_dir),
+                                           std::move(additional_root_modules)));
 }
 
 zx::result<> SetEncodedConfig(fidl::WireTableBuilder<fdf::wire::DriverStartArgs>& args,
@@ -276,11 +295,14 @@ void DriverHostComponent::StartWithDynamicLinker(
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));
     return;
   }
+
   fidl::Arena arena;
   auto args = fuchsia_driver_loader::wire::DriverHostLoadDriverRequest::Builder(arena)
                   .driver_soname(fidl::StringView::FromExternal(load_args.driver_soname))
                   .driver_binary(std::move(load_args.driver_file))
                   .driver_libs(std::move(load_args.lib_dir))
+                  .additional_root_modules(
+                      fidl::ToWire(arena, std::move(load_args.additional_root_modules)))
                   .Build();
 
   std::string driver_name = std::string(load_args.driver_soname);

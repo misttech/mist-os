@@ -11,6 +11,14 @@ using zx;
 /// for the loaded modules.
 alias DynamicLinkingPassiveAbi = uint64;
 
+/// The root module that can be loaded.
+type RootModule = resource table {
+    /// Module name.
+    1: name string:fuchsia.io.MAX_NAME_LENGTH;
+    /// Binary to load.
+    2: binary zx.Handle:VMO;
+};
+
 /// Protocol through which drivers can be loaded into a driver host process
 /// using out-of-process dynamic linking.
 @discoverable
@@ -23,6 +31,9 @@ open protocol DriverHost {
         2: driver_binary zx.Handle:VMO;
         /// Library dependencies of the driver.
         3: driver_libs client_end:fuchsia.io.Directory;
+        /// Additional root modules to be loaded, such as the
+        /// DFv1 driver module when running in DFv2 compatibility mode.
+        4: additional_root_modules vector<RootModule>:MAX;
     }) -> (table {
         /// The dynamic linking passive ABI for the loaded modules.
         1: dynamic_linking_abi DynamicLinkingPassiveAbi;

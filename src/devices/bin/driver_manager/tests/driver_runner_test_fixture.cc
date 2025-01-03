@@ -393,7 +393,10 @@ DriverRunnerTestBase::StartDriverResult DriverRunnerTestBase::StartDriver(
 
   fidl::Arena arena;
 
-  fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 5);
+  // The "compat" field is optional.
+  size_t num_program_entries = (driver.compat == "") ? 5 : 6;
+
+  fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, num_program_entries);
   program_entries[0].key.Set(arena, "binary");
   program_entries[0].value = fdata::wire::DictionaryValue::WithStr(arena, driver.binary);
 
@@ -412,6 +415,11 @@ DriverRunnerTestBase::StartDriverResult DriverRunnerTestBase::StartDriver(
   program_entries[4].key.Set(arena, "use_dynamic_linker");
   program_entries[4].value =
       fdata::wire::DictionaryValue::WithStr(arena, driver.use_dynamic_linker ? "true" : "false");
+
+  if (driver.compat != "") {
+    program_entries[5].key.Set(arena, "compat");
+    program_entries[5].value = fdata::wire::DictionaryValue::WithStr(arena, driver.compat);
+  }
 
   auto program_builder = fdata::wire::Dictionary::Builder(arena);
   program_builder.entries(program_entries);
@@ -551,12 +559,14 @@ void DriverRunnerTestBase::ValidateProgram(std::optional<::fuchsia_data::Diction
                                            std::string_view binary, std::string_view colocate,
                                            std::string_view host_restart_on_crash,
                                            std::string_view use_next_vdso,
-                                           std::string_view use_dynamic_linker) {
+                                           std::string_view use_dynamic_linker,
+                                           std::string_view compat) {
   ZX_ASSERT(program.has_value());
   auto& entries_opt = program.value().entries();
   ZX_ASSERT(entries_opt.has_value());
   auto& entries = entries_opt.value();
-  EXPECT_EQ(5u, entries.size());
+  size_t expected_num_entries = (compat == "") ? 5u : 6u;
+  EXPECT_EQ(expected_num_entries, entries.size());
   EXPECT_EQ("binary", entries[0].key());
   EXPECT_EQ(std::string(binary), entries[0].value()->str().value());
   EXPECT_EQ("colocate", entries[1].key());
@@ -567,6 +577,10 @@ void DriverRunnerTestBase::ValidateProgram(std::optional<::fuchsia_data::Diction
   EXPECT_EQ(std::string(use_next_vdso), entries[3].value()->str().value());
   EXPECT_EQ("use_dynamic_linker", entries[4].key());
   EXPECT_EQ(std::string(use_dynamic_linker), entries[4].value()->str().value());
+  if (compat != "") {
+    EXPECT_EQ("compat", entries[5].key());
+    EXPECT_EQ(std::string(compat), entries[5].value()->str().value());
+  }
 }
 void DriverRunnerTestBase::AssertNodeBound(const std::shared_ptr<CreatedChild>& child) {
   auto& node = child->node;

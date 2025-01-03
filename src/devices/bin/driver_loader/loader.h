@@ -102,7 +102,8 @@ class Loader : public fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher
     // Returns the dynamic linking passive ABI for the loaded modules.
     zx::result<DynamicLinkingPassiveAbi> LoadDriverModule(
         std::string driver_name, zx::vmo driver_module,
-        fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
+        fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+        fidl::VectorView<fuchsia_driver_loader::wire::RootModule> additional_root_modules);
 
     // Allocates the stack for the initial thread of the process.
     zx_status_t AllocateStack();
