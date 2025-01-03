@@ -2,6 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "driver_entry_point.h"
+#include "v1_driver_entry_point.h"
 
-int64_t DriverStart(uint64_t* data, int data_len) { return 1; }
+int64_t V1DriverStart() { return 5; }

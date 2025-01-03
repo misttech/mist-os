@@ -13,23 +13,25 @@
 #include "driver_entry_point.h"
 #include "entry_point.h"
 #include "fake_runtime.h"
+#include "v1_driver_entry_point.h"
 
-// Returns the pointer to the Driver's Start symbol.
-decltype(DriverStart)* GetDriverStartFunc(ld::abi::Abi<>* dl_passive_abi) {
+// Returns the function address of the first instance of |symbol|.
+uint64_t FindSymbol(ld::abi::Abi<>* dl_passive_abi, const char* symbol) {
   const auto& modules = ld::AbiLoadedModules<>(*dl_passive_abi);
   if (modules.empty()) {
-    return nullptr;
+    return 0;
   }
-  const auto& executable_module = *modules.begin();
-  constexpr elfldltl::SymbolName kDriverStart{"DriverStart"};
-  auto* symbol = kDriverStart.Lookup(executable_module.symbols);
-  if (!symbol) {
-    return nullptr;
+  auto executable_module = modules.begin();
+  while (executable_module != modules.end()) {
+    const elfldltl::SymbolName kDriverStart{symbol};
+    auto* symbol = kDriverStart.Lookup(executable_module->symbols);
+    if (symbol) {
+      auto load_bias = executable_module->link_map.addr;
+      return load_bias + symbol->value;
+    }
+    executable_module++;
   }
-  auto load_bias = executable_module.link_map.addr;
-  const auto driver_start_func =
-      reinterpret_cast<decltype(DriverStart)*>(load_bias + symbol->value);
-  return driver_start_func;
+  return 0;
 }
 
 // This fake driver host waits for messages to be received on the bootstrap channel.
@@ -68,11 +70,23 @@ extern "C" int64_t Start(zx_handle_t bootstrap, void* vdso) {
     }
 
     auto dl_passive_abi = reinterpret_cast<ld::abi::Abi<>*>(ptr);
-    const auto driver_start_func = GetDriverStartFunc(dl_passive_abi);
-    if (!driver_start_func) {
+    const auto driver_start_func_addr = FindSymbol(dl_passive_abi, "DriverStart");
+    if (!driver_start_func_addr) {
       return ZX_ERR_NOT_FOUND;
     }
-    total += driver_start_func();
+    const auto driver_start_func = reinterpret_cast<decltype(DriverStart)*>(driver_start_func_addr);
+
+    // This only applies for compat drivers, not an error if we can't find this.
+    const auto v1_driver_start_func_addr = FindSymbol(dl_passive_abi, "V1DriverStart");
+
+    // If present, send the address of the v1 driver start to the compat driver.
+    int data_len = 0;
+    uint64_t data[1];
+    if (v1_driver_start_func_addr != 0) {
+      data[0] = v1_driver_start_func_addr;
+      data_len = 1;
+    }
+    total += driver_start_func(data, data_len);
   }
   return total;
 }

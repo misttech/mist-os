@@ -37,6 +37,9 @@ const std::string root_driver_binary = "driver/root-driver.so";
 const std::string second_driver_url = "fuchsia-boot:///#meta/second-driver.cm";
 const std::string second_driver_binary = "driver/second-driver.so";
 
+const std::string compat_driver_url = "fuchsia-boot:///#meta/compat.cm";
+const std::string compat_driver_binary = "driver/compat.so";
+
 using driver_manager::Devfs;
 using driver_manager::DriverRunner;
 using driver_manager::InspectManager;
@@ -59,6 +62,14 @@ static const test_utils::TestPkg::Config kDefaultRootDriverPkgConfig = {
         {
             "libfake_root_driver_deps.so",
         },
+};
+
+static const test_utils::TestPkg::Config kCompatDriverPkgConfig = {
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_compat_driver.so",
+                    .open_path = compat_driver_binary},
+    .expected_libs = {},
+    .additional_modules = {test_utils::TestPkg::ModuleConfig{
+        .test_pkg_path = "/pkg/lib/fake_v1_driver.so", .open_path = "driver/fake_v1_driver.so"}},
 };
 
 // The tests that use these configs don't actually run the driver, so we can
