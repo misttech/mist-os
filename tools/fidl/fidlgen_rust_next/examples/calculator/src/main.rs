@@ -21,7 +21,7 @@ impl<T: Transport> CalculatorClientHandler<T> for MyCalculatorClient {
         sender: &ClientSender<T, Calculator>,
         _: ResponseBuffer<T, calculator::OnError>,
     ) {
-        println!("Client received an error event, closing connection.");
+        println!("Client received an error event, closing connection");
         sender.close();
     }
 }
@@ -43,6 +43,7 @@ impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer {
 
             use fidl_next_examples_calculator::{CalculatorAddResponse, CalculatorAddResult};
 
+            println!("{} + {} = {}", request.a, request.b, request.a + request.b);
             let mut response =
                 CalculatorAddResult::Response(CalculatorAddResponse { sum: request.a + request.b });
             let Ok(_) = responder.respond(&sender, &mut response).unwrap().await else {
@@ -66,11 +67,19 @@ impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer {
             };
 
             let mut response = if request.divisor != 0 {
+                println!(
+                    "{} / {} = {} rem {}",
+                    request.dividend,
+                    request.divisor,
+                    request.dividend / request.divisor,
+                    request.dividend % request.divisor,
+                );
                 CalculatorDivideResult::Response(CalculatorDivideResponse {
                     quotient: request.dividend / request.divisor,
                     remainder: request.dividend % request.divisor,
                 })
             } else {
+                println!("{} / 0 = undefined", request.dividend);
                 CalculatorDivideResult::Err(DivisionError::DivideByZero)
             };
             let Ok(_) = responder.respond(&sender, &mut response).unwrap().await else {
@@ -79,8 +88,14 @@ impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer {
         });
     }
 
-    fn clear(&mut self, _: &ServerSender<T, Calculator>) {
-        println!("cleared")
+    fn clear(&mut self, sender: &ServerSender<T, Calculator>) {
+        let sender = sender.clone();
+        self.scope.spawn(async move {
+            use fidl_next_examples_calculator::CalculatorServerSender as _;
+
+            println!("Cleared, sending an error back to close the connection");
+            sender.on_error().unwrap().await.unwrap();
+        });
     }
 }
 
@@ -102,7 +117,8 @@ async fn main() {
     });
 
     use fidl_next_examples_calculator::{
-        calculator_add_result, CalculatorAddRequest, CalculatorClientSender as _,
+        calculator_add_result, calculator_divide_result, CalculatorAddRequest,
+        CalculatorClientSender as _, CalculatorDivideRequest, DivisionError,
     };
 
     let mut buffer =
@@ -111,7 +127,26 @@ async fn main() {
     let calculator_add_result::Ref::Response(response) = result.as_ref() else { panic!() };
     assert_eq!(response.sum, 42);
 
-    client_sender.close();
+    let mut buffer = client_sender
+        .divide(&mut CalculatorDivideRequest { dividend: 100, divisor: 3 })
+        .unwrap()
+        .await
+        .unwrap();
+    let result = buffer.decode().unwrap();
+    let calculator_divide_result::Ref::Response(response) = result.as_ref() else { panic!() };
+    assert_eq!(response.quotient, 33);
+    assert_eq!(response.remainder, 1);
+
+    let mut buffer = client_sender
+        .divide(&mut CalculatorDivideRequest { dividend: 42, divisor: 0 })
+        .unwrap()
+        .await
+        .unwrap();
+    let result = buffer.decode().unwrap();
+    let calculator_divide_result::Ref::Err(error) = result.as_ref() else { panic!() };
+    assert_eq!(DivisionError::DivideByZero, (*error).into());
+
+    client_sender.clear().unwrap().await.unwrap();
 
     client_task.await;
     server_task.await;
