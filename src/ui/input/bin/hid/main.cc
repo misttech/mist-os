@@ -20,13 +20,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <threads.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/threads.h>
 #include <zircon/types.h>
 
 #include <iterator>
+#include <mutex>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -75,12 +75,11 @@ struct input_args_t {
   size_t data_size;
 };
 
-static mtx_t print_lock = MTX_INIT;
-#define lprintf(fmt...)      \
-  do {                       \
-    mtx_lock(&print_lock);   \
-    printf(fmt);             \
-    mtx_unlock(&print_lock); \
+static std::mutex print_lock;
+#define lprintf(fmt...)            \
+  do {                             \
+    std::lock_guard lock(print_lock); \
+    printf(fmt);                   \
   } while (0)
 
 static void print_hex(const uint8_t* buf, size_t len) {
@@ -156,13 +155,12 @@ static zx_status_t print_report_desc(input_args_t* args) {
 
   lprintf("hid: %s report descriptor len=%zu\n", args->devpath, result.value().desc.count());
 
-  mtx_lock(&print_lock);
+  std::lock_guard lock(print_lock);
   printf("hid: %s report descriptor:\n", args->devpath);
   print_hex(result.value().desc.data(), result.value().desc.count());
   if (verbose) {
     print_report_descriptor(result.value().desc.data(), result.value().desc.count());
   }
-  mtx_unlock(&print_lock);
   return ZX_OK;
 }
 
@@ -190,7 +188,7 @@ static zx_status_t print_hid_status(input_args_t* args) {
   }
   auto cleanup = fit::defer([&dev_desc]() { hid::FreeDeviceDescriptor(dev_desc); });
 
-  mtx_lock(&print_lock);
+  std::lock_guard lock(print_lock);
   printf("hid: %s num reports: %zu\n", args->devpath, dev_desc->rep_count);
 
   printf("hid: %s report ids...\n", args->devpath);
@@ -208,7 +206,6 @@ static zx_status_t print_hid_status(input_args_t* args) {
              dev_desc->report[i].feature_byte_sz);
     }
   }
-  mtx_unlock(&print_lock);
 
   return ZX_OK;
 }
@@ -255,10 +252,9 @@ static int hid_read_reports(input_args_t* args) {
   zx::event report_event;
   auto result = args->sync_client->GetReportsEvent();
   if ((result.status() != ZX_OK) || result->is_error()) {
-    mtx_lock(&print_lock);
+    std::lock_guard lock(print_lock);
     printf("read returned error: (call_status=%d) (status=%d)\n", result.status(),
            result->error_value());
-    mtx_unlock(&print_lock);
     return ZX_ERR_INTERNAL;
   }
   report_event = std::move(result.value()->event);
@@ -269,17 +265,15 @@ static int hid_read_reports(input_args_t* args) {
     status =
         hid_input_read_report(args, report_event, report.size(), report.data(), &returned_size);
     if (status != ZX_OK) {
-      mtx_lock(&print_lock);
+      std::lock_guard lock(print_lock);
       printf("hid_input_read_report returned %d\n", status);
-      mtx_unlock(&print_lock);
       break;
     }
 
-    mtx_lock(&print_lock);
+    std::lock_guard lock(print_lock);
     printf("read returned %ld bytes\n", returned_size);
     printf("hid: input from %s\n", args->devpath);
     print_hex(report.data(), returned_size);
-    mtx_unlock(&print_lock);
   }
 
   lprintf("hid: closing %s\n", args->devpath);
