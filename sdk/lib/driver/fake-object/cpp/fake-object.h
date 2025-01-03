@@ -181,10 +181,9 @@ class FakeHandleTable {
 // fake object instances are expected to be added to this singleton.
 FakeHandleTable& FakeHandleTable();
 
-// Creates a base object for testing handle methods.
-zx::result<zx_handle_t> fake_object_create();
-zx::result<zx_handle_t> fake_object_create_typed(zx_obj_type_t type);
-zx::result<zx_koid_t> fake_object_get_koid(zx_handle_t);
+// Creates a base fake object and adds it to FakeHandleTable(). This is used to create basic fake
+// objects for testing handle methods.
+zx::result<zx_handle_t> CreateFakeObject(zx_obj_type_t type = ZX_OBJ_TYPE_NONE);
 
 }  // namespace fake_object
 

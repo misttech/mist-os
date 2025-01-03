@@ -26,23 +26,13 @@ void* FindRealSyscall(const char* name) {
   return dlsym(vdso, name);
 }
 
-zx::result<zx_handle_t> fake_object_create_typed(zx_obj_type_t type) {
+zx::result<zx_handle_t> CreateFakeObject(zx_obj_type_t type) {
   auto obj = std::make_shared<FakeObject>(type);
   zx::result result = FakeHandleTable().Add(std::move(obj));
   if (result.is_error()) {
     return result.take_error();
   }
   return zx::success(result.value());
-}
-
-zx::result<zx_handle_t> fake_object_create() { return fake_object_create_typed(ZX_OBJ_TYPE_NONE); }
-
-zx::result<zx_koid_t> fake_object_get_koid(zx_handle_t handle) {
-  zx::result result = FakeHandleTable().Get(handle);
-  if (result.is_error()) {
-    return result.take_error();
-  }
-  return zx::success(result->get_koid());
 }
 
 }  // namespace fake_object
