@@ -21,10 +21,10 @@ def _fuchsia_post_processing_script_impl(ctx):
         python3_executable = py_toolchain.py3_runtime.interpreter
         args += [
             "-p",
-            python3_executable.basename,
+            python3_executable.path,
         ]
         inputs.update({
-            file: file.basename
+            file: file.path
             for file in py_toolchain.py3_runtime.files.to_list() + [python3_executable]
         })
 
