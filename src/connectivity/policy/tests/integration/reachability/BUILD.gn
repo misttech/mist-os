@@ -23,6 +23,7 @@ rustc_test("reachability") {
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/fake-clock/fidl:fidl_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/network/packet",
     "//third_party/rust_crates:anyhow",

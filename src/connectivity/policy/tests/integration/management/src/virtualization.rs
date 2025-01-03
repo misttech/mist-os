@@ -261,7 +261,6 @@ fn create_bridged_network(
     ];
     "disable_upstream")]
 async fn virtualization<N: Netstack>(name: &str, sub_name: &str, steps: &[Step]) {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default()).expect("init logging");
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let gateway_realm = sandbox
         .create_netstack_realm::<N, _>(format!("{}_{}_gateway", name, sub_name))

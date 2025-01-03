@@ -48,8 +48,11 @@ import("//tools/cmc/build/expect_includes.gni")
 #     Type: list of scopes
 #
 #   treatment_of_cases_with_error_logs (optional)
-#      Identifies how test cases that are expected to generate error logs
-#      should be run.
+#      Identifies how test cases that are expected to generate error logs should be run. Since most
+#      failed tests fail by panicking on a failed assertion, which generates error logs, this is
+#      useful for segregating expected-to-fail tests from expected-to-pass tests by marking the
+#      former as "expect_failure_with_err_log" and placing them in a separate test package that
+#      allows error logs without failing the whole suite.
 #      Type: string
 #      Options:
 #        - "SKIP_CASES_WITH_ERROR_LOGS" indicates that tests expected to

@@ -10,7 +10,7 @@
             ],
         },
         {
-            type: "expect_failure",
+            type: "expect_failure_with_err_logs",
             matchers: [
                 "tcp_bind_with_zone_connect_unzoned_ns2",
                 "tcp_socket_shutdown_listener_v4_ns2",

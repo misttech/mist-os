@@ -11,7 +11,7 @@ rustc_test("tcp") {
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
     "//src/connectivity/network/tests/fidl/filter-deprecated/common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
   ]
   sources = [ "src/lib.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

@@ -16,6 +16,7 @@ rustc_test("connect") {
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/tcp-stream-ext",
     "//third_party/rust_crates:futures-util",
@@ -40,6 +41,15 @@ if (target_cpu != "riscv64") {
 fuchsia_test_component_with_expectations("netstack-connect-test-component") {
   expectations = "expects.json5"
   manifest = "meta/connect.cml"
+  treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
+  deps = [ ":connect" ]
+}
+
+fuchsia_test_component_with_expectations(
+    "netstack-connect-test-with-error-logs-component") {
+  expectations = "expects.json5"
+  manifest = "meta/connect.cml"
+  treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
   deps = [ ":connect" ]
 }
 
@@ -48,7 +58,20 @@ fuchsia_test_package("netstack-connect-tests") {
   deps = package_deps
 }
 
+fuchsia_test_package("netstack-connect-tests-with-error-logs") {
+  test_components = [ ":netstack-connect-test-with-error-logs-component" ]
+  deps = package_deps
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
 group("tests") {
   testonly = true
-  deps = [ ":netstack-connect-tests" ]
+  deps = [
+    ":netstack-connect-tests",
+    ":netstack-connect-tests-with-error-logs",
+  ]
 }

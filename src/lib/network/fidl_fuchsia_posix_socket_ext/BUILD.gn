@@ -32,7 +32,7 @@ rustc_library("fidl_fuchsia_posix_socket_ext") {
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//third_party/rust_crates:libc",
   ]

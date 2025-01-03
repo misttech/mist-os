@@ -79,8 +79,6 @@ macro_rules! generate_test_cases_for_all_matchers {
                     name: &str,
                     matcher: M,
                 ) {
-                    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-                        .expect("initialize logging");
                     $test::<I, M>(name, matcher).await;
                 }
             }
@@ -93,8 +91,6 @@ macro_rules! generate_test_cases_for_all_matchers {
                     name: &str,
                     matcher: M,
                 ) {
-                    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-                        .expect("initialize logging");
                     $test::<I, M>(name, $hook, matcher).await;
                 }
             }
