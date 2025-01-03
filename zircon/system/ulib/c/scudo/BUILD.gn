@@ -232,6 +232,7 @@ source_set("gwp-asan-common") {
     "${gwp_asan}/stack_trace_compressor.h",
     "gwp_asan_info.h",
   ]
+  deps = [ "..:libc_source_set.deps" ]
 }
 
 config("gwp-asan-common-config") {

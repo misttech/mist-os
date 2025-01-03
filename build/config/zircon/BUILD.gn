@@ -268,10 +268,8 @@ config("machine") {
 
 variant("user") {
   defines = [ "_ALL_SOURCE" ]
-  configs = [
-    ":nolibc",
-    "//zircon/third_party/ulib/musl:headers",
-  ]
+  configs = [ ":nolibc" ]
+  deps = [ "//zircon/system/ulib/c/include:headers" ]
 
   if (is_gcc) {
     # This is the default in Clang for Fuchsia targets.  In shlib toolchains

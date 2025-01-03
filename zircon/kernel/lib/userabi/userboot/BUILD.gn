@@ -39,6 +39,7 @@ if (current_toolchain == default_toolchain) {
         # reusing this environment, e.g. hermetic_module().
         "//build/config/zircon:rodso",
       ]
+      source_deps = [ "${configs[0]}_deps" ]
 
       with_shared = false
 
@@ -92,6 +93,7 @@ if (toolchain_environment == "userboot") {
   }
 
   group("userboot_config_deps") {
+    public_deps = [ "//build/config/zircon:user_deps" ]
   }
   group("userboot_config_executable_deps") {
   }

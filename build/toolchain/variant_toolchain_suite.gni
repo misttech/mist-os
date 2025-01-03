@@ -18,6 +18,7 @@ _config_keys = [
   "remove_common_configs",
   "remove_executable_configs",
   "remove_shared_configs",
+  "source_deps",
 ]
 
 # Private subroutine of variant_toolchain_suite(), below, used to instantiate
@@ -61,45 +62,37 @@ template("_variant_toolchain") {
 
   # Build the toolchain_variant scope used for this toolchain() instance.
   _toolchain_variant = {
-    # First forward configs from the variant.
+    # First forward variables from the variant.
+    configs = []
+    executable_configs = []
+    prefix_configs = []
+    remove_common_configs = []
+    remove_executable_configs = []
+    remove_shared_configs = []
+    source_deps = []
     forward_variables_from(this_variant, "*")
 
     # Then add toolchain-specific configs.
     if (defined(this_invoker.configs)) {
-      if (!defined(configs)) {
-        configs = []
-      }
       configs += this_invoker.configs
     }
     if (defined(this_invoker.executable_configs)) {
-      if (!defined(executable_configs)) {
-        executable_configs = []
-      }
       executable_configs += this_invoker.executable_configs
     }
     if (defined(this_invoker.prefix_configs)) {
-      if (!defined(prefix_configs)) {
-        prefix_configs = []
-      }
       prefix_configs += this_invoker.prefix_configs
     }
     if (defined(this_invoker.remove_common_configs)) {
-      if (!defined(remove_common_configs)) {
-        remove_common_configs = []
-      }
       remove_common_configs += this_invoker.remove_common_configs
     }
     if (defined(this_invoker.remove_executable_configs)) {
-      if (!defined(remove_executable_configs)) {
-        remove_executable_configs = []
-      }
       remove_executable_configs += this_invoker.remove_executable_configs
     }
     if (defined(this_invoker.remove_shared_configs)) {
-      if (!defined(remove_shared_configs)) {
-        remove_shared_configs = []
-      }
       remove_shared_configs += this_invoker.remove_shared_configs
+    }
+    if (defined(this_invoker.source_deps)) {
+      source_deps += this_invoker.source_deps
     }
 
     is_pic_default = invoker.is_pic_default
@@ -144,69 +137,94 @@ template("_variant_toolchain") {
 #
 # Parameters
 #
-#   toolchain_template:
-#     Required: A GN template name that will be invoked to instantiate the
+#   * toolchain_template:
+#     - Required: A GN template name that will be invoked to instantiate the
 #     final toolchain() instance.
+#     - Type: string
 #
-#   with_shared:
-#     Optional: If these toolchains will have a "-shared" companion.
+#   * with_shared:
+#     - Optional: If these toolchains will have a "-shared" companion.
 #     (Each variant toolchain has its own "-shared" companion.)
+#     - Type: bool
+#     - Default: false
 #
-#   is_pic_default:
-#     Optional: If these toolchains will generate PIC-friendly code by
+#   * is_pic_default:
+#     - Optional: If these toolchains will generate PIC-friendly code by
 #     default on ELF platforms. If true, this is incompatible with
 #     `with_shared == true`.
+#     - Type: bool
+#     - Default: false
 #
-#   toolchain_tags:
-#     Optional: A list of tags applied to each toolchain instantiated in this
+#   * toolchain_tags:
+#     - Optional: A list of tags applied to each toolchain instantiated in this
 #     suite. See //build/toolchain/toolchain_tags.gni for the list of valid
 #     values and their meaning.
+#     - Type: list(string)
+#     - Default: []
 #
-#   exclude_variant_tags:
-#     Optional: A list of variant tags that this toolchain suite should
+#   * exclude_variant_tags:
+#     - Optional: A list of variant tags that this toolchain suite should
 #     *not* instantiate.
+#     - Type: list(string)
+#     - Default: []
 #
-#   configs:
-#     Optional: A list of configs added to all targets built by toolchain()
+#   * configs:
+#     - Optional: A list of configs added to all targets built by toolchain()
 #     instances in this suite. Note that these are added after the default
 #     configs set in //build/config/BUILDCONFIG.gn.
+#     - Type: list(label_no_toolchain)
+#     - Default: []
 #
-#   executable_configs:
-#     Optional: Additional configs only for executable() targets.
+#   * executable_configs:
+#     - Optional: Additional configs only for executable() targets.
+#     - Type: list(label_no_toolchain)
+#     - Default: []
 #
-#   prefix_configs:
-#     Optional: Like configs, but these configs are added before the default
+#   * prefix_configs:
+#     - Optional: Like configs, but these configs are added before the default
 #     configs. Should only be used for kernel toolchains that need to
 #     override the system include directories to provide their own
 #     standard C and C++ headers.
+#     - Type: list(label_no_toolchain)
+#     - Default: []
 #
-#   remove_common_configs:
-#     Optional: A list of configs that are removed for all targets built by
+#   * remove_common_configs:
+#     - Optional: A list of configs that are removed for all targets built by
 #     toolchain() instances in this suite. Useful to remove specific default
 #     configs when needed.
+#     - Type: list(label_no_toolchain)
+#     - Default: []
 #
-#   remove_executable_configs:
-#     Optional: Same as remove_common_configs, but will only apply to
+#   * remove_executable_configs:
+#     - Optional: Same as remove_common_configs, but will only apply to
 #     executable() targets.
+#     - Type: list(label_no_toolchain)
+#     - Default: []
 #
-#   remove_shared_configs:
-#     Optional: Same as remove_common_configs, but will only apply to
+#   * remove_shared_configs:
+#     - Optional: Same as remove_common_configs, but will only apply to
 #     shared_library() targets.
+#     - Type: list(label_no_toolchain)
+#     - Default: []
 #
-#   toolchain_args:
-#     Optional: Scope of common variables to be set in the variant toolchains'
-#     toolchain_args scope. Note that values in each selected variant's
-#     toolchain_args scope will override these values.
+#   * toolchain_args:
+#     - Optional: Scope of common variables to be set in the variant
+#     toolchains' toolchain_args scope. Note that values in each selected
+#     variant's toolchain_args scope will override these values.
+#     - Type: scope
+#     - Default: {}
 #
-#   enable_variants:
-#     Optional: A list of variant names that should always be enabled,
+#   * enable_variants:
+#     - Optional: A list of variant names that should always be enabled,
 #     independent of the content of the global `select_variant` list. This
 #     should only be used for specific targets that need it, e.g. the C
 #     library needs to be built with the regular as well as ASan-enabled
 #     toolchains for the Fuchsia SDK.
+#     - Type: list(string)
+#     - Default: []
 #
-# All other parameters are passed to ${toolchain_template}(). See
-# clang_toolchain_instance() and zircon_toolchain_instance() for their values.
+# All other parameters are passed to ${toolchain_template}().  See
+# clang_toolchain() and zircon_toolchain() for their values.
 #
 template("variant_toolchain_suite") {
   # Expand all_toolchain_variants into a canonicalized, list of variant specs
