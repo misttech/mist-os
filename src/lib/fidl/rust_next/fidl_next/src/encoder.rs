@@ -131,12 +131,11 @@ pub trait EncoderExt {
 impl<E: Encoder + ?Sized> EncoderExt for E {
     fn preallocate<T>(&mut self, len: usize) -> Preallocated<'_, Self, T> {
         let pos = self.bytes_written();
-        let len_bytes = len * size_of::<T>();
 
         // Zero out the next `count` bytes
-        self.reserve(len_bytes);
+        self.reserve(len * size_of::<T>());
 
-        Preallocated { encoder: self, pos, end: pos + len_bytes, _phantom: PhantomData }
+        Preallocated { encoder: self, pos, remaining: len, _phantom: PhantomData }
     }
 
     fn encode_next_slice<T: Encode<Self>>(&mut self, values: &mut [T]) -> Result<(), EncodeError> {
@@ -162,16 +161,17 @@ pub struct Preallocated<'a, E: ?Sized, T> {
     /// The encoder.
     pub encoder: &'a mut E,
     pos: usize,
-    end: usize,
+    remaining: usize,
     _phantom: PhantomData<T>,
 }
 
 impl<E: Encoder + ?Sized, T> Preallocated<'_, E, T> {
     /// Writes into the next pre-allocated slot in the encoder.
     pub fn write_next(&mut self, slot: Slot<'_, T>) {
-        assert_ne!(self.pos, self.end, "attemped to write more slots than preallocated",);
+        assert!(self.remaining > 0, "attemped to write more slots than preallocated");
 
         self.encoder.rewrite(self.pos, slot.as_bytes());
         self.pos += size_of::<T>();
+        self.remaining -= 1;
     }
 }
