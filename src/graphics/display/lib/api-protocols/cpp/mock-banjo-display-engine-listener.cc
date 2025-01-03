@@ -6,12 +6,9 @@
 
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <zircon/assert.h>
-#include <zircon/compiler.h>
 
-#include <cstddef>
 #include <cstdint>
 #include <mutex>
-#include <vector>
 
 namespace display::testing {
 

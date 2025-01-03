@@ -6,11 +6,11 @@
 #define SRC_GRAPHICS_DISPLAY_LIB_API_PROTOCOLS_CPP_MOCK_BANJO_DISPLAY_ENGINE_LISTENER_H_
 
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/fit/function.h>
 #include <zircon/compiler.h>
 
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <mutex>
 #include <vector>
 
@@ -26,12 +26,12 @@ class MockBanjoDisplayEngineListener
  public:
   // Expectation containers for fuchsia.hardware.display.controller/DisplayEngineListener:
   using OnDisplayAddedChecker =
-      std::function<void(const raw_display_info_t* banjo_raw_display_info)>;
-  using OnDisplayRemovedChecker = std::function<void(uint64_t banjo_display_id)>;
+      fit::function<void(const raw_display_info_t* banjo_raw_display_info)>;
+  using OnDisplayRemovedChecker = fit::function<void(uint64_t banjo_display_id)>;
   using OnDisplayVsyncChecker =
-      std::function<void(uint64_t banjo_display_id, zx_time_t banjo_timestamp,
+      fit::function<void(uint64_t banjo_display_id, zx_time_t banjo_timestamp,
                          const config_stamp_t* banjo_config_stamp)>;
-  using OnCaptureCompleteChecker = std::function<void()>;
+  using OnCaptureCompleteChecker = fit::function<void()>;
 
   MockBanjoDisplayEngineListener();
   MockBanjoDisplayEngineListener(const MockBanjoDisplayEngineListener&) = delete;

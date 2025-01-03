@@ -37,6 +37,8 @@ test_sources = [
   "display-engine-interface-test.cc",
   "mock-banjo-display-engine-listener.cc",
   "mock-banjo-display-engine-listener.h",
+  "mock-display-engine.cc",
+  "mock-display-engine.h",
 ]
 
 group("test-deps") {
@@ -45,7 +47,9 @@ group("test-deps") {
   public_deps = [
     ":cpp",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
+    "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/image-format",
