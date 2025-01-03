@@ -344,7 +344,7 @@ impl ::core::convert::From<Bits> for WireBits {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
 pub enum Enum {
     Val = 1,
@@ -392,7 +392,7 @@ impl ::fidl_next::TakeFrom<WireEnum> for Enum {
 }
 
 /// The wire type corresponding to [`Enum`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WireEnum {
     value: ::fidl_next::u32_le,

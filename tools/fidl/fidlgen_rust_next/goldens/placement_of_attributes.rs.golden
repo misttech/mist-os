@@ -90,7 +90,7 @@ impl ::core::convert::From<ExampleBits> for WireExampleBits {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u32)]
 pub enum ExampleEnum {
     Member = 1,
@@ -135,7 +135,7 @@ impl ::fidl_next::TakeFrom<WireExampleEnum> for ExampleEnum {
 }
 
 /// The wire type corresponding to [`ExampleEnum`].
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct WireExampleEnum {
     value: ::fidl_next::u32_le,
