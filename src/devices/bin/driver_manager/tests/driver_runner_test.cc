@@ -429,7 +429,7 @@ TEST_P(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   EXPECT_TRUE(did_bind);
 
   auto second_driver_config = kDefaultSecondDriverPkgConfig;
-  std::string binary = std::string(second_driver_config.module_open_path);
+  std::string binary = std::string(second_driver_config.main_module.open_path);
   StartDriverHandler start_handler = [this, binary](TestDriver* driver,
                                                     fdfw::DriverStartArgs start_args) {
     auto& symbols = start_args.symbols().value();
@@ -777,7 +777,7 @@ TEST_P(DriverRunnerTest, BindAndRestartThroughRequest) {
 
   // Get the third-driver running.
   auto third_driver_config = kDefaultThirdDriverPkgConfig;
-  std::string binary = std::string(third_driver_config.module_open_path);
+  std::string binary = std::string(third_driver_config.main_module.open_path);
   StartDriverHandler start_handler = [&](TestDriver* driver, fdfw::DriverStartArgs start_args) {
     EXPECT_FALSE(start_args.symbols().has_value());
     ValidateProgram(start_args.program(), binary, "false", "false", "false");
@@ -959,7 +959,7 @@ TEST_P(DriverRunnerTest, StartDriverChain_UnbindSecondNode) {
     EXPECT_TRUE(RunLoopUntilIdle());
 
     auto driver_config = kDefaultDriverPkgConfig;
-    std::string binary = std::string(driver_config.module_open_path);
+    std::string binary = std::string(driver_config.main_module.open_path);
     StartDriverHandler start_handler = [this, binary](TestDriver* driver,
                                                       fdfw::DriverStartArgs start_args) {
       EXPECT_FALSE(start_args.symbols().has_value());
@@ -1187,7 +1187,7 @@ TEST_P(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
   ASSERT_TRUE(driver_runner().composite_node_spec_manager().specs().at(name)->parent_nodes().at(1));
 
   auto composite_driver_config = kDefaultCompositeDriverPkgConfig;
-  std::string binary = std::string(composite_driver_config.module_open_path);
+  std::string binary = std::string(composite_driver_config.main_module.open_path);
   StartDriverHandler start_handler = [this, binary](TestDriver* driver,
                                                     fdfw::DriverStartArgs start_args) {
     ValidateProgram(start_args.program(), binary, "true", "false", "false");

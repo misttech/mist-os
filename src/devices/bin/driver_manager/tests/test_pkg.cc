@@ -8,9 +8,17 @@ namespace test_utils {
 
 TestPkg::TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server,
                  std::string_view module_test_pkg_path, std::string_view module_open_path,
-                 const std::vector<std::string_view> expected_libs)
+                 const std::vector<std::string_view> expected_libs,
+                 const std::vector<ModuleConfig> additional_modules_configs)
     : module_(module_test_pkg_path) {
   EXPECT_EQ(ZX_OK, loop_.StartThread());
+
+  for (auto& module : additional_modules_configs) {
+    additional_modules_.emplace_back(
+        Module{.file = TestFile{module.test_pkg_path}, .open_path = std::string(module.open_path)});
+    additional_modules_.back().binding =
+        std::make_unique<fidl::Binding<fuchsia::io::File>>(&additional_modules_.back().file);
+  }
 
   // Construct the test files for the expected libs.
   for (auto name : expected_libs) {
@@ -40,6 +48,13 @@ TestPkg::TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server,
     } else if (strcmp(path.c_str(), module_open_path.c_str()) == 0) {
       EXPECT_EQ(fuchsia::io::PERM_READABLE | fuchsia::io::PERM_EXECUTABLE, flags);
       module_binding_.Bind(std::move(object), loop_.dispatcher());
+    } else {
+      for (auto& module : additional_modules_) {
+        if (strcmp(path.c_str(), module.open_path.c_str()) == 0) {
+          EXPECT_EQ(fuchsia::io::PERM_READABLE | fuchsia::io::PERM_EXECUTABLE, flags);
+          module.binding->Bind(std::move(object), loop_.dispatcher());
+        }
+      }
     }
   });
 }

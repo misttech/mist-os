@@ -42,8 +42,8 @@ using driver_manager::DriverRunner;
 using driver_manager::InspectManager;
 
 static const test_utils::TestPkg::Config kDefaultDriverHostPkgConfig = {
-    .module_test_pkg_path = "/pkg/bin/fake_driver_host_with_bootstrap",
-    .module_open_path = "bin/driver_host2",
+    .main_module = {.test_pkg_path = "/pkg/bin/fake_driver_host_with_bootstrap",
+                    .open_path = "bin/driver_host2"},
     .expected_libs =
         {
             "libdh-deps-a.so",
@@ -53,8 +53,8 @@ static const test_utils::TestPkg::Config kDefaultDriverHostPkgConfig = {
 };
 
 static const test_utils::TestPkg::Config kDefaultRootDriverPkgConfig = {
-    .module_test_pkg_path = "/pkg/lib/fake_root_driver.so",
-    .module_open_path = root_driver_binary,
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_root_driver.so",
+                    .open_path = root_driver_binary},
     .expected_libs =
         {
             "libfake_root_driver_deps.so",
@@ -66,26 +66,24 @@ static const test_utils::TestPkg::Config kDefaultRootDriverPkgConfig = {
 // by the loader library. We can replace them in future with a custom .so
 // if needed.
 static const test_utils::TestPkg::Config kDefaultSecondDriverPkgConfig = {
-    .module_test_pkg_path = "/pkg/lib/fake_driver.so",
-    .module_open_path = second_driver_binary,
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_driver.so", .open_path = second_driver_binary},
     .expected_libs = {},
 };
 
 static const test_utils::TestPkg::Config kDefaultThirdDriverPkgConfig = {
-    .module_test_pkg_path = "/pkg/lib/fake_driver.so",
-    .module_open_path = "driver/third-driver.so",
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_driver.so",
+                    .open_path = "driver/third-driver.so"},
     .expected_libs = {},
 };
 
 static const test_utils::TestPkg::Config kDefaultDriverPkgConfig = {
-    .module_test_pkg_path = "/pkg/lib/fake_driver.so",
-    .module_open_path = "driver/driver.so",
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_driver.so", .open_path = "driver/driver.so"},
     .expected_libs = {},
 };
 
 static const test_utils::TestPkg::Config kDefaultCompositeDriverPkgConfig = {
-    .module_test_pkg_path = "/pkg/lib/fake_driver.so",
-    .module_open_path = "driver/composite-driver.so",
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_driver.so",
+                    .open_path = "driver/composite-driver.so"},
     .expected_libs = {},
 };
 

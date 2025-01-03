@@ -520,7 +520,7 @@ DriverRunnerTestBase::StartRootDriverDynamicLinking(test_utils::TestPkg::Config 
 
   auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   test_utils::TestPkg test_pkg(std::move(pkg_endpoints.server), driver_config);
-  StartDriverHandler start_handler = [pkg_path = driver_config.module_open_path](
+  StartDriverHandler start_handler = [pkg_path = driver_config.main_module.open_path](
                                          driver_runner::TestDriver* driver,
                                          fdfw::DriverStartArgs start_args) {
     ValidateProgram(start_args.program(), pkg_path, "false" /* colocate */,
@@ -535,7 +535,7 @@ DriverRunnerTestBase::StartRootDriverDynamicLinking(test_utils::TestPkg::Config 
   return zx::ok(StartDriver(
       {
           .url = driver_runner::root_driver_url,
-          .binary = std::string(driver_config.module_open_path),
+          .binary = std::string(driver_config.main_module.open_path),
           .use_dynamic_linker = true,
       },
       std::move(start_handler), std::move(pkg_endpoints.client),
@@ -596,7 +596,7 @@ void DriverRunnerTestBase::SetupDevfs() {
 DriverRunnerTestBase::StartDriverResult DriverRunnerTestBase::StartSecondDriver(
     bool colocate, bool host_restart_on_crash, bool use_next_vdso, bool use_dynamic_linker) {
   auto second_driver_config = kDefaultSecondDriverPkgConfig;
-  std::string binary = std::string(second_driver_config.module_open_path);
+  std::string binary = std::string(second_driver_config.main_module.open_path);
   StartDriverHandler start_handler = [colocate, host_restart_on_crash, use_next_vdso, binary,
                                       use_dynamic_linker](TestDriver* driver,
                                                           fdfw::DriverStartArgs start_args) {
