@@ -17,16 +17,17 @@ fdio_slot* slot_locked(std::array<fdio_slot, FDIO_MAX_FD>& fdtab, int fd) {
 
 }  // namespace
 
-// `constinit` to force initialization at program load time. Otherwise initialization may occur
-// after |__libc_extension_init|, wiping the fd table *after* it has been filled in with valid
-// entries; musl invokes |__libc_start_init| after |__libc_extensions_init|.
-//
-// Note that even moving the initialization to |__libc_extensions_init| doesn't work out in the
-// presence of sanitizers that deliberately initialize with garbage *after* |__libc_extensions_init|
-// runs.
-constinit fdio_state_t __fdio_global_state{
-    .cwd_path = fdio_internal::PathBuffer('/'),
-};
+fdio_state_t& fdio_global_state() {
+  // The C++20 `constinit` specifier ensures that no runtime initialization is needed. The
+  // `clang::no_destroy` attribute ensures that no automatic runtime finalization is done, since
+  // it's difficult to control its ordering with respect to other finalization routines; instead we
+  // explicitly invoke the destructor in `__libc_extensions_fini` which happens safely after all
+  // other finalization code.
+  [[clang::no_destroy]] static constinit fdio_state_t state{
+      .cwd_path = fdio_internal::PathBuffer('/'),
+  };
+  return state;
+}
 
 std::optional<int> fdio_state_t::bind_to_fd(const fbl::RefPtr<fdio>& io) {
   fbl::AutoLock guard(&lock);

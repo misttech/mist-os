@@ -637,6 +637,9 @@ extern "C" __EXPORT void __libc_extensions_fini(void) __TA_NO_THREAD_SAFETY_ANAL
   for (auto& var : gstate.fdtab) {
     [[maybe_unused]] const fdio_ptr io = var.release();
   }
+   // Automatic destructor registration is prevented for this object. Now that it's safely after all
+   // others, call its destructor explicitly. See commentary in `fdio_global_state`.
+  gstate.~fdio_state_t();
 }
 
 __EXPORT

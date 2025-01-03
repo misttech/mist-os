@@ -35,9 +35,6 @@ struct fdio_state_t {
   fdio_internal::PathBuffer cwd_path __TA_GUARDED(cwd_lock);
 };
 
-static inline fdio_state_t& fdio_global_state() {
-  extern fdio_state_t __fdio_global_state;
-  return __fdio_global_state;
-}
+fdio_state_t& fdio_global_state();
 
 #endif  // LIB_FDIO_FDIO_STATE_H_
