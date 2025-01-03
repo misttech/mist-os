@@ -4,24 +4,27 @@
 
 use fuchsia_async::{Scope, Task};
 
-use crate::protocol::{Client, ClientHandler, Responder, Server, ServerHandler, Transport};
+use crate::protocol::{
+    Client, ClientDispatcher, ClientHandler, Responder, Server, ServerDispatcher, ServerHandler,
+    Transport,
+};
 use crate::{DecoderExt, WireString};
 
 pub struct Ignore;
 
 impl<T: Transport> ClientHandler<T> for Ignore {
-    fn on_event(&mut self, _: u64, _: T::RecvBuffer) {}
+    fn on_event(&mut self, _: &Client<T>, _: u64, _: T::RecvBuffer) {}
 }
 
 impl<T: Transport> ServerHandler<T> for Ignore {
-    fn on_one_way(&mut self, _: u64, _: T::RecvBuffer) {}
-    fn on_two_way(&mut self, _: u64, _: T::RecvBuffer, _: Responder) {}
+    fn on_one_way(&mut self, _: &Server<T>, _: u64, _: T::RecvBuffer) {}
+    fn on_two_way(&mut self, _: &Server<T>, _: u64, _: T::RecvBuffer, _: Responder) {}
 }
 
 pub async fn test_close_on_drop<T: Transport>(client_end: T, server_end: T) {
-    let (_, mut client_dispatcher) = Client::new(client_end);
+    let mut client_dispatcher = ClientDispatcher::new(client_end);
     let client_task = Task::spawn(async move { client_dispatcher.run(Ignore).await });
-    let (_, mut server_dispatcher) = Server::new(server_end);
+    let mut server_dispatcher = ServerDispatcher::new(server_end);
     let server_task = Task::spawn(async move { server_dispatcher.run(Ignore).await });
 
     drop(client_task);
@@ -32,7 +35,7 @@ pub async fn test_one_way<T: Transport>(client_end: T, server_end: T) {
     struct TestServer;
 
     impl<T: Transport> ServerHandler<T> for TestServer {
-        fn on_one_way(&mut self, ordinal: u64, mut buffer: T::RecvBuffer) {
+        fn on_one_way(&mut self, _: &Server<T>, ordinal: u64, mut buffer: T::RecvBuffer) {
             assert_eq!(ordinal, 42);
             let message = T::decoder(&mut buffer)
                 .decode_last::<WireString<'_>>()
@@ -40,14 +43,15 @@ pub async fn test_one_way<T: Transport>(client_end: T, server_end: T) {
             assert_eq!(&**message, "Hello world");
         }
 
-        fn on_two_way(&mut self, _: u64, _: T::RecvBuffer, _: Responder) {
+        fn on_two_way(&mut self, _: &Server<T>, _: u64, _: T::RecvBuffer, _: Responder) {
             panic!("unexpected two-way message");
         }
     }
 
-    let (client, mut client_dispatcher) = Client::new(client_end);
+    let mut client_dispatcher = ClientDispatcher::new(client_end);
+    let client = client_dispatcher.client().clone();
     let client_task = Task::spawn(async move { client_dispatcher.run(Ignore).await });
-    let (_, mut server_dispatcher) = Server::new(server_end);
+    let mut server_dispatcher = ServerDispatcher::new(server_end);
     let server_task = Task::spawn(async move { server_dispatcher.run(TestServer).await });
 
     client
@@ -62,18 +66,23 @@ pub async fn test_one_way<T: Transport>(client_end: T, server_end: T) {
 }
 
 pub async fn test_two_way<T: Transport>(client_end: T, server_end: T) {
-    struct TestServer<T: Transport> {
-        server: Server<T>,
+    struct TestServer {
         scope: Scope,
     }
 
-    impl<T: Transport> ServerHandler<T> for TestServer<T> {
-        fn on_one_way(&mut self, _: u64, _: T::RecvBuffer) {
+    impl<T: Transport> ServerHandler<T> for TestServer {
+        fn on_one_way(&mut self, _: &Server<T>, _: u64, _: T::RecvBuffer) {
             panic!("unexpected event");
         }
 
-        fn on_two_way(&mut self, ordinal: u64, mut buffer: T::RecvBuffer, responder: Responder) {
-            let server = self.server.clone();
+        fn on_two_way(
+            &mut self,
+            server: &Server<T>,
+            ordinal: u64,
+            mut buffer: T::RecvBuffer,
+            responder: Responder,
+        ) {
+            let server = server.clone();
             self.scope.spawn(async move {
                 assert_eq!(ordinal, 42);
                 let message = T::decoder(&mut buffer)
@@ -90,12 +99,12 @@ pub async fn test_two_way<T: Transport>(client_end: T, server_end: T) {
         }
     }
 
-    let (client, mut client_dispatcher) = Client::new(client_end);
+    let mut client_dispatcher = ClientDispatcher::new(client_end);
+    let client = client_dispatcher.client().clone();
     let client_task = Task::spawn(async move { client_dispatcher.run(Ignore).await });
-    let (server, mut server_dispatcher) = Server::new(server_end);
-    let server_task = Task::spawn(async move {
-        server_dispatcher.run(TestServer { server, scope: Scope::new() }).await
-    });
+    let mut server_dispatcher = ServerDispatcher::new(server_end);
+    let server_task =
+        Task::spawn(async move { server_dispatcher.run(TestServer { scope: Scope::new() }).await });
 
     let mut buffer = client
         .send_two_way(42, &mut "Ping".to_string())
@@ -113,18 +122,23 @@ pub async fn test_two_way<T: Transport>(client_end: T, server_end: T) {
 }
 
 pub async fn test_multiple_two_way<T: Transport>(client_end: T, server_end: T) {
-    struct TestServer<T: Transport> {
-        server: Server<T>,
+    struct TestServer {
         scope: Scope,
     }
 
-    impl<T: Transport> ServerHandler<T> for TestServer<T> {
-        fn on_one_way(&mut self, _: u64, _: T::RecvBuffer) {
+    impl<T: Transport> ServerHandler<T> for TestServer {
+        fn on_one_way(&mut self, _: &Server<T>, _: u64, _: T::RecvBuffer) {
             panic!("unexpected event");
         }
 
-        fn on_two_way(&mut self, ordinal: u64, mut buffer: T::RecvBuffer, responder: Responder) {
-            let server = self.server.clone();
+        fn on_two_way(
+            &mut self,
+            server: &Server<T>,
+            ordinal: u64,
+            mut buffer: T::RecvBuffer,
+            responder: Responder,
+        ) {
+            let server = server.clone();
             self.scope.spawn(async move {
                 let message = T::decoder(&mut buffer)
                     .decode_last::<WireString<'_>>()
@@ -148,12 +162,12 @@ pub async fn test_multiple_two_way<T: Transport>(client_end: T, server_end: T) {
         }
     }
 
-    let (client, mut client_dispatcher) = Client::new(client_end);
+    let mut client_dispatcher = ClientDispatcher::new(client_end);
+    let client = client_dispatcher.client().clone();
     let client_task = Task::spawn(async move { client_dispatcher.run(Ignore).await });
-    let (server, mut server_dispatcher) = Server::new(server_end);
-    let server_task = Task::spawn(async move {
-        server_dispatcher.run(TestServer { server, scope: Scope::new() }).await
-    });
+    let mut server_dispatcher = ServerDispatcher::new(server_end);
+    let server_task =
+        Task::spawn(async move { server_dispatcher.run(TestServer { scope: Scope::new() }).await });
 
     let send_one =
         client.send_two_way(1, &mut "One".to_string()).expect("client failed to encode request");
@@ -190,26 +204,24 @@ pub async fn test_multiple_two_way<T: Transport>(client_end: T, server_end: T) {
 }
 
 pub async fn test_event<T: Transport>(client_end: T, server_end: T) {
-    struct TestClient<T: Transport> {
-        client: Client<T>,
-    }
+    struct TestClient;
 
-    impl<T: Transport> ClientHandler<T> for TestClient<T> {
-        fn on_event(&mut self, ordinal: u64, mut buffer: T::RecvBuffer) {
+    impl<T: Transport> ClientHandler<T> for TestClient {
+        fn on_event(&mut self, client: &Client<T>, ordinal: u64, mut buffer: T::RecvBuffer) {
             assert_eq!(ordinal, 10);
             let message = T::decoder(&mut buffer)
                 .decode_last::<WireString<'_>>()
                 .expect("failed to decode request");
             assert_eq!(&**message, "Surprise!");
 
-            self.client.close();
+            client.close();
         }
     }
 
-    let (client, mut client_dispatcher) = Client::new(client_end);
-    let client_task =
-        Task::spawn(async move { client_dispatcher.run(TestClient { client }).await });
-    let (server, mut server_dispatcher) = Server::new(server_end);
+    let mut client_dispatcher = ClientDispatcher::new(client_end);
+    let client_task = Task::spawn(async move { client_dispatcher.run(TestClient).await });
+    let mut server_dispatcher = ServerDispatcher::new(server_end);
+    let server = server_dispatcher.server().clone();
     let server_task = Task::spawn(async move { server_dispatcher.run(Ignore).await });
 
     server

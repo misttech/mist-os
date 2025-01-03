@@ -2818,11 +2818,11 @@ where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn strict_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(200845620698173917, &mut ())
+        self.as_untyped().send_one_way(200845620698173917, &mut ())
     }
 
     fn flexible_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(3790953144423004126, &mut ())
+        self.as_untyped().send_one_way(3790953144423004126, &mut ())
     }
 
     fn strict_two_way(
@@ -2835,7 +2835,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(523076268125513549, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -2850,7 +2850,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(902155904889801604, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -2865,7 +2865,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(8952307689721713673, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -2880,7 +2880,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(3114064683372134045, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -2895,7 +2895,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(7057260423103547829, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -2910,7 +2910,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(6490530264582540031, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -2925,7 +2925,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(2319476129312263555, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -2940,7 +2940,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(6883106306697493305, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -2950,7 +2950,13 @@ where
 
 pub trait UnknownInteractionsAjarDriverProtocolClientHandler<___T: ::fidl_next::protocol::Transport>
 {
-    fn handle_unknown_interaction(&mut self, ordinal: u64);
+    fn on_unknown_interaction(
+        &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarDriverProtocol>,
+        ordinal: u64,
+    ) {
+        client.close();
+    }
 }
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H>
@@ -2980,9 +2986,14 @@ where
     for<'buf> crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        client: &::fidl_next::bind::Client<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(client, ordinal),
         }
     }
 }
@@ -3001,12 +3012,20 @@ where
 
 pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::protocol::Transport>
 {
-    fn strict_one_way(&mut self);
+    fn strict_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+    );
 
-    fn flexible_one_way(&mut self);
+    fn flexible_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+    );
 
     fn strict_two_way(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_driver_protocol::StrictTwoWay,
         >,
@@ -3014,6 +3033,8 @@ pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::
 
     fn strict_two_way_fields(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_driver_protocol::StrictTwoWayFields,
         >,
@@ -3021,6 +3042,8 @@ pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::
 
     fn strict_two_way_union(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_driver_protocol::StrictTwoWayUnion,
         >,
@@ -3028,6 +3051,8 @@ pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::
 
     fn strict_two_way_table(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_driver_protocol::StrictTwoWayTable,
         >,
@@ -3035,6 +3060,8 @@ pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::
 
     fn strict_two_way_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_driver_protocol::StrictTwoWayErr,
         >,
@@ -3042,6 +3069,8 @@ pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::
 
     fn strict_two_way_fields_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_driver_protocol::StrictTwoWayFieldsErr,
         >,
@@ -3049,6 +3078,8 @@ pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::
 
     fn strict_two_way_union_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_driver_protocol::StrictTwoWayUnionErr,
         >,
@@ -3056,12 +3087,20 @@ pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::
 
     fn strict_two_way_table_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_driver_protocol::StrictTwoWayTableErr,
         >,
     );
 
-    fn handle_unknown_interaction(&mut self, ordinal: u64);
+    fn on_unknown_interaction(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarDriverProtocol>,
+        ordinal: u64,
+    ) {
+        server.close();
+    }
 }
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H>
@@ -3070,22 +3109,28 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsAjarDriverProtocolServerHandler<___T>,
 {
-    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             200845620698173917 => {
-                handler.strict_one_way();
+                handler.strict_one_way(server);
             }
 
             3790953144423004126 => {
-                handler.flexible_one_way();
+                handler.flexible_one_way(server);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(server, ordinal),
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -3094,52 +3139,52 @@ where
             523076268125513549 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way(responder);
+                handler.strict_two_way(server, responder);
             }
 
             902155904889801604 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields(responder);
+                handler.strict_two_way_fields(server, responder);
             }
 
             8952307689721713673 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union(responder);
+                handler.strict_two_way_union(server, responder);
             }
 
             3114064683372134045 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table(responder);
+                handler.strict_two_way_table(server, responder);
             }
 
             7057260423103547829 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_err(responder);
+                handler.strict_two_way_err(server, responder);
             }
 
             6490530264582540031 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields_err(responder);
+                handler.strict_two_way_fields_err(server, responder);
             }
 
             2319476129312263555 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union_err(responder);
+                handler.strict_two_way_union_err(server, responder);
             }
 
             6883106306697493305 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table_err(responder);
+                handler.strict_two_way_table_err(server, responder);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(server, ordinal),
         }
     }
 }
@@ -7037,11 +7082,11 @@ where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn strict_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(956561744635167883, &mut ())
+        self.as_untyped().send_one_way(956561744635167883, &mut ())
     }
 
     fn flexible_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(2483093178939638607, &mut ())
+        self.as_untyped().send_one_way(2483093178939638607, &mut ())
     }
 
     fn strict_two_way(
@@ -7054,7 +7099,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(364341676962177080, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -7069,7 +7114,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(1821674633227946298, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -7084,7 +7129,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(5870221221557233361, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -7099,7 +7144,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(8038805778859962068, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -7114,7 +7159,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(6577335136969723910, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -7129,7 +7174,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(595881957484758745, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -7144,7 +7189,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(3224530777258896533, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -7159,7 +7204,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(3515589146717969463, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -7168,10 +7213,15 @@ where
 /// A client handler for the UnknownInteractionsAjarProtocol protocol.
 
 pub trait UnknownInteractionsAjarProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
-    fn strict_event(&mut self);
+    fn strict_event(
+        &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarProtocol>,
+    );
 
     fn strict_event_fields(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_ajar_protocol::StrictEventFields,
@@ -7180,6 +7230,8 @@ pub trait UnknownInteractionsAjarProtocolClientHandler<___T: ::fidl_next::protoc
 
     fn strict_event_union(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_ajar_protocol::StrictEventUnion,
@@ -7188,16 +7240,23 @@ pub trait UnknownInteractionsAjarProtocolClientHandler<___T: ::fidl_next::protoc
 
     fn strict_event_table(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_ajar_protocol::StrictEventTable,
         >,
     );
 
-    fn flexible_event(&mut self);
+    fn flexible_event(
+        &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarProtocol>,
+    );
 
     fn flexible_event_fields(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_ajar_protocol::FlexibleEventFields,
@@ -7206,6 +7265,8 @@ pub trait UnknownInteractionsAjarProtocolClientHandler<___T: ::fidl_next::protoc
 
     fn flexible_event_union(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_ajar_protocol::FlexibleEventUnion,
@@ -7214,13 +7275,21 @@ pub trait UnknownInteractionsAjarProtocolClientHandler<___T: ::fidl_next::protoc
 
     fn flexible_event_table(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_ajar_protocol::FlexibleEventTable,
         >,
     );
 
-    fn handle_unknown_interaction(&mut self, ordinal: u64);
+    fn on_unknown_interaction(
+        &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsAjarProtocol>,
+        ordinal: u64,
+    ) {
+        client.close();
+    }
 }
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for UnknownInteractionsAjarProtocol
@@ -7267,47 +7336,52 @@ where
     for<'buf> crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        client: &::fidl_next::bind::Client<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             6927291151663612592 => {
-                handler.strict_event();
+                handler.strict_event(client);
             }
 
             5838220329633564521 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_fields(buffer);
+                handler.strict_event_fields(client, buffer);
             }
 
             6303151946645602671 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_union(buffer);
+                handler.strict_event_union(client, buffer);
             }
 
             659277224687564957 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_table(buffer);
+                handler.strict_event_table(client, buffer);
             }
 
             1281760452005010931 => {
-                handler.flexible_event();
+                handler.flexible_event(client);
             }
 
             4298964238728681570 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_fields(buffer);
+                handler.flexible_event_fields(client, buffer);
             }
 
             8950943792372972717 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_union(buffer);
+                handler.flexible_event_union(client, buffer);
             }
 
             705539350563403440 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_table(buffer);
+                handler.flexible_event_table(client, buffer);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(client, ordinal),
         }
     }
 }
@@ -7337,52 +7411,62 @@ where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn strict_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(6927291151663612592, &mut ())
+        self.as_untyped().send_event(6927291151663612592, &mut ())
     }
 
     fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(5838220329633564521, &mut ())
+        self.as_untyped().send_event(5838220329633564521, &mut ())
     }
 
     fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(6303151946645602671, &mut ())
+        self.as_untyped().send_event(6303151946645602671, &mut ())
     }
 
     fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(659277224687564957, &mut ())
+        self.as_untyped().send_event(659277224687564957, &mut ())
     }
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(1281760452005010931, &mut ())
+        self.as_untyped().send_event(1281760452005010931, &mut ())
     }
 
     fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(4298964238728681570, &mut ())
+        self.as_untyped().send_event(4298964238728681570, &mut ())
     }
 
     fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(8950943792372972717, &mut ())
+        self.as_untyped().send_event(8950943792372972717, &mut ())
     }
 
     fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(705539350563403440, &mut ())
+        self.as_untyped().send_event(705539350563403440, &mut ())
     }
 }
 
 /// A server handler for the UnknownInteractionsAjarProtocol protocol.
 
 pub trait UnknownInteractionsAjarProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn strict_one_way(&mut self);
+    fn strict_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+    );
 
-    fn flexible_one_way(&mut self);
+    fn flexible_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+    );
 
     fn strict_two_way(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_ajar_protocol::StrictTwoWay>,
     );
 
     fn strict_two_way_fields(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_protocol::StrictTwoWayFields,
         >,
@@ -7390,6 +7474,8 @@ pub trait UnknownInteractionsAjarProtocolServerHandler<___T: ::fidl_next::protoc
 
     fn strict_two_way_union(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_protocol::StrictTwoWayUnion,
         >,
@@ -7397,6 +7483,8 @@ pub trait UnknownInteractionsAjarProtocolServerHandler<___T: ::fidl_next::protoc
 
     fn strict_two_way_table(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_protocol::StrictTwoWayTable,
         >,
@@ -7404,6 +7492,8 @@ pub trait UnknownInteractionsAjarProtocolServerHandler<___T: ::fidl_next::protoc
 
     fn strict_two_way_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_protocol::StrictTwoWayErr,
         >,
@@ -7411,6 +7501,8 @@ pub trait UnknownInteractionsAjarProtocolServerHandler<___T: ::fidl_next::protoc
 
     fn strict_two_way_fields_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_protocol::StrictTwoWayFieldsErr,
         >,
@@ -7418,6 +7510,8 @@ pub trait UnknownInteractionsAjarProtocolServerHandler<___T: ::fidl_next::protoc
 
     fn strict_two_way_union_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_protocol::StrictTwoWayUnionErr,
         >,
@@ -7425,12 +7519,20 @@ pub trait UnknownInteractionsAjarProtocolServerHandler<___T: ::fidl_next::protoc
 
     fn strict_two_way_table_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_ajar_protocol::StrictTwoWayTableErr,
         >,
     );
 
-    fn handle_unknown_interaction(&mut self, ordinal: u64);
+    fn on_unknown_interaction(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsAjarProtocol>,
+        ordinal: u64,
+    ) {
+        server.close();
+    }
 }
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for UnknownInteractionsAjarProtocol
@@ -7438,22 +7540,28 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsAjarProtocolServerHandler<___T>,
 {
-    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             956561744635167883 => {
-                handler.strict_one_way();
+                handler.strict_one_way(server);
             }
 
             2483093178939638607 => {
-                handler.flexible_one_way();
+                handler.flexible_one_way(server);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(server, ordinal),
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -7462,52 +7570,52 @@ where
             364341676962177080 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way(responder);
+                handler.strict_two_way(server, responder);
             }
 
             1821674633227946298 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields(responder);
+                handler.strict_two_way_fields(server, responder);
             }
 
             5870221221557233361 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union(responder);
+                handler.strict_two_way_union(server, responder);
             }
 
             8038805778859962068 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table(responder);
+                handler.strict_two_way_table(server, responder);
             }
 
             6577335136969723910 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_err(responder);
+                handler.strict_two_way_err(server, responder);
             }
 
             595881957484758745 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields_err(responder);
+                handler.strict_two_way_fields_err(server, responder);
             }
 
             3224530777258896533 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union_err(responder);
+                handler.strict_two_way_union_err(server, responder);
             }
 
             3515589146717969463 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table_err(responder);
+                handler.strict_two_way_table_err(server, responder);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(server, ordinal),
         }
     }
 }
@@ -10338,7 +10446,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn strict_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(9111839835597799810, &mut ())
+        self.as_untyped().send_one_way(9111839835597799810, &mut ())
     }
 
     fn strict_two_way(
@@ -10351,7 +10459,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(2815690661228737027, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -10366,7 +10474,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(5761316743698652038, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -10381,7 +10489,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(7235351480214368636, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -10396,7 +10504,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(1839495150551777151, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -10411,7 +10519,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(4350840352076287137, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -10426,7 +10534,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(3933117456632607830, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -10441,7 +10549,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(4598950031783776653, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -10456,7 +10564,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(1456858375973362525, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -10497,9 +10605,16 @@ where
     for<'buf> crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        client: &::fidl_next::bind::Client<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                client.close();
+            }
         }
     }
 }
@@ -10520,10 +10635,15 @@ pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
     ___T: ::fidl_next::protocol::Transport,
 >
 {
-    fn strict_one_way(&mut self);
+    fn strict_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedDriverProtocol>,
+    );
 
     fn strict_two_way(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_driver_protocol::StrictTwoWay,
         >,
@@ -10531,6 +10651,8 @@ pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
 
     fn strict_two_way_fields(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_driver_protocol::StrictTwoWayFields,
         >,
@@ -10538,6 +10660,8 @@ pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
 
     fn strict_two_way_union(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_driver_protocol::StrictTwoWayUnion,
         >,
@@ -10545,6 +10669,8 @@ pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
 
     fn strict_two_way_table(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_driver_protocol::StrictTwoWayTable,
         >,
@@ -10552,6 +10678,8 @@ pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
 
     fn strict_two_way_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_driver_protocol::StrictTwoWayErr,
         >,
@@ -10559,6 +10687,8 @@ pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
 
     fn strict_two_way_fields_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_driver_protocol::StrictTwoWayFieldsErr,
         >,
@@ -10566,6 +10696,8 @@ pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
 
     fn strict_two_way_union_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_driver_protocol::StrictTwoWayUnionErr,
         >,
@@ -10573,6 +10705,8 @@ pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
 
     fn strict_two_way_table_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_driver_protocol::StrictTwoWayTableErr,
         >,
@@ -10585,18 +10719,26 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsClosedDriverProtocolServerHandler<___T>,
 {
-    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             9111839835597799810 => {
-                handler.strict_one_way();
+                handler.strict_one_way(server);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -10605,52 +10747,54 @@ where
             2815690661228737027 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way(responder);
+                handler.strict_two_way(server, responder);
             }
 
             5761316743698652038 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields(responder);
+                handler.strict_two_way_fields(server, responder);
             }
 
             7235351480214368636 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union(responder);
+                handler.strict_two_way_union(server, responder);
             }
 
             1839495150551777151 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table(responder);
+                handler.strict_two_way_table(server, responder);
             }
 
             4350840352076287137 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_err(responder);
+                handler.strict_two_way_err(server, responder);
             }
 
             3933117456632607830 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields_err(responder);
+                handler.strict_two_way_fields_err(server, responder);
             }
 
             4598950031783776653 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union_err(responder);
+                handler.strict_two_way_union_err(server, responder);
             }
 
             1456858375973362525 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table_err(responder);
+                handler.strict_two_way_table_err(server, responder);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 }
@@ -13980,7 +14124,7 @@ where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn strict_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(401526495318825508, &mut ())
+        self.as_untyped().send_one_way(401526495318825508, &mut ())
     }
 
     fn strict_two_way(
@@ -13993,7 +14137,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(6834828562275693047, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -14008,7 +14152,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(1379139029283639891, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -14023,7 +14167,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(7544414847426850727, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -14038,7 +14182,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(7947328131967870853, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -14053,7 +14197,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(5738532966428790074, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -14068,7 +14212,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(802395819586836733, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -14083,7 +14227,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(925029359463709824, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -14098,7 +14242,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(1260407702860823440, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -14107,10 +14251,15 @@ where
 /// A client handler for the UnknownInteractionsClosedProtocol protocol.
 
 pub trait UnknownInteractionsClosedProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
-    fn strict_event(&mut self);
+    fn strict_event(
+        &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsClosedProtocol>,
+    );
 
     fn strict_event_fields(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsClosedProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_closed_protocol::StrictEventFields,
@@ -14119,6 +14268,8 @@ pub trait UnknownInteractionsClosedProtocolClientHandler<___T: ::fidl_next::prot
 
     fn strict_event_union(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsClosedProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_closed_protocol::StrictEventUnion,
@@ -14127,6 +14278,8 @@ pub trait UnknownInteractionsClosedProtocolClientHandler<___T: ::fidl_next::prot
 
     fn strict_event_table(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsClosedProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_closed_protocol::StrictEventTable,
@@ -14169,28 +14322,35 @@ where
     for<'buf> crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        client: &::fidl_next::bind::Client<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             760799297757210939 => {
-                handler.strict_event();
+                handler.strict_event(client);
             }
 
             6736355582617074292 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_fields(buffer);
+                handler.strict_event_fields(client, buffer);
             }
 
             4288682345454280036 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_union(buffer);
+                handler.strict_event_union(client, buffer);
             }
 
             2871682464255309246 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_table(buffer);
+                handler.strict_event_table(client, buffer);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                client.close();
+            }
         }
     }
 }
@@ -14212,34 +14372,41 @@ where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn strict_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(760799297757210939, &mut ())
+        self.as_untyped().send_event(760799297757210939, &mut ())
     }
 
     fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(6736355582617074292, &mut ())
+        self.as_untyped().send_event(6736355582617074292, &mut ())
     }
 
     fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(4288682345454280036, &mut ())
+        self.as_untyped().send_event(4288682345454280036, &mut ())
     }
 
     fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(2871682464255309246, &mut ())
+        self.as_untyped().send_event(2871682464255309246, &mut ())
     }
 }
 
 /// A server handler for the UnknownInteractionsClosedProtocol protocol.
 
 pub trait UnknownInteractionsClosedProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn strict_one_way(&mut self);
+    fn strict_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedProtocol>,
+    );
 
     fn strict_two_way(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_closed_protocol::StrictTwoWay>,
     );
 
     fn strict_two_way_fields(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_protocol::StrictTwoWayFields,
         >,
@@ -14247,6 +14414,8 @@ pub trait UnknownInteractionsClosedProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_union(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_protocol::StrictTwoWayUnion,
         >,
@@ -14254,6 +14423,8 @@ pub trait UnknownInteractionsClosedProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_table(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_protocol::StrictTwoWayTable,
         >,
@@ -14261,6 +14432,8 @@ pub trait UnknownInteractionsClosedProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_protocol::StrictTwoWayErr,
         >,
@@ -14268,6 +14441,8 @@ pub trait UnknownInteractionsClosedProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_fields_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_protocol::StrictTwoWayFieldsErr,
         >,
@@ -14275,6 +14450,8 @@ pub trait UnknownInteractionsClosedProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_union_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_protocol::StrictTwoWayUnionErr,
         >,
@@ -14282,6 +14459,8 @@ pub trait UnknownInteractionsClosedProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_table_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsClosedProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_closed_protocol::StrictTwoWayTableErr,
         >,
@@ -14293,18 +14472,26 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsClosedProtocolServerHandler<___T>,
 {
-    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             401526495318825508 => {
-                handler.strict_one_way();
+                handler.strict_one_way(server);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -14313,52 +14500,54 @@ where
             6834828562275693047 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way(responder);
+                handler.strict_two_way(server, responder);
             }
 
             1379139029283639891 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields(responder);
+                handler.strict_two_way_fields(server, responder);
             }
 
             7544414847426850727 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union(responder);
+                handler.strict_two_way_union(server, responder);
             }
 
             7947328131967870853 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table(responder);
+                handler.strict_two_way_table(server, responder);
             }
 
             5738532966428790074 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_err(responder);
+                handler.strict_two_way_err(server, responder);
             }
 
             802395819586836733 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields_err(responder);
+                handler.strict_two_way_fields_err(server, responder);
             }
 
             925029359463709824 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union_err(responder);
+                handler.strict_two_way_union_err(server, responder);
             }
 
             1260407702860823440 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table_err(responder);
+                handler.strict_two_way_table_err(server, responder);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 }
@@ -21489,11 +21678,11 @@ where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn strict_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(6982839851953080288, &mut ())
+        self.as_untyped().send_one_way(6982839851953080288, &mut ())
     }
 
     fn flexible_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(1083620022582160398, &mut ())
+        self.as_untyped().send_one_way(1083620022582160398, &mut ())
     }
 
     fn strict_two_way(
@@ -21506,7 +21695,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(1481114722667499972, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21521,7 +21710,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(6841797014773573215, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21536,7 +21725,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(1451514501977162287, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21551,7 +21740,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(3330693085881435529, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21566,7 +21755,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(8222960355260037542, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21581,7 +21770,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(225387363174180470, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21596,7 +21785,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(3066880266580913088, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21611,7 +21800,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(708169949929096689, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21626,7 +21815,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(2929398860738426482, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21641,7 +21830,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(8423663794424433896, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21656,7 +21845,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(8216450897182897849, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21671,7 +21860,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(1049265954148894210, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21686,7 +21875,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(5583489590753947170, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21701,7 +21890,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(6033174601748665003, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21716,7 +21905,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(6235121653537390575, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21731,7 +21920,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(940887795361350656, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -21740,7 +21929,13 @@ where
 /// A client handler for the UnknownInteractionsDriverProtocol protocol.
 
 pub trait UnknownInteractionsDriverProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
-    fn handle_unknown_interaction(&mut self, ordinal: u64);
+    fn on_unknown_interaction(
+        &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsDriverProtocol>,
+        ordinal: u64,
+    ) {
+        client.close();
+    }
 }
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for UnknownInteractionsDriverProtocol
@@ -21793,9 +21988,14 @@ where
     for<'buf> crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        client: &::fidl_next::bind::Client<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(client, ordinal),
         }
     }
 }
@@ -21813,17 +22013,27 @@ where
 /// A server handler for the UnknownInteractionsDriverProtocol protocol.
 
 pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn strict_one_way(&mut self);
+    fn strict_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+    );
 
-    fn flexible_one_way(&mut self);
+    fn flexible_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+    );
 
     fn strict_two_way(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_driver_protocol::StrictTwoWay>,
     );
 
     fn strict_two_way_fields(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::StrictTwoWayFields,
         >,
@@ -21831,6 +22041,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_union(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::StrictTwoWayUnion,
         >,
@@ -21838,6 +22050,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_table(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::StrictTwoWayTable,
         >,
@@ -21845,6 +22059,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::StrictTwoWayErr,
         >,
@@ -21852,6 +22068,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_fields_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::StrictTwoWayFieldsErr,
         >,
@@ -21859,6 +22077,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_union_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::StrictTwoWayUnionErr,
         >,
@@ -21866,6 +22086,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn strict_two_way_table_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::StrictTwoWayTableErr,
         >,
@@ -21873,6 +22095,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn flexible_two_way(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::FlexibleTwoWay,
         >,
@@ -21880,6 +22104,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn flexible_two_way_fields(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::FlexibleTwoWayFields,
         >,
@@ -21887,6 +22113,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn flexible_two_way_union(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::FlexibleTwoWayUnion,
         >,
@@ -21894,6 +22122,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn flexible_two_way_table(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::FlexibleTwoWayTable,
         >,
@@ -21901,6 +22131,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn flexible_two_way_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::FlexibleTwoWayErr,
         >,
@@ -21908,6 +22140,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn flexible_two_way_fields_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::FlexibleTwoWayFieldsErr,
         >,
@@ -21915,6 +22149,8 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn flexible_two_way_union_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::FlexibleTwoWayUnionErr,
         >,
@@ -21922,12 +22158,20 @@ pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::prot
 
     fn flexible_two_way_table_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_driver_protocol::FlexibleTwoWayTableErr,
         >,
     );
 
-    fn handle_unknown_interaction(&mut self, ordinal: u64);
+    fn on_unknown_interaction(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsDriverProtocol>,
+        ordinal: u64,
+    ) {
+        server.close();
+    }
 }
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for UnknownInteractionsDriverProtocol
@@ -21935,22 +22179,28 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsDriverProtocolServerHandler<___T>,
 {
-    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             6982839851953080288 => {
-                handler.strict_one_way();
+                handler.strict_one_way(server);
             }
 
             1083620022582160398 => {
-                handler.flexible_one_way();
+                handler.flexible_one_way(server);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(server, ordinal),
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -21959,100 +22209,100 @@ where
             1481114722667499972 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way(responder);
+                handler.strict_two_way(server, responder);
             }
 
             6841797014773573215 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields(responder);
+                handler.strict_two_way_fields(server, responder);
             }
 
             1451514501977162287 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union(responder);
+                handler.strict_two_way_union(server, responder);
             }
 
             3330693085881435529 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table(responder);
+                handler.strict_two_way_table(server, responder);
             }
 
             8222960355260037542 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_err(responder);
+                handler.strict_two_way_err(server, responder);
             }
 
             225387363174180470 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields_err(responder);
+                handler.strict_two_way_fields_err(server, responder);
             }
 
             3066880266580913088 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union_err(responder);
+                handler.strict_two_way_union_err(server, responder);
             }
 
             708169949929096689 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table_err(responder);
+                handler.strict_two_way_table_err(server, responder);
             }
 
             2929398860738426482 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way(responder);
+                handler.flexible_two_way(server, responder);
             }
 
             8423663794424433896 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_fields(responder);
+                handler.flexible_two_way_fields(server, responder);
             }
 
             8216450897182897849 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_union(responder);
+                handler.flexible_two_way_union(server, responder);
             }
 
             1049265954148894210 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_table(responder);
+                handler.flexible_two_way_table(server, responder);
             }
 
             5583489590753947170 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_err(responder);
+                handler.flexible_two_way_err(server, responder);
             }
 
             6033174601748665003 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_fields_err(responder);
+                handler.flexible_two_way_fields_err(server, responder);
             }
 
             6235121653537390575 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_union_err(responder);
+                handler.flexible_two_way_union_err(server, responder);
             }
 
             940887795361350656 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_table_err(responder);
+                handler.flexible_two_way_table_err(server, responder);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(server, ordinal),
         }
     }
 }
@@ -30079,11 +30329,11 @@ where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn strict_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(5652707722400962470, &mut ())
+        self.as_untyped().send_one_way(5652707722400962470, &mut ())
     }
 
     fn flexible_one_way(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_one_way(583422011583300678, &mut ())
+        self.as_untyped().send_one_way(583422011583300678, &mut ())
     }
 
     fn strict_two_way(
@@ -30092,7 +30342,7 @@ where
         ::fidl_next::bind::ResponseFuture<'_, ___T, unknown_interactions_protocol::StrictTwoWay>,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(8308184097687583042, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30107,7 +30357,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(3697260130745060067, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30122,7 +30372,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(2455165891480464557, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30137,7 +30387,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(8389853739594228663, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30148,7 +30398,7 @@ where
         ::fidl_next::bind::ResponseFuture<'_, ___T, unknown_interactions_protocol::StrictTwoWayErr>,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(7862264614495172967, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30163,7 +30413,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(2414673307948662059, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30178,7 +30428,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(4988571416540160202, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30193,7 +30443,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(5487292735562672344, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30204,7 +30454,7 @@ where
         ::fidl_next::bind::ResponseFuture<'_, ___T, unknown_interactions_protocol::FlexibleTwoWay>,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(334879577560091516, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30219,7 +30469,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(4257018954691721778, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30234,7 +30484,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(4913460516188409782, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30249,7 +30499,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(9171907422498283911, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30264,7 +30514,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(6999736795697216519, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30279,7 +30529,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(1093132337162001157, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30294,7 +30544,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(2410151523245950935, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30309,7 +30559,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(7893309626427980786, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -30318,10 +30568,15 @@ where
 /// A client handler for the UnknownInteractionsProtocol protocol.
 
 pub trait UnknownInteractionsProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
-    fn strict_event(&mut self);
+    fn strict_event(
+        &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsProtocol>,
+    );
 
     fn strict_event_fields(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_protocol::StrictEventFields,
@@ -30330,6 +30585,8 @@ pub trait UnknownInteractionsProtocolClientHandler<___T: ::fidl_next::protocol::
 
     fn strict_event_union(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_protocol::StrictEventUnion,
@@ -30338,16 +30595,23 @@ pub trait UnknownInteractionsProtocolClientHandler<___T: ::fidl_next::protocol::
 
     fn strict_event_table(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_protocol::StrictEventTable,
         >,
     );
 
-    fn flexible_event(&mut self);
+    fn flexible_event(
+        &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsProtocol>,
+    );
 
     fn flexible_event_fields(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_protocol::FlexibleEventFields,
@@ -30356,6 +30620,8 @@ pub trait UnknownInteractionsProtocolClientHandler<___T: ::fidl_next::protocol::
 
     fn flexible_event_union(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_protocol::FlexibleEventUnion,
@@ -30364,13 +30630,21 @@ pub trait UnknownInteractionsProtocolClientHandler<___T: ::fidl_next::protocol::
 
     fn flexible_event_table(
         &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<
             ___T,
             unknown_interactions_protocol::FlexibleEventTable,
         >,
     );
 
-    fn handle_unknown_interaction(&mut self, ordinal: u64);
+    fn on_unknown_interaction(
+        &mut self,
+        client: &::fidl_next::bind::Client<___T, UnknownInteractionsProtocol>,
+        ordinal: u64,
+    ) {
+        client.close();
+    }
 }
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for UnknownInteractionsProtocol
@@ -30441,47 +30715,52 @@ where
     for<'buf> crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        client: &::fidl_next::bind::Client<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             685715276307386305 => {
-                handler.strict_event();
+                handler.strict_event(client);
             }
 
             8896208255987935026 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_fields(buffer);
+                handler.strict_event_fields(client, buffer);
             }
 
             3919175221694221274 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_union(buffer);
+                handler.strict_event_union(client, buffer);
             }
 
             2711448698318579984 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.strict_event_table(buffer);
+                handler.strict_event_table(client, buffer);
             }
 
             7042257263728687206 => {
-                handler.flexible_event();
+                handler.flexible_event(client);
             }
 
             3613822014516746241 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_fields(buffer);
+                handler.flexible_event_fields(client, buffer);
             }
 
             2499446536152409191 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_union(buffer);
+                handler.flexible_event_union(client, buffer);
             }
 
             5724881371349617120 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.flexible_event_table(buffer);
+                handler.flexible_event_table(client, buffer);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(client, ordinal),
         }
     }
 }
@@ -30511,72 +30790,90 @@ where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn strict_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(685715276307386305, &mut ())
+        self.as_untyped().send_event(685715276307386305, &mut ())
     }
 
     fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(8896208255987935026, &mut ())
+        self.as_untyped().send_event(8896208255987935026, &mut ())
     }
 
     fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(3919175221694221274, &mut ())
+        self.as_untyped().send_event(3919175221694221274, &mut ())
     }
 
     fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(2711448698318579984, &mut ())
+        self.as_untyped().send_event(2711448698318579984, &mut ())
     }
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(7042257263728687206, &mut ())
+        self.as_untyped().send_event(7042257263728687206, &mut ())
     }
 
     fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(3613822014516746241, &mut ())
+        self.as_untyped().send_event(3613822014516746241, &mut ())
     }
 
     fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(2499446536152409191, &mut ())
+        self.as_untyped().send_event(2499446536152409191, &mut ())
     }
 
     fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(5724881371349617120, &mut ())
+        self.as_untyped().send_event(5724881371349617120, &mut ())
     }
 }
 
 /// A server handler for the UnknownInteractionsProtocol protocol.
 
 pub trait UnknownInteractionsProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn strict_one_way(&mut self);
+    fn strict_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+    );
 
-    fn flexible_one_way(&mut self);
+    fn flexible_one_way(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+    );
 
     fn strict_two_way(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_protocol::StrictTwoWay>,
     );
 
     fn strict_two_way_fields(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_protocol::StrictTwoWayFields>,
     );
 
     fn strict_two_way_union(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_protocol::StrictTwoWayUnion>,
     );
 
     fn strict_two_way_table(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_protocol::StrictTwoWayTable>,
     );
 
     fn strict_two_way_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_protocol::StrictTwoWayErr>,
     );
 
     fn strict_two_way_fields_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_protocol::StrictTwoWayFieldsErr,
         >,
@@ -30584,6 +30881,8 @@ pub trait UnknownInteractionsProtocolServerHandler<___T: ::fidl_next::protocol::
 
     fn strict_two_way_union_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_protocol::StrictTwoWayUnionErr,
         >,
@@ -30591,6 +30890,8 @@ pub trait UnknownInteractionsProtocolServerHandler<___T: ::fidl_next::protocol::
 
     fn strict_two_way_table_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_protocol::StrictTwoWayTableErr,
         >,
@@ -30598,11 +30899,15 @@ pub trait UnknownInteractionsProtocolServerHandler<___T: ::fidl_next::protocol::
 
     fn flexible_two_way(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_protocol::FlexibleTwoWay>,
     );
 
     fn flexible_two_way_fields(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_protocol::FlexibleTwoWayFields,
         >,
@@ -30610,21 +30915,29 @@ pub trait UnknownInteractionsProtocolServerHandler<___T: ::fidl_next::protocol::
 
     fn flexible_two_way_union(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_protocol::FlexibleTwoWayUnion>,
     );
 
     fn flexible_two_way_table(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_protocol::FlexibleTwoWayTable>,
     );
 
     fn flexible_two_way_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<unknown_interactions_protocol::FlexibleTwoWayErr>,
     );
 
     fn flexible_two_way_fields_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_protocol::FlexibleTwoWayFieldsErr,
         >,
@@ -30632,6 +30945,8 @@ pub trait UnknownInteractionsProtocolServerHandler<___T: ::fidl_next::protocol::
 
     fn flexible_two_way_union_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_protocol::FlexibleTwoWayUnionErr,
         >,
@@ -30639,12 +30954,20 @@ pub trait UnknownInteractionsProtocolServerHandler<___T: ::fidl_next::protocol::
 
     fn flexible_two_way_table_err(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             unknown_interactions_protocol::FlexibleTwoWayTableErr,
         >,
     );
 
-    fn handle_unknown_interaction(&mut self, ordinal: u64);
+    fn on_unknown_interaction(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, UnknownInteractionsProtocol>,
+        ordinal: u64,
+    ) {
+        server.close();
+    }
 }
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for UnknownInteractionsProtocol
@@ -30652,22 +30975,28 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: UnknownInteractionsProtocolServerHandler<___T>,
 {
-    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             5652707722400962470 => {
-                handler.strict_one_way();
+                handler.strict_one_way(server);
             }
 
             583422011583300678 => {
-                handler.flexible_one_way();
+                handler.flexible_one_way(server);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(server, ordinal),
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -30676,100 +31005,100 @@ where
             8308184097687583042 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way(responder);
+                handler.strict_two_way(server, responder);
             }
 
             3697260130745060067 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields(responder);
+                handler.strict_two_way_fields(server, responder);
             }
 
             2455165891480464557 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union(responder);
+                handler.strict_two_way_union(server, responder);
             }
 
             8389853739594228663 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table(responder);
+                handler.strict_two_way_table(server, responder);
             }
 
             7862264614495172967 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_err(responder);
+                handler.strict_two_way_err(server, responder);
             }
 
             2414673307948662059 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_fields_err(responder);
+                handler.strict_two_way_fields_err(server, responder);
             }
 
             4988571416540160202 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_union_err(responder);
+                handler.strict_two_way_union_err(server, responder);
             }
 
             5487292735562672344 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_two_way_table_err(responder);
+                handler.strict_two_way_table_err(server, responder);
             }
 
             334879577560091516 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way(responder);
+                handler.flexible_two_way(server, responder);
             }
 
             4257018954691721778 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_fields(responder);
+                handler.flexible_two_way_fields(server, responder);
             }
 
             4913460516188409782 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_union(responder);
+                handler.flexible_two_way_union(server, responder);
             }
 
             9171907422498283911 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_table(responder);
+                handler.flexible_two_way_table(server, responder);
             }
 
             6999736795697216519 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_err(responder);
+                handler.flexible_two_way_err(server, responder);
             }
 
             1093132337162001157 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_fields_err(responder);
+                handler.flexible_two_way_fields_err(server, responder);
             }
 
             2410151523245950935 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_union_err(responder);
+                handler.flexible_two_way_union_err(server, responder);
             }
 
             7893309626427980786 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_two_way_table_err(responder);
+                handler.flexible_two_way_table_err(server, responder);
             }
 
-            ordinal => handler.handle_unknown_interaction(ordinal),
+            ordinal => handler.on_unknown_interaction(server, ordinal),
         }
     }
 }

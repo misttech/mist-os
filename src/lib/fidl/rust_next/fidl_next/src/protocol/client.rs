@@ -32,13 +32,6 @@ pub struct Client<T: Transport> {
 }
 
 impl<T: Transport> Client<T> {
-    /// Creates a new client and dispatcher from a transport.
-    pub fn new(transport: T) -> (Self, ClientDispatcher<T>) {
-        let (sender, receiver) = transport.split();
-        let shared = Arc::new(Shared::new());
-        (Self { shared: shared.clone(), sender }, ClientDispatcher { shared, receiver })
-    }
-
     /// Closes the channel from the client end.
     pub fn close(&self) {
         T::close(&self.sender);
@@ -194,25 +187,37 @@ pub trait ClientHandler<T: Transport> {
     /// The dispatcher cannot handle more messages until `on_event` completes. If `on_event` may
     /// block, perform asynchronous work, or take a long time to process a message, it should
     /// offload work to an async task.
-    fn on_event(&mut self, ordinal: u64, buffer: T::RecvBuffer);
+    fn on_event(&mut self, client: &Client<T>, ordinal: u64, buffer: T::RecvBuffer);
 }
 
 /// A dispatcher for a client endpoint.
 ///
 /// It must be actively polled to receive events and two-way message responses.
 pub struct ClientDispatcher<T: Transport> {
-    shared: Arc<Shared<T>>,
+    client: Client<T>,
     receiver: T::Receiver,
 }
 
 impl<T: Transport> ClientDispatcher<T> {
+    /// Creates a new client and dispatcher from a transport.
+    pub fn new(transport: T) -> Self {
+        let (sender, receiver) = transport.split();
+        let shared = Arc::new(Shared::new());
+        Self { client: Client { shared, sender }, receiver }
+    }
+
+    /// Returns the client for the dispatcher.
+    pub fn client(&self) -> &Client<T> {
+        &self.client
+    }
+
     /// Runs the dispatcher with the provided handler.
     pub async fn run<H>(&mut self, mut handler: H) -> Result<(), DispatcherError<T::Error>>
     where
         H: ClientHandler<T>,
     {
         let result = self.run_to_completion(&mut handler).await;
-        self.shared.responses.lock().unwrap().wake_all();
+        self.client.shared.responses.lock().unwrap().wake_all();
 
         result
     }
@@ -230,9 +235,9 @@ impl<T: Transport> ClientDispatcher<T> {
             let (txid, ordinal) =
                 decode_header::<T>(&mut buffer).map_err(DispatcherError::InvalidMessageHeader)?;
             if txid == 0 {
-                handler.on_event(ordinal, buffer);
+                handler.on_event(&self.client, ordinal, buffer);
             } else {
-                let mut responses = self.shared.responses.lock().unwrap();
+                let mut responses = self.client.shared.responses.lock().unwrap();
                 let locker = responses
                     .get(txid - 1)
                     .ok_or_else(|| DispatcherError::UnrequestedResponse(txid))?;

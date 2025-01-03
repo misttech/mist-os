@@ -12,26 +12,26 @@ use crate::protocol::{self, DispatcherError, Transport};
 use super::{ClientEnd, Method, ResponseBuffer};
 
 /// A strongly typed client.
+#[repr(transparent)]
 pub struct Client<T: Transport, P> {
     client: protocol::Client<T>,
     _protocol: PhantomData<P>,
 }
 
 impl<T: Transport, P> Client<T, P> {
-    /// Creates a new client and dispatcher from a client end.
-    pub fn new(client_end: ClientEnd<T, P>) -> (Self, ClientDispatcher<T, P>) {
-        let (client, dispatcher) = protocol::Client::new(client_end.into_untyped());
-        (Self::from_untyped(client), ClientDispatcher::from_untyped(dispatcher))
-    }
-
-    /// Creates a new strongly typed client from an untyped client.
-    pub fn from_untyped(client: protocol::Client<T>) -> Self {
-        Self { client, _protocol: PhantomData }
+    /// Wraps an untyped client reference, returning a typed client reference.
+    pub fn wrap_untyped(client: &protocol::Client<T>) -> &Self {
+        unsafe { &*(client as *const protocol::Client<T>).cast() }
     }
 
     /// Returns the underlying untyped client.
-    pub fn untyped(&self) -> &protocol::Client<T> {
+    pub fn as_untyped(&self) -> &protocol::Client<T> {
         &self.client
+    }
+
+    /// Closes the channel from the client end.
+    pub fn close(&self) {
+        self.as_untyped().close();
     }
 }
 
@@ -42,9 +42,9 @@ impl<T: Transport, P> Clone for Client<T, P> {
 }
 
 /// A protocol which supports clients.
-pub trait ClientProtocol<T: Transport, H> {
+pub trait ClientProtocol<T: Transport, H>: Sized {
     /// Handles a received client event with the given handler.
-    fn on_event(handler: &mut H, ordinal: u64, buffer: T::RecvBuffer);
+    fn on_event(handler: &mut H, client: &Client<T, Self>, ordinal: u64, buffer: T::RecvBuffer);
 }
 
 /// An adapter for a client protocol handler.
@@ -65,8 +65,8 @@ where
     T: Transport,
     P: ClientProtocol<T, H>,
 {
-    fn on_event(&mut self, ordinal: u64, buffer: T::RecvBuffer) {
-        P::on_event(&mut self.handler, ordinal, buffer)
+    fn on_event(&mut self, client: &protocol::Client<T>, ordinal: u64, buffer: T::RecvBuffer) {
+        P::on_event(&mut self.handler, Client::wrap_untyped(client), ordinal, buffer)
     }
 }
 
@@ -77,6 +77,19 @@ pub struct ClientDispatcher<T: Transport, P> {
 }
 
 impl<T: Transport, P> ClientDispatcher<T, P> {
+    /// Creates a new client dispatcher from a client end.
+    pub fn new(client_end: ClientEnd<T, P>) -> ClientDispatcher<T, P> {
+        Self {
+            dispatcher: protocol::ClientDispatcher::new(client_end.into_untyped()),
+            _protocol: PhantomData,
+        }
+    }
+
+    /// Returns the client for the dispatcher.
+    pub fn client(&self) -> &Client<T, P> {
+        Client::wrap_untyped(self.dispatcher.client())
+    }
+
     /// Creates a new client dispathcer from an untyped client dispatcher.
     pub fn from_untyped(dispatcher: protocol::ClientDispatcher<T>) -> Self {
         Self { dispatcher, _protocol: PhantomData }

@@ -5970,7 +5970,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(6628358876445129155, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -5985,7 +5985,7 @@ where
         >,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(7588545459451501794, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -6006,9 +6006,16 @@ where
     for<'buf> crate::WireTestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        client: &::fidl_next::bind::Client<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                client.close();
+            }
         }
     }
 }
@@ -6026,6 +6033,8 @@ impl<___T> TestProtocolServer<___T> for ::fidl_next::bind::Server<___T, TestProt
 pub trait TestProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_union_hence_response_may_be_stack_allocated(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, TestProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             test_protocol::StrictUnionHenceResponseMayBeStackAllocated,
         >,
@@ -6033,6 +6042,8 @@ pub trait TestProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
 
     fn flexible_union_hence_response_must_be_heap_allocated(
         &mut self,
+        server: &::fidl_next::bind::Server<___T, TestProtocol>,
+
         responder: ::fidl_next::bind::Responder<
             test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated,
         >,
@@ -6044,14 +6055,22 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: TestProtocolServerHandler<___T>,
 {
-    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -6060,16 +6079,18 @@ where
             6628358876445129155 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.strict_union_hence_response_may_be_stack_allocated(responder);
+                handler.strict_union_hence_response_may_be_stack_allocated(server, responder);
             }
 
             7588545459451501794 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.flexible_union_hence_response_must_be_heap_allocated(responder);
+                handler.flexible_union_hence_response_must_be_heap_allocated(server, responder);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 }

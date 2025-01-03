@@ -36,7 +36,7 @@ where
         &self,
     ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, top::GetFoo>, ::fidl_next::EncodeError>
     {
-        self.untyped()
+        self.as_untyped()
             .send_two_way(4619180266423108403, &mut ())
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
@@ -54,9 +54,16 @@ where
     for<'buf> fidl_next_test_middle::WireMiddleGetFooResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        client: &::fidl_next::bind::Client<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                client.close();
+            }
         }
     }
 }
@@ -72,7 +79,12 @@ impl<___T> TopServer<___T> for ::fidl_next::bind::Server<___T, Top> where
 /// A server handler for the Top protocol.
 
 pub trait TopServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn get_foo(&mut self, responder: ::fidl_next::bind::Responder<top::GetFoo>);
+    fn get_foo(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, Top>,
+
+        responder: ::fidl_next::bind::Responder<top::GetFoo>,
+    );
 }
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for Top
@@ -80,14 +92,22 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: TopServerHandler<___T>,
 {
-    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -96,10 +116,12 @@ where
             4619180266423108403 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.get_foo(responder);
+                handler.get_foo(server, responder);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 }

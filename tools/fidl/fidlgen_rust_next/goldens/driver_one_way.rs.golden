@@ -228,7 +228,7 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireOneWaySendRequest>,
     {
-        self.untyped().send_one_way(7942965975761529343, request)
+        self.as_untyped().send_one_way(7942965975761529343, request)
     }
 }
 
@@ -241,9 +241,16 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: OneWayClientHandler<___T>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        client: &::fidl_next::bind::Client<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                client.close();
+            }
         }
     }
 }
@@ -259,7 +266,12 @@ impl<___T> OneWayServer<___T> for ::fidl_next::bind::Server<___T, OneWay> where
 /// A server handler for the OneWay protocol.
 
 pub trait OneWayServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn send(&mut self, request: ::fidl_next::bind::RequestBuffer<___T, one_way::Send>);
+    fn send(
+        &mut self,
+        server: &::fidl_next::bind::Server<___T, OneWay>,
+
+        request: ::fidl_next::bind::RequestBuffer<___T, one_way::Send>,
+    );
 }
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for OneWay
@@ -270,25 +282,35 @@ where
     for<'buf> crate::WireOneWaySendRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             7942965975761529343 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.send(buffer);
+                handler.send(server, buffer);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 
     fn on_two_way(
         handler: &mut ___H,
+        server: &::fidl_next::bind::Server<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                server.close();
+            }
         }
     }
 }

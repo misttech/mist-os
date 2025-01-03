@@ -21,12 +21,6 @@ pub struct Server<T: Transport> {
 }
 
 impl<T: Transport> Server<T> {
-    /// Creates a new server and dispatcher from a transport.
-    pub fn new(transport: T) -> (Self, ServerDispatcher<T>) {
-        let (sender, receiver) = transport.split();
-        (Self { sender }, ServerDispatcher { receiver })
-    }
-
     /// Closes the channel from the server end.
     pub fn close(&self) {
         T::close(&self.sender);
@@ -77,22 +71,40 @@ pub trait ServerHandler<T: Transport> {
     /// The dispatcher cannot handle more messages until `on_one_way` completes. If `on_one_way` may
     /// block, perform asynchronous work, or take a long time to process a message, it should
     /// offload work to an async task.
-    fn on_one_way(&mut self, ordinal: u64, buffer: T::RecvBuffer);
+    fn on_one_way(&mut self, server: &Server<T>, ordinal: u64, buffer: T::RecvBuffer);
 
     /// Handles a received two-way server message.
     ///
     /// The dispatcher cannot handle more messages until `on_two_way` completes. If `on_two_way` may
     /// block, perform asynchronous work, or take a long time to process a message, it should
     /// offload work to an async task.
-    fn on_two_way(&mut self, ordinal: u64, buffer: T::RecvBuffer, responder: Responder);
+    fn on_two_way(
+        &mut self,
+        server: &Server<T>,
+        ordinal: u64,
+        buffer: T::RecvBuffer,
+        responder: Responder,
+    );
 }
 
 /// A dispatcher for a server endpoint.
 pub struct ServerDispatcher<T: Transport> {
+    server: Server<T>,
     receiver: T::Receiver,
 }
 
 impl<T: Transport> ServerDispatcher<T> {
+    /// Creates a new server and dispatcher from a transport.
+    pub fn new(transport: T) -> Self {
+        let (sender, receiver) = transport.split();
+        Self { server: Server { sender }, receiver }
+    }
+
+    /// Returns the server for the dispatcher.
+    pub fn server(&self) -> &Server<T> {
+        &self.server
+    }
+
     /// Runs the dispatcher with the provided handler.
     pub async fn run<H>(&mut self, mut handler: H) -> Result<(), DispatcherError<T::Error>>
     where
@@ -104,9 +116,9 @@ impl<T: Transport> ServerDispatcher<T> {
             let (txid, ordinal) =
                 decode_header::<T>(&mut buffer).map_err(DispatcherError::InvalidMessageHeader)?;
             if let Some(txid) = NonZeroU32::new(txid) {
-                handler.on_two_way(ordinal, buffer, Responder { txid });
+                handler.on_two_way(&self.server, ordinal, buffer, Responder { txid });
             } else {
-                handler.on_one_way(ordinal, buffer);
+                handler.on_one_way(&self.server, ordinal, buffer);
             }
         }
 

@@ -16,20 +16,19 @@ pub struct Server<T: Transport, P> {
 }
 
 impl<T: Transport, P> Server<T, P> {
-    /// Creates a new server and dispatcher from a server end.
-    pub fn new(server_end: ServerEnd<T, P>) -> (Self, ServerDispatcher<T, P>) {
-        let (server, dispatcher) = protocol::Server::new(server_end.into_untyped());
-        (Self::from_untyped(server), ServerDispatcher::from_untyped(dispatcher))
-    }
-
-    /// Creates a new strongly typed server from an untyped server.
-    pub fn from_untyped(server: protocol::Server<T>) -> Self {
-        Self { server, _protocol: PhantomData }
+    /// Wraps an untyped server reference, returning a typed server reference.
+    pub fn wrap_untyped(client: &protocol::Server<T>) -> &Self {
+        unsafe { &*(client as *const protocol::Server<T>).cast() }
     }
 
     /// Returns the underlying untyped server.
-    pub fn untyped(&self) -> &protocol::Server<T> {
+    pub fn as_untyped(&self) -> &protocol::Server<T> {
         &self.server
+    }
+
+    /// Closes the channel from the server end.
+    pub fn close(&self) {
+        self.as_untyped().close();
     }
 }
 
@@ -40,13 +39,14 @@ impl<T: Transport, P> Clone for Server<T, P> {
 }
 
 /// A protocol which supports servers.
-pub trait ServerProtocol<T: Transport, H> {
+pub trait ServerProtocol<T: Transport, H>: Sized {
     /// Handles a received server one-way message with the given handler.
-    fn on_one_way(handler: &mut H, ordinal: u64, buffer: T::RecvBuffer);
+    fn on_one_way(handler: &mut H, server: &Server<T, Self>, ordinal: u64, buffer: T::RecvBuffer);
 
     /// Handles a received server two-way message with the given handler.
     fn on_two_way(
         handler: &mut H,
+        server: &Server<T, Self>,
         ordinal: u64,
         buffer: T::RecvBuffer,
         responder: protocol::Responder,
@@ -71,17 +71,18 @@ where
     T: Transport,
     P: ServerProtocol<T, H>,
 {
-    fn on_one_way(&mut self, ordinal: u64, buffer: T::RecvBuffer) {
-        P::on_one_way(&mut self.handler, ordinal, buffer)
+    fn on_one_way(&mut self, server: &protocol::Server<T>, ordinal: u64, buffer: T::RecvBuffer) {
+        P::on_one_way(&mut self.handler, Server::wrap_untyped(server), ordinal, buffer)
     }
 
     fn on_two_way(
         &mut self,
+        server: &protocol::Server<T>,
         ordinal: u64,
         buffer: <T as Transport>::RecvBuffer,
         responder: protocol::Responder,
     ) {
-        P::on_two_way(&mut self.handler, ordinal, buffer, responder)
+        P::on_two_way(&mut self.handler, Server::wrap_untyped(server), ordinal, buffer, responder)
     }
 }
 
@@ -92,6 +93,17 @@ pub struct ServerDispatcher<T: Transport, P> {
 }
 
 impl<T: Transport, P> ServerDispatcher<T, P> {
+    /// Creates a new server dispatcher from a server end.
+    pub fn new(server_end: ServerEnd<T, P>) -> ServerDispatcher<T, P> {
+        let dispatcher = protocol::ServerDispatcher::new(server_end.into_untyped());
+        Self { dispatcher, _protocol: PhantomData }
+    }
+
+    /// Returns the server for the dispatcher.
+    pub fn server(&self) -> &Server<T, P> {
+        Server::wrap_untyped(self.dispatcher.server())
+    }
+
     /// Creates a new server dispathcer from an untyped server dispatcher.
     pub fn from_untyped(dispatcher: protocol::ServerDispatcher<T>) -> Self {
         Self { dispatcher, _protocol: PhantomData }
@@ -130,6 +142,6 @@ impl<M> Responder<M> {
         M: Method<Protocol = P>,
         for<'buf> R: Encode<T::Encoder<'buf>, Encoded<'buf> = M::Response<'buf>>,
     {
-        server.untyped().send_response(self.responder, M::ORDINAL, response)
+        server.as_untyped().send_response(self.responder, M::ORDINAL, response)
     }
 }
