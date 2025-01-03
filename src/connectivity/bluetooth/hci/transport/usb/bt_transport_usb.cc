@@ -38,10 +38,6 @@
 // The maximum HCI ACL frame size used for data transactions
 #define ACL_MAX_FRAME_SIZE 1028  // (1024 + 4 bytes for the ACL header)
 
-// TODO(https://fxbug.dev/42171484): move these to hw/usb.h (or hw/bluetooth.h if that exists)
-#define USB_SUBCLASS_BLUETOOTH 1
-#define USB_PROTOCOL_BLUETOOTH 1
-
 namespace bt_transport_usb {
 namespace fhbt = fuchsia_hardware_bluetooth;
 namespace {
