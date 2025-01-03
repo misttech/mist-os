@@ -137,7 +137,10 @@ impl RealmProxyClient {
         }
 
         Ok(T::Proxy::from_member_opener(Box::new(
-            fuchsia_component::client::ServiceInstanceDirectory(client.into_proxy()),
+            fuchsia_component::client::ServiceInstanceDirectory(
+                client.into_proxy(),
+                instance.to_owned(),
+            ),
         )))
     }
 }

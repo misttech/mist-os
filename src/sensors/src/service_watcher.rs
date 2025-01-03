@@ -18,21 +18,13 @@ pub(crate) async fn watch_service_directory(
 ) -> Result<(), Error> {
     let mut watcher = sensor_service.watch().await?;
     while let Ok(Some(instance)) = watcher.try_next().await {
-        let instance_name = &instance.name;
+        let instance_name = instance.instance_name();
         log::info!("Found new sensor service provider: {}", instance_name);
-        let driver_proxy: DriverProxy = if let Ok(service_proxy) = instance.connect().await {
-            let driver_proxy_res = service_proxy.connect_to_driver();
-            if let Ok(proxy) = driver_proxy_res {
-                proxy
-            } else {
-                log::error!("Failed to connect to driver instance: {:#?}", driver_proxy_res);
-                continue;
-            }
+        let driver_proxy_res = instance.connect_to_driver();
+        let driver_proxy: DriverProxy = if let Ok(proxy) = driver_proxy_res {
+            proxy
         } else {
-            log::error!(
-                "Failed to connect to service instance. Skipping instance: {}",
-                instance_name
-            );
+            log::error!("Failed to connect to driver instance: {:#?}", driver_proxy_res);
             continue;
         };
         let mut sm = manager.lock().await;

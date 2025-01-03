@@ -156,7 +156,10 @@ impl LocalComponentHandles {
             fio::Flags::empty(),
         )?;
         Ok(S::Proxy::from_member_opener(Box::new(
-            fuchsia_component::client::ServiceInstanceDirectory(directory_proxy),
+            fuchsia_component::client::ServiceInstanceDirectory(
+                directory_proxy,
+                instance_name.to_owned(),
+            ),
         )))
     }
 

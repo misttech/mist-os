@@ -319,6 +319,9 @@ pub trait MemberOpener {
     /// Opens a member protocol of a FIDL service by name, serving that protocol
     /// on the given channel.
     fn open_member(&self, member: &str, server_end: Channel) -> Result<(), Error>;
+
+    /// Returns the name of the instance that was opened.
+    fn instance_name(&self) -> &str;
 }
 
 /// Utility that spawns a new task to handle requests of a particular type, requiring a

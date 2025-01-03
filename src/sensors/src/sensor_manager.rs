@@ -268,7 +268,8 @@ impl SensorManager {
         // playback is configured and exit early if it is not.
         svc.watch().await?;
 
-        fuchsia_async::Task::spawn(async move {
+        let svc = fclient::Service::open(driver_fidl::ServiceMarker)?;
+        fuchsia_async::Task::local(async move {
             if let Err(e) = watch_service_directory(svc, manager).await {
                 log::error!("Failed to open sensor service! Error: {:#?}", e);
             }

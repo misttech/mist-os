@@ -701,7 +701,11 @@ impl fidl::endpoints::ServiceProxy for EmptyServiceProxy {
 }
 
 #[cfg(target_os = "fuchsia")]
-impl EmptyServiceProxy {}
+impl EmptyServiceProxy {
+    pub fn instance_name(&self) -> &str {
+        self.0.instance_name()
+    }
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct MultiHeterogeneousMemberServiceMarker;
@@ -808,6 +812,10 @@ impl MultiHeterogeneousMemberServiceProxy {
         server_end: fidl::endpoints::ServerEnd<SecondProtocolMarker>,
     ) -> Result<(), fidl::Error> {
         self.0.open_member("second_member", server_end.into_channel())
+    }
+
+    pub fn instance_name(&self) -> &str {
+        self.0.instance_name()
     }
 }
 
@@ -917,6 +925,10 @@ impl MultiHomogeneousMemberServiceProxy {
     ) -> Result<(), fidl::Error> {
         self.0.open_member("second_member", server_end.into_channel())
     }
+
+    pub fn instance_name(&self) -> &str {
+        self.0.instance_name()
+    }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -992,6 +1004,10 @@ impl SingleMemberServiceProxy {
         server_end: fidl::endpoints::ServerEnd<FirstProtocolMarker>,
     ) -> Result<(), fidl::Error> {
         self.0.open_member("single_member", server_end.into_channel())
+    }
+
+    pub fn instance_name(&self) -> &str {
+        self.0.instance_name()
     }
 }
 

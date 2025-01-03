@@ -419,9 +419,6 @@ impl TestEnv {
             .watch_for_any()
             .await
             .unwrap()
-            .connect()
-            .await
-            .unwrap()
     }
 
     /// Destroys the TestEnv and underlying RealmInstance.

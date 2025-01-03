@@ -26,13 +26,10 @@ async fn test_sample_driver() -> Result<()> {
         .driver_test_realm_start(RealmArgs { dtr_exposes: Some(dtr_exposes), ..Default::default() })
         .await?;
 
-    let parent_service =
-        Service::open_from_dir(instance.root.get_exposed_dir(), i2c::ServiceMarker)?
-            .watch_for_any()
-            .await?
-            .connect()
-            .await?;
-    let client = parent_service.connect_to_device()?;
+    let client = Service::open_from_dir(instance.root.get_exposed_dir(), i2c::ServiceMarker)?
+        .watch_for_any()
+        .await?
+        .connect_to_device()?;
     let device_name = client.get_name().await?.unwrap();
 
     println!("device name: {device_name}");
