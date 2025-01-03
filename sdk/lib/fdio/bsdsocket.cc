@@ -20,7 +20,6 @@
 #include <cstdarg>
 #include <mutex>
 
-#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/unique_fd.h>
 
@@ -181,7 +180,7 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
 
   fdio_state_t& gstate = fdio_global_state();
   std::optional reservation = [&]() -> std::optional<std::pair<int, void (fdio_slot::*)()>> {
-    const fbl::AutoLock lock(&gstate.lock);
+    std::lock_guard lock(gstate.lock);
     for (int i = 0; i < FDIO_MAX_FD; ++i) {
       std::optional cleanup = gstate.fdtab[i].try_reserve();
       if (cleanup.has_value()) {
@@ -196,7 +195,7 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
   auto [nfd, cleanup_getter] = reservation.value();
   // Lambdas are not allowed to reference local bindings.
   auto release = fit::defer([&, nfd = nfd, cleanup_getter = cleanup_getter]() {
-    const fbl::AutoLock lock(&gstate.lock);
+    std::lock_guard lock(gstate.lock);
     (gstate.fdtab[nfd].*cleanup_getter)();
   });
 
@@ -254,7 +253,7 @@ int accept4(int fd, struct sockaddr* __restrict addr, socklen_t* __restrict addr
     accepted_io->ioflag() |= IOFLAG_CLOEXEC;
   }
 
-  const fbl::AutoLock lock(&gstate.lock);
+  std::lock_guard lock(gstate.lock);
   if (gstate.fdtab[nfd].try_fill(accepted_io)) {
     return nfd;
   }

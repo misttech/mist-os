@@ -40,7 +40,6 @@
 #include <utility>
 #include <variant>
 
-#include <fbl/auto_lock.h>
 #include <fbl/string_buffer.h>
 #include <safemath/checked_math.h>
 
@@ -202,7 +201,7 @@ fdio_ptr fdio_iodir(int dirfd, std::string_view& in_out_path) {
     }
   }
   fdio_state_t& gstate = fdio_global_state();
-  const fbl::AutoLock lock(&gstate.lock);
+  std::lock_guard lock(gstate.lock);
   if (root) {
     return gstate.root.get();
   }
@@ -631,7 +630,7 @@ extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle
 extern "C" __EXPORT void __libc_extensions_fini(void) __TA_NO_THREAD_SAFETY_ANALYSIS {
   fdio_state_t& gstate = fdio_global_state();
 
-  mtx_lock(&gstate.lock);
+  gstate.lock.lock();
   [[maybe_unused]] auto root = gstate.root.release();
   [[maybe_unused]] auto cwd = gstate.cwd.release();
   for (auto& var : gstate.fdtab) {
@@ -646,7 +645,7 @@ __EXPORT
 zx_status_t fdio_ns_get_installed(fdio_ns_t** ns) {
   fdio_state_t& gstate = fdio_global_state();
 
-  const fbl::AutoLock lock(&gstate.lock);
+  std::lock_guard lock(gstate.lock);
   if (gstate.ns == nullptr) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -874,7 +873,7 @@ int dup2(int oldfd, int newfd) {
   {
     fdio_state_t& gstate = fdio_global_state();
 
-    const fbl::AutoLock lock(&gstate.lock);
+    std::lock_guard lock(gstate.lock);
     const fdio_ptr io = gstate.fd_to_io_locked(oldfd);
     if (io == nullptr) {
       return ERRNO(EBADF);
@@ -888,7 +887,7 @@ __EXPORT
 int dup(int oldfd) {
   fdio_state_t& gstate = fdio_global_state();
 
-  const fbl::AutoLock lock(&gstate.lock);
+  std::lock_guard lock(gstate.lock);
   const fdio_ptr io = gstate.fd_to_io_locked(oldfd);
   if (io == nullptr) {
     return ERRNO(EBADF);
@@ -938,7 +937,7 @@ int fcntl(int fd, int cmd, ...) {
       if (starting_fd < 0) {
         return ERRNO(EINVAL);
       }
-      const fbl::AutoLock lock(&gstate.lock);
+      std::lock_guard lock(gstate.lock);
       const fdio_ptr io = gstate.fd_to_io_locked(fd);
       if (io == nullptr) {
         return ERRNO(EBADF);
@@ -1299,7 +1298,7 @@ char* realpath(const char* __restrict filename, char* __restrict resolved) {
     // Convert 'filename' from a relative path to an absolute path.
     {
       fdio_state_t& gstate = fdio_global_state();
-      const fbl::AutoLock cwd_lock(&gstate.cwd_lock);
+      std::lock_guard cwd_lock(gstate.cwd_lock);
       if (gstate.cwd_path.length() + 1 + filename_view.length() >= PATH_MAX) {
         errno = ENAMETOOLONG;
         return nullptr;
@@ -1408,7 +1407,7 @@ int socketpair_create(int fd[2], uint32_t options, int flags) {
   size_t n = 0;
 
   fdio_state_t& gstate = fdio_global_state();
-  const fbl::AutoLock lock(&gstate.lock);
+  std::lock_guard lock(gstate.lock);
   for (int i = 0; i < static_cast<int>(gstate.fdtab.size()); ++i) {
     if (gstate.fdtab[i].try_set(ios[n])) {
       fd[n] = i;
@@ -1518,7 +1517,7 @@ char* getcwd(char* buf, size_t size) {
   char* out = nullptr;
   {
     fdio_state_t& gstate = fdio_global_state();
-    const fbl::AutoLock lock(&gstate.cwd_lock);
+    std::lock_guard lock(gstate.cwd_lock);
     const size_t len = gstate.cwd_path.length() + 1;  // +1 to include null-terminating character
 
     // |size| is inclusive of null-terminating character.
@@ -1538,9 +1537,9 @@ char* getcwd(char* buf, size_t size) {
 
 void fdio_chdir(fdio_ptr io, const char* path) {
   fdio_state_t& gstate = fdio_global_state();
-  const fbl::AutoLock cwd_lock(&gstate.cwd_lock);
+  std::lock_guard cwd_lock(gstate.cwd_lock);
   fdio_internal::update_cwd_path(gstate.cwd_path, path);
-  const fbl::AutoLock lock(&gstate.lock);
+  std::lock_guard lock(gstate.lock);
   gstate.cwd.replace(std::move(io));
 }
 
@@ -1564,7 +1563,7 @@ bool resolve_path(const char* relative, fdio_internal::PathBuffer* out_resolved)
   fdio_internal::PathBuffer buffer;
   {
     fdio_state_t& gstate = fdio_global_state();
-    const fbl::AutoLock cwd_lock(&gstate.cwd_lock);
+    std::lock_guard cwd_lock(gstate.cwd_lock);
     buffer.Append(gstate.cwd_path);
   }
   const size_t cwd_length = buffer.length();
@@ -1603,8 +1602,8 @@ int chroot(const char* path) {
     // |fdio_internal::open| operation, then we could end up in an inconsistent state, but the only
     // inconsistency would be the name we apply to the cwd session in the new chrooted namespace.
     fdio_state_t& gstate = fdio_global_state();
-    const fbl::AutoLock cwd_lock(&gstate.cwd_lock);
-    const fbl::AutoLock lock(&gstate.lock);
+    std::lock_guard cwd_lock(gstate.cwd_lock);
+    std::lock_guard lock(gstate.lock);
 
     const zx_status_t status = fdio_ns_set_root(gstate.ns, io.value().get());
     if (status != ZX_OK) {
@@ -1631,7 +1630,7 @@ int chroot(const char* path) {
 }
 
 struct __dirstream {
-  mtx_t lock;
+  std::mutex lock;
 
   // fd number of the directory under iteration.
   int fd;
@@ -1648,7 +1647,6 @@ namespace {
 
 DIR* internal_opendir(int fd) {
   DIR* dir = new __dirstream;
-  mtx_init(&dir->lock, mtx_plain);
   dir->fd = fd;
   return dir;
 }
@@ -1712,7 +1710,7 @@ zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr& io) {
 
 __EXPORT
 struct dirent* readdir(DIR* dir) {
-  const fbl::AutoLock lock(&dir->lock);
+  std::lock_guard lock(dir->lock);
   struct dirent* de = &dir->de;
 
   const fdio_ptr io = fdio_global_state().fd_to_io(dir->fd);
@@ -1767,7 +1765,7 @@ struct dirent* readdir(DIR* dir) {
 
 __EXPORT
 void rewinddir(DIR* dir) {
-  const fbl::AutoLock lock(&dir->lock);
+  std::lock_guard lock(dir->lock);
   const fdio_ptr io = fdio_global_state().fd_to_io(dir->fd);
 
   // Always try to initialize and rewind the directory stream. If a client were to create |dir| via
@@ -1815,7 +1813,7 @@ __EXPORT
 mode_t umask(mode_t mask) {
   fdio_state_t& gstate = fdio_global_state();
   mode_t oldmask;
-  const fbl::AutoLock lock(&gstate.lock);
+  std::lock_guard lock(gstate.lock);
   oldmask = gstate.umask;
   gstate.umask = mask & 0777;
   return oldmask;

@@ -9,8 +9,6 @@
 
 #include <variant>
 
-#include <fbl/auto_lock.h>
-
 #include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/internal.h"
@@ -74,7 +72,7 @@ int fdio_bind_to_fd(fdio_t* io, int fd, int starting_fd) {
   fdio_ptr io_to_close = nullptr;
   {
     fdio_state_t& gstate = fdio_global_state();
-    fbl::AutoLock lock(&gstate.lock);
+    std::lock_guard lock(gstate.lock);
     if (fd < 0) {
       // A negative fd implies that any free fd value can be used
       // TODO: bitmap, ffs, etc
@@ -120,7 +118,7 @@ __EXPORT
 size_t fdio_currently_allocated_fd_count(void) {
   size_t count = 0;
   fdio_state_t& gstate = fdio_global_state();
-  fbl::AutoLock lock(&gstate.lock);
+  std::lock_guard lock(gstate.lock);
   for (size_t fd = 0; fd < FDIO_MAX_FD; ++fd) {
     if (gstate.fdtab[fd].allocated()) {
       ++count;

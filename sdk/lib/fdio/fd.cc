@@ -7,8 +7,6 @@
 
 #include <variant>
 
-#include <fbl/auto_lock.h>
-
 #include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/internal.h"
 
@@ -30,7 +28,7 @@ __EXPORT
 zx_status_t fdio_cwd_clone(zx_handle_t* out_handle) {
   fdio_ptr cwd = []() {
     fdio_state_t& gstate = fdio_global_state();
-    fbl::AutoLock lock(&gstate.lock);
+    std::lock_guard lock(gstate.lock);
     return gstate.cwd.get();
   }();
   return cwd->clone(out_handle);

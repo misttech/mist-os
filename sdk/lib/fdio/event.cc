@@ -11,8 +11,6 @@
 #include <sys/eventfd.h>
 #include <zircon/assert.h>
 
-#include <fbl/auto_lock.h>
-
 #include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/zxio.h"
@@ -28,7 +26,7 @@ struct fdio_event_t {
 
   zx::event handle;
 
-  mtx_t lock;
+  std::mutex lock;
   eventfd_t value __TA_GUARDED(lock);
   int flags __TA_GUARDED(lock);
 };
@@ -63,7 +61,7 @@ zx_status_t fdio_event_readv(zxio_t* io, const zx_iovec_t* vector, size_t vector
 
   fdio_event_t* event = reinterpret_cast<fdio_event_t*>(io);
 
-  fbl::AutoLock lock(&event->lock);
+  std::lock_guard lock(event->lock);
   if (event->value == 0u) {
     return ZX_ERR_SHOULD_WAIT;
   }
@@ -100,7 +98,7 @@ zx_status_t fdio_event_writev(zxio_t* io, const zx_iovec_t* vector, size_t vecto
 
   fdio_event_t* event = reinterpret_cast<fdio_event_t*>(io);
 
-  fbl::AutoLock lock(&event->lock);
+  std::lock_guard lock(event->lock);
   uint64_t new_value = 0u;
   if (add_overflow(event->value, increment, &new_value) || new_value == UINT64_MAX) {
     // If we overflow, we need to block until the next read, which means we need to clear the
@@ -199,7 +197,7 @@ int eventfd(unsigned int initval, int flags) {
   };
   zxio_init(&event->io, &fdio_event_ops);
   {
-    fbl::AutoLock lock(&event->lock);
+    std::lock_guard lock(event->lock);
     fdio_event_update_signals(event);
   }
 

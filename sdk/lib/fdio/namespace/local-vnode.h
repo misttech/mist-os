@@ -18,7 +18,6 @@
 #include <utility>
 
 #include <fbl/intrusive_wavl_tree.h>
-#include <fbl/mutex.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
