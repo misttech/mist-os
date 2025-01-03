@@ -77,7 +77,7 @@ pub trait {{ client_trait_name }}<___T: ::fidl_next::protocol::Transport> {
                         &self,
                         request: &mut ___R,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<
+                        ::fidl_next::bind::ResponseFuture<
                             '_,
                             ___T,
                             {{ module_name }}::{{ method_type_name }},
@@ -93,7 +93,7 @@ pub trait {{ client_trait_name }}<___T: ::fidl_next::protocol::Transport> {
                     fn {{ method_name }}(
                         &self,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<
+                        ::fidl_next::bind::ResponseFuture<
                             '_,
                             ___T,
                             {{ module_name }}::{{ method_type_name }},
@@ -130,13 +130,13 @@ where
                             Encoded<'buf> = {{ context.wire_type(request) }},
                         >,
                     {
-                        self.untyped().send_request({{ method.ordinal }}, request)
+                        self.untyped().send_one_way({{ method.ordinal }}, request)
                     }
                 {% else %}
                     fn {{ method_name }}(
                         &self,
                     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-                        self.untyped().send_request({{ method.ordinal }}, &mut ())
+                        self.untyped().send_one_way({{ method.ordinal }}, &mut ())
                     }
                 {% endif %}
             {% when ProtocolMethodKind::TwoWay %}
@@ -145,7 +145,7 @@ where
                         &self,
                         request: &mut ___R,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
+                        ::fidl_next::bind::ResponseFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
                         ::fidl_next::EncodeError,
                     >
                     where
@@ -154,18 +154,18 @@ where
                             Encoded<'buf> = {{ context.wire_type(request) }},
                         >,
                     {
-                        self.untyped().send_transaction({{ method.ordinal }}, request)
-                            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+                        self.untyped().send_two_way({{ method.ordinal }}, request)
+                            .map(::fidl_next::bind::ResponseFuture::from_untyped)
                     }
                 {% else %}
                     fn {{ method_name }}(
                         &self,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
+                        ::fidl_next::bind::ResponseFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
                         ::fidl_next::EncodeError,
                     > {
-                        self.untyped().send_transaction({{ method.ordinal }}, &mut ())
-                            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+                        self.untyped().send_two_way({{ method.ordinal }}, &mut ())
+                            .map(::fidl_next::bind::ResponseFuture::from_untyped)
                     }
                 {% endif %}
             {% when ProtocolMethodKind::Event %}
@@ -373,7 +373,7 @@ where
         {% endif %}
     {% endfor %}
 {
-    fn on_event(
+    fn on_one_way(
         handler: &mut ___H,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
@@ -400,10 +400,10 @@ where
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {

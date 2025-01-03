@@ -477,10 +477,7 @@ pub trait ExampleClient<___T: ::fidl_next::protocol::Transport> {
     fn foo<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, example::Foo>,
-        ::fidl_next::EncodeError,
-    >
+    ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, example::Foo>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
             ___T::Encoder<'buf>,
@@ -495,10 +492,7 @@ where
     fn foo<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, example::Foo>,
-        ::fidl_next::EncodeError,
-    >
+    ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, example::Foo>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R: ::fidl_next::Encode<
             ___T::Encoder<'buf>,
@@ -506,8 +500,8 @@ where
         >,
     {
         self.untyped()
-            .send_transaction(1107623248440401476, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(1107623248440401476, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 }
 
@@ -556,16 +550,16 @@ where
     for<'buf> crate::WireExampleFooRequest<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
         match ordinal {
             ordinal => todo!(),
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {

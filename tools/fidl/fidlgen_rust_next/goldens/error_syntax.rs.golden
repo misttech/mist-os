@@ -514,7 +514,7 @@ pub trait ExampleUseOfErrorSyntaxClient<___T: ::fidl_next::protocol::Transport> 
                         &self,
                         request: &mut ___R,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<
+                        ::fidl_next::bind::ResponseFuture<
                             '_,
                             ___T,
                             example_use_of_error_syntax::ComposedCallWhichMayFail,
@@ -531,11 +531,7 @@ pub trait ExampleUseOfErrorSyntaxClient<___T: ::fidl_next::protocol::Transport> 
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
-            '_,
-            ___T,
-            example_use_of_error_syntax::CallWhichMayFail,
-        >,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, example_use_of_error_syntax::CallWhichMayFail>,
         ::fidl_next::EncodeError,
     >
     where
@@ -554,7 +550,7 @@ where
                         &self,
                         request: &mut ___R,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<'_, ___T, example_use_of_error_syntax::ComposedCallWhichMayFail>,
+                        ::fidl_next::bind::ResponseFuture<'_, ___T, example_use_of_error_syntax::ComposedCallWhichMayFail>,
                         ::fidl_next::EncodeError,
                     >
                     where
@@ -564,19 +560,15 @@ where
                         >,
                     {
         self.untyped()
-            .send_transaction(3565108794310607393, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(3565108794310607393, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn call_which_may_fail<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
-            '_,
-            ___T,
-            example_use_of_error_syntax::CallWhichMayFail,
-        >,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, example_use_of_error_syntax::CallWhichMayFail>,
         ::fidl_next::EncodeError,
     >
     where
@@ -586,8 +578,8 @@ where
         >,
     {
         self.untyped()
-            .send_transaction(3757408930698888354, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(3757408930698888354, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 }
 
@@ -660,16 +652,16 @@ where
     for<'buf> crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
         match ordinal {
             ordinal => todo!(),
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {

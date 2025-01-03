@@ -41,11 +41,11 @@ impl<T: Transport, P> Clone for Server<T, P> {
 
 /// A protocol which supports servers.
 pub trait ServerProtocol<T: Transport, H> {
-    /// Handles a received server event with the given handler.
-    fn on_event(handler: &mut H, ordinal: u64, buffer: T::RecvBuffer);
+    /// Handles a received server one-way message with the given handler.
+    fn on_one_way(handler: &mut H, ordinal: u64, buffer: T::RecvBuffer);
 
-    /// Handles a received server transaction with the given handler.
-    fn on_transaction(
+    /// Handles a received server two-way message with the given handler.
+    fn on_two_way(
         handler: &mut H,
         ordinal: u64,
         buffer: T::RecvBuffer,
@@ -71,17 +71,17 @@ where
     T: Transport,
     P: ServerProtocol<T, H>,
 {
-    fn on_event(&mut self, ordinal: u64, buffer: T::RecvBuffer) {
-        P::on_event(&mut self.handler, ordinal, buffer)
+    fn on_one_way(&mut self, ordinal: u64, buffer: T::RecvBuffer) {
+        P::on_one_way(&mut self.handler, ordinal, buffer)
     }
 
-    fn on_transaction(
+    fn on_two_way(
         &mut self,
         ordinal: u64,
         buffer: <T as Transport>::RecvBuffer,
         responder: protocol::Responder,
     ) {
-        P::on_transaction(&mut self.handler, ordinal, buffer, responder)
+        P::on_two_way(&mut self.handler, ordinal, buffer, responder)
     }
 }
 

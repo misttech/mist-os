@@ -4,7 +4,7 @@
 
 use crate::{u32_le, u64_le, Decode, DecodeError, Encodable, Encode, EncodeError, IntoBytes, Slot};
 
-/// A transactional FIDL message header
+/// A FIDL protocol message header
 #[derive(Clone, Copy, Debug, IntoBytes)]
 #[repr(C)]
 pub struct WireMessageHeader {

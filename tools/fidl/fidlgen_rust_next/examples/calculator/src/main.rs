@@ -8,9 +8,7 @@ use fidl_next::bind::{
 use fidl_next::protocol::mpsc::Mpsc;
 use fidl_next::protocol::Transport;
 use fidl_next_examples_calculator::{
-    calculator, calculator_add_result, Calculator, CalculatorAddRequest, CalculatorAddResponse,
-    CalculatorAddResult, CalculatorClient as _, CalculatorClientHandler, CalculatorDivideResponse,
-    CalculatorDivideResult, CalculatorServerHandler, DivisionError,
+    calculator, Calculator, CalculatorClientHandler, CalculatorServerHandler,
 };
 use fuchsia_async::{Scope, Task};
 
@@ -40,6 +38,9 @@ impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer<T> {
         let server = self.server.clone();
         self.scope.spawn(async move {
             let request = request.decode().expect("failed to decode add message");
+
+            use fidl_next_examples_calculator::{CalculatorAddResponse, CalculatorAddResult};
+
             let mut response =
                 CalculatorAddResult::Response(CalculatorAddResponse { sum: request.a + request.b });
             responder.respond(&server, &mut response).unwrap().await.unwrap();
@@ -54,6 +55,11 @@ impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer<T> {
         let server = self.server.clone();
         self.scope.spawn(async move {
             let request = request.decode().expect("failed to decode message");
+
+            use fidl_next_examples_calculator::{
+                CalculatorDivideResponse, CalculatorDivideResult, DivisionError,
+            };
+
             let mut response = if request.divisor != 0 {
                 CalculatorDivideResult::Response(CalculatorDivideResponse {
                     quotient: request.dividend / request.divisor,
@@ -90,6 +96,10 @@ async fn main() {
     let server_task = Task::spawn(async move {
         server_dispatcher.run(MyCalculatorServer { server, scope: Scope::new() }).await.unwrap();
     });
+
+    use fidl_next_examples_calculator::{
+        calculator_add_result, CalculatorAddRequest, CalculatorClient as _,
+    };
 
     let mut buffer = client.add(&mut CalculatorAddRequest { a: 16, b: 26 }).unwrap().await.unwrap();
     let result = buffer.decode().unwrap();

@@ -136,7 +136,7 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireParentFirstRequest>,
     {
-        self.untyped().send_request(3973163707930985819, request)
+        self.untyped().send_one_way(3973163707930985819, request)
     }
 }
 
@@ -178,7 +178,7 @@ where
     for<'buf> crate::WireParentFirstRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
         match ordinal {
             3973163707930985819 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
@@ -189,10 +189,10 @@ where
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
@@ -355,7 +355,7 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireParentFirstRequest>,
     {
-        self.untyped().send_request(3973163707930985819, request)
+        self.untyped().send_one_way(3973163707930985819, request)
     }
 
     fn second<___R>(
@@ -366,7 +366,7 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireChildSecondRequest>,
     {
-        self.untyped().send_request(2545123272820824165, request)
+        self.untyped().send_one_way(2545123272820824165, request)
     }
 }
 
@@ -413,7 +413,7 @@ where
     for<'buf> crate::WireChildSecondRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
         match ordinal {
             3973163707930985819 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
@@ -429,10 +429,10 @@ where
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {

@@ -9,7 +9,7 @@ use core::num::NonZeroU32;
 use crate::protocol::{decode_header, encode_header, DispatcherError, Transport};
 use crate::{Encode, EncodeError, EncoderExt as _};
 
-/// A responder for a transactional request.
+/// A responder for a two-way message.
 #[must_use]
 pub struct Responder {
     txid: NonZeroU32,
@@ -47,7 +47,7 @@ impl<T: Transport> Server<T> {
         Ok(T::send(&self.sender, buffer))
     }
 
-    /// Send a response to a transactional request.
+    /// Send a response to a two-way message.
     pub fn send_response<M>(
         &self,
         responder: Responder,
@@ -72,19 +72,19 @@ impl<T: Transport> Clone for Server<T> {
 
 /// A type which handles incoming events for a server.
 pub trait ServerHandler<T: Transport> {
-    /// Handles a received server event.
+    /// Handles a received one-way server message.
     ///
-    /// The dispatcher cannot handle more messages until `on_event` completes. If `on_event` may
+    /// The dispatcher cannot handle more messages until `on_one_way` completes. If `on_one_way` may
     /// block, perform asynchronous work, or take a long time to process a message, it should
     /// offload work to an async task.
-    fn on_event(&mut self, ordinal: u64, buffer: T::RecvBuffer);
+    fn on_one_way(&mut self, ordinal: u64, buffer: T::RecvBuffer);
 
-    /// Handles a received server transaction.
+    /// Handles a received two-way server message.
     ///
-    /// The dispatcher cannot handle more messages until `on_event` completes. If `on_event` may
+    /// The dispatcher cannot handle more messages until `on_two_way` completes. If `on_two_way` may
     /// block, perform asynchronous work, or take a long time to process a message, it should
     /// offload work to an async task.
-    fn on_transaction(&mut self, ordinal: u64, buffer: T::RecvBuffer, responder: Responder);
+    fn on_two_way(&mut self, ordinal: u64, buffer: T::RecvBuffer, responder: Responder);
 }
 
 /// A dispatcher for a server endpoint.
@@ -104,9 +104,9 @@ impl<T: Transport> ServerDispatcher<T> {
             let (txid, ordinal) =
                 decode_header::<T>(&mut buffer).map_err(DispatcherError::InvalidMessageHeader)?;
             if let Some(txid) = NonZeroU32::new(txid) {
-                handler.on_transaction(ordinal, buffer, Responder { txid });
+                handler.on_two_way(ordinal, buffer, Responder { txid });
             } else {
-                handler.on_event(ordinal, buffer);
+                handler.on_one_way(ordinal, buffer);
             }
         }
 

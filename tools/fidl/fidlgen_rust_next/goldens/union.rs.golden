@@ -5936,7 +5936,7 @@ pub trait TestProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn strict_union_hence_response_may_be_stack_allocated(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
+        ::fidl_next::bind::ResponseFuture<
             '_,
             ___T,
             test_protocol::StrictUnionHenceResponseMayBeStackAllocated,
@@ -5947,7 +5947,7 @@ pub trait TestProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn flexible_union_hence_response_must_be_heap_allocated(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
+        ::fidl_next::bind::ResponseFuture<
             '_,
             ___T,
             test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated,
@@ -5963,7 +5963,7 @@ where
     fn strict_union_hence_response_may_be_stack_allocated(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
+        ::fidl_next::bind::ResponseFuture<
             '_,
             ___T,
             test_protocol::StrictUnionHenceResponseMayBeStackAllocated,
@@ -5971,14 +5971,14 @@ where
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(6628358876445129155, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(6628358876445129155, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn flexible_union_hence_response_must_be_heap_allocated(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
+        ::fidl_next::bind::ResponseFuture<
             '_,
             ___T,
             test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated,
@@ -5986,8 +5986,8 @@ where
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(7588545459451501794, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(7588545459451501794, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 }
 
@@ -6044,16 +6044,16 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: TestProtocolServerHandler<___T>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
         match ordinal {
             ordinal => todo!(),
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {

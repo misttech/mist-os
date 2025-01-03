@@ -91,20 +91,20 @@ impl<T: Transport, P> ClientDispatcher<T, P> {
     }
 }
 
-/// A strongly typed transaction future.
-pub struct TransactionFuture<'a, T: Transport, M> {
-    future: protocol::TransactionFuture<'a, T>,
+/// A strongly typed response future.
+pub struct ResponseFuture<'a, T: Transport, M> {
+    future: protocol::ResponseFuture<'a, T>,
     _method: PhantomData<M>,
 }
 
-impl<'a, T: Transport, M> TransactionFuture<'a, T, M> {
-    /// Returns a strongly typed `TransactionFuture` wrapping the given transaction future.
-    pub fn from_untyped(future: protocol::TransactionFuture<'a, T>) -> Self {
+impl<'a, T: Transport, M> ResponseFuture<'a, T, M> {
+    /// Creates a new response future from an untyped response future.
+    pub fn from_untyped(future: protocol::ResponseFuture<'a, T>) -> Self {
         Self { future, _method: PhantomData }
     }
 }
 
-impl<T, M> Future for TransactionFuture<'_, T, M>
+impl<T, M> Future for ResponseFuture<'_, T, M>
 where
     T: Transport,
     M: Method,

@@ -6094,7 +6094,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayBasic>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6104,7 +6104,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn error_basic(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorBasic>,
         ::fidl_next::EncodeError,
     >;
 
@@ -6120,7 +6120,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayCompound>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6130,7 +6130,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn error_compound(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorCompound>,
         ::fidl_next::EncodeError,
     >;
 
@@ -6146,7 +6146,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayArrayBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayArrayBasic>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6156,7 +6156,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn error_array_basic(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorArrayBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorArrayBasic>,
         ::fidl_next::EncodeError,
     >;
 
@@ -6174,7 +6174,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayArrayCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayArrayCompound>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6186,7 +6186,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn error_array_compound(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorArrayCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorArrayCompound>,
         ::fidl_next::EncodeError,
     >;
 
@@ -6202,7 +6202,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayVectorBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayVectorBasic>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6212,7 +6212,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn error_vector_basic(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorVectorBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorVectorBasic>,
         ::fidl_next::EncodeError,
     >;
 
@@ -6230,7 +6230,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayVectorCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayVectorCompound>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6242,7 +6242,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn error_vector_compound(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorVectorCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorVectorCompound>,
         ::fidl_next::EncodeError,
     >;
 
@@ -6260,7 +6260,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayVectorOptional>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayVectorOptional>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6272,7 +6272,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn error_vector_optional(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorVectorOptional>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorVectorOptional>,
         ::fidl_next::EncodeError,
     >;
 
@@ -6290,7 +6290,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayArrayVectorNested>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayArrayVectorNested>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6302,7 +6302,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn error_array_vector_nested(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorArrayVectorNested>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorArrayVectorNested>,
         ::fidl_next::EncodeError,
     >;
 
@@ -6318,7 +6318,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayResource>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayResource>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6328,7 +6328,7 @@ pub trait ProtocolClient<___T: ::fidl_next::protocol::Transport> {
     fn error_resource(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorResource>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorResource>,
         ::fidl_next::EncodeError,
     >;
 }
@@ -6345,14 +6345,14 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic<'buf>>,
     {
-        self.untyped().send_request(8948968077914418681, request)
+        self.untyped().send_one_way(8948968077914418681, request)
     }
 
     fn two_way_basic<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayBasic>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6360,19 +6360,19 @@ where
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic<'buf>>,
     {
         self.untyped()
-            .send_transaction(2331618702752598159, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(2331618702752598159, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn error_basic(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorBasic>,
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(5016634351643393939, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(5016634351643393939, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_compound<___R>(
@@ -6383,14 +6383,14 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound<'buf>>,
     {
-        self.untyped().send_request(3153289648860022476, request)
+        self.untyped().send_one_way(3153289648860022476, request)
     }
 
     fn two_way_compound<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayCompound>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6398,19 +6398,19 @@ where
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound<'buf>>,
     {
         self.untyped()
-            .send_transaction(8787219719097524529, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(8787219719097524529, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn error_compound(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorCompound>,
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(2990809657626249085, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(2990809657626249085, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_array_basic<___R>(
@@ -6421,14 +6421,14 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic<'buf>>,
     {
-        self.untyped().send_request(7125516817014311449, request)
+        self.untyped().send_one_way(7125516817014311449, request)
     }
 
     fn two_way_array_basic<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayArrayBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayArrayBasic>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6436,19 +6436,19 @@ where
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic<'buf>>,
     {
         self.untyped()
-            .send_transaction(5309034178175279380, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(5309034178175279380, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn error_array_basic(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorArrayBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorArrayBasic>,
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(1084731895342694265, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(1084731895342694265, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_array_compound<___R>(
@@ -6461,14 +6461,14 @@ where
             Encoded<'buf> = crate::WireArrayCompound<'buf>,
         >,
     {
-        self.untyped().send_request(5064659223443251357, request)
+        self.untyped().send_one_way(5064659223443251357, request)
     }
 
     fn two_way_array_compound<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayArrayCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayArrayCompound>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6478,19 +6478,19 @@ where
         >,
     {
         self.untyped()
-            .send_transaction(849744466051983995, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(849744466051983995, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn error_array_compound(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorArrayCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorArrayCompound>,
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(5919277476782807556, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(5919277476782807556, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_vector_basic<___R>(
@@ -6501,14 +6501,14 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic<'buf>>,
     {
-        self.untyped().send_request(5733220720079947351, request)
+        self.untyped().send_one_way(5733220720079947351, request)
     }
 
     fn two_way_vector_basic<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayVectorBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayVectorBasic>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6516,19 +6516,19 @@ where
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic<'buf>>,
     {
         self.untyped()
-            .send_transaction(8674156353091415668, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(8674156353091415668, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn error_vector_basic(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorVectorBasic>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorVectorBasic>,
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(875941614196965234, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(875941614196965234, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_vector_compound<___R>(
@@ -6541,14 +6541,14 @@ where
             Encoded<'buf> = crate::WireVectorCompound<'buf>,
         >,
     {
-        self.untyped().send_request(1853985797298830992, request)
+        self.untyped().send_one_way(1853985797298830992, request)
     }
 
     fn two_way_vector_compound<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayVectorCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayVectorCompound>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6558,19 +6558,19 @@ where
         >,
     {
         self.untyped()
-            .send_transaction(3968024057912959924, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(3968024057912959924, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn error_vector_compound(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorVectorCompound>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorVectorCompound>,
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(8506780203315865989, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(8506780203315865989, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_vector_optional<___R>(
@@ -6583,14 +6583,14 @@ where
             Encoded<'buf> = crate::WireVectorOptional<'buf>,
         >,
     {
-        self.untyped().send_request(1530215841195476271, request)
+        self.untyped().send_one_way(1530215841195476271, request)
     }
 
     fn two_way_vector_optional<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayVectorOptional>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayVectorOptional>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6600,19 +6600,19 @@ where
         >,
     {
         self.untyped()
-            .send_transaction(1030024737742222323, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(1030024737742222323, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn error_vector_optional(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorVectorOptional>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorVectorOptional>,
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(6406191217027936606, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(6406191217027936606, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_array_vector_nested<___R>(
@@ -6625,14 +6625,14 @@ where
             Encoded<'buf> = crate::WireArrayVectorNested<'buf>,
         >,
     {
-        self.untyped().send_request(5912603762133524183, request)
+        self.untyped().send_one_way(5912603762133524183, request)
     }
 
     fn two_way_array_vector_nested<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayArrayVectorNested>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayArrayVectorNested>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6642,19 +6642,19 @@ where
         >,
     {
         self.untyped()
-            .send_transaction(5351275678438791132, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(5351275678438791132, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn error_array_vector_nested(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorArrayVectorNested>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorArrayVectorNested>,
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(9085604921605802151, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(9085604921605802151, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_resource<___R>(
@@ -6665,14 +6665,14 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource<'buf>>,
     {
-        self.untyped().send_request(6553996787849601058, request)
+        self.untyped().send_one_way(6553996787849601058, request)
     }
 
     fn two_way_resource<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::TwoWayResource>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::TwoWayResource>,
         ::fidl_next::EncodeError,
     >
     where
@@ -6680,19 +6680,19 @@ where
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource<'buf>>,
     {
         self.untyped()
-            .send_transaction(1802709005492464987, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(1802709005492464987, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn error_resource(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, protocol::ErrorResource>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, protocol::ErrorResource>,
         ::fidl_next::EncodeError,
     > {
         self.untyped()
-            .send_transaction(6568609240497354166, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+            .send_two_way(6568609240497354166, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 }
 
@@ -7143,7 +7143,7 @@ where
     for<'buf> crate::WireResource<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
         match ordinal {
             8948968077914418681 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
@@ -7194,10 +7194,10 @@ where
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
