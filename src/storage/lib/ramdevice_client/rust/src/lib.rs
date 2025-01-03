@@ -5,16 +5,13 @@
 //! A safe rust wrapper for creating and using ramdisks.
 
 #![deny(missing_docs)]
-use anyhow::{anyhow, bail, Context as _, Error};
-use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, Proxy as _, ServiceMarker};
+use anyhow::{anyhow, Context as _, Error};
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, Proxy as _};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy, ControllerSynchronousProxy};
 use fidl_fuchsia_hardware_ramdisk::{Guid, RamdiskControllerMarker};
 use fuchsia_component::client::{
-    connect_to_instance_in_service_dir, connect_to_named_protocol_at_dir_root,
-    connect_to_protocol_at_dir_svc,
+    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc, Service,
 };
-use fuchsia_fs::directory::WatchEvent;
-use futures::TryStreamExt;
 use {
     fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_hardware_block_volume as fvolume,
     fidl_fuchsia_hardware_ramdisk as framdisk, fidl_fuchsia_io as fio,
@@ -108,31 +105,13 @@ impl RamdiskClientBuilder {
 
         if use_v2 {
             // Pick the first service instance we find.
-            let ramdisk_service_dir = match ramdisk_service {
-                Some(s) => s,
-                None => fuchsia_fs::directory::open_in_namespace(
-                    &format!("/svc/{}", fidl_fuchsia_hardware_ramdisk::ServiceMarker::SERVICE_NAME),
-                    fio::Flags::empty(),
-                )?,
-            };
-            let mut watcher = fuchsia_fs::directory::Watcher::new(&ramdisk_service_dir)
-                .await
-                .context("Watcher closed")?;
-            let ramdisk_controller = loop {
-                let Some(item) = watcher.try_next().await? else {
-                    bail!("Unexpected watcher end");
-                };
-                if let WatchEvent::ADD_FILE | WatchEvent::EXISTING = item.event {
-                    let instance = item.filename.to_str().expect("Non UTF8 name!");
-                    if instance == "." {
-                        continue;
-                    }
-                    break connect_to_instance_in_service_dir::<
-                        fidl_fuchsia_hardware_ramdisk::ServiceMarker,
-                    >(&ramdisk_service_dir, instance)?
-                    .connect_to_controller()?;
+            let service = match ramdisk_service {
+                Some(s) => {
+                    Service::from_service_dir_proxy(s, fidl_fuchsia_hardware_ramdisk::ServiceMarker)
                 }
+                None => Service::open(fidl_fuchsia_hardware_ramdisk::ServiceMarker)?,
             };
+            let ramdisk_controller = service.watch_for_any().await?.connect_to_controller()?;
 
             let type_guid = guid.map(|guid| Guid { value: guid });
 
