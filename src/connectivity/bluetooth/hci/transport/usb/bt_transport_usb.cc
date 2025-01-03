@@ -30,13 +30,13 @@
 
 #include "src/lib/listnode/listnode.h"
 
-#define EVENT_REQ_COUNT 8
-#define ACL_READ_REQ_COUNT 8
-#define ACL_WRITE_REQ_COUNT 10
-#define SCO_READ_REQ_COUNT 8
+constexpr int EVENT_REQ_COUNT = 8;
+constexpr int ACL_READ_REQ_COUNT = 8;
+constexpr int ACL_WRITE_REQ_COUNT = 10;
+constexpr int SCO_READ_REQ_COUNT = 8;
 
 // The maximum HCI ACL frame size used for data transactions
-#define ACL_MAX_FRAME_SIZE 1028  // (1024 + 4 bytes for the ACL header)
+constexpr uint64_t ACL_MAX_FRAME_SIZE = 1028;  // (1024 + 4 bytes for the ACL header)
 
 namespace bt_transport_usb {
 namespace fhbt = fuchsia_hardware_bluetooth;
@@ -596,7 +596,7 @@ void Device::UsbRequestCallback(usb_request_t* req) {
     // memcpy is necessary here to prevent undefined behavior since there are no guarantees
     // about the alignment of data that other drivers append to the usb_request_t.
     usb_callback_t callback;
-    memcpy(&callback,
+    memcpy(static_cast<void*>(&callback),
            reinterpret_cast<unsigned char*>(req) + parent_req_size_ + sizeof(usb_req_internal_t),
            sizeof(callback));
     // Our threading model allows a callback to immediately re-queue a request here
@@ -644,7 +644,7 @@ void Device::UsbRequestSend(usb_protocol_t* function, usb_request_t* req, usb_ca
           },
       .ctx = this};
   memcpy(reinterpret_cast<unsigned char*>(req) + parent_req_size + sizeof(usb_req_internal_t),
-         &callback, sizeof(callback));
+         static_cast<void*>(&callback), sizeof(callback));
   usb_request_queue(function, req, &internal_completion);
 }
 
@@ -1038,7 +1038,7 @@ void Device::HciScoWriteComplete(usb_request_t* req) {
 
   // Reply the completer for this packet.
   if (sco_connection_binding_.has_value()) {
-    ZX_DEBUG_ASSERT(sco_callback_queue_.size() != 0);
+    ZX_DEBUG_ASSERT(!sco_callback_queue_.empty());
     (sco_callback_queue_.front())();
     sco_callback_queue_.pop();
   }
@@ -1086,7 +1086,7 @@ void Device::OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> c
   ZX_ASSERT(node);
 
   usb_req_internal_t* req_int = containerof(node, usb_req_internal_t, node);
-  usb_request_t* req = REQ_INTERNAL_TO_USB_REQ(req_int, parent_req_size_);
+  usb_request_t* req = req_internal_to_usb_req(req_int, parent_req_size_);
   size_t result = usb_request_copy_to(req, packet.data(), length, 0);
   ZX_ASSERT(result == length);
   req->header.length = length;
@@ -1184,7 +1184,7 @@ void Device::Send(SendRequest& request, SendCompleter::Sync& completer) {
       }
 
       usb_req_internal_t* req_int = containerof(node, usb_req_internal_t, node);
-      usb_request_t* req = REQ_INTERNAL_TO_USB_REQ(req_int, parent_req_size_);
+      usb_request_t* req = req_internal_to_usb_req(req_int, parent_req_size_);
       size_t result = usb_request_copy_to(req, request.acl().value().data(), length, 0);
       ZX_ASSERT(result == length);
       req->header.length = length;
@@ -1355,13 +1355,17 @@ void Device::HandleUsbResponseError(usb_request_t* req, const char* req_descript
   RemoveDeviceLocked();
 }
 
+namespace {
+
 // A lambda is used to create an empty instance of zx_driver_ops_t.
-static zx_driver_ops_t usb_bt_hci_driver_ops = []() {
+zx_driver_ops_t usb_bt_hci_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
   ops.bind = Device::Create;
   return ops;
 }();
+
+}  // namespace
 
 }  // namespace bt_transport_usb
 
