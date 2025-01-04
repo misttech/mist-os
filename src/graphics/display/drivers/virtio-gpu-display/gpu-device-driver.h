@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_GPU_DEVICE_DRIVER_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GPU_DISPLAY_GPU_DEVICE_DRIVER_H_
 
-#include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/stdcompat/span.h>

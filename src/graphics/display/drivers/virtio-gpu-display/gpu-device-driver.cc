@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/gpu-device-driver.h"
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/start_completer.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -69,9 +68,8 @@ zx::result<> GpuDeviceDriver::InitResources() {
   }
   display_engine_ = std::move(display_engine_result).value();
 
-  engine_banjo_adapter_ =
-      fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
-          &alloc_checker, display_engine_.get(), engine_events_.get());
+  engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
+      &alloc_checker, display_engine_.get(), engine_events_.get());
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineBanjoAdapter");
     return zx::error(ZX_ERR_NO_MEMORY);
