@@ -134,6 +134,10 @@ FUNCTION(arm64_elX_to_el1)
     msr spsr_el2, x9
 
 .Ldrop_to_el1:
+    // Reuse the current stack pointer after the drop to EL1.
+    mov x9, sp
+    msr sp_el1, x9
+
     isb
     eret
     SPECULATION_POSTFENCE

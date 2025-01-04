@@ -98,7 +98,13 @@ FUNCTION(_start)
     str     x2, [tmp2, #:lo12:arch_boot_el]
 
 .Lno_save_bootinfo:
-    /* if we entered at a higher EL than 1, drop to EL1 */
+    // If we entered at a higher EL than 1, drop to EL1.
+    //
+    // Make sure to clear the stack pointer first. The call will reuse in EL1
+    // whatever is currently installed, but on a cold boot this might be
+    // garbage and run afoul of EL1 sp alignment checks if blindly installed.
+    mov     x0, xzr
+    mov     sp, x0
     bl      arm64_elX_to_el1
 
     // Make sure no old exception handlers are installed.
