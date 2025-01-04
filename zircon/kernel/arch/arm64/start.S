@@ -293,9 +293,14 @@ FUNCTION(_start)
     b   .
 
 .Lsecondary_boot:
+    // Before we set sp, ensure that it's 'linked' to the current SP_ELX and
+    // not SP_EL0.
+    msr     SPSel, #1
+
     bl      arm64_get_secondary_sp
     cbz     x0, .Lunsupported_cpu_trap
     mov     sp, x0
+
     msr     tpidr_el1, x1
 #if __has_feature(shadow_call_stack)
     mov     shadow_call_sp, x2
