@@ -35,7 +35,6 @@ constexpr int32_t kDisplayWidthPx = 1024;
 constexpr int32_t kDisplayHeightPx = 768;
 constexpr int32_t kDisplayRefreshRateHz = 60;
 
-constexpr size_t kDisplayCount = 1;
 constexpr size_t kMaxLayerCount = 3;  // This is the max size of layer array.
 
 }  // namespace
@@ -63,11 +62,9 @@ class GoldfishDisplayEngineTest : public testing::Test {
   fdf::UnownedSynchronizedDispatcher display_event_dispatcher_ =
       driver_runtime_.StartBackgroundDispatcher();
 
-  std::array<std::array<layer_t, kMaxLayerCount>, kDisplayCount> layer_ = {};
-
-  std::array<display_config_t, kDisplayCount> configs_ = {};
-
-  std::array<layer_composition_operations_t, kMaxLayerCount * kDisplayCount> results_ = {};
+  std::array<layer_t, kMaxLayerCount> layers_ = {};
+  display_config_t config_ = {};
+  std::array<layer_composition_operations_t, kMaxLayerCount> results_ = {};
 
   std::unique_ptr<DisplayEngine> display_engine_;
 
@@ -91,11 +88,9 @@ void GoldfishDisplayEngineTest::SetUp() {
       std::move(control_client), std::move(pipe_client), std::move(sysmem_client),
       std::make_unique<RenderControl>(), display_event_dispatcher_->async_dispatcher());
 
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    configs_[i].display_id = i + 1;
-    configs_[i].layer_list = layer_[i].data();
-    configs_[i].layer_count = 1;
-  }
+  config_.display_id = 1;
+  config_.layer_list = layers_.data();
+  config_.layer_count = 1;
 
   // Call SetupPrimaryDisplayForTesting() so that we can set up the display
   // devices without any dependency on proper driver binding.
@@ -105,96 +100,68 @@ void GoldfishDisplayEngineTest::SetUp() {
 
 void GoldfishDisplayEngineTest::TearDown() { allocator_binding_->Unbind(); }
 
-TEST_F(GoldfishDisplayEngineTest, CheckConfigNoDisplay) {
-  // Test No display
-  size_t layer_composition_operations_actual = 0;
-  config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), 0, results_.data(), results_.size(), &layer_composition_operations_actual);
-  EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
-}
-
 TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
   // ensure we fail correctly if layers more than 1
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    configs_[i].layer_count = kMaxLayerCount;
-  }
+  config_.layer_count = kMaxLayerCount;
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
-  EXPECT_EQ(actual_result_size, kDisplayCount * kMaxLayerCount);
-  int result_cfg_offset = 0;
-  for (size_t j = 0; j < kDisplayCount; j++) {
-    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE_BASE,
-              results_[result_cfg_offset] & LAYER_COMPOSITION_OPERATIONS_MERGE_BASE);
-    for (unsigned i = 1; i < kMaxLayerCount; i++) {
-      EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE_SRC, results_[result_cfg_offset + i]);
-    }
-    result_cfg_offset += kMaxLayerCount;
+  EXPECT_EQ(actual_result_size, kMaxLayerCount);
+  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE_BASE,
+            results_[0] & LAYER_COMPOSITION_OPERATIONS_MERGE_BASE);
+  for (unsigned i = 1; i < kMaxLayerCount; ++i) {
+    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE_SRC, results_[i]);
   }
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
-  constexpr int kNumLayersPerDisplay = 1;
-  // First create layer for each device
   static constexpr rect_u_t kDisplayArea = {
       .x = 0,
       .y = 0,
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].image_handle = INVALID_DISPLAY_ID;
-    layer_[i][0].image_metadata = {.dimensions = {.width = 0, .height = 0},
-                                   .tiling_type = IMAGE_TILING_TYPE_LINEAR};
-    layer_[i][0].display_destination = kDisplayArea;
-    layer_[i][0].image_source = {.x = 0, .y = 0, .width = 0, .height = 0};
-    layer_[i][0].alpha_mode = ALPHA_DISABLE;
-    layer_[i][0].image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY;
-  }
+  layers_[0].image_handle = INVALID_DISPLAY_ID;
+  layers_[0].image_metadata = {.dimensions = {.width = 0, .height = 0},
+                               .tiling_type = IMAGE_TILING_TYPE_LINEAR};
+  layers_[0].display_destination = kDisplayArea;
+  layers_[0].image_source = {.x = 0, .y = 0, .width = 0, .height = 0};
+  layers_[0].alpha_mode = ALPHA_DISABLE;
+  layers_[0].image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY;
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
-  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_USE_IMAGE,
-              results_[i] & LAYER_COMPOSITION_OPERATIONS_USE_IMAGE);
-  }
+  EXPECT_EQ(1u, actual_result_size);
+  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_USE_IMAGE,
+            results_[0] & LAYER_COMPOSITION_OPERATIONS_USE_IMAGE);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
-  constexpr int kNumLayersPerDisplay = 1;
-  // First create layer for each device
   static constexpr rect_u_t kDisplayArea = {
       .x = 0,
       .y = 0,
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].display_destination = kDisplayArea;
-    layer_[i][0].image_source = kDisplayArea;
-    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
-    layer_[i][0].alpha_mode = ALPHA_DISABLE;
-    layer_[i][0].image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY;
-  }
+  layers_[0].display_destination = kDisplayArea;
+  layers_[0].image_source = kDisplayArea;
+  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
+  layers_[0].alpha_mode = ALPHA_DISABLE;
+  layers_[0].image_source_transformation = COORDINATE_TRANSFORMATION_IDENTITY;
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
-  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(0u, results_[i]);
-  }
+  EXPECT_EQ(1u, actual_result_size);
+  EXPECT_EQ(0u, results_[0]);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
-  constexpr int kNumLayersPerDisplay = 1;
-  // First create layer for each device
   static constexpr rect_u_t kDisplayDestination = {
       .x = 0,
       .y = 0,
@@ -207,25 +174,19 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].display_destination = kDisplayDestination;
-    layer_[i][0].image_source = kImageSource;
-    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
-  }
+  layers_[0].display_destination = kDisplayDestination;
+  layers_[0].image_source = kImageSource;
+  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
-  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE, results_[i]);
-  }
+  EXPECT_EQ(1u, actual_result_size);
+  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE, results_[0]);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
-  constexpr int kNumLayersPerDisplay = 1;
-  // First create layer for each device
   static constexpr rect_u_t kDisplayArea = {
       .x = 0,
       .y = 0,
@@ -238,105 +199,81 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
       .width = 768,
       .height = 768,
   };
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].display_destination = kDisplayArea;
-    layer_[i][0].image_source = kImageSource;
-    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
-  }
+  layers_[0].display_destination = kDisplayArea;
+  layers_[0].image_source = kImageSource;
+  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
-  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_SRC_FRAME, results_[i]);
-  }
+  EXPECT_EQ(1u, actual_result_size);
+  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_SRC_FRAME, results_[0]);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
-  constexpr int kNumLayersPerDisplay = 1;
-  // First create layer for each device
   static constexpr rect_u_t kDisplayArea = {
       .x = 0,
       .y = 0,
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].display_destination = kDisplayArea;
-    layer_[i][0].image_source = kDisplayArea;
-    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
-    layer_[i][0].alpha_mode = ALPHA_HW_MULTIPLY;
-  }
+  layers_[0].display_destination = kDisplayArea;
+  layers_[0].image_source = kDisplayArea;
+  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
+  layers_[0].alpha_mode = ALPHA_HW_MULTIPLY;
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
-  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_ALPHA, results_[i]);
-  }
+  EXPECT_EQ(1u, actual_result_size);
+  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_ALPHA, results_[0]);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
-  constexpr int kNumLayersPerDisplay = 1;
-  // First create layer for each device
   static constexpr rect_u_t kDisplayArea = {
       .x = 0,
       .y = 0,
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].display_destination = kDisplayArea;
-    layer_[i][0].image_source = kDisplayArea;
-    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
-    layer_[i][0].image_source_transformation = COORDINATE_TRANSFORMATION_REFLECT_X;
-  }
+  layers_[0].display_destination = kDisplayArea;
+  layers_[0].image_source = kDisplayArea;
+  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
+  layers_[0].image_source_transformation = COORDINATE_TRANSFORMATION_REFLECT_X;
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
-  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_TRANSFORM, results_[i]);
-  }
+  EXPECT_EQ(1u, actual_result_size);
+  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_TRANSFORM, results_[0]);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
-  constexpr int kNumLayersPerDisplay = 1;
-  // First create layer for each device
   static constexpr rect_u_t kDisplayArea = {
       .x = 0,
       .y = 0,
       .width = 1024,
       .height = 768,
   };
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].display_destination = kDisplayArea;
-    layer_[i][0].image_source = kDisplayArea;
-    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
-    configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
-  }
+  layers_[0].display_destination = kDisplayArea;
+  layers_[0].image_source = kDisplayArea;
+  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
+  config_.cc_flags = COLOR_CONVERSION_POSTOFFSET;
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
-  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    // TODO(payamm): For now, driver will pretend it supports color conversion.
-    // It should return LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION instead.
-    EXPECT_EQ(0u, results_[i]);
-  }
+  EXPECT_EQ(1u, actual_result_size);
+  // TODO(payamm): For now, driver will pretend it supports color conversion.
+  // It should return LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION instead.
+  EXPECT_EQ(0u, results_[0]);
 }
 
 TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
-  constexpr int kNumLayersPerDisplay = 1;
-  // First create layer for each device
   static constexpr rect_u_t kDisplayDestination = {
       .x = 0,
       .y = 0,
@@ -349,28 +286,24 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
       .width = 768,
       .height = 768,
   };
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    layer_[i][0].display_destination = kDisplayDestination;
-    layer_[i][0].image_source = kImageSource;
-    layer_[i][0].image_metadata.dimensions = {.width = 1024, .height = 768};
-    layer_[i][0].alpha_mode = ALPHA_HW_MULTIPLY;
-    layer_[i][0].image_source_transformation = COORDINATE_TRANSFORMATION_ROTATE_CCW_180;
-    configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
-  }
+  layers_[0].display_destination = kDisplayDestination;
+  layers_[0].image_source = kImageSource;
+  layers_[0].image_metadata.dimensions = {.width = 1024, .height = 768};
+  layers_[0].alpha_mode = ALPHA_HW_MULTIPLY;
+  layers_[0].image_source_transformation = COORDINATE_TRANSFORMATION_ROTATE_CCW_180;
+  config_.cc_flags = COLOR_CONVERSION_POSTOFFSET;
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      configs_.data(), kDisplayCount, results_.data(), results_.size(), &actual_result_size);
+      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
-  EXPECT_EQ(actual_result_size, kDisplayCount * kNumLayersPerDisplay);
-  for (size_t i = 0; i < kDisplayCount; i++) {
-    // TODO(https://fxbug.dev/42080897): Driver will pretend it supports color conversion
-    // for now. Instead this should contain
-    // LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION bit.
-    EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE | LAYER_COMPOSITION_OPERATIONS_SRC_FRAME |
-                  LAYER_COMPOSITION_OPERATIONS_ALPHA | LAYER_COMPOSITION_OPERATIONS_TRANSFORM,
-              results_[i]);
-  }
+  EXPECT_EQ(1u, actual_result_size);
+  // TODO(https://fxbug.dev/42080897): Driver will pretend it supports color conversion
+  // for now. Instead this should contain
+  // LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION bit.
+  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE | LAYER_COMPOSITION_OPERATIONS_SRC_FRAME |
+                LAYER_COMPOSITION_OPERATIONS_ALPHA | LAYER_COMPOSITION_OPERATIONS_TRANSFORM,
+            results_[0]);
 }
 
 TEST_F(GoldfishDisplayEngineTest, ImportBufferCollection) {
