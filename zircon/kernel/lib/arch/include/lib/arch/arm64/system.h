@@ -659,6 +659,207 @@ ARCH_ARM64_SYSREG(ArmEsrEl2, "esr_el2");
 struct ArmEsrEl3 : public arch::SysRegDerived<ArmEsrEl3, ArmExceptionSyndromeRegister> {};
 ARCH_ARM64_SYSREG(ArmEsrEl3, "esr_el3");
 
+// [arm/sysreg]/cptr_el2: Architectural Feature Trap Register (EL2)
+// [arm/sysreg]/cptr_el3: Architectural Feature Trap Register (EL3)
+//
+// The layout is dependent upon whether there is an EL2 host running (i.e, when
+// FEAT_VHE is implemented and HCR_EL2.E2H == 1)
+template <bool El2Host>
+struct ArmArchitecturalFeatureTrapRegister
+    : public SysRegDerivedBase<ArmArchitecturalFeatureTrapRegister<El2Host>, uint64_t> {
+  using SelfType = ArmArchitecturalFeatureTrapRegister<El2Host>;
+
+  DEF_RSVDZ_FIELD(63, 32);
+  DEF_BIT(31, tcpac);
+  DEF_BIT(30, tam);
+  DEF_RSVDZ_BIT(29);
+
+  DEF_COND_BIT(28, tta, El2Host);
+  DEF_COND_RSVDZ_BIT(28, !El2Host);
+
+  DEF_RSVDZ_FIELD(27, 26);
+
+  DEF_COND_FIELD(25, 24, smen, El2Host);
+  DEF_COND_RSVDZ_FIELD(25, 24, !El2Host);
+
+  DEF_RSVDZ_FIELD(23, 22);
+
+  DEF_COND_FIELD(21, 20, fpen, El2Host);
+  DEF_COND_RSVDZ_BIT(21, !El2Host);
+  DEF_COND_BIT(20, tta, !El2Host);
+
+  DEF_RSVDZ_FIELD(19, 18);
+
+  DEF_COND_FIELD(17, 16, zen, El2Host);
+  DEF_COND_RSVDZ_FIELD(15, 0, El2Host);
+
+  DEF_COND_RSVDZ_FIELD(17, 14, !El2Host);
+  // Bit 13 is reserved as 1 if !El2Host
+  DEF_COND_BIT(12, tsm, !El2Host);
+  DEF_COND_RSVDZ_BIT(11, !El2Host);
+  DEF_COND_BIT(10, tfp, !El2Host);
+  // Bit 9 is reserved as 1 if !El2Host
+  DEF_COND_BIT(8, tz, !El2Host);
+  DEF_COND_RSVDZ_FIELD(7, 0, !El2Host);
+};
+
+template <bool El2Host>
+struct ArmCptrEl2 : public arch::SysRegDerived<ArmCptrEl2<El2Host>,
+                                               ArmArchitecturalFeatureTrapRegister<El2Host>> {};
+ARCH_ARM64_SYSREG(ArmCptrEl2<false>, "cptr_el2");
+ARCH_ARM64_SYSREG(ArmCptrEl2<true>, "cptr_el2");
+
+using ArmCptrEl2NoEl2Host = ArmCptrEl2<false>;
+using ArmCptrEl2WithEl2Host = ArmCptrEl2<true>;
+
+template <bool El2Host>
+struct ArmCptrEl3 : public arch::SysRegDerived<ArmCptrEl3<El2Host>,
+                                               ArmArchitecturalFeatureTrapRegister<El2Host>> {};
+
+ARCH_ARM64_SYSREG(ArmCptrEl3<false>, "cptr_el3");
+ARCH_ARM64_SYSREG(ArmCptrEl3<true>, "cptr_el3");
+
+using ArmCptrEl3NoEl2Host = ArmCptrEl3<false>;
+using ArmCptrEl3WithEl2Host = ArmCptrEl3<true>;
+
+// [arm/sysreg]/hcr_el2: Hypervisor Configuration register (EL2)
+struct ArmHypervisorConfigurationRegister
+    : public SysRegDerivedBase<ArmHypervisorConfigurationRegister, uint64_t> {
+  DEF_FIELD(63, 60, twedel);
+  DEF_BIT(59, tweden);
+  DEF_BIT(58, tid5);
+  DEF_BIT(57, dct);
+  DEF_BIT(56, ata);
+  DEF_BIT(55, ttlbos);
+  DEF_BIT(54, ttlbis);
+  DEF_BIT(53, enscxt);
+  DEF_BIT(52, tocu);
+  DEF_BIT(51, amvoffen);
+  DEF_BIT(50, ticab);
+  DEF_BIT(49, tid4);
+  DEF_BIT(48, gpf);
+  DEF_BIT(47, fien);
+  DEF_BIT(46, fwb);
+  DEF_BIT(45, nv2);
+  DEF_BIT(44, at);
+  DEF_BIT(43, nv1);
+  DEF_BIT(42, nv);
+  DEF_BIT(41, api);
+  DEF_BIT(40, apk);
+  DEF_BIT(39, tme);
+  DEF_BIT(38, miocnce);
+  DEF_BIT(37, tea);
+  DEF_BIT(36, terr);
+  DEF_BIT(35, tlor);
+  DEF_BIT(34, e2h);
+  DEF_BIT(33, id);
+  DEF_BIT(32, cd);
+  DEF_BIT(31, rw);
+  DEF_BIT(30, trvm);
+  DEF_BIT(29, hcd);
+  DEF_BIT(28, tdz);
+  DEF_BIT(27, tge);
+  DEF_BIT(26, tvm);
+  DEF_BIT(25, ttlb);
+  DEF_BIT(24, tpu);
+  DEF_BIT(23, tcpc);
+  DEF_BIT(22, tsw);
+  DEF_BIT(21, tacr);
+  DEF_BIT(20, tidcp);
+  DEF_BIT(19, tsc);
+  DEF_BIT(18, tid3);
+  DEF_BIT(17, tid2);
+  DEF_BIT(16, tid1);
+  DEF_BIT(15, tid0);
+  DEF_BIT(14, twe);
+  DEF_BIT(13, twi);
+  DEF_BIT(12, dc);
+  DEF_FIELD(11, 10, bsu);
+  DEF_BIT(9, fb);
+  DEF_BIT(8, vse);
+  DEF_BIT(7, vi);
+  DEF_BIT(6, vf);
+  DEF_BIT(5, amo);
+  DEF_BIT(4, imo);
+  DEF_BIT(3, fmo);
+  DEF_BIT(2, ptw);
+  DEF_BIT(1, swio);
+  DEF_BIT(0, vm);
+};
+
+struct ArmHcrEl2 : public arch::SysRegDerived<ArmHcrEl2, ArmHypervisorConfigurationRegister> {};
+ARCH_ARM64_SYSREG(ArmHcrEl2, "hcr_el2");
+
+// [arm/sysreg]/cnthctl_el2: Counter-timer Hypervisor Control register (EL2)
+//
+// The layout is dependent upon whether there is an EL2 host running (i.e, when
+// FEAT_VHE is implemented and HCR_EL2.E2H == 1)
+template <bool El2Host>
+struct ArmCounterTimerHypervisorControl
+    : public SysRegDerivedBase<ArmCounterTimerHypervisorControl<El2Host>, uint64_t> {
+  using SelfType = ArmCounterTimerHypervisorControl<El2Host>;
+
+  DEF_RSVDZ_FIELD(63, 20);
+  DEF_BIT(19, cntpmask);
+  DEF_BIT(18, cntvmask);
+  DEF_BIT(17, evntis);
+  DEF_BIT(16, el1nvvct);
+  DEF_BIT(15, el1nvpct);
+  DEF_BIT(14, el1tvct);
+  DEF_BIT(13, el1tvt);
+  DEF_BIT(12, ecv);
+
+  DEF_COND_BIT(11, el1pten, El2Host);
+  DEF_COND_BIT(10, el1pcten, El2Host);
+  DEF_COND_BIT(9, el0pten, El2Host);
+  DEF_COND_BIT(8, el0vten, El2Host);
+  DEF_COND_RSVDZ_FIELD(11, 8, !El2Host);
+
+  DEF_FIELD(7, 4, evnti);
+  DEF_BIT(3, evntdir);
+  DEF_BIT(2, evnten);
+
+  DEF_COND_BIT(1, el0vcten, El2Host);
+  DEF_COND_BIT(1, el1pcen, !El2Host);
+
+  DEF_COND_BIT(0, el0pcten, El2Host);
+  DEF_COND_BIT(0, el1pcten, !El2Host);
+};
+
+template <bool El2Host>
+struct ArmCnthctlEl2 : public arch::SysRegDerived<ArmCnthctlEl2<El2Host>,
+                                                  ArmCounterTimerHypervisorControl<El2Host>> {};
+ARCH_ARM64_SYSREG(ArmCnthctlEl2<false>, "cnthctl_el2");
+ARCH_ARM64_SYSREG(ArmCnthctlEl2<true>, "cnthctl_el2");
+
+using ArmCnthctlEl2NoEl2Host = ArmCnthctlEl2<false>;
+using ArmCnthctlEl2WithEl2Host = ArmCnthctlEl2<true>;
+
+// [arm/sysreg]/icc_sre_el1: Interrupt Controller System Register Enable Register (EL1)
+// [arm/sysreg]/icc_sre_el2: Interrupt Controller System Register Enable Register (EL2)
+// [arm/sysreg]/icc_sre_el3: Interrupt Controller System Register Enable Register (EL3)
+struct ArmInterruptControllerSystemRegisterEnableRegister
+    : public SysRegDerivedBase<ArmInterruptControllerSystemRegisterEnableRegister, uint64_t> {
+  DEF_RSVDZ_FIELD(63, 4);
+  DEF_BIT(3, enable);
+  DEF_BIT(2, dib);
+  DEF_BIT(1, dfb);
+  DEF_BIT(0, sre);
+};
+
+struct ArmIccSreEl1
+    : public arch::SysRegDerived<ArmIccSreEl1, ArmInterruptControllerSystemRegisterEnableRegister> {
+};
+struct ArmIccSreEl2
+    : public arch::SysRegDerived<ArmIccSreEl2, ArmInterruptControllerSystemRegisterEnableRegister> {
+};
+struct ArmIccSreEl3
+    : public arch::SysRegDerived<ArmIccSreEl3, ArmInterruptControllerSystemRegisterEnableRegister> {
+};
+ARCH_ARM64_SYSREG(ArmIccSreEl1, "icc_sre_el1");
+ARCH_ARM64_SYSREG(ArmIccSreEl2, "icc_sre_el2");
+ARCH_ARM64_SYSREG(ArmIccSreEl3, "icc_sre_el3");
+
 }  // namespace arch
 
 #endif  // ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ARM64_SYSTEM_H_
