@@ -486,15 +486,6 @@ pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
         .context("namespace open failed")
 }
 
-/// Opens a FIDL service hosted in `directory` as a directory, which holds
-/// instances of the service.
-pub fn open_service_at_dir<S: ServiceMarker>(
-    directory: &fio::DirectoryProxy,
-) -> Result<fio::DirectoryProxy, Error> {
-    fuchsia_fs::directory::open_directory_async(directory, S::SERVICE_NAME, fio::Flags::empty())
-        .map_err(Into::into)
-}
-
 /// Opens the exposed directory from a child. Only works in CFv2, and only works if this component
 /// uses `fuchsia.component.Realm`.
 pub async fn open_childs_exposed_directory(
