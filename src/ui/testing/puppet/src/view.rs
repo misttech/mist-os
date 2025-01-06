@@ -14,12 +14,12 @@ use fidl_fuchsia_ui_pointer::{
 };
 use futures::channel::{mpsc, oneshot};
 use futures::StreamExt;
+use log::info;
 use once_cell::unsync::OnceCell;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::slice::Iter;
-use tracing::info;
 use {
     fidl_fuchsia_math as fmath, fidl_fuchsia_ui_composition as ui_comp,
     fidl_fuchsia_ui_test_conformance as ui_conformance, fidl_fuchsia_ui_test_input as test_input,

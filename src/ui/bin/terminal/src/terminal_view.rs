@@ -20,6 +20,7 @@ use fidl_fuchsia_hardware_pty::WindowSize;
 use futures::channel::mpsc;
 use futures::io::AsyncReadExt;
 use futures::{select, FutureExt, StreamExt};
+use log::error;
 use pty::ServerPty;
 use std::any::Any;
 use std::cell::RefCell;
@@ -36,7 +37,6 @@ use term_model::index::{Column, Line, Point};
 use term_model::term::{SizeInfo, TermMode};
 use term_model::Term;
 use terminal::{cell_size_from_cell_height, get_scale_factor, FontSet};
-use tracing::error;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 // Font files.

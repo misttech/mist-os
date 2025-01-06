@@ -6,7 +6,7 @@ use anyhow::{Error, Result};
 use fidl_fuchsia_ui_test_input::RegistryRequestStream;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
-use tracing::info;
+use log::info;
 
 enum Service {
     RegistryServer(RegistryRequestStream),

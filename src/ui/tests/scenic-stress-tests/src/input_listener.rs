@@ -4,7 +4,7 @@
 
 use fidl_fuchsia_ui_pointer as fpointer;
 use fuchsia_async::Task;
-use tracing::debug;
+use log::debug;
 
 // Returns a Task that continuously listens for touch events and responds to them.
 pub fn autolisten_touch(touch_source: fpointer::TouchSourceProxy) -> Task<()> {

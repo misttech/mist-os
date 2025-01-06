@@ -13,9 +13,9 @@ use fidl_fuchsia_ui_brightness::{
 use fidl_fuchsia_ui_policy::{DisplayBacklightRequest, DisplayBacklightRequestStream};
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt;
+use log::{error, info, warn};
 use scene_management::SceneManagerTrait;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {fidl_fuchsia_ui_display_color as fidl_color, fuchsia_async as fasync};
 
 const ZERO_OFFSET: [f32; 3] = [0., 0., 0.];

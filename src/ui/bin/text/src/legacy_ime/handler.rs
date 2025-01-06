@@ -81,11 +81,11 @@ impl LegacyIme {
                     self_clone
                         .handle_ime_message(msg)
                         .await
-                        .unwrap_or_else(|e| tracing::warn!("error handling ime message: {:?}", e));
+                        .unwrap_or_else(|e| log::warn!("error handling ime message: {:?}", e));
                 }
                 Ok(())
             }
-            .unwrap_or_else(|e: anyhow::Error| tracing::error!("{:?}", e))
+            .unwrap_or_else(|e: anyhow::Error| log::error!("{:?}", e))
             .then(|()| {
                 async move {
                     // this runs when IME stream closes

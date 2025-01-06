@@ -34,12 +34,12 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
+use log::{error, info, warn};
 use scene_management::{SceneManager, SceneManagerTrait, ViewingDistance};
 use scene_manager_structured_config::Config;
 use std::fs::File;
 use std::io::Read;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_accessibility_scene as a11y_view, fidl_fuchsia_ui_composition as flatland,
     fidl_fuchsia_ui_composition_internal as fcomp, fidl_fuchsia_ui_display_color as color,

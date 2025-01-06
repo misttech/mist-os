@@ -73,9 +73,9 @@ icu_rustc_library("input_pipeline") {
     "//third_party/rust_crates:glob",
     "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:serde",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

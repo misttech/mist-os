@@ -10,8 +10,8 @@ use fuchsia_scenic::flatland::{IdGenerator, ViewCreationTokenPair};
 use fuchsia_scenic::ViewRefPair;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{StreamExt, TryStreamExt};
+use log::{error, info, warn};
 use std::collections::HashMap;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_element as element, fidl_fuchsia_session_scene as scene,
     fidl_fuchsia_ui_composition as ui_comp, fidl_fuchsia_ui_views as ui_views,

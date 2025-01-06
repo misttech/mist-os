@@ -33,11 +33,11 @@ use input_pipeline::media_buttons_handler::MediaButtonsHandler;
 use input_pipeline::mouse_injector_handler::MouseInjectorHandler;
 use input_pipeline::touch_injector_handler::TouchInjectorHandler;
 use input_pipeline::{dead_keys_handler, input_device, keymap_handler, metrics};
+use log::{error, info, warn};
 use scene_management::SceneManagerTrait;
 use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {fidl_fuchsia_settings as fsettings, fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 /// Begins handling input events. The returned future will complete when

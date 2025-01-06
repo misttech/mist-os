@@ -219,7 +219,7 @@ impl InputPipelineAssembly {
         tasks.push(fasync::Task::local(async move {
             if let Ok(mut focus_listener) =
                 FocusListener::new(focus_chain_publisher, metrics_logger_clone).map_err(|e| {
-                    tracing::warn!(
+                    log::warn!(
                         "could not create focus listener, focus will not be dispatched: {:?}",
                         e
                     )
@@ -231,9 +231,7 @@ impl InputPipelineAssembly {
                     .dispatch_focus_changes()
                     .await
                     .map(|_| {
-                        tracing::warn!(
-                            "dispatch focus loop ended, focus will no longer be dispatched"
-                        )
+                        log::warn!("dispatch focus loop ended, focus will no longer be dispatched")
                     })
                     .map_err(|e| {
                         panic!("could not dispatch focus changes, this is a fatal error: {:?}", e)
@@ -482,7 +480,7 @@ impl InputPipeline {
                 let pathbuf = PathBuf::from(filename.clone());
                 match msg.event {
                     WatchEvent::EXISTING | WatchEvent::ADD_FILE => {
-                        tracing::info!("found input device {}", filename);
+                        log::info!("found input device {}", filename);
                         devices_discovered.add(1);
                         let device_proxy =
                             input_device::get_device_from_dir_entry_path(&dir_proxy, &pathbuf)?;
@@ -612,7 +610,7 @@ impl InputPipeline {
         fasync::Task::local(async move {
             while let Some(event) = receiver.next().await {
                 if event.handled == input_device::Handled::No {
-                    tracing::warn!("unhandled input event: {:?}", &event);
+                    log::warn!("unhandled input event: {:?}", &event);
                 }
             }
             panic!("unhandled event catcher is not supposed to terminate.");
@@ -665,7 +663,7 @@ async fn add_device_bindings(
             }
         }
         if matched_device_types.is_empty() {
-            tracing::info!(
+            log::info!(
                 "device {} did not match any supported device types: {:?}",
                 filename,
                 device_types
@@ -685,7 +683,7 @@ async fn add_device_bindings(
         return;
     }
 
-    tracing::info!(
+    log::info!(
         "binding {} to device types: {}",
         filename,
         matched_device_types

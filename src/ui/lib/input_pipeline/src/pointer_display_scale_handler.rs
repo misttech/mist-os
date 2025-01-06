@@ -140,7 +140,7 @@ impl PointerDisplayScaleHandler {
         input_handlers_node: &fuchsia_inspect::Node,
         metrics_logger: metrics::MetricsLogger,
     ) -> Result<Rc<Self>, Error> {
-        tracing::debug!("scale_factor={}", scale_factor);
+        log::debug!("scale_factor={}", scale_factor);
         use std::num::FpCategory;
         let inspect_status = InputHandlerStatus::new(
             input_handlers_node,

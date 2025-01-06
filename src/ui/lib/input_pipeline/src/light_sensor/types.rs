@@ -242,8 +242,8 @@ impl Calibration {
             {
                 Ok(config) => config,
                 Err(e) => {
-                    tracing::error!("Failed to map {name:?}'s rgbc field: {e:?}");
-                    tracing::error!("Will not account for {name:?} in calibration");
+                    log::error!("Failed to map {name:?}'s rgbc field: {e:?}");
+                    log::error!("Will not account for {name:?} in calibration");
                     continue;
                 }
             };

@@ -146,7 +146,7 @@ impl DisplayOwnership {
             // not, this will fail with a timeout error.
             .wait_handle(*ANY_DISPLAY_EVENT, MonotonicInstant::INFINITE_PAST)
             .expect("unable to set the initial display state");
-        tracing::debug!("setting initial display ownership to: {:?}", &initial_state);
+        log::debug!("setting initial display ownership to: {:?}", &initial_state);
         let initial_ownership: Ownership = initial_state.into();
         let ownership = Rc::new(RefCell::new(initial_ownership.clone()));
 
@@ -157,19 +157,19 @@ impl DisplayOwnership {
                 let signals = ownership_clone.wait_ownership_change(&display_ownership_event).await;
                 match signals {
                     Err(e) => {
-                        tracing::warn!("could not read display state: {:?}", e);
+                        log::warn!("could not read display state: {:?}", e);
                         break;
                     }
                     Ok(signals) => {
-                        tracing::debug!("setting display ownership to: {:?}", &signals);
+                        log::debug!("setting display ownership to: {:?}", &signals);
                         ownership_sender.unbounded_send(signals.into()).unwrap();
                         ownership_clone = signals.into();
                     }
                 }
             }
-            tracing::warn!("display loop exiting and will no longer monitor display changes - this is not expected");
+            log::warn!("display loop exiting and will no longer monitor display changes - this is not expected");
         });
-        tracing::info!("Display ownership handler installed");
+        log::info!("Display ownership handler installed");
         let inspect_status = InputHandlerStatus::new(
             input_handlers_node,
             "display_ownership",

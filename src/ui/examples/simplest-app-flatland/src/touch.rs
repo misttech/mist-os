@@ -8,9 +8,9 @@ use fidl_fuchsia_ui_pointer::{
 };
 use fuchsia_async as fasync;
 use futures::channel::mpsc::UnboundedSender;
+use log::*;
 use std::collections::HashMap;
 use std::slice::Iter;
-use tracing::*;
 
 /// Generate a vector of responses to the input `TouchEvents`, as required by
 /// `fuchsia.ui.pointer.TouchSource.Watch()`.

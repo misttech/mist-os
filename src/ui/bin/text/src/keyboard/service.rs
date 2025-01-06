@@ -51,7 +51,7 @@ impl Service {
                 }
                 Ok(())
             }
-            .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
+            .unwrap_or_else(|e: anyhow::Error| log::error!("couldn't run: {:?}", e)),
         )
         .detach();
     }
@@ -93,7 +93,7 @@ impl Service {
                                     // field, but no such field is currently in focus.  Therefore
                                     // increasing the verbosity of the message, so that it's only
                                     // printed when you *really* need it for debugging.
-                                    tracing::debug!(
+                                    log::debug!(
                                         concat!(
                                             "keyboard::Service::spawn_key_event_injector: ",
                                             "error injecting input into IME: {:?}"
@@ -119,7 +119,7 @@ impl Service {
                 }
                 Ok(())
             }
-            .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
+            .unwrap_or_else(|e: anyhow::Error| log::error!("couldn't run: {:?}", e)),
         )
         .detach();
     }
@@ -138,7 +138,7 @@ impl Service {
                 }
                 Ok(())
             }
-            .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
+            .unwrap_or_else(|e: anyhow::Error| log::error!("couldn't run: {:?}", e)),
         )
         .detach();
     }
@@ -147,7 +147,7 @@ impl Service {
         let keyboard3 = self.keyboard3.clone();
         fuchsia_async::Task::spawn(
             async move { keyboard3.spawn_service(stream).await }
-                .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
+                .unwrap_or_else(|e: anyhow::Error| log::error!("couldn't run: {:?}", e)),
         )
         .detach();
     }
@@ -161,7 +161,7 @@ fn key_from_non_printable_key(
         NonPrintableKey::Tab => Some(fidl_fuchsia_input::Key::Tab),
         NonPrintableKey::Backspace => Some(fidl_fuchsia_input::Key::Backspace),
         unrecognized => {
-            tracing::warn!("received unrecognized NonPrintableKey {:?}", unrecognized);
+            log::warn!("received unrecognized NonPrintableKey {:?}", unrecognized);
             None
         }
     }

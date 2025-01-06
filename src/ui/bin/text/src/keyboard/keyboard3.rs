@@ -157,7 +157,7 @@ impl KeyboardService {
             });
 
             if let Err(e) = future::try_join_all(dispatches).await {
-                tracing::warn!("Error sending cancel events {:?} to {:?}", e, subscriber.view_ref);
+                log::warn!("Error sending cancel events {:?} to {:?}", e, subscriber.view_ref);
             };
         };
         store.focused_view = None;
@@ -195,7 +195,7 @@ impl KeyboardService {
         });
 
         if let Err(e) = future::try_join_all(dispatches).await {
-            tracing::warn!("Error sending sync events {:?} to {:?}", e, subscriber.view_ref);
+            log::warn!("Error sending sync events {:?} to {:?}", e, subscriber.view_ref);
         };
     }
 
@@ -214,11 +214,7 @@ impl KeyboardService {
         focused_view: ViewRef,
         event_time: zx::MonotonicInstant,
     ) {
-        tracing::debug!(
-            "focus change to view: {:?}, at timestamp: {:?}",
-            &focused_view,
-            &event_time
-        );
+        log::debug!("focus change to view: {:?}, at timestamp: {:?}", &focused_view, &event_time);
         self.handle_focus_lost(event_time).await;
         self.update_focused_view(focused_view.clone()).await;
         self.handle_client_focused(focused_view, event_time).await;
@@ -393,13 +389,13 @@ impl KeyListenerStore {
                         .on_timeout(
                             fasync::MonotonicInstant::after(DEFAULT_LISTENER_TIMEOUT),
                             || {
-                                tracing::info!("Key listener timeout! {:?}", subscriber.view_ref);
+                                log::info!("Key listener timeout! {:?}", subscriber.view_ref);
                                 Ok(ui_input3::KeyEventStatus::NotHandled)
                             },
                         )
                         .await
                         .unwrap_or_else(|e| {
-                            tracing::info!("key listener handle error: {:?}", e);
+                            log::info!("key listener handle error: {:?}", e);
                             ui_input3::KeyEventStatus::NotHandled
                         });
                     if handled == ui_input3::KeyEventStatus::Handled {
@@ -445,7 +441,7 @@ mod tests {
             let service_clone = service.clone();
             fuchsia_async::Task::spawn(
                 async move { service_clone.spawn_service(keyboard_request_stream).await }
-                    .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
+                    .unwrap_or_else(|e: anyhow::Error| log::error!("couldn't run: {:?}", e)),
             )
             .detach();
             Helper { service, keyboard_proxy, fake_now }

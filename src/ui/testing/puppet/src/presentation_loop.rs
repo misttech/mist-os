@@ -6,8 +6,8 @@ use flatland_frame_scheduling_lib::*;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::prelude::*;
+use log::warn;
 use std::rc::Weak;
-use tracing::warn;
 use {fidl_fuchsia_ui_composition as ui_comp, fuchsia_async as fasync};
 
 /// Unbounded sender used for presentation messages.

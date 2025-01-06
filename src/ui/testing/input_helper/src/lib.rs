@@ -24,8 +24,8 @@ use fuchsia_component::client::connect_to_protocol;
 use futures::{StreamExt, TryStreamExt};
 use keymaps::inverse_keymap::{InverseKeymap, Shift};
 use keymaps::usages::{hid_usage_to_input3_key, Usages};
+use log::{error, info, warn};
 use std::time::Duration;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_math as math, fidl_fuchsia_ui_display_singleton as display_info,
     fuchsia_async as fasync,

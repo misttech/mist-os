@@ -127,7 +127,7 @@ impl FocusListener {
                 ),
             }
         }
-        tracing::warn!("Stopped dispatching focus changes.");
+        log::warn!("Stopped dispatching focus changes.");
         Ok(())
     }
 }

@@ -35,7 +35,7 @@ pub struct Led {
 
 impl Led {
     pub async fn new() -> Result<Led, Error> {
-        tracing::info!("Opening LEDs");
+        log::info!("Opening LEDs");
         let proxy = open_light().await?;
 
         Ok(Led { proxy })

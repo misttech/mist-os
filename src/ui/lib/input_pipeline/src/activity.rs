@@ -27,14 +27,14 @@ impl LeaseHolder {
             .take_wake_lease("scene_manager")
             .await
             .context("cannot get wake lease from SAG")?;
-        tracing::info!("Activity Manager created a wake lease during initialization.");
+        log::info!("Activity Manager created a wake lease during initialization.");
 
         Ok(Self { activity_governor, wake_lease: Some(wake_lease) })
     }
 
     async fn create_lease(&mut self) -> Result<(), Error> {
         if self.wake_lease.is_some() {
-            tracing::warn!("Activity Manager already held a wake lease when trying to create one, please investigate.");
+            log::warn!("Activity Manager already held a wake lease when trying to create one, please investigate.");
             return Ok(());
         }
 
@@ -44,17 +44,17 @@ impl LeaseHolder {
             .await
             .context("cannot get wake lease from SAG")?;
         self.wake_lease = Some(wake_lease);
-        tracing::info!("Activity Manager created a wake lease due to receiving recent user input.");
+        log::info!("Activity Manager created a wake lease due to receiving recent user input.");
 
         Ok(())
     }
 
     fn drop_lease(&mut self) {
         if let Some(lease) = self.wake_lease.take() {
-            tracing::info!("Activity Manager is dropping the wake lease due to not receiving any recent user input.");
+            log::info!("Activity Manager is dropping the wake lease due to not receiving any recent user input.");
             std::mem::drop(lease);
         } else {
-            tracing::warn!("Activity Manager was not holding a wake lease when trying to drop one, please investigate.");
+            log::warn!("Activity Manager was not holding a wake lease when trying to drop one, please investigate.");
         }
     }
 
@@ -87,7 +87,7 @@ impl StateTransitioner {
         state_publisher: StatePublisher,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
     ) -> Self {
-        tracing::info!(
+        log::info!(
             "Activity Manager is initialized with idle_threshold_ms: {:?}",
             idle_threshold_ms.into_millis()
         );
@@ -112,7 +112,7 @@ impl StateTransitioner {
     ) {
         if let Some(holder) = lease_holder {
             if let Err(e) = holder.borrow_mut().create_lease().await {
-                tracing::warn!(
+                log::warn!(
                     "Unable to create lease, system may incorrectly go into suspend: {:?}",
                     e
                 );
@@ -181,7 +181,7 @@ impl ActivityManager {
                 match LeaseHolder::new(activity_governor).await {
                     Ok(holder) => Some(Rc::new(RefCell::new(holder))),
                     Err(e) => {
-                        tracing::error!("Unable to integrate with power, system may incorrectly enter suspend: {:?}", e);
+                        log::error!("Unable to integrate with power, system may incorrectly enter suspend: {:?}", e);
                         None
                     }
                 }
@@ -249,7 +249,7 @@ impl ActivityManager {
                     let _: Result<(), fidl::Error> = responder.send();
                 }
                 Err(e) => {
-                    tracing::warn!(
+                    log::warn!(
                         "Error serving fuchsia.input.interaction.observation.Aggregator: {:?}",
                         e
                     );
@@ -281,7 +281,7 @@ impl ActivityManager {
     fn init_hanging_get(initial_state: State) -> InteractionHangingGet {
         let notify_fn: NotifyFn = Box::new(|state, responder| {
             if responder.send(*state).is_err() {
-                tracing::info!("Failed to send user input interaction state");
+                log::info!("Failed to send user input interaction state");
             }
 
             true
@@ -371,12 +371,12 @@ mod tests {
                         responder.send(fake_wake_lease).expect("failed to send fake wake lease");
                     }
                     Ok(unexpected) => {
-                        tracing::warn!(
+                        log::warn!(
                             "Unexpected request {unexpected:?} serving fuchsia.power.system.ActivityGovernor"
                         );
                     }
                     Err(e) => {
-                        tracing::warn!(
+                        log::warn!(
                             "Error serving fuchsia.power.system.ActivityGovernor: {:?}",
                             e
                         );

@@ -75,7 +75,7 @@ impl TestEnvironment {
             self.realm.root.connect_to_protocol_at_exposed_dir::<P::Protocol>().with_context(
                 || format!("Failed to connect to test realm's {}", P::Protocol::DEBUG_NAME),
             );
-        tracing::debug!("Connected to test realm's {}", P::Protocol::DEBUG_NAME);
+        log::debug!("Connected to test realm's {}", P::Protocol::DEBUG_NAME);
         conn
     }
 
@@ -156,7 +156,7 @@ async fn test_disconnecting_keyboard_client_disconnects_listener_with_connection
     keyboard_service_client: ui_input3::KeyboardProxy,
     keyboard_service_other_client: &ui_input3::KeyboardProxy,
 ) -> Result<()> {
-    tracing::debug!("test_disconnecting_keyboard_client_disconnects_listener_with_connections");
+    log::debug!("test_disconnecting_keyboard_client_disconnects_listener_with_connections");
 
     // Create fake client.
     let (listener_client_end, mut listener) =

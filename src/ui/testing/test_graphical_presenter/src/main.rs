@@ -167,7 +167,7 @@ impl TestGraphicalPresenter {
                                         Ok(FocusState { focused: Some(true), ..}) => break,
                                         Ok(_) => {}
                                         Err(e) => {
-                                            tracing::error!("Error waiting for view to focus {}", e);
+                                            log::error!("Error waiting for view to focus {}", e);
                                             return Err(e.into());
                                         }
                                     }
@@ -177,13 +177,13 @@ impl TestGraphicalPresenter {
                         break;
                     }
                     Some(Ok(other)) => {
-                        tracing::error!("Got unexpected ViewProvider request {:?}", other);
+                        log::error!("Got unexpected ViewProvider request {:?}", other);
                     }
                     Some(Err(e)) => {
-                        tracing::error!("ViewProvider FIDL error {:?}", e);
+                        log::error!("ViewProvider FIDL error {:?}", e);
                     }
                     None => {
-                        tracing::error!("ViewProvider End of Stream");
+                        log::error!("ViewProvider End of Stream");
                     }
                 }
             }
@@ -202,7 +202,7 @@ impl TestGraphicalPresenter {
                 service = self.service_fs.next().fuse() => self.handle_incoming_service_connection(service).await,
                 graphical_presenter_request = self.graphical_presenter_streams.next() => {
                     if let Err(e) = self.handle_graphical_presenter_request(graphical_presenter_request).await {
-                        tracing::error!("Error handling GraphicalPresenter request: {}", e);
+                        log::error!("Error handling GraphicalPresenter request: {}", e);
                     }
                 }
                 // Read the event stream to manage our present credit budget.
@@ -263,10 +263,10 @@ impl TestGraphicalPresenter {
                 );
             }
             Some(Err(e)) => {
-                tracing::error!("GraphicalPresenter FIDL error {:?}", e);
+                log::error!("GraphicalPresenter FIDL error {:?}", e);
             }
             None => {
-                tracing::error!("GraphicalPresenter End of Stream");
+                log::error!("GraphicalPresenter End of Stream");
             }
         }
         Ok(())
@@ -342,10 +342,10 @@ impl TestGraphicalPresenter {
                         Some(Ok(token)) => match view_focuser.request_focus(token).await {
                             Ok(Ok(())) => {}
                             Ok(Err(e)) => {
-                                tracing::error!("Error requesting focus:: {:?}", e);
+                                log::error!("Error requesting focus:: {:?}", e);
                             }
                             Err(e) => {
-                                tracing::error!("FIDL error requesting focus: {:?}", e);
+                                log::error!("FIDL error requesting focus: {:?}", e);
                             }
                         },
                         _ => {}
@@ -364,7 +364,7 @@ enum IncomingService {
 #[fuchsia::main(logging = true, threads = 1)]
 async fn main() -> Result<(), Error> {
     if let Err(e) = TestGraphicalPresenter::new()?.run().await {
-        tracing::error!("Failure running test_graphical_presenter {}", e);
+        log::error!("Failure running test_graphical_presenter {}", e);
     }
     Ok(())
 }

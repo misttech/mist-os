@@ -131,7 +131,7 @@ impl LedWatcher {
                         light_proxy_receives_initial_response.set(true);
                         match watch_result {
                             Ok(light_groups) => self.update_light_groups(light_groups),
-                            Err(e) => tracing::warn!("Failed to get light group update: {:?}", e),
+                            Err(e) => log::warn!("Failed to get light group update: {:?}", e),
                         }
                         light_group_fut = light_groups_stream.select_next_some()
                     }
@@ -139,7 +139,7 @@ impl LedWatcher {
                         brightness_proxy_receives_initial_response.set(true);
                         match watch_result {
                             Ok(brightness) => self.update_brightness(brightness),
-                            Err(e) => tracing::warn!("Failed to get brightness update: {:?}", e),
+                            Err(e) => log::warn!("Failed to get brightness update: {:?}", e),
                         }
                         brightness_fut = brightness_stream.select_next_some();
                     }

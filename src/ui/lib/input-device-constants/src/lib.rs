@@ -36,10 +36,7 @@ impl InputDeviceType {
                 "mouse" => Some(InputDeviceType::Mouse),
                 "touchscreen" => Some(InputDeviceType::Touch),
                 _ => {
-                    tracing::warn!(
-                        "Ignoring unsupported device configuration: {}",
-                        device.as_ref()
-                    );
+                    log::warn!("Ignoring unsupported device configuration: {}", device.as_ref());
                     None
                 }
             })

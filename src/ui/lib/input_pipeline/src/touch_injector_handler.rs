@@ -110,7 +110,7 @@ impl UnhandledInputHandler for TouchInjectorHandler {
 
                 // Report the event to the Activity Service.
                 if let Err(e) = self.report_touch_activity(event_time).await {
-                    tracing::error!("report_touch_activity failed: {}", e);
+                    log::error!("report_touch_activity failed: {}", e);
                 }
 
                 // Consume the input event.
@@ -290,7 +290,7 @@ impl TouchInjectorHandler {
             .register(config, device_server)
             .await
             .context("Failed to register injector.")?;
-        tracing::info!("Registered injector with device id {:?}", touch_descriptor.device_id);
+        log::info!("Registered injector with device id {:?}", touch_descriptor.device_id);
 
         Ok(())
     }

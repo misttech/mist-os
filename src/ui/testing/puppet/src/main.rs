@@ -5,7 +5,7 @@
 use anyhow::{Error, Result};
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
-use tracing::info;
+use log::info;
 
 /// Note to contributors: This component is test-only, so it should panic liberally. Loud crashes
 /// are much easier to debug than silent failures. Please use `expect()` and `panic!` where

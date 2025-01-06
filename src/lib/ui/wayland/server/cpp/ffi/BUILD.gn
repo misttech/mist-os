@@ -17,7 +17,7 @@ rustc_cdylib("ffi") {
     "//src/lib/fuchsia-async",
     "//src/lib/ui/wayland/server",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
 
     # Unlike executables, libfdio is not added as an implicit dependency to
     # shared libraries, so we have to add it ourselves.

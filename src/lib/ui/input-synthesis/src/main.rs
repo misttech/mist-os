@@ -22,8 +22,8 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 use input_synthesis::synthesizer::InputDevice;
+use log::{error, info, warn};
 use std::time::Duration;
-use tracing::{error, info, warn};
 
 #[fuchsia::main(logging_tags = ["input-synthesis"])]
 async fn main() -> Result<()> {
@@ -74,7 +74,7 @@ async fn main() -> Result<()> {
                     }) => {
                         let id = device_id as usize;
                         if id >= devices.len() {
-                            error!(device_id = id, "unknown");
+                            error!(device_id = id; "unknown");
                             responder
                                 .send(Err(Error::InvalidDeviceId))
                                 .expect("send a Error to MouseRequest");

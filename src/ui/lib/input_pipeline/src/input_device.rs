@@ -335,7 +335,7 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
         }
         // TODO(https://fxbug.dev/42131965): Add signaling for when this loop exits, since it means the device
         // binding is no longer functional.
-        tracing::warn!("initialize_report_stream exited - device binding no longer works");
+        log::warn!("initialize_report_stream exited - device binding no longer works");
     })
     .detach();
 }

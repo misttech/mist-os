@@ -22,8 +22,8 @@ use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt;
 use futures::TryFutureExt;
+use log::error;
 use std::sync::Arc;
-use tracing::error;
 
 // Local shorthand type aliases
 type HangingGetNotifyFn =

@@ -22,11 +22,11 @@ use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::prelude::*;
 use input_pipeline::Size;
+use log::{error, info, warn};
 use std::collections::VecDeque;
 use std::ffi::CStr;
 use std::process;
 use std::sync::{Arc, Weak};
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_accessibility_scene as a11y_scene, fidl_fuchsia_math as math,
     fidl_fuchsia_ui_app as ui_app, fidl_fuchsia_ui_display_singleton as singleton_display,
