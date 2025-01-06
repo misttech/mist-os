@@ -599,15 +599,32 @@ where
 
 /// A helper trait for the `EmptyProtocol` server sender.
 pub trait EmptyProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
-    fn receive(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn receive<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireEmptyProtocolReceiveRequest,
+        >;
 }
 
 impl<___T> EmptyProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, EmptyProtocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
-    fn receive(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2301564782476583487, &mut ())
+    fn receive<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireEmptyProtocolReceiveRequest,
+        >,
+    {
+        self.as_untyped().send_event(2301564782476583487, request)
     }
 }
 

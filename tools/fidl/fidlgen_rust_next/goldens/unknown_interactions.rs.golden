@@ -7393,19 +7393,69 @@ where
 pub trait UnknownInteractionsAjarProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest,
+        >;
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest,
+        >;
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'buf>,
+        >;
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
+        >;
 
-    fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
+        >;
 
-    fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<
+                'buf,
+            >,
+        >;
 }
 
 impl<___T> UnknownInteractionsAjarProtocolServerSender<___T>
@@ -7417,32 +7467,88 @@ where
         self.as_untyped().send_event(6927291151663612592, &mut ())
     }
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5838220329633564521, &mut ())
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(5838220329633564521, request)
     }
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(6303151946645602671, &mut ())
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(6303151946645602671, request)
     }
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(659277224687564957, &mut ())
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolStrictEventTableRequest<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(659277224687564957, request)
     }
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(1281760452005010931, &mut ())
     }
 
-    fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(4298964238728681570, &mut ())
+    fn flexible_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(4298964238728681570, request)
     }
 
-    fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(8950943792372972717, &mut ())
+    fn flexible_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(8950943792372972717, request)
     }
 
-    fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(705539350563403440, &mut ())
+    fn flexible_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsAjarProtocolFlexibleEventTableRequest<
+                'buf,
+            >,
+        >,
+    {
+        self.as_untyped().send_event(705539350563403440, request)
     }
 }
 
@@ -14369,11 +14475,37 @@ where
 pub trait UnknownInteractionsClosedProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest,
+        >;
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest,
+        >;
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest<
+                'buf,
+            >,
+        >;
 }
 
 impl<___T> UnknownInteractionsClosedProtocolServerSender<___T>
@@ -14385,16 +14517,45 @@ where
         self.as_untyped().send_event(760799297757210939, &mut ())
     }
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(6736355582617074292, &mut ())
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(6736355582617074292, request)
     }
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(4288682345454280036, &mut ())
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(4288682345454280036, request)
     }
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2871682464255309246, &mut ())
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsClosedProtocolStrictEventTableRequest<
+                'buf,
+            >,
+        >,
+    {
+        self.as_untyped().send_event(2871682464255309246, request)
     }
 }
 
@@ -30779,19 +30940,67 @@ where
 pub trait UnknownInteractionsProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest,
+        >;
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventUnionRequest,
+        >;
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventTableRequest<'buf>,
+        >;
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest,
+        >;
 
-    fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest,
+        >;
 
-    fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn flexible_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest<'buf>,
+        >;
 }
 
 impl<___T> UnknownInteractionsProtocolServerSender<___T>
@@ -30803,32 +31012,86 @@ where
         self.as_untyped().send_event(685715276307386305, &mut ())
     }
 
-    fn strict_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(8896208255987935026, &mut ())
+    fn strict_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(8896208255987935026, request)
     }
 
-    fn strict_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(3919175221694221274, &mut ())
+    fn strict_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(3919175221694221274, request)
     }
 
-    fn strict_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2711448698318579984, &mut ())
+    fn strict_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolStrictEventTableRequest<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(2711448698318579984, request)
     }
 
     fn flexible_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
         self.as_untyped().send_event(7042257263728687206, &mut ())
     }
 
-    fn flexible_event_fields(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(3613822014516746241, &mut ())
+    fn flexible_event_fields<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest,
+        >,
+    {
+        self.as_untyped().send_event(3613822014516746241, request)
     }
 
-    fn flexible_event_union(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2499446536152409191, &mut ())
+    fn flexible_event_union<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventUnionRequest,
+        >,
+    {
+        self.as_untyped().send_event(2499446536152409191, request)
     }
 
-    fn flexible_event_table(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5724881371349617120, &mut ())
+    fn flexible_event_table<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireUnknownInteractionsProtocolFlexibleEventTableRequest<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(5724881371349617120, request)
     }
 }
 

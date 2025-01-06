@@ -1030,7 +1030,15 @@ where
 
 /// A helper trait for the `ChannelProtocol` server sender.
 pub trait ChannelProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
-    fn event_a(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_a<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireChannelProtocolEventARequest,
+        >;
 }
 
 impl<___T> ChannelProtocolServerSender<___T>
@@ -1038,8 +1046,17 @@ impl<___T> ChannelProtocolServerSender<___T>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
-    fn event_a(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2220452875311597006, &mut ())
+    fn event_a<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireChannelProtocolEventARequest,
+        >,
+    {
+        self.as_untyped().send_event(2220452875311597006, request)
     }
 }
 
@@ -1881,7 +1898,15 @@ where
 
 /// A helper trait for the `HandleRightsProtocol` server sender.
 pub trait HandleRightsProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
-    fn an_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn an_event<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireHandleRightsProtocolAnEventRequest,
+        >;
 }
 
 impl<___T> HandleRightsProtocolServerSender<___T>
@@ -1889,8 +1914,17 @@ impl<___T> HandleRightsProtocolServerSender<___T>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
-    fn an_event(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(476727631355490611, &mut ())
+    fn an_event<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireHandleRightsProtocolAnEventRequest,
+        >,
+    {
+        self.as_untyped().send_event(476727631355490611, request)
     }
 }
 
@@ -4487,7 +4521,15 @@ where
 pub trait WithAndWithoutRequestResponseServerSender<___T: ::fidl_next::protocol::Transport> {
     fn on_empty_response(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
-    fn on_with_response(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn on_with_response<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireWithAndWithoutRequestResponseOnWithResponseRequest<'buf>,
+        >;
 }
 
 impl<___T> WithAndWithoutRequestResponseServerSender<___T>
@@ -4499,8 +4541,17 @@ where
         self.as_untyped().send_event(5397663296507358806, &mut ())
     }
 
-    fn on_with_response(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5811598563493228968, &mut ())
+    fn on_with_response<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireWithAndWithoutRequestResponseOnWithResponseRequest<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(5811598563493228968, request)
     }
 }
 

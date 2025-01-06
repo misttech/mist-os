@@ -18,8 +18,11 @@ impl<T: Transport> CalculatorClientHandler<T> for MyCalculatorClient {
     fn on_error(
         &mut self,
         sender: &ClientSender<T, Calculator>,
-        _: ResponseBuffer<T, calculator::OnError>,
+        mut response: ResponseBuffer<T, calculator::OnError>,
     ) {
+        let message = response.decode().unwrap();
+        assert_eq!(message.status_code, 100);
+
         println!("Client received an error event, closing connection");
         sender.close();
     }
@@ -93,7 +96,13 @@ impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer {
             use fidl_next_examples_calculator::CalculatorServerSender as _;
 
             println!("Cleared, sending an error back to close the connection");
-            sender.on_error().unwrap().await.unwrap();
+
+            use fidl_next_examples_calculator::CalculatorOnErrorRequest;
+            sender
+                .on_error(&mut CalculatorOnErrorRequest { status_code: 100 })
+                .unwrap()
+                .await
+                .unwrap();
         });
     }
 }

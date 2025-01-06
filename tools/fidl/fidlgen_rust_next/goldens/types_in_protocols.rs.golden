@@ -6910,63 +6910,196 @@ where
 
 /// A helper trait for the `Protocol` server sender.
 pub trait ProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
-    fn event_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic<'buf>>;
 
-    fn event_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound<'buf>>;
 
-    fn event_array_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_array_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic<'buf>>;
 
-    fn event_array_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_array_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireArrayCompound<'buf>,
+        >;
 
-    fn event_vector_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_vector_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic<'buf>>;
 
-    fn event_vector_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_vector_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireVectorCompound<'buf>,
+        >;
 
-    fn event_vector_optional(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_vector_optional<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireVectorOptional<'buf>,
+        >;
 
-    fn event_array_vector_nested(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_array_vector_nested<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireArrayVectorNested<'buf>,
+        >;
 
-    fn event_resource(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
+    fn event_resource<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource<'buf>>;
 }
 
 impl<___T> ProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Protocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
-    fn event_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5892309624949902400, &mut ())
+    fn event_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireBasic<'buf>>,
+    {
+        self.as_untyped().send_event(5892309624949902400, request)
     }
 
-    fn event_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(7024581948727571669, &mut ())
+    fn event_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireCompound<'buf>>,
+    {
+        self.as_untyped().send_event(7024581948727571669, request)
     }
 
-    fn event_array_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5888282827283820590, &mut ())
+    fn event_array_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireArrayBasic<'buf>>,
+    {
+        self.as_untyped().send_event(5888282827283820590, request)
     }
 
-    fn event_array_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(2189769767733851157, &mut ())
+    fn event_array_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireArrayCompound<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(2189769767733851157, request)
     }
 
-    fn event_vector_basic(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(4583890770109526006, &mut ())
+    fn event_vector_basic<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireVectorBasic<'buf>>,
+    {
+        self.as_untyped().send_event(4583890770109526006, request)
     }
 
-    fn event_vector_compound(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(6026375226599919603, &mut ())
+    fn event_vector_compound<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireVectorCompound<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(6026375226599919603, request)
     }
 
-    fn event_vector_optional(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(1684763340073130077, &mut ())
+    fn event_vector_optional<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireVectorOptional<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(1684763340073130077, request)
     }
 
-    fn event_array_vector_nested(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(1228201560727880574, &mut ())
+    fn event_array_vector_nested<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R: ::fidl_next::Encode<
+            ___T::Encoder<'buf>,
+            Encoded<'buf> = crate::WireArrayVectorNested<'buf>,
+        >,
+    {
+        self.as_untyped().send_event(1228201560727880574, request)
     }
 
-    fn event_resource(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5745997765922613643, &mut ())
+    fn event_resource<___R>(
+        &self,
+        request: &mut ___R,
+    ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>
+    where
+        for<'buf> ___R:
+            ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireResource<'buf>>,
+    {
+        self.as_untyped().send_event(5745997765922613643, request)
     }
 }
 

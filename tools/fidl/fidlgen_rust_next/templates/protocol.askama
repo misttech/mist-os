@@ -264,7 +264,7 @@ pub trait {{ server_sender_name }}<___T: ::fidl_next::protocol::Transport> {
             #[doc = "{{ doc.escape_default() }}"]
         {% endif %}
         {% if method.kind == ProtocolMethodKind::Event %}
-            {% if let Some(request) = method.maybe_request_payload %}
+            {% if let Some(request) = method.maybe_response_payload %}
                 fn {{ method_name }}<___R>(
                     &self,
                     request: &mut ___R,
@@ -294,7 +294,7 @@ where
             #[doc = "{{ doc.escape_default() }}"]
         {% endif %}
         {% if method.kind == ProtocolMethodKind::Event %}
-            {% if let Some(request) = method.maybe_request_payload %}
+            {% if let Some(request) = method.maybe_response_payload %}
                 fn {{ method_name }}<___R>(
                     &self,
                     request: &mut ___R,
