@@ -5,6 +5,7 @@
 import("//build/assembly/developer_overrides.gni")
 import("//build/assembly/sshd_config.gni")
 import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_content_hashes.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/generate_content_hash_file.gni")
@@ -90,14 +91,6 @@ action("generate_main_workspace") {
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/args.json",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/git",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/jiri_snapshot.xml",
-
-    # The list of content hash files
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/bazel_rules_fuchsia.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/boringssl.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/com_google_googletest.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_clang.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/prebuilt_clang.hash",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/prebuilt_python.hash",
 
     # Other files.
     "${bazel_main_top_dir}/workspace/platform_mappings",
@@ -243,6 +236,14 @@ bazel_action("final_fuchsia_in_tree_sdk") {
       },
     ]
   }
+}
+
+# Write the content of bazel_content_hash_definitions to a JSON file
+# at `gn gen` time.
+generated_file("bazel_content_hashes_json") {
+  outputs = [ "$root_build_dir/bazel_content_hashes.json" ]
+  contents = bazel_content_hash_definitions
+  output_conversion = "json"
 }
 
 # Generate content hash files for python and Clang toolchains.

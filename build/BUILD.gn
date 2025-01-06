@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/testing/python_build_time_tests.gni")
+
 group("build") {
   testonly = true
 
@@ -13,6 +15,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    ":regenerator_tests",
     "bazel:tests",
     "fidl:tests",
     "go:tests",
@@ -24,6 +27,15 @@ group("tests") {
     "sdk:tests",
     "tools:tests",
     "tracer:tests",
+  ]
+}
+
+python_build_time_tests("regenerator_tests") {
+  tests = [ "//build/regenerator_test.py" ]
+  inputs = [
+    "//build/regenerator.py",
+    "//build/bazel/scripts/compute_content_hash.py",
+    "//build/bazel/scripts/get_git_head_commit.py",
   ]
 }
 
