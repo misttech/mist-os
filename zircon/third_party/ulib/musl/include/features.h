@@ -1,6 +1,8 @@
 #ifndef SYSROOT_FEATURES_H_
 #define SYSROOT_FEATURES_H_
 
+#include "__llvm-libc-common.h"
+
 #if defined(_ALL_SOURCE) && !defined(_GNU_SOURCE)
 #define _GNU_SOURCE 1
 #endif
@@ -15,33 +17,10 @@
 #define _XOPEN_SOURCE 700
 #endif
 
-#if __STDC_VERSION__ >= 199901L
-#define __restrict restrict
-#elif !defined(__GNUC__)
-#define __restrict
-#endif
-
 #if __STDC_VERSION__ >= 199901L || defined(__cplusplus)
 #define __inline inline
 #endif
 
-#if __STDC_VERSION__ >= 201112L
-#elif defined(__GNUC__)
-#define _Noreturn __attribute__((__noreturn__))
-#else
-#define _Noreturn
-#endif
-
-#ifndef __cplusplus
-#ifdef __GNUC__
-#define __nothrow_fn __attribute__((__nothrow__))
-#else
-#define __nothrow_fn
-#endif
-#elif __cplusplus >= 201710L
-#define __nothrow_fn noexcept
-#else
-#define __nothrow_fn throw()
-#endif
+#define __nothrow_fn __NOEXCEPT  // __llvm-libc-common.h defines this
 
 #endif  // SYSROOT_FEATURES_H_
