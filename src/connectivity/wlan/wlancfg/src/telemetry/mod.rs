@@ -31,6 +31,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::future::LocalBoxFuture;
 use futures::{select, Future, FutureExt, StreamExt};
 use ieee80211::OuiFmt;
+use log::{error, info, warn};
 use num_traits::SaturatingAdd;
 use static_assertions::const_assert_eq;
 use std::cmp::{max, min, Reverse};
@@ -38,7 +39,6 @@ use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_sme as fidl_sme, wlan_metrics_registry as metrics,

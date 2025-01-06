@@ -13,9 +13,9 @@ use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 pub use frame::{AntiCloggingTokenMsg, CommitMsg, ConfirmMsg};
 use hmac_utils::{HmacUtils, HmacUtilsImpl};
 use ieee80211::{MacAddr, Ssid};
+use log::warn;
 use mundane::hash::Sha256;
 use num::FromPrimitive;
-use tracing::warn;
 use wlan_common::ie::rsn::akm::{self, Akm};
 
 /// Maximum number of incorrect frames sent before SAE fails.

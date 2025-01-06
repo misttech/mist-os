@@ -5,8 +5,8 @@
 #![cfg_attr(feature = "benchmarks", feature(test))]
 
 use core::mem;
+use log::warn;
 use thiserror::Error;
-use tracing::warn;
 use wlan_bitfield::bitfield;
 use wlan_common::append::{Append, BufferTooSmall};
 use wlan_common::big_endian::{BigEndianU16, BigEndianU64};
@@ -83,7 +83,7 @@ impl<B: SplitByteSlice> KeyFrameRx<B> {
                 // Some APs add additional bytes to the 802.1X body. This is odd, but doesn't break anything.
                 match reader.peek_remaining().len() {
                     0 => (),
-                    extra => warn!(bytes = extra, "Ignoring extra bytes in eapol frame body"),
+                    extra => warn!(bytes = extra; "Ignoring extra bytes in eapol frame body"),
                 }
                 Ok(KeyFrameRx { eapol_fields, key_frame_fields, key_mic, key_data })
             }

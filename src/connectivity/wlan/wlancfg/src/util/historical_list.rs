@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_async as fasync;
+use log::warn;
 use std::collections::VecDeque;
-use tracing::warn;
 
 /// Trait for time function, for use in HistoricalList functions
 pub trait Timestamped {

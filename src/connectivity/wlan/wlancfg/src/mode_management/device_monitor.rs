@@ -10,8 +10,8 @@ use fidl::endpoints::create_proxy;
 use fidl_fuchsia_wlan_common as fidl_common;
 use fidl_fuchsia_wlan_device_service::{DeviceMonitorProxy, DeviceWatcherEvent};
 use futures::lock::Mutex;
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 
 pub struct Listener {
     proxy: DeviceMonitorProxy,

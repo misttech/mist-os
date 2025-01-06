@@ -14,10 +14,10 @@ use anyhow::format_err;
 use async_trait::async_trait;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
+use log::{info, warn};
 use rand::Rng;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
-use tracing::{info, warn};
 use {
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async as fasync,

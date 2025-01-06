@@ -28,12 +28,12 @@ use futures::future::{ready, Fuse, LocalBoxFuture};
 use futures::lock::Mutex;
 use futures::stream::FuturesUnordered;
 use futures::{select, FutureExt, StreamExt};
+use log::{debug, error, info, warn};
 use std::convert::Infallible;
 use std::fmt::Debug;
 use std::pin::pin;
 use std::sync::Arc;
 use std::unimplemented;
-use tracing::{debug, error, info, warn};
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.

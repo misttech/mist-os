@@ -26,7 +26,7 @@ pub async fn create_client(
 
     let dirents = fuchsia_fs::directory::readdir(&directory).await.expect("readdir failed");
     let devices = dirents.into_iter().map(|file| {
-        tracing::info!("Found file name {:?}", file.name);
+        log::info!("Found file name {:?}", file.name);
         connect_to_named_protocol_at_dir_root::<
                 fidl_fuchsia_hardware_network::DeviceInstanceMarker,
             >(&directory, &file.name)
@@ -110,10 +110,10 @@ pub async fn start_session(
     loop {
         if let Some(flags) = watcher_proxy.watch_status().await.unwrap().flags {
             if flags == fidl_fuchsia_hardware_network::StatusFlags::ONLINE {
-                tracing::info!("Network device port online!");
+                log::info!("Network device port online!");
                 break;
             }
-            tracing::info!("Waiting for network device port to come online...");
+            log::info!("Waiting for network device port to come online...");
         }
     }
 

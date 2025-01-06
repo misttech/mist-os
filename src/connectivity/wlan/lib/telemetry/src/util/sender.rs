@@ -4,9 +4,9 @@
 
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
+use log::{info, warn};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tracing::{info, warn};
 
 /// Capacity of "first come, first serve" slots available to clients of
 /// the mpsc::Sender<TelemetryEvent>.

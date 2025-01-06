@@ -18,11 +18,11 @@ use futures::future::OptionFuture;
 use futures::lock::Mutex;
 use futures::prelude::*;
 use futures::{select, TryFutureExt};
+use log::{error, info, warn};
 use std::convert::Infallible;
 use std::pin::pin;
 use std::rc::Rc;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use wlancfg_lib::access_point::AccessPoint;
 use wlancfg_lib::client::connection_selection::{
     serve_connection_selection_request_loop, ConnectionSelectionRequester, ConnectionSelector,

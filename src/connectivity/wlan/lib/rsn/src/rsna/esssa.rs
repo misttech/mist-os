@@ -13,8 +13,8 @@ use crate::rsna::{
 };
 use crate::Error;
 use fidl_fuchsia_wlan_mlme::EapolResultCode;
+use log::{error, info};
 use std::collections::HashSet;
-use tracing::{error, info};
 use wlan_statemachine::StateMachine;
 use zerocopy::SplitByteSlice;
 

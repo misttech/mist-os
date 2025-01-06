@@ -4,7 +4,7 @@
 
 use crate::client::types as client_types;
 use anyhow::{format_err, Error};
-use tracing::error;
+use log::error;
 
 /// Update a weighted average with a new measurement
 fn calculate_ewma_update(current: f64, next: f64, weighting_factor: f64) -> f64 {

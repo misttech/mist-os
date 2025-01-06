@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context, Error, Result};
-use tracing::warn;
+use log::warn;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,

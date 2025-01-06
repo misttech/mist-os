@@ -16,7 +16,7 @@ use fidl_fuchsia_wlan_sme as fidl_sme;
 use fuchsia_async::TimeoutExt;
 use futures::channel::{mpsc, oneshot};
 use futures::{TryFutureExt, TryStreamExt};
-use tracing::{info, warn};
+use log::{info, warn};
 
 // A long amount of time that a scan should be able to finish within. If a scan takes longer than
 // this is indicates something is wrong.

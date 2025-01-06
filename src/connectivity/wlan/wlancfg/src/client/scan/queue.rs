@@ -9,7 +9,7 @@ use crate::telemetry::TelemetrySender;
 use fidl_fuchsia_wlan_sme as fidl_sme;
 use futures::channel::oneshot;
 use lazy_static::lazy_static;
-use tracing::warn;
+use log::warn;
 
 lazy_static! {
     static ref WILDCARD_SSID: Ssid = Ssid::from_bytes_unchecked("".into());

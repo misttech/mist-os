@@ -6,10 +6,10 @@ use anyhow::{format_err, Error};
 use fuchsia_inspect_contrib::inspect_log;
 use futures::select;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
+use log::{error, info};
 use std::convert::Infallible;
 use std::pin::pin;
 use std::sync::Arc;
-use tracing::{error, info};
 use {fidl_fuchsia_wlan_device as fidl_wlan_dev, fidl_fuchsia_wlan_sme as fidl_wlan_sme};
 
 use crate::watchable_map::WatchableMap;

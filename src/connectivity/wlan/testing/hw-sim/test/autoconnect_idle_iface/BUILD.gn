@@ -14,7 +14,7 @@ rust_wlan_integration_test("autoconnect_idle_iface") {
     "//src/connectivity/wlan/testing/hw-sim:wlan-hw-sim",
     "//src/connectivity/wlan/tests/helpers/realm-factory/fidl:test.wlan.realm_rust",
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]

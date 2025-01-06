@@ -61,7 +61,7 @@ impl<S: Clone + Debug> StateMachineStatusPublisher<S> {
     pub fn publish_status(&self, status: S) {
         match self.0.write() {
             Ok(mut writer) => *writer = status,
-            Err(e) => tracing::warn!("Failed to write current status {:?}: {}", status, e),
+            Err(e) => log::warn!("Failed to write current status {:?}: {}", status, e),
         }
     }
 }

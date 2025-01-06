@@ -5,7 +5,7 @@
 use crate::aes::{self, SizedKey};
 use crate::integrity::Algorithm;
 use crate::Error;
-use tracing::error;
+use log::error;
 
 /// The AES CMAC-128 algorithm is used for integrity checks on AKMS 00-0F-AC:3 through 00-0F-AC:9.
 /// https://tools.ietf.org/html/rfc4493

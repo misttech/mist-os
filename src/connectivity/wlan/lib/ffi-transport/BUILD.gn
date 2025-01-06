@@ -19,7 +19,7 @@ rustc_library("wlan-ffi-transport") {
     "//src/connectivity/wlan/lib/trace:wlan-trace",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/trace/rust:trace",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [ "//third_party/rust_crates:futures" ]

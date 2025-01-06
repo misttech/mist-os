@@ -225,7 +225,7 @@ impl StashStore {
                                 config_list.push(network_config);
                             }
                             Err(e) => {
-                                tracing::error!("Error loading from stash: {:?}", e);
+                                log::error!("Error loading from stash: {:?}", e);
                             }
                         }
                     }
@@ -236,7 +236,7 @@ impl StashStore {
                     network_configs.insert(net_id, config_list);
                 }
                 Err(e) => {
-                    tracing::error!("Error reading network identifier from stash: {:?}", e);
+                    log::error!("Error reading network identifier from stash: {:?}", e);
                     continue;
                 }
             }

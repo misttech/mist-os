@@ -7,8 +7,8 @@ use anyhow::{format_err, Error};
 use fidl::prelude::*;
 use futures::stream::TryStreamExt;
 use ieee80211::MacAddrBytes;
+use log::{debug, info};
 use measure_tape_for_scan_result::Measurable as _;
-use tracing::{debug, info};
 use {fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme};
 
 // TODO(https://fxbug.dev/42160765): Remove this.

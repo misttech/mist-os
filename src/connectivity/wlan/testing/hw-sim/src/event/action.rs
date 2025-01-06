@@ -46,7 +46,7 @@
 
 use anyhow::{bail, Context};
 use ieee80211::{Bssid, MacAddrBytes, Ssid};
-use tracing::{debug, info};
+use log::{debug, info};
 use wlan_common::bss::Protection;
 use wlan_common::channel::Channel;
 use wlan_common::mac;
@@ -152,7 +152,7 @@ where
     const SCAN_COMPLETION_DELAY: MonotonicDuration = MonotonicDuration::from_seconds(2i64);
 
     event::matched(move |_: &mut S, event: &fidl_tap::StartScanArgs| {
-        tracing::info!(
+        log::info!(
             "TODO(https://fxbug.dev/42060050): Sleeping for {} second(s) before sending scan completion.",
             SCAN_COMPLETION_DELAY.into_seconds()
         );

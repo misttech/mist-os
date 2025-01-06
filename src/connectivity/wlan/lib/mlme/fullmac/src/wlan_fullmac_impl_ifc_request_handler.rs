@@ -7,7 +7,7 @@ use crate::{FullmacDriverEvent, FullmacDriverEventSink};
 use anyhow::Context;
 use fidl_fuchsia_wlan_fullmac as fidl_fullmac;
 use futures::StreamExt;
-use tracing::error;
+use log::error;
 
 pub async fn serve_wlan_fullmac_impl_ifc_request_handler(
     mut fullmac_ifc_request_stream: fidl_fullmac::WlanFullmacImplIfcRequestStream,

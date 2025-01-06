@@ -18,7 +18,7 @@ use crate::error::Error;
 use cstr::cstr;
 use fuchsia_trace::Id as TraceId;
 use ieee80211::{Bssid, MacAddr, MacAddrBytes};
-use tracing::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 use wlan_common::buffer_reader::BufferReader;
 use wlan_common::capabilities::{intersect_with_ap_as_client, ApCapabilities, StaCapabilities};
 use wlan_common::energy::DecibelMilliWatt;

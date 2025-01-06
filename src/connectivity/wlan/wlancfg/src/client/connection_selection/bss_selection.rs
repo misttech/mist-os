@@ -10,9 +10,9 @@ use fuchsia_inspect_contrib::log::InspectList;
 use fuchsia_inspect_contrib::nodes::BoundedListNode as InspectBoundedListNode;
 use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
 use futures::lock::Mutex;
+use log::{error, info};
 use std::cmp::Reverse;
 use std::sync::Arc;
-use tracing::{error, info};
 
 /// BSS selection. Selects the best from a list of candidates that are available for
 /// connection.

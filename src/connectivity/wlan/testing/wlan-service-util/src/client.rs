@@ -183,7 +183,7 @@ pub async fn connect(
     let connection_result_code = handle_connect_transaction(connection_proxy).await?;
 
     if !matches!(connection_result_code, fidl_ieee80211::StatusCode::Success) {
-        tracing::error!("Failed to connect to network: {:?}", connection_result_code);
+        log::error!("Failed to connect to network: {:?}", connection_result_code);
         return Ok(false);
     }
 
@@ -192,7 +192,7 @@ pub async fn connect(
     Ok(match client_status_response {
         fidl_sme::ClientStatusResponse::Connected(serving_ap_info) => {
             if serving_ap_info.ssid != target_ssid {
-                tracing::error!(
+                log::error!(
                     "Connected to wrong network: {:?}. Expected: {:?}.",
                     serving_ap_info.ssid.as_slice(),
                     target_ssid
@@ -205,7 +205,7 @@ pub async fn connect(
         fidl_sme::ClientStatusResponse::Connecting(_)
         | fidl_sme::ClientStatusResponse::Roaming(_)
         | fidl_sme::ClientStatusResponse::Idle(_) => {
-            tracing::error!(
+            log::error!(
                 "Unexpected status {:?} after {:?}",
                 client_status_response,
                 connection_result_code
@@ -278,21 +278,17 @@ pub async fn disconnect_all(wlan_svc: &WlanService) -> Result<(), Error> {
                     if let Err(e) = disconnect(&sme_proxy).await {
                         error_msg =
                             format!("{}Error disconnecting iface {}: {}\n", error_msg, iface_id, e);
-                        tracing::error!(
-                            "disconnect_all: disconnect err on iface {}: {}",
-                            iface_id,
-                            e
-                        );
+                        log::error!("disconnect_all: disconnect err on iface {}: {}", iface_id, e);
                     }
                 }
             }
             Err(zx::sys::ZX_ERR_NOT_FOUND) => {
                 error_msg = format!("{}no query response on iface {}\n", error_msg, iface_id);
-                tracing::error!("disconnect_all: iface query empty on iface {}", iface_id);
+                log::error!("disconnect_all: iface query empty on iface {}", iface_id);
             }
             Err(e) => {
                 error_msg = format!("{}failed querying iface {}: {}\n", error_msg, iface_id, e);
-                tracing::error!("disconnect_all: query err on iface {}: {}", iface_id, e);
+                log::error!("disconnect_all: query err on iface {}: {}", iface_id, e);
             }
         }
     }

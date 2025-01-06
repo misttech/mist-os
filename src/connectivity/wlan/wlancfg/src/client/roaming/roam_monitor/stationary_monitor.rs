@@ -11,8 +11,8 @@ use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::pseudo_energy::EwmaSignalData;
 use async_trait::async_trait;
 use futures::lock::Mutex;
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
     fuchsia_async as fasync,

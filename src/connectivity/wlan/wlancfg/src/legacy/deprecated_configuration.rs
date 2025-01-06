@@ -7,8 +7,8 @@ use fidl_fuchsia_wlan_product_deprecatedconfiguration as fidl_deprecated;
 use futures::lock::Mutex;
 use futures::{select, StreamExt};
 use ieee80211::MacAddr;
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 
 #[derive(Clone)]
 pub struct DeprecatedConfigurator {

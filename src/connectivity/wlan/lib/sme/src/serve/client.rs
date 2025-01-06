@@ -14,9 +14,9 @@ use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::select;
 use ieee80211::MacAddrBytes;
+use log::error;
 use std::pin::pin;
 use std::sync::{Arc, Mutex};
-use tracing::error;
 use wlan_common::scan::write_vmo;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,

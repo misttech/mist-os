@@ -11,10 +11,10 @@ use fuchsia_sync::Mutex;
 use futures::channel::mpsc::UnboundedReceiver;
 use futures::prelude::*;
 use futures::try_join;
+use log::error;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::Arc;
-use tracing::error;
 
 use crate::watchable_map::{MapEvent, WatchableMap};
 

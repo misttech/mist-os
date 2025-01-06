@@ -12,12 +12,12 @@ use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::{select, FutureExt, TryStreamExt};
 use ieee80211::Bssid;
+use log::{info, warn};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
-use tracing::{info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::scan::Compatibility;
 use {

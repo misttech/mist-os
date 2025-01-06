@@ -13,10 +13,10 @@ use async_trait::async_trait;
 use fidl::endpoints::create_proxy;
 use fuchsia_inspect::{self as inspect, NumericProperty};
 use ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR};
+use log::{error, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::iter::Iterator;
 use thiserror::Error;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device_service as fidl_service,
     fidl_fuchsia_wlan_sme as fidl_sme,

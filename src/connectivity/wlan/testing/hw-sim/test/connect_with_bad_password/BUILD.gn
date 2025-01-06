@@ -16,7 +16,7 @@ rust_wlan_integration_test("connect_with_bad_password") {
     "//src/connectivity/wlan/tests/helpers/realm-factory/fidl:test.wlan.realm_rust",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/lib.rs" ]

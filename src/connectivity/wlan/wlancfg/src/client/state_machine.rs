@@ -26,10 +26,10 @@ use futures::channel::{mpsc, oneshot};
 use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{self, StreamExt, TryStreamExt};
+use log::{debug, error, info, warn};
 use std::convert::Infallible;
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::sequestered::Sequestered;
 use {

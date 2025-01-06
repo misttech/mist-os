@@ -5,10 +5,10 @@
 //! TODO(https://fxbug.dev/42084621): Types and functions in this file are taken from wlancfg. Dedupe later.
 
 use ieee80211::Bssid;
+use log::{error, warn};
 use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::convert::TryFrom;
-use tracing::{error, warn};
 use wlan_common::scan::Compatibility;
 use wlan_common::security::wep::WepKey;
 use wlan_common::security::wpa::credential::Passphrase;

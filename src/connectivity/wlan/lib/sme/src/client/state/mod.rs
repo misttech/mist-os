@@ -21,7 +21,7 @@ use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::log::InspectBytes;
 use ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid};
 use link_state::LinkState;
-use tracing::{error, info, warn};
+use log::{error, info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::ie::rsn::cipher;
 use wlan_common::ie::rsn::suite_selector::OUI;

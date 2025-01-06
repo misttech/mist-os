@@ -10,7 +10,7 @@ use super::{
     SaeUpdateSink, Timeout,
 };
 use anyhow::{bail, format_err, Error};
-use tracing::{error, warn};
+use log::{error, warn};
 use wlan_statemachine::*;
 
 // TODO(https://fxbug.dev/42118302): Handle received timeouts.

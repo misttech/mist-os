@@ -15,9 +15,9 @@ use futures::future::LocalBoxFuture;
 use futures::lock::Mutex;
 use futures::stream::FuturesUnordered;
 use futures::{select, StreamExt};
+use log::{debug, error};
 use std::convert::Infallible;
 use std::sync::Arc;
-use tracing::{debug, error};
 
 // Create a roam monitor implementation based on the roaming profile.
 fn create_roam_monitor(

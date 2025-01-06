@@ -9,7 +9,7 @@ use state::*;
 use crate::ap::event::{ClientEvent, Event};
 use crate::ap::{aid, Context, MlmeRequest, RsnCfg};
 use ieee80211::{MacAddr, MacAddrBytes};
-use tracing::error;
+use log::error;
 use wlan_common::ie::SupportedRate;
 use wlan_common::mac::{Aid, CapabilityInfo};
 use wlan_common::timer::EventId;
@@ -103,7 +103,7 @@ impl RemoteClient {
         result_code: fidl_mlme::AuthenticateResultCode,
     ) {
         // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
-        tracing::info!("Sending fidl_mlme::AuthenticateResponse - result code: {:?}", result_code);
+        log::info!("Sending fidl_mlme::AuthenticateResponse - result code: {:?}", result_code);
         ctx.mlme_sink.send(MlmeRequest::AuthResponse(fidl_mlme::AuthenticateResponse {
             peer_sta_address: self.addr.to_array(),
             result_code,

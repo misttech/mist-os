@@ -5,8 +5,8 @@
 use fuchsia_async::TimeoutExt;
 use fuchsia_sync::Mutex;
 
+use log::{error, warn};
 use std::sync::Arc;
-use tracing::{error, warn};
 use windowed_stats::experimental::clock::Timed;
 use windowed_stats::experimental::series::interpolation::LastSample;
 use windowed_stats::experimental::series::statistic::LatchMax;

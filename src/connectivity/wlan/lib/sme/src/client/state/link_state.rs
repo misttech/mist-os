@@ -11,7 +11,7 @@ use crate::{MlmeRequest, MlmeSink};
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::log::InspectBytes;
 use ieee80211::{Bssid, MacAddr, MacAddrBytes, WILDCARD_BSSID};
-use tracing::{error, warn};
+use log::{error, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::timer::EventId;
 use wlan_rsn::key::exchange::Key;

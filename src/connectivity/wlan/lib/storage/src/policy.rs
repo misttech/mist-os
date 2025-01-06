@@ -43,7 +43,7 @@ impl PolicyStorage {
         let cobalt_proxy = init_telemetry_channel()
             .await
             .inspect_err(|e| {
-                tracing::info!(
+                log::info!(
                     "Error accessing telemetry. Stash migration metric will not be logged: {}",
                     e
                 );
@@ -96,7 +96,7 @@ impl PolicyStorage {
             // Write the data to the new storage.
             match self.root.write(networks_list.clone()) {
                 Ok(_) => {
-                    tracing::info!("Migrated saved networks from stash");
+                    log::info!("Migrated saved networks from stash");
                     // Delete from stash if writing was successful.
                     let delete_result = stash_store.delete_store().await;
                     match delete_result {
@@ -104,7 +104,7 @@ impl PolicyStorage {
                             self.log_load_metric(MigrationResult::Success).await;
                         }
                         Err(e) => {
-                            tracing::info!(
+                            log::info!(
                                 "Failed to delete legacy stash data after migration: {:?}",
                                 e
                             );
@@ -114,7 +114,7 @@ impl PolicyStorage {
                     }
                 }
                 Err(e) => {
-                    tracing::info!(?e, "Failed to write migrated saved networks");
+                    log::info!(e:?; "Failed to write migrated saved networks");
                     self.log_load_metric(MigrationResult::FailedToWriteNewStore).await;
                 }
             }
@@ -123,7 +123,7 @@ impl PolicyStorage {
             // The backing file is only actually created when a write happens, but we
             // don't want to intentionally create a file if migrating stash fails since
             // then we will never try to read from stash again.
-            tracing::info!(?load_err, "Failed to read saved networks from file and legacy stash, new file will be created when a network is saved",);
+            log::info!(load_err:?; "Failed to read saved networks from file and legacy stash, new file will be created when a network is saved",);
             self.log_load_metric(MigrationResult::FailedToLoadLegacyData).await;
             Ok(Vec::new())
         }
@@ -158,14 +158,14 @@ impl PolicyStorage {
         // The error type of this inner result is a fidl_fuchsia_metrics defined error.
         match cobalt_proxy.log_metric_events(events).await {
             Err(e) => {
-                tracing::info!(
+                log::info!(
                     "Error logging metric {:?} for migration result: {:?}",
                     result_event_code,
                     e
                 );
             }
             Ok(Err(e)) => {
-                tracing::info!(
+                log::info!(
                     "Error sending metric {:?} for migration result: {:?}",
                     result_event_code,
                     e

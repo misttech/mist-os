@@ -13,10 +13,10 @@ use futures::future::FutureObj;
 use futures::prelude::*;
 use futures::select;
 use futures::stream::FuturesUnordered;
+use log::{error, info, warn};
 use std::convert::Infallible;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use tracing::{error, info, warn};
 use wlan_common::timer::{self, ScheduledEvent};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,

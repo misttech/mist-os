@@ -9,8 +9,8 @@ use crate::{DriverState, FullmacDriverEvent, FullmacDriverEventSink};
 use anyhow::{bail, Context};
 use futures::channel::{mpsc, oneshot};
 use futures::{select, Future, StreamExt};
+use log::{error, info};
 use std::pin::Pin;
-use tracing::{error, info};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,

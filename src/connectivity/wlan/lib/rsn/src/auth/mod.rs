@@ -11,7 +11,7 @@ use crate::rsna::{
 use crate::Error;
 use fidl_fuchsia_wlan_mlme::SaeFrame;
 use ieee80211::{MacAddr, MacAddrBytes, Ssid};
-use tracing::warn;
+use log::warn;
 use wlan_common::ie::rsn::akm::AKM_SAE;
 use wlan_sae as sae;
 use zerocopy::SplitByteSlice;

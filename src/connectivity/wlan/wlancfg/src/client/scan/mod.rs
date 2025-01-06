@@ -17,10 +17,10 @@ use futures::lock::Mutex;
 use futures::select;
 use futures::stream::{FuturesUnordered, StreamExt};
 use itertools::Itertools;
+use log::{debug, error, info, trace, warn};
 use std::collections::HashMap;
 use std::pin::pin;
 use std::sync::Arc;
-use tracing::{debug, error, info, trace, warn};
 use {
     fidl_fuchsia_location_sensor as fidl_location_sensor, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,

@@ -5,7 +5,7 @@
 use crate::auth;
 use anyhow::{bail, Error};
 use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
-use tracing::error;
+use log::error;
 use wlan_common::mac;
 use zerocopy::SplitByteSlice;
 

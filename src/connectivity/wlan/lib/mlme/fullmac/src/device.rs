@@ -83,7 +83,7 @@ impl DeviceOps for FullmacDevice {
             .fullmac_impl_sync_proxy
             .init(req, zx::MonotonicInstant::INFINITE)
             .map_err(|e| {
-                tracing::error!("FIDL error on Start: {}", e);
+                log::error!("FIDL error on Start: {}", e);
                 zx::Status::INTERNAL
             })?
             .map_err(|e| zx::Status::from_raw(e))?;

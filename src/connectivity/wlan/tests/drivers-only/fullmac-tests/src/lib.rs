@@ -36,7 +36,7 @@ impl FullmacDriverFixture {
         let realm = DriversOnlyTestRealm::new().await;
         let (id, fullmac_req_stream, fullmac_ifc_proxy, generic_sme_proxy) =
             fullmac_helpers::create_fullmac_driver(realm.testcontroller_proxy(), &config).await;
-        tracing::info!("Created fullmac driver {:?}", id);
+        log::info!("Created fullmac driver {:?}", id);
         Self {
             id,
             config,
@@ -54,7 +54,7 @@ impl FullmacDriverFixture {
 
 impl Drop for FullmacDriverFixture {
     fn drop(&mut self) {
-        tracing::info!("FullmacDriverFixture deleting fullmac driver {:?}...", self.id);
+        log::info!("FullmacDriverFixture deleting fullmac driver {:?}...", self.id);
         let testcontroller_sync_proxy = self.realm.take_sync_testcontroller_proxy();
         testcontroller_sync_proxy
             .delete_fullmac(self.id, zx::MonotonicInstant::INFINITE)

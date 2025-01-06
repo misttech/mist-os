@@ -18,8 +18,8 @@ use crate::rsna::{
 };
 use crate::Error;
 use anyhow::{ensure, format_err};
+use log::{error, warn};
 use std::fmt;
-use tracing::{error, warn};
 use zerocopy::SplitByteSlice;
 
 #[derive(Debug, PartialEq)]

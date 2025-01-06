@@ -9,7 +9,7 @@ use fidl_fuchsia_wlan_policy::{Credential, NetworkConfig, NetworkIdentifier, Sec
 use fuchsia_component::client::connect_to_protocol_at;
 use futures::{StreamExt, TryStreamExt};
 use ieee80211::Ssid;
-use tracing::info;
+use log::info;
 
 fn create_network_config(
     ssid: &Ssid,

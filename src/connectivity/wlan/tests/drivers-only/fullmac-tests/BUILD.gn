@@ -25,8 +25,8 @@ rust_wlan_integration_test("fullmac-tests") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:tracing",
   ]
   sources = [
     "src/ap.rs",

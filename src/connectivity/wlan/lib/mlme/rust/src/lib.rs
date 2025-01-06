@@ -29,10 +29,10 @@ use fuchsia_sync::Mutex;
 use futures::channel::mpsc::{self, TrySendError};
 use futures::channel::oneshot;
 use futures::{select, Future, StreamExt};
+use log::info;
 use std::sync::Arc;
 use std::time::Duration;
 use std::{cmp, fmt};
-use tracing::info;
 use wlan_ffi_transport::{EthernetTxEvent, EthernetTxEventSender, WlanRxEvent, WlanRxEventSender};
 use wlan_fidl_ext::{ResponderExt, SendResultExt};
 use {

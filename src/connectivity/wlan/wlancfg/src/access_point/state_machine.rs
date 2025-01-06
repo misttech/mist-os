@@ -23,11 +23,11 @@ use futures::channel::{mpsc, oneshot};
 use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt};
+use log::{info, warn};
 use std::convert::Infallible;
 use std::fmt::Debug;
 use std::pin::pin;
 use std::sync::Arc;
-use tracing::{info, warn};
 use wlan_common::channel::{Cbw, Channel};
 use wlan_common::RadioConfig;
 

@@ -8,7 +8,7 @@ use fuchsia_inspect::{Node as InspectNode, StringReference};
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use futures::channel::mpsc;
-use tracing::warn;
+use log::warn;
 
 // As a general note, recovery is intended to be a method of last resort.  It should be used in
 // circumstances where it is thought that WLAN firmware or the interface with the WLAN peripheral

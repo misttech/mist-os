@@ -16,7 +16,7 @@ use fuchsia_inspect::Inspector;
 use futures::channel::{mpsc, oneshot};
 use futures::future::BoxFuture;
 use futures::StreamExt;
-use tracing::{error, info, warn};
+use log::{error, info, warn};
 use wlan_common::sink::UnboundedSink;
 use wlan_ffi_transport::completers::Completer;
 use wlan_sme::serve::create_sme;

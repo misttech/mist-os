@@ -8,7 +8,7 @@ use fidl_fuchsia_wlan_device_service::{
     DestroyIfaceRequest, DeviceMonitorCreateIfaceRequest, DeviceMonitorCreateIfaceResponse,
     DeviceMonitorProxy, QueryIfaceResponse,
 };
-use tracing::info;
+use log::info;
 
 use ieee80211::{MacAddr, MacAddrBytes};
 

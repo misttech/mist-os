@@ -15,8 +15,8 @@ use fuchsia_inspect::{Inspector, InspectorConfig};
 use futures::channel::mpsc;
 use futures::future::{try_join4, BoxFuture};
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 use {fidl_fuchsia_wlan_device_service as fidl_svc, fuchsia_async as fasync};
 
 const PHY_PATH: &str = "/dev/class/wlanphy";

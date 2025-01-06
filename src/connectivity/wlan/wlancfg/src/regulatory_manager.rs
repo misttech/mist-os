@@ -7,8 +7,8 @@ use anyhow::{Context, Error};
 use fidl_fuchsia_location_namedplace::RegulatoryRegionWatcherProxy;
 use futures::channel::oneshot;
 use futures::lock::Mutex;
+use log::{info, warn};
 use std::sync::Arc;
-use tracing::{info, warn};
 
 pub struct RegulatoryManager<I: IfaceManagerApi + ?Sized> {
     regulatory_service: RegulatoryRegionWatcherProxy,
