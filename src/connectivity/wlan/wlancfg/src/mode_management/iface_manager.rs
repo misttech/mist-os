@@ -668,24 +668,22 @@ impl IfaceManagerService {
                 .await
                 .create_all_client_ifaces(CreateClientIfacesReason::RecoverClientIfaces)
                 .await;
-            if client_iface_ids.values().any(Result::is_err) {
-                warn!(
-                    "failed to recover some client interfaces: {:?}",
-                    client_iface_ids
-                        .iter()
-                        .filter_map(|(phy_id, iface_ids)| {
-                            if iface_ids.is_err() {
-                                Some((phy_id, iface_ids.clone().unwrap_err()))
-                            } else {
-                                None
-                            }
-                        })
-                        .collect::<Vec<_>>()
-                );
-            }
-            let client_iface_ids = client_iface_ids.into_values().flat_map(Result::unwrap);
 
-            for iface_id in client_iface_ids {
+            let mut failures = Vec::new();
+            let mut recreated_client_iface_ids = Vec::new();
+
+            for (phy_id, result) in client_iface_ids {
+                match result {
+                    Ok(ids) => recreated_client_iface_ids.extend_from_slice(&ids),
+                    Err(e) => failures.push((phy_id, e)),
+                }
+            }
+
+            if !failures.is_empty() {
+                warn!("failed to recover some client interfaces: {:?}", failures);
+            }
+
+            for iface_id in recreated_client_iface_ids {
                 match self.get_client(Some(iface_id)).await {
                     Ok(iface) => self.clients.push(iface),
                     Err(e) => {
@@ -3415,7 +3413,7 @@ mod tests {
 
         assert!(!iface_manager.aps.is_empty());
 
-        // Verify that not new client interface was created.
+        // Verify that no new client interface was created.
         assert!(iface_manager.clients.is_empty());
 
         // Verify that a ConnectionsDisabled notification was sent.
@@ -3430,6 +3428,41 @@ mod tests {
                 assert_eq!(updates, expected_update);
             }
         );
+    }
+
+    #[fuchsia::test]
+    fn test_client_iface_recreation_fails() {
+        let mut exec = fuchsia_async::TestExecutor::new();
+
+        // Create an IfaceManager with a client and an AP.
+        let test_values = test_setup(&mut exec);
+        let (mut iface_manager, _next_sme_req) =
+            create_iface_manager_with_client(&test_values, true);
+        iface_manager.phy_manager = Arc::new(Mutex::new(FakePhyManager {
+            create_iface_ok: false,
+            destroy_iface_ok: true,
+            set_country_ok: true,
+            country_code: None,
+            client_connections_enabled: true,
+            client_ifaces: vec![TEST_CLIENT_IFACE_ID],
+            defects: vec![],
+            recovery_sender: None,
+        }));
+
+        let removed_iface_id = 123;
+        iface_manager.clients[0].iface_id = removed_iface_id;
+
+        // Notify the IfaceManager that the client interface has been removed.
+        {
+            let fut = iface_manager.handle_removed_iface(removed_iface_id);
+            let mut fut = pin!(fut);
+
+            // Verify that the future completes immediately since the interface recreation failed.
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        }
+
+        // Verify that no new client interface was created.
+        assert!(iface_manager.clients.is_empty());
     }
 
     #[fuchsia::test]
