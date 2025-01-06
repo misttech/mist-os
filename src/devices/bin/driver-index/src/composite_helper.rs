@@ -147,7 +147,7 @@ pub fn match_node(bind_rules: &BindRules, device_properties: &DeviceProperties) 
             }
             fdf::Condition::Reject => !dev_prop_contains_value,
             fdf::Condition::Unknown => {
-                tracing::error!("Invalid condition type in bind rules.");
+                log::error!("Invalid condition type in bind rules.");
                 return false;
             }
         };

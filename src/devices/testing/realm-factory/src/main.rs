@@ -14,8 +14,8 @@ use fuchsia_component_test::{
 };
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use futures::{FutureExt, StreamExt, TryStreamExt};
+use log::*;
 use std::sync::Arc;
-use tracing::*;
 use {
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_driver_test as fdt,
     fidl_fuchsia_io as fio, fuchsia_async as fasync,

@@ -35,7 +35,7 @@ impl From<fdf::DriverPackageType> for DriverPackageType {
             fdf::DriverPackageType::Cached => DriverPackageType::Cached,
             fdf::DriverPackageType::Universe => DriverPackageType::Universe,
             _ => {
-                tracing::warn!("Unknown driver package type {:?}, defaulting to boot.", value);
+                log::warn!("Unknown driver package type {:?}, defaulting to boot.", value);
                 DriverPackageType::Boot
             }
         }
@@ -77,34 +77,34 @@ impl ResolvedDriver {
         let res = resolver
             .resolve(component_url.as_str())
             .map_err(|e| {
-                tracing::warn!("Resolve call failed: {}", e);
+                log::warn!("Resolve call failed: {}", e);
                 zx::Status::INTERNAL
             })
             .await?;
         let resolved_component = res.map_err(|e| {
-            tracing::warn!("{:?}: Failed to resolve driver: {:?}", component_url, e);
+            log::warn!("{:?}: Failed to resolve driver: {:?}", component_url, e);
             map_resolve_err_to_zx_status(e)
         })?;
         let decl_data = resolved_component.decl.ok_or_else(|| {
-            tracing::warn!("{}: Missing component decl", component_url);
+            log::warn!("{}: Missing component decl", component_url);
             zx::Status::NOT_FOUND
         })?;
         let decl_bytes = mem_util::bytes_from_data(&decl_data).map_err(|e| {
-            tracing::warn!("{}: Failed to parse decl data into bytes: {}", component_url, e);
+            log::warn!("{}: Failed to parse decl data into bytes: {}", component_url, e);
             zx::Status::IO
         })?;
         let decl: fdecl::Component = fidl::unpersist(&decl_bytes[..]).map_err(|e| {
-            tracing::warn!("{}: Failed to parse component decl: {}", component_url, e);
+            log::warn!("{}: Failed to parse component decl: {}", component_url, e);
             zx::Status::INVALID_ARGS
         })?;
         let package = resolved_component.package.and_then(|p| p.directory).ok_or_else(|| {
-            tracing::warn!("{}: Missing package directory", component_url);
+            log::warn!("{}: Missing package directory", component_url);
             zx::Status::NOT_FOUND
         })?;
         let proxy = package.into_proxy();
         let package_dir = PackageDirectory::from_proxy(proxy);
         let package_hash = package_dir.merkle_root().await.map_err(|e| {
-            tracing::warn!("Failed to read package directory's hash: {}", e);
+            log::warn!("Failed to read package directory's hash: {}", e);
             zx::Status::INTERNAL
         })?;
         load_driver(
@@ -115,7 +115,7 @@ impl ResolvedDriver {
             Some(BlobId::from(package_hash)),
         )
         .map_err(|e| {
-            tracing::warn!("Could not load driver: {}", e);
+            log::warn!("Could not load driver: {}", e);
             zx::Status::INTERNAL
         })
         .await
@@ -134,7 +134,7 @@ impl ResolvedDriver {
                 properties,
             )
             .map_err(|e| {
-                tracing::error!("Driver {}: bind error: {}", self, e);
+                log::error!("Driver {}: bind error: {}", self, e);
                 e
             })?;
 

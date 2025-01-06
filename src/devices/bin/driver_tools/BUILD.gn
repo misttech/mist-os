@@ -20,7 +20,7 @@ _host_or_test = [
   "//sdk/lib/device-watcher/rust",
   "//src/lib/fuchsia-async",
   "//src/lib/fuchsia-fs",
-  "//third_party/rust_crates:tracing",
+  "//third_party/rust_crates:log",
 ]
 
 rustc_library("lib") {

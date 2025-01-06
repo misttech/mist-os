@@ -125,13 +125,11 @@ impl CompositeNodeSpecManager {
         let name = spec.name.clone().ok_or_else(|| Status::INVALID_ARGS.into_raw())?;
         if let Ok(name_regex) = Regex::new(NAME_REGEX) {
             if !name_regex.is_match(&name) {
-                tracing::error!(
-                    "Invalid spec name. Name can only contain [A-Za-z0-9-_] characters"
-                );
+                log::error!("Invalid spec name. Name can only contain [A-Za-z0-9-_] characters");
                 return Err(Status::INVALID_ARGS.into_raw());
             }
         } else {
-            tracing::warn!("Regex failure. Unable to validate spec name");
+            log::warn!("Regex failure. Unable to validate spec name");
         }
 
         let parents = spec.parents.clone().ok_or_else(|| Status::INVALID_ARGS.into_raw())?;
@@ -167,7 +165,7 @@ impl CompositeNodeSpecManager {
         let matched_composite_result = find_composite_driver_match(&parents, &composite_drivers);
 
         if let Some(matched_composite) = &matched_composite_result {
-            tracing::info!(
+            log::info!(
                 "Matched '{}' to composite node spec '{}'",
                 get_driver_url(matched_composite),
                 name
@@ -246,7 +244,7 @@ impl CompositeNodeSpecManager {
             let parents = composite_info.spec.as_ref().unwrap().parents.as_ref().unwrap();
             let matched_composite_result = match_composite_properties(resolved_driver, parents);
             if let Ok(Some(matched_composite)) = matched_composite_result {
-                tracing::info!(
+                log::info!(
                     "Matched '{}' to composite node spec '{}'",
                     get_driver_url(&matched_composite),
                     name

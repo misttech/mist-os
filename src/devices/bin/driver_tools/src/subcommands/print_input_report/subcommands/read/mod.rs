@@ -80,7 +80,7 @@ pub async fn read(
             if let Err(err) =
                 read_input_device(input_device_proxy, &input_device_path, usize::MAX, writer).await
             {
-                tracing::error!(from = ?input_device_path, %err, "Failed to print input reports");
+                log::error!(from:? = input_device_path, err:%; "Failed to print input reports");
             }
         })
         .detach();

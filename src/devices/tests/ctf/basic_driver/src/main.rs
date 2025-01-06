@@ -8,8 +8,8 @@ use fuchsia_component::client::{connect_to_protocol, Service};
 use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::prelude::*;
+use log::info;
 use realm_client::{extend_namespace, InstalledNamespace};
-use tracing::info;
 use {
     fidl_fuchsia_basicdriver_ctftest as ctf, fidl_fuchsia_driver_test as fdt,
     fidl_fuchsia_driver_testing as ftest, fidl_fuchsia_io as fio, fuchsia_async as fasync,

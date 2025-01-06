@@ -107,8 +107,8 @@ impl Indexer {
             match parsed_hash {
                 Ok(h) => Some(BlobId::from(h)),
                 Err(e) => {
-                    tracing::warn!("Failed to parse package_hash in disable_driver: {:?}.", e);
-                    tracing::warn!("Skipping hash comparisons.");
+                    log::warn!("Failed to parse package_hash in disable_driver: {:?}.", e);
+                    log::warn!("Skipping hash comparisons.");
                     None
                 }
             }
@@ -117,7 +117,7 @@ impl Indexer {
         for driver in self.boot_repo.borrow_mut().iter_mut() {
             if driver.component_url.as_str() == driver_url {
                 if requested_hash.is_some() && requested_hash != driver.package_hash {
-                    tracing::warn!(
+                    log::warn!(
                         "{} found matching driver url, but skipping due to hash mismatch.",
                         op
                     );
@@ -138,7 +138,7 @@ impl Indexer {
                 for driver in base_repo.iter_mut() {
                     if driver.component_url.as_str() == driver_url {
                         if requested_hash.is_some() && requested_hash != driver.package_hash {
-                            tracing::warn!(
+                            log::warn!(
                                 "{} found matching driver url, but skipping due to hash mismatch.",
                                 op
                             );
@@ -160,7 +160,7 @@ impl Indexer {
         for (_url, driver) in self.ephemeral_drivers.borrow_mut().iter_mut() {
             if driver.component_url.as_str() == driver_url {
                 if requested_hash.is_some() && requested_hash != driver.package_hash {
-                    tracing::warn!(
+                    log::warn!(
                         "{} found matching driver url, but skipping due to hash mismatch.",
                         op
                     );
@@ -199,9 +199,9 @@ impl Indexer {
         mut receiver: futures::channel::mpsc::UnboundedReceiver<Vec<ResolvedDriver>>,
     ) {
         while let Some(mut drivers) = receiver.next().await {
-            tracing::info!("Loaded drivers into the driver index:");
+            log::info!("Loaded drivers into the driver index:");
             for driver in &drivers {
-                tracing::info!("     {}", driver.component_url);
+                log::info!("     {}", driver.component_url);
                 let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
                 composite_node_spec_manager.new_driver_available(driver);
             }
@@ -215,7 +215,7 @@ impl Indexer {
             Some(ref notifier) => {
                 let result = notifier.new_driver_available();
                 if let Err(e) = result {
-                    tracing::warn!("Failed to send new_driver_available: {:?}", e);
+                    log::warn!("Failed to send new_driver_available: {:?}", e);
                 }
             }
             None => {}
@@ -266,7 +266,7 @@ impl Indexer {
 
     pub fn match_driver(&self, args: fdi::MatchDriverArgs) -> fdi::DriverIndexMatchDriverResult {
         if args.properties.is_none() {
-            tracing::error!("Failed to match driver: empty properties");
+            log::error!("Failed to match driver: empty properties");
             return Err(Status::INVALID_ARGS.into_raw());
         }
         let properties = args.properties.unwrap();
@@ -308,13 +308,13 @@ impl Indexer {
             (0, 1) => Ok(fallback.pop().unwrap().1),
             (0, 0) => Err(Status::NOT_FOUND.into_raw()),
             (0, _) => {
-                tracing::error!("Failed to match driver: Encountered unsupported behavior: Zero non-fallback drivers and more than one fallback drivers were matched");
-                tracing::error!("Fallback drivers {:#?}", fallback);
+                log::error!("Failed to match driver: Encountered unsupported behavior: Zero non-fallback drivers and more than one fallback drivers were matched");
+                log::error!("Fallback drivers {:#?}", fallback);
                 Err(Status::NOT_SUPPORTED.into_raw())
             }
             _ => {
-                tracing::error!("Failed to match driver: Encountered unsupported behavior: Multiple non-fallback drivers were matched");
-                tracing::error!("Drivers {:#?}", non_fallback);
+                log::error!("Failed to match driver: Encountered unsupported behavior: Multiple non-fallback drivers were matched");
+                log::error!("Drivers {:#?}", non_fallback);
                 Err(Status::NOT_SUPPORTED.into_raw())
             }
         }
@@ -402,12 +402,12 @@ impl Indexer {
         resolver: &fresolution::ResolverProxy,
     ) -> Result<(), i32> {
         let component_url = cm_types::Url::new(&driver_url).map_err(|e| {
-            tracing::error!("Couldn't parse driver url: {}: error: {}", &driver_url, e);
+            log::error!("Couldn't parse driver url: {}: error: {}", &driver_url, e);
             Status::ADDRESS_UNREACHABLE.into_raw()
         })?;
         for boot_driver in self.boot_repo.borrow().iter() {
             if boot_driver.component_url == component_url {
-                tracing::warn!("Driver being registered already exists in boot list.");
+                log::warn!("Driver being registered already exists in boot list.");
                 return Err(Status::ALREADY_EXISTS.into_raw());
             }
         }
@@ -416,7 +416,7 @@ impl Indexer {
             BaseRepo::Resolved(resolved_base_drivers) => {
                 for base_driver in resolved_base_drivers {
                     if base_driver.component_url == component_url {
-                        tracing::warn!("Driver being registered already exists in base list.");
+                        log::warn!("Driver being registered already exists in base list.");
                         return Err(Status::ALREADY_EXISTS.into_raw());
                     }
                 }
@@ -441,9 +441,9 @@ impl Indexer {
         let existing = ephemeral_drivers.insert(component_url.clone(), resolved_driver);
 
         if let Some(existing_driver) = existing {
-            tracing::info!("Updating existing ephemeral driver {}.", existing_driver);
+            log::info!("Updating existing ephemeral driver {}.", existing_driver);
         } else {
-            tracing::info!("Registered driver successfully: {}.", component_url);
+            log::info!("Registered driver successfully: {}.", component_url);
         }
 
         Ok(())
@@ -460,11 +460,11 @@ impl Indexer {
             return Err(Status::NOT_FOUND.into_raw());
         }
 
-        tracing::info!("Disabled {} driver(s).", count);
+        log::info!("Disabled {} driver(s).", count);
 
         let rebind_result = self.rebind_composites_with_driver(driver_url);
         if let Err(e) = rebind_result {
-            tracing::error!(
+            log::error!(
                 "Failed to rebind composites with the driver being disabled: {}.",
                 Status::from_raw(e)
             );
@@ -484,11 +484,11 @@ impl Indexer {
             return Err(Status::NOT_FOUND.into_raw());
         }
 
-        tracing::info!("Enabled {} driver(s).", count);
+        log::info!("Enabled {} driver(s).", count);
 
         let rebind_result = self.rebind_composites_with_driver(driver_url);
         if let Err(e) = rebind_result {
-            tracing::error!(
+            log::error!(
                 "Failed to rebind composites with the driver being enabled: {}.",
                 Status::from_raw(e)
             );

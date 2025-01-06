@@ -8,8 +8,8 @@ use fidl::HandleBased;
 use fuchsia_component::directory::AsRefDirectory;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
+use log::info;
 use std::collections::HashSet;
-use tracing::info;
 use vfs::remote;
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess, fidl_fuchsia_process_lifecycle as fpl,

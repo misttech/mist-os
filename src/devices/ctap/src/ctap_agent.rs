@@ -10,9 +10,9 @@ use fuchsia_fs::directory::{WatchEvent, Watcher};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use futures::lock::Mutex;
 use futures::TryStreamExt;
+use log::{error, info, warn};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Contains a reference to the currently connected key.

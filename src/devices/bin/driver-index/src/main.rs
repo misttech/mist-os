@@ -54,7 +54,7 @@ fn ignore_peer_closed(err: fidl::Error) -> Result<(), fidl::Error> {
 }
 
 fn log_error(err: anyhow::Error) -> anyhow::Error {
-    tracing::error!("{:#?}", err);
+    log::error!("{:#?}", err);
     err
 }
 
@@ -245,7 +245,7 @@ async fn run_driver_registrar_server(
                     }
                 }
                 fdr::DriverRegistrarRequest::_UnknownMethod { ordinal, method_type, .. } => {
-                    tracing::warn!(
+                    log::warn!(
                         "DriverRegistrarRequest::UnknownMethod {:?} with ordinal {}",
                         method_type,
                         ordinal
@@ -352,7 +352,7 @@ async fn run_load_base_drivers(
         .await
         .context("Error loading base packages")
         .map_err(log_error);
-        tracing::info!("loaded base drivers.");
+        log::info!("loaded base drivers.");
         res
     } else {
         Ok(())
@@ -437,7 +437,7 @@ async fn run_driver_index(
                             Ok(())
                         }
                     }
-                    .unwrap_or_else(|e| tracing::error!("Error running index_server: {:?}", e))
+                    .unwrap_or_else(|e| log::error!("Error running index_server: {:?}", e))
                 })
                 .await;
     Ok(())
@@ -522,10 +522,10 @@ async fn main() -> Result<()> {
         .filter_map(|url| cm_types::Url::new(url).ok())
         .collect();
     for driver in disabled_drivers.iter() {
-        tracing::info!("Disabling driver {}", driver);
+        log::info!("Disabling driver {}", driver);
     }
     for driver in eager_drivers.iter() {
-        tracing::info!("Marking driver {} as eager", driver);
+        log::info!("Marking driver {} as eager", driver);
     }
 
     let boot_resolver = client::connect_to_protocol_at_path::<fresolution::ResolverMarker>(
@@ -552,7 +552,7 @@ async fn main() -> Result<()> {
     let boot_repo_resume = resumed_state.as_ref().and_then(|s| s.boot_repo.clone());
     let boot_drivers = match boot_repo_resume {
         Some(boot_repo) => {
-            tracing::info!("loading boot drivers from escrow.");
+            log::info!("loading boot drivers from escrow.");
             boot_repo
         }
         None => {
@@ -567,7 +567,7 @@ async fn main() -> Result<()> {
     for argument in std::env::args() {
         if argument == "--no-base-drivers" {
             should_load_base_drivers = false;
-            tracing::info!("Not loading base drivers");
+            log::info!("Not loading base drivers");
         }
     }
 
@@ -629,7 +629,7 @@ async fn main() -> Result<()> {
     // indicates a stop request came in from the Component Framework.
     futures::select! {
         (base_drivers_result, index_result) = main_tasks => {
-            tracing::info!("driver-index stopping because it is idle.");
+            log::info!("driver-index stopping because it is idle.");
 
             if base_drivers_result.is_err() {
                 return base_drivers_result;
@@ -640,7 +640,7 @@ async fn main() -> Result<()> {
             }
         },
         () = stop_watcher => {
-            tracing::info!("driver-index stopping because it was told to stop.");
+            log::info!("driver-index stopping because it was told to stop.");
         }
     }
 
@@ -758,7 +758,7 @@ mod tests {
                         context: _,
                         responder,
                     } => {
-                        tracing::error!(
+                        log::error!(
                             "ResolveWithContext is not currently implemented in driver-index"
                         );
                         responder
@@ -766,7 +766,7 @@ mod tests {
                             .context("error sending response")?;
                     }
                     fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
-                        tracing::warn!(%ordinal, "Unknown Resolver request");
+                        log::warn!(ordinal:%; "Unknown Resolver request");
                     }
                 }
                 Ok(())
