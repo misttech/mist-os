@@ -161,6 +161,10 @@ fn create_tee_clients(
             ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
         },
         cml::Offer {
+            dictionary: Some(create_name("diagnostics")?.into()),
+            ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
+        },
+        cml::Offer {
             protocol: Some(create_name("fuchsia.tracing.provider.Registry")?.into()),
             availability: Some(cml::Availability::SameAsTarget),
             ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
@@ -407,6 +411,11 @@ mod tests {
           },
           {
             "protocol": "fuchsia.logger.LogSink",
+            "from": "parent",
+            "to": "all"
+          },
+          {
+            "dictionary": "diagnostics",
             "from": "parent",
             "to": "all"
           },

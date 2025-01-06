@@ -39,6 +39,11 @@
             to: "#system-activity-governor",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [ "#system-activity-governor" ],
+        },
+        {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
             to: "#system-activity-governor",

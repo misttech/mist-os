@@ -34,6 +34,11 @@
             to: "#system-update-committer",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#system-update-committer",
+        },
+        {
             directory: "system-update-committer-config-data",
             from: "parent",
             as: "config-data",

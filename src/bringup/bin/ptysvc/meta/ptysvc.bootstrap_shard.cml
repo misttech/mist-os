@@ -15,6 +15,11 @@
             to: "#ptysvc",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#ptysvc",
+        },
+        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",

@@ -34,6 +34,11 @@
             to: "#kernel_debug_broker",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#kernel_debug_broker",
+        },
+        {
             protocol: "fuchsia.component.Binder",
             from: "#kernel_debug_broker",
             as: "fuchsia.component.KernelDebugBrokerBinder",

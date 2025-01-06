@@ -15,6 +15,11 @@
             to: "#process_resolver",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#process_resolver",
+        },
+        {
             protocol: "fuchsia.pkg.PackageResolver-base",
             from: "parent",
             as: "fuchsia.pkg.PackageResolver-pkg",

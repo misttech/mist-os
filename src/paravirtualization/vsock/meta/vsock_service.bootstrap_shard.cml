@@ -22,6 +22,11 @@
             to: "#vsock",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [ "#vsock" ],
+        },
+        {
             protocol: "fuchsia.hardware.vsock.Device",
             from: "#vsock-loopback",
             as: "fuchsia.hardware.vsock.Device-Loopback",

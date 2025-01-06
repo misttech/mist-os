@@ -22,9 +22,17 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.power.SuspendEnabled" ],
             from: "parent",
             to: "#full-drivers",
-            config: [ "fuchsia.power.SuspendEnabled" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#full-drivers",
+                "#full_resolver",
+            ],
         },
 
         // Full resolver dependencies

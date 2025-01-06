@@ -10,10 +10,15 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.network.PrimaryInterface" ],
             from: "parent",
             to: "#device_name_provider",
-            config: [ "fuchsia.network.PrimaryInterface" ],
             availability: "optional",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#device_name_provider",
         },
         {
             protocol: [

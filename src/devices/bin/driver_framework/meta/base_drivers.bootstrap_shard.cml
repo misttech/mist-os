@@ -24,6 +24,11 @@
             availability: "optional",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [ "#base-drivers" ],
+        },
+        {
             protocol: "fuchsia.kernel.InfoResource",
             from: "parent",
             to: "#base-drivers",

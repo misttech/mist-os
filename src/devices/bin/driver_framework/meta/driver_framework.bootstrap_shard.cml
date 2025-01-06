@@ -68,6 +68,18 @@
             availability: "optional",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#boot-drivers",
+                "#devfs",
+                "#devfs-with-pkg",
+                "#driver-hosts",
+                "#driver_index",
+                "#driver_manager",
+            ],
+        },
+        {
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",

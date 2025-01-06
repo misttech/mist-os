@@ -41,6 +41,11 @@
             to: "#system-updater",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#system-updater",
+        },
+        {
             directory: "system",
             from: "parent",
             to: "#system-updater",

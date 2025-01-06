@@ -259,7 +259,10 @@
         {
             dictionary: "diagnostics",
             from: "#bootstrap",
-            to: "#core",
+            to: [
+                "#core",
+                "#startup",
+            ],
         },
         {
             service: [

@@ -26,6 +26,11 @@
             subdir: "config/cpu_manager",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#cpu_manager",
+        },
+        {
             protocol: [ "fuchsia.thermal.ClientStateConnector" ],
             from: "#power_manager",
             to: "#cpu_manager",

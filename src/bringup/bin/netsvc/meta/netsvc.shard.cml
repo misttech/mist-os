@@ -11,9 +11,9 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.network.PrimaryInterface" ],
             from: "parent",
             to: "#netsvc",
-            config: [ "fuchsia.network.PrimaryInterface" ],
             availability: "optional",
         },
         {
@@ -75,6 +75,11 @@
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
+            to: "#netsvc",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
             to: "#netsvc",
         },
     ],

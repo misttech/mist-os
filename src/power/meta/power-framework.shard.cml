@@ -23,6 +23,14 @@
             availability: "optional",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#power-broker",
+                "#power_manager",
+            ],
+        },
+        {
             directory: "boot",
             from: "parent",
             as: "config",

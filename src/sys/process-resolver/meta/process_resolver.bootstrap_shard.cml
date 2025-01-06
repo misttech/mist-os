@@ -20,6 +20,11 @@
             to: "#process_resolver",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#process_resolver",
+        },
+        {
             protocol: "fuchsia.pkg.PackageResolver-pkg",
             from: "void",
             to: "#process_resolver",

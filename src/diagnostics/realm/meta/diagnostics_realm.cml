@@ -11,14 +11,19 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: "fuchsia.update.Listener",
+            from: "parent",
+            to: [ "#persistence" ],
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: "all",
         },
         {
-            protocol: "fuchsia.update.Listener",
+            protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: [ "#persistence" ],
+            to: "all",
         },
         {
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor.feedback" ],

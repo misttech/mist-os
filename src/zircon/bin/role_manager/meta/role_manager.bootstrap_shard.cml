@@ -30,6 +30,11 @@
             from: "#archivist",
             to: "#role_manager",
         },
+        {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#role_manager",
+        },
     ],
     expose: [
         {

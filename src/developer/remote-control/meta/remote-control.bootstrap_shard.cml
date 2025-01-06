@@ -45,6 +45,11 @@
             to: "#remote-control",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#remote-control",
+        },
+        {
             directory: "dev-overnet-usb",
             from: "void",
             to: "#remote-control",

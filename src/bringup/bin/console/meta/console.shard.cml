@@ -277,6 +277,15 @@
             source_availability: "unknown",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#boot-shell-commands",
+                "#console",
+                "#console-launcher",
+            ],
+        },
+        {
             protocol: [
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.host.ArchiveAccessor",

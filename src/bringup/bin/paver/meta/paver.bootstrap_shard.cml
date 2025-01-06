@@ -51,6 +51,11 @@
             to: "#paver",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#paver",
+        },
+        {
             protocol: [
                 "fuchsia.fshost.Admin",
                 "fuchsia.fshost.Recovery",

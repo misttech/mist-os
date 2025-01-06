@@ -22,6 +22,11 @@
             to: "#system-update-checker",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [ "#system-update-checker" ],
+        },
+        {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "parent",
             to: "#system-update-checker",

@@ -23,6 +23,15 @@
             to: "#system-activity-governor",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: [
+                "#config-use-suspender",
+                "#fake-suspend",
+                "#system-activity-governor",
+            ],
+        },
+        {
             config: [ "fuchsia.power.WaitForSuspendingToken" ],
             from: "parent",
             to: "#system-activity-governor",

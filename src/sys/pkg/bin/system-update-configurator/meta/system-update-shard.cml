@@ -18,6 +18,11 @@
             to: [ "#system-update-configurator" ],
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#system-update-configurator",
+        },
+        {
             protocol: [
                 "fuchsia.tee.Application.99dc95b2-938e-47eb-80e8-9404ae8a1385",
                 "fuchsia.tee.DeviceInfo",
