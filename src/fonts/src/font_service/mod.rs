@@ -26,10 +26,10 @@ use fidl_fuchsia_intl::LocaleId;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use futures::prelude::*;
 use itertools::Itertools;
+use log::{debug, error, warn};
 use std::collections::BTreeMap;
 use std::iter;
 use std::sync::Arc;
-use tracing::{debug, error, warn};
 use unicase::UniCase;
 use {
     fidl_fuchsia_fonts_experimental as fonts_exp, fuchsia_async as fasync, fuchsia_trace as trace,
@@ -536,7 +536,7 @@ where
                 .await
                 .context("Error while handling font provider request")
                 .map_err(|err| {
-                    error!(?err);
+                    error!("{err:?}");
                     err
                 })?;
         }
@@ -552,7 +552,7 @@ where
                 .await
                 .context("Error while handling experimental font provider request")
                 .map_err(|err| {
-                    error!(?err);
+                    error!("{err:?}");
                     err
                 })?;
         }

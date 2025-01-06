@@ -102,7 +102,7 @@ where
             .map(|manifest_or_path| match manifest_or_path {
                 ManifestOrPath::Manifest(manifest) => Ok((manifest, None)),
                 ManifestOrPath::Path(path) => {
-                    tracing::debug!(?path, "Loading manifest");
+                    log::debug!(path:?; "Loading manifest");
                     Ok((FontsManifest::load_from_file(&path)?, Some(path)))
                 }
             })

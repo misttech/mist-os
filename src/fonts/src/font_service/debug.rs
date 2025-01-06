@@ -4,8 +4,8 @@
 
 use anyhow::{Error, Result};
 use fidl_fuchsia_fonts as fonts;
+use log::debug;
 use std::stringify;
-use tracing::debug;
 
 macro_rules! format_field {
     ($debug_struct:expr, $parent:expr, $field:ident, $wrapper:path) => {

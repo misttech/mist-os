@@ -8,7 +8,7 @@ use fidl_fuchsia_pkg::{FontResolverRequest, FontResolverRequestStream};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_url::AbsolutePackageUrl;
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
