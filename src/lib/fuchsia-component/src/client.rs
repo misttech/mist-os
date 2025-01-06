@@ -435,20 +435,7 @@ impl<S: ServiceMarker> FusedStream for ServiceInstanceStream<S> {
 // inputs but Rust limits specifying explicit generic parameters when `impl-traits`
 // are present.
 pub fn connect_to_service_instance<S: ServiceMarker>(instance: &str) -> Result<S::Proxy, Error> {
-    connect_to_service_instance_at::<S>(SVC_DIR, instance)
-}
-
-/// Connect to an instance of a FIDL service using the provided path prefix.
-/// `path_prefix` should not contain any slashes.
-/// `instance` is a path of one or more components.
-// NOTE: We would like to use impl AsRef<T> to accept a wide variety of string-like
-// inputs but Rust limits specifying explicit generic parameters when `impl-traits`
-// are present.
-pub fn connect_to_service_instance_at<S: ServiceMarker>(
-    path_prefix: &str,
-    instance: &str,
-) -> Result<S::Proxy, Error> {
-    let service_path = format!("{}/{}/{}", path_prefix, S::SERVICE_NAME, instance);
+    let service_path = format!("{}/{}/{}", SVC_DIR, S::SERVICE_NAME, instance);
     let directory_proxy =
         fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
