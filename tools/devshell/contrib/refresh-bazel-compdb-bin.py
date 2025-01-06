@@ -16,6 +16,10 @@ _OPT_PATTERN = re.compile("[\W]+")
 
 _SHOULD_LOG = False
 
+_FIDL_FUCHSIA_SDK_REGEX_PATTERN = re.compile(
+    ".*bazel-out.*\/fuchsia_sdk\/fidl\/.*\/_virtual_includes\/(.*)_cpp"
+)
+
 
 class Action:
     """Represents an action that comes from aquery"""
@@ -76,17 +80,24 @@ class CompDBFormatter:
         if file_path.startswith(("sdk/", "src/", "vendor/", "zircon/")):
             return "../../" + file_path
 
+        # If we are incliding a generated fidl file change it to point to the fidling
+        # directory. This is needed because the fidl libraries use a _virtual_include
+        # path when we run the original query which does not seem to point to a valid
+        # location. Instead we can fall back to the gn generated code. This is currently
+        # a best effort attempt.
+        fidl_match = _FIDL_FUCHSIA_SDK_REGEX_PATTERN.match(file_path)
+        if fidl_match:
+            fidl_lib = fidl_match.group(1)
+            return f"-Ifidling/gen/sdk/fidl/{fidl_lib}/{fidl_lib}/cpp"
+
         # bazel-out needs to be checked first because it contains external/ paths
         if "bazel-out/" in file_path:
-            return file_path.replace("bazel-out/", self.output_path_rel + "/")
+            return file_path.replace("bazel-out", "../../bazel-out", 1)
 
         # Look for arguments to files in external/ paths. This is usually
         # the clang binary and include roots
         if "external/" in file_path:
-            return file_path.replace(
-                "external/",
-                os.path.join(self.output_base_rel, "external") + "/",
-            )
+            return file_path.replace("external", "../../bazel-repos", 1)
 
         # Just a regular argument
         return file_path
