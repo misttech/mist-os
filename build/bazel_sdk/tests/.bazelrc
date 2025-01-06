@@ -10,14 +10,6 @@ build:fuchsia_riscv64 --crosstool_top=@fuchsia_clang//:toolchain
 build:fuchsia_riscv64 --cpu=riscv64
 build:fuchsia_riscv64 --copt=--debug --strip=never
 
-# `fx build bazel_sdk_tests` can pass `--config=gcertauth` along, so set this
-# config alias to prevent any build errors.
-# TODO(https://fxbug.dev/384956017): Remove once we can import
-# `remote_services.bazelrc` here.
-# LINT.IfChange
-build:gcertauth --credential_helper=*.googleapis.com=/google/src/head/depot/google3/devtools/blaze/bazel/credhelper/credhelper
-# LINT.ThenChange(//build/bazel/templates/template.remote_services.bazelrc)
-
 # The @fuchsia_build_config//:host platform definition always
 # matches the host os and cpu, which is very convenient to avoid
 # a hard-coded --host_cpu=k8 flag in this file (which would not
