@@ -12,7 +12,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::stream::{StreamExt, TryStreamExt};
 use futures::FutureExt;
-use tracing::{debug, error, trace, warn};
+use log::{debug, error, trace, warn};
 use zx::{self as zx, AsHandleRef, Peered};
 
 use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};

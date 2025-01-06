@@ -58,7 +58,7 @@ rustc_test("integration_test_bin") {
     "//src/sys/time/testing/fidl/test.time.realm:fidl_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 
@@ -135,7 +135,7 @@ rustc_test("faketime_integration_test_bin") {
     "//src/sys/time/testing/fidl/test.time.realm:fidl_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 

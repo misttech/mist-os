@@ -27,7 +27,7 @@ enum Services {
 
 #[fuchsia::main(logging_tags = [ "test", "timekeeper-test-realm-factory" ])]
 async fn main() -> Result<()> {
-    tracing::debug!("starting timekeeper test realm factory");
+    log::debug!("starting timekeeper test realm factory");
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(Services::RealmFactory);
     fs.take_and_serve_directory_handle()?;
@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
         Services::RealmFactory(stream) => serve_realm_factory(stream),
     })
     .await;
-    tracing::debug!("stopping timekeeper test realm factory");
+    log::debug!("stopping timekeeper test realm factory");
     Ok(())
 }
 
@@ -57,11 +57,11 @@ async fn serve_rtc_updates(
             }
             m @ fttr::RtcUpdatesRequest::_UnknownMethod { .. } => {
                 // Have we expanded the FIDL API, but forgotten to add an implementation?
-                tracing::warn!("RtcUpdates endpoint received an unknown FIDL request: {:?}", &m);
+                log::warn!("RtcUpdates endpoint received an unknown FIDL request: {:?}", &m);
             }
         }
     }
-    tracing::debug!("serve_push_puppet is terminating - all connections will be closed");
+    log::debug!("serve_push_puppet is terminating - all connections will be closed");
     Ok(())
 }
 
@@ -73,7 +73,7 @@ async fn serve_push_puppet(
     while let Some(Ok(request)) = stream.next().await {
         match request {
             fttr::PushSourcePuppetRequest::Crash { responder, .. } => {
-                tracing::debug!("simulating crash...");
+                log::debug!("simulating crash...");
                 puppet.simulate_crash();
                 responder.send()?;
             }
@@ -81,25 +81,22 @@ async fn serve_push_puppet(
                 responder.send(puppet.lifetime_served_connections())?;
             }
             fttr::PushSourcePuppetRequest::SetSample { sample, responder, .. } => {
-                tracing::debug!("setting sample: {:?}", &sample);
+                log::debug!("setting sample: {:?}", &sample);
                 puppet.set_sample(sample).await;
                 responder.send()?;
             }
             fttr::PushSourcePuppetRequest::SetStatus { status, responder, .. } => {
-                tracing::debug!("setting status: {:?}", &status);
+                log::debug!("setting status: {:?}", &status);
                 puppet.set_status(status).await;
                 responder.send()?;
             }
             m @ fttr::PushSourcePuppetRequest::_UnknownMethod { .. } => {
                 // Have we expanded the FIDL API, but forgotten to add an implementation?
-                tracing::warn!(
-                    "PushSourcePuppet endpoint received an unknown FIDL request: {:?}",
-                    &m
-                );
+                log::warn!("PushSourcePuppet endpoint received an unknown FIDL request: {:?}", &m);
             }
         }
     }
-    tracing::debug!("serve_push_puppet is terminating - all connections will be closed");
+    log::debug!("serve_push_puppet is terminating - all connections will be closed");
     Ok(())
 }
 
@@ -125,7 +122,7 @@ fn serve_realm_factory(mut stream: fttr::RealmFactoryRequestStream) -> BoxFuture
         let mut task_group = fasync::TaskGroup::new();
         let result: Result<()> = async move {
             while let Ok(Some(request)) = stream.try_next().await {
-                tracing::trace!("received a request: {:?}", &request);
+                log::trace!("received a request: {:?}", &request);
                 match request {
                     fttr::RealmFactoryRequest::_UnknownMethod { control_handle, .. } => {
                         control_handle.shutdown_with_epitaph(zx_status::Status::NOT_SUPPORTED);
@@ -188,7 +185,7 @@ fn serve_realm_factory(mut stream: fttr::RealmFactoryRequestStream) -> BoxFuture
                 }
             }
 
-            tracing::debug!("waiting for the realms to complete");
+            log::debug!("waiting for the realms to complete");
             task_group.join().await;
             Ok(())
         }

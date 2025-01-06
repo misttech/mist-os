@@ -12,8 +12,8 @@ use fidl_fuchsia_time_external::{Status, Urgency};
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_runtime::UtcInstant;
 use futures::{FutureExt as _, StreamExt as _};
+use log::{debug, error, info, warn};
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 
 /// Sets the maximum rate at which Timekeeper is willing to accept new updates from a time source in
 /// order to limit the Timekeeper resource utilization. This value is also used to apply an upper

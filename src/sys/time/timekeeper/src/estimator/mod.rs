@@ -11,10 +11,9 @@ use crate::time_source::Sample;
 use crate::{Config, UtcTransform};
 use chrono::prelude::*;
 use frequency::FrequencyEstimator;
-
 use kalman_filter::KalmanFilter;
+use log::{info, warn};
 use std::sync::Arc;
-use tracing::{info, warn};
 
 /// The maximum change in Kalman filter estimate that can occur before we discard any previous
 /// samples being used as part of a long term frequency assessment. This is similar to the value

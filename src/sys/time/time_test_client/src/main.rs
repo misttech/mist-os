@@ -11,7 +11,7 @@ use anyhow::Error;
 use chrono::{DateTime, TimeZone as _, Timelike as _, Utc};
 use futures::prelude::*;
 use lazy_static::lazy_static;
-use tracing::{info, warn};
+use log::{info, warn};
 use {fuchsia_async as fasync, fuchsia_runtime as runtime};
 
 /// Delay between polls of system and userspace clocks.

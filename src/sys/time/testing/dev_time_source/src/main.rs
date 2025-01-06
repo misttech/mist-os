@@ -9,7 +9,7 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 
 use futures::StreamExt;
-use tracing::info;
+use log::info;
 
 #[fuchsia::main(logging_tags=["time", "dev_time_source"])]
 async fn main() {

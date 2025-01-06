@@ -32,13 +32,13 @@ use fidl::HandleBased;
 use futures::channel::mpsc;
 use futures::sink::SinkExt;
 use futures::StreamExt;
+use log::{debug, error, warn};
 use scopeguard::defer;
 use std::cell::RefCell;
 use std::cmp;
 use std::collections::{BTreeMap, BinaryHeap, HashMap};
 use std::rc::Rc;
 use std::sync::LazyLock;
-use tracing::{debug, error, warn};
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_hardware_hrtimer as ffhh, fidl_fuchsia_time_alarms as fta, fuchsia_async as fasync,

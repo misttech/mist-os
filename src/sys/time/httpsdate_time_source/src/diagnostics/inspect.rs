@@ -13,8 +13,8 @@ use fuchsia_sync::Mutex;
 
 use fuchsia_runtime::{UtcDuration, UtcInstant};
 use httpdate_hyper::HttpsDateErrorType;
+use log::error;
 use std::collections::HashMap;
-use tracing::error;
 
 /// Maximum number of successful samples recorded.
 const SAMPLES_RECORDED: usize = 5;

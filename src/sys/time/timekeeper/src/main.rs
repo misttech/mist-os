@@ -33,11 +33,11 @@ use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcClockUpdate, UtcDuration, Ut
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
+use log::{debug, error, info, warn};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
-use tracing::{debug, error, info, warn};
 use zx::BootTimeline;
 use {
     fidl_fuchsia_time as ftime, fidl_fuchsia_time_alarms as fta, fidl_fuchsia_time_test as fftt,
@@ -340,7 +340,7 @@ async fn main() -> Result<()> {
                             rtc_testing::serve(allow_update_rtc, stream)
                                 .await
                                 .map_err(|e| {
-                                    tracing::error!("while serving fuchsia.time.test/RPC: {:?}", e)
+                                    log::error!("while serving fuchsia.time.test/RPC: {:?}", e)
                                 })
                                 .unwrap_or(());
                         } else {
@@ -539,7 +539,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         }
     }
     if config.get_early_exit() {
-        tracing::info!("early_exit=true: exiting early per request from configuration. UTC clock will not be managed");
+        log::info!("early_exit=true: exiting early per request from configuration. UTC clock will not be managed");
         return;
     }
     let primary_source_manager = time_source_fn(

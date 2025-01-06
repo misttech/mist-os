@@ -8,12 +8,12 @@
 use anyhow::Result;
 use fidl_fuchsia_time_test as fftt;
 use futures::StreamExt;
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use std::cell::Cell;
 use std::fs;
 use std::path::Path;
 use std::rc::Rc;
-use tracing::{debug, error};
 
 /// The path to the internal production persistent state file.
 const PERSISTENT_STATE_PATH: &'static str = "/data/persistent_state.json";

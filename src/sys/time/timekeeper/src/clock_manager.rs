@@ -14,12 +14,12 @@ use chrono::prelude::*;
 use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcDuration, UtcInstant};
 use futures::channel::mpsc;
 use futures::{select, FutureExt, SinkExt, StreamExt};
+use log::{debug, error, info, warn};
 use std::cell::Cell;
 use std::cmp;
 use std::fmt::{self, Debug};
 use std::rc::Rc;
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
 use zx::AsHandleRef;
 use {fidl_fuchsia_time as fft, fuchsia_async as fasync};
 

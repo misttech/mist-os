@@ -7,7 +7,7 @@ use fidl::endpoints::{create_proxy, ProtocolMarker};
 use fuchsia_component::client;
 use futures::channel::mpsc;
 use futures::{future, Future, SinkExt, StreamExt};
-use tracing::{debug, error};
+use log::{debug, error};
 use {fidl_fuchsia_power_broker as fpb, fidl_fuchsia_power_system as fps, fuchsia_async as fasync};
 
 const ELEMENT_NAME: &str = "timekeeper-pe";
@@ -151,8 +151,7 @@ mod tests {
     use super::*;
     use crate::Command;
     use fidl::endpoints;
-
-    use tracing::debug;
+    use log::debug;
 
     // Returns immediately.
     async fn async_send_via(s: &mut mpsc::Sender<u8>, value: u8) {

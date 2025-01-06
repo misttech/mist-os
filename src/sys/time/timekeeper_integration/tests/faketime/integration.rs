@@ -74,9 +74,9 @@ where
     Fut: Future<Output = ()>,
 {
     let utc_clock_copy = utc_clock.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicated");
-    tracing::debug!("using utc_clock_copy with koid: {}", koid_of(&utc_clock_copy));
+    log::debug!("using utc_clock_copy with koid: {}", koid_of(&utc_clock_copy));
     let utc_clock = Arc::new(utc_clock);
-    tracing::debug!("using utc_clock with koid     : {}", koid_of(&*utc_clock));
+    log::debug!("using utc_clock with koid     : {}", koid_of(&*utc_clock));
     let test_realm_proxy =
         client::connect_to_protocol::<fttr::RealmFactoryMarker>().with_context(|| {
             format!(
@@ -104,9 +104,9 @@ where
 
     let push_source_puppet = push_source_puppet.into_proxy();
     let push_source_controller = RemotePushSourcePuppet::new(push_source_puppet);
-    tracing::debug!("faketime_test: about to run test_fn");
+    log::debug!("faketime_test: about to run test_fn");
     let result = test_fn(utc_clock, push_source_controller, cobalt, fake_clock_controller).await;
-    tracing::debug!("faketime_test: done with run test_fn");
+    log::debug!("faketime_test: done with run test_fn");
     Ok(result)
 }
 
@@ -147,7 +147,7 @@ async fn test_restart_inactive_time_source_that_claims_healthy() -> Result<()> {
                 ..Default::default()
             })
             .await;
-        tracing::debug!("before CLOCK_STARTED");
+        log::debug!("before CLOCK_STARTED");
         fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED)
             .await
             .expect("Failed to wait for CLOCK_STARTED");
@@ -157,7 +157,7 @@ async fn test_restart_inactive_time_source_that_claims_healthy() -> Result<()> {
         )
         .await
         .expect("Failed to wait for SIGNAL_UTC_CLOCK_SYNCHRONIZED");
-        tracing::debug!("after SIGNAL_UTC_CLOCK_SYNCHRONIZED");
+        log::debug!("after SIGNAL_UTC_CLOCK_SYNCHRONIZED");
 
         assert_eq!(push_source_controller.lifetime_served_connections().await, 1);
 
@@ -216,7 +216,7 @@ async fn test_dont_restart_inactive_time_source_with_unhealthy_dependency() -> R
                 ..Default::default()
             })
             .await;
-        tracing::debug!("before CLOCK_STARTED");
+        log::debug!("before CLOCK_STARTED");
         fasync::OnSignals::new(&*clock, zx::Signals::CLOCK_STARTED)
             .await
             .expect("Failed to wait for CLOCK_STARTED");
@@ -226,7 +226,7 @@ async fn test_dont_restart_inactive_time_source_with_unhealthy_dependency() -> R
         )
         .await
         .unwrap();
-        tracing::debug!("after SIGNAL_UTC_CLOCK_SYNCHRONIZED");
+        log::debug!("after SIGNAL_UTC_CLOCK_SYNCHRONIZED");
         // Report unhealthy after first sample accepted.
         push_source_controller.set_status(Status::Network).await;
 
