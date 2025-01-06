@@ -49,6 +49,8 @@ class Environment : public fdf_testing::Environment {
     pdev_.AddFidlMetadata(fuchsia_hardware_clockimpl::ClockIdsMetadata::kSerializableName,
                           fuchsia_hardware_clockimpl::ClockIdsMetadata{{.clock_ids{}}});
 #endif
+    pdev_.AddFidlMetadata(fuchsia_hardware_clockimpl::InitMetadata::kSerializableName,
+                          fuchsia_hardware_clockimpl::InitMetadata{{.steps{}}});
   }
 
  private:

@@ -89,6 +89,8 @@ class Vim3Clock final : public fdf::DriverBase,
   fdf_metadata::MetadataServer<fuchsia_hardware_clockimpl::ClockIdsMetadata>
       clock_ids_metadata_server_;
 #endif
+  fdf_metadata::MetadataServer<fuchsia_hardware_clockimpl::InitMetadata>
+      clock_init_metadata_server_;
 };
 
 }  // namespace vim3_clock

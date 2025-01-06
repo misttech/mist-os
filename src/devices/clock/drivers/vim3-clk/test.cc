@@ -96,6 +96,17 @@ class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_de
     }
 #endif
 
+    if (metadata_id == fuchsia_hardware_clockimpl::InitMetadata::kSerializableName) {
+      fuchsia_hardware_clockimpl::InitMetadata metadata{{.steps{}}};
+      fit::result encoded_metadata = fidl::Persist(metadata);
+      if (encoded_metadata.is_error()) {
+        completer.ReplyError(encoded_metadata.error_value().status());
+        return;
+      }
+      completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(encoded_metadata.value()));
+      return;
+    }
+
     completer.ReplyError(ZX_ERR_NOT_FOUND);
   }
 
