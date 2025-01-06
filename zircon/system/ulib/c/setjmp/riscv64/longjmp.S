@@ -184,11 +184,9 @@
   restore_fs 11
 #endif
 
-  mv a0, a1
-  .cfi_undefined a0
-  bnez a0, .Lreturn
-  li a0, 1
-.Lreturn:
+  seqz a0, a1                   // a0 = (a1 == 0) ? 1 : 0
+  .cfi_undefined a0             // Caller's a0 is no longer recoverable.
+  add a0, a0, a1                // a0 += a1; AKA a0 = (a1 == 0) ? 1 : a1
   ret
 
 .end_function
