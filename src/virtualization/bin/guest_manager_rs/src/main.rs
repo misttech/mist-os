@@ -22,7 +22,7 @@ async fn main() -> Result<(), Error> {
     let mut manager = GuestManager::new_with_defaults();
     let lifecycle = Rc::new(connect_to_protocol::<GuestLifecycleMarker>()?);
     if let Err(err) = manager.run(lifecycle, fs).await {
-        tracing::error!(%err, "failed to run guest manager");
+        log::error!(err:%; "failed to run guest manager");
         Err(err)
     } else {
         Ok(())

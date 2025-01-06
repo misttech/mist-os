@@ -109,7 +109,7 @@ impl GuestInitiated {
                 GuestInitiatedShutdown::new(self.key, self.control_packets),
             ),
             op => {
-                tracing::error!("Unsupported GuestInitiated operation: {:?}", op);
+                log::error!("Unsupported GuestInitiated operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
                     self.control_packets,
@@ -148,7 +148,7 @@ impl GuestInitiated {
                 )))
             }
             Err(err) => {
-                tracing::error!(%err, "Failed to transition from GuestInitiated with error");
+                log::error!(err:%; "Failed to transition from GuestInitiated with error");
                 StateAction::UpdateState(VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
                     self.control_packets.clone(),
@@ -199,7 +199,7 @@ impl ClientInitiated {
                     let local_async = fasync::Socket::from_socket(device);
 
                     // TODO(https://fxbug.dev/42062247): Remove once flake is resolved.
-                    tracing::info!("Sending socket to client for {:?}", self.key);
+                    log::info!("Sending socket to client for {:?}", self.key);
 
                     self.responder.take().unwrap().send(Ok(client))?;
                     Ok(local_async)
@@ -216,7 +216,7 @@ impl ClientInitiated {
                         self.control_packets.clone(),
                     )),
                     Err(err) => {
-                        tracing::error!(%err, "Failed to transition out of ClientInitiated");
+                        log::error!(err:%; "Failed to transition out of ClientInitiated");
                         VsockConnectionState::ShutdownForced(ShutdownForced::new(
                             self.key,
                             self.control_packets.clone(),
@@ -228,7 +228,7 @@ impl ClientInitiated {
                 GuestInitiatedShutdown::new(self.key, self.control_packets.clone()),
             ),
             op => {
-                tracing::error!("Unsupported ClientInitiated operation: {:?}", op);
+                log::error!("Unsupported ClientInitiated operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
                     self.control_packets.clone(),
@@ -261,7 +261,7 @@ impl Drop for ClientInitiated {
             if let Err(err) =
                 self.responder.take().unwrap().send(Err(zx::Status::CONNECTION_REFUSED.into_raw()))
             {
-                tracing::error!(%err,"Connection failed to send closing message");
+                log::error!(err:%; "Connection failed to send closing message");
             }
         }
     }
@@ -371,8 +371,8 @@ impl ReadWrite {
             && !self.conn_flags.borrow().contains(VirtioVsockFlags::SHUTDOWN_RECIEVE)
         {
             if let Err(err) = self.socket.as_ref().half_close() {
-                tracing::error!(
-                    %err,
+                log::error!(
+                    err:%;
                     "Failed to half close remote socket upon receiving \
                     VirtioVsockFlags::SHUTDOWN_RECIEVE",
                 );
@@ -404,7 +404,7 @@ impl ReadWrite {
                 }
             }
             op => {
-                tracing::error!("Unsupported ReadWrite operation: {:?}", op);
+                log::error!("Unsupported ReadWrite operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
                     self.control_packets,
@@ -445,7 +445,7 @@ impl ReadWrite {
             && !self.conn_flags.borrow().contains(VirtioVsockFlags::SHUTDOWN_SEND)
         {
             if let Err(err) = self.send_credit_update_when_credit_available().await {
-                tracing::error!(%err);
+                log::error!(err:%; "");
                 return StateAction::UpdateState(VsockConnectionState::ShutdownForced(
                     ShutdownForced::new(self.key, self.control_packets.clone()),
                 ));
@@ -738,7 +738,7 @@ impl GuestInitiatedShutdown {
         match op {
             OpType::Shutdown => VsockConnectionState::GuestInitiatedShutdown(self),
             op => {
-                tracing::error!("Unsupported GuestInitiatedShutdown operation: {:?}", op);
+                log::error!("Unsupported GuestInitiatedShutdown operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
                     self.control_packets,
@@ -785,7 +785,7 @@ impl ClientInitiatedShutdown {
                 // A guest sending the device shutdown after itself being sent shutdown makes this
                 // difficult to ensure a clean disconnect, so simply force shutdown and briefly
                 // quarantine the ports.
-                tracing::info!("Guest sent shutdown while being asked to shutdown");
+                log::info!("Guest sent shutdown while being asked to shutdown");
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
                     self.control_packets,
@@ -801,7 +801,7 @@ impl ClientInitiatedShutdown {
                 VsockConnectionState::ClientInitiatedShutdown(self)
             }
             op => {
-                tracing::error!("Unsupported ClientInitiatedShutdown operation: {:?}", op);
+                log::error!("Unsupported ClientInitiatedShutdown operation: {:?}", op);
                 VsockConnectionState::ShutdownForced(ShutdownForced::new(
                     self.key,
                     self.control_packets,
@@ -840,7 +840,7 @@ impl ClientInitiatedShutdown {
         // Returns once the state has waited 5s from creation for a guest response.
         fasync::Timer::new(self.timeout.get()).await;
 
-        tracing::error!("Guest didn't send a clean disconnect within 5s");
+        log::error!("Guest didn't send a clean disconnect within 5s");
         StateAction::UpdateState(VsockConnectionState::ShutdownForced(ShutdownForced::new(
             self.key,
             self.control_packets.clone(),
@@ -860,7 +860,7 @@ impl ShutdownClean {
     }
 
     fn next(self, op: OpType) -> VsockConnectionState {
-        tracing::error!(
+        log::error!(
             "Connection in ShutdownClean expected no more packets, \
             but received operation {:?}",
             op
@@ -889,7 +889,7 @@ impl ShutdownForced {
     }
 
     fn next(self, op: OpType) -> VsockConnectionState {
-        tracing::info!("Connection is in ShutdownForced, disregarding operation {:?}", op);
+        log::info!("Connection is in ShutdownForced, disregarding operation {:?}", op);
         VsockConnectionState::ShutdownForced(self)
     }
 

@@ -97,7 +97,7 @@ impl<'a, 'b> RequestWrapper<'a, 'b> {
         match self.parse_header::<T>() {
             Ok(header) => Ok(Some((self, header))),
             Err(err) => {
-                tracing::error!("{}", err);
+                log::error!("{}", err);
                 reply_controlq::err(self.chain, wire::VIRTIO_SND_S_BAD_MSG)?;
                 Ok(None)
             }
@@ -194,7 +194,7 @@ impl<'s> PcmStream<'s> {
         // 5.14.6.6.3.2 Driver Requirements: Stream Parameters
         // - buffer_bytes must be divisible by period_bytes
         if period_bytes == 0 || buffer_bytes % period_bytes != 0 {
-            tracing::warn!(
+            log::warn!(
                 "{}: buffer_bytes must be divisible by period_bytes: {:?}",
                 req_wrapper.name,
                 req,
@@ -204,7 +204,7 @@ impl<'s> PcmStream<'s> {
 
         // - The driver must select supported features only
         if features != 0 {
-            tracing::warn!("{}: requested unsupported features: {:?}", req_wrapper.name, req);
+            log::warn!("{}: requested unsupported features: {:?}", req_wrapper.name, req);
             return reply_controlq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_BAD_MSG);
         }
 
@@ -212,7 +212,7 @@ impl<'s> PcmStream<'s> {
         let stream_type = match wire_parameters_to_fidl_stream_type(&req) {
             Some(stream_type) => stream_type,
             None => {
-                tracing::warn!(
+                log::warn!(
                     "{}: could not convert to FIDL AudioStreamType: {:?}",
                     req_wrapper.name,
                     req,
@@ -224,7 +224,7 @@ impl<'s> PcmStream<'s> {
         if stream_type.channels < (self.info.channels_min as u32)
             || stream_type.channels > (self.info.channels_max as u32)
         {
-            tracing::warn!(
+            log::warn!(
                 "{}: channel count not in supported range [{}, {}]: {:?}",
                 req_wrapper.name,
                 self.info.channels_min,
@@ -236,7 +236,7 @@ impl<'s> PcmStream<'s> {
 
         // - The driver must initialize the padding byte to 0.
         if req.padding != 0 {
-            tracing::warn!("{}: padding must be zero: {:?}", req_wrapper.name, req);
+            log::warn!("{}: padding must be zero: {:?}", req_wrapper.name, req);
             return reply_controlq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_BAD_MSG);
         }
 
@@ -245,7 +245,7 @@ impl<'s> PcmStream<'s> {
         // that any driver would use a fractional number of frames per period.
         let frame_bytes = bytes_per_frame(stream_type) as usize;
         if frame_bytes == 0 || period_bytes % frame_bytes != 0 {
-            tracing::warn!(
+            log::warn!(
                 "{}: period_bytes must be divisible by the frame size ({} bytes): {:?}",
                 req_wrapper.name,
                 frame_bytes,
@@ -258,13 +258,13 @@ impl<'s> PcmStream<'s> {
         // tear down the connection since we're transitioning out of Prepared.
         if let PcmState::Prepared(_) = self.state.get() {
             if let Err(err) = self.stream.disconnect().await {
-                tracing::warn!("{}: failed to disconnect: {}", req_wrapper.name, err);
+                log::warn!("{}: failed to disconnect: {}", req_wrapper.name, err);
                 return reply_controlq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_IO_ERR);
             }
         }
 
         let params = AudioStreamParams { stream_type, buffer_bytes, period_bytes };
-        tracing::info!("{}: set parameters to {:?}", req_wrapper.name, params);
+        log::info!("{}: set parameters to {:?}", req_wrapper.name, params);
         self.state.set(PcmState::Released(params));
         reply_controlq::success(req_wrapper.take_chain())?;
         Ok(())
@@ -285,7 +285,7 @@ impl<'s> PcmStream<'s> {
         // We must be coming from Released, meaning the stream must be disconnected,
         // hence no need to disconnect before connecting.
         if let Err(err) = self.stream.connect(params).await {
-            tracing::warn!("{}: failed to connect: {}", req_wrapper.name, err);
+            log::warn!("{}: failed to connect: {}", req_wrapper.name, err);
             return reply_controlq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_IO_ERR);
         }
 
@@ -307,7 +307,7 @@ impl<'s> PcmStream<'s> {
 
         // In the Prepared and Stopped states, we must already be connected.
         if let Err(err) = self.stream.disconnect().await {
-            tracing::warn!("{}: failed to disconnect: {}", req_wrapper.name, err);
+            log::warn!("{}: failed to disconnect: {}", req_wrapper.name, err);
             return reply_controlq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_IO_ERR);
         }
 
@@ -325,7 +325,7 @@ impl<'s> PcmStream<'s> {
         };
 
         if let Err(err) = self.stream.start().await {
-            tracing::warn!("{}: failed to start: {}", req_wrapper.name, err);
+            log::warn!("{}: failed to start: {}", req_wrapper.name, err);
             return reply_controlq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_IO_ERR);
         }
 
@@ -343,7 +343,7 @@ impl<'s> PcmStream<'s> {
         };
 
         if let Err(err) = self.stream.stop().await {
-            tracing::warn!("{}: failed to stop: {}", req_wrapper.name, err);
+            log::warn!("{}: failed to stop: {}", req_wrapper.name, err);
             return reply_controlq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_IO_ERR);
         }
 
@@ -356,7 +356,7 @@ impl<'s> PcmStream<'s> {
         &self,
         req_wrapper: RequestWrapper<'a, 'b>,
     ) -> Result<(), Error> {
-        tracing::warn!(
+        log::warn!(
             "{}: invoked from wrong state {:?}; ignoring",
             req_wrapper.name,
             self.state.get(),
@@ -374,7 +374,7 @@ impl<'s> PcmStream<'s> {
         match self.state.get() {
             PcmState::Prepared(_) | PcmState::Started(_) | PcmState::Stopped(_) => (),
             _ => {
-                tracing::warn!(
+                log::warn!(
                     "TXQ message received from wrong state {:?}; ignoring",
                     self.state.get()
                 );
@@ -398,7 +398,7 @@ impl<'s> PcmStream<'s> {
         match self.state.get() {
             PcmState::Prepared(_) | PcmState::Started(_) | PcmState::Stopped(_) => (),
             _ => {
-                tracing::warn!(
+                log::warn!(
                     "RXQ message received from wrong state {:?}; ignoring",
                     self.state.get()
                 );
@@ -514,7 +514,7 @@ impl<'s> VirtSoundService<'s> {
             // how specific PCM channels map to hardware jacks. Neither of those features
             // are currently supported by audio_core.
             code => {
-                tracing::error!("controlq dispatch error: unimplemented controlq code {}", code);
+                log::error!("controlq dispatch error: unimplemented controlq code {}", code);
                 reply_controlq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_NOT_SUPP)
             }
         }
@@ -538,7 +538,7 @@ impl<'s> VirtSoundService<'s> {
         let start_id = req.start_id.get() as usize;
         let end_id = start_id + (req.count.get() as usize);
         if end_id > infos.len() {
-            tracing::error!(
+            log::error!(
                 "{}: requested ids {}..{}, but device has only {} infos",
                 req_wrapper.name,
                 req.start_id.get(),
@@ -549,7 +549,7 @@ impl<'s> VirtSoundService<'s> {
         }
         let min_size = std::mem::size_of::<T::WireT>();
         if (req.size.get() as usize) < min_size {
-            tracing::error!(
+            log::error!(
                 "{}: response struct is {} bytes, but driver provided only {} bytes",
                 req_wrapper.name,
                 min_size,
@@ -580,7 +580,7 @@ impl<'s> VirtSoundService<'s> {
         // Validate the request.
         let id = hdr.stream_id.get() as usize;
         if id >= self.pcm_streams.len() {
-            tracing::error!("{}: unknown stream_id {}", req_wrapper.name, id);
+            log::error!("{}: unknown stream_id {}", req_wrapper.name, id);
             return reply_controlq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_BAD_MSG);
         }
 
@@ -618,7 +618,7 @@ impl<'s> VirtSoundService<'s> {
         let hdr = match req_wrapper.parse_header::<wire::VirtioSndPcmXfer>() {
             Ok(x) => x,
             Err(err) => {
-                tracing::error!("{}", err);
+                log::error!("{}", err);
                 return reply_txq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_BAD_MSG, 0);
             }
         };
@@ -626,13 +626,13 @@ impl<'s> VirtSoundService<'s> {
         // TX messages must target a valid output stream.
         let id = hdr.stream_id.get() as usize;
         if id >= self.pcm_streams.len() {
-            tracing::error!("txq dispatch error: unknown stream_id {}", id);
+            log::error!("txq dispatch error: unknown stream_id {}", id);
             return reply_txq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_BAD_MSG, 0);
         }
 
         let stream = &self.pcm_streams[id];
         if stream.dir != PcmDir::Output {
-            tracing::error!("txq dispatch error: stream_id {} is an input stream", id);
+            log::error!("txq dispatch error: stream_id {} is an input stream", id);
             return reply_txq::err(req_wrapper.take_chain(), wire::VIRTIO_SND_S_BAD_MSG, 0);
         }
 
@@ -659,7 +659,7 @@ impl<'s> VirtSoundService<'s> {
         let hdr = match req_wrapper.parse_header::<wire::VirtioSndPcmXfer>() {
             Ok(x) => x,
             Err(err) => {
-                tracing::error!("{}", err);
+                log::error!("{}", err);
                 return reply_rxq::err_from_readable(
                     req_wrapper.take_chain(),
                     wire::VIRTIO_SND_S_BAD_MSG,
@@ -671,7 +671,7 @@ impl<'s> VirtSoundService<'s> {
         // RX messages must target a valid input stream.
         let id = hdr.stream_id.get() as usize;
         if id >= self.pcm_streams.len() {
-            tracing::error!("rxq dispatch error: unknown stream_id {}", id);
+            log::error!("rxq dispatch error: unknown stream_id {}", id);
             return reply_rxq::err_from_readable(
                 req_wrapper.take_chain(),
                 wire::VIRTIO_SND_S_BAD_MSG,
@@ -681,7 +681,7 @@ impl<'s> VirtSoundService<'s> {
 
         let stream = &self.pcm_streams[id];
         if stream.dir != PcmDir::Input {
-            tracing::error!("rxq dispatch error: stream_id {} is an output stream", id);
+            log::error!("rxq dispatch error: stream_id {} is an output stream", id);
             return reply_rxq::err_from_readable(
                 req_wrapper.take_chain(),
                 wire::VIRTIO_SND_S_BAD_MSG,

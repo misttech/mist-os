@@ -397,12 +397,12 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
         };
 
         if conn.closing.get() {
-            tracing::warn!("AudioOutput received buffer while connection is closing");
+            log::warn!("AudioOutput received buffer while connection is closing");
             return reply_txq::err(chain, wire::VIRTIO_SND_S_IO_ERR, 0);
         }
 
         if let Err(err) = conn.validate_buffer(chain.remaining()?.bytes) {
-            tracing::warn!("AudioOutput validate_buffer failed: {}", err);
+            log::warn!("AudioOutput validate_buffer failed: {}", err);
             return reply_txq::err(chain, wire::VIRTIO_SND_S_BAD_MSG, conn.latency_bytes());
         }
 
@@ -410,7 +410,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
         let packet_range = match conn.payload_buffer.packets_avail.pop_front() {
             Some(packet) => packet,
             None => {
-                tracing::warn!(
+                log::warn!(
                     "AudioOutput ran out of available packet space (buffer from driver has size {} bytes, period is {} bytes)",
                     buffer_size,
                     conn.params.period_bytes
@@ -517,7 +517,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                     Some(conn) => match resp {
                         Ok(_) => reply_txq::success(chain, conn.latency_bytes())?,
                         Err(err) =>{
-                            tracing::warn!("AudioRenderer SendPacket[{}] failed: {}", conn.buffers_received, err);
+                            log::warn!("AudioRenderer SendPacket[{}] failed: {}", conn.buffers_received, err);
                             reply_txq::err(chain, wire::VIRTIO_SND_S_IO_ERR, conn.latency_bytes())?
                         },
                     },
@@ -570,7 +570,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                             Err(err) => {
                                 match err {
                                     fidl::Error::ClientChannelClosed{..} => (),
-                                    _ => tracing::warn!("AudioRenderer event stream: unexpected error: {}", err),
+                                    _ => log::warn!("AudioRenderer event stream: unexpected error: {}", err),
                                 }
                                 // TODO(https://fxbug.dev/42052022): temporary for debugging
                                 throttled_log::info!("AudioRenderer lead_time FIDL connection broken");
@@ -693,7 +693,7 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
         let mut chain = WritableChain::from_readable(chain)?;
         let buffer_size = reply_rxq::buffer_size(&chain)?;
         if let Err(err) = conn.validate_buffer(buffer_size) {
-            tracing::warn!("{}", err);
+            log::warn!("{}", err);
             return reply_rxq::err_from_writable(
                 chain,
                 wire::VIRTIO_SND_S_BAD_MSG,
@@ -744,7 +744,7 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
         let packet_range = match conn.payload_buffer.packets_avail.pop_front() {
             Some(range) => range,
             None => {
-                tracing::warn!(
+                log::warn!(
                     "AudioInput ran out of packets (latest buffer has size {} bytes, period is {} bytes)",
                     buffer_size,
                     conn.params.period_bytes
@@ -823,7 +823,7 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
                         Some(AudioInputInner {conn, ..}) => match resp {
                             Ok(resp) => resp,
                             Err(err) =>{
-                                tracing::warn!("AudioInput failed to capture packet: {}", err);
+                                log::warn!("AudioInput failed to capture packet: {}", err);
                                 return reply_rxq::err_from_writable(chain, wire::VIRTIO_SND_S_IO_ERR, conn.latency_bytes());
                             },
                         },
@@ -856,7 +856,7 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
             || resp.payload_offset != (packet_range.start as u64)
             || resp.payload_size != (buffer_size as u64)
         {
-            tracing::warn!("skipping captured packet {:?}, expected {{.payload_buffer_id=0, .payload_offset={}, .payload_size={}}}",
+            log::warn!("skipping captured packet {:?}, expected {{.payload_buffer_id=0, .payload_offset={}, .payload_size={}}}",
                 resp, packet_range.start, buffer_size);
             return Ok(());
         }

@@ -75,7 +75,7 @@ impl ConsoleDevice {
                 Ok(chain) => chain,
                 Err(err) => {
                     // Ignore this chain and continue processing.
-                    tracing::error!(%err, "Device received a bad chain on the RX queue");
+                    log::error!(err:%; "Device received a bad chain on the RX queue");
                     continue;
                 }
             };

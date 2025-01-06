@@ -120,7 +120,7 @@ impl VsockDevice {
         let header = match VsockDevice::read_header(&mut chain) {
             Ok(header) => header,
             Err(err) => {
-                tracing::error!(%err);
+                log::error!(err:%; "");
                 return Ok(());
             }
         };
@@ -176,7 +176,7 @@ impl VsockDevice {
         // The device treats all runtime TX errors as recoverable, and so simply closes the
         // connection and allows the guest to restart it.
         if let Err(err) = result {
-            tracing::error!(connection_key = ?key, %err, "Failed to handle tx packet");
+            log::error!(connection_key:? = key, err:%; "Failed to handle tx packet");
             self.force_close_connection(key).await;
         }
 
@@ -211,7 +211,7 @@ impl VsockDevice {
                 Ok(chain) => chain,
                 Err(err) => {
                     // Ignore this chain and continue processing.
-                    tracing::error!(%err, "Device received a bad chain on the RX queue");
+                    log::error!(err:%; "Device received a bad chain on the RX queue");
                     continue;
                 }
             };
@@ -258,7 +258,7 @@ impl VsockDevice {
         };
 
         if let Err(err) = result {
-            tracing::error!(%err, "Device received bad writable chain");
+            log::error!(err:%; "Device received bad writable chain");
             return Ok(());
         }
 
@@ -312,7 +312,7 @@ impl VsockDevice {
 
         // Log the error, but return Ok so avoid stopping the device.
         if let Err(err) = result {
-            tracing::error!(%err, "Failed to service RX queue");
+            log::error!(err:%; "Failed to service RX queue");
         }
 
         Ok(())
@@ -364,7 +364,7 @@ impl VsockDevice {
         let connection = {
             let host_port = self.port_manager.borrow_mut().find_unused_ephemeral_port();
             if let Err(err) = host_port {
-                tracing::error!(
+                log::error!(
                     "Exhausted all ephemeral ports when handling a client initiated connection"
                 );
                 return responder.send(Err(err.into_raw()));

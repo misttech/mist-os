@@ -66,7 +66,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     fs.for_each_concurrent(None, |stream| async {
         if let Err(err) = run_virtio_rng(stream).await {
-            tracing::error!(%err, "Error running virtio_rng service");
+            log::error!(err:%; "Error running virtio_rng service");
         }
     })
     .await;

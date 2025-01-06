@@ -109,7 +109,7 @@ impl GuestEthernetInterface for GuestEthernet {
     }
 
     fn initialize(&self, mac_address: MacAddress, enable_bridge: bool) -> Result<(), zx::Status> {
-        tracing::info!("Registering a virtio-net device with the netstack");
+        log::info!("Registering a virtio-net device with the netstack");
         zx::Status::ok(unsafe {
             interface::guest_ethernet_initialize(
                 self.raw_ptr,
@@ -145,7 +145,7 @@ impl GuestEthernet {
                 .expect("received a nullptr device from C++")
         };
 
-        tracing::info!("C++ guest ethernet object sent status: {}", status);
+        log::info!("C++ guest ethernet object sent status: {}", status);
         guest_ethernet
             .status_tx
             .unbounded_send(status)
@@ -186,7 +186,7 @@ impl GuestEthernet {
 impl Drop for GuestEthernet {
     fn drop(&mut self) {
         unsafe {
-            tracing::info!("Disconnecting a virtio-net device from the netstack");
+            log::info!("Disconnecting a virtio-net device from the netstack");
             interface::guest_ethernet_destroy(self.raw_ptr);
         }
     }

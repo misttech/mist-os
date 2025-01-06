@@ -84,7 +84,7 @@ async fn main() -> Result<(), anyhow::Error> {
         match service {
             IncomingService::VirtioInput(stream) => {
                 if let Err(e) = run_virtio_input(stream).await {
-                    tracing::error!("Error running virtio_input service: {}", e);
+                    log::error!("Error running virtio_input service: {}", e);
                 }
             }
         }

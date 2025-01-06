@@ -83,7 +83,7 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
                 continue;
             }
             if let Err(e) = self.input_device.write_events_to_queue(evs.as_ref()) {
-                tracing::warn!("Failed to write mouse event to queue with err: {e:?}");
+                log::warn!("Failed to write mouse event to queue with err: {e:?}");
                 break;
             }
         }
@@ -105,7 +105,7 @@ impl<'a, 'b, N: DriverNotify, M: DriverMem, Q: Stream<Item = DescChain<'a, 'b, N
                 .as_ref()
                 .expect("MouseDeviceInfo is expected to provide a list of button identifiers");
             if buttons.len() > 3 {
-                tracing::warn!(
+                log::warn!(
                     concat!(
                         "The following mouse buttons were reported by the device: {:?}, ",
                         "but only the first 3 will be used"

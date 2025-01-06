@@ -149,7 +149,7 @@ pub async fn launch(linux_manager: &LinuxManagerProxy, w: &mut impl Write) -> Re
                     continue;
                 }
 
-                tracing::debug!("LinuxManagerEvent: {:?}", info);
+                log::debug!("LinuxManagerEvent: {:?}", info);
 
                 let container_status = if let Some(status) = info.container_status {
                     status

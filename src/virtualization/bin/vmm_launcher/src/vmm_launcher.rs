@@ -12,7 +12,7 @@ use {fidl_fuchsia_component_decl as cdecl, fidl_fuchsia_io as fio, zx_status};
 
 fn send_epitaph<T>(server_end: ServerEnd<T>, epitaph: zx_status::Status) {
     if let Err(e) = server_end.close_with_epitaph(epitaph) {
-        tracing::error!("Unable to write epitaph{}: {}", epitaph, e);
+        log::error!("Unable to write epitaph{}: {}", epitaph, e);
     }
 }
 
@@ -57,12 +57,12 @@ impl VmmLauncher {
         let realm_result = self.realm.create_child(&collection_ref, &decl, args).await;
         match realm_result {
             Err(fidl_error) => {
-                tracing::error!("FIDL error creating vmm child: {}", fidl_error);
+                log::error!("FIDL error creating vmm child: {}", fidl_error);
                 send_epitaph(lifecycle, zx_status::Status::INTERNAL);
                 return;
             }
             Ok(Err(realm_error)) => {
-                tracing::error!("Realm error creating vmm child: {:?}", realm_error);
+                log::error!("Realm error creating vmm child: {:?}", realm_error);
                 send_epitaph(lifecycle, zx_status::Status::NO_RESOURCES);
                 return;
             }
@@ -76,12 +76,12 @@ impl VmmLauncher {
         let realm_result = self.realm.open_exposed_dir(&child_ref, svc_dir).await;
         match realm_result {
             Err(fidl_error) => {
-                tracing::error!("FIDL error opening vmm child exposed dir: {}", fidl_error);
+                log::error!("FIDL error opening vmm child exposed dir: {}", fidl_error);
                 send_epitaph(lifecycle, zx_status::Status::INTERNAL);
                 return;
             }
             Ok(Err(realm_error)) => {
-                tracing::error!("Realm error opening vmm child exposed dir: {:?}", realm_error);
+                log::error!("Realm error opening vmm child exposed dir: {:?}", realm_error);
                 send_epitaph(lifecycle, zx_status::Status::INTERNAL);
                 return;
             }
@@ -92,7 +92,7 @@ impl VmmLauncher {
             client::new_protocol_connector_in_dir::<GuestLifecycleMarker>(&svc_dir_proxy)
                 .connect_with(lifecycle.into_channel());
         if let Err(e) = connect_result {
-            tracing::error!("Failed to connect to GuestLifecycle in vmm child: {}", e);
+            log::error!("Failed to connect to GuestLifecycle in vmm child: {}", e);
         }
     }
 }

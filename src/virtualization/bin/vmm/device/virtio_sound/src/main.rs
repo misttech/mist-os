@@ -198,7 +198,7 @@ async fn run_virtio_sound(
     // Create a VirtSoundService to handle all virtq requests.
     let vss = Rc::new(VirtSoundService::new(&jacks, &streams, &chmaps, audio));
 
-    tracing::info!(
+    log::info!(
         "Virtio sound device initialized with features = {:?}, enable_input = {}, config = {:?}",
         FEATURES,
         enable_input,
@@ -255,8 +255,8 @@ async fn main() -> Result<(), Error> {
     // Failing to apply a deadline profile is not fatal (e.g., it may happen in tests),
     // but warn because performance may suffer.
     match fuchsia_scheduler::set_role_for_this_thread("fuchsia.virtualization.virtio_sound") {
-        Ok(_) => tracing::info!("Applied deadline profile"),
-        Err(err) => tracing::warn!("Failed to apply deadline profile: {}", err),
+        Ok(_) => log::info!("Applied deadline profile"),
+        Err(err) => log::warn!("Failed to apply deadline profile: {}", err),
     };
 
     // Run the virtio-sound server.
@@ -266,7 +266,7 @@ async fn main() -> Result<(), Error> {
 
     fs.for_each_concurrent(None, |stream| async {
         if let Err(e) = run_virtio_sound(stream, &audio).await {
-            tracing::error!("Error running virtio_sound service: {}", e);
+            log::error!("Error running virtio_sound service: {}", e);
         }
     })
     .await;

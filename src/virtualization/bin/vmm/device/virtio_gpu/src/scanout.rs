@@ -119,7 +119,7 @@ impl Scanout for FlatlandScanout {
 
     fn set_layout_info(&mut self, layout_info: LayoutInfo) {
         if layout_info.logical_size.is_none() {
-            tracing::error!("Received LayoutInfo without logical size");
+            log::error!("Received LayoutInfo without logical size");
             return;
         }
         self.layout_info = layout_info;
@@ -135,7 +135,7 @@ impl Scanout for FlatlandScanout {
             Ok(())
         })();
         if let Err(e) = result {
-            tracing::warn!("Failed to set view layout: {}", e);
+            log::warn!("Failed to set view layout: {}", e);
         }
     }
 
@@ -210,7 +210,7 @@ impl FlatlandScanout {
             let keyboard = connect_to_protocol::<fidl_fuchsia_ui_input3::KeyboardMarker>()?;
             match keyboard.add_listener(view_ref_for_keyboard, keyboard_listener).await {
                 Err(e) => {
-                    tracing::warn!("Failed to register keyboard listener: {}", e);
+                    log::warn!("Failed to register keyboard listener: {}", e);
                     None
                 }
                 Ok(()) => Some(keyboard),
