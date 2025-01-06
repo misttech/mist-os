@@ -85,7 +85,6 @@ action("generate_main_workspace") {
   outputs = [
     # LINT.IfChange
     "${bazel_main_top_dir}/bazel",
-    "${bazel_main_top_dir}/download_config_file",
     "${bazel_main_top_dir}/generated-info.json",
     "${bazel_main_top_dir}/workspace/.bazelrc",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/args.json",

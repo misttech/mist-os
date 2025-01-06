@@ -6,7 +6,6 @@
 # AUTO-GENERATED - DO NOT EDIT!
 
 readonly _SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" >/dev/null 2>&1 && pwd)"
-readonly _DOWNLOAD_CONFIG_FILE=${{_SCRIPT_DIR}}/{download_config_file}
 readonly _WORKSPACE_DIR="${{_SCRIPT_DIR}}/{workspace}"
 readonly _OUTPUT_BASE="${{_SCRIPT_DIR}}/{output_base}"
 readonly _OUTPUT_USER_ROOT="${{_SCRIPT_DIR}}/{output_user_root}"

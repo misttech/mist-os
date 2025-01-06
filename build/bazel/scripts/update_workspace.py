@@ -512,9 +512,6 @@ def dot_bazelrc_format_args(
         "execution_log_file": os.path.relpath(
             os.path.join(logs_dir, "exec_log.pb.zstd"), workspace_dir
         ),
-        "config_file": os.path.relpath(
-            os.path.join(topdir, "download_config_file"), workspace_dir
-        ),
     }
 
 
@@ -789,17 +786,6 @@ def main() -> int:
                 os.path.join(fuchsia_git_dir, git_file),
             )
 
-    # Generate a DownloaderUrlRewriter configuration file.
-    # See https://cs.opensource.google/bazel/bazel/+/master:src/main/java/com/google/devtools/build/lib/bazel/repository/downloader/UrlRewriterConfig.java;drc=63bc1c7d0853dc187e4b96a490d733fb29f79664;l=31
-    download_config = """# Auto-generated - DO NOT EDIT!
-all_blocked_message Repository downloads are forbidden for Fuchsia platform builds
-block *
-"""
-    generated.add_file(
-        "download_config_file",
-        download_config,
-    )
-
     # Generate a platform mapping file to ensure that using --platforms=<value>
     # also sets --cpu properly, as required by the Bazel SDK rules. See comments
     # in template file for more details.
@@ -858,7 +844,6 @@ common --enable_bzlmod=false
         python_prebuilt_dir=os.path.relpath(python_prebuilt_dir, topdir),
         output_base=os.path.relpath(output_base_dir, topdir),
         output_user_root=os.path.relpath(output_user_root, topdir),
-        download_config_file="download_config_file",
         rbe_project=build_config["rbe_project"],
     )
     generated.add_file("bazel", bazel_launcher_content, executable=True)

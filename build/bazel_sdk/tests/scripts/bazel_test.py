@@ -647,7 +647,10 @@ def main() -> int:
     # Assume this script is under '$WORKSPACE/scripts'
     script_dir = Path(__file__).parent.resolve()
     workspace_dir = script_dir.parent
-    downloader_config_file = script_dir / "downloader_config"
+
+    downloader_config_file = (
+        fuchsia_source_dir / "build/bazel/config/no_downloads_allowed.config"
+    )
 
     # To ensure that the repository rules for @fuchsia_clang and
     # @prebuilt_python are re-run properly when the content of the prebuilt

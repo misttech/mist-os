@@ -61,7 +61,7 @@ common:exec_log --experimental_execution_graph_log_dep_type=all
 common:exec_log --experimental_enable_execution_graph_log
 
 # Prevent repository downloads with custom downloader config file.
-common --experimental_downloader_config={config_file}
+common --experimental_downloader_config=build/bazel/config/no_downloads_allowed.config
 
 # Pass local developer overrides for assembly to Bazel
 # For now, this needs to set the label_flag() in both @rules_fuchsia
