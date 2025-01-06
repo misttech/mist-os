@@ -13,7 +13,6 @@
 #include <zircon/dlfcn.h>
 
 #include <fbl/auto_lock.h>
-#include <fbl/string_printf.h>
 
 #include "src/devices/lib/log/log.h"
 #include "src/lib/driver_symbols/symbols.h"
@@ -245,8 +244,7 @@ zx::result<fdf::Dispatcher> CreateDispatcher(const fbl::RefPtr<Driver>& driver,
   // Currently we only support synchronized dispatchers for the default dispatcher.
   return fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
       driver.get(), fdf::SynchronizedDispatcher::Options{.value = dispatcher_opts},
-      fbl::StringPrintf("%.*s-default-%p", static_cast<int>(name.size()), name.data(),
-                        driver.get()),
+      std::format("{}-default-{:p}", name, static_cast<void*>(driver.get())),
       [driver_ref = driver](fdf_dispatcher_t* dispatcher) {}, scheduler_role);
 }
 
