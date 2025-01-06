@@ -10,7 +10,7 @@ use fidl::prelude::*;
 use fuchsia_component::server as fserver;
 use futures::channel::mpsc;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
-use tracing::{info, warn};
+use log::{info, warn};
 use vfs::directory::entry_container::Directory;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path as pfsPath;

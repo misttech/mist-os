@@ -5,7 +5,7 @@
 use anyhow::Error;
 use fidl_fuchsia_test_pwrbtn as test_pwrbtn;
 use fuchsia_component::client as fclient;
-use tracing::info;
+use log::info;
 
 #[fuchsia::test(logging_tags = ["critical-services-integration-test"])]
 async fn run() -> Result<(), Error> {
