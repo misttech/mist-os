@@ -7,14 +7,12 @@ import("//build/assembly/assembly_resources_directory.gni")
 import("//build/assembly/kernel_aib.gni")
 import("//build/assembly/platform_artifacts.gni")
 import("//build/bazel/bazel_inputs.gni")
-import("//build/config/clang/clang.gni")
+import("//build/components.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
-import("//bundles/assembly/rust_libstd.gni")
 import("//src/lib/icu/tzdata/icu_tzres_source.gni")
 import("//third_party/sbase/binaries.gni")
 import("//zircon/kernel/phys/qemu.gni")
-import("//zircon/system/ulib/c/libc_toolchain.gni")
 
 ########
 # Guaranteed Invariants
@@ -2744,6 +2742,7 @@ assembly_input_bundle("fshost_common") {
     {
       bootfs_package = true
       name = "fshost"
+      packages = [ "//src/storage/fshost:pkg" ]
       components = [
         {
           component_name = "fshost"
@@ -2752,74 +2751,6 @@ assembly_input_bundle("fshost_common") {
             "//src/storage/lib/fs_management/client.shard.cml",
             "//src/storage/fshost/meta/config.cml",
           ]
-        },
-      ]
-      contents = [
-        {
-          label = "//src/storage/fshost"
-          source = "${root_out_dir}/fshost"
-          destination = "bin/fshost"
-        },
-        {
-          label = "//src/storage/lib/fs_management/cpp:fs-management($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libfs-management.so"
-          destination = "lib/libfs-management.so"
-        },
-        {
-          label = "//sdk/lib/fdio($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libfdio.so"
-          destination = "lib/libfdio.so"
-        },
-        {
-          label = "//third_party/boringssl:crypto-shared($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libcrypto.so"
-          destination = "lib/libcrypto.so"
-        },
-        {
-          label = "//third_party/boringssl:ssl-shared($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libssl.so"
-          destination = "lib/libssl.so"
-        },
-        {
-          label = "//zircon/system/ulib/trace-engine($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libtrace-engine.so"
-          destination = "lib/libtrace-engine.so"
-        },
-        {
-          label = "//src/security/lib/tee/tee-client-api($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libtee-client-api.so"
-          destination = "lib/libtee-client-api.so"
-        },
-        {
-          label = "//zircon/system/ulib/c:libc_fshost"
-          source = system_libc_stripped
-          destination = "lib/ld.so.1"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source =
-              "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++.so.2"
-          destination = "lib/libc++.so.2"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++abi.so.1"
-          destination = "lib/libc++abi.so.1"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libunwind.so.1"
-          destination = "lib/libunwind.so.1"
-        },
-        {
-          label = "//sdk/lib/svc($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libsvc.so"
-          destination = "lib/libsvc.so"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-rust-libstd-deps"
-          source = "${rust_libstd_path}"
-          destination = "lib/${rust_libstd_so_name}"
         },
       ]
       component_includes = [
@@ -4621,56 +4552,13 @@ assembly_input_bundle("tee_manager") {
     },
     {
       name = "tee_manager"
+      packages = [ "//src/security/bin/tee_manager:pkg" ]
       components = [
         {
           component_name = "tee_manager"
           shards = []
         },
       ]
-      contents = [
-        {
-          label = "//src/security/bin/tee_manager:bin"
-          source = "${root_out_dir}/tee_manager"
-          destination = "bin/tee_manager"
-        },
-        {
-          label = "//zircon/system/ulib/c:libc_fshost"
-          source = system_libc_stripped
-          destination = "lib/ld.so.1"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source =
-              "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++.so.2"
-          destination = "lib/libc++.so.2"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libc++abi.so.1"
-          destination = "lib/libc++abi.so.1"
-        },
-        {
-          label = "//sdk/lib/fdio($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libfdio.so"
-          destination = "lib/libfdio.so"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-rust-libstd-deps"
-          source = "${rust_libstd_path}"
-          destination = "lib/${rust_libstd_so_name}"
-        },
-        {
-          label = "//build/toolchain/runtime:shared-libc++-deps"
-          source = "${clang_prefix}/../lib/${clang_cpu}-unknown-fuchsia/libunwind.so.1"
-          destination = "lib/libunwind.so.1"
-        },
-        {
-          label = "//zircon/system/ulib/trace-engine($shlib_toolchain)"
-          source = "${root_out_dir}/${target_cpu}-shared/libtrace-engine.so"
-          destination = "lib/libtrace-engine.so"
-        },
-      ]
-
       component_includes = [
         {
           source = "//sdk/lib/syslog/client.shard.cml"

@@ -53,6 +53,11 @@ rustc_binary("bin") {
   ]
 }
 
+fuchsia_package("pkg") {
+  package_name = "tee_manager"
+  deps = [ ":bin" ]
+}
+
 fuchsia_unittest_package("tee-manager-tests") {
   manifest = "meta/tee_manager_bin_test.cml"
   deps = [ ":bin_test" ]

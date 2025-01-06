@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Set, TextIO, Tuple, Union
 import serialization
 from assembly import package_copier
 from assembly.package_manifest import PackageManifest
-from serialization import serialize_json
+from serialization import json_load, serialize_json
 
 from .common import FileEntry, FilePath, fast_copy_makedirs
 from .image_assembly_config import KernelInfo
@@ -139,6 +139,8 @@ class CompiledPackageDefinitionFromGN:
 
     # Name of the package
     name: str = field()
+    # Package manifests that include files to add to `contents`
+    packages: List[FilePath] = field(default_factory=list)
     # Dictionary mapping components to cml files by name
     components: List[CompiledComponentDefinition] = field(default_factory=list)
     # Other files to include in the compiled package
@@ -624,9 +626,27 @@ class AIBCreator:
                 map(lambda x: x.destination, copied_include_entries)
             )
 
+            # Collect all the contents include the files from the input packages.
+            package_contents = []
+            package_manifests = []
+            for package_manifest_path in package.packages:
+                with open(package_manifest_path, "r") as f:
+                    package_manifest = json_load(PackageManifest, f)
+                    package_manifests += [package_manifest_path]
+                    for blob in package_manifest.blobs:
+                        # We do not include the meta.far, because assembly will
+                        # generate a new one with all the contents.
+                        if blob.path != "meta/":
+                            package_contents.append(
+                                FileEntry(blob.source_path, blob.path)
+                            )
+            contents = package.contents
+            contents.update(package_contents)
+            deps.update(package_manifests)
+
             # Copy the package contents entries
             (copied_package_files, package_deps) = self._copy_file_entries(
-                package.contents,
+                contents,
                 os.path.join("compiled_packages", package.name, "files"),
             )
 

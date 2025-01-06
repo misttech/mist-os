@@ -119,6 +119,11 @@ rustc_binary("fshost") {
   exclude_toolchain_tags = [ "instrumented" ]
 }
 
+fuchsia_package("pkg") {
+  package_name = "fshost"
+  deps = [ ":fshost" ]
+}
+
 fuchsia_unittest_component("fshost_tests_component") {
   component_name = "fshost_tests"
   deps = [ ":fshost_test" ]
