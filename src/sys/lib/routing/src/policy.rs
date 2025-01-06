@@ -11,10 +11,10 @@ use cm_config::{
     AllowlistEntry, AllowlistMatcher, CapabilityAllowlistKey, CapabilityAllowlistSource,
     DebugCapabilityKey, SecurityPolicy,
 };
+use log::{error, warn};
 use moniker::{ExtendedMoniker, Moniker};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{error, warn};
 use zx_status as zx;
 
 use cm_rust::CapabilityTypeName;

@@ -11,8 +11,8 @@ use fidl_fuchsia_stash::{
 };
 use futures::lock::Mutex;
 use futures::{TryFutureExt, TryStreamExt};
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 
 use crate::{accessor, store};
 
@@ -94,7 +94,7 @@ impl Instance {
                 // aren't produced when a component in test is torn down. This should
                 // distinguish between channel closed errors and actual stash failures and
                 // set the appropriate log level.
-                warn!(?err, "error running accessor interface");
+                warn!(err:?; "error running accessor interface");
             }),
         )
         .detach();

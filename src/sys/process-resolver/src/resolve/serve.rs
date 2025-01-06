@@ -8,7 +8,7 @@ use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::AbsoluteComponentUrl;
 use futures::prelude::*;
-use tracing::warn;
+use log::warn;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg};
 
 pub async fn serve(mut stream: ResolverRequestStream) {

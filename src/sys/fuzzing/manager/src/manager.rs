@@ -8,13 +8,13 @@ use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker, ServerEnd};
 use futures::channel::mpsc;
 use futures::StreamExt;
 use fuzz::RegistryProxy;
+use log::warn;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use test_manager::{
     RunBuilderMarker, RunControllerMarker, RunControllerProxy, RunOptions, SuiteControllerMarker,
     SuiteControllerProxy,
 };
-use tracing::warn;
 use url::Url;
 use {fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager};
 

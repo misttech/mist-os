@@ -32,8 +32,8 @@ rustc_library("cm_config") {
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

@@ -11,10 +11,10 @@ use fidl_fuchsia_stash::{
 use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::{TryFutureExt, TryStreamExt};
+use log::warn;
 use measure_tape_for_stash::Measurable as _;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::warn;
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 
 use crate::store;
@@ -168,7 +168,7 @@ impl Accessor {
             .unwrap_or_else(|err: anyhow::Error| {
                 // TODO(https://fxbug.dev/42140775) - determine which errors are stash failures and log them
                 // with error severity
-                warn!(?err, "error running list prefix interface")
+                warn!(err:?; "error running list prefix interface")
             }),
         )
         .detach();
@@ -257,7 +257,7 @@ impl Accessor {
             .unwrap_or_else(|err: anyhow::Error| {
                 // TODO(https://fxbug.dev/42140775) - determine which errors are stash failures and log them
                 // with error severity
-                warn!(?err, "error running get prefix interface");
+                warn!(err:?; "error running get prefix interface");
             }),
         )
         .detach();

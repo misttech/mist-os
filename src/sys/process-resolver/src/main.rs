@@ -6,7 +6,7 @@ use anyhow::{Context, Error};
 use fidl_fuchsia_process::ResolverRequestStream;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use tracing::info;
+use log::info;
 
 mod resolve;
 enum IncomingRequest {

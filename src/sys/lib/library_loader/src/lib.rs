@@ -6,8 +6,8 @@ use anyhow::{format_err, Error};
 use fidl::prelude::*;
 use fidl_fuchsia_ldsvc::{LoaderRequest, LoaderRequestStream};
 use futures::{TryFutureExt, TryStreamExt};
+use log::*;
 use std::sync::Arc;
-use tracing::*;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Helper function to load `object_name` from `search_dirs`.

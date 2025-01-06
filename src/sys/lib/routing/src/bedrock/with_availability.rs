@@ -31,7 +31,7 @@ impl<T: CapabilityBound> Routable<T> for AvailabilityRouter<T> {
         let request_availability =
             request.metadata.get_metadata().ok_or(fsandbox::RouterError::InvalidArgs).inspect_err(
                 |e| {
-                    tracing::error!(
+                    log::error!(
                         "request {:?} did not have availability metadata: {e:?}",
                         request.target
                     )

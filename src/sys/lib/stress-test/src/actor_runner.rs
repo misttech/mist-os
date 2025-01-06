@@ -7,9 +7,9 @@ use crate::counter::CounterTx;
 use fuchsia_async::{MonotonicInstant, Task, Timer};
 use futures::future::{AbortHandle, Abortable, Aborted};
 use futures::lock::Mutex;
+use log::debug;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::debug;
 
 /// The thread that runs an actor indefinitely
 #[derive(Clone)]
@@ -50,16 +50,16 @@ impl ActorRunner {
             loop {
                 if let Some(delay) = self.delay {
                     debug!(
-                        %generation,
-                        name = %self.name,
-                        %local_count,
-                        sleep_duration = ?delay,
+                        generation:%,
+                        name:% = self.name,
+                        local_count:%,
+                        sleep_duration:? = delay;
                         "Sleeping"
                     );
                     Timer::new(MonotonicInstant::after(delay.into())).await;
                 }
 
-                debug!(%generation, name = %self.name, %local_count, "Performing...");
+                debug!(generation:%, name:% = self.name, local_count:%; "Performing...");
 
                 // Lock on the actor and perform. This prevents the environment from
                 // modifying the actor until the operation is complete.
@@ -72,7 +72,7 @@ impl ActorRunner {
                     Ok(()) => {
                         // Count this iteration towards the global count
                         let _ = counter_tx.unbounded_send(self.name.clone());
-                        debug!(%generation, name = %self.name, %local_count, "Done!");
+                        debug!(generation:%, name:% = self.name, local_count:%; "Done!");
                     }
                     Err(ActorError::DoNotCount) => {
                         // Do not count this iteration towards global count
@@ -80,7 +80,7 @@ impl ActorRunner {
                     Err(ActorError::ResetEnvironment) => {
                         // Actor needs environment to be reset. Stop the runner
                         debug!(
-                            %generation, name = %self.name, %local_count,
+                            generation:%, name:% = self.name, local_count:%;
                             "Reset Environment!"
                         );
                         return (self, generation);

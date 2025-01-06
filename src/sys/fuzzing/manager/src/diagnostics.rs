@@ -8,11 +8,11 @@ use async_trait::async_trait;
 use fidl::endpoints::ClientEnd;
 use futures::channel::mpsc;
 use futures::{join, pin_mut, select, AsyncWriteExt, FutureExt, SinkExt, StreamExt};
+use log::{info, warn};
 use std::cell::RefCell;
 use std::collections::LinkedList;
 use std::rc::Rc;
 use test_manager::Artifact;
-use tracing::{info, warn};
 use {
     fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_test_manager as test_manager,
     fuchsia_async as fasync,

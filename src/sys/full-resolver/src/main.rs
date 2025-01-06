@@ -7,7 +7,7 @@ use fidl::endpoints::{create_proxy, ClientEnd, Proxy};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::stream::{StreamExt as _, TryStreamExt as _};
-use tracing::{error, info, warn};
+use log::{error, info, warn};
 use version_history::AbiRevision;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
@@ -80,7 +80,7 @@ async fn serve(mut stream: fresolution::ResolverRequestStream) -> anyhow::Result
                 responder.send(result).context("failed sending response")?;
             }
             fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown Resolver request");
+                warn!(ordinal:%; "Unknown Resolver request");
             }
         }
     }

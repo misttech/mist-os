@@ -13,9 +13,9 @@ use futures::prelude::*;
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
 use futures::stream::BoxStream;
 use lazy_static::lazy_static;
+use log::*;
 use namespace::Namespace;
 use thiserror::Error;
-use tracing::*;
 use zx::{self as zx, HandleBased, Status};
 use {
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
@@ -172,7 +172,7 @@ impl<C: Controllable + 'static> Controller<C> {
         while let Some(event) = on_escrow.next().await {
             control_handle
                 .send_on_escrow(event)
-                .unwrap_or_else(|err| error!(%err, "failed to send OnEscrow event"));
+                .unwrap_or_else(|err| error!(err:%; "failed to send OnEscrow event"));
         }
     }
 

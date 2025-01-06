@@ -7,7 +7,7 @@ use anyhow::Result;
 use fidl_fuchsia_fuzzer as fuzz;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
-use tracing::warn;
+use log::warn;
 
 mod aggregator;
 mod options;

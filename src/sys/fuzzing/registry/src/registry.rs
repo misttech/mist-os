@@ -6,11 +6,11 @@ use anyhow::Result;
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use futures::channel::oneshot;
 use futures::{pin_mut, select, FutureExt, StreamExt};
+use log::{error, warn};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::rc::Rc;
-use tracing::{error, warn};
 use url::Url;
 use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync};
 

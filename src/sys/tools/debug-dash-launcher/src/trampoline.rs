@@ -31,7 +31,7 @@ struct PkgDir {
 /// Returns (url without fragment, fragment if present)
 fn parse_url(url: &str) -> Result<(url::Url, Option<String>), LauncherError> {
     let mut url = url::Url::parse(url).map_err(|e| {
-        tracing::warn!(?url, "bad url: {:#}", anyhow::anyhow!(e));
+        log::warn!(url:?; "bad url: {:#}", anyhow::anyhow!(e));
         LauncherError::BadUrl
     })?;
     if let Some(fragment) = url.fragment() {

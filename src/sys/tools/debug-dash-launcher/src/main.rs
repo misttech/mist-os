@@ -9,7 +9,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use futures::prelude::*;
-use tracing::*;
+use log::*;
 use {fidl_fuchsia_dash as fdash, fuchsia_async as fasync};
 
 mod launch;

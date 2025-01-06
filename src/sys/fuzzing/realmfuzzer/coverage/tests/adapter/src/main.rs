@@ -7,7 +7,7 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::process_self;
 use futures::{try_join, StreamExt, TryFutureExt, TryStreamExt};
-use tracing::warn;
+use log::warn;
 use zx::{self as zx, AsHandleRef, HandleBased, Peered};
 use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync};
 

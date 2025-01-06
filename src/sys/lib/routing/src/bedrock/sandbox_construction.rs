@@ -17,6 +17,7 @@ use cm_types::{IterablePath, Name, SeparatedPath};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use itertools::Itertools;
 use lazy_static::lazy_static;
+use log::warn;
 use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use sandbox::{
@@ -25,8 +26,6 @@ use sandbox::{
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
-use tracing::warn;
-
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 lazy_static! {
