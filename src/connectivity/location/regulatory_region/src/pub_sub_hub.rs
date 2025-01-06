@@ -101,7 +101,7 @@ fn load_region_code(path: impl AsRef<Path>) -> Option<String> {
         Err(e) => match e.kind() {
             io::ErrorKind::NotFound => return None,
             _ => {
-                tracing::info!(
+                log::info!(
                     "Failed to read cached regulatory region, will initialize with none: {}",
                     e
                 );
@@ -113,7 +113,7 @@ fn load_region_code(path: impl AsRef<Path>) -> Option<String> {
     match serde_json::from_reader::<_, RegulatoryRegion>(io::BufReader::new(file)) {
         Ok(region) => Some(region.region_code),
         Err(e) => {
-            tracing::info!("Error parsing stored regulatory region code: {}", e);
+            log::info!("Error parsing stored regulatory region code: {}", e);
             try_delete_file(path);
             None
         }
@@ -129,20 +129,20 @@ fn write_region_code(region_code: String, storage_path: impl AsRef<Path>) {
     let file = match File::create(storage_path.as_ref()) {
         Ok(file) => file,
         Err(e) => {
-            tracing::info!("Failed to open file to write regulatory region: {}", e);
+            log::info!("Failed to open file to write regulatory region: {}", e);
             try_delete_file(storage_path);
             return;
         }
     };
     if let Err(e) = serde_json::to_writer(io::BufWriter::new(file), &write_val) {
-        tracing::info!("Failed to write regulatory region: {}", e);
+        log::info!("Failed to write regulatory region: {}", e);
         try_delete_file(storage_path);
     }
 }
 
 fn try_delete_file(storage_path: impl AsRef<Path>) {
     if let Err(e) = fs::remove_file(&storage_path) {
-        tracing::info!("Failed to delete previously cached regulatory region: {}", e);
+        log::info!("Failed to delete previously cached regulatory region: {}", e);
     }
 }
 

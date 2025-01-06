@@ -34,8 +34,8 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::info;
 use std::time::{Duration, Instant};
-use tracing::info;
 
 const CONCURRENCY_LIMIT: Option<usize> = None;
 const API_KEY_FILE: &str = "/config/data/google_maps_api_key.txt";
