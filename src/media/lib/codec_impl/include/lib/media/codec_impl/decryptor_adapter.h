@@ -19,7 +19,7 @@
 #include <variant>
 #include <vector>
 
-#include "src/media/lib/mpsc_queue/mpsc_queue.h"
+#include "src/media/lib/blocking_mpsc_queue/blocking_mpsc_queue.h"
 
 class DecryptorAdapter : public CodecAdapter {
  public:

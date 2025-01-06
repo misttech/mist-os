@@ -6,18 +6,18 @@ group("lib") {
   testonly = true
   deps = [
     ":tests",
+    "//src/media/lib/blocking_mpsc_queue",
     "//src/media/lib/extend_bits",
     "//src/media/lib/ffmpeg",
     "//src/media/lib/metrics",
-    "//src/media/lib/mpsc_queue",
   ]
 }
 
 group("tests") {
   testonly = true
   deps = [
+    "//src/media/lib/blocking_mpsc_queue:tests",
     "//src/media/lib/codec_impl:tests",
     "//src/media/lib/extend_bits:tests",
-    "//src/media/lib/mpsc_queue:tests",
   ]
 }

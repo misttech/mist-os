@@ -8,57 +8,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/media/lib/mpsc_queue/mpsc_queue.h"
-
-TEST(MpscQueueTest, Sanity) {
-  MpscQueue<int> under_test;
-  std::queue<int> expectation;
-  const int kElements = 10;
-
-  for (int i = 0; i < kElements; ++i) {
-    under_test.Push(i);
-    expectation.push(i);
-  }
-
-  for (int i = 0; i < kElements; ++i) {
-    std::optional<int> maybe_elem = under_test.Pop();
-    EXPECT_TRUE(maybe_elem.has_value());
-    if (maybe_elem.has_value()) {
-      EXPECT_EQ(expectation.front(), *maybe_elem);
-      expectation.pop();
-    }
-  }
-}
-
-TEST(MpscQueueTest, TwoThreads) {
-  MpscQueue<int> under_test;
-  std::set<int> expectation;
-
-  const int kElements = 100;
-  for (int i = 0; i < kElements; ++i) {
-    expectation.insert(i);
-  }
-
-  async::Loop producer_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  async::PostTask(producer_loop.dispatcher(), [&under_test] {
-    for (int i = 0; i < kElements; ++i) {
-      under_test.Push(i);
-    }
-  });
-
-  producer_loop.StartThread("Test Producer thread", nullptr);
-
-  int element_count = 0;
-  while (element_count < kElements) {
-    std::optional<int> maybe_elem = under_test.Pop();
-    if (maybe_elem.has_value()) {
-      ++element_count;
-      expectation.erase(*maybe_elem);
-    }
-  }
-
-  EXPECT_EQ(expectation.size(), 0u);
-}
+#include "src/media/lib/blocking_mpsc_queue/blocking_mpsc_queue.h"
 
 TEST(BlockingMpscQueueTest, TwoThreads) {
   BlockingMpscQueue<int> under_test;
