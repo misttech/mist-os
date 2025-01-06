@@ -14,6 +14,7 @@ use fuchsia_component::client::connect_to_protocol;
 use futures::future::{BoxFuture, FutureExt};
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::{error, info, warn};
 use omaha_client::common::{App, CheckOptions, CheckTiming, ProtocolState, UpdateCheckSchedule};
 use omaha_client::policy::{CheckDecision, Policy, PolicyEngine, UpdateDecision};
 use omaha_client::protocol::request::InstallSource;
@@ -23,7 +24,6 @@ use omaha_client::unless::Unless;
 use omaha_client_fuchsia::install_plan;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{error, info, warn};
 
 mod rate_limiter;
 use rate_limiter::UpdateCheckRateLimiter;

@@ -11,7 +11,7 @@ use fidl_fuchsia_update_config::{
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::channel::mpsc;
 use futures::prelude::*;
-use tracing::warn;
+use log::warn;
 
 /// ServiceFs, configured for single-threaded execution and handling services listed in
 /// [`IncomingServices`].

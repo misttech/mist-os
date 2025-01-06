@@ -12,8 +12,8 @@ use fidl_fuchsia_pkg_rewrite::{
 use fidl_fuchsia_pkg_rewrite_ext::Rule;
 use fuchsia_async as fasync;
 use futures::prelude::*;
+use log::{error, info, warn};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use zx::Status;
 
 const LIST_CHUNK_SIZE: usize = 100;

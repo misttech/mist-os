@@ -23,10 +23,10 @@ use fuchsia_cobalt_builders::MetricEventExt as _;
 use fuchsia_hash::Hash;
 use fuchsia_inspect::{self as finspect, NumericProperty as _, Property as _, StringProperty};
 use futures::{FutureExt as _, TryFutureExt as _, TryStreamExt as _};
+use log::{error, warn};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use tracing::{error, warn};
 use vfs::directory::entry_container::Directory;
 use zx::Status;
 use {cobalt_sw_delivery_registry as metrics, fidl_fuchsia_io as fio, fuchsia_trace as ftrace};
@@ -735,19 +735,19 @@ async fn open_blob(
         Err(AlreadyExists) if is_readable => (Ok(None), Ok(AlreadyCached)),
         Err(AlreadyExists) => (Err(fErr::ConcurrentWrite), Ok(Needed)),
         Err(Io(e)) => {
-            warn!(%blob_id, "io error opening blob {:#}", anyhow!(e));
+            warn!(blob_id:%; "io error opening blob {:#}", anyhow!(e));
             (Err(fErr::UnspecifiedIo), Ok(Needed))
         }
         Err(ConvertToClientEnd) => {
-            warn!(%blob_id, "converting blob handle");
+            warn!(blob_id:%; "converting blob handle");
             (Err(fErr::UnspecifiedIo), Ok(Needed))
         }
         Err(Fidl(e)) => {
-            warn!(%blob_id, "fidl error opening blob {:#}", anyhow!(e));
+            warn!(blob_id:%; "fidl error opening blob {:#}", anyhow!(e));
             (Err(fErr::UnspecifiedIo), Ok(Needed))
         }
         Err(BlobCreator(error)) => {
-            warn!(?error, %blob_id, "error calling blob creator");
+            warn!(error:?, blob_id:%; "error calling blob creator");
             (Err(fErr::Internal), Ok(Needed))
         }
     };
@@ -785,28 +785,28 @@ async fn get_subpackage(
 ) -> Result<(), fpkg::GetSubpackageError> {
     let subpackage = subpackage.parse::<fuchsia_url::RelativePackageUrl>().map_err(|e| {
         error!(
-            %superpackage,
-            %subpackage,
+            superpackage:%,
+            subpackage:%;
             "get_subpackage: invalid subpackage url: {:#}",
             anyhow!(e)
         );
         fpkg::GetSubpackageError::DoesNotExist
     })?;
     let Some(super_dir) = open_packages.get(&superpackage) else {
-        error!(%superpackage, %subpackage, "get_subpackage: superpackage not open");
+        error!(superpackage:%, subpackage:%; "get_subpackage: superpackage not open");
         return Err(fpkg::GetSubpackageError::SuperpackageClosed);
     };
     let subpackages = super_dir.subpackages().await.map_err(|e| {
         error!(
-            %superpackage,
-            %subpackage,
+            superpackage:%,
+            subpackage:%;
             "get_subpackage: determining subpackages: {:#}",
             anyhow!(e)
         );
         fpkg::GetSubpackageError::Internal
     })?;
     let Some(hash) = subpackages.subpackages().get(&subpackage) else {
-        error!(%superpackage, %subpackage, "get_subpackage: not a subpackage of the superpackage");
+        error!(superpackage:%, subpackage:%; "get_subpackage: not a subpackage of the superpackage");
         return Err(fpkg::GetSubpackageError::DoesNotExist);
     };
     let () = open_packages
@@ -814,8 +814,8 @@ async fn get_subpackage(
         .await
         .map_err(|e| {
             error!(
-                %superpackage,
-                %subpackage,
+                superpackage:%,
+                subpackage:%;
                 "get_subpackage: creating subpackage RootDir: {:#}",
                 anyhow!(e)
             );

@@ -13,10 +13,10 @@ use fuchsia_cobalt_builders::MetricEventExt as _;
 use fuchsia_inspect::{self as inspect, Property};
 use futures::future::TryFutureExt as _;
 use futures::lock::Mutex as AsyncMutex;
+use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::info;
 use tuf::client::Config;
 use tuf::crypto::PublicKey;
 use tuf::error::Error as TufError;
@@ -168,7 +168,7 @@ impl Repository {
                 return Err(MerkleForError::TargetNotFound(path))
             }
             Err(other) => {
-                tracing::error!(
+                log::error!(
                     "failed to update local TUF metadata for {:?} while getting merkle for {:?} with error: {:#}",
                     self.log_ctx.repo_url,
                     target_path,

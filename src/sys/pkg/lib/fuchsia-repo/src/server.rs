@@ -21,6 +21,7 @@ use hyper::body::Body;
 use hyper::header::RANGE;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
+use log::{error, info, warn};
 use netext::{TcpListenerStream, TokioAsyncReadExt, TokioAsyncWrapper};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -32,7 +33,6 @@ use std::sync::{Arc, Mutex, RwLock as SyncRwLock, Weak};
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
-use tracing::{error, info, warn};
 
 // FIXME: This value was chosen basically at random.
 const AUTO_BUFFER_SIZE: usize = 10;
@@ -567,7 +567,7 @@ async fn generate_package_html(
 ) -> Response<Body> {
     // Update the repository.
     if repo.write().await.update().await.is_err() {
-        tracing::error!("Unable to update repository {}", repo_name);
+        log::error!("Unable to update repository {}", repo_name);
         return status_response(StatusCode::BAD_REQUEST);
     }
 

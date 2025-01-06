@@ -7,9 +7,9 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig};
 use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_url::AbsolutePackageUrl;
+use log::error;
 use std::collections::VecDeque;
 use thiserror::Error;
-use tracing::error;
 
 /// [RewriteManager] controls access to all static and dynamic rewrite rules used by the package
 /// resolver.

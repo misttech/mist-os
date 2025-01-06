@@ -10,6 +10,7 @@ use fidl_fuchsia_feedback::{CrashReporterMarker, CrashReporterProxy};
 use fuchsia_inspect::Node;
 use futures::future::LocalBoxFuture;
 use futures::prelude::*;
+use log::{error, warn};
 use omaha_client::clock;
 use omaha_client::common::{ProtocolState, UpdateCheckSchedule};
 use omaha_client::protocol::response::Response;
@@ -21,7 +22,6 @@ use omaha_client::time::{StandardTimeSource, TimeSource};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::SystemTime;
-use tracing::{error, warn};
 
 mod crash_report;
 mod platform;

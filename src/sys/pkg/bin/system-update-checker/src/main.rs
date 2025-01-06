@@ -28,8 +28,8 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect as finspect;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
+use log::error;
 use std::sync::Arc;
-use tracing::error;
 
 const MAX_CONCURRENT_CONNECTIONS: usize = 200;
 const DEFAULT_UPDATE_PACKAGE_URL: &str = "fuchsia-pkg://fuchsia.com/update";

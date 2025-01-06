@@ -8,6 +8,7 @@ use channel_config::{ChannelConfig, ChannelConfigs};
 use eager_package_config::omaha_client::{EagerPackageConfig, EagerPackageConfigs};
 use fidl_fuchsia_boot::{ArgumentsMarker, ArgumentsProxy};
 use fidl_fuchsia_pkg::{self as fpkg, CupMarker, CupProxy, GetInfoError};
+use log::{error, info, warn};
 use omaha_client::common::App;
 use omaha_client::configuration::{Config, Updater};
 use omaha_client::protocol::request::OS;
@@ -15,7 +16,6 @@ use omaha_client::protocol::Cohort;
 use omaha_client::version::Version;
 use std::collections::HashMap;
 use std::{fs, io};
-use tracing::{error, info, warn};
 
 // TODO: This is not 0.0.0.0 because that would cause state machine to not start. We should find a
 // better way to achieve that when build version is invalid.

@@ -1043,7 +1043,7 @@ impl<B: Blobfs> TestEnv<B> {
             .expect("one result");
 
         if data.payload.is_none() {
-            tracing::error!(?data, "Unexpected empty payload");
+            log::error!(data:?; "Unexpected empty payload");
         }
 
         data.payload.unwrap()

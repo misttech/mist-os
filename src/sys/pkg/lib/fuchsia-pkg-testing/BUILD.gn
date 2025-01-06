@@ -44,6 +44,7 @@ rustc_library("fuchsia-pkg-testing") {
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:http",
     "//third_party/rust_crates:hyper",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:maybe-owned",
     "//third_party/rust_crates:rustls",
     "//third_party/rust_crates:rustls-pemfile",
@@ -53,7 +54,6 @@ rustc_library("fuchsia-pkg-testing") {
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:tokio-rustls",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tuf",
     "//third_party/rust_crates:walkdir",
   ]

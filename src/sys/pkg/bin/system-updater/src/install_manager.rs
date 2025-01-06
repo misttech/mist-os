@@ -14,8 +14,8 @@ use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use futures::select;
 use futures::stream::FusedStream;
+use log::{error, warn};
 use std::time::Duration;
-use tracing::{error, warn};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 const INSPECT_STATUS_NODE_NAME: &str = "status";

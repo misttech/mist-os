@@ -14,10 +14,10 @@ rustc_library("eager-package-config") {
     "//src/lib/fuchsia-url",
     "//src/sys/pkg/lib/channel-config",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:omaha_client",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tracing",
   ]
   if (is_fuchsia) {
     deps += [

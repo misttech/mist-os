@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Context};
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
 use fuchsia_component::client::connect_to_protocol;
-use tracing::error;
+use log::error;
 
 /// Reboots the system, logging errors instead of failing.
 pub(super) async fn reboot() {

@@ -18,9 +18,9 @@ use futures::future::{AbortHandle, Abortable, FutureExt as _, TryFutureExt as _}
 use futures::lock::Mutex as AsyncMutex;
 use futures::stream::StreamExt;
 use http_uri_ext::HttpUriExt as _;
+use log::info;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
-use tracing::info;
 use tuf::error::Error as TufError;
 use tuf::metadata::{Metadata, TargetDescription, TargetPath};
 use tuf::pouf::Pouf1;
@@ -337,7 +337,7 @@ impl AutoClient {
                     if log_connection_attempt {
                         log_connection_attempt = false;
 
-                        tracing::error!(
+                        log::error!(
                             "AutoClient for {:?} error connecting: {:#}",
                             self.auto_url,
                             anyhow!(e)
@@ -345,7 +345,7 @@ impl AutoClient {
                     }
                 }
                 Err(e) => {
-                    tracing::error!(
+                    log::error!(
                         "AutoClient for {:?} making request: {:#}",
                         self.auto_url,
                         anyhow!(e)
@@ -385,7 +385,7 @@ impl AutoClient {
             match item {
                 Ok(event) => {
                     if event.event_type() != "timestamp.json" {
-                        tracing::error!(
+                        log::error!(
                             "AutoClient for {:?} ignoring unrecognized event: {:?}",
                             self.auto_url,
                             event
@@ -396,7 +396,7 @@ impl AutoClient {
                     if let Some(updating_client) = self.updating_client.upgrade() {
                         self.inspect.update_attempt_count.increment();
                         if let Err(e) = updating_client.lock().await.update().await {
-                            tracing::error!(
+                            log::error!(
                                 "AutoClient for {:?} error updating TUF client: {:#}",
                                 self.auto_url,
                                 anyhow!(e)
@@ -407,7 +407,7 @@ impl AutoClient {
                     }
                 }
                 Err(e) => {
-                    tracing::error!(
+                    log::error!(
                         "AutoClient for {:?} event stream read error: {:#}",
                         self.auto_url,
                         anyhow!(e)
@@ -416,7 +416,7 @@ impl AutoClient {
                 }
             }
         }
-        tracing::error!("AutoClient for {:?} event stream closed.", self.auto_url);
+        log::error!("AutoClient for {:?} event stream closed.", self.auto_url);
         HandleSseEndState::Reconnect
     }
 

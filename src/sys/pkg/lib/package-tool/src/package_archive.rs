@@ -246,7 +246,7 @@ async fn populate_namespace(far_file: PathBuf, output_dir: PathBuf) -> Result<()
         // Finally, extract the files respecting the mapping from the contents file
         extract_far_to_dir(&mut reader, &output_dir, &blobs_dir, Some(hash_path_map)).await?;
     } else {
-        tracing::info!("No meta.far included, simply extracting all files.");
+        log::info!("No meta.far included, simply extracting all files.");
         extract_far_to_dir(&mut reader, &output_dir, &blobs_dir, None).await?;
     }
 

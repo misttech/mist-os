@@ -7,9 +7,9 @@ use fuchsia_inspect as finspect;
 use fuchsia_merkle::Hash;
 use futures::future::BoxFuture;
 use futures::{FutureExt as _, StreamExt as _};
+use log::warn;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::warn;
 
 /// A forest of packages and the blobs they require (including subpackages).
 #[derive(Debug)]

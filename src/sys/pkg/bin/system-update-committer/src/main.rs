@@ -20,9 +20,9 @@ use fuchsia_inspect::{self as finspect};
 use futures::channel::oneshot;
 use futures::prelude::*;
 use futures::stream::FuturesUnordered;
+use log::{error, info, warn};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tracing::{error, info, warn};
 use zx::{self as zx, HandleBased};
 
 mod config;

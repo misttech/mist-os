@@ -401,11 +401,7 @@ where
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "failed to read meta/contents for package {}: {}",
-                        package_name,
-                        e
-                    );
+                    log::warn!("failed to read meta/contents for package {}: {}", package_name, e);
                 }
             }
 

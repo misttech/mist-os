@@ -10,6 +10,7 @@ use crate::omaha::installer::IsolatedInstaller;
 use anyhow::{Context, Error};
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::error;
 use omaha_client::app_set::VecAppSet;
 use omaha_client::common::App;
 use omaha_client::configuration::{Config, Updater};
@@ -26,7 +27,6 @@ use omaha_client::time::StandardTimeSource;
 use omaha_client::version::Version;
 use omaha_client_fuchsia::{http_request, timer};
 use std::rc::Rc;
-use tracing::error;
 
 /// Get a |Config| object to use when making requests to Omaha.
 async fn get_omaha_config(version: &str, service_url: &str) -> Config {

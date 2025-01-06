@@ -27,6 +27,7 @@ use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::prelude::*;
+use log::{error, info, warn};
 use omaha_client::app_set::{AppSet as _, AppSetExt as _};
 use omaha_client::common::CheckOptions;
 use omaha_client::protocol::request::InstallSource;
@@ -35,7 +36,6 @@ use omaha_client::storage::{Storage, StorageExt};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
-use tracing::{error, info, warn};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct State {

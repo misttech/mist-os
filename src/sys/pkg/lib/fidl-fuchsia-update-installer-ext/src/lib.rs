@@ -24,11 +24,11 @@ use fidl_fuchsia_update_installer::{
 use fuchsia_url::AbsolutePackageUrl;
 use futures::prelude::*;
 use futures::task::{Context, Poll};
+use log::info;
 use pin_project::pin_project;
 use std::fmt;
 use std::pin::Pin;
 use thiserror::Error;
-use tracing::info;
 
 /// Describes the errors encountered by UpdateAttempt.
 #[derive(Debug, Error)]

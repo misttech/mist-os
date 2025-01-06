@@ -5,7 +5,7 @@
 use anyhow::Context as _;
 use fidl_fuchsia_pkg::PackageIndexIteratorMarker;
 use fuchsia_url::{PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl};
-use tracing::warn;
+use log::warn;
 
 /// Load the list of cache_packages from fuchsia.pkg/PackageCache.CachePackageIndex.
 /// If any error is encountered during loading, an empty list will be returned.

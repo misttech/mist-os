@@ -23,9 +23,9 @@ rustc_library("isolated-swd") {
     "//src/sys/pkg/lib/omaha-client-fuchsia",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:omaha_client",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

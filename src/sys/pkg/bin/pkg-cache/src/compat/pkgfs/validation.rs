@@ -4,9 +4,9 @@
 
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use log::{error, info};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tracing::{error, info};
 use vfs::directory::entry::{EntryInfo, OpenRequest};
 use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::traversal_position::TraversalPosition;
@@ -43,9 +43,9 @@ impl Validation {
         missing.sort();
 
         if missing.is_empty() {
-            info!(total = self.base_blobs.len(), "all base package blobs were found");
+            info!(total = self.base_blobs.len(); "all base package blobs were found");
         } else {
-            error!(total = missing.len(), "base package blobs are missing");
+            error!(total = missing.len(); "base package blobs are missing");
         }
 
         #[allow(clippy::format_collect)]

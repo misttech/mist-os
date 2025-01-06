@@ -10,9 +10,9 @@ use fidl_fuchsia_feedback::{CrashReport, CrashReporterProxy};
 use futures::channel::mpsc;
 use futures::future::LocalBoxFuture;
 use futures::prelude::*;
+use log::{error, warn};
 use omaha_client::time::TimeSource;
 use std::time::Duration;
-use tracing::{error, warn};
 
 const TWENTY_FOUR_HOURS: Duration = Duration::from_secs(60 * 60 * 24);
 const MAX_PENDING_CRASH_REPORTS: usize = 10;

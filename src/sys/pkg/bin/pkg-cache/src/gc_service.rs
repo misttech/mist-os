@@ -12,9 +12,9 @@ use fidl_fuchsia_space::{
 };
 use fidl_fuchsia_update::CommitStatusProviderProxy;
 use futures::prelude::*;
+use log::{error, info};
 use std::collections::HashSet;
 use std::sync::Arc;
-use tracing::{error, info};
 use zx::{self as zx, AsHandleRef};
 
 pub async fn serve(
@@ -119,7 +119,7 @@ async fn gc(
         let mut errors = 0;
         for (i, blob) in eligible_blobs.iter().enumerate() {
             let () = blobfs.delete_blob(blob).await.unwrap_or_else(|e| {
-                error!(%blob, "Failed to delete blob: {:#}", anyhow!(e));
+                error!(blob:%; "Failed to delete blob: {:#}", anyhow!(e));
                 errors += 1;
             });
             if (i + 1) % 100 == 0 {

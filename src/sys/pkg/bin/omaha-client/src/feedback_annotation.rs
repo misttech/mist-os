@@ -7,9 +7,9 @@ use fidl_fuchsia_feedback::{
     Annotation, ComponentData, ComponentDataRegisterMarker, ComponentDataRegisterProxy,
 };
 use futures::lock::Mutex;
+use log::error;
 use omaha_client::app_set::AppSet as _;
 use std::rc::Rc;
-use tracing::error;
 
 pub async fn publish_ids_to_feedback(app_set: Rc<Mutex<FuchsiaAppSet>>) {
     let proxy =

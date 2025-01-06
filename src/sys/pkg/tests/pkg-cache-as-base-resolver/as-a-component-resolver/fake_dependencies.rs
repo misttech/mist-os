@@ -4,9 +4,9 @@
 
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use futures::stream::TryStreamExt as _;
+use log::info;
 use mock_metrics::MockMetricEventLoggerFactory;
 use std::sync::Arc;
-use tracing::info;
 use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
 use {fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics};

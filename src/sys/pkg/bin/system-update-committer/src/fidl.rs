@@ -7,8 +7,8 @@ use fidl_fuchsia_update::{CommitStatusProviderRequest, CommitStatusProviderReque
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::channel::oneshot;
 use futures::prelude::*;
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 use zx::{self as zx, EventPair, HandleBased};
 
 pub struct FidlServer {

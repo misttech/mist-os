@@ -21,6 +21,7 @@ use fuchsia_url::PinnedAbsolutePackageUrl;
 use futures::future::LocalBoxFuture;
 use futures::lock::Mutex as AsyncMutex;
 use futures::prelude::*;
+use log::{info, warn};
 use omaha_client::app_set::AppSet as _;
 use omaha_client::cup_ecdsa::RequestMetadata;
 use omaha_client::installer::{AppInstallResult, Installer, ProgressObserver};
@@ -30,7 +31,6 @@ use omaha_client::request_builder::RequestParams;
 use std::rc::Rc;
 use std::time::Duration;
 use thiserror::Error;
-use tracing::{info, warn};
 
 /// Represents possible reasons the installer could have ended in a failure state. Not exhaustive.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

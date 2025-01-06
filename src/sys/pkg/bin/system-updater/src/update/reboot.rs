@@ -7,8 +7,8 @@ use anyhow::{anyhow, Context};
 use fidl_fuchsia_hardware_power_statecontrol::AdminProxy as PowerStateControlProxy;
 use fuchsia_async::{Task, TimeoutExt};
 use futures::prelude::*;
+use log::error;
 use std::time::Duration;
-use tracing::error;
 
 // The system-updater does not want to manage the policy of when to schedule a reboot.  As a
 // failsafe against an initiator holding onto a controller and never scheduling a time to reboot,

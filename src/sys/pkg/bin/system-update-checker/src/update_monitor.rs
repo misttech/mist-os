@@ -7,8 +7,8 @@ use event_queue::{ControlHandle, EventQueue, Notify};
 use fidl_fuchsia_update_ext::{AttemptOptions, State};
 use fuchsia_inspect_contrib::inspectable::InspectableDebugString;
 use futures::prelude::*;
+use log::{error, warn};
 use std::time::Duration;
-use tracing::{error, warn};
 
 pub trait StateNotifier: Notify<Event = State> + Send + Sync + 'static {}
 

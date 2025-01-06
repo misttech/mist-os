@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::anyhow;
+use log::{error, info};
 use serde::Deserialize;
 use std::fs::File;
 use std::io::{BufReader, Read};
 use thiserror::Error;
-use tracing::{error, info};
 
 /// Static service configuration options.
 #[derive(Debug, Default, PartialEq, Eq)]

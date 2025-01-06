@@ -4,8 +4,8 @@
 
 use fuchsia_hash::Hash;
 use futures::future::FutureExt as _;
+use log::error;
 use std::collections::{HashMap, HashSet};
-use tracing::error;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum ErrorStrategy {

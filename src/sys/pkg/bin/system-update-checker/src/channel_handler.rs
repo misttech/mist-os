@@ -9,8 +9,8 @@ use fidl_fuchsia_update_channel::{ProviderRequest, ProviderRequestStream};
 use fidl_fuchsia_update_channelcontrol::{ChannelControlRequest, ChannelControlRequestStream};
 
 use futures::prelude::*;
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 
 pub(crate) struct ChannelHandler {
     current_channel_manager: Arc<CurrentChannelManager>,

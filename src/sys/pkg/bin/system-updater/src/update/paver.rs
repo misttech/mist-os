@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _};
-use tracing::{info, warn};
+use log::{info, warn};
 use {fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver};
 
 mod configuration;

@@ -26,8 +26,8 @@ use futures::future::BoxFuture;
 use futures::prelude::*;
 use futures::stream::BoxStream;
 use futures::{pin_mut, select};
+use log::{error, info};
 use std::sync::Arc;
-use tracing::{error, info};
 use {fuchsia_async as fasync, fuchsia_inspect as finspect};
 
 #[derive(Debug)]

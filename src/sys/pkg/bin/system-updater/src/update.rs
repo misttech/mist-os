@@ -14,11 +14,11 @@ use futures::future::FutureExt as _;
 use futures::stream::{FusedStream, TryStreamExt as _};
 use futures::Future;
 use include_str_from_working_dir::include_str_from_working_dir_env;
+use log::{error, info, warn};
 use std::collections::HashSet;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fidl_fuchsia_paver as fpaver,
     fidl_fuchsia_pkg as fpkg, fidl_fuchsia_space as fspace,
@@ -292,7 +292,7 @@ async fn update(
         let (mut cobalt, cobalt_forwarder_task) = env.cobalt_connector.connect();
         let cobalt_forwarder_task = fuchsia_async::Task::spawn(cobalt_forwarder_task);
 
-        info!(?config, "starting system update");
+        info!(config:?; "starting system update");
         cobalt.log_ota_start(config.initiator, config.start_time);
 
         let mut target_version = history::Version::default();
@@ -351,7 +351,7 @@ async fn update(
             }
         };
 
-        info!(?mode, "checking if reboot is required or should be deferred");
+        info!(mode:?; "checking if reboot is required or should be deferred");
         // Figure out if we should reboot.
         match mode {
             // First priority: Always reboot on ForceRecovery success, even if the caller
@@ -1131,10 +1131,10 @@ async fn image_to_write(
             {
                 let target_config = desired_config.to_target_configuration();
                 info!(
-                    ?current_config,
-                    ?target_config,
-                    ?image_type,
-                    ?image_metadata,
+                    current_config:?,
+                    target_config:?,
+                    image_type:?,
+                    image_metadata:?;
                     "Current configuration contains the desired target image, \
                     copying to avoid a download"
                 );
@@ -1187,9 +1187,9 @@ async fn get_image_buffer_if_hash_and_size_match(
             Ok(buffer) => buffer,
             Err(e) => {
                 warn!(
-                    ?configuration,
-                    ?image_type,
-                    ?image_metadata,
+                    configuration:?,
+                    image_type:?,
+                    image_metadata:?;
                     "Error reading image, so it will not be used to avoid a download: {:#}",
                     anyhow!(e)
                 );
@@ -1207,9 +1207,9 @@ async fn get_image_buffer_if_hash_and_size_match(
         Ok(hash) => hash,
         Err(e) => {
             warn!(
-                ?configuration,
-                ?image_type,
-                ?image_metadata,
+                configuration:?,
+                image_type:?,
+                image_metadata:?;
                 "Error hashing image so it will not be used to avoid a download: {:#}",
                 anyhow!(e)
             );
