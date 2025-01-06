@@ -19,7 +19,7 @@ ZirconPlatformBusMapper::BusMapping::~BusMapping() {
   for (auto& pmt : pmt_) {
     zx_status_t status = pmt.unpin();
     if (status != ZX_OK) {
-      DLOG("zx_pmt_unpin failed: %d\n", status);
+      DLOG("zx_pmt_unpin failed: %s\n", zx_status_get_string(status));
     }
   }
 }
@@ -70,14 +70,15 @@ std::unique_ptr<PlatformBusMapper::BusMapping> ZirconPlatformBusMapper::MapPageR
                                     nullptr);
       MAGMA_LOG(
           WARNING,
-          "Failed to pin buffer \"%s\" koid %ld  %u 0x%lx pages (0x%lx bytes) with status %d. Out of Memory?\n"
+          "Failed to pin buffer \"%s\" koid %ld  %u 0x%lx pages (0x%lx bytes) with status %s. Out of Memory?\n"
           "mem_mapped_bytes: 0x%lx mem_private_bytes: 0x%lx mem_shared_bytes: 0x%lx\n"
           "total_bytes: 0x%lx free_bytes 0x%lx: wired_bytes: 0x%lx vmo_bytes: 0x%lx\n"
           "mmu_overhead_bytes: 0x%lx other_bytes: 0x%lx\n",
-          buffer->GetName().c_str(), buffer->global_id(), i, chunk_page_count, size, status,
-          task_stats.mem_mapped_bytes, task_stats.mem_private_bytes, task_stats.mem_shared_bytes,
-          kmem_stats.total_bytes, kmem_stats.free_bytes, kmem_stats.wired_bytes,
-          kmem_stats.vmo_bytes, kmem_stats.mmu_overhead_bytes, kmem_stats.other_bytes);
+          buffer->GetName().c_str(), buffer->global_id(), i, chunk_page_count, size,
+          zx_status_get_string(status), task_stats.mem_mapped_bytes, task_stats.mem_private_bytes,
+          task_stats.mem_shared_bytes, kmem_stats.total_bytes, kmem_stats.free_bytes,
+          kmem_stats.wired_bytes, kmem_stats.vmo_bytes, kmem_stats.mmu_overhead_bytes,
+          kmem_stats.other_bytes);
       return nullptr;
     }
   }
