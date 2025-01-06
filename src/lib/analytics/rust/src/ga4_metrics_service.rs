@@ -178,7 +178,7 @@ impl GA4MetricsService {
         let _ = self.post.validate()?;
         let post_body = self.post.to_json();
         let url = self.get_url();
-        tracing::trace!(%url, %post_body, "POSTING GA4 ANALYTICS");
+        log::trace!(url:%, post_body:%; "POSTING GA4 ANALYTICS");
 
         let req = Request::builder()
             .method(Method::POST)
@@ -188,12 +188,12 @@ impl GA4MetricsService {
         let res = self.client.request(req).await;
         Ok(match res {
             Ok(mut res) => {
-                tracing::trace!("GA 4 Analytics response: {}", res.status());
+                log::trace!("GA 4 Analytics response: {}", res.status());
                 while let Some(chunk) = res.body_mut().data().await {
-                    tracing::trace!(?chunk);
+                    log::trace!(chunk:?; "");
                 }
             }
-            Err(e) => tracing::trace!("Error posting GA 4 analytics: {}", e),
+            Err(e) => log::trace!("Error posting GA 4 analytics: {}", e),
         })
     }
 
@@ -206,7 +206,7 @@ impl GA4MetricsService {
             && self.post.events[0].name.eq_ignore_ascii_case("invoke")
             && self.post.events[1].name.eq_ignore_ascii_case("timing")
         {
-            tracing::trace!("Rewriting ffx batch invoke to ga4 post invoke");
+            log::trace!("Rewriting ffx batch invoke to ga4 post invoke");
             let events = &mut self.post.events;
             let invoke_event = &mut events[0].clone();
             let timing_event = events.remove(1);

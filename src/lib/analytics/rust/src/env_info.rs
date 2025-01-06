@@ -48,7 +48,7 @@ pub fn get_analytics_dir() -> Result<PathBuf, Error> {
 pub(crate) fn migrate_legacy_folder(analytics_folder: &PathBuf) -> Result<(), Error> {
     let old_analytics_folder = old_analytics_folder();
     if !analytics_folder.exists() && old_analytics_folder.exists() {
-        tracing::trace!("Migrating analytics to {analytics_folder:?}");
+        log::trace!("Migrating analytics to {analytics_folder:?}");
         create_dir_all(&analytics_folder)?;
         copy_old_to_new(&old_analytics_folder, &analytics_folder)?;
         remove_old_analytics_dir(&old_analytics_folder);
@@ -61,8 +61,8 @@ pub(crate) fn migrate_legacy_folder(analytics_folder: &PathBuf) -> Result<(), Er
 
 fn remove_old_analytics_dir(old_analytics_folder: &PathBuf) {
     match remove_dir_all(old_analytics_folder) {
-        Ok(()) => tracing::trace!("removed old directory"),
-        Err(e) => tracing::error!("Error removing old directory: {:?}", e),
+        Ok(()) => log::trace!("removed old directory"),
+        Err(e) => log::error!("Error removing old directory: {:?}", e),
     }
 }
 
@@ -71,8 +71,8 @@ fn symlink_old_to_new(analytics_folder: &PathBuf, old_analytics_folder: &PathBuf
     let old_parent = old_analytics_folder.parent().unwrap();
     if !old_parent.exists() {
         match create_dir_all(&old_parent) {
-            Ok(()) => tracing::trace!("Created parent of old analytics folder"),
-            Err(e) => tracing::error!(
+            Ok(()) => log::trace!("Created parent of old analytics folder"),
+            Err(e) => log::error!(
                 "Could not create parent of old analytics directory for symlinking: {:?},{:?},{:?}",
                 analytics_folder,
                 &old_parent,
@@ -82,8 +82,8 @@ fn symlink_old_to_new(analytics_folder: &PathBuf, old_analytics_folder: &PathBuf
     }
     if old_parent.exists() {
         match symlink(analytics_folder, old_analytics_folder) {
-            Ok(()) => tracing::trace!("symlinked old directory to new directory"),
-            Err(e) => tracing::error!(
+            Ok(()) => log::trace!("symlinked old directory to new directory"),
+            Err(e) => log::error!(
                 "Error symlinking old directory: {:?},{:?},{:?}",
                 analytics_folder,
                 old_analytics_folder.as_path(),
@@ -119,7 +119,7 @@ fn copy_old_to_new(
     }
     for entry in read_dir(old_analytics_folder)? {
         let entry = entry?;
-        tracing::trace!("Copying file: {:?}", &entry.path());
+        log::trace!("Copying file: {:?}", &entry.path());
         copy(entry.path(), new_analytics_folder.as_path().join(entry.file_name()))?;
     }
     Ok(())
