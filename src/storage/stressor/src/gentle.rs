@@ -85,7 +85,7 @@ impl Stressor {
 
     /// Starts the stressor. Loops forever.
     pub fn run(self: &Arc<Self>, num_threads: usize) {
-        tracing::info!(
+        log::info!(
             "Running stressor, found {} files, counter: {}",
             self.all_files.read().unwrap().len(),
             self.name_counter.load(Ordering::Relaxed),
@@ -99,7 +99,7 @@ impl Stressor {
             std::thread::sleep(std::time::Duration::from_secs(10));
             let all_file_count = self.all_files.read().unwrap().len();
             let open_file_count = self.open_files.read().unwrap().len();
-            tracing::info!(
+            log::info!(
                 "{} files, {} open, weights: {:?}, counts: {:?}",
                 all_file_count,
                 open_file_count,

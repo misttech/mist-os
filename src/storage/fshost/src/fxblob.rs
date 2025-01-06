@@ -23,11 +23,11 @@ pub fn blobfs_verifier_service() -> Arc<service::Service> {
                     // TODO(https://fxbug.dev/42077105): Implement by calling out
                     // to Fxfs' blob volume.
                     responder.send(Ok(())).unwrap_or_else(|e| {
-                        tracing::error!("failed to send Verify response. error: {:?}", e);
+                        log::error!("failed to send Verify response. error: {:?}", e);
                     });
                 }
                 Err(e) => {
-                    tracing::error!("BlobfsVerifier server failed: {:?}", e);
+                    log::error!("BlobfsVerifier server failed: {:?}", e);
                     return;
                 }
             }
@@ -46,11 +46,11 @@ pub fn ota_health_check_service() -> Arc<service::Service> {
                     // TODO(https://fxbug.dev/42077105): Implement by calling out
                     // to Fxfs' blob volume.
                     responder.send(fupdate::HealthStatus::Healthy).unwrap_or_else(|e| {
-                        tracing::error!("failed to send GetHealthStatus response. error: {:?}", e);
+                        log::error!("failed to send GetHealthStatus response. error: {:?}", e);
                     });
                 }
                 Err(e) => {
-                    tracing::error!("ComponentOtaHealthCheck server failed: {:?}", e);
+                    log::error!("ComponentOtaHealthCheck server failed: {:?}", e);
                     return;
                 }
             }

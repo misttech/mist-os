@@ -130,7 +130,7 @@ impl<T: PagerBacked> PagerPacketReceiver<T> {
                         watch_for_zero_children(strong.as_ref()).unwrap();
                     }
                 }
-                Err(e) => error!(error = ?e, "Vmo::info failed"),
+                Err(e) => error!(error:? = e; "Vmo::info failed"),
             }
         }
     }
@@ -277,7 +277,7 @@ impl Pager {
         transfer_offset: u64,
     ) {
         if let Err(e) = self.pager.supply_pages(vmo, range, transfer_vmo, transfer_offset) {
-            error!(error = ?e, "supply_pages failed");
+            error!(error:? = e; "supply_pages failed");
         }
     }
 
@@ -300,7 +300,7 @@ impl Pager {
             _ => zx::Status::BAD_STATE,
         };
         if let Err(e) = self.pager.op_range(zx::PagerOp::Fail(pager_status), vmo, range) {
-            error!(error = ?e, "op_range failed");
+            error!(error:? = e; "op_range failed");
         }
     }
 
@@ -310,7 +310,7 @@ impl Pager {
         if let Err(e) = self.pager.op_range(zx::PagerOp::Dirty, vmo, range) {
             // TODO(https://fxbug.dev/42086069): The kernel can spuriously return ZX_ERR_NOT_FOUND.
             if e != zx::Status::NOT_FOUND {
-                error!(error = ?e, "dirty_pages failed");
+                error!(error:? = e; "dirty_pages failed");
             }
         }
     }
@@ -324,7 +324,7 @@ impl Pager {
         options: zx::PagerWritebackBeginOptions,
     ) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::WritebackBegin(options), vmo, range) {
-            error!(error = ?e, "writeback_begin failed");
+            error!(error:? = e; "writeback_begin failed");
         }
     }
 
@@ -332,7 +332,7 @@ impl Pager {
     /// `ZX_PAGER_OP_WRITEBACK_END` for more information.
     pub fn writeback_end(&self, vmo: &zx::Vmo, range: Range<u64>) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::WritebackEnd, vmo, range) {
-            error!(error = ?e, "writeback_end failed");
+            error!(error:? = e; "writeback_end failed");
         }
     }
 
@@ -520,7 +520,7 @@ async fn page_in_chunk<P: PagerBacked>(
     let buffer = match this.aligned_read(read_range.range()).await {
         Ok(v) => v,
         Err(error) => {
-            error!(range = ?read_range.range(), ?error, "Failed to load range");
+            error!(range:? = read_range.range(), error:?; "Failed to load range");
             read_range.report_failure(map_to_status(error));
             return;
         }

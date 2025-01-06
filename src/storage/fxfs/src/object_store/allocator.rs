@@ -1442,7 +1442,7 @@ impl Allocator {
                             [std::cmp::min(63, (len / self.block_size) as usize)] += 1;
                     }
                     Err(err) => {
-                        error!(%err, "Likely filesystem corruption.");
+                        error!(err:%; "Likely filesystem corruption.");
                         return Err(err.into());
                     }
                     Ok(x) => {
@@ -1459,7 +1459,7 @@ impl Allocator {
             }
         };
 
-        debug!(device_range = ?result, "allocate");
+        debug!(device_range:? = result; "allocate");
 
         let len = result.length().unwrap();
         let reservation_owner = reservation.either(
@@ -1565,7 +1565,7 @@ impl Allocator {
         owner_object_id: u64,
         dealloc_range: Range<u64>,
     ) -> Result<u64, Error> {
-        debug!(device_range = ?dealloc_range, "deallocate");
+        debug!(device_range:? = dealloc_range; "deallocate");
         ensure!(dealloc_range.is_valid(), FxfsError::InvalidArgs);
         // We don't currently support sharing of allocations (value.count always equals 1), so as
         // long as we can assume the deallocated range is actually allocated, we can avoid device
@@ -2065,7 +2065,7 @@ impl<'a> Flusher<'a> {
             .await?;
         let mut serialized_info = Vec::new();
 
-        debug!(oid = layer_object_handle.object_id(), "new allocator layer file");
+        debug!(oid = layer_object_handle.object_id(); "new allocator layer file");
         object_handle = ObjectStore::open_object(
             &root_store,
             self.allocator.object_id(),

@@ -6,8 +6,8 @@ use super::{BufferSlice, MutableBufferSlice, RemoteBlockClientSync, VmoId};
 use anyhow::{ensure, Error};
 
 use linked_hash_map::LinkedHashMap;
+use log::error;
 use std::io::{SeekFrom, Write};
-use tracing::error;
 
 const VMO_SIZE: u64 = 262_144;
 const BLOCK_SIZE: u64 = 8192;

@@ -81,7 +81,7 @@ where
         let test = self.test;
         self.fs
             .for_each_concurrent(MAX_CONCURRENT, move |stream| {
-                handle_request(test.clone(), stream).unwrap_or_else(|e| tracing::error!("{}", e))
+                handle_request(test.clone(), stream).unwrap_or_else(|e| log::error!("{}", e))
             })
             .await;
     }
@@ -105,20 +105,20 @@ async fn handle_controller<T: Test + 'static>(
     match request {
         ControllerRequest::Setup { responder, device_label, device_path, seed } => {
             let res = test.setup(device_label, device_path, seed).await.map_err(|e| {
-                tracing::error!("{:?}", e);
+                log::error!("{:?}", e);
                 zx::Status::INTERNAL.into_raw()
             });
             responder.send(res)?;
         }
         ControllerRequest::Test { responder, device_label, device_path, seed, duration } => {
             let test_fut = test.test(device_label, device_path, seed).map_err(|e| {
-                tracing::error!("{:?}", e);
+                log::error!("{:?}", e);
                 zx::Status::INTERNAL.into_raw()
             });
             if duration != 0 {
                 // If a non-zero duration is provided, spawn the test and then return after that
                 // duration.
-                tracing::info!("starting test and replying in {} seconds...", duration);
+                log::info!("starting test and replying in {} seconds...", duration);
                 let timer = pin!(fasync::Timer::new(std::time::Duration::from_secs(duration)));
                 let res = match future::select(test_fut, timer).await {
                     future::Either::Left((res, _)) => res,
@@ -130,14 +130,14 @@ async fn handle_controller<T: Test + 'static>(
                 responder.send(res)?;
             } else {
                 // If a zero duration is provided, return once the test step is complete.
-                tracing::info!("starting test...");
+                log::info!("starting test...");
                 responder.send(test_fut.await)?;
             }
         }
         ControllerRequest::Verify { responder, device_label, device_path, seed } => {
             let res = test.verify(device_label, device_path, seed).await.map_err(|e| {
                 // The test tries failing on purpose, so only print errors as warnings.
-                tracing::warn!("{:?}", e);
+                log::warn!("{:?}", e);
                 zx::Status::BAD_STATE.into_raw()
             });
             responder.send(res)?;
@@ -164,7 +164,7 @@ pub async fn find_dev(dev: &str) -> Result<String> {
         let path = format!("/dev/class/block/{}", entry.name);
         let proxy = connect_to_protocol_at_path::<ControllerMarker>(&path)?;
         let topo_path = proxy.get_topological_path().await?.map_err(|s| zx::Status::from_raw(s))?;
-        tracing::info!("{} => {}", path, topo_path);
+        log::info!("{} => {}", path, topo_path);
         if dev == topo_path {
             return Ok(path);
         }

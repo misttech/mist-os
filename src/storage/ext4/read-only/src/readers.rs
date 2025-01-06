@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::error;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
-use tracing::error;
 
 #[cfg(target_os = "fuchsia")]
 pub use self::fuchsia::*;
@@ -93,9 +93,8 @@ mod fuchsia {
     use block_client::{Cache, RemoteBlockClientSync};
     use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_hardware_block::BlockMarker;
-
+    use log::error;
     use std::sync::{Arc, Mutex};
-    use tracing::error;
 
     pub struct VmoReader {
         vmo: Arc<zx::Vmo>,

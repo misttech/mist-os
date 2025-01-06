@@ -220,8 +220,8 @@ impl TestFixtureBuilder {
             storage_host: self.storage_host,
         };
 
-        tracing::info!(
-            realm_name = ?fixture.realm.root.child_name(),
+        log::info!(
+            realm_name:? = fixture.realm.root.child_name();
             "built new test realm",
         );
 
@@ -266,7 +266,7 @@ pub struct TestFixture {
 
 impl TestFixture {
     pub async fn tear_down(mut self) {
-        tracing::info!(realm_name = ?self.realm.root.child_name(), "tearing down");
+        log::info!(realm_name:? = self.realm.root.child_name(); "tearing down");
         // Check the crash reports before destroying the realm because tearing down the realm can
         // cause mounting errors that trigger a crash report.
         if !self.ignore_crash_reports {
@@ -403,7 +403,7 @@ impl TestFixture {
         expected_program: &'_ str,
         expected_signature: &'_ str,
     ) {
-        tracing::info!("Waiting for {count} crash reports");
+        log::info!("Waiting for {count} crash reports");
         for _ in 0..count {
             let report = self.crash_reports.next().await.expect("Sender closed");
             assert_eq!(report.program_name.as_deref(), Some(expected_program));
@@ -412,7 +412,7 @@ impl TestFixture {
         if count > 0 {
             let selector =
                 format!("realm_builder\\:{}/test-fshost:root", self.realm.root.child_name());
-            tracing::info!("Checking inspect for corruption event, selector={selector}");
+            log::info!("Checking inspect for corruption event, selector={selector}");
             let tree = ArchiveReader::new()
                 .add_selector(selector)
                 .snapshot::<Inspect>()

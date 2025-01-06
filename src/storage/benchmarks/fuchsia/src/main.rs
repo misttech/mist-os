@@ -162,8 +162,8 @@ async fn main() {
 
     let fvm_volume_factory = FvmVolumeFactory::new().await;
     if fvm_volume_factory.is_none() {
-        tracing::warn!("Not running any tests -- neither FVM nor GPT could be found.");
-        tracing::warn!("To run these test locally on an emulator, see the README.md.");
+        log::warn!("Not running any tests -- neither FVM nor GPT could be found.");
+        log::warn!("To run these test locally on an emulator, see the README.md.");
         return;
     }
 

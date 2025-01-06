@@ -442,7 +442,7 @@ impl SuperBlockManager {
                 }
             }
         };
-        info!(?super_block, ?current_super_block, "loaded super-block");
+        info!(super_block:?, current_super_block:?; "loaded super-block");
         *self.next_instance.lock().unwrap() = current_super_block.next();
         Ok((super_block, root_parent))
     }

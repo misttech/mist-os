@@ -228,7 +228,7 @@ pub async fn fsck_with_options(
         Err(anyhow!("Fsck encountered {} errors, {} warnings", errors, warnings))
     } else {
         if warnings > 0 {
-            warn!(count = warnings, "Fsck encountered warnings");
+            warn!(count = warnings; "Fsck encountered warnings");
         } else {
             if !options.quiet {
                 info!("No issues detected");
@@ -257,7 +257,7 @@ pub async fn fsck_volume_with_options(
 ) -> Result<FsckResult, Error> {
     let mut result = FsckResult::default();
     if !options.quiet {
-        info!(?store_id, "Starting volume fsck");
+        info!(store_id:?; "Starting volume fsck");
     }
 
     let _guard = if options.no_lock {
@@ -278,7 +278,7 @@ pub async fn fsck_volume_with_options(
         Err(anyhow!("Volume fsck encountered {} errors, {} warnings", errors, warnings))
     } else {
         if warnings > 0 {
-            warn!(count = warnings, "Volume fsck encountered warnings");
+            warn!(count = warnings; "Volume fsck encountered warnings");
         } else {
             if !options.quiet {
                 info!("No issues detected");
@@ -320,7 +320,7 @@ impl<'a> Fsck<'a> {
     // Log if in verbose mode.
     fn verbose(&self, message: impl AsRef<str>) {
         if self.options.verbose {
-            info!(message = message.as_ref(), "fsck");
+            info!(message = message.as_ref(); "fsck");
         }
     }
 

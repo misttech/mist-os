@@ -240,7 +240,7 @@ impl Gpt {
         let (header, partitions) = match load_metadata(&client, WhichHeader::Primary).await {
             Ok(v) => v,
             Err(error) => {
-                tracing::warn!(?error, "Failed to load primary metadata; falling back to backup");
+                log::warn!(error:?; "Failed to load primary metadata; falling back to backup");
                 restore_primary = true;
                 load_metadata(&client, WhichHeader::Backup)
                     .await
@@ -254,7 +254,7 @@ impl Gpt {
             transaction_state: Arc::new(Mutex::new(TransactionState::default())),
         };
         if restore_primary {
-            tracing::info!("Restoring primary metadata from backup!");
+            log::info!("Restoring primary metadata from backup!");
             this.header.backup_lba = this.header.current_lba;
             this.header.current_lba = 1;
             this.header.part_start = 2;
@@ -365,11 +365,11 @@ impl Gpt {
         // Per section 5.3.2 of the UEFI spec, the backup metadata must be written first.  The spec
         // permits the partition table entries and header to be written in either order.
         self.write_metadata(&backup_header, &partition_table_raw[..]).await.map_err(|err| {
-            tracing::error!(?err, "Failed to write metadata");
+            log::error!(err:?; "Failed to write metadata");
             TransactionCommitError::Io
         })?;
         self.write_metadata(&new_header, &partition_table_raw[..]).await.map_err(|err| {
-            tracing::error!(?err, "Failed to write metadata");
+            log::error!(err:?; "Failed to write metadata");
             TransactionCommitError::Io
         })?;
 

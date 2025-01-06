@@ -278,7 +278,7 @@ impl BufferAllocator {
 
         inner.allocation_map.insert(offset, self.size_for_order(order));
         let range = offset..offset + size;
-        tracing::debug!(?range, bytes_used = self.size_for_order(order), "Allocated");
+        log::debug!(range:?, bytes_used = self.size_for_order(order); "Allocated");
 
         // Safety is ensured by the allocator not double-allocating any regions.
         Ok(Buffer::new(unsafe { self.source.sub_slice(&range) }, range, &self))
@@ -294,7 +294,7 @@ impl BufferAllocator {
             .remove(&offset)
             .unwrap_or_else(|| panic!("No allocation record found for {:?}", range));
         assert!(range.end - range.start <= size);
-        tracing::debug!(?range, bytes_used = size, "Freeing");
+        log::debug!(range:?, bytes_used = size; "Freeing");
 
         // Merge as many free slots as we can.
         let mut order = order(size, self.block_size());

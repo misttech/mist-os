@@ -969,10 +969,10 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         let attributes = match self.file.list_extended_attributes().await {
             Ok(attributes) => attributes,
             Err(status) => {
-                tracing::error!(?status, "list extended attributes failed");
+                log::error!(status:?; "list extended attributes failed");
                 iterator
                     .close_with_epitaph(status)
-                    .unwrap_or_else(|error| tracing::error!(?error, "failed to send epitaph"));
+                    .unwrap_or_else(|error| log::error!(error:?; "failed to send epitaph"));
                 return;
             }
         };

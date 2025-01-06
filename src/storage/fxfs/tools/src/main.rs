@@ -194,7 +194,7 @@ struct CheckGoldenSubCommand {
 
 #[fuchsia::main(threads = 2)]
 async fn main() -> Result<(), Error> {
-    tracing::debug!("fxfs {:?}", std::env::args());
+    log::debug!("fxfs {:?}", std::env::args());
 
     let args: TopLevel = argh::from_env();
     match args.subcommand {

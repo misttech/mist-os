@@ -50,16 +50,16 @@ async fn find_partition_helper(
     device_label: String,
 ) -> Result<ControllerProxy> {
     let mut partition_path = if let Some(path) = device_path {
-        tracing::info!("fs-tree blackout using provided path for load gen");
+        log::info!("fs-tree blackout using provided path for load gen");
         path.into()
     } else {
-        tracing::info!("fs-tree blackout finding gpt for load gen");
+        log::info!("fs-tree blackout finding gpt for load gen");
         find_block_device(&[BlockDeviceMatcher::Name(&device_label)])
             .await
             .context("finding block device")?
     };
     partition_path.push("device_controller");
-    tracing::info!(?partition_path, "found partition to use");
+    log::info!(partition_path:?; "found partition to use");
     connect_to_protocol_at_path::<ControllerMarker>(partition_path.to_str().unwrap())
         .context("connecting to provided path")
 }
@@ -188,16 +188,16 @@ impl Test for FsTree {
         device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        tracing::info!(device_label, device_path, "setting up fs-tree blackout test");
+        log::info!(device_label:%, device_path:?; "setting up fs-tree blackout test");
         let mut partition_path = if let Some(path) = device_path {
-            tracing::info!("fs-tree blackout test using provided path");
+            log::info!("fs-tree blackout test using provided path");
             path.into()
         } else if let Ok(path) = find_block_device(&[BlockDeviceMatcher::Name(&device_label)]).await
         {
-            tracing::info!("fs-tree blackout test found existing partition");
+            log::info!("fs-tree blackout test found existing partition");
             path
         } else {
-            tracing::info!("fs-tree blackout test setting up gpt");
+            log::info!("fs-tree blackout test setting up gpt");
             let mut gpt_block_path =
                 find_block_device(&[BlockDeviceMatcher::ContentsMatch(DiskFormat::Gpt)])
                     .await
@@ -250,7 +250,7 @@ impl Test for FsTree {
             .context("waiting for new gpt partition")?
         };
         partition_path.push("device_controller");
-        tracing::info!(?partition_path, "found partition to use");
+        log::info!(partition_path:?; "found partition to use");
         let partition_controller =
             connect_to_protocol_at_path::<ControllerMarker>(partition_path.to_str().unwrap())
                 .context("connecting to provided path")?;
@@ -261,7 +261,7 @@ impl Test for FsTree {
             _ => panic!("Unsupported filesystem"),
         }
 
-        tracing::info!("setup complete");
+        log::info!("setup complete");
         Ok(())
     }
 
@@ -271,7 +271,7 @@ impl Test for FsTree {
         device_path: Option<String>,
         seed: u64,
     ) -> Result<()> {
-        tracing::info!(device_label, device_path, "fs-tree blackout test running load gen");
+        log::info!(device_label:%, device_path:?; "fs-tree blackout test running load gen");
         let partition_controller = find_partition_helper(device_path, device_label)
             .await
             .context("test failed to find partition")?;
@@ -281,24 +281,24 @@ impl Test for FsTree {
             _ => panic!("Unsupported filesystem"),
         };
 
-        tracing::info!("generating load");
+        log::info!("generating load");
         let mut rng = StdRng::seed_from_u64(seed);
         loop {
-            tracing::debug!("generating tree");
+            log::debug!("generating tree");
             let dist = EntryDistribution::new(6);
             let tree: DirectoryEntry = rng.sample(&dist);
-            tracing::debug!("generated tree: {:?}", tree);
+            log::debug!("generated tree: {:?}", tree);
             let tree_name = tree.get_name();
-            tracing::debug!("writing tree");
+            log::debug!("writing tree");
             tree.write_tree_at(fs.root()).await.context("failed to write directory tree")?;
             // now try renaming the tree root
             let tree_name2 = format!("{}-renamed", tree_name);
-            tracing::debug!("moving tree");
+            log::debug!("moving tree");
             fuchsia_fs::directory::rename(fs.root(), &tree_name, &tree_name2)
                 .await
                 .context("failed to rename directory tree")?;
             // then try deleting the entire thing.
-            tracing::debug!("deleting tree");
+            log::debug!("deleting tree");
             fuchsia_fs::directory::remove_dir_recursive(fs.root(), &tree_name2)
                 .await
                 .context("failed to delete directory tree")?;
@@ -311,11 +311,7 @@ impl Test for FsTree {
         device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        tracing::info!(
-            device_label,
-            device_path,
-            "fs-tree blackout test verifying disk consistency"
-        );
+        log::info!(device_label:%, device_path:?; "fs-tree blackout test verifying disk consistency");
         let partition_controller = find_partition_helper(device_path, device_label)
             .await
             .context("verify failed to find partition")?;
@@ -326,7 +322,7 @@ impl Test for FsTree {
             _ => panic!("Unsupported filesystem"),
         }
 
-        tracing::info!("verification complete");
+        log::info!("verification complete");
         Ok(())
     }
 }

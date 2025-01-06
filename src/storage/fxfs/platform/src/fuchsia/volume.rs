@@ -298,7 +298,7 @@ impl FxVolume {
             if let Err(e) = self.store.lock().await {
                 // The store will be left in a safe state and there won't be data-loss unless
                 // there's an issue flushing the journal later.
-                warn!(error = ?e, "Locking store error");
+                warn!(error:? = e; "Locking store error");
             }
         }
         let sync_status = self
@@ -307,7 +307,7 @@ impl FxVolume {
             .sync(SyncOptions { flush_device: true, ..Default::default() })
             .await;
         if let Err(e) = sync_status {
-            error!(error = ?e, "Failed to sync filesystem; data may be lost");
+            error!(error:? = e; "Failed to sync filesystem; data may be lost");
         }
     }
 
@@ -420,7 +420,7 @@ impl FxVolume {
         mut level_stream: impl Stream<Item = MemoryPressureLevel> + FusedStream + Unpin,
         terminate: oneshot::Receiver<()>,
     ) {
-        debug!(store_id = self.store.store_object_id(), "FxVolume::background_task start");
+        debug!(store_id = self.store.store_object_id(); "FxVolume::background_task start");
         let mut terminate = terminate.fuse();
         // Default to the normal period until updates come from the `level_stream`.
         let mut level = MemoryPressureLevel::Normal;
@@ -481,7 +481,7 @@ impl FxVolume {
                 self.dirent_cache.set_limit(config.for_level(&level).cache_size_limit);
             }
         }
-        debug!(store_id = self.store.store_object_id(), "FxVolume::background_task end");
+        debug!(store_id = self.store.store_object_id(); "FxVolume::background_task end");
     }
 
     /// Reports that a certain number of bytes will be dirtied in a pager-backed VMO.
@@ -515,14 +515,14 @@ impl FxVolume {
                     warn!(
                         store_id = self.store.store_object_id(),
                         oid = file.object_id(),
-                        error = ?e,
+                        error:? = e;
                         "Failed to flush",
                     )
                 }
             }
             flushed += 1;
         }
-        debug!(store_id = self.store.store_object_id(), file_count = flushed, "FxVolume flushed");
+        debug!(store_id = self.store.store_object_id(), file_count = flushed; "FxVolume flushed");
     }
 
     /// Spawns a short term task for the volume that includes a guard that will prevent termination.
@@ -660,38 +660,39 @@ impl FxVolumeAndRoot {
             match request {
                 ProjectIdRequest::SetLimit { responder, project_id, bytes, nodes } => responder
                     .send(
-                        self.volume
-                            .store()
-                            .set_project_limit(project_id, bytes, nodes)
-                            .await
-                            .map_err(|error| {
-                                error!(?error, store_id, project_id, "Failed to set project limit");
-                                map_to_raw_status(error)
-                            }),
-                    )?,
-                ProjectIdRequest::Clear { responder, project_id } => responder.send(
-                    self.volume.store().clear_project_limit(project_id).await.map_err(|error| {
-                        error!(?error, store_id, project_id, "Failed to clear project limit");
-                        map_to_raw_status(error)
-                    }),
+                    self.volume.store().set_project_limit(project_id, bytes, nodes).await.map_err(
+                        |error| {
+                            error!(error:?, store_id, project_id; "Failed to set project limit");
+                            map_to_raw_status(error)
+                        },
+                    ),
                 )?,
+                ProjectIdRequest::Clear { responder, project_id } => {
+                    responder
+                        .send(self.volume.store().clear_project_limit(project_id).await.map_err(
+                        |error| {
+                            error!(error:?, store_id, project_id; "Failed to clear project limit");
+                            map_to_raw_status(error)
+                        },
+                    ))?
+                }
                 ProjectIdRequest::SetForNode { responder, node_id, project_id } => responder.send(
                     self.volume.store().set_project_for_node(node_id, project_id).await.map_err(
                         |error| {
-                            error!(?error, store_id, node_id, project_id, "Failed to apply node.");
+                            error!(error:?, store_id, node_id, project_id; "Failed to apply node.");
                             map_to_raw_status(error)
                         },
                     ),
                 )?,
                 ProjectIdRequest::GetForNode { responder, node_id } => responder.send(
                     self.volume.store().get_project_for_node(node_id).await.map_err(|error| {
-                        error!(?error, store_id, node_id, "Failed to get node.");
+                        error!(error:?, store_id, node_id; "Failed to get node.");
                         map_to_raw_status(error)
                     }),
                 )?,
                 ProjectIdRequest::ClearForNode { responder, node_id } => responder.send(
                     self.volume.store().clear_project_for_node(node_id).await.map_err(|error| {
-                        error!(?error, store_id, node_id, "Failed to clear for node.");
+                        error!(error:?, store_id, node_id; "Failed to clear for node.");
                         map_to_raw_status(error)
                     }),
                 )?,
@@ -699,7 +700,7 @@ impl FxVolumeAndRoot {
                     responder.send(match self.list_projects(&token).await {
                         Ok((ref entries, ref next_token)) => Ok((entries, next_token.as_ref())),
                         Err(error) => {
-                            error!(?error, store_id, ?token, "Failed to list projects.");
+                            error!(error:?, store_id, token:?; "Failed to list projects.");
                             Err(map_to_raw_status(error))
                         }
                     })?
@@ -708,7 +709,7 @@ impl FxVolumeAndRoot {
                     responder.send(match self.project_info(project_id).await {
                         Ok((ref limit, ref usage)) => Ok((limit, usage)),
                         Err(error) => {
-                            error!(?error, store_id, project_id, "Failed to get project info.");
+                            error!(error:?, store_id, project_id; "Failed to get project info.");
                             Err(map_to_raw_status(error))
                         }
                     })?

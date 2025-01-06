@@ -387,10 +387,10 @@ impl Inner {
         self.terminate = true;
 
         if let Some(err) = reason {
-            error!(error = ?err, "Terminating journal");
+            error!(error:? = err; "Terminating journal");
             // Log previous error if one was already set, otherwise latch the error.
             if let Some(prev_err) = self.terminate_reason.as_ref() {
-                error!(error = ?prev_err, "Journal previously terminated");
+                error!(error:? = prev_err; "Journal previously terminated");
             } else {
                 self.terminate_reason = Some(err);
             }
@@ -520,7 +520,7 @@ impl Journal {
     pub fn set_trace(&self, trace: bool) {
         let old_value = self.trace.swap(trace, Ordering::Relaxed);
         if trace != old_value {
-            info!(trace, "J: trace");
+            info!(trace; "J: trace");
         }
     }
 
@@ -784,7 +784,7 @@ impl Journal {
                 .chain(non_root_mutations.iter().map(|(_, m)| m))
             {
                 if !self.validate_mutation(mutation, block_size, device_size) {
-                    info!(?mutation, "Stopping replay at bad mutation");
+                    info!(mutation:?; "Stopping replay at bad mutation");
                     valid_to = checkpoint.file_offset;
                     break 'bad_replay;
                 }
@@ -947,7 +947,7 @@ impl Journal {
             .await
             .context("Failed to complete replay for object manager")?;
 
-        info!(checkpoint = last_checkpoint.file_offset, discarded_to, "replay complete");
+        info!(checkpoint = last_checkpoint.file_offset, discarded_to; "replay complete");
         Ok(())
     }
 
@@ -1198,7 +1198,7 @@ impl Journal {
         const INIT_ROOT_STORE_OBJECT_ID: u64 = 4;
         const INIT_ALLOCATOR_OBJECT_ID: u64 = 5;
 
-        info!(device_size = filesystem.device().size(), "Formatting");
+        info!(device_size = filesystem.device().size(); "Formatting");
 
         let checkpoint = JournalCheckpoint {
             version: LATEST_VERSION,

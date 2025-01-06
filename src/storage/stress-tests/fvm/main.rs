@@ -9,10 +9,10 @@ pub mod volume_actor;
 pub mod vslice;
 
 use argh::FromArgs;
+use diagnostics_log::Severity;
 use environment::FvmEnvironment;
 use fuchsia_async as fasync;
 use stress_test::run_test;
-use tracing::Level;
 
 #[derive(Clone, Debug, FromArgs)]
 /// Creates an instance of fvm and performs stressful operations on it
@@ -31,7 +31,7 @@ pub struct Args {
 
     /// filter logging by level (off, error, warn, info, debug, trace)
     #[argh(option, short = 'l')]
-    log_filter: Option<Level>,
+    log_filter: Option<Severity>,
 
     /// number of volumes in FVM.
     /// each volume operates on a different thread and will perform

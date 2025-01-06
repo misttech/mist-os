@@ -56,15 +56,15 @@ impl Container for FxfsContainer {
                     ))
                 }
                 Ok(None) => {
-                    tracing::warn!(
+                    log::warn!(
                         "could not find keybag. Perhaps the keys were shredded? \
                          Reformatting the data and unencrypted volumes."
                     );
                 }
                 Err(error) => {
                     launcher.report_corruption("fxfs", &error);
-                    tracing::error!(
-                        ?error,
+                    log::error!(
+                        error:?;
                         "unlock_data_volume failed. Reformatting the data and unencrypted volumes."
                     );
                 }

@@ -73,7 +73,7 @@ impl ObjectStore {
 
         let trace = self.trace.load(Ordering::Relaxed);
         if trace {
-            info!(store_id = self.store_object_id(), "OS: begin flush");
+            info!(store_id = self.store_object_id(); "OS: begin flush");
         }
 
         let layer_file_sizes = if matches!(&*self.lock_state.lock().unwrap(), LockState::Locked) {
@@ -88,7 +88,7 @@ impl ObjectStore {
         };
 
         if trace {
-            info!(store_id = self.store_object_id(), "OS: end flush");
+            info!(store_id = self.store_object_id(); "OS: end flush");
         }
         if let Some(callback) = self.flush_callback.get() {
             callback(self);
@@ -254,7 +254,7 @@ impl ObjectStore {
                 old_layer_count = old_layers.len(),
                 new_layer_count = new_layers.len(),
                 total_layer_size,
-                ?new_store_info,
+                new_store_info:?;
                 "OS: compacting"
             );
         }

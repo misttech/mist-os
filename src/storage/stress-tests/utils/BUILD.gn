@@ -17,8 +17,8 @@ rustc_library("utils") {
     "//src/lib/fuchsia-fs",
     "//src/storage/lib/ramdevice_client",
     "//src/storage/testing/rust:storage-isolated-driver-manager",
+    "//third_party/rust_crates:log",  # for recording messages
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:tracing",  # for recording messages
   ]
 
   sources = [

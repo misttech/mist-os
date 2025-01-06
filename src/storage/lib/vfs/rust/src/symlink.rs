@@ -201,7 +201,7 @@ impl<T: Symlink> Connection<T> {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::SymlinkRequest::_UnknownMethod { ordinal, .. } => {
-                tracing::warn!(ordinal, "Received unknown method")
+                log::warn!(ordinal; "Received unknown method")
             }
         }
         Ok(false)
@@ -270,10 +270,10 @@ impl<T: Symlink> Connection<T> {
         let attributes = match self.symlink.list_extended_attributes().await {
             Ok(attributes) => attributes,
             Err(status) => {
-                tracing::error!(?status, "list extended attributes failed");
+                log::error!(status:?; "list extended attributes failed");
                 iterator
                     .close_with_epitaph(status)
-                    .unwrap_or_else(|error| tracing::error!(?error, "failed to send epitaph"));
+                    .unwrap_or_else(|error| log::error!(error:?; "failed to send epitaph"));
                 return;
             }
         };

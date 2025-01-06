@@ -135,7 +135,7 @@ impl StorageHostService {
             let me = self.clone();
             self.scope.spawn(async move {
                 if let Err(e) = me.handle_lifecycle_requests(channel).await {
-                    tracing::warn!(error = ?e, "handle_lifecycle_requests");
+                    log::warn!(error:? = e; "handle_lifecycle_requests");
                 }
             });
         }
@@ -150,7 +150,7 @@ impl StorageHostService {
         mut stream: fstartup::StartupRequestStream,
     ) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await.context("Reading request")? {
-            tracing::debug!(?request);
+            log::debug!(request:?; "");
             match request {
                 fstartup::StartupRequest::Start { device, options: _, responder } => {
                     responder
@@ -159,17 +159,17 @@ impl StorageHostService {
                                 .await
                                 .map_err(|status| status.into_raw()),
                         )
-                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Start response"));
+                        .unwrap_or_else(|e| log::error!(e:?; "Failed to send Start response"));
                 }
                 fstartup::StartupRequest::Format { responder, .. } => {
                     responder
                         .send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
-                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Check response"));
+                        .unwrap_or_else(|e| log::error!(e:?; "Failed to send Check response"));
                 }
                 fstartup::StartupRequest::Check { responder, .. } => {
                     responder
                         .send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
-                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Check response"));
+                        .unwrap_or_else(|e| log::error!(e:?; "Failed to send Check response"));
                 }
             }
         }
@@ -179,7 +179,7 @@ impl StorageHostService {
     async fn start(self: &Arc<Self>, device: fblock::BlockProxy) -> Result<(), zx::Status> {
         let mut state = self.state.lock().await;
         if !state.is_stopped() {
-            tracing::warn!("Device already bound");
+            log::warn!("Device already bound");
             return Err(zx::Status::ALREADY_BOUND);
         }
 
@@ -194,7 +194,7 @@ impl StorageHostService {
         *state = match GptManager::new(&device, self.partitions_dir.clone()).await {
             Ok(runner) => State::Running(runner),
             Err(err) => {
-                tracing::error!(?err, "Failed to load GPT.  Reformatting may be required.");
+                log::error!(err:?; "Failed to load GPT.  Reformatting may be required.");
                 State::NeedsFormatting(device)
             }
         };
@@ -206,19 +206,19 @@ impl StorageHostService {
         mut stream: fpartitions::PartitionsManagerRequestStream,
     ) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await.context("Reading request")? {
-            tracing::debug!(?request);
+            log::debug!(request:?; "");
             match request {
                 fpartitions::PartitionsManagerRequest::GetBlockInfo { responder } => {
                     responder
                         .send(self.get_block_info().await.map_err(|status| status.into_raw()))
-                        .unwrap_or_else(|e| {
-                            tracing::error!(?e, "Failed to send GetBlockInfo response")
-                        });
+                        .unwrap_or_else(
+                            |e| log::error!(e:?; "Failed to send GetBlockInfo response"),
+                        );
                 }
                 fpartitions::PartitionsManagerRequest::CreateTransaction { responder } => {
                     responder
                         .send(self.create_transaction().await.map_err(|status| status.into_raw()))
-                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Start response"));
+                        .unwrap_or_else(|e| log::error!(e:?; "Failed to send Start response"));
                 }
                 fpartitions::PartitionsManagerRequest::CommitTransaction {
                     transaction,
@@ -230,7 +230,7 @@ impl StorageHostService {
                                 .await
                                 .map_err(|status| status.into_raw()),
                         )
-                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Start response"));
+                        .unwrap_or_else(|e| log::error!(e:?; "Failed to send Start response"));
                 }
             }
         }
@@ -246,7 +246,7 @@ impl StorageHostService {
                     .get_info()
                     .await
                     .map_err(|err| {
-                        tracing::error!(?err, "get_block_info: failed to query block info");
+                        log::error!(err:?; "get_block_info: failed to query block info");
                         zx::Status::IO
                     })?
                     .map_err(zx::Status::from_raw)?;
@@ -271,7 +271,7 @@ impl StorageHostService {
         mut stream: fpartitions::PartitionsAdminRequestStream,
     ) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await.context("Reading request")? {
-            tracing::debug!(?request);
+            log::debug!(request:?; "");
             match request {
                 fpartitions::PartitionsAdminRequest::ResetPartitionTable {
                     partitions,
@@ -283,7 +283,7 @@ impl StorageHostService {
                                 .await
                                 .map_err(|status| status.into_raw()),
                         )
-                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Start response"));
+                        .unwrap_or_else(|e| log::error!(e:?; "Failed to send Start response"));
                 }
             }
         }
@@ -310,23 +310,23 @@ impl StorageHostService {
         match &mut *state {
             State::Stopped => return Err(zx::Status::BAD_STATE),
             State::NeedsFormatting(block) => {
-                tracing::info!("reset_partition_table: Reformatting GPT.");
+                log::info!("reset_partition_table: Reformatting GPT.");
                 let client = Arc::new(RemoteBlockClient::new(&*block).await?);
 
-                tracing::info!("reset_partition_table: Reformatting GPT...");
+                log::info!("reset_partition_table: Reformatting GPT...");
                 gpt::Gpt::format(client, partitions).await.map_err(|err| {
-                    tracing::error!(?err, "reset_partition_table: failed to init GPT");
+                    log::error!(err:?; "reset_partition_table: failed to init GPT");
                     zx::Status::IO
                 })?;
                 *state = State::Running(
                     GptManager::new(&*block, self.partitions_dir.clone()).await.map_err(|err| {
-                        tracing::error!(?err, "reset_partition_table: failed to re-launch GPT");
+                        log::error!(err:?; "reset_partition_table: failed to re-launch GPT");
                         zx::Status::BAD_STATE
                     })?,
                 );
             }
             State::Running(gpt) => {
-                tracing::info!("reset_partition_table: Updating GPT.");
+                log::info!("reset_partition_table: Updating GPT.");
                 gpt.reset_partition_table(partitions).await?;
             }
         }
@@ -339,13 +339,13 @@ impl StorageHostService {
         );
         match stream.try_next().await.context("Reading request")? {
             Some(flifecycle::LifecycleRequest::Stop { .. }) => {
-                tracing::info!("Received Lifecycle::Stop request");
+                log::info!("Received Lifecycle::Stop request");
                 let mut state = self.state.lock().await;
                 if let State::Running(gpt) = std::mem::take(&mut *state) {
                     gpt.shutdown().await;
                 }
                 self.scope.shutdown();
-                tracing::info!("Shutdown complete");
+                log::info!("Shutdown complete");
             }
             None => {}
         }

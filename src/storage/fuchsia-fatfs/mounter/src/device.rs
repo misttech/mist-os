@@ -9,7 +9,7 @@ use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker};
 use fidl_fuchsia_io as fio;
 use fuchsia_fatfs::FatFs;
-use tracing::info;
+use log::info;
 use vfs::execution_scope::ExecutionScope;
 
 const MICROSOFT_BASIC_DATA_GUID: [u8; 16] = [
@@ -76,7 +76,7 @@ impl FatDevice {
                 }
             };
 
-            info!(name = ?entry.name, ?guid, "Found block device");
+            info!(name:? = entry.name, guid:?; "Found block device");
             if guid.value == MICROSOFT_BASIC_DATA_GUID {
                 return Ok(Some(entry.name.clone()));
             }

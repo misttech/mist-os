@@ -142,7 +142,7 @@ impl Matchers {
                 }
                 if let Some(tag) = tag {
                     env.registered_devices().register_device(tag, device);
-                    tracing::info!("Registering device {tag:?}");
+                    log::info!("Registering device {tag:?}");
                 }
                 return Ok(true);
             }
@@ -293,7 +293,7 @@ impl Matcher for FvmComponentMatcher {
                     || label == FTL_PARTITION_LABEL
                     || label == SUPER_PARTITION_LABEL)
                 {
-                    tracing::info!("Label {label} doesn't match");
+                    log::info!("Label {label} doesn't match");
                     return false;
                 }
             }
@@ -370,7 +370,7 @@ impl Matcher for FvmMatcher {
                 {
                     env.mount_blobfs_on(blob_name).await?;
                 } else {
-                    tracing::error!(?volume_names, "Couldn't find blobfs partition!");
+                    log::error!(volume_names:?; "Couldn't find blobfs partition!");
                     bail!("Unable to find blobfs within FVM.");
                 }
             }
@@ -382,7 +382,7 @@ impl Matcher for FvmMatcher {
                     env.mount_data_on(data_name, device.is_fshost_ramdisk()).await?;
                 } else {
                     let fvm_driver_path = format!("{}/fvm", device.topological_path());
-                    tracing::warn!(%fvm_driver_path, ?volume_names,
+                    log::warn!(fvm_driver_path:%, volume_names:?;
                         "No existing data partition. Calling format_data().",
                     );
                     let fs =
@@ -429,7 +429,7 @@ impl Matcher for SystemGptMatcher {
             .await
             .map(|info| info.flags.contains(BlockFlag::REMOVABLE))
             .inspect_err(|err| {
-                tracing::warn!(?err, "Failed to query block info; assuming non-removable device");
+                log::warn!(err:?; "Failed to query block info; assuming non-removable device");
             })
             .unwrap_or(false);
         // If the partition has a type GUID, that implies it's inside a partition table so it can't

@@ -14,8 +14,8 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:tracing",
   ]
   sources = [
     "src/aggressive.rs",
@@ -31,9 +31,9 @@ rustc_binary("stressor_bin") {
     ":lib",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:tracing",
   ]
   sources = [ "src/main.rs" ]
 }

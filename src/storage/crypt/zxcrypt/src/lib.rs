@@ -54,7 +54,7 @@ async fn unwrap_zxcrypt_key(policy: Policy, wrapped_key: &[u8]) -> Result<Vec<u8
             return Ok(unwrapped);
         }
     }
-    tracing::warn!("Failed to unwrap zxcrypt key!");
+    log::warn!("Failed to unwrap zxcrypt key!");
     Err(zx::Status::IO_DATA_INTEGRITY)
 }
 
@@ -90,7 +90,7 @@ async fn create_zxcrypt_key(policy: Policy) -> Result<([u8; 16], Vec<u8>, Vec<u8
 
         Ok(([0; 16], header_and_key, unwrapped_key))
     } else {
-        tracing::warn!("No keys sources to create zxcrypt key");
+        log::warn!("No keys sources to create zxcrypt key");
         Err(zx::Status::INTERNAL)
     }
 }

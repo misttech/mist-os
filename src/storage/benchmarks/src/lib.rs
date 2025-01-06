@@ -10,10 +10,10 @@ pub mod testing;
 
 use async_trait::async_trait;
 use fuchsiaperf::FuchsiaPerfBenchmarkResult;
+use log::info;
 use regex::RegexSet;
 use std::io::Write;
 use std::time::Instant;
-use tracing::info;
 
 pub use crate::block_device::{BlockDeviceConfig, BlockDeviceFactory};
 pub use crate::filesystem::{CacheClearableFilesystem, Filesystem, FilesystemConfig};

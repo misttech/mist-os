@@ -133,7 +133,7 @@ pub async fn extended_attributes_sender(
             None => (&[][..], true),
         };
         responder.send(Ok((chunk, last))).unwrap_or_else(|error| {
-            tracing::error!(?error, "list extended attributes failed to send a chunk");
+            log::error!(error:?; "list extended attributes failed to send a chunk");
         });
         if last {
             break;

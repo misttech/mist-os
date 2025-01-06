@@ -62,7 +62,7 @@ impl CryptService {
         zx::cprng_draw(&mut key);
 
         let wrapped = cipher.encrypt(&nonce, &key[..]).map_err(|e| {
-            error!(error = ?e, "Failed to wrap key");
+            error!(error:? = e; "Failed to wrap key");
             zx::Status::INTERNAL.into_raw()
         })?;
 
@@ -79,7 +79,7 @@ impl CryptService {
         zx::cprng_draw(&mut key);
 
         let wrapped = cipher.encrypt(&nonce, &key[..]).map_err(|error| {
-            error!(?error, "Failed to wrap key");
+            error!(error:?; "Failed to wrap key");
             zx::Status::INTERNAL.into_raw()
         })?;
 
@@ -104,7 +104,7 @@ impl CryptService {
         match inner.ciphers.entry(wrapping_key_id) {
             Entry::Occupied(_) => Err(zx::Status::ALREADY_EXISTS.into_raw()),
             Entry::Vacant(vacant) => {
-                info!(wrapping_key_id, "Adding wrapping key");
+                info!(wrapping_key_id; "Adding wrapping key");
                 vacant.insert(Aes256GcmSiv::new(Key::<Aes256GcmSiv>::from_slice(&key[..])));
                 Ok(())
             }
@@ -129,7 +129,7 @@ impl CryptService {
     }
 
     fn forget_wrapping_key(&self, wrapping_key_id: u128) -> CryptManagementForgetWrappingKeyResult {
-        info!(wrapping_key_id, "Removing wrapping key");
+        info!(wrapping_key_id; "Removing wrapping key");
         let mut inner = self.inner.lock().unwrap();
         if let Some(id) = &inner.active_data_key {
             if *id == wrapping_key_id {
@@ -157,8 +157,10 @@ impl CryptService {
                                     Err(e) => Err(*e),
                                 })
                                 .unwrap_or_else(|e| {
+                                    // TODO(https://fxbug.dev/360919323): we can use `:err` when we
+                                    // enable the log kv_std feature.
                                     error!(
-                                        error = e.as_value(),
+                                        error:? = e;
                                         "Failed to send CreateKey response"
                                     )
                                 });
@@ -175,8 +177,10 @@ impl CryptService {
                                     },
                                 )
                                 .unwrap_or_else(|e| {
+                                    // TODO(https://fxbug.dev/360919323): we can use `:err` when we
+                                    // enable the log kv_std feature.
                                     error!(
-                                        error = e.as_value(),
+                                        error:? = e;
                                         "Failed to send CreateKeyWithId response"
                                     )
                                 });
@@ -194,8 +198,10 @@ impl CryptService {
                                     },
                                 )
                                 .unwrap_or_else(|e| {
+                                    // TODO(https://fxbug.dev/360919323): we can use `:err` when we
+                                    // enable the log kv_std feature.
                                     error!(
-                                        error = e.as_value(),
+                                        error:? = e;
                                         "Failed to send UnwrapKey response"
                                     )
                                 });
@@ -214,8 +220,10 @@ impl CryptService {
                             let response =
                                 self.add_wrapping_key(u128::from_le_bytes(wrapping_key_id), key);
                             responder.send(response).unwrap_or_else(|e| {
+                                // TODO(https://fxbug.dev/360919323): we can use `:err` when we
+                                // enable the log kv_std feature.
                                 error!(
-                                    error = e.as_value(),
+                                    error:? = e;
                                     "Failed to send AddWrappingKey response"
                                 )
                             });
@@ -227,9 +235,11 @@ impl CryptService {
                         } => {
                             let response =
                                 self.set_active_key(purpose, u128::from_le_bytes(wrapping_key_id));
-                            responder.send(response).unwrap_or_else(|e| {
-                                error!(error = e.as_value(), "Failed to send SetActiveKey response")
-                            });
+                            responder.send(response).unwrap_or_else(
+                                // TODO(https://fxbug.dev/360919323): we can use `:err` when we
+                                // enable the log kv_std feature.
+                                |e| error!(error:? = e;"Failed to send SetActiveKey response"),
+                            );
                         }
                         CryptManagementRequest::ForgetWrappingKey {
                             wrapping_key_id,
@@ -238,8 +248,10 @@ impl CryptService {
                             let response =
                                 self.forget_wrapping_key(u128::from_le_bytes(wrapping_key_id));
                             responder.send(response).unwrap_or_else(|e| {
+                                // TODO(https://fxbug.dev/360919323): we can use `:err` when we
+                                // enable the log kv_std feature.
                                 error!(
-                                    error = e.as_value(),
+                                    error:? = e;
                                     "Failed to send ForgetWrappingKey response"
                                 )
                             });

@@ -284,7 +284,7 @@ impl MountedVolumesGuard<'_> {
                 _ => return,
             }
 
-            info!(store_id, "Last connection to volume closed, shutting down");
+            info!(store_id; "Last connection to volume closed, shutting down");
             let root_store = volumes_directory.root_volume.volume_directory().store();
             let fs = root_store.filesystem();
             let _guard = fs
@@ -296,7 +296,7 @@ impl MountedVolumesGuard<'_> {
                 .await;
 
             if let Err(e) = mounted_volumes.unmount(store_id).await {
-                warn!(?e, store_id, "Failed to unmount volume");
+                warn!(e:?, store_id; "Failed to unmount volume");
             }
         })
         .detach();
@@ -363,7 +363,7 @@ impl VolumesDirectory {
                 return dir.unlink(profile_name, false).await;
             }
         }
-        warn!(volume_name, profile_name, "Volume not found while deleting profile");
+        warn!(volume_name, profile_name; "Volume not found while deleting profile");
         Err(zx::Status::NOT_FOUND)
     }
 
@@ -411,9 +411,9 @@ impl VolumesDirectory {
                     .await
                 {
                     error!(
-                        ?error,
-                        profile_name,
-                        volume_name = name,
+                        error:?,
+                        profile_name = profile_name.as_str(),
+                        volume_name = name.as_str();
                         "Failed to record or replay profile",
                     );
                 }
@@ -572,7 +572,7 @@ impl VolumesDirectory {
         );
 
         info!(
-            store_id,
+            store_id;
             "Serving volume, pager port koid={}",
             fasync::EHandle::local().port().get_koid().unwrap().raw_koid()
         );
@@ -611,21 +611,21 @@ impl VolumesDirectory {
             match request {
                 VolumeRequest::Check { responder, options } => {
                     responder.send(self.handle_check(store_id, options).await.map_err(|error| {
-                        error!(?error, store_id, "Failed to check volume");
+                        error!(error:?, store_id; "Failed to check volume");
                         map_to_raw_status(error)
                     }))?
                 }
                 VolumeRequest::Mount { responder, outgoing_directory, options } => responder.send(
                     self.handle_mount(name, store_id, outgoing_directory, options).await.map_err(
                         |error| {
-                            error!(?error, name, store_id, "Failed to mount volume");
+                            error!(error:?, name, store_id; "Failed to mount volume");
                             map_to_raw_status(error)
                         },
                     ),
                 )?,
                 VolumeRequest::SetLimit { responder, bytes } => responder.send(
                     self.handle_set_limit(store_id, bytes).await.map_err(|error| {
-                        error!(?error, store_id, "Failed to set volume limit");
+                        error!(error:?, store_id; "Failed to set volume limit");
                         map_to_raw_status(error)
                     }),
                 )?,
@@ -727,7 +727,7 @@ impl VolumesDirectory {
         };
         let result = fsck::fsck_volume(fs.as_ref(), store_id, crypt).await?;
         // TODO(b/311550633): Stash result in inspect.
-        info!(%store_id, "{result:?}");
+        info!(store_id:%; "{result:?}");
         Ok(())
     }
 
@@ -751,7 +751,7 @@ impl VolumesDirectory {
         outgoing_directory: ServerEnd<fio::DirectoryMarker>,
         options: MountOptions,
     ) -> Result<(), Error> {
-        info!(%name, %store_id, ?options, "Received mount request");
+        info!(name:%, store_id:%, options:?; "Received mount request");
         let crypt = if let Some(crypt) = options.crypt {
             Some(Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>)
         } else {
@@ -776,7 +776,7 @@ impl VolumesDirectory {
         if let Some(request) = stream.try_next().await.context("Reading request")? {
             match request {
                 AdminRequest::Shutdown { responder } => {
-                    info!(store_id, "Received shutdown request for volume");
+                    info!(store_id; "Received shutdown request for volume");
 
                     let root_store = self.root_volume.volume_directory().store();
                     let fs = root_store.filesystem();

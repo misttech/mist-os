@@ -501,7 +501,7 @@ impl FxFilesystem {
                 self.object_manager().required_reservation(),
                 self.object_manager().borrowed_metadata_space(),
             ),
-            Err(e) => error!(error = ?e, "Failed to sync filesystem; data may be lost"),
+            Err(e) => error!(error:? = e; "Failed to sync filesystem; data may be lost"),
         }
         self.journal.terminate();
         let flush_task = self.flush_task.lock().unwrap().take();
@@ -714,7 +714,7 @@ impl FxFilesystem {
                         "Trimmed {bytes_trimmed} bytes in {duration:?}.  Next trim in \
                         {next_timer:?}",
                     ),
-                    Err(e) => error!(?e, "Failed to trim"),
+                    Err(e) => error!(e:?; "Failed to trim"),
                 }
             }
         }));

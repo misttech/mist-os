@@ -226,7 +226,7 @@ impl FxFile {
             // If this file is no longer referenced by anything, do a final flush if needed.
             self.handle.owner().clone().spawn(async move {
                 if let Err(error) = self.handle.flush().await {
-                    warn!(?error, "flush on close failed");
+                    log::warn!(error:?; "flush on close failed");
                 }
             });
         }

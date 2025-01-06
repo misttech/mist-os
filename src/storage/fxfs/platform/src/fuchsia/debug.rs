@@ -218,7 +218,7 @@ impl ObjectStoreDirectory {
         let this_clone = this.clone();
         store.set_flush_callback(move |store| {
             if let Err(e) = this_clone.update_from_store(store) {
-                tracing::warn!(?e, "debug: Failed to update store; debug info may be stale");
+                log::warn!(e:?; "debug: Failed to update store; debug info may be stale");
             }
         });
 
@@ -478,7 +478,7 @@ impl FxfsDebug {
         volumes.set_on_mount_callback(move |name, volume| {
             let add = volume.is_some();
             if let Err(e) = this_clone.add_volume(name, volume) {
-                tracing::warn!(
+                log::warn!(
                     "debug: Failed to {} volume in debug directory: {e:?}",
                     if add { "add" } else { "remove" }
                 );

@@ -7,9 +7,8 @@ use ext4_read_only::readers::{BlockDeviceReader, Reader, VmoReader};
 use ext4_read_only::structs::{self, MIN_EXT4_SIZE};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_hardware_block::BlockMarker;
-
+use log::error;
 use std::sync::Arc;
-use tracing::error;
 
 pub enum FsSourceType {
     BlockDevice(ClientEnd<BlockMarker>),

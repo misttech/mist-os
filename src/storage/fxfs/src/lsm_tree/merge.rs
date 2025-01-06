@@ -359,7 +359,7 @@ impl<'a, K: Key + LayerKey + OrdLowerBound, V: Value> Merger<'a, K, V> {
             counters.layer_files_total += len;
             counters.layer_files_skipped += len - layer_count;
         }
-        tracing::debug!(?query, "Consulting {}/{} layers", layer_count, len);
+        log::debug!(query:?; "Consulting {}/{} layers", layer_count, len);
         let mut merger_iter = MergerIterator {
             merge_fn: self.merge_fn,
             pending_iterators,
@@ -703,9 +703,9 @@ pub(super) fn merge_into<K: Debug + OrdLowerBound, V: Debug>(
             // In this branch the mutable layer is left and the item we're merging-in is right.
             let merge_result = merge_fn(&mut_merge_iter, &item_merge_iter);
             debug!(
-                lhs = ?mut_merge_iter.key(),
-                rhs = ?item_merge_iter.key(),
-                result = ?merge_result,
+                lhs:? = mut_merge_iter.key(),
+                rhs:? = item_merge_iter.key(),
+                result:? = merge_result;
                 "(1) merge");
             match merge_result {
                 MergeResult::EmitLeft => {
@@ -746,9 +746,9 @@ pub(super) fn merge_into<K: Debug + OrdLowerBound, V: Debug>(
             // In this branch, the item we're merging-in is left and the mutable layer is right.
             let merge_result = merge_fn(&item_merge_iter, &mut_merge_iter);
             debug!(
-                lhs = ?mut_merge_iter.key(),
-                rhs = ?item_merge_iter.key(),
-                result = ?merge_result,
+                lhs:? = mut_merge_iter.key(),
+                rhs:? = item_merge_iter.key(),
+                result:? = merge_result;
                 "(2) merge");
             match merge_result {
                 MergeResult::EmitLeft => break, // Item is inserted outside the loop

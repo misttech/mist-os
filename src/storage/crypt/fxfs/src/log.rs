@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use tracing::{debug, error, info, warn};
+pub use log::{debug, error, info, warn};
 
 pub trait AsValue<'a> {
     type ValueType;

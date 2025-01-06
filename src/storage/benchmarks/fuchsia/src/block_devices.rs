@@ -247,10 +247,10 @@ impl FvmVolumeFactory {
         //    partition called "benchmark" with BENCHMARK_TYPE_GUID should exist that we'll format
         //    as FVM for this test.
         let fvm = if let Some(fvm) = connect_to_system_fvm().await {
-            tracing::info!("Using system FVM");
+            log::info!("Using system FVM");
             fvm
         } else if let Some(fvm) = connect_to_test_fvm().await {
-            tracing::info!("Using test FVM");
+            log::info!("Using test FVM");
             fvm
         } else {
             return None;

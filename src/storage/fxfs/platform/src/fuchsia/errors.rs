@@ -20,7 +20,7 @@ pub fn map_to_status(error: anyhow::Error) -> Status {
         Status::IO_DATA_INTEGRITY
     } else {
         // Print the internal error if we re-map it because we will lose any context after this.
-        warn!(?error, "Internal error");
+        warn!(error:?; "Internal error");
         Status::INTERNAL
     }
 }

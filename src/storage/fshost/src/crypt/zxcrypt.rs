@@ -94,9 +94,9 @@ impl ZxcryptDevice {
                         inner_device: outer_device.get_child("/zxcrypt/unsealed/block").await?,
                         is_fshost_ramdisk: false,
                     };
-                    tracing::info!(
+                    log::info!(
                         path = device.path(),
-                        topological_path = device.topological_path(),
+                        topological_path = device.topological_path();
                         "created zxcryptdevice"
                     );
                     return Ok(UnsealOutcome::Unsealed(device));

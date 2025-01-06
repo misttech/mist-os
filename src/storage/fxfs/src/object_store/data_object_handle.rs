@@ -1487,12 +1487,12 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     TrimResult::Incomplete
                 ) {
                     if let Err(error) = transaction.commit_and_continue().await {
-                        warn!(?error, "Failed to trim after truncate");
+                        warn!(error:?; "Failed to trim after truncate");
                         return Ok(());
                     }
                 }
                 if let Err(error) = transaction.commit().await {
-                    warn!(?error, "Failed to trim after truncate");
+                    warn!(error:?; "Failed to trim after truncate");
                 }
                 return Ok(());
             }

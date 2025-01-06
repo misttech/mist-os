@@ -39,7 +39,6 @@ impl SparseImageBuilder {
         self
     }
 
-    #[tracing::instrument(skip(self, output))]
     pub fn build<W: Writer>(self, output: &mut W) -> Result<()> {
         // We'll fill the header in later.
         output.seek(SeekFrom::Start(SPARSE_HEADER_SIZE as u64))?;

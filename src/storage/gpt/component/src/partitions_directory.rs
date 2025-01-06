@@ -68,7 +68,7 @@ impl PartitionsDirectoryEntry {
                 async move {
                     if let Some(server) = server.upgrade() {
                         if let Err(err) = server.handle_requests(requests).await {
-                            tracing::error!(?err, "Error handling requests");
+                            log::error!(err:?; "Error handling requests");
                         }
                     }
                 }
@@ -84,7 +84,7 @@ impl PartitionsDirectoryEntry {
                         if let Err(err) =
                             manager.handle_partitions_requests(gpt_index, requests).await
                         {
-                            tracing::error!(?err, "Error handling requests");
+                            log::error!(err:?; "Error handling requests");
                         }
                     }
                 }

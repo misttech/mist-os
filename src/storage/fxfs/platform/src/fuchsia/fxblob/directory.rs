@@ -95,7 +95,7 @@ impl RootDir for BlobDirectory {
         let scope = self.volume().scope().clone();
         scope.spawn(async move {
             if let Err(e) = self.prefetch_blobs().await {
-                tracing::warn!("Failed to prefetch blobs: {:?}", e);
+                log::warn!("Failed to prefetch blobs: {:?}", e);
             }
         });
     }
@@ -107,7 +107,7 @@ impl RootDir for BlobDirectory {
                 BlobCreatorRequest::Create { responder, hash, .. } => {
                     responder.send(self.create_blob_writer(Hash::from(hash)).await).unwrap_or_else(
                         |error| {
-                            tracing::error!(?error, "failed to send Create response");
+                            log::error!(error:?; "failed to send Create response");
                         },
                     );
                 }
@@ -123,7 +123,7 @@ impl RootDir for BlobDirectory {
                     responder
                         .send(self.get_blob_vmo(blob_hash.into()).await.map_err(map_to_raw_status))
                         .unwrap_or_else(|error| {
-                            tracing::error!(?error, "failed to send GetVmo response");
+                            log::error!(error:?; "failed to send GetVmo response");
                         });
                 }
             };
@@ -337,7 +337,7 @@ impl BlobDirectory {
             .open_blob(&id)
             .await
             .map_err(|e| {
-                tracing::error!("Failed to lookup blob: {:?}", e);
+                log::error!("Failed to lookup blob: {:?}", e);
                 CreateBlobError::Internal
             })?
             .is_some();
@@ -346,12 +346,12 @@ impl BlobDirectory {
         }
         let (client_end, request_stream) = create_request_stream::<BlobWriterMarker>();
         let writer = DeliveryBlobWriter::new(self, hash).await.map_err(|e| {
-            tracing::error!("Failed to create blob writer: {:?}", e);
+            log::error!("Failed to create blob writer: {:?}", e);
             CreateBlobError::Internal
         })?;
         self.volume().scope().spawn(async move {
             if let Err(e) = writer.handle_requests(request_stream).await {
-                tracing::error!("Failed to handle BlobWriter requests: {}", e);
+                log::error!("Failed to handle BlobWriter requests: {}", e);
             }
         });
         return Ok(client_end);

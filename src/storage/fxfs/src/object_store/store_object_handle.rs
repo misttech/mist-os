@@ -153,7 +153,7 @@ pub struct StoreObjectHandle<S: HandleOwner> {
 
 impl<S: HandleOwner> ObjectHandle for StoreObjectHandle<S> {
     fn set_trace(&self, v: bool) {
-        info!(store_id = self.store().store_object_id, oid = self.object_id(), trace = v, "trace");
+        info!(store_id = self.store().store_object_id, oid = self.object_id(), trace = v; "trace");
         self.trace.store(v, atomic::Ordering::Relaxed);
     }
 
@@ -321,9 +321,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         info!(
                             store_id = self.store().store_object_id(),
                             oid = self.object_id(),
-                            device_range = ?range,
+                            device_range:? = range,
                             len = range.end - range.start,
-                            ?extent_key,
+                            extent_key:?;
                             "D",
                         );
                     }
@@ -351,8 +351,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             info!(
                 store_id = self.store().store_object_id(),
                 oid = self.object_id(),
-                device_range = ?(device_offset..device_offset + buf.len() as u64),
-                len = buf.len(),
+                device_range:? = (device_offset..device_offset + buf.len() as u64),
+                len = buf.len();
                 "W",
             );
         }
@@ -854,10 +854,10 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         info!(
                             store_id = self.store().store_object_id(),
                             oid = self.object_id(),
-                            device_range = ?(device_offset..device_offset + to_copy as u64),
+                            device_range:? = (device_offset..device_offset + to_copy as u64),
                             offset,
-                            range = ?extent_key.range,
-                            block_size,
+                            range:? = extent_key.range,
+                            block_size;
                             "R",
                         );
                     }
@@ -903,7 +903,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         info!(
                             store_id = self.store().store_object_id(),
                             oid = self.object_id(),
-                            device_range = ?(device_offset..device_offset + align_buf.len() as u64),
+                            device_range:? = (device_offset..device_offset + align_buf.len() as u64);
                             "RT",
                         );
                     }
@@ -1092,8 +1092,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 info!(
                     store_id,
                     oid = self.object_id(),
-                    ?device_range,
-                    len = device_range.end - device_range.start,
+                    device_range:?,
+                    len = device_range.end - device_range.start;
                     "A",
                 );
             }

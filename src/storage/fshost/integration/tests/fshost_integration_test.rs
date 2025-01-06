@@ -369,7 +369,7 @@ async fn partition_max_size_set() {
     // commitment is one slice bigger.
     let mut expected_slices = (DATA_MAX_BYTES + FVM_SLICE_SIZE - 1) / FVM_SLICE_SIZE;
     if data_fs_zxcrypt() && data_fs_type() != VFS_TYPE_FXFS {
-        tracing::info!("Adding an extra expected data slice for zxcrypt");
+        log::info!("Adding an extra expected data slice for zxcrypt");
         expected_slices += 1;
     }
     assert_eq!(data_slice_count, expected_slices);

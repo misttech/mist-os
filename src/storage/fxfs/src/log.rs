@@ -5,4 +5,4 @@
 // This is designed to be imported by users as `use crate::log::*` so we should be judicious when
 // adding to this module.
 
-pub use tracing::{debug, error, info, warn};
+pub use log::{debug, error, info, warn};

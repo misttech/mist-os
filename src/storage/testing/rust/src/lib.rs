@@ -35,7 +35,7 @@ async fn partition_type_guid_matches(guid: &Guid, partition: &PartitionProxy) ->
     zx::ok(status).context("Failed to get type guid")?;
     let type_guid = if let Some(guid) = type_guid { guid } else { return Ok(false) };
     let matched = type_guid.value == *guid;
-    tracing::info!(matched, ?type_guid, target_guid=?guid, "matching type guid");
+    log::info!(matched, type_guid:?, target_guid:?=guid; "matching type guid");
     Ok(matched)
 }
 
@@ -45,7 +45,7 @@ async fn partition_instance_guid_matches(guid: &Guid, partition: &PartitionProxy
     zx::ok(status).context("Failed to get instance guid")?;
     let instance_guid = if let Some(guid) = instance_guid { guid } else { return Ok(false) };
     let matched = instance_guid.value == *guid;
-    tracing::info!(matched, ?instance_guid, target_guid=?guid, "matching instance guid");
+    log::info!(matched, instance_guid:?, target_guid:?=guid; "matching instance guid");
     Ok(matched)
 }
 
@@ -55,7 +55,7 @@ async fn partition_name_matches(name: &str, partition: &PartitionProxy) -> Resul
     zx::ok(status).context("Failed to get partition name")?;
     let partition_name = if let Some(name) = partition_name { name } else { return Ok(false) };
     let matched = partition_name == name;
-    tracing::info!(matched, partition_name, target_name = name, "matching name");
+    log::info!(matched, partition_name = partition_name.as_str(), target_name = name; "matching name");
     Ok(matched)
 }
 
@@ -134,14 +134,14 @@ pub async fn find_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<Pa
         .context("Failed to readdir /dev/class/block")?;
     for entry in entries {
         let path = Path::new(DEV_CLASS_BLOCK).join(entry.name);
-        tracing::info!(?path, "checking device");
+        log::info!(path:?; "checking device");
         let partition = connect_to_protocol_at_path::<PartitionMarker>(path.to_str().unwrap())?;
         let mut matches = true;
         for matcher in matchers {
             let this_matches = match matcher.matches(&partition).await {
                 Ok(this_matches) => this_matches,
                 Err(error) => {
-                    tracing::warn!(?error, ?matcher, "matcher returned an error");
+                    log::warn!(error:?, matcher:?; "matcher returned an error");
                     false
                 }
             };
@@ -151,7 +151,7 @@ pub async fn find_block_device(matchers: &[BlockDeviceMatcher<'_>]) -> Result<Pa
             }
         }
         if matches {
-            tracing::info!(?path, "found match");
+            log::info!(path:?; "found match");
             return Ok(path);
         }
     }

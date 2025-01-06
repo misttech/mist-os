@@ -32,8 +32,8 @@ rustc_binary("blackout-fxfs-tree-bin") {
     "//src/storage/testing/rust:storage-isolated-driver-manager",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:tracing",
   ]
   data_deps = [
     "//src/storage/crypt/fxfs",

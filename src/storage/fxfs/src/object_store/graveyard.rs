@@ -126,12 +126,12 @@ impl Graveyard {
                         self.tombstone_object(store_id, object_id).await
                     };
                     if let Err(e) = res {
-                        error!(error = ?e, store_id, oid = object_id, attribute_id, "Tombstone error");
+                        error!(error:? = e, store_id, oid = object_id, attribute_id; "Tombstone error");
                     }
                 }
                 Message::Trim(store_id, object_id) => {
                     if let Err(e) = self.trim(store_id, object_id).await {
-                        error!(error = ?e, store_id, oid = object_id, "Tombstone error");
+                        error!(error:? = e, store_id, oid = object_id; "Tombstone error");
                     }
                 }
                 Message::Flush(sender) => {

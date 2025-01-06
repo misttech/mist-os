@@ -26,13 +26,13 @@ async fn main() {
 
     // Attempt to load configuration from file.
     let mode = if let Ok(file) = std::fs::File::open("/data/config.json") {
-        tracing::info!("Reading config from json file.");
+        log::info!("Reading config from json file.");
         serde_json::from_reader(BufReader::new(file)).unwrap()
     } else {
         Mode::Gentle
     };
 
-    tracing::info!("Config: {mode:?}");
+    log::info!("Config: {mode:?}");
 
     // Give the system some time to start.
     std::thread::sleep(std::time::Duration::from_secs(10));

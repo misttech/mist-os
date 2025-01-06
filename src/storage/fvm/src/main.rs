@@ -25,6 +25,7 @@ use fs_management::{ComponentType, FSConfig, Options};
 use fuchsia_runtime::HandleType;
 use futures::future::BoxFuture;
 use futures::stream::{FuturesUnordered, TryStreamExt as _};
+use log::{debug, error, info, warn};
 use mapping::{Mapping, MappingExt as _};
 use regex::Regex;
 use sha2::{Digest, Sha256};
@@ -37,7 +38,6 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
@@ -446,7 +446,7 @@ impl Fvm {
             .filter_map(|(index, metadata)| match metadata {
                 Ok(metadata) => Some((index, metadata)),
                 Err(error) => {
-                    warn!(?error, "Bad metadata {index}");
+                    warn!(error:?; "Bad metadata {index}");
                     None
                 }
             })
@@ -927,14 +927,14 @@ impl Component {
                         )
                         .await
                         .map_err(|error| {
-                            tracing::warn!(?error, "Create volume failed");
+                            log::warn!(error:?; "Create volume failed");
                             map_to_raw_status(error)
                         }),
                     )?;
                 }
                 VolumesRequest::Remove { responder, name } => {
                     responder.send(self.handle_remove_volume(&name).await.map_err(|error| {
-                        tracing::warn!(?error, "Remove volume failed");
+                        log::warn!(error:?; "Remove volume failed");
                         map_to_raw_status(error)
                     }))?;
                 }
@@ -957,7 +957,7 @@ impl Component {
                     self.handle_mount(partition_index, outgoing_directory, options, false)
                         .await
                         .map_err(|error| {
-                            error!(?error, partition_index, "Failed to mount volume");
+                            error!(error:?, partition_index; "Failed to mount volume");
                             map_to_raw_status(error)
                         }),
                 )?,
@@ -1175,7 +1175,7 @@ impl Component {
         }
         .await
         .map_err(|error| {
-            warn!(?error, "Created partition {name}, but failed to mount");
+            warn!(error:?; "Created partition {name}, but failed to mount");
             error
         })
     }
@@ -1209,7 +1209,7 @@ impl Component {
         inner.partition_state.remove(&partition_index);
 
         if let Err(error) = self.volumes_directory.remove_entry(name, false) {
-            warn!(?error, "Removed volume from FVM, but failed to remove entry from directory");
+            warn!(error:?; "Removed volume from FVM, but failed to remove entry from directory");
         }
 
         Ok(())
@@ -1283,7 +1283,7 @@ impl Interface for PartitionInterface {
                 .await
         }
         .map_err(|error| {
-            warn!(?error, "Read failed");
+            warn!(error:?; "Read failed");
             map_to_status(error)
         })
     }
@@ -1339,7 +1339,7 @@ impl Interface for PartitionInterface {
                 .await
         }
         .map_err(|error| {
-            warn!(?error, "Write failed");
+            warn!(error:?; "Write failed");
             map_to_status(error)
         })
     }
@@ -1604,7 +1604,7 @@ fn map_to_status(error: anyhow::Error) -> zx::Status {
         status.clone()
     } else {
         // Print the internal error if we re-map it because we will lose any context after this.
-        warn!(?error, "Internal error");
+        warn!(error:?; "Internal error");
         zx::Status::INTERNAL
     }
 }
@@ -1995,7 +1995,7 @@ mod tests {
                 fixture.fake_server
             };
 
-            tracing::info!("Created {partition_count} partitions");
+            log::info!("Created {partition_count} partitions");
 
             // Reopen and check we can mount all the partitions we created.
             let fixture = Fixture::from_fake_server(fake_server).await;

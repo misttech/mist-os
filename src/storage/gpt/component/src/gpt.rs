@@ -42,7 +42,7 @@ impl GptPartition {
 
     pub async fn terminate(&self) {
         if let Err(error) = self.block_client.close().await {
-            tracing::warn!(?error, "Failed to close block client");
+            log::warn!(error:?; "Failed to close block client");
         }
     }
 
@@ -189,7 +189,7 @@ impl Inner {
         self.partitions_dir.clear();
         let mut partitions = BTreeMap::new();
         for (index, info) in self.gpt.partitions().iter() {
-            tracing::info!("GPT part {index}: {info:?}");
+            log::info!("GPT part {index}: {info:?}");
             let partition = PartitionBackend::new(GptPartition::new(
                 parent,
                 self.gpt.client().clone(),
@@ -237,7 +237,7 @@ impl GptManager {
         block: impl AsBlockProxy,
         partitions_dir: Arc<vfs::directory::immutable::Simple>,
     ) -> Result<Arc<Self>, Error> {
-        tracing::info!("Binding to GPT");
+        log::info!("Binding to GPT");
         let client = Arc::new(RemoteBlockClient::new(block).await?);
         let block_size = client.block_size();
         let block_count = client.block_count();
@@ -254,9 +254,9 @@ impl GptManager {
             }),
             shutdown: AtomicBool::new(false),
         });
-        tracing::info!("Bind to GPT OK, binding partitions");
+        log::info!("Bind to GPT OK, binding partitions");
         this.inner.lock().await.bind_partitions(&this).await?;
-        tracing::info!("Starting all partitions OK!");
+        log::info!("Starting all partitions OK!");
         Ok(this)
     }
 
@@ -295,7 +295,7 @@ impl GptManager {
         inner.ensure_transaction_matches(&transaction)?;
         let transaction = std::mem::take(&mut inner.pending_transaction).unwrap().transaction;
         if let Err(err) = inner.gpt.commit_transaction(transaction).await {
-            tracing::error!(?err, "Failed to commit transaction");
+            log::error!(err:?; "Failed to commit transaction");
             return Err(zx::Status::IO);
         }
         Ok(())
@@ -318,9 +318,9 @@ impl GptManager {
                                 .await
                                 .map_err(|status| status.into_raw()),
                         )
-                        .unwrap_or_else(|err| {
-                            tracing::error!(?err, "Failed to send UpdateMetadata response")
-                        });
+                        .unwrap_or_else(
+                            |err| log::error!(err:?; "Failed to send UpdateMetadata response"),
+                        );
                 }
             }
         }
@@ -356,27 +356,27 @@ impl GptManager {
             return Err(zx::Status::BAD_STATE);
         }
 
-        tracing::info!("Resetting gpt.  Expect data loss!!!");
+        log::info!("Resetting gpt.  Expect data loss!!!");
         let mut transaction = inner.gpt.create_transaction().unwrap();
         transaction.partitions = partitions;
         inner.gpt.commit_transaction(transaction).await?;
 
-        tracing::info!("Rebinding partitions...");
+        log::info!("Rebinding partitions...");
         if let Err(err) = inner.bind_partitions(&self).await {
-            tracing::error!(?err, "Failed to rebind partitions");
+            log::error!(err:?; "Failed to rebind partitions");
             return Err(zx::Status::BAD_STATE);
         }
-        tracing::info!("Rebinding partitions OK!");
+        log::info!("Rebinding partitions OK!");
         Ok(())
     }
 
     pub async fn shutdown(self: Arc<Self>) {
-        tracing::info!("Shutting down gpt");
+        log::info!("Shutting down gpt");
         let mut inner = self.inner.lock().await;
         inner.partitions_dir.clear();
         inner.partitions.clear();
         self.shutdown.store(true, Ordering::Relaxed);
-        tracing::info!("Shutting down gpt OK");
+        log::info!("Shutting down gpt OK");
     }
 }
 

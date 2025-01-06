@@ -163,7 +163,7 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
         let mut writer =
             PersistentLayerWriter::<W, K, V>::new(writer, num_items, block_size).await?;
         while let Some(item_ref) = iterator.get() {
-            debug!(?item_ref, "compact: writing");
+            debug!(item_ref:?; "compact: writing");
             writer.write(item_ref).await?;
             iterator.advance().await?;
         }

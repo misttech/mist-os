@@ -6,12 +6,12 @@ use aes_gcm_siv::aead::Aead;
 use aes_gcm_siv::{Aes256GcmSiv, Key, KeyInit as _, Nonce};
 use async_trait::async_trait;
 use fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes};
+use log::error;
 use rand::rngs::StdRng;
 use rand::{RngCore, SeedableRng};
 use rustc_hash::FxHashMap as HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use tracing::error;
 use zx_status as zx;
 
 pub const DATA_KEY: [u8; 32] = [

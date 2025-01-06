@@ -211,7 +211,7 @@ impl TestFixture {
         volume.volume().terminate().await;
 
         if volume.into_volume().try_unwrap().is_none() {
-            tracing::error!("References to volume still exist; hanging");
+            log::error!("References to volume still exist; hanging");
             let () = std::future::pending().await;
         }
 

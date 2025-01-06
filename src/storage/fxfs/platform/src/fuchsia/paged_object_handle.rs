@@ -409,7 +409,7 @@ impl PagedObjectHandle {
         let modified_ranges =
             self.collect_modified_ranges().context("collect_modified_ranges failed")?;
 
-        debug!(?modified_ranges, ?page_aligned_content_size, "flush: modified ranges from kernel");
+        debug!(modified_ranges:?, page_aligned_content_size:?; "flush: modified ranges from kernel");
 
         let mut flush_batches = FlushBatches::default();
         let mut last_end = 0;
@@ -700,7 +700,7 @@ impl PagedObjectHandle {
         match self.flush_impl().await {
             Ok(()) => Ok(()),
             Err(error) => {
-                error!(?error, "Failed to flush");
+                error!(error:?; "Failed to flush");
                 Err(error)
             }
         }

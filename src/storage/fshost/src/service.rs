@@ -119,7 +119,7 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
             }
             Ok(false) => {}
             Err(error) => {
-                tracing::info!(?error, "Failure in partition match. Transient device?");
+                log::info!(error:?; "Failure in partition match. Transient device?");
             }
         }
     }
@@ -152,22 +152,22 @@ async fn wipe_storage_fxblob(
     blobfs_root: Option<ServerEnd<DirectoryMarker>>,
     blob_creator: Option<ServerEnd<fidl_fuchsia_fxfs::BlobCreatorMarker>>,
 ) -> Result<(), Error> {
-    tracing::info!("Searching for fxfs block device");
+    log::info!("Searching for fxfs block device");
 
     let registered_devices = environment.lock().await.registered_devices().clone();
     let block_connector = registered_devices
         .get_block_connector(DeviceTag::FxblobOnRecovery)
         .map_err(|error| {
-            tracing::error!(?error, "shred_data_volume: unable to get block connector");
+            log::error!(error:?; "shred_data_volume: unable to get block connector");
             zx::Status::NOT_FOUND
         })
         .on_timeout(FIND_PARTITION_DURATION, || {
-            tracing::error!("Failed to find fxfs within timeout");
+            log::error!("Failed to find fxfs within timeout");
             Err(zx::Status::NOT_FOUND)
         })
         .await?;
 
-    tracing::info!("Reformatting Fxfs.");
+    log::info!("Reformatting Fxfs.");
 
     let mut fxfs =
         filesystem::Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
@@ -176,7 +176,7 @@ async fn wipe_storage_fxblob(
     let blobfs_root = match blobfs_root {
         Some(handle) => handle,
         None => {
-            tracing::info!("Not provisioning fxblob: missing blobfs root handle");
+            log::info!("Not provisioning fxblob: missing blobfs root handle");
             return Ok(());
         }
     };
@@ -184,7 +184,7 @@ async fn wipe_storage_fxblob(
     let blob_creator = match blob_creator {
         Some(handle) => handle,
         None => {
-            tracing::info!("Not provisioning fxblob: missing blob creator handle");
+            log::info!("Not provisioning fxblob: missing blob creator handle");
             return Ok(());
         }
     };
@@ -230,7 +230,7 @@ async fn wipe_storage_fvm(
     matcher_lock: &Arc<Mutex<HashSet<String>>>,
     blobfs_root: Option<ServerEnd<DirectoryMarker>>,
 ) -> Result<(), Error> {
-    tracing::info!("Searching for block device with FVM");
+    log::info!("Searching for block device with FVM");
     let mut ignored_paths = matcher_lock.lock().await;
 
     let fvm_matcher = PartitionMatcher {
@@ -248,19 +248,19 @@ async fn wipe_storage_fvm(
         .map_err(zx::Status::from_raw)
         .context("fvm get_topo_path returned error")?;
 
-    tracing::info!(device_path = ?fvm_path, "Wiping storage");
-    tracing::info!("Unbinding child drivers (FVM/zxcrypt).");
+    log::info!(device_path:? = fvm_path; "Wiping storage");
+    log::info!("Unbinding child drivers (FVM/zxcrypt).");
 
     fvm_controller.unbind_children().await?.map_err(zx::Status::from_raw)?;
 
-    tracing::info!(slice_size = config.fvm_slice_size, "Initializing FVM");
+    log::info!(slice_size = config.fvm_slice_size; "Initializing FVM");
     let (block_proxy, server_end) = fidl::endpoints::create_proxy::<BlockMarker>();
     fvm_controller
         .connect_to_device_fidl(server_end.into_channel())
         .context("connecting to block protocol")?;
     initialize_fvm(config.fvm_slice_size, &block_proxy)?;
 
-    tracing::info!("Binding and waiting for FVM driver.");
+    log::info!("Binding and waiting for FVM driver.");
     fvm_controller.bind(constants::FVM_DRIVER_PATH).await?.map_err(zx::Status::from_raw)?;
 
     let fvm_dir = fuchsia_fs::directory::open_in_namespace(&fvm_path, fio::Flags::empty())
@@ -274,12 +274,12 @@ async fn wipe_storage_fvm(
     let blobfs_root = match blobfs_root {
         Some(handle) => handle,
         None => {
-            tracing::info!("Not provisioning blobfs");
+            log::info!("Not provisioning blobfs");
             return Ok(());
         }
     };
 
-    tracing::info!("Allocating new partitions");
+    log::info!("Allocating new partitions");
     // Volumes will be dynamically resized.
     const INITIAL_SLICE_COUNT: u64 = 1;
 
@@ -310,7 +310,7 @@ async fn wipe_storage_fvm(
     .await
     .context("Failed to allocate fvm data partition")?;
 
-    tracing::info!("Formatting Blobfs.");
+    log::info!("Formatting Blobfs.");
     let mut blobfs_config = Blobfs {
         deprecated_padded_blobfs_format: config.blobfs_use_deprecated_padded_format,
         ..launcher.get_blobfs_config()
@@ -374,7 +374,7 @@ async fn write_data_file(
             .context("get_topo_path transport error")?
             .map_err(zx::Status::from_raw)
             .context("get_topo_path returned error")?;
-        tracing::info!(%partition_path, "Found data partition");
+        log::info!(partition_path:%; "Found data partition");
         let mut device = Box::new(
             BlockDevice::from_proxy(partition_controller, &partition_path)
                 .await
@@ -384,7 +384,7 @@ async fn write_data_file(
         let mut zxcrypt_device;
         if format != DiskFormat::Fxfs && !config.no_zxcrypt {
             launcher.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
-            tracing::info!("Ensuring device is formatted with zxcrypt");
+            log::info!("Ensuring device is formatted with zxcrypt");
             zxcrypt_device = Box::new(
                 match ZxcryptDevice::unseal(device).await.context("Failed to unseal zxcrypt")? {
                     UnsealOutcome::Unsealed(device) => device,
@@ -410,7 +410,7 @@ async fn write_data_file(
         let filesystem = match filesystem {
             ServeFilesystemStatus::Serving(fs) => fs,
             ServeFilesystemStatus::FormatRequired => {
-                tracing::info!(
+                log::info!(
                     "Format required {:?} for device {:?}",
                     format,
                     device.topological_path()
@@ -480,14 +480,14 @@ async fn shred_data_volume(
     }
     // If we expect Fxfs to be live, ask `environment` to shred the data volume.
     if (config.data || config.fxfs_blob) && !config.ramdisk_image {
-        tracing::info!("Filesystem is running; shredding online.");
+        log::info!("Filesystem is running; shredding online.");
         environment.lock().await.shred_data().await.map_err(|err| {
             debug_log(&format!("Failed to shred data: {:?}", err));
             zx::Status::INTERNAL
         })?;
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
-        tracing::info!("Filesystem is not running; shredding offline.");
+        log::info!("Filesystem is not running; shredding offline.");
 
         let filesystem = if config.fxfs_blob {
             // We find the device via our own matcher.
@@ -495,11 +495,11 @@ async fn shred_data_volume(
             let block_connector = registered_devices
                 .get_block_connector(DeviceTag::FxblobOnRecovery)
                 .map_err(|error| {
-                    tracing::error!(?error, "shred_data_volume: unable to get block connector");
+                    log::error!(error:?; "shred_data_volume: unable to get block connector");
                     zx::Status::NOT_FOUND
                 })
                 .on_timeout(FIND_PARTITION_DURATION, || {
-                    tracing::error!("Failed to find fxfs within timeout");
+                    log::error!("Failed to find fxfs within timeout");
                     Err(zx::Status::NOT_FOUND)
                 })
                 .await?;
@@ -509,7 +509,7 @@ async fn shred_data_volume(
                 &block_connector
                     .connect_block()
                     .map_err(|error| {
-                        tracing::error!(?error, "connect_block failed");
+                        log::error!(error:?; "connect_block failed");
                         zx::Status::INTERNAL
                     })?
                     .into_proxy(),
@@ -525,37 +525,37 @@ async fn shred_data_volume(
                     ))
                     .await
                     .map_err(|error| {
-                        tracing::error!(?error, "serving fxfs");
+                        log::error!(error:?; "serving fxfs");
                         zx::Status::INTERNAL
                     })?
             }
         } else {
             let partition_controller = find_data_partition(ramdisk_prefix).await.map_err(|e| {
-                tracing::error!("shred_data_volume: unable to find partition: {e:?}");
+                log::error!("shred_data_volume: unable to find partition: {e:?}");
                 zx::Status::NOT_FOUND
             })?;
             let partition_path = partition_controller
                 .get_topological_path()
                 .await
                 .map_err(|e| {
-                    tracing::error!("Failed to get topo path (fidl error): {e:?}");
+                    log::error!("Failed to get topo path (fidl error): {e:?}");
                     zx::Status::INTERNAL
                 })?
                 .map_err(|e| {
                     let status = zx::Status::from_raw(e);
-                    tracing::error!("Failed to get topo path: {}", status.to_string());
+                    log::error!("Failed to get topo path: {}", status.to_string());
                     status
                 })?;
             let mut device = Box::new(
                 BlockDevice::from_proxy(partition_controller, &partition_path).await.map_err(
                     |e| {
-                        tracing::error!("failed to make new device: {e:?}");
+                        log::error!("failed to make new device: {e:?}");
                         zx::Status::NOT_FOUND
                     },
                 )?,
             );
             launcher.serve_data(device.as_mut(), Fxfs::dynamic_child()).await.map_err(|e| {
-                tracing::error!("serving fxfs: {e:?}");
+                log::error!("serving fxfs: {e:?}");
                 zx::Status::INTERNAL
             })?
         };
@@ -567,30 +567,30 @@ async fn shred_data_volume(
             ServeFilesystemStatus::Serving(fs) => fs,
         };
         let unencrypted = filesystem.volume(UNENCRYPTED_VOLUME_LABEL).ok_or_else(|| {
-            tracing::error!("Failed to find unencrypted volume");
+            log::error!("Failed to find unencrypted volume");
             zx::Status::NOT_FOUND
         })?;
         let dir =
             fuchsia_fs::directory::open_directory(unencrypted.root(), "keys", fio::PERM_WRITABLE)
                 .await
                 .map_err(|e| {
-                    tracing::error!("Failed to open keys dir: {e:?}");
+                    log::error!("Failed to open keys dir: {e:?}");
                     zx::Status::INTERNAL
                 })?;
         dir.unlink("fxfs-data", &fio::UnlinkOptions::default())
             .await
             .map_err(|e| {
-                tracing::error!("Failed to remove keybag (fidl error): {e:?}");
+                log::error!("Failed to remove keybag (fidl error): {e:?}");
                 zx::Status::INTERNAL
             })?
             .map_err(|e| {
                 let status = zx::Status::from_raw(e);
-                tracing::error!("Failed to remove keybag: {}", status.to_string());
+                log::error!("Failed to remove keybag: {}", status.to_string());
                 status
             })?;
         debug_log("Deleted fxfs-data keybag");
     }
-    tracing::info!("Shredded the data volume.  Data will be lost!!");
+    log::info!("Shredded the data volume.  Data will be lost!!");
     Ok(())
 }
 
@@ -600,15 +600,15 @@ async fn init_system_partition_table(
     config: &fshost_config::Config,
 ) -> Result<(), zx::Status> {
     if !config.netboot {
-        tracing::error!("init_system_partition_table only supported in netboot mode.");
+        log::error!("init_system_partition_table only supported in netboot mode.");
         return Err(zx::Status::NOT_SUPPORTED);
     }
     if !config.storage_host {
-        tracing::error!("init_system_partition_table only supported in storage-host mode.");
+        log::error!("init_system_partition_table only supported in storage-host mode.");
         return Err(zx::Status::NOT_SUPPORTED);
     }
     if !config.gpt {
-        tracing::error!("init_system_partition_table called on a non-gpt system.");
+        log::error!("init_system_partition_table called on a non-gpt system.");
         return Err(zx::Status::NOT_SUPPORTED);
     }
 
@@ -617,19 +617,19 @@ async fn init_system_partition_table(
     let _ = registered_devices
         .get_block_connector(DeviceTag::SystemPartitionTable)
         .map_err(|error| {
-            tracing::error!(?error, "init_system_partition_table: unable to get block connector");
+            log::error!(error:?; "init_system_partition_table: unable to get block connector");
             zx::Status::NOT_FOUND
         })
         .on_timeout(TIMEOUT, || {
-            tracing::error!("init_system_partition_table: Failed to find gpt within timeout");
+            log::error!("init_system_partition_table: Failed to find gpt within timeout");
             Err(zx::Status::NOT_FOUND)
         })
         .await?;
 
-    tracing::info!("init_system_partition_table: Reformatting GPT...");
+    log::info!("init_system_partition_table: Reformatting GPT...");
     let exposed_dir = environment.lock().await.partition_manager_exposed_dir().map_err(|err| {
-        tracing::error!(
-            ?err,
+        log::error!(
+            err:?;
             "init_system_partition_table: Failed to connect to partition manager"
         );
         Err(zx::Status::BAD_STATE)
@@ -641,7 +641,7 @@ async fn init_system_partition_table(
         .reset_partition_table(&partitions[..])
         .await
         .map_err(|err| {
-            tracing::error!(?err, "init_system_partition_table: FIDL error");
+            log::error!(err:?; "init_system_partition_table: FIDL error");
             Err(zx::Status::PEER_CLOSED)
         })?
         .map_err(zx::Status::from_raw)
@@ -665,26 +665,26 @@ pub fn fshost_admin(
             while let Some(request) = stream.next().await {
                 match request {
                     Ok(fshost::AdminRequest::Mount { responder, .. }) => {
-                        tracing::info!("admin mount called");
+                        log::info!("admin mount called");
                         responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
                             |e| {
-                                tracing::error!("failed to send Mount response. error: {:?}", e);
+                                log::error!("failed to send Mount response. error: {:?}", e);
                             },
                         );
                     }
                     Ok(fshost::AdminRequest::Unmount { responder, .. }) => {
-                        tracing::info!("admin unmount called");
+                        log::info!("admin unmount called");
                         responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
                             |e| {
-                                tracing::error!("failed to send Unmount response. error: {:?}", e);
+                                log::error!("failed to send Unmount response. error: {:?}", e);
                             },
                         );
                     }
                     Ok(fshost::AdminRequest::GetDevicePath { responder, .. }) => {
-                        tracing::info!("admin get device path called");
+                        log::info!("admin get device path called");
                         responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
                             |e| {
-                                tracing::error!(
+                                log::error!(
                                     "failed to send GetDevicePath response. error: {:?}",
                                     e
                                 );
@@ -692,7 +692,7 @@ pub fn fshost_admin(
                         );
                     }
                     Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
-                        tracing::info!(?filename, "admin write data file called");
+                        log::info!(filename:?; "admin write data file called");
                         let res = match write_data_file(
                             &env,
                             &config,
@@ -705,15 +705,12 @@ pub fn fshost_admin(
                         {
                             Ok(()) => Ok(()),
                             Err(e) => {
-                                tracing::error!("admin service: write_data_file failed: {:?}", e);
+                                log::error!("admin service: write_data_file failed: {:?}", e);
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         };
                         responder.send(res).unwrap_or_else(|e| {
-                            tracing::error!(
-                                "failed to send WriteDataFile response. error: {:?}",
-                                e
-                            );
+                            log::error!("failed to send WriteDataFile response. error: {:?}", e);
                         });
                     }
                     Ok(fshost::AdminRequest::WipeStorage {
@@ -721,9 +718,9 @@ pub fn fshost_admin(
                         blobfs_root,
                         blob_creator,
                     }) => {
-                        tracing::info!("admin wipe storage called");
+                        log::info!("admin wipe storage called");
                         let res = if !config.ramdisk_image {
-                            tracing::error!(
+                            log::error!(
                                 "Can't WipeStorage from a non-recovery build; \
                                 ramdisk_image must be set."
                             );
@@ -742,17 +739,17 @@ pub fn fshost_admin(
                             {
                                 Ok(()) => Ok(()),
                                 Err(e) => {
-                                    tracing::error!(?e, "admin service: wipe_storage failed");
+                                    log::error!(e:?; "admin service: wipe_storage failed");
                                     Err(zx::Status::INTERNAL.into_raw())
                                 }
                             }
                         };
                         responder.send(res).unwrap_or_else(|e| {
-                            tracing::error!(?e, "failed to send WipeStorage response");
+                            log::error!(e:?; "failed to send WipeStorage response");
                         });
                     }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
-                        tracing::info!("admin shred data volume called");
+                        log::info!("admin shred data volume called");
                         let res = match shred_data_volume(
                             &env,
                             &config,
@@ -771,22 +768,19 @@ pub fn fshost_admin(
                             }
                         };
                         responder.send(res).unwrap_or_else(|e| {
-                            tracing::error!(
-                                "failed to send ShredDataVolume response. error: {:?}",
-                                e
-                            );
+                            log::error!("failed to send ShredDataVolume response. error: {:?}", e);
                         });
                     }
                     Ok(fshost::AdminRequest::StorageHostEnabled { responder }) => {
                         responder.send(config.storage_host).unwrap_or_else(|e| {
-                            tracing::error!(
+                            log::error!(
                                 "failed to send StorageHostEnabled response. error: {:?}",
                                 e
                             );
                         });
                     }
                     Err(e) => {
-                        tracing::error!("admin server failed: {:?}", e);
+                        log::error!("admin server failed: {:?}", e);
                         return;
                     }
                 }
@@ -809,7 +803,7 @@ pub fn fshost_recovery(
                         partitions,
                         responder,
                     }) => {
-                        tracing::info!("recovery init gpt called");
+                        log::info!("recovery init gpt called");
                         let res = match init_system_partition_table(partitions, &env, &config).await
                         {
                             Ok(()) => Ok(()),
@@ -822,14 +816,14 @@ pub fn fshost_recovery(
                             }
                         };
                         responder.send(res).unwrap_or_else(|e| {
-                            tracing::error!(
+                            log::error!(
                                 "failed to send InitSystemPartitionTable response. error: {:?}",
                                 e
                             );
                         });
                     }
                     Err(e) => {
-                        tracing::error!("admin server failed: {:?}", e);
+                        log::error!("admin server failed: {:?}", e);
                         return;
                     }
                 }
@@ -847,7 +841,7 @@ pub fn handle_lifecycle_requests(
         fasync::Task::spawn(async move {
             if let Ok(Some(LifecycleRequest::Stop { .. })) = stream.try_next().await {
                 shutdown.start_send(FshostShutdownResponder::Lifecycle(stream)).unwrap_or_else(
-                    |e| tracing::error!("failed to send shutdown message. error: {:?}", e),
+                    |e| log::error!("failed to send shutdown message. error: {:?}", e),
                 );
             }
         })

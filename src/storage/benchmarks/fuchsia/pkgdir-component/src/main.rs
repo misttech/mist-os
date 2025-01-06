@@ -6,7 +6,7 @@ use anyhow::Context;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_io as fio;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
-use tracing::error;
+use log::error;
 
 enum IncomingService {
     PkgDir(fidl_test_pkgdir::PkgDirRequestStream),

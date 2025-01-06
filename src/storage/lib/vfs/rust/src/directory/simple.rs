@@ -242,7 +242,7 @@ impl Directory for Simple {
                         //   where
                         //     K: Borrow<T>,
                         //     R: RangeBounds<T>,
-                        //     T: Ord + ?Sized,
+                        //     T: Ord + Sized:?,
                         //
                         // for some reason here.  It says:
                         //

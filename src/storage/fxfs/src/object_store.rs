@@ -646,7 +646,7 @@ impl ObjectStore {
     pub fn set_trace(&self, trace: bool) {
         let old_value = self.trace.swap(trace, Ordering::Relaxed);
         if trace != old_value {
-            info!(store_id = self.store_object_id(), trace, "OS: trace",);
+            info!(store_id = self.store_object_id(), trace; "OS: trace",);
         }
     }
 
@@ -1750,7 +1750,7 @@ impl ObjectStore {
             self.filesystem().sync(SyncOptions { flush_device: true, ..Default::default() }).await;
 
         *self.lock_state.lock().unwrap() = if let Err(error) = &sync_result {
-            error!(?error, "Failed to sync journal; store will no longer be usable");
+            error!(error:?; "Failed to sync journal; store will no longer be usable");
             LockState::Invalid
         } else {
             LockState::Locked

@@ -191,7 +191,7 @@ impl Device for FakeDevice {
         let mut rng = rand::thread_rng();
         let mut guard = self.data.lock().unwrap();
         let (ref mut data, ref mut blocks_written) = &mut *guard;
-        tracing::info!("Discarding from {blocks_written:?}");
+        log::info!("Discarding from {blocks_written:?}");
         let mut discarded = Vec::new();
         for block in blocks_written.drain(..) {
             if rng.gen() {
@@ -199,7 +199,7 @@ impl Device for FakeDevice {
                 discarded.push(block);
             }
         }
-        tracing::info!("Discarded {discarded:?}");
+        log::info!("Discarded {discarded:?}");
         Ok(())
     }
 

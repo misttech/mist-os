@@ -20,8 +20,8 @@ rustc_binary("blackout-blobfs-checkerboard-bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:byteorder",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:tracing",
   ]
   sources = [ "src/main.rs" ]
 }

@@ -15,9 +15,9 @@ rustc_library("insecure") {
     "//src/storage/fxfs/crypto",
     "//third_party/rust_crates:aes-gcm-siv",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:rustc-hash",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [ "src/lib.rs" ]

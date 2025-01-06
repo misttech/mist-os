@@ -537,7 +537,7 @@ impl MutableDirectory for FxDirectory {
                 // If purging fails , we should still return success, since the file will appear
                 // unlinked at this point anyways.  The file should be cleaned up on a later mount.
                 if let Err(e) = self.volume().maybe_purge_file(id).await {
-                    warn!(error = ?e, "Failed to purge file");
+                    warn!(error:? = e; "Failed to purge file");
                 }
             }
             ReplacedChild::Directory(id) => {
@@ -755,14 +755,12 @@ impl VfsDirectory for FxDirectory {
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
                     if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) && node.verified_file() {
-                        tracing::error!(
-                            "Tried to open a verified file with the RIGHT_WRITABLE flag."
-                        );
+                        log::error!("Tried to open a verified file with the RIGHT_WRITABLE flag.");
                         return Err(zx::Status::NOT_SUPPORTED);
                     }
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
                         if node.verified_file() {
-                            tracing::error!("Tried to expose a verified file as a block device.");
+                            log::error!("Tried to expose a verified file as a block device.");
                             return Err(zx::Status::NOT_SUPPORTED);
                         }
                         let mut server =
@@ -920,7 +918,7 @@ impl VfsDirectory for FxDirectory {
                 let mut iter = match self.directory.iter_from(&mut merger, "").await {
                     Ok(iter) => iter,
                     Err(e) => {
-                        error!(error = ?e, "Failed to iterate directory for watch",);
+                        error!(error:? = e; "Failed to iterate directory for watch",);
                         // TODO(https://fxbug.dev/42178164): This really should close the watcher connection
                         // with an epitaph so that the watcher knows.
                         return;
@@ -932,7 +930,7 @@ impl VfsDirectory for FxDirectory {
                 while let Some((name, _, _)) = iter.get() {
                     controller.send_event(&mut SingleNameEventProducer::existing(name));
                     if let Err(e) = iter.advance().await {
-                        error!(error = ?e, "Failed to iterate directory for watch",);
+                        error!(error:? = e; "Failed to iterate directory for watch",);
                         return;
                     }
                 }

@@ -498,20 +498,20 @@ impl DeliveryBlobWriter {
             match request {
                 BlobWriterRequest::GetVmo { size, responder } => {
                     let result = self.get_vmo(size).await.map_err(|error| {
-                        tracing::error!(?error, "BlobWriter.GetVmo failed.");
+                        log::error!(error:?; "BlobWriter.GetVmo failed.");
                         map_to_status(error).into_raw()
                     });
                     responder.send(result).unwrap_or_else(|error| {
-                        tracing::error!(?error, "Failed to send BlobWriter.GetVmo response.");
+                        log::error!(error:?; "Failed to send BlobWriter.GetVmo response.");
                     });
                 }
                 BlobWriterRequest::BytesReady { bytes_written, responder } => {
                     let result = self.bytes_ready(bytes_written).await.map_err(|error| {
-                        tracing::error!(?error, "BlobWriter.BytesReady failed.");
+                        log::error!(error:?; "BlobWriter.BytesReady failed.");
                         map_to_status(error)
                     });
                     responder.send(result.map_err(Status::into_raw)).unwrap_or_else(|error| {
-                        tracing::error!(?error, "Failed to send BlobWriter.BytesReady response.");
+                        log::error!(error:?; "Failed to send BlobWriter.BytesReady response.");
                     });
                     // If any error occurs when handling a BytesReady request, the writer will
                     // remain in an unrecoverable state. The client must use the BlobCreator
