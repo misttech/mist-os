@@ -7,7 +7,8 @@
 #include <lib/fdf/cpp/arena.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <fbl/string_printf.h>
+#include <format>
+
 #include <perftest/perftest.h>
 
 #include "src/devices/bin/driver_runtime/microbenchmarks/assert.h"
@@ -65,8 +66,8 @@ void RegisterTests() {
   };
   for (auto buffer_size : kBufferSize) {
     for (auto num_handles : kNumHandles) {
-      auto name = fbl::StringPrintf("MessagePacket/CreateDestroy/%ubytes/%uhandles", buffer_size,
-                                    num_handles);
+      auto name =
+          std::format("MessagePacket/CreateDestroy/{}bytes/{}handles", buffer_size, num_handles);
       perftest::RegisterTest(name.c_str(), MessagePacketCreateDestroyTest, buffer_size,
                              num_handles);
     }

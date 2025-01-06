@@ -19,9 +19,9 @@
 #include <lib/zx/event.h>
 #include <lib/zx/interrupt.h>
 
+#include <format>
 #include <map>
 
-#include <fbl/string_printf.h>
 #include <perftest/perftest.h>
 
 #include "src/devices/bin/driver_runtime/microbenchmarks/assert.h"
@@ -310,18 +310,16 @@ void RegisterTests() {
   for (auto const& [type, dispatcher_name] : kDispatcherTypes) {
     for (auto const& [use_threads, use_threads_desc] : kUseThreads) {
       for (auto batch_size : kTaskBatchSize) {
-        auto task_name = fbl::StringPrintf("Dispatcher/%s/Task/%s/%utasks", dispatcher_name.c_str(),
-                                           use_threads_desc.c_str(), batch_size);
+        auto task_name = std::format("Dispatcher/{}/Task/{}/{}tasks", dispatcher_name,
+                                     use_threads_desc, batch_size);
         perftest::RegisterTest(task_name.c_str(), DispatcherTaskTest, type, use_threads,
                                batch_size);
       }
 
-      auto wait_name = fbl::StringPrintf("Dispatcher/%s/Wait/%s", dispatcher_name.c_str(),
-                                         use_threads_desc.c_str());
+      auto wait_name = std::format("Dispatcher/{}/Wait/{}", dispatcher_name, use_threads_desc);
       perftest::RegisterTest(wait_name.c_str(), DispatcherWaitTest, type, use_threads);
 
-      auto irq_name = fbl::StringPrintf("Dispatcher/%s/Irq/%s", dispatcher_name.c_str(),
-                                        use_threads_desc.c_str());
+      auto irq_name = std::format("Dispatcher/{}/Irq/{}", dispatcher_name, use_threads_desc);
       perftest::RegisterTest(irq_name.c_str(), DispatcherIrqTest, type, use_threads);
     }
   }

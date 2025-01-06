@@ -17,10 +17,9 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 
+#include <format>
 #include <map>
 #include <vector>
-
-#include <fbl/string_printf.h>
 
 #include "src/devices/bin/driver_runtime/microbenchmarks/assert.h"
 #include "src/devices/bin/driver_runtime/microbenchmarks/test_runner.h"
@@ -247,13 +246,11 @@ void RegisterTests() {
   for (auto message_size : kMessageSizesInBytes) {
     for (auto num_messages : kNumMessages) {
       for (auto const& [option, name] : kDispatcherTypes) {
-        auto benchmark_name =
-            fbl::StringPrintf("OneWay_%s_%u_%ubytes", name.c_str(), num_messages, message_size);
+        auto benchmark_name = std::format("OneWay_{}_{}_{}bytes", name, num_messages, message_size);
         driver_runtime_benchmark::RegisterTest<OneWayTest>(benchmark_name.c_str(), option,
                                                            num_messages, message_size);
       }
-      auto benchmark_name =
-          fbl::StringPrintf("OneWay_Zircon_%u_%ubytes", num_messages, message_size);
+      auto benchmark_name = std::format("OneWay_Zircon_{}_{}bytes", num_messages, message_size);
       driver_runtime_benchmark::RegisterTest<OneWayZirconTest>(benchmark_name.c_str(), num_messages,
                                                                message_size);
     }

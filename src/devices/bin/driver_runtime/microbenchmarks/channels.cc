@@ -4,7 +4,8 @@
 
 #include <lib/fdf/cpp/channel.h>
 
-#include <fbl/string_printf.h>
+#include <format>
+
 #include <perftest/perftest.h>
 
 #include "src/devices/bin/driver_runtime/microbenchmarks/assert.h"
@@ -111,7 +112,7 @@ void RegisterTests() {
   for (auto message_size : kMessageSizesInBytes) {
     for (auto handle_count : kHandleCounts) {
       auto write_read_name =
-          fbl::StringPrintf("Channel/WriteRead/%ubytes/%uhandles", message_size, handle_count);
+          std::format("Channel/WriteRead/{}bytes/{}handles", message_size, handle_count);
       perftest::RegisterTest(write_read_name.c_str(), ChannelWriteReadTest, message_size,
                              handle_count);
     }
@@ -119,7 +120,7 @@ void RegisterTests() {
   for (auto message_size : kMessageSizesInBytes) {
     for (auto handle_count : kHandleCounts) {
       auto write_read_name =
-          fbl::StringPrintf("Channel/WriteReadC/%ubytes/%uhandles", message_size, handle_count);
+          std::format("Channel/WriteReadC/{}bytes/{}handles", message_size, handle_count);
       perftest::RegisterTest(write_read_name.c_str(), ChannelWriteReadCTest, message_size,
                              handle_count);
     }
