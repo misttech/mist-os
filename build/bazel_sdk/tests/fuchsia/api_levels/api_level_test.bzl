@@ -91,7 +91,7 @@ def _test_level_setting():
     level_setting_failure_test(
         name = "test_unset",
         target_under_test = ":unset",
-        expected_failure_message = '`@//fuchsia/api_levels:unset` has not been set to an API level. Has an API level been specified for this target? Valid API levels are ["',
+        expected_failure_message = "ERROR: An API level has not been specified for this target or the repository.",
         tags = ["manual"],
     )
 

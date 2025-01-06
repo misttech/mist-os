@@ -54,8 +54,9 @@ def _fuchsia_api_level_in_effect(settings, attr):
     ) or (
         repo_default_api_level
     ) or (
-        # No API level has been specified. This will be handled by
-        # `fuchsia_api_level`, which is cleaner than failing in the transition.
+        # No API level has been specified. This will be handled by the
+        # `fuchsia_api_level` implementation, which is cleaner than failing in
+        # the transition and allows failure tests to be written.
         ""
     )
 
