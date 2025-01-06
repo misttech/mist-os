@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use fuchsia_component::client::{connect_to_instance_in_service_dir, open_service_at_dir};
+use fuchsia_component::client::Service;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 
 use {
@@ -67,16 +67,9 @@ impl PowerFrameworkTestRealmInstance for RealmInstance {
     async fn power_framework_test_realm_connect_to_suspender(
         &self,
     ) -> Result<fhsuspend::SuspenderProxy> {
-        let service_dir =
-            open_service_at_dir::<fhsuspend::SuspendServiceMarker>(self.root.get_exposed_dir())
-                .unwrap();
-
-        let svc_inst = connect_to_instance_in_service_dir::<fhsuspend::SuspendServiceMarker>(
-            &service_dir,
-            "default",
-        )?;
-
-        svc_inst
+        Service::open_from_dir(self.root.get_exposed_dir(), fhsuspend::SuspendServiceMarker)
+            .unwrap()
+            .connect_to_instance("default")?
             .connect_to_suspender()
             .map_err(|e| anyhow::anyhow!("Failed to connect to suspender: {:?}", e))
     }
