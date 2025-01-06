@@ -99,7 +99,7 @@ impl IntlController {
         let time_zone_list = match uenum::open_time_zones() {
             Ok(time_zones) => time_zones,
             Err(err) => {
-                tracing::error!("Unable to load time zones: {:?}", err);
+                log::error!("Unable to load time zones: {:?}", err);
                 return HashSet::new();
             }
         };
@@ -137,7 +137,7 @@ impl IntlController {
                 match loc {
                     Ok(parsed) => {
                         if parsed.label().is_empty() {
-                            tracing::error!("Locale is invalid: {:?}", locale.id);
+                            log::error!("Locale is invalid: {:?}", locale.id);
                             return Err(ControllerError::InvalidArgument(
                                 SettingType::Intl,
                                 "locale id".into(),
@@ -146,7 +146,7 @@ impl IntlController {
                         }
                     }
                     Err(err) => {
-                        tracing::error!("Error loading locale: {:?}", err);
+                        log::error!("Error loading locale: {:?}", err);
                         return Err(ControllerError::InvalidArgument(
                             SettingType::Intl,
                             "locale id".into(),

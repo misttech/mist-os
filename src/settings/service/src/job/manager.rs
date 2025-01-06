@@ -204,7 +204,7 @@ impl Manager {
                     .expect("source should be present")
                     .add_pending_job(job)
                 {
-                    tracing::error!("Failed to add job: {:?}", e);
+                    log::error!("Failed to add job: {:?}", e);
                     return;
                 }
             }
@@ -213,7 +213,7 @@ impl Manager {
                 // through the APIs error responder.
                 let id = error_responder.id();
                 if let Err(e) = error_responder.respond(fidl_fuchsia_settings::Error::Failed) {
-                    tracing::warn!(
+                    log::warn!(
                         "Failed to report invalid input error to caller on API {} with id {:?}: \
                             {:?}",
                         id,
@@ -228,7 +228,7 @@ impl Manager {
                 let id = error_responder.id();
                 if let Err(e) = error_responder.respond(fidl_fuchsia_settings_policy::Error::Failed)
                 {
-                    tracing::warn!(
+                    log::warn!(
                         "Failed to report invalid policy input error to caller on policy API {} \
                             with id {:?}: {:?}",
                         id,
@@ -240,12 +240,12 @@ impl Manager {
             Some(Err(Error::Unexpected(err))) if !err.is_closed() => {
                 // No-op. If the error did not close the stream then just warn and allow the rest
                 // of the stream to continue processing.
-                tracing::warn!("Received an unexpected error on source {:?}: {:?}", source, err);
+                log::warn!("Received an unexpected error on source {:?}: {:?}", source, err);
             }
             Some(Err(err @ (Error::Unexpected(_) | Error::Unsupported))) => {
                 // All other errors cause the source stream to close. Clean up the source and cancel
                 // any pending jobs. We still need to wait for any remaining jobs to finish.
-                tracing::warn!(
+                log::warn!(
                     "Unable to process anymore job requests for {:?} due to fatal error: {:?}",
                     source,
                     err

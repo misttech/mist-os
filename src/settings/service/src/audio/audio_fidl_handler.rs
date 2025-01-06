@@ -79,7 +79,7 @@ impl TryFrom<AudioRequest> for Job {
                         Ok(request::Work::new(SettingType::Audio, request, responder).into())
                     }
                     Err(err) => {
-                        tracing::error!(
+                        log::error!(
                             "{}: Failed to process request: {:?}",
                             AudioMarker::DEBUG_NAME,
                             err
@@ -120,7 +120,7 @@ impl TryFrom<AudioRequest> for Job {
                 ))
             }
             _ => {
-                tracing::warn!("Received a call to an unsupported API: {:?}", item);
+                log::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

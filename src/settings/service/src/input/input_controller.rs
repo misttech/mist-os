@@ -36,7 +36,7 @@ impl DeviceStorageCompatible for InputInfoSources {
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
         Self::extract(value).or_else(|e| {
-            tracing::info!("Failed to deserialize InputInfoSources. Falling back to V2: {e:?}");
+            log::info!("Failed to deserialize InputInfoSources. Falling back to V2: {e:?}");
             InputInfoSourcesV2::try_deserialize_from(value).map(Self::from)
         })
     }
@@ -95,7 +95,7 @@ impl DeviceStorageCompatible for InputInfoSourcesV2 {
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
         Self::extract(value).or_else(|e| {
-            tracing::info!("Failed to deserialize InputInfoSourcesV2. Falling back to V1: {e:?}");
+            log::info!("Failed to deserialize InputInfoSourcesV2. Falling back to V1: {e:?}");
             InputInfoSourcesV1::try_deserialize_from(value).map(Self::from)
         })
     }
@@ -168,12 +168,12 @@ impl InputControllerInner {
                     // Camera setup failure should not prevent start of service. This also allows
                     // clients to see that the camera may not be usable.
                     if let Err(e) = self.push_cam_sw_state(state).await {
-                        tracing::error!("Unable to restore camera state: {e:?}");
+                        log::error!("Unable to restore camera state: {e:?}");
                         self.set_cam_err_state(state);
                     }
                 }
                 Err(e) => {
-                    tracing::error!("Unable to load cam sw state: {e:?}");
+                    log::error!("Unable to load cam sw state: {e:?}");
                     self.set_cam_err_state(DeviceState::ERROR);
                 }
             }

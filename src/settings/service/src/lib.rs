@@ -22,11 +22,11 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
 use fuchsia_inspect::component;
 use futures::lock::Mutex;
 use futures::StreamExt;
+#[cfg(test)]
+use log as _;
 use settings_storage::device_storage::DeviceStorage;
 use settings_storage::fidl_storage::FidlStorage;
 use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
-#[cfg(test)]
-use tracing as _;
 use zx::MonotonicDuration; // Make it easier to debug tests by always building with tracing
 
 pub use display::display_configuration::DisplayConfiguration;
@@ -451,11 +451,11 @@ impl<'a, T: StorageFactory<Storage = DeviceStorage> + 'static> EnvironmentBuilde
                 .context("failed to register migrations")?;
                 let migration_id = match migration_manager.run_migrations().await {
                     Ok(id) => {
-                        tracing::info!("migrated storage to {id:?}");
+                        log::info!("migrated storage to {id:?}");
                         id
                     }
                     Err((id, e)) => {
-                        tracing::error!("Settings migration failed: {e:?}");
+                        log::error!("Settings migration failed: {e:?}");
                         id
                     }
                 };
@@ -807,7 +807,7 @@ where
         if registrant.get_dependencies().iter().all(|dependency| {
             let dep_met = dependency.is_fulfilled(&entities);
             if !dep_met {
-                tracing::error!(
+                log::error!(
                     "Skipping {} registration due to missing dependency {:?}",
                     registrant.get_interface(),
                     dependency

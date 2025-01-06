@@ -64,7 +64,7 @@ impl ListenerInspectLogger {
             Some(listener_inspect_info) => {
                 let _ = listener_inspect_info.count.subtract(1u64);
             }
-            None => tracing::error!("Tried to subtract from nonexistent listener count"),
+            None => log::error!("Tried to subtract from nonexistent listener count"),
         }
     }
 }

@@ -31,7 +31,7 @@ impl Mocks for SetupTest {
                 let recorded_actions_clone = recorded_actions.clone();
                 fasync::Task::spawn(async move {
                     while let Ok(Some(req)) = stream.try_next().await {
-                        tracing::info!("Get a request.");
+                        log::info!("Get a request.");
                         // Support future expansion of FIDL.
                         #[allow(unreachable_patterns)]
                         if let AdminRequest::Reboot {
@@ -39,11 +39,11 @@ impl Mocks for SetupTest {
                             responder,
                         } = req
                         {
-                            tracing::info!("Request has user reboot request.");
+                            log::info!("Request has user reboot request.");
                             recorded_actions_clone.lock().await.push(Action::Reboot);
-                            tracing::info!("recorded_actions added Action::Reboot.");
+                            log::info!("recorded_actions added Action::Reboot.");
                             responder.send(Ok(())).unwrap();
-                            tracing::info!("Responder sent.");
+                            log::info!("Responder sent.");
                         }
                     }
                 })

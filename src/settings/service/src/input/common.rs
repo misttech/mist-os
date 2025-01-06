@@ -119,7 +119,7 @@ pub(crate) async fn monitor_media_buttons(
     // whether this can be removed or left as-is as part of the linked bug.
     fasync::Task::local(async move {
         if let Err(error) = call_async!(presenter_service => register_listener(client_end)).await {
-            tracing::error!(
+            log::error!(
                 "Registering media button listener with presenter service failed {:?}",
                 error
             );
@@ -140,7 +140,7 @@ pub(crate) async fn monitor_media_buttons(
                     // Acknowledge the event.
                     responder
                         .send()
-                        .unwrap_or_else(|_| tracing::error!("Failed to ack media buttons event"));
+                        .unwrap_or_else(|_| log::error!("Failed to ack media buttons event"));
                 }
                 _ => {}
             }

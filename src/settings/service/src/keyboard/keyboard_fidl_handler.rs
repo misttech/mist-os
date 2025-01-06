@@ -54,7 +54,7 @@ impl TryFrom<KeyboardRequest> for Job {
                     Ok(request::Work::new(SettingType::Keyboard, request, responder).into())
                 }
                 Err(e) => {
-                    tracing::error!(
+                    log::error!(
                         "Transferring from KeyboardSettings to a Set request has an error: {:?}",
                         e
                     );
@@ -65,7 +65,7 @@ impl TryFrom<KeyboardRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Keyboard, responder))
             }
             _ => {
-                tracing::warn!("Received a call to an unsupported API: {:?}", item);
+                log::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

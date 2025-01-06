@@ -48,7 +48,7 @@ impl Drop for StreamVolumeControl {
             // Consider panic! is likely to be abort in the drop method, only log info for
             // unbounded_send failure.
             exit_tx.send(()).unwrap_or_else(|_| {
-                tracing::warn!("StreamVolumeControl::drop, exit_tx failed to send exit signal")
+                log::warn!("StreamVolumeControl::drop, exit_tx failed to send exit signal")
             });
         }
     }

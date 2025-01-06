@@ -58,7 +58,7 @@ impl Agent {
                 let _ = client.reply(Payload::Complete(agent.handle(invocation).await).into());
             }
 
-            tracing::info!("Earcons agent done processing requests");
+            log::info!("Earcons agent done processing requests");
         })
         .detach();
     }
@@ -85,7 +85,7 @@ impl Agent {
             // For now, report back as an error to prevent issues on
             // platforms that don't support the handler's dependencies.
             // TODO(https://fxbug.dev/42139617): Handle with config
-            tracing::error!("Could not set up VolumeChangeHandler: {:?}", e);
+            log::error!("Could not set up VolumeChangeHandler: {:?}", e);
         }
 
         if BluetoothHandler::create(
@@ -99,7 +99,7 @@ impl Agent {
             // For now, report back as an error to prevent issues on
             // platforms that don't support the handler's dependencies.
             // TODO(https://fxbug.dev/42139617): Handle with config
-            tracing::error!("Could not set up BluetoothHandler");
+            log::error!("Could not set up BluetoothHandler");
         }
 
         Ok(())

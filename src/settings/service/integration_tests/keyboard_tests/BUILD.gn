@@ -22,7 +22,7 @@ rustc_test("bin") {
     "//src/lib/fuchsia-component-test",
     "//src/settings/service/integration_tests/utils",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

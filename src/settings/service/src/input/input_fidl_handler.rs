@@ -51,7 +51,7 @@ fn to_request(fidl_input_states: Vec<FidlInputState>) -> Option<Request> {
 
     // If any devices were filtered out, the args were invalid, so exit.
     if input_states_invalid_args.next().is_some() {
-        tracing::error!("Failed to parse input request: missing args");
+        log::error!("Failed to parse input request: missing args");
         return None;
     }
 
@@ -85,7 +85,7 @@ impl TryFrom<InputRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Input, responder))
             }
             _ => {
-                tracing::warn!("Received a call to an unsupported API: {:?}", req);
+                log::warn!("Received a call to an unsupported API: {:?}", req);
                 Err(JobError::Unsupported)
             }
         }

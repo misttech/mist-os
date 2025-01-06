@@ -250,7 +250,7 @@ impl FidlStorage {
                                     .min(MAX_FLUSH_INTERVAL_MS)
                             );
                             let next_flush_time = MonotonicInstant::now() + flush_duration;
-                            tracing::error!(
+                            log::error!(
                                 "Failed to sync write to disk for {:?}, delaying by {:?}, \
                                     caused by: {:?}",
                                 cached_storage.file_path,

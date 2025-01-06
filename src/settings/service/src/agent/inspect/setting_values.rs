@@ -103,7 +103,7 @@ impl SettingValuesInspectAgent {
         {
             Ok(messenger) => messenger,
             Err(err) => {
-                tracing::error!("could not create inspect: {:?}", err);
+                log::error!("could not create inspect: {:?}", err);
                 return;
             }
         };
@@ -177,10 +177,7 @@ impl SettingValuesInspectAgent {
             {
                 self.write_setting_to_inspect(setting_info).await;
             } else {
-                tracing::error!(
-                    "Could not fetch initial value for setting type:{:?}",
-                    setting_type
-                );
+                log::error!("Could not fetch initial value for setting type:{:?}", setting_type);
             }
         }
     }

@@ -50,7 +50,7 @@ struct TestConfig {
 }
 
 fn read_config<C: DeserializeOwned>(path: &OsStr) -> Result<C, Error> {
-    tracing::info!("Validating {:?}", path);
+    log::info!("Validating {:?}", path);
     let mut file = File::open(path)
         .with_context(|| format!("Couldn't open path `{}`", path.to_string_lossy()))?;
     let mut contents = String::new();

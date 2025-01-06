@@ -144,9 +144,7 @@ impl MigrationManager {
                     if self.migrations.keys().any(|id| *id == migration_id) {
                         LastMigration { migration_id }
                     } else {
-                        tracing::warn!(
-                            "Unknown migration {migration_id}, reverting to default data"
-                        );
+                        log::warn!("Unknown migration {migration_id}, reverting to default data");
 
                         // We don't know which migrations to run. Some future build may have
                         // run migrations, then something caused a boot loop, and the system

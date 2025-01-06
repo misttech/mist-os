@@ -157,7 +157,7 @@ impl VolumeChangeHandler {
         let last_user_volume = self.last_user_volumes.get(&stream_type);
 
         // Logging for debugging volume changes.
-        tracing::debug!(
+        log::debug!(
             "[earcons_agent] New {:?} user volume: {:?}, Last {:?} user volume: {:?}",
             stream_type,
             new_user_volume,
@@ -191,9 +191,7 @@ impl VolumeChangeHandler {
                     Audience::Address(service::Address::Handler(SettingType::Audio)),
                 );
                 if let Err(e) = receptor.next_payload().await {
-                    tracing::error!(
-                        "Failed to play sound after waiting for message response: {e:?}"
-                    );
+                    log::error!("Failed to play sound after waiting for message response: {e:?}");
                 } else {
                     self.play_volume_sound(new_user_volume);
                 }
@@ -278,7 +276,7 @@ impl VolumeChangeHandler {
                     Ok(())
                 };
                 if let Err(e) = play_sound_result {
-                    tracing::warn!("Failed to play sound: {:?}", e);
+                    log::warn!("Failed to play sound: {:?}", e);
                 }
             }
         })

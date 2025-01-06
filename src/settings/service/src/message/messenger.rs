@@ -90,7 +90,7 @@ impl Messenger {
         // Log info. transmit is called by forward. However, forward might fail if there is no next
         // Messenger exists.
         self.action_tx.unbounded_send((self.fingerprint, action, beacon)).unwrap_or_else(|_| {
-            tracing::warn!("Messenger::transmit, action_tx failed to send message")
+            log::warn!("Messenger::transmit, action_tx failed to send message")
         });
     }
 

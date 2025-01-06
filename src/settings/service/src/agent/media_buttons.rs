@@ -52,7 +52,7 @@ impl MediaButtonsAgent {
                 let _ = client.reply(Payload::Complete(agent.handle(invocation).await).into());
             }
 
-            tracing::info!("Media buttons agent done processing requests");
+            log::info!("Media buttons agent done processing requests");
         })
         .detach()
     }
@@ -70,7 +70,7 @@ impl MediaButtonsAgent {
     ) -> InvocationResult {
         let (input_tx, mut input_rx) = futures::channel::mpsc::unbounded::<MediaButtonsEvent>();
         if let Err(e) = monitor_media_buttons(service_context, input_tx).await {
-            tracing::error!("Unable to monitor media buttons: {:?}", e);
+            log::error!("Unable to monitor media buttons: {:?}", e);
             return Err(AgentError::UnexpectedError);
         }
 

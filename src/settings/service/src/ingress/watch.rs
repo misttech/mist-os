@@ -180,11 +180,7 @@ impl<R: From<SettingInfo> + 'static, E: From<Error> + 'static, T: Responder<R, E
             }
             Ok(Payload::Response(Err(error))) => Some(Err(error)),
             Err(error) => {
-                tracing::warn!(
-                    "An error occurred while watching {:?}:{:?}",
-                    self.setting_type,
-                    error
-                );
+                log::warn!("An error occurred while watching {:?}:{:?}", self.setting_type, error);
                 Some(Err(match error.root_cause().downcast_ref::<Error>() {
                     Some(error) => error.clone(),
                     _ => crate::handler::base::Error::CommunicationError,
@@ -230,7 +226,7 @@ impl<R: From<SettingInfo> + 'static, E: From<Error> + 'static, T: Responder<R, E
         let next_payload = self.get_next(&mut get_receptor).await?;
         if let Some(response) = self.process_response(next_payload, &mut store) {
             self.responder.respond(response.map(R::from).map_err(|err| {
-                tracing::error!("First watch response has an error: {:?}", err);
+                log::error!("First watch response has an error: {:?}", err);
                 E::from(err)
             }));
             return Ok(());
@@ -242,7 +238,7 @@ impl<R: From<SettingInfo> + 'static, E: From<Error> + 'static, T: Responder<R, E
             let next_payload = self.get_next(&mut listen_receptor).await?;
             if let Some(response) = self.process_response(next_payload, &mut store) {
                 self.responder.respond(response.map(R::from).map_err(|err| {
-                    tracing::error!("Updated watch response has an error: {:?}", err);
+                    log::error!("Updated watch response has an error: {:?}", err);
                     E::from(err)
                 }));
                 return Ok(());
