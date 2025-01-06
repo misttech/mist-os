@@ -425,6 +425,28 @@ int FtlnReport(void* vol, ui32 msg, ...) {
 
       // Return success.
       return 0;
+
+    case FS_GET_NEW_WEAR_LEVELING: {
+      int* state;
+      va_start(ap, msg);
+      state = va_arg(ap, int*);
+      va_end(ap);
+
+      *state = FtlnGetNewWearLeveling(ftl);
+      return 0;
+    }
+
+    case FS_SET_NEW_WEAR_LEVELING: {
+      int state;
+      va_start(ap, msg);
+      state = va_arg(ap, int);
+      va_end(ap);
+
+      // If a map page is never written out after this call, then the call
+      // never really happened anyways, so don't bother forcing a flush.
+      FtlnSetNewWearLeveling(ftl, state);
+      return 0;
+    }
   }
 
   // Return success.

@@ -104,6 +104,12 @@ class __EXPORT Volume {
 
   // Returns basic counters about the device.
   virtual zx_status_t GetCounters(Counters* stats) = 0;
+
+  // Returns the status of using the new wear leveling algorithm.
+  virtual zx_status_t GetNewWearLeveling(bool* state) = 0;
+
+  // Sets the new wear leveling algorithm on or off.
+  virtual zx_status_t SetNewWearLeveling(bool state) = 0;
 };
 
 // Implementation of the Volume interface.
@@ -125,6 +131,8 @@ class __EXPORT VolumeImpl final : public Volume {
   zx_status_t GarbageCollect() final;
   zx_status_t GetStats(Stats* stats) final;
   zx_status_t GetCounters(Counters* counters) final;
+  zx_status_t GetNewWearLeveling(bool* state) final;
+  zx_status_t SetNewWearLeveling(bool state) final;
 
   // Internal notification of added volumes. This is forwarded to
   // FtlInstance::OnVolumeAdded.

@@ -213,9 +213,10 @@ struct ftln {
   ui8* main_buf;   // NAND main page buffer.
   ui8* spare_buf;  // Spare buffer for single/multi-pg access.
 
-  ui8 eb_size;         // Spare area size in bytes.
-  ui8 copy_end_found;  // Vblk resume copy-end mark found.
-  ui8 deferment;       // # of recycles before applying wear limit.
+  ui8 eb_size;            // Spare area size in bytes.
+  ui8 copy_end_found;     // Vblk resume copy-end mark found.
+  ui8 deferment;          // # of recycles before applying wear limit.
+  ui8 new_wear_leveling;  // 1 to use new wear leveling.
 #if FS_ASSERT
   ui8 assert_no_recycle;  // Test no recycle changes physical page #.
 #endif
@@ -255,6 +256,8 @@ int FtlnRdPage(FTLN ftl, ui32 pn, void* buf);
 ui8 FtlnCalculateSpareValidity(const ui8* spare_buf);
 void FtlnSetSpareValidity(ui8* spare_buf);
 int FtlnCheckSpareValidity(const ui8* spare_bu);
+int FtlnGetNewWearLeveling(CFTLN ftl);
+void FtlnSetNewWearLeveling(FTLN ftl, int state);
 int FtlnIncompleteWrite(const ui8* spare_buf);
 int FtlnMapWr(void* vol, ui32 mpn, void* buf);
 int FtlnMetaWr(FTLN ftl, ui32 type);
