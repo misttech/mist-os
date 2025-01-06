@@ -289,67 +289,60 @@ def fuchsia_prebuilt_board_configuration(
     _fuchsia_prebuilt_board_configuration(**kwargs)
 
 def _fuchsia_hybrid_board_configuration_impl(ctx):
-    board_dir_name = ctx.label.name
-    board_configuration = ctx.attr.board_configuration[FuchsiaBoardConfigInfo].config.split("/")[-1]
-    board_configuration_file = ctx.actions.declare_file(board_dir_name + "/" + board_configuration)
+    src_board_config = ctx.attr.board_configuration[FuchsiaBoardConfigInfo].config
+    src_board_dir = paths.dirname(src_board_config)
 
-    board_outputs = []
-    board_input_bundle_dirs = ["input_bundles"]
-    board_input_bundles_path = "input_bundles"
-    src_config_dirname = "/".join(ctx.attr.board_configuration[FuchsiaBoardConfigInfo].config.split("/")[:-1])
+    output_board_dir = ctx.label.name
+    output_board_config = ctx.actions.declare_file(paths.join(output_board_dir, paths.basename(src_board_config)))
 
-    output_config = ctx.actions.declare_file(board_dir_name + "/" + ctx.attr.board_configuration[FuchsiaBoardConfigInfo].config.split("/")[-1])
+    board_outputs_without_bibs = []
+    board_input_bundles_dir = "input_bundles"
     for f in ctx.attr.board_configuration[FuchsiaBoardConfigInfo].files:
-        file_path = f.path[len(src_config_dirname):]
-        output_path = board_dir_name + "/" + file_path
-
-        # Skip copying the board input bundles which are going to be replaced
-        skip = False
-        for d in board_input_bundle_dirs:
-            if file_path.removeprefix("/").startswith(d):
-                skip = True
-
-        if skip:
+        relative_path = paths.relativize(f.path, src_board_dir)
+        if relative_path.startswith(board_input_bundles_dir):
             continue
         if not f.is_directory:
-            board_outputs.append(ctx.actions.declare_file(output_path))
+            output_path = paths.join(output_board_dir, relative_path)
+            board_outputs_without_bibs.append(ctx.actions.declare_file(output_path))
 
     _copy_directory(
         ctx,
-        src_config_dirname,
-        output_config.dirname,
+        src_board_dir,
+        output_board_config.dirname,
         ctx.attr.board_configuration[FuchsiaBoardConfigInfo].files,
-        board_outputs,
-        subdirectories_to_skip = board_input_bundle_dirs,
+        board_outputs_without_bibs,
+        subdirectories_to_skip = [board_input_bundles_dir],
     )
 
-    all_outputs = board_outputs
-    for d in board_input_bundle_dirs:
-        src_board_dirname = "/".join(ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].config.split("/")[:-1])
-        bib_outputs = []
-        files_to_copy = []
-        for f in ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].files:
-            file_path = f.path[len(src_board_dirname):].removeprefix("/")
+    all_outputs = board_outputs_without_bibs
 
-            # Copy in only the files which are under the boards directory
-            # of this bundle
-            if file_path.startswith(board_input_bundles_path):
-                relative_output_path = file_path.removeprefix(board_input_bundles_path + "/")
+    bib_outputs = []
+    files_to_copy = []
+    replacement_board_info = ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo]
+    for f in replacement_board_info.files:
+        if f.is_directory:
+            continue
 
-                if not f.is_directory:
-                    output_path = d + "/" + relative_output_path
-                    bib_outputs.append(ctx.actions.declare_file(board_dir_name + "/" + output_path))
-                    files_to_copy.append(f)
+        bib_board_dir = paths.dirname(replacement_board_info.config)
+        relative_file_path = paths.relativize(f.path, bib_board_dir)
 
-        _copy_directory(
-            ctx,
-            src_board_dirname + "/" + board_input_bundles_path,
-            output_config.dirname + "/" + d,
-            files_to_copy,
-            bib_outputs,
-        )
+        # Copy in only the files which are under the boards directory of this
+        # bundle.
+        if not relative_file_path.startswith(board_input_bundles_dir):
+            continue
 
-        all_outputs += bib_outputs
+        bib_outputs.append(ctx.actions.declare_file(paths.join(output_board_dir, relative_file_path)))
+        files_to_copy.append(f)
+
+    _copy_directory(
+        ctx,
+        paths.join(bib_board_dir, board_input_bundles_dir),
+        paths.join(output_board_config.dirname, board_input_bundles_dir),
+        files_to_copy,
+        bib_outputs,
+    )
+
+    all_outputs += bib_outputs
 
     return [
         DefaultInfo(
@@ -357,7 +350,7 @@ def _fuchsia_hybrid_board_configuration_impl(ctx):
         ),
         FuchsiaBoardConfigInfo(
             files = all_outputs,
-            config = board_configuration_file.path,
+            config = output_board_config.path,
         ),
     ]
 
