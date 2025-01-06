@@ -11,13 +11,13 @@ use fidl::endpoints::{
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::{FutureExt, Stream, StreamExt};
+use log::warn;
 use pin_project::pin_project;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use thiserror::Error;
-use tracing::warn;
 use vfs::directory::entry::DirectoryEntry;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;

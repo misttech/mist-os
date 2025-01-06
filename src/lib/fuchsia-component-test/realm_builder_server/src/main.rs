@@ -18,13 +18,13 @@ use fuchsia_component::server as fserver;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::{join, FutureExt, StreamExt, TryStreamExt};
+use log::*;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock};
 use thiserror::Error;
-use tracing::*;
 use url::Url;
 use vfs::execution_scope::ExecutionScope;
 use {
@@ -114,7 +114,7 @@ async fn main() {
         );
         execution_scope_clone.spawn(async move {
             if let Err(err) = factory.handle_stream(stream).await {
-                error!(%err, "Encountered unexpected error.");
+                error!(err:%; "Encountered unexpected error.");
             }
         });
     });
@@ -216,7 +216,7 @@ impl RealmBuilderFactory {
                     {
                         Ok(realm_node) => realm_node,
                         Err(err) => {
-                            warn!(method = "RealmBuilderFactory.CreateFromRelativeUrl", message = %err);
+                            warn!(method = "RealmBuilderFactory.CreateFromRelativeUrl", message:% = err; "");
                             responder.send(Err(err.into()))?;
                             continue;
                         }
@@ -239,7 +239,7 @@ impl RealmBuilderFactory {
                     if let Err(err) = pkg_dir.query().await.context(
                         "Invoking `fuchsia.unknown/Queryable.query` on provided `pkg_dir` failed.",
                     ) {
-                        warn!(method = "RealmBuilderFactory.Create", message = %err);
+                        warn!(method = "RealmBuilderFactory.Create", message:% = err; "");
                         responder.send(Err(ftest::RealmBuilderError::InvalidPkgDirHandle))?;
                         continue;
                     }
@@ -285,7 +285,7 @@ impl RealmBuilderFactory {
 
         self.execution_scope.spawn(async move {
             if let Err(err) = realm.handle_stream(realm_stream).await {
-                error!(%err, "`Realm` server unexpectedly failed.");
+                error!(err:%; "`Realm` server unexpectedly failed.");
             }
         });
 
@@ -302,7 +302,7 @@ impl RealmBuilderFactory {
         };
         self.execution_scope.spawn(async move {
             if let Err(err) = builder.handle_stream(builder_stream).await {
-                error!(%err, "`Builder` server unexpectedly failed.");
+                error!(err:%; "`Builder` server unexpectedly failed.");
             }
         });
         Ok(())
@@ -351,7 +351,7 @@ impl Builder {
             match req {
                 ftest::BuilderRequest::Build { runner, responder } => {
                     if self.realm_has_been_built.swap(true, Ordering::Relaxed) {
-                        warn!(method = "Builder.Build", message = %RealmBuilderError::BuildAlreadyCalled);
+                        warn!(method = "Builder.Build", message:% = RealmBuilderError::BuildAlreadyCalled; "");
                         responder.send(Err(ftest::RealmBuilderError::BuildAlreadyCalled))?;
                         continue;
                     }
@@ -379,7 +379,7 @@ impl Builder {
                             );
                         }
                         Err(err) => {
-                            warn!(method = "Builder.Build", message = %err);
+                            warn!(method = "Builder.Build", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -417,7 +417,7 @@ impl Realm {
                     match self.add_child(name.clone(), url.clone(), options).await {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
-                            warn!(method = "Realm.AddChild", message = %err);
+                            warn!(method = "Realm.AddChild", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -430,7 +430,7 @@ impl Realm {
                     match self.add_child_from_decl(name.clone(), decl, options).await {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
-                            warn!(method = "Realm.AddChildFromDecl", message = %err);
+                            warn!(method = "Realm.AddChildFromDecl", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -443,7 +443,7 @@ impl Realm {
                     match self.add_local_child(name.clone(), options).await {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
-                            warn!(method = "Realm.AddLocalChild", message = %err);
+                            warn!(method = "Realm.AddLocalChild", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -456,7 +456,7 @@ impl Realm {
                     match self.add_child_realm(name.clone(), options, child_realm).await {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
-                            warn!(method = "Realm.AddChildRealm", message = %err);
+                            warn!(method = "Realm.AddChildRealm", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -488,7 +488,7 @@ impl Realm {
                     {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
-                            warn!(method = "Realm.AddChildRealmFromRelativeUrl", message = %err);
+                            warn!(method = "Realm.AddChildRealmFromRelativeUrl", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -512,7 +512,7 @@ impl Realm {
                     {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
-                            warn!(method = "Realm.AddChildRealmFromDecl", message = %err);
+                            warn!(method = "Realm.AddChildRealmFromDecl", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -525,7 +525,7 @@ impl Realm {
                     match self.get_component_decl(name.clone()).await {
                         Ok(decl) => responder.send(Ok(&decl))?,
                         Err(err) => {
-                            warn!(method = "Realm.GetComponentDecl", message = %err);
+                            warn!(method = "Realm.GetComponentDecl", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -538,7 +538,7 @@ impl Realm {
                     match self.replace_component_decl(name.clone(), component_decl).await {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
-                            warn!(method = "Realm.ReplaceComponentDecl", message = %err);
+                            warn!(method = "Realm.ReplaceComponentDecl", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -558,7 +558,7 @@ impl Realm {
                     match self.replace_realm_decl(component_decl).await {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
-                            warn!(method = "Realm.ReplaceRealmDecl", message = %err);
+                            warn!(method = "Realm.ReplaceRealmDecl", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -575,7 +575,7 @@ impl Realm {
                     match self.use_nested_component_manager(&component_manager_relative_url).await {
                         Ok(()) => responder.send(Ok(()))?,
                         Err(err) => {
-                            warn!(method = "Realm.UseNestedComponentManager", message = %err);
+                            warn!(method = "Realm.UseNestedComponentManager", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -590,7 +590,7 @@ impl Realm {
                             responder.send(Ok(()))?;
                         }
                         Err(err) => {
-                            warn!(method = "Realm.AddRoute", message = %err);
+                            warn!(method = "Realm.AddRoute", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -610,7 +610,7 @@ impl Realm {
                             responder.send(Ok(()))?;
                         }
                         Err(err) => {
-                            warn!(method = "Realm.ReadOnlyDirectory", message = %err);
+                            warn!(method = "Realm.ReadOnlyDirectory", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -659,7 +659,7 @@ impl Realm {
                             responder.send(Ok(()))?;
                         }
                         Err(err) => {
-                            warn!(method = "Realm.AddCapability", message = %err);
+                            warn!(method = "Realm.AddCapability", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -676,7 +676,7 @@ impl Realm {
                             responder.send(Ok(()))?;
                         }
                         Err(err) => {
-                            warn!(method = "Realm.AddCollection", message = %err);
+                            warn!(method = "Realm.AddCollection", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -693,7 +693,7 @@ impl Realm {
                             responder.send(Ok(()))?;
                         }
                         Err(err) => {
-                            warn!(method = "Realm.AddEnvironment", message = %err);
+                            warn!(method = "Realm.AddEnvironment", message:% = err; "");
                             responder.send(Err(err.into()))?;
                         }
                     }
@@ -707,7 +707,7 @@ impl Realm {
                                 responder.send(Ok(()))?;
                             }
                             Err(err) => {
-                                warn!(method = "Realm.SetConfigValue", message = %err);
+                                warn!(method = "Realm.SetConfigValue", message:% = err; "");
                                 responder.send(Err(err.into()))?;
                             }
                         }

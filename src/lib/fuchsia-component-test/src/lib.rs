@@ -14,10 +14,10 @@ use fidl::endpoints::{
 use fuchsia_component::client as fclient;
 use futures::future::BoxFuture;
 use futures::{FutureExt, TryFutureExt, TryStreamExt};
+use log::*;
 use rand::Rng;
 use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
-use tracing::*;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_test as ftest, fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem,
@@ -2165,7 +2165,7 @@ impl ExecutionController {
                 Ok(Some(fcomponent::ExecutionControllerEvent::_UnknownEvent {
                     ordinal, ..
                 })) => {
-                    warn!(%ordinal, "fuchsia.component/ExecutionController delivered unknown event");
+                    warn!(ordinal:%; "fuchsia.component/ExecutionController delivered unknown event");
                 }
                 Ok(None) => {
                     return Err(format_err!("ExecutionController closed and no OnStop received"));

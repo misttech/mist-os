@@ -9,9 +9,9 @@ use fidl::endpoints::{create_endpoints, ServerEnd};
 use fidl::Vmo;
 use futures::lock::{Mutex, MutexGuard};
 use futures::TryStreamExt;
+use log::*;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::*;
 use url::Url;
 use version_history::AbiRevision;
 use {
@@ -106,7 +106,7 @@ impl Registry {
         let self_ref = self.clone();
         fasync::Task::local(async move {
             if let Err(err) = self_ref.handle_resolver_request_stream(stream).await {
-                warn!(%err, "`Resolver` server unexpectedly failed.", );
+                warn!(err:%; "`Resolver` server unexpectedly failed.", );
             }
         })
         .detach();
@@ -220,7 +220,7 @@ impl Registry {
                 }
                 #[cfg(fuchsia_api_level_at_least = "24")]
                 fresolution::ResolverRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(%ordinal, "Unknown Resolver request");
+                    warn!(ordinal:%; "Unknown Resolver request");
                 }
             }
         }
