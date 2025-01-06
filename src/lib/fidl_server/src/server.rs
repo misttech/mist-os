@@ -6,7 +6,7 @@ use anyhow::{Context, Error, Result};
 use fidl::endpoints::{ProtocolMarker, Request, RequestStream};
 use fuchsia_async as fasync;
 use futures::TryStreamExt;
-use tracing::error;
+use log::error;
 
 /// RequestHandler handles incoming FIDL requests.
 pub trait RequestHandler<P: ProtocolMarker>: Send {

@@ -10,10 +10,10 @@ use crate::{
     ServeInner,
 };
 use futures::{Future, FutureExt, Stream, TryFutureExt, TryStream, TryStreamExt};
+use log::error;
 use std::convert::Infallible;
 use std::marker::PhantomData;
 use std::sync::Arc;
-use tracing::error;
 use {fuchsia_async as fasync, zx_status};
 
 /// A marker for a particular FIDL protocol.

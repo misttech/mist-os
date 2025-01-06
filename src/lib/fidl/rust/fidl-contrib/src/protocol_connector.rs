@@ -81,9 +81,9 @@ use fuchsia_async::{self as fasync, DurationExt};
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::{Future, StreamExt};
+use log::error;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tracing::error;
 
 /// A trait for implementing connecting to and sending messages to a FIDL protocol.
 pub trait ConnectedProtocol {
@@ -231,7 +231,7 @@ impl<CP: ConnectedProtocol> ProtocolConnector<CP> {
     /// underlying protocol will be logged.
     pub fn serve_and_log_errors(self) -> (ProtocolSender<CP::Message>, impl Future<Output = ()>) {
         let protocol = <<<CP as ConnectedProtocol>::Protocol as fidl::endpoints::Proxy>::Protocol as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
-        let mut log_error = log_first_n_factory(30, move |e| error!(%protocol, "{}", e));
+        let mut log_error = log_first_n_factory(30, move |e| error!(protocol:%; "{e}"));
         self.serve(move |e| match e {
             ProtocolConnectorError::ConnectFailed(e) => {
                 log_error(format!("Error obtaining a connection to the protocol: {}", e))
