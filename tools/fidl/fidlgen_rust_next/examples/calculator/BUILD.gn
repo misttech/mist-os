@@ -22,13 +22,13 @@ rustc_binary("bin") {
     "//src/lib/fidl/rust_next/fidl_next",
     "//src/lib/fuchsia-async",
   ]
+  if (is_fuchsia) {
+    deps += [ "//sdk/rust/zx" ]
+  }
 }
 
 fuchsia_component("component") {
   deps = [ ":bin" ]
-
-  # Defines the name given to the manifest when included in a fuchsia package.
-  # In this case: "hello-world-rust.cm"
   component_name = "rust_next_calculator"
   manifest = "meta/rust_next_calculator.cml"
 }

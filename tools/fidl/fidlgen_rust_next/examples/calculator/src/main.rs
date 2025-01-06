@@ -6,7 +6,6 @@ use fidl_next::bind::{
     Client, ClientEnd, ClientSender, RequestBuffer, Responder, ResponseBuffer, Server, ServerEnd,
     ServerSender,
 };
-use fidl_next::protocol::mpsc::Mpsc;
 use fidl_next::protocol::Transport;
 use fidl_next_examples_calculator::{
     calculator, Calculator, CalculatorClientHandler, CalculatorServerHandler,
@@ -99,11 +98,24 @@ impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer {
     }
 }
 
+#[cfg(not(target_os = "fuchsia"))]
+fn make_transport() -> (fidl_next::protocol::mpsc::Mpsc, fidl_next::protocol::mpsc::Mpsc) {
+    fidl_next::protocol::mpsc::Mpsc::new()
+}
+
+#[cfg(target_os = "fuchsia")]
+fn make_transport() -> (zx::Channel, zx::Channel) {
+    zx::Channel::create()
+}
+
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
-    let (client_mpsc, server_mpsc) = Mpsc::new();
-    let client_end = ClientEnd::<_, Calculator>::from_untyped(client_mpsc);
-    let server_end = ServerEnd::<_, Calculator>::from_untyped(server_mpsc);
+    println!("Starting right now!");
+
+    let (client_transport, server_transport) = make_transport();
+
+    let client_end = ClientEnd::<_, Calculator>::from_untyped(client_transport);
+    let server_end = ServerEnd::<_, Calculator>::from_untyped(server_transport);
 
     let mut client = Client::new(client_end);
     let client_sender = client.sender().clone();
