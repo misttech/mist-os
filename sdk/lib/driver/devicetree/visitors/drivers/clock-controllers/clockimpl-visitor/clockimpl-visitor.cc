@@ -221,17 +221,21 @@ zx::result<> ClockImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   }
 
   auto cells = ClockCells(specifiers);
-  clock_id_t id;
-  id.clock_id = cells.id();
+  uint32_t clock_id = cells.id();
 
   FDF_LOG(DEBUG, "Clock ID added - ID 0x%x name '%s' to controller '%s'", cells.id(),
           clock_name ? std::string(*clock_name).c_str() : "<anonymous>", parent.name().c_str());
 
-  controller.clock_ids_metadata.insert(controller.clock_ids_metadata.end(),
-                                       reinterpret_cast<const uint8_t*>(&id),
-                                       reinterpret_cast<const uint8_t*>(&id) + sizeof(clock_id_t));
+  controller.clock_ids_metadata_legacy.insert(
+      controller.clock_ids_metadata_legacy.end(), reinterpret_cast<const uint8_t*>(&clock_id),
+      reinterpret_cast<const uint8_t*>(&clock_id) + sizeof(uint32_t));
+  auto& clock_ids = controller.clock_ids_metadata.clock_ids();
+  if (!clock_ids.has_value()) {
+    clock_ids.emplace(std::vector<uint32_t>{});
+  }
+  clock_ids.value().emplace_back(clock_id);
 
-  return AddChildNodeSpec(child, id.clock_id, clock_name);
+  return AddChildNodeSpec(child, clock_id, clock_name);
 }
 
 zx::result<> ClockImplVisitor::ParseInitChild(
@@ -294,13 +298,14 @@ zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       return zx::ok();
     }
 
-    if (!controller->second.clock_ids_metadata.empty()) {
+    if (!controller->second.clock_ids_metadata_legacy.empty()) {
       fuchsia_hardware_platform_bus::Metadata id_metadata = {{
           .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
-          .data = controller->second.clock_ids_metadata,
+          .data = controller->second.clock_ids_metadata_legacy,
       }};
       node.AddMetadata(std::move(id_metadata));
-      FDF_LOG(DEBUG, "Clock IDs metadata added to node '%s'", node.name().c_str());
+
+      FDF_LOG(DEBUG, "Clock ID's legacy metadata added to node '%s'", node.name().c_str());
     }
 
     if (!controller->second.init_metadata.steps().empty()) {
@@ -318,6 +323,26 @@ zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       node.AddMetadata(std::move(metadata));
       FDF_LOG(DEBUG, "Clock init steps metadata added to node '%s'", node.name().c_str());
     }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    const auto& clock_ids = controller->second.clock_ids_metadata.clock_ids();
+    if (clock_ids.has_value() && !clock_ids.value().empty()) {
+      const fit::result encoded_clock_id_metadata =
+          fidl::Persist(controller->second.clock_ids_metadata);
+      if (!encoded_clock_id_metadata.is_ok()) {
+        FDF_LOG(ERROR, "Failed to encode clock ID's: %s",
+                encoded_clock_id_metadata.error_value().FormatDescription().c_str());
+        return zx::error(encoded_clock_id_metadata.error_value().status());
+      }
+      fuchsia_hardware_platform_bus::Metadata metadata = {{
+          .id = fuchsia_hardware_clockimpl::wire::ClockIdsMetadata::kSerializableName,
+          .data = encoded_clock_id_metadata.value(),
+      }};
+      node.AddMetadata(std::move(metadata));
+
+      FDF_LOG(DEBUG, "Clock ID's metadata added to node '%s'", node.name().c_str());
+    }
+#endif
   }
 
   return zx::ok();

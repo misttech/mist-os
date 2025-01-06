@@ -120,11 +120,13 @@ declare_args() {
 }
 
 if (!defined(toolchain_variant.name)) {
-  # Default values correspond to the default toolchain. For now, it is used
-  # to build Fuchsia user binaries, so populate it accordingly. The only
-  # non-obvious key is 'exclude_variant_tags', it must match the result
-  # of calling clang_toolchain_suite() for $target_cpu, which currently
-  # implies rejecting variants with the 'gcc' and 'kernel-only' tags.
+  # Default values correspond to the default toolchain.  For now, it is used to
+  # build Fuchsia user binaries, so populate it accordingly.  One non-obvious
+  # key is 'exclude_variant_tags': it must match the result of calling
+  # clang_toolchain_suite() for $target_cpu, which currently implies rejecting
+  # variants with the 'gcc' and 'kernel-only' tags.  Another is `source_deps`:
+  # it must match the `clang_toolchain_suite()` invocation defining the
+  # toolchain (the value there will be used in variant and shared toolchains).
   toolchain_variant.name = ""
   toolchain_variant.suffix = ""
   toolchain_variant.configs = []
@@ -143,6 +145,11 @@ if (!defined(toolchain_variant.name)) {
     "gcc",
     "kernel-only",
   ]
+
+  # LINT.IfChange
+  toolchain_variant.source_deps = [ "//zircon/public/sysroot:headers" ]
+
+  # LINT.ThenChange(//build/toolchain/fuchsia/BUILD.gn)
 }
 
 # Shared libraries built in GN toolchain() instances that implement instrumented
@@ -1662,6 +1669,11 @@ declare_args() {
   #       linked in this variant (as well as `deps`, above, and the automatic
   #       `${label}_deps` for each label in configs).
   #
+  #   `source_deps`
+  #       [list of labels] Added to the deps of every target that compiles
+  #       `sources`.  This is added to source_set() and static_library()
+  #       targets, and only this; the linking targets get both this and `deps`.
+  #
   #   `name` (required if configs is omitted)
   #       [string] Name of the variant as used in
   #       [`select_variant`](#select_variant) elements' `variant` fields.
@@ -2448,6 +2460,8 @@ template("_fuchsia_binary") {
   }
 
   target(_maybe_target_type_internal_wrapper, target_name) {
+    deps = []
+    data_deps = []
     forward_variables_from(invoker,
                            "*",
                            [
@@ -2463,6 +2477,9 @@ template("_fuchsia_binary") {
                              "visibility",
                            ])
 
+    # This is implicitly added to every kind of target that can have `sources`.
+    deps += toolchain_variant.source_deps
+
     if ((is_fuchsia || is_mistos) && zircon_toolchain == false) {
       # Depend on runtime libraries provided by the sysroot and the toolchain.
       # This ensures the libraries are packaged up with the output of this
@@ -2470,12 +2487,6 @@ template("_fuchsia_binary") {
       # These dependencies need to be attached here rather than higher up in the
       # dependency tree in order to correctly capture the active toolchain
       # variant.
-      if (!defined(deps)) {
-        deps = []
-      }
-      if (!defined(data_deps)) {
-        data_deps = []
-      }
 
       # NOTE: invoker.crate_root will be defined when building a Rust crate
       # instead of a C++ binary.
@@ -3380,6 +3391,13 @@ template("basic_executable") {
   }
 }
 
+# Likewise for a source_set() that needs to avoid source_deps.
+template("basic_source_set") {
+  _source_set_internal_wrapper(target_name) {
+    forward_variables_from(invoker, "*")
+  }
+}
+
 import("//build/rust/rust_auxiliary.gni")
 
 # variables needed by above
@@ -3869,6 +3887,7 @@ set_defaults("component") {
 
 template("source_set") {
   _source_set_internal_wrapper(target_name) {
+    deps = []
     forward_variables_from(invoker,
                            "*",
                            [
@@ -3882,16 +3901,9 @@ template("source_set") {
                              "testonly",
                              "visibility",
                            ])
-    if ((is_fuchsia || is_mistos) && zircon_toolchain == false) {
-      if (!defined(deps)) {
-        deps = []
-      }
 
-      # When generating Fuchsia user binaries, ensure the right sysroot-related
-      # dependencies are added to source_set() and static_library() instances
-      # automatically.
-      deps += [ "//zircon/public/sysroot:headers" ]
-    }
+    # This is implicitly added to every kind of target that can have `sources`.
+    deps += toolchain_variant.source_deps
   }
 }
 _built_in_target_types_without_public_wrapper -= [ "source_set" ]
@@ -3917,6 +3929,9 @@ template("static_library") {
   }
 
   _static_library_internal_wrapper(target_name) {
+    deps = []
+    public_deps = []
+    inputs = []
     forward_variables_from(invoker,
                            "*",
                            [
@@ -3932,9 +3947,9 @@ template("static_library") {
                              "visibility",
                            ])
 
-    if (!defined(public_deps)) {
-      public_deps = []
-    }
+    # This is implicitly added to every kind of target that can have `sources`.
+    deps += toolchain_variant.source_deps
+
     if (defined(invoker.no_rust_aux_build_config_dep)) {
       _no_rust_aux_build_config_dep = invoker.no_rust_aux_build_config_dep
     } else {
@@ -3944,28 +3959,16 @@ template("static_library") {
       public_deps += [ ":$_rust_auxiliary_name" ]
     }
     if ((is_fuchsia || is_mistos) && zircon_toolchain == false) {
-      if (!defined(deps)) {
-        deps = []
-      }
-
-      # When generating Fuchsia user binaries, ensure the right sysroot-related
-      # dependencies are added to source_set() and static_library() instances
-      # automatically.
-      deps += [ "//zircon/public/sysroot:headers" ]
-
       if (defined(crate_root)) {
-        if (!defined(inputs)) {
-          inputs = []
-        }
         inputs += restat_rust_wrapper_inputs
       }
       metadata = {
+        # Don't collect rlibs from transitive deps.
+        rust_barrier = []
+
         if (defined(invoker.metadata)) {
           forward_variables_from(invoker.metadata, "*")
         }
-
-        # Don't collect rlibs from transitive deps
-        rust_barrier = []
       }
     }
   }

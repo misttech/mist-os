@@ -24,11 +24,15 @@ static constexpr uint kMmuFlags =
     ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE | ARCH_MMU_FLAG_PERM_EXECUTE;
 
 static bool hypervisor_supported() {
-#ifdef __x86_64__
-  return true;
-#else
+#if ARCH_ARM64
+  if (arm64_get_boot_el() < 2) {
+    unittest_printf("Hypervisor not supported\n");
+    return false;
+  }
+#elif __riscv
   return false;
 #endif
+  return true;
 }
 
 static zx::result<hypervisor::GuestPhysicalAspace> create_gpas() {

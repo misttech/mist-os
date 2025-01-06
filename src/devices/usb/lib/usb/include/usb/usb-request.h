@@ -29,8 +29,9 @@ typedef struct {
   list_node_t node;
 } usb_req_internal_t;
 
-#define USB_REQ_TO_REQ_INTERNAL(req, size) ((usb_req_internal_t*)((uintptr_t)(req) + (size)))
-#define REQ_INTERNAL_TO_USB_REQ(ctx, size) ((usb_request_t*)((uintptr_t)(ctx) - (size)))
+usb_req_internal_t* usb_req_to_req_internal(usb_request_t* req, size_t size);
+
+usb_request_t* req_internal_to_usb_req(usb_req_internal_t* ctx, size_t size);
 
 // usb_request_alloc() creates a new usb request with payload space of data_size.
 zx_status_t usb_request_alloc(usb_request_t** out, uint64_t data_size, uint8_t ep_address,

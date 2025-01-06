@@ -9,8 +9,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
-#include "sdk/lib/fdio/internal.h"
 
 // checkfile, checkfileat, and checkfd let us error out if the object
 // doesn't exist, which allows the stubs to be a little more 'real'
@@ -38,7 +38,7 @@ static int checkfileat(int fd, const char* path, int flags, int err) {
   return seterr(err);
 }
 
-static bool fdok(int fd) { return fd_to_io(fd) != nullptr; }
+static bool fdok(int fd) { return fdio_global_state().fd_to_io(fd) != nullptr; }
 
 static int checkfd(int fd, int err) {
   if (!fdok(fd)) {

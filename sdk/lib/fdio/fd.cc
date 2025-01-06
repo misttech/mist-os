@@ -7,9 +7,7 @@
 
 #include <variant>
 
-#include <fbl/auto_lock.h>
-
-#include "sdk/lib/fdio/fdio_unistd.h"
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/internal.h"
 
 __EXPORT
@@ -18,7 +16,7 @@ zx_status_t fdio_fd_create(zx_handle_t handle, int* fd_out) {
   if (io.is_error()) {
     return io.status_value();
   }
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     *fd_out = fd.value();
     return ZX_OK;
@@ -29,15 +27,16 @@ zx_status_t fdio_fd_create(zx_handle_t handle, int* fd_out) {
 __EXPORT
 zx_status_t fdio_cwd_clone(zx_handle_t* out_handle) {
   fdio_ptr cwd = []() {
-    fbl::AutoLock lock(&fdio_lock);
-    return fdio_cwd_handle.get();
+    fdio_state_t& gstate = fdio_global_state();
+    std::lock_guard lock(gstate.lock);
+    return gstate.cwd.get();
   }();
   return cwd->clone(out_handle);
 }
 
 __EXPORT
 zx_status_t fdio_fd_clone(int fd, zx_handle_t* out_handle) {
-  fdio_ptr io = fd_to_io(fd);
+  fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -47,7 +46,7 @@ zx_status_t fdio_fd_clone(int fd, zx_handle_t* out_handle) {
 
 __EXPORT
 zx_status_t fdio_fd_transfer(int fd, zx_handle_t* out_handle) {
-  fdio_ptr io = unbind_from_fd(fd);
+  fdio_ptr io = fdio_global_state().unbind_from_fd(fd);
   if (io == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -61,7 +60,7 @@ zx_status_t fdio_fd_transfer(int fd, zx_handle_t* out_handle) {
 
 __EXPORT
 zx_status_t fdio_fd_transfer_or_clone(int fd, zx_handle_t* out_handle) {
-  fdio_ptr io = unbind_from_fd(fd);
+  fdio_ptr io = fdio_global_state().unbind_from_fd(fd);
   if (io == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }

@@ -163,7 +163,7 @@ fuchsia_api_level = rule(
         so that we can skip checking the API level during analysis for builds
         like bazel build //... which might analyze fuchsia targets that depend
         on the api level flag but depend on the fuchsia_transition to set it.
-        """, default = "@fuchsia_sdk//fuchsia:fuchsia_targets_enabled"),
+        """, default = "@rules_fuchsia//fuchsia/flags:fuchsia_targets_enabled"),
     },
 )
 

@@ -7,6 +7,7 @@
 #include <endian.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.sdmmc/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
@@ -16,6 +17,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
@@ -328,7 +330,7 @@ struct IncomingNamespace {
 
   fdf_testing::TestNode node{"root"};
   fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
-  compat::DeviceServer device_server;
+  fdf_metadata::MetadataServer<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata_server;
   zx::event exec_opportunistic, wake_assertive;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
   FakePowerBroker power_broker;
@@ -385,16 +387,17 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     }
   }
 
-  zx_status_t StartDriverForMmc(uint64_t speed_capabilities = 0,
+  zx_status_t StartDriverForMmc(fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities = {},
                                 bool supply_power_framework = false) {
     return StartDriver(/*is_sd=*/false, speed_capabilities, supply_power_framework);
   }
-  zx_status_t StartDriverForSd(uint64_t speed_capabilities = 0,
+  zx_status_t StartDriverForSd(fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities = {},
                                bool supply_power_framework = false) {
     return StartDriver(/*is_sd=*/true, speed_capabilities, supply_power_framework);
   }
 
-  zx_status_t StartDriver(bool is_sd, uint64_t speed_capabilities, bool supply_power_framework) {
+  zx_status_t StartDriver(bool is_sd, fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities,
+                          bool supply_power_framework) {
     TestSdmmcRootDevice::use_fidl_ = GetParam();
     TestSdmmcRootDevice::is_sd_ = is_sd;
     if (is_sd) {
@@ -420,10 +423,7 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
 
     // Initialize driver test environment.
     fuchsia_driver_framework::DriverStartArgs start_args;
-    fit::result metadata = fidl::Persist(CreateMetadata(/*removable=*/is_sd, speed_capabilities));
-    if (!metadata.is_ok()) {
-      return metadata.error_value().status();
-    }
+    auto metadata = CreateMetadata(/*removable=*/is_sd, speed_capabilities);
     incoming_.SyncCall([&](IncomingNamespace* incoming) mutable {
       auto start_args_result = incoming->node.CreateStartArgsAndServe();
       ASSERT_TRUE(start_args_result.is_ok());
@@ -432,12 +432,10 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
 
       ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
 
-      incoming->device_server.Initialize("default");
       // Serve metadata.
-      ASSERT_OK(incoming->device_server.AddMetadata(DEVICE_METADATA_SDMMC, metadata->data(),
-                                                    metadata->size()));
-      ASSERT_OK(incoming->device_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                              &incoming->env.incoming_directory()));
+      ASSERT_OK(incoming->metadata_server.SetMetadata(metadata));
+      ASSERT_OK(incoming->metadata_server.Serve(incoming->env.incoming_directory(),
+                                                fdf::Dispatcher::GetCurrent()->async_dispatcher()));
 
       if (supply_power_framework) {
         // Serve (fake) system_activity_governor.
@@ -596,15 +594,15 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     }
   }
 
-  fuchsia_hardware_sdmmc::wire::SdmmcMetadata CreateMetadata(bool removable,
-                                                             uint64_t speed_capabilities) {
-    return fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena_)
-        .speed_capabilities(speed_capabilities)
-        .enable_cache(true)
-        .removable(removable)
-        .max_command_packing(16)
-        .use_fidl(false)
-        .Build();
+  static fuchsia_hardware_sdmmc::SdmmcMetadata CreateMetadata(
+      bool removable, fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities) {
+    return fuchsia_hardware_sdmmc::SdmmcMetadata{{
+        .speed_capabilities = speed_capabilities,
+        .enable_cache = true,
+        .removable = removable,
+        .max_command_packing = 16,
+        .use_fidl = false,
+    }};
   }
 
   void BindRpmbClient() {
@@ -1561,10 +1559,9 @@ TEST_P(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  const uint64_t speed_capabilities =
-      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200) |
-      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400) |
-      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr);
+  const auto speed_capabilities = fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200 |
+                                  fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400 |
+                                  fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr;
   EXPECT_OK(StartDriverForMmc(speed_capabilities));
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HS);
@@ -1582,9 +1579,8 @@ TEST_P(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  const uint64_t speed_capabilities =
-      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200) |
-      static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400);
+  const auto speed_capabilities = fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200 |
+                                  fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400;
   EXPECT_OK(StartDriverForMmc(speed_capabilities));
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HSDDR);
@@ -2272,7 +2268,7 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
                                 }
                               });
 
-  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/0, /*supply_power_framework=*/true));
+  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/true));
 
   // Initial power level is kPowerLevelOff.
   runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
@@ -2333,7 +2329,7 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
 }
 
 TEST_P(SdmmcBlockDeviceTest, BlockServer) {
-  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/0, /*supply_power_framework=*/false));
+  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/false));
 
   runtime_.PerformBlockingWork([&] {
     auto client = GetRemoteBlockDeviceForBlockServer();
@@ -2417,7 +2413,7 @@ TEST_P(SdmmcBlockDeviceTest, BlockServer) {
 
 // TODO(https://fxbug.dev/376147833): The fake driver doesn't support packed transfers
 TEST_P(SdmmcBlockDeviceTest, DISABLED_BlockServerMaxTransferSize) {
-  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/0, /*supply_power_framework=*/false));
+  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/false));
 
   runtime_.PerformBlockingWork([&] {
     constexpr int kMaxTransferSize = 16384;

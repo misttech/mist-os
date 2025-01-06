@@ -21,12 +21,12 @@ rustc_library("openthread") {
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:num",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
   test_deps = [ "//third_party/rust_crates:assert_matches" ]

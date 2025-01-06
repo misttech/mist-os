@@ -174,6 +174,8 @@ zx_status_t AmlClock::PopulateRegisterBlocks(uint32_t device_id, fdf::PDev& pdev
 zx::result<> AmlClock::Start() {
   // Initialize compat server.
   {
+    // TODO(b/373903133): Don't forward clock ID's using the legacy method once it is no longer
+    // used.
     zx::result<> result = compat_server_.Initialize(
         incoming(), outgoing(), node_name(), kChildNodeName,
         compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS, DEVICE_METADATA_CLOCK_INIT}));
@@ -193,6 +195,29 @@ zx::result<> AmlClock::Start() {
     }
     pdev = fdf::PDev{std::move(result.value())};
   }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  // Serve metadata.
+  {
+    zx::result clock_ids = pdev.GetFidlMetadata<fuchsia_hardware_clockimpl::ClockIdsMetadata>(
+        fuchsia_hardware_clockimpl::ClockIdsMetadata::kSerializableName);
+    if (clock_ids.is_error()) {
+      FDF_LOG(ERROR, "Failed to retrieve clock ID's: %s", clock_ids.status_string());
+      return clock_ids.take_error();
+    }
+    if (zx::result result = clock_ids_metadata_server_.SetMetadata(clock_ids.value());
+        result.is_error()) {
+      FDF_LOG(ERROR, "Failed to set metadata for clock ID's metadata server: %s",
+              result.status_string());
+      return result.take_error();
+    }
+    if (zx::result result = clock_ids_metadata_server_.Serve(*outgoing(), dispatcher());
+        result.is_error()) {
+      FDF_LOG(ERROR, "Failed to serve clock ID's: %s", result.status_string());
+      return result.take_error();
+    }
+  }
+#endif
 
   // All AML clocks have HIU and dosbus regs but only some support MSR regs.
   // Figure out which of the varieties we're dealing with.
@@ -305,6 +330,7 @@ zx_status_t AmlClock::InitChildNode() {
 
   auto offers = compat_server_.CreateOffers2();
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_clockimpl::Service>());
+  offers.push_back(clock_ids_metadata_server_.MakeOffer());
 
   zx::result result = AddChild(kChildNodeName, devfs_add_args, properties, offers);
   if (result.is_error()) {

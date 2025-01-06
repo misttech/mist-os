@@ -4,9 +4,8 @@
 
 #include "sdio-controller-device.h"
 
-#include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/sdio/hw.h>
@@ -77,25 +76,20 @@ FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
 class Environment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    fit::result metadata =
-        fidl::Persist(fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena_).Build());
-    if (!metadata.is_ok()) {
-      return zx::error(metadata.error_value().status());
+    if (zx::result result = metadata_server_.SetMetadata({}); result.is_error()) {
+      return result.take_error();
     }
-
-    device_server_.Initialize(component::kDefaultInstance);
-    zx_status_t status =
-        device_server_.AddMetadata(DEVICE_METADATA_SDMMC, metadata->data(), metadata->size());
-    if (status != ZX_OK) {
-      return zx::error(status);
+    if (zx::result result = metadata_server_.Serve(
+            to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        result.is_error()) {
+      return result.take_error();
     }
-    return zx::make_result(
-        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
+    return zx::ok();
   }
 
  private:
   fidl::Arena<> arena_;
-  compat::DeviceServer device_server_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata_server_;
 };
 
 class TestConfig final {

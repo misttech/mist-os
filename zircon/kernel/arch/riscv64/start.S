@@ -92,21 +92,6 @@ FUNCTION(_start)
     li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_R | RISCV64_PTE_W | RISCV64_PTE_V
     call    riscv64_boot_map
 
-    // map the kernel to a fixed address
-    // note: mapping the kernel here with full rwx, this will get locked down later in vm initialization
-    mv      a0, s4
-    mv      a1, s3                 // 2nd arg: Virtual __executable_start.
-    lla     a2, __executable_start // 3rd arg: Physical __executable_start.
-    lla     a3, _end               // Physical _end.
-    sub     a3, a3, a2             // 4th arg: Total image size.
-    li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_PERM_MASK | RISCV64_PTE_V
-    call    riscv64_boot_map
-
-    // ensure it's written out
-    fence   w,w
-
-    // mmu is initialized and we're running out of an identity physical map
-
     // compute the delta between the old physical and newer high addresses
     sub     t0, s3, s2
 

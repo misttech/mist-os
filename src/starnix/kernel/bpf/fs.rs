@@ -5,7 +5,6 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use crate::bpf::map::{compute_map_storage_size, Map, PinnedMap, RINGBUF_SIGNAL};
 use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
 use crate::mm::memory::MemoryObject;
@@ -21,6 +20,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrStorage as _,
 };
 use ebpf::MapSchema;
+use ebpf_api::{compute_map_storage_size, Map, PinnedMap, RINGBUF_SIGNAL};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
@@ -169,8 +169,10 @@ impl FileOps for BpfHandle {
             }
 
             bpf_map_type_BPF_MAP_TYPE_ARRAY => {
-                let array_size =
-                    round_up_to_increment(compute_map_storage_size(&schema)?, *PAGE_SIZE as usize)?;
+                let array_size = round_up_to_increment(
+                    compute_map_storage_size(&schema).map_err(|_| errno!(EINVAL))?,
+                    *PAGE_SIZE as usize,
+                )?;
                 if length > array_size {
                     return error!(EINVAL);
                 }

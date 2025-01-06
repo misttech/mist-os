@@ -10,7 +10,8 @@
 #include <lib/zx/channel.h>
 #include <lib/zxio/zxio.h>
 
-#include <fbl/mutex.h>
+#include <mutex>
+
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 
@@ -113,7 +114,7 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
       fit::function<zx::result<fbl::RefPtr<LocalVnode>>(std::optional<LocalVnode::ParentAndId>)>
           builder);
 
-  mutable fbl::Mutex lock_;
+  mutable std::mutex lock_;
   fbl::RefPtr<LocalVnode> root_ __TA_GUARDED(lock_);
 };
 

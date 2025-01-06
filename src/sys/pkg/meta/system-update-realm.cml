@@ -12,19 +12,7 @@
             on_terminate: "reboot",
         },
     ],
-    capabilities: [
-        {
-            config: "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
-            type: "int64",
-            value: -1,
-        },
-    ],
     offer: [
-        {
-            config: "fuchsia.system-update-committer.StopOnIdleTimeoutMillis",
-            from: "self",
-            to: "#system-update-committer",
-        },
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",

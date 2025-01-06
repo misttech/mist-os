@@ -429,18 +429,20 @@ GlobalHitRegionsMap ComputeGlobalHitRegions(
     const auto uber_struct_kv = uber_structs.find(handle.GetInstanceId());
     FX_DCHECK(uber_struct_kv != uber_structs.end());
 
-    const auto regions_vec_kv = uber_struct_kv->second->local_hit_regions_map.find(handle);
+    const auto& local_hit_regions_map = uber_struct_kv->second->local_hit_regions_map;
+    const auto regions_vec_kv = local_hit_regions_map.find(handle);
 
-    if (regions_vec_kv != uber_struct_kv->second->local_hit_regions_map.end()) {
-      for (auto& local_hit_region : regions_vec_kv->second) {
+    if (regions_vec_kv != local_hit_regions_map.end()) {
+      auto& hit_regions = global_hit_regions[handle];
+      hit_regions.reserve(regions_vec_kv->second.size());
+      for (const auto& local_hit_region : regions_vec_kv->second) {
         if (local_hit_region.is_finite()) {
           // Usually: calculate the global position of the current hit region.
           auto global_rect = MatrixMultiplyRectF(matrix_vector[i], local_hit_region.region());
-          global_hit_regions[handle].push_back(
-              flatland::HitRegion(global_rect, local_hit_region.interaction()));
+          hit_regions.emplace_back(global_rect, local_hit_region.interaction());
         } else {
           // Special case: preserve sentinel value for infinite hit region.
-          global_hit_regions[handle].push_back(local_hit_region);
+          hit_regions.push_back(local_hit_region);
         }
       }
     }

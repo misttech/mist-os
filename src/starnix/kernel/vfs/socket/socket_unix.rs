@@ -5,8 +5,6 @@
 #[cfg(not(feature = "starnix_lite"))]
 use crate::bpf::fs::get_bpf_object;
 #[cfg(not(feature = "starnix_lite"))]
-use crate::bpf::helpers::{get_socket_filter_helpers, SocketFilterContext};
-#[cfg(not(feature = "starnix_lite"))]
 use crate::bpf::program::LinkedProgram;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter};
@@ -22,7 +20,7 @@ use crate::vfs::{
     LookupContext, Message,
 };
 use ebpf::{EbpfRunContext, FieldMapping, StructMapping};
-use ebpf_api::{ProgramType, SK_BUF_ID};
+use ebpf_api::{get_socket_filter_helpers, ProgramType, SocketFilterContext, SK_BUF_ID};
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};

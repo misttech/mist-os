@@ -8,7 +8,7 @@ use component_events::matcher::EventMatcher;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fuchsia_component_test::ScopedInstance;
 use futures::StreamExt;
-use tracing::info;
+use log::info;
 
 #[fuchsia::main]
 async fn main() {

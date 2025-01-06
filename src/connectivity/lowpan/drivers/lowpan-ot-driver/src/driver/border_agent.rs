@@ -102,7 +102,7 @@ where
             }
 
             Err(err) => {
-                warn!(tag = "meshcop", "Failed to get active dataset: {:?}", err);
+                warn!(tag = "meshcop"; "Failed to get active dataset: {:?}", err);
             }
         }
 
@@ -160,16 +160,16 @@ async fn publish_border_agent_service(
                   responder,
               }| {
             debug!(
-                tag = "meshcop",
+                tag = "meshcop";
                 "publish_border_agent_service: publication_cause: {publication_cause:?}"
             );
-            debug!(tag = "meshcop", "publish_border_agent_service: publication_cause: {subtype:?}");
+            debug!(tag = "meshcop"; "publish_border_agent_service: publication_cause: {subtype:?}");
             debug!(
-                tag = "meshcop",
+                tag = "meshcop";
                 "publish_border_agent_service: source_addresses: {source_addresses:?}"
             );
             debug!(
-                tag = "meshcop",
+                tag = "meshcop";
                 "publish_border_agent_service: publication: {:?}", &publication
             );
 
@@ -180,7 +180,7 @@ async fn publish_border_agent_service(
 
             let result = if subtype.is_some() {
                 debug!(
-                    tag = "meshcop",
+                    tag = "meshcop";
                     "publish_border_agent_service: Subtype specified, skipping advertisement."
                 );
                 Err(OnPublicationError::DoNotRespond)
@@ -197,13 +197,13 @@ async fn publish_border_agent_service(
     futures::try_join!(
         publish_init_future.inspect_err(|err| {
             error!(
-                tag = "meshcop",
+                tag = "meshcop";
                 "publish_border_agent_service: publish_init_future failed: {:?}", err
             );
         }),
         publish_responder_future.inspect_err(|err| {
             error!(
-                tag = "meshcop",
+                tag = "meshcop";
                 "publish_border_agent_service: publish_responder_future failed: {:?}", err
             );
         }),
@@ -225,7 +225,7 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
                 (vendor, model)
             }
             Err(err) => {
-                warn!(tag = "meshcop", "Unable to get product info: {:?}", err);
+                warn!(tag = "meshcop"; "Unable to get product info: {:?}", err);
                 ("Unknown".to_string(), "Fuchsia".to_string())
             }
         };
@@ -268,10 +268,10 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
         let mut last_txt_entries = border_agent_current_txt_entries.lock().await;
 
         if txt == *last_txt_entries {
-            debug!(tag = "meshcop", "update_border_agent_service: No changes.");
+            debug!(tag = "meshcop"; "update_border_agent_service: No changes.");
         } else {
             debug!(
-                tag = "meshcop",
+                tag = "meshcop";
                 "update_border_agent_service: Updating meshcop dns-sd: port={} txt=[PII]({:?})",
                 port,
                 txt
@@ -283,12 +283,12 @@ impl<OT: ot::InstanceInterface, NI, BI> OtDriver<OT, NI, BI> {
             if let Some(task) = old_service {
                 if let Some(Err(err)) = task.cancel().await {
                     warn!(
-                        tag = "meshcop",
+                        tag = "meshcop";
                         "update_border_agent_service: Previous publication task ended with an \
                          error: {err:?}"
                     );
                 }
-                info!(tag = "meshcop", "update_border_agent_service: pervious task terminated");
+                info!(tag = "meshcop"; "update_border_agent_service: pervious task terminated");
             }
 
             *self.border_agent_service.lock() = Some(fasync::Task::spawn(

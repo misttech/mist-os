@@ -4,12 +4,12 @@
 
 #include <lib/fdio/unsafe.h>
 
-#include "sdk/lib/fdio/fdio_unistd.h"
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/internal.h"
 
 __EXPORT
 fdio_t* fdio_unsafe_fd_to_io(int fd) {
-  fdio_ptr io = fd_to_io(fd);
+  fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return nullptr;
   }

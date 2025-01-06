@@ -51,6 +51,7 @@ rustc_library("lib") {
     "src/compiler/instruction.rs",
     "src/compiler/mod.rs",
     "src/compiler/symbol_table.rs",
+    "src/compiler/test_lib.rs",
     "src/ddk_bind_constants.rs",
     "src/debugger/debug_dump.rs",
     "src/debugger/debugger.rs",

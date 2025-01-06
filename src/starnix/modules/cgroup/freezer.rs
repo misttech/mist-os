@@ -13,8 +13,8 @@ use starnix_uapi::{errno, error};
 
 use crate::cgroup::{Cgroup, CgroupOps};
 
-#[derive(Clone, Debug)]
-enum FreezerState {
+#[derive(Clone, Debug, PartialEq)]
+pub enum FreezerState {
     Frozen,
     Thawed,
 }
@@ -25,6 +25,12 @@ impl std::fmt::Display for FreezerState {
             FreezerState::Frozen => write!(f, "1"),
             FreezerState::Thawed => write!(f, "0"),
         }
+    }
+}
+
+impl Default for FreezerState {
+    fn default() -> Self {
+        FreezerState::Thawed
     }
 }
 

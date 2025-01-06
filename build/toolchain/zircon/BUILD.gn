@@ -23,6 +23,7 @@ if (current_toolchain == default_toolchain) {
         "//build/config/zircon:user-link",
         "//build/config:no-compiler-abi",
       ]
+      source_deps = [ "//build/config/zircon:user_deps" ]
 
       # Since //build/config/zircon:user-executable uses BFD, we can't use ICF.
       # It's only supported by Gold and LLD.  But we can't use Gold for

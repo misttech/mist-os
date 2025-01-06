@@ -301,6 +301,11 @@ fuchsia_test_package("driver-manager-tests") {
 }
 
 fuchsia_test_package("driver-host-runner-tests") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   test_components = [ ":driver-host-runner-test" ]
   deps = [
     "modules:modules.basic",

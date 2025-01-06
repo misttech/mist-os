@@ -9,7 +9,7 @@ use component_events::matcher::EventMatcher;
 use diagnostics_reader::{ArchiveReader, Logs};
 use fuchsia_component_test::ScopedInstance;
 use futures::StreamExt;
-use tracing::info;
+use log::info;
 
 /// verify the launch behavior of a hello debian binary
 #[derive(Debug, FromArgs)]

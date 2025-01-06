@@ -10,7 +10,7 @@
             ],
         },
         {
-            type: "expect_failure",
+            type: "expect_failure_with_err_logs",
             matchers: [
                 "timeouts_ns3",
             ],

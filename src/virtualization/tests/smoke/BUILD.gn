@@ -7,12 +7,7 @@ import("//build/testing/cc_test_executable.gni")
 
 group("smoke") {
   testonly = true
-
-  # arm64 hypervisor support has been suspended until FEAT_VHE can be taken for
-  # granted.
-  if (current_cpu != "arm64") {
-    deps = [ ":zircon_guest_smoke_tests_pkg" ]
-  }
+  deps = [ ":zircon_guest_smoke_tests_pkg" ]
 }
 
 cc_test_executable("zircon_guest_smoke_tests") {

@@ -39,9 +39,6 @@ async fn redirect_ingress_no_assigned_address<I: TestIpExt, S: SocketType>(
     name: &str,
     _socket_type: PhantomData<S>,
 ) {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-        .expect("initialize logging");
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
     let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
@@ -101,9 +98,6 @@ async fn masquerade_egress_no_assigned_address<I: TestIpExt, S: SocketType>(
     name: &str,
     _socket_type: PhantomData<S>,
 ) {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-        .expect("initialize logging");
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
     let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
@@ -156,9 +150,6 @@ async fn masquerade_egress_no_assigned_address<I: TestIpExt, S: SocketType>(
 #[netstack_test]
 #[variant(I, Ip)]
 async fn masquerade_remove_and_add_address<I: RouterTestIpExt>(name: &str) {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-        .expect("initialize logging");
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
 
     // Set up a network with two hosts (client and server) and a router. The client
@@ -277,9 +268,6 @@ async fn redirect_ingress<I: TestIpExt, S: SocketType>(
     _socket_type: PhantomData<S>,
     change_dst_port: bool,
 ) {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-        .expect("initialize logging");
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
     let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
@@ -378,9 +366,6 @@ async fn redirect_local_egress<I: TestIpExt, S: SocketType>(
     _socket_type: PhantomData<S>,
     change_dst_port: bool,
 ) {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-        .expect("initialize logging");
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
     let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
@@ -458,9 +443,6 @@ async fn redirect_local_egress<I: TestIpExt, S: SocketType>(
 #[test_case(PhantomData::<TcpSocket>; "tcp")]
 #[test_case(PhantomData::<UdpSocket>; "udp")]
 async fn masquerade<I: RouterTestIpExt, S: SocketType>(name: &str, _socket_type: PhantomData<S>) {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-        .expect("initialize logging");
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
 
@@ -513,9 +495,6 @@ async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
     _socket_type: PhantomData<S>,
     rewrite_to_conflicting_port: bool,
 ) {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-        .expect("initialize logging");
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
 
@@ -618,9 +597,6 @@ async fn implicit_snat_ports_of_locally_generated_traffic<I: RouterTestIpExt, S:
     name: &str,
     _socket_type: PhantomData<S>,
 ) {
-    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
-        .expect("initialize logging");
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
 

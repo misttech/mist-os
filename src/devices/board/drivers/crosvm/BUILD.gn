@@ -63,4 +63,5 @@ fuchsia_driver_component("component") {
 fuchsia_driver_package("package") {
   package_name = "crosvm"
   driver_components = [ ":component" ]
+  export_to_bazel = true
 }

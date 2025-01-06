@@ -760,6 +760,10 @@ impl ObjectStore {
         &self.key_manager
     }
 
+    pub fn parent_store(&self) -> Option<&Arc<ObjectStore>> {
+        self.parent_store.as_ref()
+    }
+
     /// Returns the crypt object for the store. Returns None if the store is unencrypted. This will
     /// panic if the store is locked.
     pub fn crypt(&self) -> Option<Arc<dyn Crypt>> {

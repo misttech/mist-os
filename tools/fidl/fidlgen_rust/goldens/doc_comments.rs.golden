@@ -744,6 +744,10 @@ impl ServiceProxy {
     ) -> Result<(), fidl::Error> {
         self.0.open_member("interface", server_end.into_channel())
     }
+
+    pub fn instance_name(&self) -> &str {
+        self.0.instance_name()
+    }
 }
 
 mod internal {

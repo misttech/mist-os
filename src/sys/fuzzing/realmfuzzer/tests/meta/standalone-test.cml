@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/inspect/client.shard.cml",
         "//sdk/lib/sys/testing/elf_test_runner.shard.cml",
         "//src/sys/fuzzing/realmfuzzer/target/default.shard.cml",
-        "syslog/client.shard.cml",
     ],
     program: {
         binary: "test/realmfuzzer_standalone_test",

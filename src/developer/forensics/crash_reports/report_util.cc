@@ -18,6 +18,7 @@
 #include "src/developer/forensics/crash_reports/report.h"
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/lib/fsl/vmo/strings.h"
+#include "src/lib/uuid/uuid.h"
 
 namespace forensics {
 namespace crash_reports {
@@ -298,7 +299,10 @@ fpromise::result<Report> MakeReport(fuchsia::feedback::CrashReport report, const
   const std::string program_name = report.program_name();
   const std::string shortname = Shorten(program_name);
 
-  AnnotationMap annotations = {{feedback::kOSNameKey, "Fuchsia"}};
+  AnnotationMap annotations = {
+      {feedback::kDebugReportUuid, uuid::Generate()},
+      {feedback::kOSNameKey, "Fuchsia"},
+  };
   std::map<std::string, fuchsia::mem::Buffer> attachments;
   std::optional<fuchsia::mem::Buffer> minidump;
 

@@ -262,7 +262,7 @@ impl RealSymbolizerProcess {
             tracing::warn!(?err, "Failed to get SDK");
             LogError::SdkNotAvailable { msg: "not found" }
         })?;
-        if let Err(e) = ensure_symbol_index_registered(&sdk).await {
+        if let Err(e) = ensure_symbol_index_registered(&sdk) {
             tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
         let mut args = vec![

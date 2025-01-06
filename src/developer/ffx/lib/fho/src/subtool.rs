@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{FhoEnvironment, FhoToolMetadata, ToolIO, TryFromEnv};
+use crate::{FhoEnvironment, ToolIO, TryFromEnv};
 use argh::{ArgsInfo, CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use ffx_command::{
@@ -11,6 +11,7 @@ use ffx_command::{
 };
 use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
+use fho_metadata::FhoToolMetadata;
 use std::fs::File;
 use std::os::unix::process::ExitStatusExt;
 use std::path::PathBuf;
@@ -238,9 +239,10 @@ mod tests {
     // This keeps the macros from having compiler errors.
     use crate as fho;
     use crate::testing::*;
-    use crate::{FhoDetails, Only, SimpleWriter};
+    use crate::SimpleWriter;
     use async_trait::async_trait;
     use fho_macro::FfxTool;
+    use fho_metadata::{FhoDetails, Only};
 
     // The main testing part will happen in the `main()` function of the tool.
     #[fuchsia_async::run_singlethreaded(test)]

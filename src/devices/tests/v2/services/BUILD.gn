@@ -51,11 +51,9 @@ rustc_test("bin") {
     ":fuchsia.services.test_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
-    "//sdk/rust/zx",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
-    "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
   ]
 }

@@ -11,7 +11,6 @@
 
 #include <utility>
 
-#include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>

@@ -257,18 +257,6 @@ std::unique_ptr<ElfLib> ElfLib::Create(std::function<bool(uint64_t, std::vector<
     CallbackAccessor(std::function<bool(uint64_t, std::vector<uint8_t>*)> fetch) : fetch_(fetch) {}
 
     const uint8_t* GetMemory(uint64_t offset, size_t size) override {
-#ifndef NDEBUG
-      auto iter = data_.upper_bound(offset);
-
-      if (iter != data_.begin()) {
-        --iter;
-      }
-
-      if (iter != data_.end() && iter->first <= offset &&
-          iter->first + iter->second.size() > offset) {
-        ZX_DEBUG_ASSERT(iter->first == offset && iter->second.size() == size);
-      }
-#endif  // NDEBUG
       for (const auto& range : data_[offset]) {
         if (range.size() >= size) {
           return range.data();

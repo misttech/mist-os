@@ -134,9 +134,14 @@ def _fuchsia_board_configuration_impl(ctx):
 
             board_files.append(source_file)
             paths_map[source_file.path] = dest
+
+        board_scripts_input_file = ctx.actions.declare_file(ctx.label.name + "_script_inputs.json")
+        ctx.actions.write(board_scripts_input_file, json.encode(paths_map))
+        board_files.append(board_scripts_input_file)
+
         args += [
-            "--script-inputs",
-            str(paths_map),
+            "--script-inputs-path",
+            board_scripts_input_file.path,
         ]
 
     content = json.encode_indent(board_config, indent = "  ")
@@ -155,6 +160,7 @@ def _fuchsia_board_configuration_impl(ctx):
         inputs = board_files,
         executable = ctx.executable._establish_board_config_dir,
         arguments = args,
+        progress_message = "Build board configuration for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
     )
     board_files.append(board_config_dir)

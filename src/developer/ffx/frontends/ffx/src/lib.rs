@@ -5,7 +5,7 @@
 use anyhow::Result;
 use ffx_core as _;
 use ffx_lib_args::FfxBuiltIn;
-
+use fho::FhoEnvironment;
 pub fn ffx_plugin_is_machine_supported() -> bool {
     unreachable!("This is a side effect needed for the jinja template")
 }
@@ -14,9 +14,6 @@ pub fn ffx_plugin_has_schema() -> bool {
     unreachable!("This is a side effect needed for the jinja template")
 }
 
-pub async fn ffx_plugin_impl(
-    _: &Option<std::sync::Arc<dyn ffx_core::Injector>>,
-    _: FfxBuiltIn,
-) -> Result<()> {
+pub async fn ffx_plugin_impl(_: &FhoEnvironment, _: FfxBuiltIn) -> Result<()> {
     unreachable!("This is a side effect needed for the jinja template")
 }

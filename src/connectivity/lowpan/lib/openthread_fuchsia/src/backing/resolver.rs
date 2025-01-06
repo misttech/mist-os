@@ -83,10 +83,10 @@ impl Resolver {
             let dns_list_watcher_fut = async move {
                 loop {
                     let vec = proxy.watch_servers().await?;
-                    info!(tag = "resolver", "getting latest DNS server list: {:?}", vec);
+                    info!(tag = "resolver"; "getting latest DNS server list: {:?}", vec);
                     if let Err(e) = sender.send(vec).await {
                         warn!(
-                            tag = "resolver",
+                            tag = "resolver";
                             "error when sending out latest dns list to process_poll, {:?}", e
                         );
                     }
@@ -103,7 +103,7 @@ impl Resolver {
             }
         } else {
             warn!(
-                tag = "resolver",
+                tag = "resolver";
                 "failed to connect to `DnsServerWatcherMarker`, \
                          DNS upstream query will not be supported"
             );
@@ -145,12 +145,12 @@ impl Resolver {
                             instance.plat_dns_upstream_query_done(context.0, message);
                         }
                         Err(e) => {
-                            warn!(tag = "resolver", "failed to append to `ot::Message`: {}", e);
+                            warn!(tag = "resolver"; "failed to append to `ot::Message`: {}", e);
                         }
                     }
                 } else {
                     warn!(
-                        tag = "resolver",
+                        tag = "resolver";
                         "failed to create `ot::Message`, drop the upstream DNS response"
                     );
                 }
@@ -175,7 +175,7 @@ impl Resolver {
             Ok(socket) => socket,
             Err(_) => {
                 warn!(
-                    tag = "resolver",
+                    tag = "resolver";
                     "on_start_dns_upstream_query() failed to create UDP socket, ignoring the query"
                 );
                 return;
@@ -197,14 +197,14 @@ impl Resolver {
                                 ipv4_sock_addr.port,
                             );
                             info!(
-                                tag = "resolver",
+                                tag = "resolver";
                                 "sending DNS query to IPv4 server {}", sock_addr
                             );
                             if let Some(Err(e)) =
                                 socket.send_to(&query_bytes, sock_addr).now_or_never()
                             {
                                 warn!(
-                                    tag = "resolver",
+                                    tag = "resolver";
                                     "Failed to send DNS query to IPv4 server {}: {}", sock_addr, e
                                 );
                             }
@@ -218,14 +218,14 @@ impl Resolver {
                             );
 
                             info!(
-                                tag = "resolver",
+                                tag = "resolver";
                                 "sending DNS query to IPv6 server {}", sock_addr
                             );
                             if let Some(Err(e)) =
                                 socket.send_to(&query_bytes, sock_addr).now_or_never()
                             {
                                 warn!(
-                                    tag = "resolver",
+                                    tag = "resolver";
                                     "Failed to send DNS query to IPv6 server {}: {}", sock_addr, e
                                 );
                             }
@@ -255,7 +255,7 @@ impl Resolver {
                     receive_from_fut.await.context("error receiving from dns upstream socket")?;
 
                 info!(
-                    tag = "resolver",
+                    tag = "resolver";
                     "Incoming {} bytes DNS response from {:?}",
                     message_vec.len(),
                     sockaddr
@@ -264,7 +264,7 @@ impl Resolver {
                     sender.send((DnsUpstreamQueryRefWrapper(thread_context), message_vec)).await
                 {
                     warn!(
-                        tag = "resolver",
+                        tag = "resolver";
                         "error when sending out dns upstream reply to process_poll, {:?}", e
                     );
                 }
@@ -279,7 +279,7 @@ impl Resolver {
                 .insert(DnsUpstreamQueryRefWrapper(thread_context), transaction);
         } else {
             warn!(
-                tag = "resolver",
+                tag = "resolver";
                 "on_start_dns_upstream_query() failed to get local_dns_record, ignoring the query"
             );
         }
@@ -301,7 +301,7 @@ impl Resolver {
             self.transactions_map.lock().remove(&DnsUpstreamQueryRefWrapper(thread_context))
         {
             warn!(
-                tag = "resolver",
+                tag = "resolver";
                 "on_cancel_dns_upstream_query() target transaction not presented for remove, ignoring"
             );
         }

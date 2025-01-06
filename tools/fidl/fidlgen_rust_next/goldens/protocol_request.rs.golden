@@ -8,10 +8,10 @@ pub struct Child;
 
 pub mod child {}
 
-/// A helper trait for the `Child` client protocol.
-pub trait ChildClient<___T: ::fidl_next::protocol::Transport> {}
+/// A helper trait for the `Child` client sender.
+pub trait ChildClientSender<___T: ::fidl_next::protocol::Transport> {}
 
-impl<___T> ChildClient<___T> for ::fidl_next::bind::Client<___T, Child> where
+impl<___T> ChildClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Child> where
     ___T: ::fidl_next::protocol::Transport
 {
 }
@@ -25,17 +25,24 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ChildClientHandler<___T>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }
 
-/// A helper trait for the `Child` server protocol.
-pub trait ChildServer<___T: ::fidl_next::protocol::Transport> {}
+/// A helper trait for the `Child` server sender.
+pub trait ChildServerSender<___T: ::fidl_next::protocol::Transport> {}
 
-impl<___T> ChildServer<___T> for ::fidl_next::bind::Server<___T, Child> where
+impl<___T> ChildServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Child> where
     ___T: ::fidl_next::protocol::Transport
 {
 }
@@ -49,20 +56,30 @@ where
     ___T: ::fidl_next::protocol::Transport,
     ___H: ChildServerHandler<___T>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }
@@ -490,19 +507,19 @@ pub mod parent {
     }
 }
 
-/// A helper trait for the `Parent` client protocol.
-pub trait ParentClient<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `Parent` client sender.
+pub trait ParentClientSender<___T: ::fidl_next::protocol::Transport> {
     fn get_child(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, parent::GetChild>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, parent::GetChild>,
         ::fidl_next::EncodeError,
     >;
 
     fn get_child_request(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, parent::GetChildRequest>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, parent::GetChildRequest>,
         ::fidl_next::EncodeError,
     >;
 
@@ -527,30 +544,30 @@ pub trait ParentClient<___T: ::fidl_next::protocol::Transport> {
         >;
 }
 
-impl<___T> ParentClient<___T> for ::fidl_next::bind::Client<___T, Parent>
+impl<___T> ParentClientSender<___T> for ::fidl_next::bind::ClientSender<___T, Parent>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn get_child(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, parent::GetChild>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, parent::GetChild>,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
-            .send_transaction(881818649151440699, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(881818649151440699, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn get_child_request(
         &self,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, parent::GetChildRequest>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, parent::GetChildRequest>,
         ::fidl_next::EncodeError,
     > {
-        self.untyped()
-            .send_transaction(1096855814967598201, &mut ())
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(1096855814967598201, &mut ())
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn take_child<___R>(
@@ -563,7 +580,7 @@ where
             Encoded<'buf> = crate::WireParentTakeChildRequest,
         >,
     {
-        self.untyped().send_request(4470101341872267920, request)
+        self.as_untyped().send_one_way(4470101341872267920, request)
     }
 
     fn take_child_request<___R>(
@@ -576,7 +593,7 @@ where
             Encoded<'buf> = crate::WireParentTakeChildRequestRequest,
         >,
     {
-        self.untyped().send_request(2333981071306416007, request)
+        self.as_untyped().send_one_way(2333981071306416007, request)
     }
 }
 
@@ -595,17 +612,24 @@ where
     for<'buf> crate::WireParentGetChildRequestResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }
 
-/// A helper trait for the `Parent` server protocol.
-pub trait ParentServer<___T: ::fidl_next::protocol::Transport> {}
+/// A helper trait for the `Parent` server sender.
+pub trait ParentServerSender<___T: ::fidl_next::protocol::Transport> {}
 
-impl<___T> ParentServer<___T> for ::fidl_next::bind::Server<___T, Parent> where
+impl<___T> ParentServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Parent> where
     ___T: ::fidl_next::protocol::Transport
 {
 }
@@ -613,17 +637,31 @@ impl<___T> ParentServer<___T> for ::fidl_next::bind::Server<___T, Parent> where
 /// A server handler for the Parent protocol.
 
 pub trait ParentServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn get_child(&mut self, responder: ::fidl_next::bind::Responder<parent::GetChild>);
+    fn get_child(
+        &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, Parent>,
+
+        responder: ::fidl_next::bind::Responder<parent::GetChild>,
+    );
 
     fn get_child_request(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, Parent>,
+
         responder: ::fidl_next::bind::Responder<parent::GetChildRequest>,
     );
 
-    fn take_child(&mut self, request: ::fidl_next::bind::RequestBuffer<___T, parent::TakeChild>);
+    fn take_child(
+        &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, Parent>,
+
+        request: ::fidl_next::bind::RequestBuffer<___T, parent::TakeChild>,
+    );
 
     fn take_child_request(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, Parent>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, parent::TakeChildRequest>,
     );
 }
@@ -639,42 +677,52 @@ where
     for<'buf> crate::WireParentTakeChildRequestRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             4470101341872267920 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.take_child(buffer);
+                handler.take_child(sender, buffer);
             }
 
             2333981071306416007 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.take_child_request(buffer);
+                handler.take_child_request(sender, buffer);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
             881818649151440699 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.get_child(responder);
+                handler.get_child(sender, responder);
             }
 
             1096855814967598201 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
-                handler.get_child_request(responder);
+                handler.get_child_request(sender, responder);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }

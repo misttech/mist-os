@@ -19,7 +19,7 @@ rustc_test("dhcpv4") {
     "//src/connectivity/network/tests/integration/guest:dhcp_setup",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/diagnostics/log/rust",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
   ]
   sources = [ "src/lib.rs" ]

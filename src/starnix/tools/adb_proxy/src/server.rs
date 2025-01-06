@@ -48,7 +48,7 @@ impl ProxyServer {
     }
 
     pub async fn start(&mut self, port: u32) -> Result<()> {
-        tracing::info!("Connecting to VSOCK protocol");
+        log::info!("Connecting to VSOCK protocol");
         let app_client = connect_to_protocol::<ConnectorMarker>()?;
 
         let (acceptor_remote, acceptor_client) = endpoints::create_endpoints::<AcceptorMarker>();
@@ -56,12 +56,12 @@ impl ProxyServer {
 
         app_client.listen(port, acceptor_remote).await?.map_err(zx::Status::from_raw)?;
 
-        tracing::info!("Listening for VSOCK connections.");
+        log::info!("Listening for VSOCK connections.");
 
         while let Some(Ok(AcceptorRequest::Accept { addr: _addr, responder })) =
             acceptor_client.next().await
         {
-            tracing::info!("Incoming VSOCK connection.");
+            log::info!("Incoming VSOCK connection.");
             let (data_socket, client_end, con) = make_con().context("Making connection")?;
             self.connections.push(client_end);
             responder.send(Some(con)).context("Sending con")?;
@@ -69,7 +69,7 @@ impl ProxyServer {
             match handle_connection(data_socket).await {
                 Ok(_) => (),
                 Err(e) => {
-                    tracing::error!("Failed to handle connection: {:?}", e);
+                    log::error!("Failed to handle connection: {:?}", e);
                     continue;
                 }
             };

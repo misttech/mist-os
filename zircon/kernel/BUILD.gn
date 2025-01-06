@@ -806,7 +806,6 @@ if (is_kernel) {
 
   kernel_package("zircon") {
     if (use_elf_kernel) {
-      assert(current_cpu != "x64", "use_elf_kernel=true not supported on x86")
       deps = [ ":physzircon" ]
     } else {
       deps = [
@@ -938,7 +937,7 @@ if (is_kernel) {
     testonly = true
 
     # This logic is specific to the x86 kernel when loaded as a ZBI.
-    if (target_cpu == "x64") {
+    if (target_cpu == "x64" && !use_elf_kernel) {
       public_deps = [ ":big-kernel.rsp" ]
       public_configs = [ ":rust-big-kernel.config" ]
     }

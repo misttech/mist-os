@@ -48,7 +48,7 @@ impl CoreDumpList {
         }
         let mut list = self.list.lock();
         list.add_entry(|crash_node| {
-            log_debug!(core_dump_info.linux_pid, %argv, "Recording task with a coredump.");
+            log_debug!(linux_pid = core_dump_info.linux_pid, argv:%; "Recording task with a coredump.");
             crash_node.record_uint("thread_koid", core_dump_info.thread_koid.raw_koid());
             crash_node.record_uint("process_koid", core_dump_info.process_koid.raw_koid());
             crash_node.record_int("pid", core_dump_info.linux_pid);

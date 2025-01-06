@@ -15,6 +15,7 @@ mod args_info;
 mod describe;
 mod ffx;
 mod metrics;
+mod subcommand;
 mod tools;
 
 // Re-export the top level elements
@@ -27,8 +28,8 @@ pub use ffx_command_error::{
     bug, exit_with_code, return_bug, return_user_error, user_error, Error, FfxContext,
     NonFatalError, Result,
 };
-
 pub use metrics::{analytics_command, send_enhanced_analytics, MetricsSession};
+pub use subcommand::ExternalSubToolSuite;
 pub use tools::{FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite};
 
 fn stamp_file(stamp: &Option<String>) -> Result<Option<File>> {

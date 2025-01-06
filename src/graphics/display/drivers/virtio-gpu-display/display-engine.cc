@@ -31,6 +31,7 @@
 #include "src/graphics/display/drivers/virtio-gpu-display/imported-image.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-pci-device.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/alpha-mode.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -243,11 +244,13 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
   // TODO(costan): fidl::Arena may allocate memory and crash. Find a way to get
   // control over memory allocation.
   fidl::Arena arena;
-  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
-  constraints.usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
-                        .display(fuchsia_sysmem2::wire::kDisplayUsageLayer)
-                        .Build());
-  constraints.buffer_memory_constraints(
+  auto buffer_collection_constraints_builder =
+      fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  buffer_collection_constraints_builder.usage(
+      fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+          .display(fuchsia_sysmem2::wire::kDisplayUsageLayer)
+          .Build());
+  buffer_collection_constraints_builder.buffer_memory_constraints(
       fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
           .min_size_bytes(0)
           .max_size_bytes(std::numeric_limits<uint32_t>::max())
@@ -257,18 +260,19 @@ zx::result<> DisplayEngine::SetBufferCollectionConstraints(
           .cpu_domain_supported(true)
           .Build());
 
-  constraints.image_format_constraints(
-      std::vector{fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
-                      .pixel_format(kSupportedPixelFormat.ToFidl())
-                      .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
-                      .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
-                      .bytes_per_row_divisor(4)
-                      .Build()});
+  const fuchsia_sysmem2::wire::ImageFormatConstraints image_format_constraints[] = {
+      fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena)
+          .pixel_format(kSupportedPixelFormat.ToFidl())
+          .pixel_format_modifier(fuchsia_images2::wire::PixelFormatModifier::kLinear)
+          .color_spaces(std::array{fuchsia_images2::wire::ColorSpace::kSrgb})
+          .bytes_per_row_divisor(4)
+          .Build()};
+  buffer_collection_constraints_builder.image_format_constraints(image_format_constraints);
 
   fidl::OneWayStatus set_constraints_status =
       imported_buffer_collection->sysmem_client()->SetConstraints(
           fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena)
-              .constraints(constraints.Build())
+              .constraints(buffer_collection_constraints_builder.Build())
               .Build());
   if (!set_constraints_status.ok()) {
     FDF_LOG(ERROR, "SetConstraints() FIDL call failed: %s", set_constraints_status.status_string());
@@ -296,7 +300,7 @@ zx::result<> DisplayEngine::SetMinimumRgb(uint8_t minimum_rgb) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-DisplayEngine::DisplayEngine(DisplayEngineEventsInterface* engine_events,
+DisplayEngine::DisplayEngine(display::DisplayEngineEventsInterface* engine_events,
                              fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
                              std::unique_ptr<VirtioGpuDevice> gpu_device)
     : imported_images_(std::move(sysmem_client)),
@@ -311,7 +315,8 @@ DisplayEngine::~DisplayEngine() = default;
 // static
 zx::result<std::unique_ptr<DisplayEngine>> DisplayEngine::Create(
     fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client, zx::bti bti,
-    std::unique_ptr<virtio::Backend> backend, DisplayEngineEventsInterface* engine_events) {
+    std::unique_ptr<virtio::Backend> backend,
+    display::DisplayEngineEventsInterface* engine_events) {
   zx::result<std::unique_ptr<VirtioPciDevice>> virtio_device_result =
       VirtioPciDevice::Create(std::move(bti), std::move(backend));
   if (!virtio_device_result.is_ok()) {

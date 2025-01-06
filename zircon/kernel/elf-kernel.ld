@@ -180,8 +180,9 @@ SECTIONS {
     KEEP(*(asan_globals))
     PROVIDE_HIDDEN(__stop_asan_globals = .);
 
+    /* TODO(https://fxbug.dev/384994543): Alignment should actually be 8 if present. */
     *(.data.rel.ro*)
-    ASSERT(ALIGNOF(.data.rel.ro) == 8 || SIZEOF(.data.rel.ro) == 0,
+    ASSERT(ALIGNOF(.data.rel.ro) <= 32 || SIZEOF(.data.rel.ro) == 0,
            ".data.rel.ro overalignment -> padding gaps");
   }
 

@@ -11,4 +11,4 @@
 //
 // runtime_get_id() -> 14
 // In this driver's domain a() -> 10.
-int64_t DriverStart() { return runtime_get_id() + a(); }
+int64_t DriverStart(uint64_t* data, int data_len) { return runtime_get_id() + a(); }

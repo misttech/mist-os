@@ -9,12 +9,22 @@ rustc_library("ebpf-api") {
   edition = "2021"
 
   sources = [
+    "src/helpers.rs",
     "src/lib.rs",
+    "src/maps/mod.rs",
+    "src/maps/vmar.rs",
     "src/program_type.rs",
   ]
   deps = [
+    "//sdk/rust/zx",
+    "//src/lib/dense-map",
+    "//src/lib/diagnostics/inspect/contrib/stubs:inspect_stubs",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
     "//src/starnix/lib/ebpf",
     "//src/starnix/lib/linux_uapi",
+    "//third_party/rust_crates:smallvec",
+    "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:zerocopy",
   ]
 

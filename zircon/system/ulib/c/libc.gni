@@ -296,6 +296,7 @@ template("libc_source_set") {
         if (defined(invoker.non_test_deps)) {
           deps += invoker.non_test_deps
         }
+        deps += [ "$libc:libc_source_set.deps" ]
         if (suffix != "") {
           configs += [ "$libc:llvm-libc-function-attr.config" ]
         }
@@ -325,6 +326,7 @@ template("libc_source_set") {
     if (defined(invoker.testonly_deps)) {
       deps += invoker.testonly_deps
     }
+    deps += [ "$libc:libc_test.deps" ]
   }
 }
 
@@ -406,7 +408,7 @@ template("libc_test") {
       configs += invoker.configs
     }
 
-    deps += [ "//zircon/system/ulib/zxtest" ]
+    deps += [ "$libc:libc_test.deps" ]
   }
 }
 

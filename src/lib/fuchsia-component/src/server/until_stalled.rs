@@ -210,12 +210,6 @@ impl<ServiceObjTy: ServiceObjTrait> StallableServiceFs<ServiceObjTy> {
             is_terminated: false,
         }
     }
-
-    /// Returns an [`ActiveGuard`] that will prevent the [`ServiceFs`] from shutting down until
-    /// the [`ActiveGuard`] is dropped.
-    pub fn active_guard(&self) -> ActiveGuard {
-        self.connector.scope.active_guard()
-    }
 }
 
 #[cfg(test)]

@@ -37,11 +37,15 @@ zx_status_t AmlogicSecureMemDevice::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t AmlogicSecureMemDevice::Bind() {
-  zx_status_t status = ZX_OK;
-  status = ddk::PDevFidl::FromFragment(parent(), &pdev_proto_client_);
-  if (status != ZX_OK) {
-    LOG(ERROR, "Unable to get pdev protocol - status: %d", status);
-    return status;
+  fdf::PDev pdev;
+  {
+    zx::result result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>("pdev");
+    if (result.is_error()) {
+      LOG(ERROR, "Failed to connect to platform device: %s", result.status_string());
+      return result.status_value();
+    }
+    pdev = fdf::PDev{std::move(result.value())};
   }
 
   zx::result sysmem = DdkConnectNsProtocol<fuchsia_hardware_sysmem::Sysmem>(parent());
@@ -61,13 +65,14 @@ zx_status_t AmlogicSecureMemDevice::Bind() {
 
   // See note on the constraints of |bti_| in the header.
   constexpr uint32_t kBtiIndex = 0;
-  status = pdev_proto_client_.GetBti(kBtiIndex, &bti_);
-  if (status != ZX_OK) {
-    LOG(ERROR, "Unable to get bti handle - status: %d", status);
-    return status;
+  zx::result bti = pdev.GetBti(kBtiIndex);
+  if (bti.is_error()) {
+    LOG(ERROR, "Failed to get BTI: %s", bti.status_string());
+    return bti.status_value();
   }
+  bti_ = std::move(bti.value());
 
-  status = CreateAndServeSysmemTee();
+  zx_status_t status = CreateAndServeSysmemTee();
   if (status != ZX_OK) {
     LOG(ERROR, "CreateAndServeSysmemTee() failed - status: %d", status);
     return status;

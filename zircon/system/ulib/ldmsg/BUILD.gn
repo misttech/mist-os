@@ -18,7 +18,7 @@ zx_library("ldmsg") {
     "//sdk/lib/fidl_base:fidl_txn_header",
 
     # It uses <string.h> for memcpy.
-    "//zircon/system/ulib/c:headers",
+    "//zircon/system/ulib/c/include:headers",
   ]
 
   configs += [

@@ -203,7 +203,6 @@ def normalize_product(
     files_to_normalize.append("build_info.version")
     files_to_normalize.append("build_info.jiri_snapshot")
     files_to_normalize.append("build_info.latest_commit_date")
-    files_to_normalize.append("build_info.minimum_utc_stamp")
     normalize_files_in_config(product, files_to_normalize, root_dir)
 
     if "packages" in product:

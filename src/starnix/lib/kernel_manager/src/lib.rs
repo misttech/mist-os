@@ -11,13 +11,13 @@ use fuchsia_component::client as fclient;
 use fuchsia_sync::Mutex;
 use futures::{FutureExt, TryStreamExt};
 use kernels::Kernels;
+use log::warn;
 use rand::Rng;
 use std::cell::RefCell;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::rc::Rc;
 use std::sync::Arc;
-use tracing::warn;
 use zx::{AsHandleRef, Task};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -328,7 +328,7 @@ async fn suspend_container(
         if wait_item.pending.contains(RUNNER_SIGNAL) {
             let koid = wait_item.handle.get_koid().unwrap();
             if let Some(event) = resume_events.events.get(&koid) {
-                tracing::info!("Woke from sleep for: {}", event.name);
+                log::info!("Woke from sleep for: {}", event.name);
             }
         }
     }
@@ -490,7 +490,7 @@ async fn start_proxy(
             match result {
                 Ok(result) => result,
                 Err(e) => {
-                    tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
+                    log::warn!("Failed to wait on proxied channels in runner: {:?}", e);
                     break 'outer;
                 }
             }
@@ -520,7 +520,7 @@ async fn start_proxy(
         };
 
         if result.is_err() {
-            tracing::warn!(
+            log::warn!(
                 "Proxy failed to forward message {} kernel",
                 match finished_wait {
                     WaitReturn::Container => "from",
@@ -577,7 +577,7 @@ fn forward_message(
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
+                    log::warn!("Failed to wait on proxied channels in runner: {:?}", e);
                     return Err(anyhow!("Failed to wait on signal from kernel"));
                 }
             };
@@ -621,7 +621,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
                         continue;
                     }
                     Err(e) => {
-                        tracing::warn!("Failed process suspension: {:?}", e);
+                        log::warn!("Failed process suspension: {:?}", e);
                         return Err(e.into());
                     }
                 };
@@ -638,7 +638,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
                         zx::MonotonicInstant::after(zx::MonotonicDuration::INFINITE),
                     ) {
                         Err(e) => {
-                            tracing::warn!("Error waiting for task suspension: {:?}", e);
+                            log::warn!("Error waiting for task suspension: {:?}", e);
                             return Err(e.into());
                         }
                         _ => {}

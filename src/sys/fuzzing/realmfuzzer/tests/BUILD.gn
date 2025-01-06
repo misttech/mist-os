@@ -14,7 +14,7 @@ group("tests") {
   ]
 }
 
-executable("fuzzer-bin") {
+executable("adapter") {
   testonly = true
   output_name = "realmfuzzer_test_fuzzer"
   deps = [
@@ -26,10 +26,11 @@ executable("fuzzer-bin") {
   exclude_toolchain_tags = [ "instrumented" ]
 }
 
-fuchsia_test_component("fuzzer") {
-  manifest = "meta/fuzzer.cml"
+fuchsia_test_component("adapter-component") {
+  component_name = "adapter"
+  manifest = "meta/adapter.cml"
   deps = [
-    ":fuzzer-bin",
+    ":adapter",
     "//src/sys/fuzzing/common/testing/data:corpus",
   ]
 }
@@ -56,7 +57,7 @@ fuchsia_test_package("integration-tests-pkg") {
   package_name = "realmfuzzer-integration-tests"
   test_components = [ ":integration-tests" ]
   deps = [
-    ":fuzzer",
+    ":adapter-component",
     "//src/sys/fuzzing/realmfuzzer/coverage",
   ]
 }

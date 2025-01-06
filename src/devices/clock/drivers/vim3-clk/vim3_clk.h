@@ -11,6 +11,7 @@
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/zx/result.h>
 
@@ -83,6 +84,11 @@ class Vim3Clock final : public fdf::DriverBase,
   std::vector<MesonGate> gates_;
   std::vector<MesonPllClock> plls_;
   std::vector<MesonCpuClock> cpu_clks_;
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  fdf_metadata::MetadataServer<fuchsia_hardware_clockimpl::ClockIdsMetadata>
+      clock_ids_metadata_server_;
+#endif
 };
 
 }  // namespace vim3_clock

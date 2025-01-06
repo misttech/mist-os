@@ -84,18 +84,26 @@ class TestDirectory : public fuchsia::io::testing::Directory_TestBase {
 // for the started driver host or driver component.
 class TestPkg {
  public:
-  struct Config {
+  struct ModuleConfig {
     // Where the module is located in the test's package. e.g.
     // /pkg/bin/driver_host2.
-    std::string_view module_test_pkg_path;
+    std::string_view test_pkg_path;
     // The path that will be requested to the /pkg open
     // handler for the module. e.g. bin/driver_host2.
-    std::string_view module_open_path;
-    // The names of the libraries that are needed by the module.
+    std::string_view open_path;
+  };
+
+  struct Config {
+    ModuleConfig main_module;
+    // The names of the libraries that are needed by the main module.
     // This list will be used to construct the test files that the driver host runner
     // or driver runner expects to be present in the "/pkg/libs" dir that will be passed
     // to the dynamic linker. No additional validation is done on the strings in |expected_libs|.
     std::vector<std::string_view> expected_libs;
+    // Modules that need to be load with the main module.
+    // For example, the DFv1 driver to be loaded with the compatibility shim.
+    // Additional libs are not supported.
+    std::vector<ModuleConfig> additional_modules;
   };
 
   // |server| is the channel that will be served by |TestPkg|.
@@ -111,11 +119,12 @@ class TestPkg {
   // or driver runner expects to be present in the "/pkg/libs" dir that will be passed
   // to the dynamic linker. No additional validation is done on the strings in |expected_libs|.
   TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server, std::string_view module_test_pkg_path,
-          std::string_view module_open_path, const std::vector<std::string_view> expected_libs);
+          std::string_view module_open_path, const std::vector<std::string_view> expected_libs,
+          const std::vector<ModuleConfig> additional_modules_configs = std::vector<ModuleConfig>());
 
   TestPkg(fidl::ServerEnd<fuchsia_io::Directory> server, Config config)
-      : TestPkg(std::move(server), config.module_test_pkg_path, config.module_open_path,
-                config.expected_libs) {}
+      : TestPkg(std::move(server), config.main_module.test_pkg_path, config.main_module.open_path,
+                config.expected_libs, config.additional_modules) {}
 
   ~TestPkg() {
     loop_.Quit();
@@ -124,6 +133,14 @@ class TestPkg {
 
  private:
   static constexpr std::string_view kLibPathPrefix = "/pkg/lib/";
+
+  struct Module {
+    TestFile file;
+    std::unique_ptr<fidl::Binding<fuchsia::io::File>> binding;
+    // The path that will be requested to the /pkg open
+    // handler for the module. e.g. bin/driver_host2.
+    std::string open_path;
+  };
 
   async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
 
@@ -137,6 +154,9 @@ class TestPkg {
 
   TestFile module_;
   fidl::Binding<fuchsia::io::File> module_binding_{&module_};
+
+  // The fake test files and bindings for the additional modules.
+  std::vector<Module> additional_modules_;
 };
 
 }  // namespace test_utils

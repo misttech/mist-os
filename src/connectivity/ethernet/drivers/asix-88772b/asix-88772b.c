@@ -148,7 +148,7 @@ static void queue_interrupt_requests_locked(ax88772b_t* eth) {
 static void ax88772b_recv(ax88772b_t* eth, usb_request_t* request) {
   size_t len = request->response.actual;
   uint8_t* pkt;
-  zx_status_t status = usb_request_mmap(request, (void*)&pkt);
+  zx_status_t status = usb_request_mmap(request, (void**)&pkt);
   if (status != ZX_OK) {
     zxlogf(ERROR, "ax88772b: usb_request_mmap failed: %d", status);
     return;
@@ -307,7 +307,7 @@ static void ax88772b_interrupt_complete(void* ctx, usb_request_t* request) {
     uint8_t status[INTR_REQ_SIZE];
     memset(status, 0, INTR_REQ_SIZE);
     __UNUSED size_t result = usb_request_copy_from(request, status, sizeof(status), 0);
-    if (memcmp(eth->status, status, sizeof(eth->status))) {
+    if (memcmp(eth->status, status, sizeof(eth->status)) != 0) {
       const uint8_t* b = status;
       zxlogf(DEBUG, "ax88772b: status changed: %02X %02X %02X %02X %02X %02X %02X %02X", b[0], b[1],
              b[2], b[3], b[4], b[5], b[6], b[7]);
@@ -327,7 +327,7 @@ static void ax88772b_interrupt_complete(void* ctx, usb_request_t* request) {
         usb_request_t* req;
         list_for_every_entry_safe (&eth->free_read_reqs, req_int, prev, usb_req_internal_t, node) {
           list_delete(&req_int->node);
-          req = REQ_INTERNAL_TO_USB_REQ(req_int, eth->parent_req_size);
+          req = req_internal_to_usb_req(req_int, eth->parent_req_size);
           usb_request_complete_callback_t complete = {
               .callback = ax88772b_read_complete,
               .ctx = eth,
@@ -372,7 +372,7 @@ static void ax88772b_queue_tx(void* ctx, uint32_t options, ethernet_netbuf_t* ne
     return;
   }
   usb_req_internal_t* req_int = containerof(node, usb_req_internal_t, node);
-  usb_request_t* request = REQ_INTERNAL_TO_USB_REQ(req_int, eth->parent_req_size);
+  usb_request_t* request = req_internal_to_usb_req(req_int, eth->parent_req_size);
 
   status = ax88772b_send(eth, request, netbuf);
 

@@ -42,7 +42,7 @@ impl Drop for GlobalInitHandle {
 
             // SAFETY: Basic FFI call. This won't be called unless either no GlobalInitHandle has
             // been previously constructed or the cleanup routine has already been called.
-            unsafe { symbolizer_sys::symbolizer_global_init() };
+            unsafe { symbolizer_sys::symbolizer_global_cleanup() };
         }
         *state -= 1;
     }

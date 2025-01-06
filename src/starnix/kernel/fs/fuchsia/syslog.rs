@@ -38,7 +38,7 @@ impl FileOps for SyslogFile {
         debug_assert!(offset == 0);
         data.read_each(&mut |bytes| {
             #[cfg(not(feature = "starnix_lite"))]
-            log_info!(tag = "stdio", "{}", String::from_utf8_lossy(bytes));
+            log_info!(tag = "stdio"; "{}", String::from_utf8_lossy(bytes));
             #[cfg(feature = "starnix_lite")]
             print!("{}", String::from_utf8_lossy(bytes));
             Ok(bytes.len())

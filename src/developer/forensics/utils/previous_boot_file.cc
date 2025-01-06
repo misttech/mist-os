@@ -14,11 +14,6 @@
 
 namespace forensics {
 
-PreviousBootFile PreviousBootFile::FromData(const bool is_first_instance, const std::string& file) {
-  return PreviousBootFile(is_first_instance, files::JoinPath("/tmp", file),
-                          files::JoinPath("/data", file));
-}
-
 PreviousBootFile PreviousBootFile::FromCache(const bool is_first_instance,
                                              const std::string& file) {
   return PreviousBootFile(is_first_instance, files::JoinPath("/tmp", file),

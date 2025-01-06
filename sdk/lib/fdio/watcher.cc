@@ -6,7 +6,7 @@
 #include <lib/zxio/types.h>
 #include <zircon/types.h>
 
-#include "sdk/lib/fdio/fdio_unistd.h"
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/internal.h"
 
 namespace {
@@ -21,7 +21,7 @@ struct ZxioCallbackAdapterContext {
 
 __EXPORT
 zx_status_t fdio_watch_directory(int dirfd, watchdir_func_t cb, zx_time_t deadline, void* cookie) {
-  const fbl::RefPtr<fdio> io = fd_to_io(dirfd);
+  const fbl::RefPtr<fdio> io = fdio_global_state().fd_to_io(dirfd);
   if (io == nullptr || cb == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }

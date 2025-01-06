@@ -69,7 +69,6 @@ since this needs to be pass to each invocation of bazel.
 ```bash
 $ export FUCHSIA_SDK_PATH="$(fx get-build-dir)/$(${FUCHSIA_DIR}/build/api/client print bazel_sdk_info | fx jq -r '.[] .location')"
 $ export RULES_FUCHSIA_PATH="$(fx get-build-dir)/$(${FUCHSIA_DIR}/build/api/client print rules_fuchsia_info | fx jq -r '.[] .location')"
-$ export FUCHSIA_SDK_PATH="$(fx bazel info output_base)/external/fuchsia_sdk"
 $ export SDK_OVERRIDE="--override_repository=fuchsia_sdk=$FUCHSIA_SDK_PATH --override_repository=rules_fuchsia=$RULES_FUCHSIA_PATH"
 ```
 

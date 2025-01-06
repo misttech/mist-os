@@ -34,6 +34,7 @@ BUILD_TYPES = struct(
 INPUT_DEVICE_TYPE = struct(
     BUTTON = "button",
     KEYBOARD = "keyboard",
+    LIGHT_SENSOR = "lightsensor",
     MOUSE = "mouse",
     TOUCHSCREEN = "touchscreen",
 )

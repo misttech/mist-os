@@ -64,7 +64,7 @@ impl FfxMain for FidlTool {
     async fn main(self, _writer: SimpleWriter) -> fho::Result<()> {
         let Self { cmd, sdk, launcher_proxy } = self;
 
-        if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk).await {
+        if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk) {
             tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }
 

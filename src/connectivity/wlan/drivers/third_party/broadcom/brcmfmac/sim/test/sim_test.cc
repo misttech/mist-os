@@ -168,8 +168,9 @@ void SimInterface::RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync
   if (request->status_code() == wlan_ieee80211::StatusCode::kSuccess) {
     ++stats_.roam_successes;
     ZX_ASSERT(request->has_selected_bssid());
-    ZX_ASSERT(request->selected_bssid().size() == ETH_ALEN);
-    memcpy(assoc_ctx_.bssid.byte, request->selected_bssid().data(), ETH_ALEN);
+    auto bssid = request->selected_bssid();
+    ZX_ASSERT(bssid.size() == ETH_ALEN);
+    memcpy(assoc_ctx_.bssid.byte, bssid.data(), ETH_ALEN);
   } else {
     assoc_ctx_.state = AssocContext::kNone;
   }
@@ -189,8 +190,9 @@ void SimInterface::RoamResultInd(RoamResultIndRequestView request,
   if (request->status_code() == wlan_ieee80211::StatusCode::kSuccess) {
     stats_.connect_successes++;
     ZX_ASSERT(request->has_selected_bssid());
-    ZX_ASSERT(request->selected_bssid().size() == ETH_ALEN);
-    memcpy(assoc_ctx_.bssid.byte, request->selected_bssid().data(), ETH_ALEN);
+    auto bssid = request->selected_bssid();
+    ZX_ASSERT(bssid.size() == ETH_ALEN);
+    memcpy(assoc_ctx_.bssid.byte, bssid.data(), ETH_ALEN);
   } else {
     assoc_ctx_.state = AssocContext::kNone;
   }

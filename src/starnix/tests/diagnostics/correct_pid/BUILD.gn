@@ -31,7 +31,7 @@ rustc_binary("starnix_pid_test_bin") {
     "//src/starnix/tests/diagnostics/lib/parse_starnix_inspect",
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 

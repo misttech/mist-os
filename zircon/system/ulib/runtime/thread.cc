@@ -81,7 +81,7 @@ static zx_handle_t take_handle(zxr_internal_thread_t* thread, int expected_state
   return tmp;
 }
 
-static _Noreturn void exit_non_detached(zxr_internal_thread_t* thread) {
+[[noreturn]] static void exit_non_detached(zxr_internal_thread_t* thread) {
   // Wake the _zx_futex_wait in zxr_thread_join (below), and then die.
   // This has to be done with the special four-in-one vDSO call because
   // as soon as the state transitions to DONE, the joiner is free to unmap
@@ -94,7 +94,7 @@ static _Noreturn void exit_non_detached(zxr_internal_thread_t* thread) {
   CRASH_WITH_UNIQUE_BACKTRACE();
 }
 
-static _Noreturn void thread_trampoline(uintptr_t ctx, uintptr_t arg) {
+[[noreturn]] static void thread_trampoline(uintptr_t ctx, uintptr_t arg) {
   zxr_internal_thread_t* thread = reinterpret_cast<zxr_internal_thread_t*>(ctx);
 
   thread->entry(reinterpret_cast<void*>(arg));
@@ -116,10 +116,11 @@ static _Noreturn void thread_trampoline(uintptr_t ctx, uintptr_t arg) {
   CRASH_WITH_UNIQUE_BACKTRACE();
 }
 
-_Noreturn void zxr_thread_exit_unmap_if_detached(zxr_thread_t* thread, void (*if_detached)(void*),
-                                                 void* if_detached_arg,
+[[noreturn]] void zxr_thread_exit_unmap_if_detached(zxr_thread_t* thread,
+                                                    void (*if_detached)(void*),
+                                                    void* if_detached_arg,
 
-                                                 zx_handle_t vmar, uintptr_t addr, size_t len) {
+                                                    zx_handle_t vmar, uintptr_t addr, size_t len) {
   const int old_state = begin_exit(to_internal(thread));
   switch (old_state) {
     case DETACHED: {

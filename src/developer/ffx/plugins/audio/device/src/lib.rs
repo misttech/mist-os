@@ -9,7 +9,7 @@ use crate::list::DeviceQuery;
 use async_trait::async_trait;
 use blocking::Unblock;
 use ffx_audio_device_args::{DeviceCommand, RecordCommand, SetCommand, SetSubCommand, SubCommand};
-use ffx_command::user_error;
+use ffx_command_error::{user_error, Result};
 use ffx_optional_moniker::{exposed_dir, optional_moniker};
 use fho::{moniker, FfxContext, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl::endpoints::{create_proxy, ServerEnd};
@@ -65,7 +65,7 @@ fho::embedded_plugin!(DeviceTool);
 impl FfxMain for DeviceTool {
     type Writer = MachineWriter<DeviceResult>;
 
-    async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
+    async fn main(self, mut writer: Self::Writer) -> Result<()> {
         let registry = self.registry.map(Registry::new);
 
         let devices = {
@@ -203,7 +203,7 @@ async fn device_info(
     registry: Option<&Registry>,
     selector: Selector,
     mut writer: MachineWriter<DeviceResult>,
-) -> fho::Result<()> {
+) -> Result<()> {
     let device_info = info::get_info(dev_class, registry, selector.clone()).await?;
 
     let info_result = info::InfoResult::from((device_info, selector));
@@ -228,7 +228,7 @@ async fn device_play(
     input_reader: Box<dyn Read + Send + 'static>,
     // Input generalized to stdin, file, or test buffer.
     mut writer: MachineWriter<DeviceResult>,
-) -> fho::Result<()> {
+) -> Result<()> {
     // Duplicate socket handle so that connection stays alive in real + testing scenarios.
     let remote_socket = play_remote
         .duplicate_handle(fidl::Rights::SAME_RIGHTS)
@@ -276,7 +276,7 @@ async fn device_record<W, E>(
     mut output_writer: W,
     mut output_error_writer: E,
     keypress_waiter: impl futures::Future<Output = Result<(), std::io::Error>>,
-) -> fho::Result<()>
+) -> Result<()>
 where
     W: AsyncWrite + std::marker::Unpin,
     E: std::io::Write,
@@ -318,7 +318,7 @@ async fn device_set_gain_state(
     device_control: fac::DeviceControlProxy,
     selector: Selector,
     gain_state: fhaudio::GainState,
-) -> fho::Result<()> {
+) -> Result<()> {
     device_control
         .device_set_gain_state(fac::DeviceControlDeviceSetGainStateRequest {
             device: Some(selector.into()),
@@ -331,7 +331,7 @@ async fn device_set_gain_state(
         .bug_context("Failed to set gain state")
 }
 
-fn device_list(devices: list::Devices, mut writer: MachineWriter<DeviceResult>) -> fho::Result<()> {
+fn device_list(devices: list::Devices, mut writer: MachineWriter<DeviceResult>) -> Result<()> {
     let list_result = list::ListResult::from(devices);
     let result = DeviceResult::List(list_result.clone());
     writer
@@ -344,7 +344,7 @@ fn device_list(devices: list::Devices, mut writer: MachineWriter<DeviceResult>) 
 pub fn device_list_untagged(
     devices: list::Devices,
     mut writer: MachineWriter<list::ListResult>,
-) -> fho::Result<()> {
+) -> Result<()> {
     let list_result = list::ListResult::from(devices);
     writer
         .machine_or_else(&list_result, || format!("{}", &list_result))
@@ -355,7 +355,7 @@ async fn device_set(
     device_control: Box<dyn DeviceControl>,
     set_command: SetCommand,
     mut writer: MachineWriter<DeviceResult>,
-) -> fho::Result<()> {
+) -> Result<()> {
     match set_command.subcommand {
         SetSubCommand::DaiFormat(dai_format_cmd) => {
             device_control.set_dai_format(dai_format_cmd.format, dai_format_cmd.element_id).await?;
@@ -381,7 +381,7 @@ mod tests {
     use {fidl_fuchsia_audio_controller as fac, fidl_fuchsia_audio_device as fadevice};
 
     #[fuchsia::test]
-    pub async fn test_play_success() -> Result<(), fho::Error> {
+    pub async fn test_play_success() -> Result<()> {
         let audio_player = ffx_audio_common::tests::fake_audio_player();
 
         let test_buffers = TestBuffers::default();
@@ -424,7 +424,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    pub async fn test_play_from_file_success() -> Result<(), fho::Error> {
+    pub async fn test_play_from_file_success() -> Result<()> {
         let audio_player = ffx_audio_common::tests::fake_audio_player();
 
         let test_buffers = TestBuffers::default();
@@ -477,7 +477,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    pub async fn test_record_no_cancel() -> Result<(), fho::Error> {
+    pub async fn test_record_no_cancel() -> Result<()> {
         // Test without sending a cancel message. Still set up the canceling proxy and server,
         // but never send the message from proxy to daemon to cancel. Test daemon should
         // exit after duration (real daemon exits after sending all duration amount of packets).
@@ -531,7 +531,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    pub async fn test_record_immediate_cancel() -> Result<(), fho::Error> {
+    pub async fn test_record_immediate_cancel() -> Result<()> {
         let controller = ffx_audio_common::tests::fake_audio_recorder();
         let test_buffers = TestBuffers::default();
         let mut result_writer: SimpleWriter = SimpleWriter::new_test(&test_buffers);
@@ -574,7 +574,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    pub async fn test_device_list() -> Result<(), fho::Error> {
+    pub async fn test_device_list() -> Result<()> {
         let test_buffers = TestBuffers::default();
         let writer: MachineWriter<DeviceResult> = MachineWriter::new_test(None, &test_buffers);
 
@@ -603,7 +603,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    pub async fn test_device_list_machine() -> Result<(), fho::Error> {
+    pub async fn test_device_list_machine() -> Result<()> {
         let test_buffers = TestBuffers::default();
         let writer: MachineWriter<list::ListResult> =
             MachineWriter::new_test(Some(ffx_writer::Format::Json), &test_buffers);

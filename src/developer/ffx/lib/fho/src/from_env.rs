@@ -102,10 +102,6 @@ pub struct FhoEnvironment {
     pub context: EnvironmentContext,
     pub behavior: FhoConnectionBehavior,
     pub lookup: Arc<dyn DeviceLookup>,
-
-    /// This should not be public, as the daemon is (slowly) being phased out where possible.
-    #[deprecated]
-    pub injector: Option<Arc<dyn Injector>>,
 }
 
 impl FhoEnvironment {
@@ -213,10 +209,19 @@ impl FhoEnvironment {
             behavior: crate::from_env::connection_behavior(&ffx, &injector, &context).await?,
             ffx: ffx.clone(),
             context: context.clone(),
-            injector,
             lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
         };
         Ok(env)
+    }
+
+    pub fn new_for_test(
+        context: &EnvironmentContext,
+        ffx: &FfxCommandLine,
+        behavior: FhoConnectionBehavior,
+        lookup: Arc<dyn DeviceLookup>,
+    ) -> Self {
+        #[allow(deprecated)] // injector field.
+        FhoEnvironment { behavior, ffx: ffx.clone(), context: context.clone(), lookup }
     }
 }
 
@@ -336,7 +341,7 @@ async fn daemon_try_connect<T: TryFromEnv>(
 ) -> Result<T> {
     loop {
         return match T::try_from_env(env).await {
-            Err(ffx_command::Error::User(e)) => {
+            Err(ffx_command_error::Error::User(e)) => {
                 match e.downcast::<target_errors::FfxTargetError>() {
                     Ok(target_errors::FfxTargetError::DaemonError {
                         err: ffx_fidl::DaemonError::Timeout,
@@ -430,8 +435,8 @@ async fn direct_connector_try_connect<T: TryFromEnv>(
 }
 
 impl<T: TryFromEnv> Connector<T> {
-    pub const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
-    pub const KNOCK_TARGET_TIMEOUT: Duration = ffx_target::DEFAULT_RCS_KNOCK_TIMEOUT;
+    const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
+    const KNOCK_TARGET_TIMEOUT: Duration = ffx_target::DEFAULT_RCS_KNOCK_TIMEOUT;
 
     /// Try to get a `T` from the environment. Will wait for the target to
     /// appear if it is non-responsive. If that occurs, `log_target_wait` will
@@ -486,10 +491,12 @@ impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
     }
 }
 
+/// This is prototype code for the daemonless direct-non-strict connection.
 impl<T: TryFromEnv> DirectTargetConnector<T> {
     /// Try to get a `T` from the environment. Will wait for the target to
     /// appear if it is non-responsive. If that occurs, `log_target_wait` will
     /// be called prior to waiting.
+    #[allow(dead_code)]
     pub async fn try_connect(
         &self,
         log_target_wait: impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
@@ -497,9 +504,11 @@ impl<T: TryFromEnv> DirectTargetConnector<T> {
         self.inner.try_connect(log_target_wait).await
     }
 
+    #[allow(dead_code)]
     pub async fn get_address(&self) -> Option<std::net::SocketAddr> {
         self.connector.device_address().await
     }
+    #[allow(dead_code)]
     pub async fn get_ssh_host_address(&self) -> Option<String> {
         self.connector.host_ssh_address().await
     }
@@ -647,7 +656,7 @@ impl TryFromEnv for ffx_config::SdkRoot {
     }
 }
 
-/// The implementation of the decorator returned by [`moniker`] and [`moniker_timeout`]
+/// The implementation of the decorator returned by [`moniker`].
 pub struct WithMoniker<P, D> {
     moniker: String,
     timeout: Duration,
@@ -707,34 +716,9 @@ pub fn moniker<P: Proxy>(
     toolbox_or(moniker)
 }
 
-/// Like [`moniker`], but lets you also specify an override for the default
-/// timeout.
-pub fn moniker_timeout<P: Proxy>(
-    moniker: impl AsRef<str>,
-    timeout_secs: u64,
-) -> WithMoniker<P, DefaultFuchsiaResourceDialect> {
-    WithMoniker {
-        moniker: moniker.as_ref().to_owned(),
-        timeout: Duration::from_secs(timeout_secs),
-        _p: Default::default(),
-    }
-}
-
 /// Same as [`moniker`] but for FDomain
 pub fn moniker_f<P: FProxy>(moniker: impl AsRef<str>) -> WithToolbox<P, FDomainResourceDialect> {
     toolbox_or_f(moniker)
-}
-
-/// Same as [`moniker_timeout`] but for FDomain
-pub fn moniker_timeout_f<P: FProxy>(
-    moniker: impl AsRef<str>,
-    timeout_secs: u64,
-) -> WithMoniker<P, FDomainResourceDialect> {
-    WithMoniker {
-        moniker: moniker.as_ref().to_owned(),
-        timeout: Duration::from_secs(timeout_secs),
-        _p: Default::default(),
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -742,18 +726,6 @@ pub struct DaemonProtocol<P: Clone>(P);
 
 #[derive(Debug, Clone, Default)]
 pub struct WithDaemonProtocol<P>(PhantomData<fn() -> P>);
-
-impl<P: Clone> DaemonProtocol<P> {
-    pub fn new(proxy: P) -> Self {
-        Self(proxy)
-    }
-}
-
-impl<P: Clone> DaemonProtocol<P> {
-    pub fn into_inner(self) -> P {
-        self.0
-    }
-}
 
 impl<P: Clone> std::ops::Deref for DaemonProtocol<P> {
     type Target = P;

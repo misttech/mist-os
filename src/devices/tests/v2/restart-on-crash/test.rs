@@ -47,24 +47,13 @@ async fn get_device_info(
     Ok(device_infos)
 }
 
-async fn wait_for_instance(realm: &fuchsia_component_test::RealmInstance) -> Result<String> {
-    let instance;
-    let service = client::open_service_at_dir::<fcdt::DeviceMarker>(realm.root.get_exposed_dir())
-        .context("Failed to open service")?;
-    loop {
-        // TODO(https://fxbug.dev/42124541): Once component manager supports watching for
-        // service instances, this loop shousld be replaced by a watcher.
-        let entries = fuchsia_fs::directory::readdir(&service)
-            .await
-            .context("Failed to read service instances")?;
-        if let Some(entry) = entries.iter().next() {
-            instance = entry.name.clone();
-            break;
-        }
-        Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
-    }
-
-    return Ok(instance);
+async fn wait_for_instance(realm: &fuchsia_component_test::RealmInstance) -> Result<()> {
+    let _ = client::Service::open_from_dir(realm.root.get_exposed_dir(), fcdt::DeviceMarker)
+        .context("Failed to open service")?
+        .watch_for_any()
+        .await
+        .context("Failed to wait for service instance")?;
+    Ok(())
 }
 
 #[fasync::run_singlethreaded(test)]
@@ -90,7 +79,7 @@ async fn test_restart_on_crash() -> Result<()> {
     realm.driver_test_realm_start(args).await?;
 
     // Find an instance of the `Device` service.
-    let instance = wait_for_instance(&realm).await?;
+    wait_for_instance(&realm).await?;
 
     let driver_dev = realm.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
     let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
@@ -98,12 +87,12 @@ async fn test_restart_on_crash() -> Result<()> {
     let driver_host_koid_1 = device_infos[0].driver_host_koid;
 
     // Connect to the `Device` service.
-    let device = client::connect_to_service_instance_at_dir::<fcdt::DeviceMarker>(
-        realm.root.get_exposed_dir(),
-        &instance,
-    )
-    .context("Failed to open service")?;
-    let crasher = device.connect_to_crasher()?;
+    let crasher = client::Service::open_from_dir(realm.root.get_exposed_dir(), fcdt::DeviceMarker)
+        .context("Failed to open service")?
+        .watch_for_any()
+        .await
+        .context("Failed to wait for service instance")?
+        .connect_to_crasher()?;
     let pong_1 = crasher.ping().await?;
 
     // CRASH
@@ -124,13 +113,12 @@ async fn test_restart_on_crash() -> Result<()> {
     assert_ne!(driver_host_koid_1, driver_host_koid_2);
 
     // Connect to the new one.
-    let instance = wait_for_instance(&realm).await?;
-    let device = client::connect_to_service_instance_at_dir::<fcdt::DeviceMarker>(
-        realm.root.get_exposed_dir(),
-        &instance,
-    )
-    .context("Failed to open service")?;
-    let crasher = device.connect_to_crasher()?;
+    let crasher = client::Service::open_from_dir(realm.root.get_exposed_dir(), fcdt::DeviceMarker)
+        .context("Failed to open service")?
+        .watch_for_any()
+        .await
+        .context("Failed to wait for service instance")?
+        .connect_to_crasher()?;
 
     // Check that it is able to communicate with the new one.
     let pong_2 = crasher.ping().await?;

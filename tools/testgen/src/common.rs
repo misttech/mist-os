@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Error, Result};
-use chrono::Datelike;
-use handlebars::{handlebars_helper, Handlebars};
+use handlebars::Handlebars;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 use tracing::info;
@@ -227,6 +226,10 @@ pub(crate) fn is_not_hidden(entry: &DirEntry) -> bool {
 /// subset of these variables.
 #[derive(Default, serde::Serialize)]
 pub(crate) struct TemplateVars {
+    /// The year to add to copyright notices.
+    /// Example: 2025
+    pub year: String,
+
     /// The name of the component, derived from the name of the input component manifest.
     /// Example: /path/to/my-component.cml -> my-component
     pub component_name: String,
@@ -320,13 +323,7 @@ impl CodeGenerator {
     }
 
     fn install_handlebars_helpers(&mut self) {
-        // Returns the current year.
-        handlebars_helper!(helper_year: |*args| {
-            let _ = args;
-            format!("{}", chrono::Utc::now().year())
-        });
-
-        self.handlebars.register_helper("year", Box::new(helper_year));
+        // Add helpers here.
         self.handlebars.set_strict_mode(true);
     }
 }

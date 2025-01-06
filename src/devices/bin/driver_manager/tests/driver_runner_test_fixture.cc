@@ -68,13 +68,12 @@ zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> LoaderFactory() {
   return zx::ok(std::move(endpoints->client));
 }
 
-std::unique_ptr<driver_loader::Loader> DynamicLinkerFactory(async_dispatcher_t* dispatcher) {
-  auto load_driver_handler = [](zx::unowned_channel bootstrap_sender,
-                                driver_loader::Loader::DriverStartAddr addr) {
-    zx_status_t status = bootstrap_sender->write(0, &addr, sizeof(addr), nullptr, 0);
-    ASSERT_EQ(ZX_OK, status);
-  };
-  return driver_loader::Loader::Create(dispatcher, std::move(load_driver_handler));
+zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHostLauncher>> DynamicLinkerFactory(
+    driver_loader::Loader* loader) {
+  auto [client_end, server_end] =
+      fidl::Endpoints<fuchsia_driver_loader::DriverHostLauncher>::Create();
+  loader->Connect(std::move(server_end));
+  return zx::ok(std::move(client_end));
 }
 
 fdecl::ChildRef CreateChildRef(std::string name, std::string collection) {
@@ -183,13 +182,13 @@ void DriverHostComponentStart(driver_runner::TestRealm& realm,
   }
 }
 
-fidl::ClientEnd<fuchsia_component::Realm> DriverRunnerTest::ConnectToRealm() {
+fidl::ClientEnd<fuchsia_component::Realm> DriverRunnerTestBase::ConnectToRealm() {
   auto realm_endpoints = fidl::Endpoints<fcomponent::Realm>::Create();
   realm_bindings_.AddBinding(dispatcher(), std::move(realm_endpoints.server), &realm_,
                              fidl::kIgnoreBindingClosure);
   return std::move(realm_endpoints.client);
 }
-FakeDriverIndex DriverRunnerTest::CreateDriverIndex() {
+FakeDriverIndex DriverRunnerTestBase::CreateDriverIndex() {
   return FakeDriverIndex(dispatcher(), [](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
     if (args.name().get() == "second") {
       return zx::ok(FakeDriverIndex::MatchResult{
@@ -250,28 +249,53 @@ FakeDriverIndex DriverRunnerTest::CreateDriverIndex() {
     return zx::error(ZX_ERR_NOT_FOUND);
   });
 }
-void DriverRunnerTest::SetupDriverRunner(FakeDriverIndex driver_index) {
+void DriverRunnerTestBase::SetupDriverRunner(FakeDriverIndex driver_index) {
   driver_index_.emplace(std::move(driver_index));
   driver_runner_.emplace(ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory,
                          dispatcher(), false);
   SetupDevfs();
 }
 
-void DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(
+void DriverRunnerTestBase::SetupDriverRunnerWithDynamicLinker(
     async_dispatcher_t* loader_dispatcher,
-    std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner) {
-  driver_index_.emplace(CreateDriverIndex());
+    std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner,
+    FakeDriverIndex driver_index, std::optional<uint32_t> wait_for_num_drivers) {
+  driver_index_.emplace(std::move(driver_index));
+  auto load_driver_handler =
+      [num_drivers_loaded = 0, wait_for_num_drivers](
+          zx::unowned_channel bootstrap_sender,
+          driver_loader::Loader::DynamicLinkingPassiveAbi dl_passive_abi) mutable {
+        ASSERT_EQ(ZX_OK,
+                  bootstrap_sender->write(0, &dl_passive_abi, sizeof(dl_passive_abi), nullptr, 0));
+        num_drivers_loaded++;
+        if (wait_for_num_drivers.has_value() && (wait_for_num_drivers == num_drivers_loaded)) {
+          // Send a message for the driver host to exit.
+          dl_passive_abi = 0;
+          ASSERT_EQ(ZX_OK, bootstrap_sender->write(0, &dl_passive_abi, sizeof(dl_passive_abi),
+                                                   nullptr, 0));
+        }
+      };
+  dynamic_linker_ =
+      driver_loader::Loader::Create(loader_dispatcher, std::move(load_driver_handler));
   driver_runner_.emplace(
       ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory, dispatcher(), false,
       driver_manager::DriverRunner::DynamicLinkerArgs{
-          [dispatcher = loader_dispatcher]() { return DynamicLinkerFactory(dispatcher); },
+          [loader = dynamic_linker_.get()]() { return DynamicLinkerFactory(loader); },
           std::move(driver_host_runner)});
   SetupDevfs();
 }
 
-void DriverRunnerTest::SetupDriverRunner() { SetupDriverRunner(CreateDriverIndex()); }
-void DriverRunnerTest::PrepareRealmForDriverComponentStart(const std::string& name,
-                                                           const std::string& url) {
+void DriverRunnerTestBase::SetupDriverRunnerWithDynamicLinker(
+    async_dispatcher_t* loader_dispatcher,
+    std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner,
+    std::optional<uint32_t> wait_for_num_drivers) {
+  SetupDriverRunnerWithDynamicLinker(loader_dispatcher, std::move(driver_host_runner),
+                                     CreateDriverIndex(), wait_for_num_drivers);
+}
+
+void DriverRunnerTestBase::SetupDriverRunner() { SetupDriverRunner(CreateDriverIndex()); }
+void DriverRunnerTestBase::PrepareRealmForDriverComponentStart(const std::string& name,
+                                                               const std::string& url) {
   realm().SetCreateChildHandler(
       [name, url](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
         EXPECT_EQ("boot-drivers", collection.name());
@@ -279,10 +303,10 @@ void DriverRunnerTest::PrepareRealmForDriverComponentStart(const std::string& na
         EXPECT_EQ(url, decl.url().value());
       });
 }
-void DriverRunnerTest::PrepareRealmForSecondDriverComponentStart() {
+void DriverRunnerTestBase::PrepareRealmForSecondDriverComponentStart() {
   PrepareRealmForDriverComponentStart("dev.second", second_driver_url);
 }
-void DriverRunnerTest::PrepareRealmForStartDriverHost(bool use_next_vdso) {
+void DriverRunnerTestBase::PrepareRealmForStartDriverHost(bool use_next_vdso) {
   constexpr std::string_view kDriverHostName = "driver-host-";
   std::string coll = "driver-hosts";
   realm().SetCreateChildHandler(
@@ -310,7 +334,7 @@ void DriverRunnerTest::PrepareRealmForStartDriverHost(bool use_next_vdso) {
   });
 }
 
-void DriverRunnerTest::PrepareRealmForStartDriverHostDynamicLinker() {
+void DriverRunnerTestBase::PrepareRealmForStartDriverHostDynamicLinker() {
   constexpr std::string_view kCollection = "driver-hosts";
   constexpr std::string_view kDriverHostName = "driver-host-new-";
   constexpr std::string_view kComponentUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
@@ -336,14 +360,14 @@ void DriverRunnerTest::PrepareRealmForStartDriverHostDynamicLinker() {
   });
 }
 
-void DriverRunnerTest::StopDriverComponent(
+void DriverRunnerTestBase::StopDriverComponent(
     fidl::ClientEnd<frunner::ComponentController> component) {
   fidl::WireClient client(std::move(component), dispatcher());
   auto stop_result = client->Stop();
   ASSERT_EQ(ZX_OK, stop_result.status());
   EXPECT_TRUE(RunLoopUntilIdle());
 }
-DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
+DriverRunnerTestBase::StartDriverResult DriverRunnerTestBase::StartDriver(
     Driver driver, std::optional<StartDriverHandler> start_handler,
     fidl::ClientEnd<fuchsia_io::Directory> ns_pkg,
     fidl::ClientEnd<fuchsia_io::Directory> driver_host_pkg) {
@@ -369,7 +393,10 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
 
   fidl::Arena arena;
 
-  fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, 5);
+  // The "compat" field is optional.
+  size_t num_program_entries = (driver.compat == "") ? 5 : 6;
+
+  fidl::VectorView<fdata::wire::DictionaryEntry> program_entries(arena, num_program_entries);
   program_entries[0].key.Set(arena, "binary");
   program_entries[0].value = fdata::wire::DictionaryValue::WithStr(arena, driver.binary);
 
@@ -388,6 +415,11 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
   program_entries[4].key.Set(arena, "use_dynamic_linker");
   program_entries[4].value =
       fdata::wire::DictionaryValue::WithStr(arena, driver.use_dynamic_linker ? "true" : "false");
+
+  if (driver.compat != "") {
+    program_entries[5].key.Set(arena, "compat");
+    program_entries[5].value = fdata::wire::DictionaryValue::WithStr(arena, driver.compat);
+  }
 
   auto program_builder = fdata::wire::Dictionary::Builder(arena);
   program_builder.entries(program_entries);
@@ -426,7 +458,10 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
   // The driver manager is waiting for the component framework to call the driver
   // host runner's component Start implementation. We need to call it
   // now to continue with starting the driver host and subsequently the driver.
-  if (!driver.colocate && driver.use_dynamic_linker) {
+  //
+  // If the driver |Start| request is expected to fail (|driver.close| is true),
+  // then we should not start the driver host.
+  if (!driver.colocate && driver.use_dynamic_linker && !driver.close) {
     DriverHostComponentStart(realm(), *driver_runner().driver_host_runner_for_tests(),
                              std::move(driver_host_pkg));
     RunLoopUntilIdle();
@@ -434,7 +469,29 @@ DriverRunnerTest::StartDriverResult DriverRunnerTest::StartDriver(
 
   return {std::move(started_driver), std::move(controller_endpoints.client)};
 }
-zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDriver() {
+
+DriverRunnerTestBase::StartDriverResult DriverRunnerTestBase::StartDriverWithConfig(
+    Driver driver, std::optional<StartDriverHandler> start_handler,
+    test_utils::TestPkg::Config driver_config, test_utils::TestPkg::Config driver_host_config) {
+  fidl::Endpoints<fuchsia_io::Directory> child_pkg_endpoints;
+  std::unique_ptr<test_utils::TestPkg> child_test_pkg;
+  if (driver.use_dynamic_linker) {
+    child_pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    child_test_pkg =
+        std::make_unique<test_utils::TestPkg>(std::move(child_pkg_endpoints.server), driver_config);
+  }
+  fidl::Endpoints<fuchsia_io::Directory> driver_host_pkg_endpoints;
+  std::unique_ptr<test_utils::TestPkg> driver_host_test_pkg;
+  if (!driver.colocate) {
+    driver_host_pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    driver_host_test_pkg = std::make_unique<test_utils::TestPkg>(
+        std::move(driver_host_pkg_endpoints.server), driver_host_config);
+  }
+  return StartDriver(driver, std::move(start_handler), std::move(child_pkg_endpoints.client),
+                     std::move(driver_host_pkg_endpoints.client));
+}
+
+zx::result<DriverRunnerTestBase::StartDriverResult> DriverRunnerTestBase::StartRootDriver() {
   realm().SetCreateChildHandler(
       [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
         EXPECT_EQ("boot-drivers", collection.name());
@@ -458,8 +515,9 @@ zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDrive
       std::move(start_handler)));
 }
 
-zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDriverDynamicLinking(
-    test_utils::TestPkg::Config driver_host_config, test_utils::TestPkg::Config driver_config) {
+zx::result<DriverRunnerTestBase::StartDriverResult>
+DriverRunnerTestBase::StartRootDriverDynamicLinking(test_utils::TestPkg::Config driver_host_config,
+                                                    test_utils::TestPkg::Config driver_config) {
   PrepareRealmForDriverComponentStart("dev", driver_runner::root_driver_url);
 
   auto start = driver_runner().StartRootDriver(driver_runner::root_driver_url);
@@ -470,7 +528,7 @@ zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDrive
 
   auto pkg_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
   test_utils::TestPkg test_pkg(std::move(pkg_endpoints.server), driver_config);
-  StartDriverHandler start_handler = [pkg_path = driver_config.module_open_path](
+  StartDriverHandler start_handler = [pkg_path = driver_config.main_module.open_path](
                                          driver_runner::TestDriver* driver,
                                          fdfw::DriverStartArgs start_args) {
     ValidateProgram(start_args.program(), pkg_path, "false" /* colocate */,
@@ -485,27 +543,30 @@ zx::result<DriverRunnerTest::StartDriverResult> DriverRunnerTest::StartRootDrive
   return zx::ok(StartDriver(
       {
           .url = driver_runner::root_driver_url,
-          .binary = std::string(driver_config.module_open_path),
+          .binary = std::string(driver_config.main_module.open_path),
           .use_dynamic_linker = true,
       },
       std::move(start_handler), std::move(pkg_endpoints.client),
       std::move(driver_host_pkg_endpoints.client)));
 }
 
-void DriverRunnerTest::Unbind() {
+void DriverRunnerTestBase::Unbind() {
   driver_host_bindings_.CloseAll(ZX_OK);
   EXPECT_TRUE(RunLoopUntilIdle());
 }
-void DriverRunnerTest::ValidateProgram(std::optional<::fuchsia_data::Dictionary>& program,
-                                       std::string_view binary, std::string_view colocate,
-                                       std::string_view host_restart_on_crash,
-                                       std::string_view use_next_vdso,
-                                       std::string_view use_dynamic_linker) {
+
+void DriverRunnerTestBase::ValidateProgram(std::optional<::fuchsia_data::Dictionary>& program,
+                                           std::string_view binary, std::string_view colocate,
+                                           std::string_view host_restart_on_crash,
+                                           std::string_view use_next_vdso,
+                                           std::string_view use_dynamic_linker,
+                                           std::string_view compat) {
   ZX_ASSERT(program.has_value());
   auto& entries_opt = program.value().entries();
   ZX_ASSERT(entries_opt.has_value());
   auto& entries = entries_opt.value();
-  EXPECT_EQ(5u, entries.size());
+  size_t expected_num_entries = (compat == "") ? 5u : 6u;
+  EXPECT_EQ(expected_num_entries, entries.size());
   EXPECT_EQ("binary", entries[0].key());
   EXPECT_EQ(std::string(binary), entries[0].value()->str().value());
   EXPECT_EQ("colocate", entries[1].key());
@@ -516,50 +577,61 @@ void DriverRunnerTest::ValidateProgram(std::optional<::fuchsia_data::Dictionary>
   EXPECT_EQ(std::string(use_next_vdso), entries[3].value()->str().value());
   EXPECT_EQ("use_dynamic_linker", entries[4].key());
   EXPECT_EQ(std::string(use_dynamic_linker), entries[4].value()->str().value());
+  if (compat != "") {
+    EXPECT_EQ("compat", entries[5].key());
+    EXPECT_EQ(std::string(compat), entries[5].value()->str().value());
+  }
 }
-void DriverRunnerTest::AssertNodeBound(const std::shared_ptr<CreatedChild>& child) {
+void DriverRunnerTestBase::AssertNodeBound(const std::shared_ptr<CreatedChild>& child) {
   auto& node = child->node;
   ASSERT_TRUE(node.has_value() && node.value().is_valid());
 }
-void DriverRunnerTest::AssertNodeNotBound(const std::shared_ptr<CreatedChild>& child) {
+void DriverRunnerTestBase::AssertNodeNotBound(const std::shared_ptr<CreatedChild>& child) {
   auto& node = child->node;
   ASSERT_FALSE(node.has_value() && node.value().is_valid());
 }
-void DriverRunnerTest::AssertNodeControllerBound(const std::shared_ptr<CreatedChild>& child) {
+void DriverRunnerTestBase::AssertNodeControllerBound(const std::shared_ptr<CreatedChild>& child) {
   auto& controller = child->node_controller;
   ASSERT_TRUE(controller.has_value() && controller.value().is_valid());
 }
-void DriverRunnerTest::AssertNodeControllerNotBound(const std::shared_ptr<CreatedChild>& child) {
+void DriverRunnerTestBase::AssertNodeControllerNotBound(
+    const std::shared_ptr<CreatedChild>& child) {
   auto& controller = child->node_controller;
   ASSERT_FALSE(controller.has_value() && controller.value().is_valid());
 }
-inspect::Hierarchy DriverRunnerTest::Inspect() {
+inspect::Hierarchy DriverRunnerTestBase::Inspect() {
   FakeContext context;
   auto inspector = driver_runner().Inspect()(context).take_value();
   return inspect::ReadFromInspector(inspector)(context).take_value();
 }
-void DriverRunnerTest::SetupDevfs() { driver_runner().root_node()->SetupDevfsForRootNode(devfs_); }
-DriverRunnerTest::StartDriverResult DriverRunnerTest::StartSecondDriver(bool colocate,
-                                                                        bool host_restart_on_crash,
-                                                                        bool use_next_vdso) {
-  StartDriverHandler start_handler = [colocate, host_restart_on_crash, use_next_vdso](
-                                         TestDriver* driver, fdfw::DriverStartArgs start_args) {
+void DriverRunnerTestBase::SetupDevfs() {
+  driver_runner().root_node()->SetupDevfsForRootNode(devfs_);
+}
+DriverRunnerTestBase::StartDriverResult DriverRunnerTestBase::StartSecondDriver(
+    bool colocate, bool host_restart_on_crash, bool use_next_vdso, bool use_dynamic_linker) {
+  auto second_driver_config = kDefaultSecondDriverPkgConfig;
+  std::string binary = std::string(second_driver_config.main_module.open_path);
+  StartDriverHandler start_handler = [colocate, host_restart_on_crash, use_next_vdso, binary,
+                                      use_dynamic_linker](TestDriver* driver,
+                                                          fdfw::DriverStartArgs start_args) {
     if (!colocate) {
       EXPECT_FALSE(start_args.symbols().has_value());
     }
 
-    ValidateProgram(start_args.program(), second_driver_binary, colocate ? "true" : "false",
-                    host_restart_on_crash ? "true" : "false", use_next_vdso ? "true" : "false");
+    ValidateProgram(start_args.program(), binary, colocate ? "true" : "false",
+                    host_restart_on_crash ? "true" : "false", use_next_vdso ? "true" : "false",
+                    use_dynamic_linker ? "true" : "false");
   };
-  return StartDriver(
+  return StartDriverWithConfig(
       {
           .url = second_driver_url,
-          .binary = second_driver_binary,
+          .binary = binary,
           .colocate = colocate,
           .host_restart_on_crash = host_restart_on_crash,
           .use_next_vdso = use_next_vdso,
+          .use_dynamic_linker = use_dynamic_linker,
       },
-      std::move(start_handler));
+      std::move(start_handler), second_driver_config);
 }
 void TestDirectory::Bind(fidl::ServerEnd<fio::Directory> request) {
   bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);
@@ -663,7 +735,7 @@ fidl::VectorView<fprocess::wire::HandleInfo> TestRealm::TakeHandles(fidl::AnyAre
 
   return fidl::VectorView<fprocess::wire::HandleInfo>(arena, 0);
 }
-fidl::WireClient<fuchsia_device::Controller> DriverRunnerTest::ConnectToDeviceController(
+fidl::WireClient<fuchsia_device::Controller> DriverRunnerTestBase::ConnectToDeviceController(
     std::string_view child_name) {
   fs::SynchronousVfs vfs(dispatcher());
   zx::result dev_res = devfs().Connect(vfs);

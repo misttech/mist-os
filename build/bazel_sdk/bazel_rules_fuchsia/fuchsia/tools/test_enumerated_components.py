@@ -9,7 +9,7 @@ import subprocess
 from enum import Enum
 from typing import Iterable
 
-from fuchsia_task_lib import *
+from fuchsia.tools.fuchsia_task_lib import *
 
 
 class TestingResult(Enum):

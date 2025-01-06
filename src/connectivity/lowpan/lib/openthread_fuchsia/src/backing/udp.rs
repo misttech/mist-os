@@ -30,7 +30,7 @@ pub(crate) fn poll_ot_udp_socket(
                 let ot_sockaddr: ot::SockAddr = sock_addr.into();
 
                 debug!(
-                    tag = "udp",
+                    tag = "udp";
                     "otPlatUdp:{:?}: Incoming {} byte packet from {:?}",
                     ot_udp_socket.as_ot_ptr(),
                     len,
@@ -54,7 +54,7 @@ pub(crate) fn poll_ot_udp_socket(
                 } {
                     let scope_id = sock_addr.scope_id();
                     debug!(
-                        tag = "udp",
+                        tag = "udp";
                         "inbound scope_id = {}, host_iface = {}", scope_id, host_iface
                     );
                     info.set_host_interface(scope_id == host_iface);
@@ -187,11 +187,11 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
     }
 
     fn open(&mut self) -> ot::Result {
-        debug!(tag = "udp", "otPlatUdp:{:?}: Opening", self.as_ot_ptr());
+        debug!(tag = "udp"; "otPlatUdp:{:?}: Opening", self.as_ot_ptr());
 
         if self.get_handle().is_some() {
             warn!(
-                tag = "udp",
+                tag = "udp";
                 "otPlatUdp:{:?}: Tried to open already open socket",
                 self.as_ot_ptr()
             );
@@ -204,12 +204,12 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
             Some(socket2::Protocol::UDP),
         )
         .map_err(|err| {
-            error!(tag = "udp", "Error: {:?}", err);
+            error!(tag = "udp"; "Error: {:?}", err);
             Err(ot::Error::Failed)
         })?;
 
         let socket = fasync_net::UdpSocket::from_socket(socket.into()).map_err(|err| {
-            error!(tag = "udp", "Error: {:?}", err);
+            error!(tag = "udp"; "Error: {:?}", err);
             Err(ot::Error::Failed)
         })?;
 
@@ -219,11 +219,11 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
     }
 
     fn close(&mut self) -> ot::Result {
-        debug!(tag = "udp", "otPlatUdp:{:?}: Closing", self.as_ot_ptr());
+        debug!(tag = "udp"; "otPlatUdp:{:?}: Closing", self.as_ot_ptr());
 
         if self.get_handle().is_none() {
             warn!(
-                tag = "udp",
+                tag = "udp";
                 "otPlatUdp:{:?}: Tried to close already closed socket",
                 self.as_ot_ptr()
             );
@@ -237,7 +237,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
 
     fn bind(&mut self) -> ot::Result {
         if self.get_handle().is_none() {
-            warn!(tag = "udp", "otPlatUdp:{:?}: Cannot bind, socket is closed.", self.as_ot_ptr());
+            warn!(tag = "udp"; "otPlatUdp:{:?}: Cannot bind, socket is closed.", self.as_ot_ptr());
             return Err(ot::Error::InvalidState);
         }
 
@@ -251,16 +251,16 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
             sockaddr.set_scope_id(netif);
         }
 
-        debug!(tag = "udp", "otPlatUdp:{:?}: Bind to {}", self.as_ot_ptr(), sockaddr);
+        debug!(tag = "udp"; "otPlatUdp:{:?}: Bind to {}", self.as_ot_ptr(), sockaddr);
 
         let socket = self.get_async_udp_socket().ok_or(ot::Error::Failed)?;
         socket.as_ref().bind(&sockaddr.into()).map_err(move |err| {
-            error!(tag = "udp", "Error: {:?}", err);
+            error!(tag = "udp"; "Error: {:?}", err);
             ot::Error::Failed
         })?;
 
         socket.as_ref().set_ttl(DEFAULT_HOP_LIMIT.into()).map_err(move |err| {
-            error!(tag = "udp", "Error: {:?}", err);
+            error!(tag = "udp"; "Error: {:?}", err);
             ot::Error::Failed
         })?;
 
@@ -270,14 +270,14 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
     fn bind_to_netif(&mut self, net_if_id: ot::NetifIdentifier) -> ot::Result {
         if self.get_handle().is_none() {
             warn!(
-                tag = "udp",
+                tag = "udp";
                 "otPlatUdp:{:?}: Cannot bind_to_netif, socket is closed.",
                 self.as_ot_ptr()
             );
             return Err(ot::Error::InvalidState);
         }
 
-        debug!(tag = "udp", "otPlatUdp:{:?}: Bind to netif={:?}", self.as_ot_ptr(), net_if_id);
+        debug!(tag = "udp"; "otPlatUdp:{:?}: Bind to netif={:?}", self.as_ot_ptr(), net_if_id);
 
         self.set_netif_id(net_if_id);
 
@@ -287,14 +287,14 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
     fn connect(&mut self) -> ot::Result {
         if self.get_handle().is_none() {
             warn!(
-                tag = "udp",
+                tag = "udp";
                 "otPlatUdp:{:?}: Cannot connect, socket is closed.",
                 self.as_ot_ptr()
             );
             return Err(ot::Error::InvalidState);
         }
 
-        debug!(tag = "udp", "otPlatUdp:{:?}: Connect to {:?}", self.as_ot_ptr(), self.peer_name());
+        debug!(tag = "udp"; "otPlatUdp:{:?}: Connect to {:?}", self.as_ot_ptr(), self.peer_name());
 
         // TODO(https://fxbug.dev/42175223): Investigate implications of leaving this unimplemented.
         //                        It's not entirely clear why we have this call to connect
@@ -305,14 +305,14 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
 
     fn send(&mut self, message: &ot::Message<'_>, info: &'_ ot::message::Info) -> ot::Result {
         if self.get_handle().is_none() {
-            warn!(tag = "udp", "otPlatUdp:{:?}: Cannot send, socket is closed.", self.as_ot_ptr());
+            warn!(tag = "udp"; "otPlatUdp:{:?}: Cannot send, socket is closed.", self.as_ot_ptr());
             return Err(ot::Error::InvalidState);
         }
 
         let data = message.to_vec();
 
         debug!(
-            tag = "udp",
+            tag = "udp";
             "otPlatUdp:{:?}: Sending {} byte packet to {:?}. {:?}",
             self.as_ot_ptr(),
             data.len(),
@@ -325,7 +325,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
         // Set the multicast loop flag.
         if info.multicast_loop() {
             socket.as_ref().set_multicast_loop_v6(true).map_err(move |err| {
-                error!(tag = "udp", "Error: {:?}", err);
+                error!(tag = "udp"; "Error: {:?}", err);
                 ot::Error::Failed
             })?;
         }
@@ -334,7 +334,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
 
         if should_set_hop_limit {
             socket.as_ref().set_ttl(info.hop_limit().into()).map_err(move |err| {
-                error!(tag = "udp", "Error: {:?}", err);
+                error!(tag = "udp"; "Error: {:?}", err);
                 ot::Error::Failed
             })?;
         }
@@ -362,7 +362,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
             Ok(sent) if data.len() == sent => Ok(()),
             Ok(sent) => {
                 warn!(
-                    tag = "udp",
+                    tag = "udp";
                     "otPlatUdpSend:{:?}: send_to did not send whole packet, only sent {} bytes",
                     self.as_ot_ptr(),
                     sent
@@ -371,7 +371,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
             }
             Err(err) => {
                 warn!(
-                    tag = "udp",
+                    tag = "udp";
                     "otPlatUdpSend:{:?}: send_to({:?}) failed: {:?}",
                     self.as_ot_ptr(),
                     sockaddr,
@@ -384,7 +384,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
         // Restore hop limit
         if should_set_hop_limit {
             socket.as_ref().set_ttl(DEFAULT_HOP_LIMIT.into()).map_err(move |err| {
-                error!(tag = "udp", "Error: {:?}", err);
+                error!(tag = "udp"; "Error: {:?}", err);
                 ot::Error::Failed
             })?;
         }
@@ -392,7 +392,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
         // Reset the multicast loop flag.
         if info.multicast_loop() {
             socket.as_ref().set_multicast_loop_v6(false).map_err(move |err| {
-                error!(tag = "udp", "Error: {:?}", err);
+                error!(tag = "udp"; "Error: {:?}", err);
                 ot::Error::Failed
             })?;
         }
@@ -407,7 +407,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
     ) -> ot::Result {
         if self.get_handle().is_none() {
             warn!(
-                tag = "udp",
+                tag = "udp";
                 "otPlatUdp:{:?}: Cannot join_mcast_group, socket is closed.",
                 self.as_ot_ptr()
             );
@@ -415,7 +415,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
         }
 
         debug!(
-            tag = "udp",
+            tag = "udp";
             "otPlatUdp:{:?}: JoinMulticastGroup {:?} on netif {:?}",
             self.as_ot_ptr(),
             addr,
@@ -435,7 +435,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
             Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => Ok(()),
             Err(err) => {
                 error!(
-                    tag = "udp",
+                    tag = "udp";
                     "otPlatUdp:{:?}: Error joining multicast group {addr}%{netif}: {err:?}",
                     self.as_ot_ptr()
                 );
@@ -451,7 +451,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
     ) -> ot::Result {
         if self.get_handle().is_none() {
             warn!(
-                tag = "udp",
+                tag = "udp";
                 "otPlatUdp:{:?}: Cannot leave_mcast_group, socket is closed.",
                 self.as_ot_ptr()
             );
@@ -459,7 +459,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
         }
 
         debug!(
-            tag = "udp",
+            tag = "udp";
             "otPlatUdp:{:?}: LeaveMulticastGroup {:?} on netif {:?}",
             self.as_ot_ptr(),
             addr,
@@ -478,7 +478,7 @@ impl UdpSocketHelpers for ot::UdpSocket<'_> {
             Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => Ok(()),
             Err(err) => {
                 error!(
-                    tag = "udp",
+                    tag = "udp";
                     "otPlatUdp:{:?}: Error leaving multicast group {addr}%{netif}: {err:?}",
                     self.as_ot_ptr()
                 );

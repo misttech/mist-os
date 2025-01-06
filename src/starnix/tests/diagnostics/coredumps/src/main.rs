@@ -7,8 +7,8 @@ use component_events::events::{EventStream, Stopped};
 use component_events::matcher::EventMatcher;
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fuchsia_component_test::ScopedInstance;
+use log::info;
 use parse_starnix_inspect::CoredumpReport;
-use tracing::info;
 
 #[fuchsia::main]
 async fn main() {

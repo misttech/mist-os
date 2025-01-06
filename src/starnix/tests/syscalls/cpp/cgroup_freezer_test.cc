@@ -149,7 +149,7 @@ TEST_F(CgroupFreezerTest, FreezeSingleProcess) {
   EXPECT_TRUE(fork_helper.WaitForChildren());
 }
 
-TEST_F(CgroupFreezerTest, SIGKILLAfterFroze) {
+TEST_F(CgroupFreezerTest, SIGKILLAfterFrozen) {
   pid_t parent_pid = getpid();
   test_helper::ForkHelper fork_helper;
 
@@ -162,11 +162,19 @@ TEST_F(CgroupFreezerTest, SIGKILLAfterFroze) {
     test_helper::SignalMaskHelper mask_helper;
     mask_helper.blockSignal(SIGUSR1);
 
-    // Wait for the SIGUSR1
+    // Notify the parent that the child starts running.
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
+
+    // Wait for the SIGUSR1 that should never be received.
     mask_helper.waitForSignal(SIGUSR1);
     kill(parent_pid, SIGUSR1);
   });
   test_pids_.push_back(child_pid);
+
+  // Make sure the child starts running.
+  kill(child_pid, SIGUSR1);
+  mask_helper.waitForSignal(SIGUSR1);
 
   // Write the child PID to the cgroup
   files::WriteFile(procs_path(), std::to_string(child_pid));
@@ -183,7 +191,92 @@ TEST_F(CgroupFreezerTest, SIGKILLAfterFroze) {
   // Kill the child process without thawing
   EXPECT_EQ(0, kill(child_pid, SIGKILL));
   // Wait for the child process to terminate
-  fork_helper.WaitForChildren();
+  EXPECT_FALSE(fork_helper.WaitForChildren());
+}
+
+TEST_F(CgroupFreezerTest, AddProcAfterFrozen) {
+  pid_t parent_pid = getpid();
+  test_helper::ForkHelper fork_helper;
+
+  // Set up a signal set to wait for SIGUSR1 which will be sent by the child process
+  test_helper::SignalMaskHelper mask_helper;
+  mask_helper.blockSignal(SIGUSR1);
+
+  // Freeze the cgroup first
+  files::WriteFile(freezer_path(), "1");
+
+  pid_t child_pid = fork_helper.RunInForkedProcess([parent_pid] {
+    // Set up a signal set to wait for SIGUSR1 which will be sent by the parent process
+    test_helper::SignalMaskHelper mask_helper;
+    mask_helper.blockSignal(SIGUSR1);
+
+    // Notify the parent that the child starts running.
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
+
+    // Wait for the SIGUSR1 before adding
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
+  });
+  test_pids_.push_back(child_pid);
+
+  // Make sure the child starts running.
+  kill(child_pid, SIGUSR1);
+  mask_helper.waitForSignal(SIGUSR1);
+
+  // Write the child PID to the cgroup
+  files::WriteFile(procs_path(), std::to_string(child_pid));
+
+  // Send signal; frozen child should *not* receive it.
+  kill(child_pid, SIGUSR1);
+
+  // Set up a time limit for sigtimedwait. Should timeout without receiving the signal.
+  EXPECT_THAT(mask_helper.timedWaitForSignal(SIGUSR1, 2), SyscallFailsWithErrno(EAGAIN));
+
+  // Unfreeze the child process
+  files::WriteFile(freezer_path(), "0");
+
+  // Child will process the last signal after thawed.
+  mask_helper.waitForSignal(SIGUSR1);
+
+  // Wait for the child process to terminate
+  EXPECT_TRUE(fork_helper.WaitForChildren());
+}
+
+TEST_F(CgroupFreezerTest, AddProcAfterThawed) {
+  pid_t parent_pid = getpid();
+  test_helper::ForkHelper fork_helper;
+
+  // Set up a signal set to wait for SIGUSR1 which will be sent by the child process
+  test_helper::SignalMaskHelper mask_helper;
+  mask_helper.blockSignal(SIGUSR1);
+
+  // Freeze the cgroup first
+  files::WriteFile(freezer_path(), "1");
+
+  // Thaw the child process
+  files::WriteFile(freezer_path(), "0");
+
+  pid_t child_pid = fork_helper.RunInForkedProcess([parent_pid] {
+    // Set up a signal set to wait for SIGUSR1 which will be sent by the parent process
+    test_helper::SignalMaskHelper mask_helper;
+    mask_helper.blockSignal(SIGUSR1);
+
+    // Wait for the SIGUSR1 before adding
+    mask_helper.waitForSignal(SIGUSR1);
+    kill(parent_pid, SIGUSR1);
+  });
+  test_pids_.push_back(child_pid);
+
+  // Write the child PID to the cgroup
+  files::WriteFile(procs_path(), std::to_string(child_pid));
+
+  // Send signal; child should receive it.
+  kill(child_pid, SIGUSR1);
+  mask_helper.waitForSignal(SIGUSR1);
+
+  // Wait for the child process to terminate
+  EXPECT_TRUE(fork_helper.WaitForChildren());
 }
 
 TEST_F(CgroupFreezerTest, CheckStateInEventsFile) {

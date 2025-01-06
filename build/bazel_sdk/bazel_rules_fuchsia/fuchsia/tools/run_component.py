@@ -6,7 +6,7 @@
 import argparse
 import subprocess
 
-from fuchsia_task_lib import *
+from fuchsia.tools.fuchsia_task_lib import *
 
 
 class FuchsiaTaskRunComponent(FuchsiaTask):

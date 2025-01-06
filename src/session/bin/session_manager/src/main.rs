@@ -12,13 +12,6 @@ use session_manager_config::Config;
 use session_manager_lib::session_manager::SessionManager;
 use tracing::info;
 
-// If we find a file at this path, we won't automatically launch the session on
-// startup, regardless of what the `autolaunch` structured config value says.
-//
-// TODO(https://fxbug.dev/42077029): Delete this mechanism once we have a proper
-// replacement that relies only on structured config.
-const DISABLE_AUTOLAUNCH_PATH: &str = "/data/session-manager/noautolaunch";
-
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new_local();
@@ -42,11 +35,6 @@ async fn main() -> Result<(), Error> {
         info!("Received an empty startup session URL. Waiting for a request.");
     } else if !autolaunch {
         info!("Startup session URL set, but autolaunch config option was false. Waiting for a request.");
-    } else if std::path::Path::new(DISABLE_AUTOLAUNCH_PATH).exists() {
-        info!(
-            "Session autolaunch blocked by file at path {}. Waiting for a request.",
-            DISABLE_AUTOLAUNCH_PATH
-        );
     } else {
         // TODO(https://fxbug.dev/42146741): Using ? here causes errors to not be logged.
         session_manager.start_default_session().await.expect("failed to start session");

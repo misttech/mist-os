@@ -45,7 +45,6 @@ where
     NI: NetworkInterface,
     BI: BackboneInterface,
 {
-    #[tracing::instrument(skip_all)]
     pub fn on_nat64_translator_state_changed(&self) {
         let driver_state = self.driver_state.lock();
 

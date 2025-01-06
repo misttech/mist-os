@@ -16,9 +16,12 @@ group("modules") {
   visibility = [ ":*" ]
   testonly = true
   deps = [
+    ":fake_compat_driver",
+    ":fake_driver",
     ":fake_driver_host",
     ":fake_driver_host_with_bootstrap",
     ":fake_root_driver",
+    ":fake_v1_driver",
   ]
 }
 
@@ -86,11 +89,35 @@ loadable_module("fake_root_driver") {
   ]
 }
 
+loadable_module("fake_compat_driver") {
+  visibility = [ ":*" ]
+  testonly = true
+  sources = [ "fake_compat_driver.cc" ]
+  public = [
+    "driver_entry_point.h",
+    "v1_driver_entry_point.h",
+  ]
+}
+
+loadable_module("fake_v1_driver") {
+  visibility = [ ":*" ]
+  testonly = true
+  sources = [ "fake_v1_driver.cc" ]
+  public = [ "v1_driver_entry_point.h" ]
+}
+
 shared_library("fake_root_driver_deps") {
   visibility = [ ":*" ]
   testonly = true
   sources = [ "fake_root_driver_deps.cc" ]
   deps = [ "//zircon/system/public" ]
+}
+
+loadable_module("fake_driver") {
+  visibility = [ ":*" ]
+  testonly = true
+  sources = [ "fake_driver.cc" ]
+  public = [ "driver_entry_point.h" ]
 }
 
 ifs_shared_library("fake_runtime.lib") {
@@ -116,6 +143,8 @@ executable("fake_driver_host_with_bootstrap") {
   deps = [
     ":dh-deps-a",
     ":entry_point",
+    "//sdk/lib/ld",
+    "//sdk/lib/ld:standalone",
     "//src/zircon/lib/zircon",
     "//zircon/system/public",
     "//zircon/system/ulib/zx",

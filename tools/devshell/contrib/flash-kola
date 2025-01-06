@@ -25,7 +25,7 @@ FLASH_SOURCE="$(fx-command-run get-flash-source)"
 PRODUCT_BUNDLE="$(fx get-build-dir)/${FLASH_SOURCE#product-bundle:}"
 ARTIFACTS="${PRODUCT_BUNDLE}/product_bundle.json"
 DTBO_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_a[] | select(.name=="dtbo-a") | .path' "${ARTIFACTS}")"
-FVM_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_a[] | select(.name=="storage-full") | .path' "${ARTIFACTS}")"
+FVM_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_a[] | select(.name=="fxfs.fastboot") | .path' "${ARTIFACTS}")"
 ZBI_PATH="${PRODUCT_BUNDLE}/$(fx-command-run jq --raw-output '.system_a[] | select(.name=="zircon-a") | .path' "${ARTIFACTS}")"
 
 readonly FVM_PATH ZBI_PATH DTBO_PATH

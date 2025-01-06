@@ -30,7 +30,7 @@ pub use serve_to::*;
 use spinel_pack::{self as spinel_pack};
 
 #[macro_export]
-macro_rules! traceln (($($args:tt)*) => { tracing::trace!($($args)*); }; );
+macro_rules! traceln (($($args:tt)*) => { log::trace!($($args)*); }; );
 
 #[macro_use]
 pub(crate) mod prelude_internal {
@@ -41,7 +41,7 @@ pub(crate) mod prelude_internal {
     pub use spinel_pack::prelude::*;
 
     #[allow(unused_imports)]
-    pub use tracing::{debug, error, info, trace, warn};
+    pub use log::{debug, error, info, trace, warn};
 
     pub use crate::{ServeTo as _, ZxResult, ZxStatus};
     pub use anyhow::{format_err, Context as _};

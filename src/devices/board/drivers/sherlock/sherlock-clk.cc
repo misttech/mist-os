@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.clockimpl/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/debug.h>
@@ -33,7 +34,8 @@ static const std::vector<fpbus::Mmio> clk_mmios{
     }},
 };
 
-static const clock_id_t clock_ids[] = {
+// TODO(b/373903133): Remove once no longer referenced.
+static const clock_id_t kClockIds[] = {
     // For Camera Sensor.
     {g12b_clk::G12B_CLK_CAM_INCK_24M},
     // For cpu driver.
@@ -61,12 +63,47 @@ zx_status_t Sherlock::ClkInit() {
     return encoded_metadata.error_value().status();
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  const fuchsia_hardware_clockimpl::ClockIdsMetadata kClockIdsMetadata{{
+      .clock_ids{{
+          // For Camera Sensor.
+          g12b_clk::G12B_CLK_CAM_INCK_24M,
+
+          // For cpu driver.
+          g12b_clk::G12B_CLK_SYS_PLL_DIV16,
+          g12b_clk::G12B_CLK_SYS_CPU_CLK_DIV16,
+          g12b_clk::G12B_CLK_SYS_PLLB_DIV16,
+          g12b_clk::G12B_CLK_SYS_CPUB_CLK_DIV16,
+          g12b_clk::CLK_SYS_CPU_BIG_CLK,
+          g12b_clk::CLK_SYS_CPU_LITTLE_CLK,
+
+          // For video decoder/encoder
+          g12b_clk::G12B_CLK_DOS_GCLK_VDEC,
+          g12b_clk::G12B_CLK_DOS_GCLK_HCODEC,
+          g12b_clk::G12B_CLK_DOS,
+      }},
+  }};
+  const fit::result encoded_clock_ids_metadata = fidl::Persist(kClockIdsMetadata);
+  if (!encoded_clock_ids_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to encode clock ID's: %s",
+           encoded_clock_ids_metadata.error_value().FormatDescription().c_str());
+    return encoded_clock_ids_metadata.error_value().status();
+  }
+#endif
+
   const std::vector<fpbus::Metadata> clock_metadata{
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+      {{
+          .id = fuchsia_hardware_clockimpl::ClockIdsMetadata::kSerializableName,
+          .data = encoded_clock_ids_metadata.value(),
+      }},
+#endif
+      // TODO(b/373903133): Remove once no longer referenced.
       {{
           .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
           .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&clock_ids),
-              reinterpret_cast<const uint8_t*>(&clock_ids) + sizeof(clock_ids)),
+              reinterpret_cast<const uint8_t*>(&kClockIds),
+              reinterpret_cast<const uint8_t*>(&kClockIds) + sizeof(kClockIds)),
       }},
       {{
           .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),

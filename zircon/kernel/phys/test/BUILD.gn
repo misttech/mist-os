@@ -588,16 +588,6 @@ if (current_toolchain != default_toolchain) {
     deps = [ ":physboot-elf-kernel-test-data.zbi" ]
   }
 
-  if (current_cpu == "arm64") {
-    common_test("drop-el3-test") {
-      sources = [ "drop-el3-test.cc" ]
-      deps = [
-        ":test-main",
-        "//zircon/kernel/lib/arch",
-      ]
-    }
-  }
-
   group("test") {
     testonly = true
     deps = [
@@ -637,13 +627,6 @@ if (current_toolchain != default_toolchain) {
     } else {
       # x86 qemu is 32-bit and we don't do exceptions for 32-bit.
       deps += [ ":qemu-phys-exception-test" ]
-    }
-
-    if (current_cpu == "arm64") {
-      deps += [
-        ":qemu-drop-el3-test",
-        ":zbi-drop-el3-test",
-      ]
     }
   }
 } else {  # current_toolchain == default_toolchain

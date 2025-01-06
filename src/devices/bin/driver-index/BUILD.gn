@@ -95,6 +95,7 @@ rustc_binary("bin") {
   ]
 
   sources = [
+    "src/composite_helper.rs",
     "src/composite_node_spec_manager.rs",
     "src/driver_loading_fuzzer.rs",
     "src/escrow_support.rs",

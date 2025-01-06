@@ -11,17 +11,20 @@
 
 int main(int argc, char** argv) {
   return hwreg::AsmHeader()  //
-      .Register<arch::ArmCnthctlEl2</*El2Host=*/false>>("CNTHCTL_EL2_")
-      .Register<arch::ArmCptrEl2</*El2Host=*/false>>("CPTR_EL2_")
+      .Register<arch::ArmCnthctlEl2NoEl2Host>("CNTHCTL_EL2_")
+      .Register<arch::ArmCptrEl2NoEl2Host>("CPTR_EL2_")
+      // The CPTR bits unknown to hwreg are those intended to be reserved as one.
+      .Macro("CPTR_EL2_RES1", "CPTR_EL2_UNKNOWN")
       .Register<arch::ArmCurrentEl>("CURRENT_EL_")
       .Register<arch::ArmHcrEl2>("HCR_EL2_")
       .Register<arch::ArmIccSreEl2>("ICC_SRE_EL2_")
       .Register<arch::ArmIdAa64Pfr0El1>("ID_AA64PFR0_EL1_")
-      .Register<arch::ArmScrEl3>("SCR_EL3_")
       .Register<arch::ArmSctlrEl1>("SCTLR_EL1_")
       .Register<arch::ArmSctlrEl2>("SCTLR_EL2_")
       .Register<arch::ArmSpsrEl2>("SPSR_EL2_")
-      .Register<arch::ArmSpsrEl3>("SPSR_EL3_")
-      .Register<arch::ArmVbarEl2>("VBAR_EL2_")
+      // Disables all interrupts.
+      .Macro("SPSR_EL2_DAIF", "SPSR_EL2_D | SPSR_EL2_A | SPSR_EL2_I | SPSR_EL2_F")
+      // 0b101 signifies returning to EL1 with SP_EL1.
+      .Macro("SPSR_EL2_M_EL1H", "SPSR_EL2_M_FIELD(0b101)")
       .Main(argc, argv);
 }

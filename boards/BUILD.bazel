@@ -26,14 +26,14 @@ fuchsia_prebuilt_board_configuration(
     directory = "@gn_targets//boards/qemu-arm64",
 )
 
-fuchsia_prebuilt_board_configuration(
+alias(
     name = "vim3",
-    directory = "@gn_targets//boards/vim3",
+    actual = "//boards/vim3",
 )
 
-fuchsia_prebuilt_board_configuration(
+alias(
     name = "vim3_reduced_perf_variation",
-    files = "@gn_targets//boards/vim3:reduced_perf_variation",
+    actual = "//boards/vim3:reduced_perf_variation",
 )
 
 fuchsia_prebuilt_board_configuration(
@@ -41,12 +41,12 @@ fuchsia_prebuilt_board_configuration(
     directory = "@gn_targets//boards/riscv64",
 )
 
-fuchsia_prebuilt_board_configuration(
+alias(
     name = "pkvm-x64",
-    directory = "@gn_targets//boards/pkvm:x64",
+    actual = "//boards/pkvm:x64",
 )
 
-fuchsia_prebuilt_board_configuration(
+alias(
     name = "pkvm-arm64",
-    directory = "@gn_targets//boards/pkvm:arm64",
+    actual = "//boards/pkvm:arm64",
 )

@@ -114,12 +114,9 @@ zx::result<> AmlSdmmc::Start() {
 
   // Initialize our compat server.
   {
-    // TODO(b/355244376): Don't forward `DEVICE_METADATA_SDMMC` once all drivers no longer retrieve
-    // SDMMC metadata using the legacy ddk metadata functions.
     zx::result<> result = compat_server_.Initialize(
         incoming(), outgoing(), node_name(), name(),
-        compat::ForwardMetadata::Some({DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO}),
-        get_banjo_config());
+        compat::ForwardMetadata::Some({DEVICE_METADATA_GPT_INFO}), get_banjo_config());
     if (result.is_error()) {
       return result.take_error();
     }
@@ -178,6 +175,7 @@ zx::result<> AmlSdmmc::Start() {
   std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_sdmmc::SdmmcService>(arena));
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_power::PowerTokenService>(arena));
+  offers.push_back(metadata_server_.MakeOffer(arena));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name())
@@ -283,8 +281,8 @@ zx::result<> AmlSdmmc::InitResources(
 
   {
     std::string instance_identifier;
-    zx::result metadata = compat::GetMetadata<fuchsia_hardware_sdmmc::SdmmcMetadata>(
-        incoming(), DEVICE_METADATA_SDMMC);
+    zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_sdmmc::SdmmcMetadata>(
+        fuchsia_hardware_sdmmc::SdmmcMetadata::kSerializableName);
     if (metadata.is_error()) {
       FDF_LOGL(WARNING, logger(), "Failed to get metadata: %s", metadata.status_string());
     } else if (metadata->instance_identifier().has_value()) {
@@ -1819,11 +1817,8 @@ void AmlSdmmc::PrepareStop(fdf::PrepareStopCompleter completer) {
 }
 
 zx_status_t AmlSdmmc::InitMetadataServer(fdf::PDev& pdev) {
-  // TODO(b/355244376): Replace `std::to_string(DEVICE_METADATA_SDMMC)` with
-  // `fuchsia_hardware_sdmmc::SdmmcMetadata::kSerializableName` once drivers no longer retrieve
-  // sdmmc metadata using legacy ddk metadata functions.
   zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_sdmmc::SdmmcMetadata>(
-      std::to_string(DEVICE_METADATA_SDMMC));
+      fuchsia_hardware_sdmmc::SdmmcMetadata::kSerializableName);
   if (metadata.is_error()) {
     FDF_LOGL(ERROR, logger(), "Failed to get metadata: %s", metadata.status_string());
     return metadata.status_value();

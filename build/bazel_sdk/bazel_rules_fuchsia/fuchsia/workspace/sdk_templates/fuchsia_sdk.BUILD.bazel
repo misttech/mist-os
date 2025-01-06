@@ -125,7 +125,7 @@ fuchsia_toolchain_info(
 toolchain(
     name = "fuchsia_toolchain_sdk",
     toolchain = ":fuchsia_toolchain_info",
-    toolchain_type = "@{{rules_fuchsia}}//fuchsia:toolchain",
+    toolchain_type = "@{{rules_fuchsia}}//fuchsia/toolchains:sdk",
 )
 
 # The following rules expose the sdk tools that are put in the fuchsia_toolchain

@@ -26,7 +26,6 @@ rustc_test("driver") {
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-sync",
-    "//src/sys/lib/cm_rust",
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//src/sys/pkg/lib/fidl-fuchsia-update-installer-ext",

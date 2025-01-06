@@ -494,8 +494,8 @@ pub mod empty_protocol {
     }
 }
 
-/// A helper trait for the `EmptyProtocol` client protocol.
-pub trait EmptyProtocolClient<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `EmptyProtocol` client sender.
+pub trait EmptyProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     fn send<___R>(
         &self,
         request: &mut ___R,
@@ -510,7 +510,7 @@ pub trait EmptyProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, empty_protocol::SendAndReceive>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, empty_protocol::SendAndReceive>,
         ::fidl_next::EncodeError,
     >
     where
@@ -520,7 +520,7 @@ pub trait EmptyProtocolClient<___T: ::fidl_next::protocol::Transport> {
         >;
 }
 
-impl<___T> EmptyProtocolClient<___T> for ::fidl_next::bind::Client<___T, EmptyProtocol>
+impl<___T> EmptyProtocolClientSender<___T> for ::fidl_next::bind::ClientSender<___T, EmptyProtocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -534,14 +534,14 @@ where
             Encoded<'buf> = crate::WireEmptyProtocolSendRequest,
         >,
     {
-        self.untyped().send_request(1378773277029173000, request)
+        self.as_untyped().send_one_way(1378773277029173000, request)
     }
 
     fn send_and_receive<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, empty_protocol::SendAndReceive>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, empty_protocol::SendAndReceive>,
         ::fidl_next::EncodeError,
     >
     where
@@ -550,9 +550,9 @@ where
             Encoded<'buf> = crate::WireEmptyProtocolSendAndReceiveRequest,
         >,
     {
-        self.untyped()
-            .send_transaction(534401212734647530, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(534401212734647530, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 }
 
@@ -561,6 +561,8 @@ where
 pub trait EmptyProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn receive(
         &mut self,
+        sender: &::fidl_next::bind::ClientSender<___T, EmptyProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<___T, empty_protocol::Receive>,
     );
 }
@@ -576,40 +578,55 @@ where
     for<'buf> crate::WireEmptyProtocolSendAndReceiveResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             2301564782476583487 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.receive(buffer);
+                handler.receive(sender, buffer);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }
 
-/// A helper trait for the `EmptyProtocol` server protocol.
-pub trait EmptyProtocolServer<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `EmptyProtocol` server sender.
+pub trait EmptyProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn receive(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> EmptyProtocolServer<___T> for ::fidl_next::bind::Server<___T, EmptyProtocol>
+impl<___T> EmptyProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, EmptyProtocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn receive(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(2301564782476583487, &mut ())
+        self.as_untyped().send_event(2301564782476583487, &mut ())
     }
 }
 
 /// A server handler for the EmptyProtocol protocol.
 
 pub trait EmptyProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
-    fn send(&mut self, request: ::fidl_next::bind::RequestBuffer<___T, empty_protocol::Send>);
+    fn send(
+        &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, EmptyProtocol>,
+
+        request: ::fidl_next::bind::RequestBuffer<___T, empty_protocol::Send>,
+    );
 
     fn send_and_receive(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, EmptyProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, empty_protocol::SendAndReceive>,
+
         responder: ::fidl_next::bind::Responder<empty_protocol::SendAndReceive>,
     );
 }
@@ -625,21 +642,29 @@ where
     for<'buf> crate::WireEmptyProtocolSendAndReceiveRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             1378773277029173000 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.send(buffer);
+                handler.send(sender, buffer);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
@@ -647,10 +672,12 @@ where
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.send_and_receive(buffer, responder);
+                handler.send_and_receive(sender, buffer, responder);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }

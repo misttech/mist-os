@@ -16,7 +16,7 @@ if (zircon_kernel_disable_asserts) {
 
 declare_args() {
   # Build an ELF kernel rather than a ZBI image kernel.
-  use_elf_kernel = current_cpu != "x64"
+  use_elf_kernel = true
 }
 
 declare_args() {

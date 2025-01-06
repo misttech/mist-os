@@ -6,11 +6,11 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fdio/directory.h>
 
-#include <fbl/auto_lock.h>
 #include <fbl/no_destructor.h>
 
 #include "sdk/lib/fdio/directory_internal.h"
-#include "sdk/lib/fdio/fdio_unistd.h"
+#include "sdk/lib/fdio/fdio_state.h"
+#include "sdk/lib/fdio/include/lib/fdio/namespace.h"
 #include "sdk/lib/fdio/internal.h"
 #include "sdk/lib/fdio/unistd.h"
 
@@ -133,7 +133,7 @@ zx_status_t fdio_open_fd_at_internal_deprecated(int dirfd, const char* dirty_pat
     return io.status_value();
   }
 
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (!fd.has_value()) {
     return ZX_ERR_BAD_STATE;
   }
@@ -153,7 +153,7 @@ zx_status_t fdio_open_fd_at_internal(int dirfd, const char* dirty_path, fio::Fla
   if (io.is_error()) {
     return io.status_value();
   }
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (!fd.has_value()) {
     return ZX_ERR_BAD_STATE;
   }

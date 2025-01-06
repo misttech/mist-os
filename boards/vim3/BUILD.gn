@@ -4,6 +4,7 @@
 
 import("//build/assembly/board_configuration.gni")
 import("//build/assembly/board_input_bundle.gni")
+import("//build/bazel/assembly/bazel_board_configuration.gni")
 import("//build/bazel/assembly/bazel_board_input_bundle.gni")
 
 assert(current_toolchain == default_toolchain,
@@ -11,126 +12,15 @@ assert(current_toolchain == default_toolchain,
 assert(current_cpu == "arm64",
        "The vim3 board can only be defined in an arm64 toolchain.")
 
-common_board_configuration = {
-  name = "vim3"
-
-  provided_features = [
-    "fuchsia::aml-hrtimer",
-    "fuchsia::bt_transport_uart",
-    "fuchsia::bus_pci",
-    "fuchsia::fake_battery",
-    "fuchsia::fan",
-    "fuchsia::mali_gpu",
-    "fuchsia::paver",
-    "fuchsia::pmm_checker",
-    "fuchsia::real_time_clock",
-    "fuchsia::realtek_8211f",
-    "fuchsia::suspender",
-    "fuchsia::suspending_token",
-    "fuchsia::usb_peripheral_support",
-    "fuchsia::wlan_fullmac",
-    "fuchsia::xhci",
+group("bazel_inputs") {
+  deps = [
+    ":devicetree_board_driver.bazel_inputs",
+    ":main_bundle.bazel_inputs",
+    ":paver.bazel_inputs",
+    ":rtc_driver.bazel_inputs",
+    ":vulkan_arm_mali.bazel_inputs",
+    "//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
   ]
-
-  input_bundles = [
-    ":devicetree_board_driver",
-    ":main_bundle",
-    ":paver",
-    ":vulkan_arm_mali",
-    ":rtc_driver",
-    ":bazel_drivers",
-  ]
-
-  devicetree = "//src/devices/board/drivers/vim3-devicetree:vim3"
-
-  platform = {
-    connectivity = {
-      network = {
-        # Prefer using the built-in NIC to the CDC-ether interface.
-        netsvc_interface =
-            "/dwmac-ff3f0000_group/dwmac/Designware-MAC/network-device"
-      }
-    }
-    development_support = {
-      # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
-      enable_debug_access_port_for_soc = "amlogic-a311d"
-    }
-    sysmem_defaults = {
-      # The AMlogic display engine needs contiguous physical memory for each
-      # frame buffer, because it does not have a page table walker.
-      #
-      # The maximum supported resolution is documented below.
-      # * "A311D Quick Reference Manual" revision 01, pages 2-3
-      # * "A311D Datasheet" revision 08, section 2.2 "Features", pages 4-5
-      #
-      # These pages can be loaned back to zircon for use in pager-backed VMOs,
-      # but these pages won't be used in "anonymous" VMOs (at least for now).
-      # Whether the loaned-back pages can be absorbed by pager-backed VMOs is
-      # workload dependent. The "k ppb stats_on" command can be used to
-      # determine whether all loaned pages are being used by pager-backed VMOs.
-      #
-      # This board-level default can be overridden by platform-level config.
-      contiguous_memory_size = {
-        # 200 MiB
-        fixed = 209715200
-      }
-      protected_memory_size = {
-        fixed = 0
-      }
-      contiguous_guard_pages_unused = false
-    }
-  }
-
-  filesystems = {
-    vbmeta = {
-      key = "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem"
-      key_metadata =
-          "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
-    }
-    zbi = {
-      compression = "zstd.17"
-    }
-    fvm = {
-      blobfs = {
-        size_checker_maximum_bytes = 5216665600
-      }
-      sparse_output = {
-      }
-      fastboot_output = {
-        # For VIM3, FVM partition uses all of the remaining eMMC.
-        # However, the total size of the eMMC storage maybe 16G or 32G
-        # depending on whether it is a basic or pro version. In
-        # addition, the actual size of the user block allocated by
-        # Fuchsia can be further different. (i.e. 'lsblk' shows a 29G
-        # size user block for the 32Gb version). To avoid the risk of
-        # overflowing available size, here we set it to be the same as
-        # sherlock (3280mb), which is clearly safe and sufficient for
-        # now.
-        truncate_to_length = 3439329280
-      }
-    }
-    fxfs = {
-      size_checker_maximum_bytes = 5216665600
-    }
-  }
-
-  kernel = {
-    contiguous_physical_pages = true
-  }
-}
-
-board_configuration("vim3") {
-  forward_variables_from(common_board_configuration, "*")
-}
-
-board_configuration("reduced_perf_variation") {
-  forward_variables_from(common_board_configuration, "*")
-
-  # Disable serial console printing during early boot, a phase during which
-  # UART communication is single-threaded and synchronous. In production,
-  # the serial console will be disabled, and so early boot benchmarks that
-  # include this work is sensibly avoided.
-  kernel.quiet_early_boot = true
 }
 
 board_input_bundle("main_bundle") {
@@ -293,10 +183,6 @@ board_input_bundle("devicetree_board_driver") {
   drivers = []
 }
 
-bazel_board_input_bundle("bazel_drivers") {
-  bazel_board_input_bundle_target = "//boards/vim3:bazel_drivers"
-}
-
 board_input_bundle("vulkan_arm_mali") {
   base_packages =
       [ "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0" ]
@@ -314,6 +200,22 @@ board_input_bundle("rtc_driver") {
 
 board_input_bundle("paver") {
   bootfs_packages = [ "//src/bringup/bin/paver:package-vim3" ]
+}
+
+# TODO(jayzhuang): Remove after vim3-vg is migrated.
+bazel_board_input_bundle("bazel_drivers") {
+  bazel_board_input_bundle_target = "//boards/vim3:bazel_drivers"
+}
+
+bazel_board_configuration("vim3") {
+  bazel_board_configuration_target = "//boards/vim3"
+  deps = [ ":bazel_inputs" ]
+}
+
+bazel_board_configuration("reduced_perf_variation") {
+  board_name = "vim3"
+  bazel_board_configuration_target = "//boards/vim3:reduced_perf_variation"
+  deps = [ ":bazel_inputs" ]
 }
 
 # Note: This group contains bazel built drivers that are defined in individual bazel_actions.

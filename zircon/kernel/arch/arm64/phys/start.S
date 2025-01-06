@@ -85,6 +85,10 @@
   boot_unsafe_stack_ptr .req xzr
 #endif
 
+  // Before we set sp, ensure that it's 'linked' to the current SP_ELX and not
+  // SP_EL0.
+  msr SPSel, #1
+
 #if ZX_TLS_STACK_GUARD_OFFSET + 8 != ZX_TLS_UNSAFE_SP_OFFSET
 #error "TLS ABI layout???"
 #endif

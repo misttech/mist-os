@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.session.scene") {
-  sources = [ "scene_manager.fidl" ]
+  sources = [ "manager.fidl" ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.ui.app",

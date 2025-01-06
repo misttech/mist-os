@@ -12,7 +12,6 @@
 
 #include <cerrno>
 
-#include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>
 
 #include "fidl/fuchsia.io/cpp/wire_types.h"
@@ -158,7 +157,7 @@ int fdio_ns_opendir(fdio_ns_t* ns) {
     errno = ENOMEM;
     return -1;
   }
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     return fd.value();
   }
@@ -180,8 +179,9 @@ zx_status_t fdio_ns_export(fdio_ns_t* ns, fdio_flat_namespace_t** out) { return 
 
 __EXPORT
 zx_status_t fdio_ns_export_root(fdio_flat_namespace_t** out) {
-  fbl::AutoLock lock(&fdio_lock);
-  return fdio_ns_export(fdio_root_ns, out);
+  fdio_state_t& gstate = fdio_global_state();
+  std::lock_guard lock(gstate.lock);
+  return fdio_ns_export(gstate.ns, out);
 }
 
 __EXPORT

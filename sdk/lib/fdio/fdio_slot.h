@@ -5,14 +5,12 @@
 #ifndef LIB_FDIO_FDIO_SLOT_H_
 #define LIB_FDIO_FDIO_SLOT_H_
 
-#include <lib/fdio/fdio.h>
-
 #include <optional>
 #include <variant>
 
 #include <fbl/ref_ptr.h>
 
-struct fdio;
+#include "sdk/lib/fdio/internal.h"
 
 // TODO(tamird): every operation on this type should require the global lock.
 struct fdio_slot {
@@ -39,9 +37,7 @@ struct fdio_slot {
 
   void release_reservation();
 
-  // TODO(https::/https://fxbug.dev/42151651): clang incorrectly rejects std::variant<.., fbl::RefPtr<fdio>> as
-  // a non-literal type. When that is fixed, change this |fdio_t*| to |fbl::RefPtr<fdio>|.
-  std::variant<available, reserved, fdio_t*> inner_;
+  std::variant<available, reserved, fbl::RefPtr<fdio>> inner_;
 };
 
 #endif  // LIB_FDIO_FDIO_SLOT_H_

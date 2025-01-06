@@ -62,7 +62,7 @@ pub fn new_netlink_socket(
     socket_type: SocketType,
     family: NetlinkFamily,
 ) -> Result<Box<dyn SocketOps>, Errno> {
-    log_info!(tag = NETLINK_LOG_TAG, "Creating {:?} Netlink Socket", family);
+    log_info!(tag = NETLINK_LOG_TAG; "Creating {:?} Netlink Socket", family);
     if socket_type != SocketType::Datagram && socket_type != SocketType::Raw {
         return error!(ESOCKTNOSUPPORT);
     }
@@ -775,7 +775,7 @@ impl<M: Clone + NetlinkSerializable + Send + Sync + 'static> Sender<M>
             )
             .unwrap_or_else(|e| {
                 log_warn!(
-                    tag = NETLINK_LOG_TAG,
+                    tag = NETLINK_LOG_TAG;
                     "Failed to write message into buffer for socket. Errno: {:?}",
                     e
                 );
@@ -822,7 +822,7 @@ impl RouteNetlinkSocket {
             Ok(client) => client,
             Err(NewClientError::Disconnected) => {
                 log_error!(
-                    tag = NETLINK_LOG_TAG,
+                    tag = NETLINK_LOG_TAG;
                     "Netlink async worker is unexpectedly disconnected"
                 );
                 return error!(EPIPE);
@@ -905,7 +905,7 @@ impl SocketOps for RouteNetlinkSocket {
         match NetlinkMessage::<RouteNetlinkMessage>::deserialize(&bytes) {
             Err(e) => {
                 log_warn!(
-                    tag = NETLINK_LOG_TAG,
+                    tag = NETLINK_LOG_TAG;
                     "Failed to process write; data could not be deserialized: {:?}",
                     e
                 );
@@ -923,7 +923,7 @@ impl SocketOps for RouteNetlinkSocket {
                 }
                 Err(e) => {
                     log_warn!(
-                        tag = NETLINK_LOG_TAG,
+                        tag = NETLINK_LOG_TAG;
                         "Netlink receiver unexpectedly disconnected for socket: {:?}",
                         e
                     );
@@ -1154,7 +1154,7 @@ impl GenericNetlinkSocket {
             Ok(client) => Ok(Self { inner, client, message_sender }),
             Err(e) => {
                 log_warn!(
-                    tag = NETLINK_LOG_TAG,
+                    tag = NETLINK_LOG_TAG;
                     "Failed to connect to generic netlink server. Errno: {:?}",
                     e
                 );

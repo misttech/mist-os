@@ -63,11 +63,7 @@ if (current_cpu == "arm64") {
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//build/images/zedboot:zedboot.bazel_legacy_aib",
       "//products/workbench/workbench_session:workbench_session_bazel_inputs",
-
-      # Add the board configuration as a dependency via the GN arg, as vendor-
-      # repo boards can shadow the ones in //boards.
-      get_label_info(board_configuration_label, "label_no_toolchain") +
-          ".bazel_input",
+      "//boards/vim3:bazel_inputs",
     ]
   }
 }

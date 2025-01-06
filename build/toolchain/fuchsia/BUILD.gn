@@ -14,4 +14,13 @@ clang_toolchain_suite(target_cpu) {
   # It is stronger, and thus generates smaller binaries, but also creates
   # crashes for host binaries (e.g. https://fxbug.dev/42126969).
   strip_cxx_bin_args = "--strip-sections"
+
+  # LINT.IfChange
+
+  # When generating Fuchsia user binaries, ensure the right sysroot-related
+  # dependencies are added to source_set() and static_library() instances
+  # automatically.
+  source_deps = [ "//zircon/public/sysroot:headers" ]
+
+  # LINT.ThenChange(//build/config/BUILDCONFIG.gn)
 }

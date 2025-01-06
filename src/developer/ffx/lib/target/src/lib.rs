@@ -281,7 +281,7 @@ pub async fn wait_for_device(
     env: &EnvironmentContext,
     target_spec: Option<String>,
     behavior: WaitFor,
-) -> Result<(), ffx_command::Error> {
+) -> Result<(), ffx_command_error::Error> {
     wait_for_device_inner(LocalRcsKnockerImpl, wait_timeout, env, target_spec, behavior).await
 }
 
@@ -291,7 +291,7 @@ async fn wait_for_device_inner(
     env: &EnvironmentContext,
     target_spec: Option<String>,
     behavior: WaitFor,
-) -> Result<(), ffx_command::Error> {
+) -> Result<(), ffx_command_error::Error> {
     let target_spec_clone = target_spec.clone();
     let env = env.clone();
     let knock_fut = async {
@@ -304,7 +304,7 @@ async fn wait_for_device_inner(
                         Ok(())
                     } else {
                         if let KnockError::CriticalError(e) = e {
-                            Err(ffx_command::Error::Unexpected(e.into()))
+                            Err(ffx_command_error::Error::Unexpected(e.into()))
                         } else {
                             tracing::debug!("error non-critical. retrying.");
                             Timer::new(Duration::from_millis(DOWN_REPOLL_DELAY_MS)).await;
@@ -330,7 +330,7 @@ async fn wait_for_device_inner(
     };
     futures_lite::FutureExt::or(knock_fut, async {
         timer.await;
-        Err(ffx_command::Error::User(
+        Err(ffx_command_error::Error::User(
             FfxTargetError::DaemonError { err: DaemonError::Timeout, target: target_spec }.into(),
         ))
     })
@@ -558,7 +558,7 @@ pub async fn add_manual_target(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_command::bug;
+    use ffx_command_error::bug;
     use ffx_config::macro_deps::serde_json::Value;
     use ffx_config::{test_init, ConfigLevel};
     use futures_lite::future::{pending, ready};

@@ -5,24 +5,24 @@
 use openthread::prelude::*;
 use std::ffi::CStr;
 
-pub const fn tracing_level_from(log_level: ot::LogLevel) -> tracing::Level {
+pub const fn tracing_level_from(log_level: ot::LogLevel) -> log::Level {
     match log_level {
-        ot::LogLevel::None => tracing::Level::ERROR,
-        ot::LogLevel::Crit => tracing::Level::ERROR,
-        ot::LogLevel::Warn => tracing::Level::WARN,
-        ot::LogLevel::Note => tracing::Level::INFO,
-        ot::LogLevel::Info => tracing::Level::INFO,
-        ot::LogLevel::Debg => tracing::Level::DEBUG,
+        ot::LogLevel::None => log::Level::Error,
+        ot::LogLevel::Crit => log::Level::Error,
+        ot::LogLevel::Warn => log::Level::Warn,
+        ot::LogLevel::Note => log::Level::Info,
+        ot::LogLevel::Info => log::Level::Info,
+        ot::LogLevel::Debg => log::Level::Debug,
     }
 }
 
-pub const fn ot_log_level_from(log_level: tracing::Level) -> ot::LogLevel {
+pub const fn ot_log_level_from(log_level: log::Level) -> ot::LogLevel {
     match log_level {
-        tracing::Level::ERROR => ot::LogLevel::Crit,
-        tracing::Level::WARN => ot::LogLevel::Warn,
-        tracing::Level::INFO => ot::LogLevel::Info,
-        tracing::Level::DEBUG => ot::LogLevel::Debg,
-        tracing::Level::TRACE => ot::LogLevel::Debg,
+        log::Level::Error => ot::LogLevel::Crit,
+        log::Level::Warn => ot::LogLevel::Warn,
+        log::Level::Info => ot::LogLevel::Info,
+        log::Level::Debug => ot::LogLevel::Debg,
+        log::Level::Trace => ot::LogLevel::Debg,
     }
 }
 
@@ -38,20 +38,20 @@ unsafe extern "C" fn otPlatLogLine(
     match line.to_str() {
         // Log line isn't valid UTF-8, display it directly.
         Ok(line) => match tracing_level {
-            tracing::Level::ERROR => tracing::error!(tag = "ot", "{line}"),
-            tracing::Level::WARN => tracing::warn!(tag = "ot", "{line}"),
-            tracing::Level::INFO => tracing::info!(tag = "ot", "{line}"),
-            tracing::Level::DEBUG => tracing::debug!(tag = "ot", "{line}"),
-            tracing::Level::TRACE => tracing::trace!(tag = "ot", "{line}"),
+            log::Level::Error => log::error!(tag = "ot"; "{line}"),
+            log::Level::Warn => log::warn!(tag = "ot"; "{line}"),
+            log::Level::Info => log::info!(tag = "ot"; "{line}"),
+            log::Level::Debug => log::debug!(tag = "ot"; "{line}"),
+            log::Level::Trace => log::trace!(tag = "ot"; "{line}"),
         },
 
         // Log line isn't valid UTF-8, try rendering with escaping.
         Err(_) => match tracing_level {
-            tracing::Level::ERROR => tracing::error!(tag = "ot", "{line:?}"),
-            tracing::Level::WARN => tracing::warn!(tag = "ot", "{line:?}"),
-            tracing::Level::INFO => tracing::info!(tag = "ot", "{line:?}"),
-            tracing::Level::DEBUG => tracing::debug!(tag = "ot", "{line:?}"),
-            tracing::Level::TRACE => tracing::trace!(tag = "ot", "{line:?}"),
+            log::Level::Error => log::error!(tag = "ot"; "{line:?}"),
+            log::Level::Warn => log::warn!(tag = "ot"; "{line:?}"),
+            log::Level::Info => log::info!(tag = "ot"; "{line:?}"),
+            log::Level::Debug => log::debug!(tag = "ot"; "{line:?}"),
+            log::Level::Trace => log::trace!(tag = "ot"; "{line:?}"),
         },
     }
 }
@@ -60,8 +60,8 @@ unsafe extern "C" fn otPlatLogLine(
 unsafe extern "C" fn otPlatLogHandleLevelChanged(log_level: otsys::otLogLevel) {
     let tracing_level = tracing_level_from(log_level.into());
 
-    tracing::info!(
-        tag = "openthread_fuchsia",
+    log::info!(
+        tag = "openthread_fuchsia";
         "otPlatLogHandleLevelChanged: {log_level} (Tracing: {tracing_level})"
     );
 }

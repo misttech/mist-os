@@ -6,7 +6,6 @@
 #![allow(non_upper_case_globals)]
 
 use crate::bpf::fs::{get_bpf_object, BpfFsDir, BpfFsObject, BpfHandle};
-use crate::bpf::map::{Map, MapKey};
 use crate::bpf::program::{Program, ProgramInfo};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::task::CurrentTask;
@@ -15,6 +14,7 @@ use crate::vfs::{
     UserBuffersOutputBuffer,
 };
 use ebpf::MapSchema;
+use ebpf_api::{Map, MapError, MapKey};
 use smallvec::smallvec;
 use starnix_logging::{log_error, log_trace, track_stub};
 use starnix_sync::{Locked, Unlocked};
@@ -113,6 +113,17 @@ fn read_map_key(
     current_task.read_objects_to_smallvec(UserRef::<u8>::new(addr), key_size as usize)
 }
 
+fn map_error_to_errno(e: MapError) -> Errno {
+    match e {
+        MapError::InvalidParam => errno!(EINVAL),
+        MapError::InvalidKey => errno!(ENOENT),
+        MapError::EntryExists => errno!(EEXIST),
+        MapError::NoMemory => errno!(ENOMEM),
+        MapError::SizeLimit => errno!(E2BIG),
+        MapError::Internal => errno!(EIO),
+    }
+}
+
 pub fn sys_bpf(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -141,7 +152,7 @@ pub fn sys_bpf(
                 value_size: map_attr.value_size,
                 max_entries: map_attr.max_entries,
             };
-            let mut map = Map::new(schema, map_attr.map_flags)?;
+            let mut map = Map::new(schema, map_attr.map_flags).map_err(map_error_to_errno)?;
 
             // To quote
             // https://cs.android.com/android/platform/superproject/+/master:system/bpf/libbpf_android/Loader.cpp;l=670;drc=28e295395471b33e662b7116378d15f1e88f0864
@@ -169,7 +180,7 @@ pub fn sys_bpf(
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant because all variants must be valid with all bit patterns.
             let user_value = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.value });
-            let value = map.lookup(&key)?;
+            let value = map.lookup(&key).map_err(map_error_to_errno)?;
             current_task.write_memory(user_value, &value)?;
 
             Ok(SUCCESS)
@@ -193,7 +204,7 @@ pub fn sys_bpf(
             let value =
                 current_task.read_memory_to_vec(user_value, map.schema.value_size as usize)?;
 
-            map.update(key, &value, flags)?;
+            map.update(key, &value, flags).map_err(map_error_to_errno)?;
             Ok(SUCCESS)
         }
 
@@ -207,7 +218,7 @@ pub fn sys_bpf(
             let key =
                 read_map_key(current_task, UserAddress::from(elem_attr.key), map.schema.key_size)?;
 
-            map.delete(&key)?;
+            map.delete(&key).map_err(map_error_to_errno)?;
             Ok(SUCCESS)
         }
 
@@ -229,11 +240,13 @@ pub fn sys_bpf(
                 None
             };
 
+            let next_key =
+                map.get_next_key(key.as_ref().map(|k| &k[..])).map_err(map_error_to_errno)?;
+
             // SAFETY: this union object was created with FromBytes so it's safe to access any
             // variant (right?)
             let user_next_key = UserAddress::from(unsafe { elem_attr.__bindgen_anon_1.next_key });
-            current_task
-                .write_memory(user_next_key, &map.get_next_key(key.as_ref().map(|k| &k[..]))?)?;
+            current_task.write_memory(user_next_key, &next_key)?;
 
             Ok(SUCCESS)
         }

@@ -7,7 +7,7 @@ use crate::target_connector::{
     BUFFER_SIZE,
 };
 use anyhow::Result;
-use ffx_command::FfxContext;
+use ffx_command_error::FfxContext as _;
 use ffx_config::EnvironmentContext;
 use ffx_ssh::ssh::{build_ssh_command_with_env, SshError};
 use fuchsia_async::Task;

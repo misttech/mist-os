@@ -370,7 +370,7 @@ pub fn serve_memory_attribution_provider_elfkernel(
                 fattribution::ProviderRequest::_UnknownMethod {
                     ordinal, control_handle, ..
                 } => {
-                    tracing::error!("Invalid request to AttributionProvider: {ordinal}");
+                    log_error!("Invalid request to AttributionProvider: {ordinal}");
                     control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
                 }
             }
@@ -390,7 +390,7 @@ pub fn serve_memory_attribution_provider_container(
             .try_next()
             .await
             .inspect_err(|err| {
-                tracing::warn!("Error while serving container memory attribution: {:?}", err)
+                log_warn!("Error while serving container memory attribution: {:?}", err)
             })
             .ok()
             .flatten()
@@ -402,7 +402,7 @@ pub fn serve_memory_attribution_provider_container(
                 fattribution::ProviderRequest::_UnknownMethod {
                     ordinal, control_handle, ..
                 } => {
-                    tracing::error!("Invalid request to AttributionProvider: {ordinal}");
+                    log_error!("Invalid request to AttributionProvider: {ordinal}");
                     control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
                 }
             }

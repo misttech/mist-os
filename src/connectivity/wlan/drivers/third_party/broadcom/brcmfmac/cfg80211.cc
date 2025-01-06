@@ -2853,10 +2853,11 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
     // IEEE 802.11-2016 3.2 (c.f. "vendor organizationally unique identifier")
     constexpr uint8_t kIeeeOui[] = {0x00, 0x0F, 0xAC};
     constexpr uint8_t kMsftOui[] = {0x00, 0x50, 0xF2};
-    if (!std::equal(req->cipher_oui().begin(), req->cipher_oui().begin() + req->cipher_oui().size(),
-                    kIeeeOui, kIeeeOui + std::size(kIeeeOui)) &&
-        !std::equal(req->cipher_oui().begin(), req->cipher_oui().begin() + req->cipher_oui().size(),
-                    kMsftOui, kMsftOui + std::size(kMsftOui))) {
+    auto cipher_oui = req->cipher_oui();
+    if (!std::equal(cipher_oui.begin(), cipher_oui.begin() + cipher_oui.size(), kIeeeOui,
+                    kIeeeOui + std::size(kIeeeOui)) &&
+        !std::equal(cipher_oui.begin(), cipher_oui.begin() + cipher_oui.size(), kMsftOui,
+                    kMsftOui + std::size(kMsftOui))) {
       BRCMF_ERR("Cipher OUI does not match either IEEE or MSFT OUI, not supported.");
       return ZX_ERR_NOT_SUPPORTED;
     }

@@ -9,11 +9,11 @@ use std::ffi::CString;
 use std::fmt;
 
 // This needs to be available to the macros in this module without clients having to depend on
-// tracing themselves.
+// log themselves.
 #[doc(hidden)]
-pub use tracing as __tracing;
+pub use log as __log;
 
-pub use tracing::Level;
+pub use log::Level;
 
 /// Used to track the current thread's logical context.
 enum TaskDebugInfo {
@@ -58,10 +58,21 @@ pub const fn trace_debug_logs_enabled() -> bool {
 
 #[macro_export]
 macro_rules! log_trace {
+    ($($key:tt $(:$capture:tt)? $(= $value:expr)?),+; $($arg:tt)+) => {
+        if $crate::trace_debug_logs_enabled() {
+            $crate::with_current_task_info(|_task_info| {
+                $crate::__log::trace!(
+                    tag:% = _task_info,
+                    $($key $(:$capture)* $(= $value)*),+;
+                    $($arg)*
+                );
+            });
+        }
+    };
     ($($arg:tt)*) => {
         if $crate::trace_debug_logs_enabled() {
             $crate::with_current_task_info(|_task_info| {
-                $crate::__tracing::trace!(tag = %_task_info, $($arg)*);
+                $crate::__log::trace!(tag:% = _task_info; $($arg)*);
             });
         }
     };
@@ -69,10 +80,21 @@ macro_rules! log_trace {
 
 #[macro_export]
 macro_rules! log_debug {
+    ($($key:tt $(:$capture:tt)? $(= $value:expr)?),+; $($arg:tt)+) => {
+        if $crate::trace_debug_logs_enabled() {
+            $crate::with_current_task_info(|_task_info| {
+                $crate::__log::debug!(
+                    tag:% = _task_info,
+                    $($key $(:$capture)* $(= $value)*),+;
+                    $($arg)*
+                );
+            });
+        }
+    };
     ($($arg:tt)*) => {
         if $crate::trace_debug_logs_enabled() {
             $crate::with_current_task_info(|_task_info| {
-                $crate::__tracing::debug!(tag = %_task_info, $($arg)*);
+                $crate::__log::debug!(tag:% = _task_info; $($arg)*);
             });
         }
     };
@@ -81,49 +103,44 @@ macro_rules! log_debug {
 #[macro_export]
 macro_rules! log_info {
     ($($arg:tt)*) => {
-        if $crate::logs_enabled() {
-            $crate::with_current_task_info(|_task_info| {
-                $crate::__tracing::info!(tag = %_task_info, $($arg)*);
-            });
-        }
+        $crate::log!($crate::__log::Level::Info, $($arg)*);
     };
 }
 
 #[macro_export]
 macro_rules! log_warn {
     ($($arg:tt)*) => {
-        if $crate::logs_enabled() {
-            $crate::with_current_task_info(|_task_info| {
-                $crate::__tracing::warn!(tag = %_task_info, $($arg)*);
-            });
-        }
+        $crate::log!($crate::__log::Level::Warn, $($arg)*);
     };
 }
 
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {
-        if $crate::logs_enabled() {
-            $crate::with_current_task_info(|_task_info| {
-                $crate::__tracing::error!(tag = %_task_info, $($arg)*);
-            });
-        }
+        $crate::log!($crate::__log::Level::Error, $($arg)*);
     };
 }
 
-// Note that we can't just call `event!` with a non-const level since
-// tracing requires the metadata fields to be static.
-// See: https://github.com/tokio-rs/tracing/issues/2730
 #[macro_export]
 macro_rules! log {
-    ($lvl:expr, $($arg:tt)*) => {
-         match $lvl {
-             $crate::Level::TRACE => $crate::log_trace!($($arg)*),
-             $crate::Level::DEBUG => $crate::log_debug!($($arg)*),
-             $crate::Level::INFO => $crate::log_info!($($arg)*),
-             $crate::Level::WARN => $crate::log_warn!($($arg)*),
-             $crate::Level::ERROR => $crate::log_error!($($arg)*),
-         }
+    ($lvl:expr, $($key:tt $(:$capture:tt)? $(= $value:expr)?),+; $($arg:tt)+) => {
+        if $crate::logs_enabled() {
+            $crate::with_current_task_info(|_task_info| {
+                $crate::__log::log!(
+                    $lvl,
+                    tag:% = _task_info,
+                    $($key $(:$capture)* $(= $value)*),+;
+                    $($arg)*
+                );
+            });
+        }
+    };
+    ($lvl:expr, $($arg:tt)+) => {
+        if $crate::logs_enabled() {
+            $crate::with_current_task_info(|_task_info| {
+                $crate::__log::log!($lvl, tag:% = _task_info; $($arg)*);
+            });
+        }
     };
 }
 

@@ -103,9 +103,11 @@ In order for this driver to send metadata to its child drivers, it will need to
 create an instance of the
 [fdf_metadata::MetadataServer](/sdk/lib/driver/metadata/cpp/metadata_server.h)
 class, set the metadata by calling its
-`fdf_metadata::MetadataServer::SetMetadata()` method, and then serve the
+`fdf_metadata::MetadataServer::SetMetadata()` method, serve the
 metadata to the driver's outgoing directory by calling its
-`fdf_metadata::MetadataServer::Serve()` method:
+`fdf_metadata::MetadataServer::Serve()` method, and pass the metadata
+server's offer created by `fdf_metadata::MetadataServer::MakeOffer()` to the
+child node:
 
 ```cpp
 {% verbatim %}
@@ -125,6 +127,15 @@ class Sender : public fdf::DriverBase {
     // Serve the metadata to the driver's outgoing directory.
     ZX_ASSERT(metadata_server_.Serve(*outgoing(), dispatcher()).is_ok());
 
+    // The metadata server's offer must be provided to the child node.
+    std::vector<fuchsia_driver_framework::Offer> offers{
+      metadata_server_.MakeOffer()};
+
+    zx::result child = AddChild("child", {}, offers);
+    if (child.is_error()) {
+      return child.take_error();
+    }
+
     return zx::ok();
   }
 
@@ -143,6 +154,7 @@ called before it attempts to retrieve the metadata.
 
 The `driver` build target will need to be updated to include the metadata
 library and the FIDL library that defines the metadata type:
+
 ```
 fuchsia_cc_driver("driver") {
   testonly = true
@@ -395,9 +407,10 @@ In order for the driver to forward metadata from its parent driver to its child
 drivers, it will need to create an instance of the
 [fdf_metadata::MetadataServer](/sdk/lib/driver/metadata/cpp/metadata_server.h)
 class, set the metadata by calling its
-`fdf_metadata::MetadataServer::ForwardMetadata()` method, and then serve the
+`fdf_metadata::MetadataServer::ForwardMetadata()` method, serve the
 metadata to the driver's outgoing directory by calling its
-`fdf_metadata::MetadataServer::Serve()` method:
+`fdf_metadata::MetadataServer::Serve()` method, and pass the metadata server's
+offer created by `fdf_metadata::MetadataServer::MakeOffer()` to the child node:
 
 ```cpp
 // Defines the fuchsia.examples.metadata types in C++.
@@ -414,6 +427,15 @@ class Forwarder : public fdf::DriverBase {
 
     // Serve the metadata to the driver's outgoing directory.
     ZX_ASSERT(metadata_server_.Serve(*outgoing(), dispatcher()).is_ok());
+
+    // The metadata server's offer must be provided to the child node.
+    std::vector<fuchsia_driver_framework::Offer> offers{
+      metadata_server_.MakeOffer()};
+
+    zx::result child = AddChild("child", {}, offers);
+    if (child.is_error()) {
+      return child.take_error();
+    }
 
     return zx::ok();
   }

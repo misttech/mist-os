@@ -12,6 +12,8 @@ use std::collections::{BTreeMap, HashSet};
 /// aware of. We will calculate the space consumed by these resources and subtract that space from
 /// the total space allowed in blobfs.
 const RESOURCES: &'static [&str] = &[
+    "lib/libbackend_fuchsia_globals.so",
+    "lib/libsvc.so",
     "lib/VkLayer_image_pipe_swapchain.so",
     "lib/ld.so.1",
     "lib/libasync-default.so",

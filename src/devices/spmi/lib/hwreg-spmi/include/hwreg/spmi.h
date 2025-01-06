@@ -140,8 +140,8 @@ class SpmiRegisterBase : public RegisterBase<DerivedType, IntType, PrinterState>
 
     value = ConvertToSpmiByteOrder<IntType, SpmiByteOrder>(value);
 
-    std::vector<uint8_t> vector{static_cast<uint8_t*>(&value),
-                                static_cast<uint8_t*>(&value) + sizeof(IntType)};
+    std::vector<uint8_t> vector{reinterpret_cast<uint8_t*>(&value),
+                                reinterpret_cast<uint8_t*>(&value) + sizeof(IntType)};
     auto response = fidl::WireCall(client)->ExtendedRegisterWriteLong(
         addr, fidl::VectorView<uint8_t>::FromExternal(vector));
     if (!response.ok()) {

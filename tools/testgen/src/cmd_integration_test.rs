@@ -11,6 +11,7 @@ use crate::flags;
 
 use anyhow::{bail, Error};
 use argh::FromArgs;
+use chrono::Datelike;
 use std::path::PathBuf;
 use tracing::info;
 
@@ -51,7 +52,7 @@ pub(crate) struct IntegrationTestCmd {
 /// See [`TemplateVars`] for the meaning of each variable.
 impl IntegrationTestCmd {
     // TODO(127973): Add back support for C++
-    pub async fn run(&self, _: &flags::Flags) -> Result<(), Error> {
+    pub async fn run(&self, flags: &flags::Flags) -> Result<(), Error> {
         let test_root = self.test_root.clone();
         if test_root.exists() {
             bail!("{} already exists. Please choose a directory location that does not already exist.", test_root.display());
@@ -79,10 +80,16 @@ impl IntegrationTestCmd {
         let component_name = path_file_stem(&self.component_manifest);
         let cml = load_cml_file(&self.component_manifest)?;
 
+        let year = match &flags.year_override {
+            None => format!("{}", chrono::Utc::now().year()),
+            Some(year) => year.clone(),
+        };
+
         // rustfmt mangles this. long lines are easier to read.
         #[rustfmt::skip]
         let gen = CodeGenerator::new()
             .with_template_vars(TemplateVars{
+                year: year,
                 component_name: component_name.clone(),
                 component_exposed_protocols: var_component_exposed_protocols(&cml),
                 component_gn_label: self.component_gn_label.to_string(),

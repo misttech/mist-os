@@ -9,6 +9,7 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 
@@ -19,15 +20,15 @@ namespace serial {
 
 namespace {
 
-constexpr std::string_view pdev_name = "pdev";
-constexpr std::string_view child_name = "aml-uart";
-constexpr std::string_view driver_name = "aml-uart";
+constexpr std::string_view kPdevName = "pdev";
+constexpr std::string_view kChildName = "aml-uart";
+constexpr std::string_view kDriverName = "aml-uart";
 
 }  // namespace
 
 AmlUartV2::AmlUartV2(fdf::DriverStartArgs start_args,
                      fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : fdf::DriverBase(driver_name, std::move(start_args), std::move(driver_dispatcher)),
+    : fdf::DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
       driver_config_(take_config<aml_uart_config::Config>()) {}
 
 void AmlUartV2::Start(fdf::StartCompleter completer) {
@@ -35,14 +36,9 @@ void AmlUartV2::Start(fdf::StartCompleter completer) {
 
   parent_node_client_.Bind(std::move(node()), dispatcher());
 
-  // pdev is our primary node so that is what this will be connecting to for the compat connection.
-  auto compat_connection = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
-  if (compat_connection.is_error()) {
-    CompleteStart(compat_connection.take_error());
-    return;
-  }
-  compat_client_.Bind(std::move(compat_connection.value()), dispatcher());
-  compat_client_->GetMetadata().Then(fit::bind_member<&AmlUartV2::OnReceivedMetadata>(this));
+  device_server_.Begin(incoming(), outgoing(), node_name(), kChildName,
+                       fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
+                       compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
 }
 
 void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
@@ -58,82 +54,40 @@ AmlUart& AmlUartV2::aml_uart_for_testing() {
   return aml_uart_.value();
 }
 
-void AmlUartV2::OnReceivedMetadata(
-    fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetMetadata>& metadata_result) {
-  if (!metadata_result.ok()) {
-    FDF_LOG(ERROR, "Failed to get metadata %s", metadata_result.status_string());
-    CompleteStart(zx::error(metadata_result.status()));
-    return;
-  }
-
-  if (metadata_result.value().is_error()) {
-    FDF_LOG(ERROR, "Failed to get metadata %s",
-            zx_status_get_string(metadata_result.value().error_value()));
-    CompleteStart(zx::error(metadata_result.value().error_value()));
-    return;
-  }
-
-  for (auto& metadata : metadata_result->value()->metadata) {
-    if (metadata.type == DEVICE_METADATA_SERIAL_PORT_INFO) {
-      size_t size;
-      zx_status_t status =
-          metadata.data.get_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get metadata vmo size: %s", zx_status_get_string(status));
-        CompleteStart(zx::error(status));
-        return;
-      }
-
-      std::vector<uint8_t> fidl_info_buffer(size);
-      status = metadata.data.read(fidl_info_buffer.data(), 0, fidl_info_buffer.size());
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read metadata vmo: %s", zx_status_get_string(status));
-        CompleteStart(zx::error(status));
-        return;
-      }
-
-      fit::result fidl_info =
-          fidl::InplaceUnpersist<fuchsia_hardware_serial::wire::SerialPortInfo>(fidl_info_buffer);
-      if (fidl_info.is_error()) {
-        FDF_LOG(ERROR, "Failed to decode metadata: %s",
-                fidl_info.error_value().FormatDescription().c_str());
-        CompleteStart(zx::error(fidl_info.error_value().status()));
-        return;
-      }
-
-      serial_port_info_ = {
-          .serial_class = fidl_info->serial_class,
-          .serial_vid = fidl_info->serial_vid,
-          .serial_pid = fidl_info->serial_pid,
-      };
-
-      // We can break since we have now read DEVICE_METADATA_SERIAL_PORT_INFO.
-      break;
-    }
-  }
-
-  device_server_.Begin(incoming(), outgoing(), node_name(), child_name,
-                       fit::bind_member<&AmlUartV2::OnDeviceServerInitialized>(this),
-                       compat::ForwardMetadata::Some({DEVICE_METADATA_MAC_ADDRESS}));
-}
-
 void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result) {
   if (device_server_init_result.is_error()) {
     CompleteStart(device_server_init_result.take_error());
     return;
   }
 
-  auto pdev_connection =
-      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>(pdev_name);
-  if (pdev_connection.is_error()) {
-    CompleteStart(pdev_connection.take_error());
-    return;
+  fdf::PDev pdev;
+  {
+    auto result = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>(kPdevName);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to connect to platform device: %s", result.status_string());
+      CompleteStart(result.take_error());
+      return;
+    }
+    pdev = fdf::PDev{std::move(result.value())};
   }
 
-  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> fidl_pdev(
-      std::move(pdev_connection.value()));
-
-  fdf::PDev pdev(fidl_pdev.TakeClientEnd());
+  zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_serial::SerialPortInfo>(
+      fuchsia_hardware_serial::SerialPortInfo::kSerializableName);
+  if (metadata.is_error()) {
+    if (metadata.status_value() == ZX_ERR_NOT_FOUND) {
+      FDF_LOG(DEBUG, "Serial port info metadata not found.");
+    } else {
+      FDF_LOG(ERROR, "Failed to get metadata: %s", metadata.status_string());
+      CompleteStart(metadata.take_error());
+      return;
+    }
+  } else {
+    serial_port_info_ = {
+        .serial_class = metadata->serial_class(),
+        .serial_vid = metadata->serial_vid(),
+        .serial_pid = metadata->serial_pid(),
+    };
+  }
 
   zx::result mmio = pdev.MapMmio(0);
   if (mmio.is_error()) {
@@ -179,7 +133,7 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
           },
   });
   zx::result<> add_result =
-      outgoing()->AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler), child_name);
+      outgoing()->AddService<fuchsia_hardware_serialimpl::Service>(std::move(handler), kChildName);
   if (add_result.is_error()) {
     FDF_LOG(ERROR, "Failed to add fuchsia_hardware_serialimpl::Service %s",
             add_result.status_string());
@@ -188,11 +142,11 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
   }
 
   auto offers = device_server_.CreateOffers2();
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>(child_name));
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_serialimpl::Service>(kChildName));
 
   fuchsia_driver_framework::NodeAddArgs args{
       {
-          .name = std::string(child_name),
+          .name = std::string(kChildName),
           .properties = {{
               fdf::MakeProperty(bind_fuchsia::PROTOCOL,
                                 bind_fuchsia_serial::BIND_PROTOCOL_IMPL_ASYNC),

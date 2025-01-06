@@ -79,8 +79,7 @@ impl ToolEnv {
         FhoEnvironment {
             ffx: self.ffx_cmd_line,
             context,
-            behavior: crate::FhoConnectionBehavior::DaemonConnector(injector.clone()),
-            injector: Some(injector),
+            behavior: crate::FhoConnectionBehavior::DaemonConnector(injector),
             lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
         }
     }
@@ -222,7 +221,8 @@ pub async fn fake_proxy_f<T: fdomain_client::fidl::Proxy>(
 #[cfg(test)]
 mod internal {
     use super::*;
-    use crate::{self as fho, CheckEnv, FfxMain, ToolIO, TryFromEnv};
+    use crate::from_env::CheckEnv;
+    use crate::{self as fho, FfxMain, ToolIO, TryFromEnv};
     use argh::{ArgsInfo, FromArgs};
     use std::cell::RefCell;
 

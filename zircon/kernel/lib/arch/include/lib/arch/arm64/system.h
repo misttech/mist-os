@@ -9,6 +9,7 @@
 #include <lib/arch/hwreg.h>
 #include <lib/arch/sysreg.h>
 
+#include <functional>
 #include <optional>
 
 #include "memory.h"
@@ -65,20 +66,6 @@ struct ArmCurrentEl : public SysRegBase<ArmCurrentEl, uint64_t> {
   DEF_FIELD(3, 2, el);
 };
 ARCH_ARM64_SYSREG(ArmCurrentEl, "CurrentEL");
-
-// This is only available on actual AArch64 hardware.  This fetches the current
-// EL, and if it's EL3 then drops to EL2 (if possible) or EL1.  It returns the
-// newly-current EL that ArmCurrentEl::Read() will return afterwards.
-ArmCurrentEl ArmDropEl3();
-
-// If we are executing at an exception level higher than EL1, this disables EL2
-// monitoring, ensures would-be EL2 traps are routed to EL3, installs the
-// current stack in SP_EL1 (if any), and then drops to EL1. If we are already
-// at EL1, then this call is a no-op.
-//
-// This function is safe to call in any context. Care is taken to avoid using
-// the stack and only uses scratch registers.
-extern "C" void ArmDropToEl1WithoutEl2Monitor();
 
 // This type covers three register formats:
 //  * [arm/sysreg]/sctlr_el1: System Control Register (EL1)
@@ -722,12 +709,18 @@ struct ArmCptrEl2 : public arch::SysRegDerived<ArmCptrEl2<El2Host>,
 ARCH_ARM64_SYSREG(ArmCptrEl2<false>, "cptr_el2");
 ARCH_ARM64_SYSREG(ArmCptrEl2<true>, "cptr_el2");
 
+using ArmCptrEl2NoEl2Host = ArmCptrEl2<false>;
+using ArmCptrEl2WithEl2Host = ArmCptrEl2<true>;
+
 template <bool El2Host>
 struct ArmCptrEl3 : public arch::SysRegDerived<ArmCptrEl3<El2Host>,
                                                ArmArchitecturalFeatureTrapRegister<El2Host>> {};
 
 ARCH_ARM64_SYSREG(ArmCptrEl3<false>, "cptr_el3");
 ARCH_ARM64_SYSREG(ArmCptrEl3<true>, "cptr_el3");
+
+using ArmCptrEl3NoEl2Host = ArmCptrEl3<false>;
+using ArmCptrEl3WithEl2Host = ArmCptrEl3<true>;
 
 // [arm/sysreg]/hcr_el2: Hypervisor Configuration register (EL2)
 struct ArmHypervisorConfigurationRegister
@@ -838,6 +831,9 @@ struct ArmCnthctlEl2 : public arch::SysRegDerived<ArmCnthctlEl2<El2Host>,
                                                   ArmCounterTimerHypervisorControl<El2Host>> {};
 ARCH_ARM64_SYSREG(ArmCnthctlEl2<false>, "cnthctl_el2");
 ARCH_ARM64_SYSREG(ArmCnthctlEl2<true>, "cnthctl_el2");
+
+using ArmCnthctlEl2NoEl2Host = ArmCnthctlEl2<false>;
+using ArmCnthctlEl2WithEl2Host = ArmCnthctlEl2<true>;
 
 // [arm/sysreg]/icc_sre_el1: Interrupt Controller System Register Enable Register (EL1)
 // [arm/sysreg]/icc_sre_el2: Interrupt Controller System Register Enable Register (EL2)

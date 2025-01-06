@@ -488,9 +488,9 @@ mod test {
     use byteorder::{NativeEndian, ReadBytesExt};
     use fidl::AsHandleRef;
     use futures_test as _;
-    use std::fs::File;
     use std::io::Read;
     use std::os::fd::{FromRawFd, RawFd};
+    use std::os::unix::net::UnixStream;
 
     static mut SCRATCH: [u8; 1024] = [0; 1024];
     fn testing_lib_context() -> *const LibContext {
@@ -1129,8 +1129,8 @@ mod test {
     fn handle_ready_notification() {
         let lib_ctx = testing_lib_context();
         let fd: RawFd = unsafe { ffx_connect_handle_notifier(lib_ctx) };
-        assert!(fd > 0);
-        let mut notifier_file = unsafe { File::from_raw_fd(fd) };
+        let mut notifier = unsafe { UnixStream::from_raw_fd(fd) };
+        notifier.set_nonblocking(false).unwrap();
         let (a, b) = fidl::Channel::create();
         let mut buf = [0u8; 2];
         let mut handles = [0u32; 2];
@@ -1162,7 +1162,7 @@ mod test {
         };
         assert_eq!(result, zx_status::Status::OK);
         let mut notifier_buf = [0u8; 4];
-        let bytes_read = notifier_file.read(&mut notifier_buf).unwrap();
+        let bytes_read = notifier.read(&mut notifier_buf).unwrap();
         let mut notifier_buf_reader = std::io::Cursor::new(notifier_buf);
         assert_eq!(bytes_read, 4);
         let read_handle = notifier_buf_reader.read_u32::<NativeEndian>().unwrap();
@@ -1174,8 +1174,8 @@ mod test {
     fn user_signal_pending() {
         let lib_ctx = testing_lib_context();
         let fd: RawFd = unsafe { ffx_connect_handle_notifier(lib_ctx) };
-        assert!(fd > 0);
-        let mut notifier_file = unsafe { File::from_raw_fd(fd) };
+        let mut notifier = unsafe { UnixStream::from_raw_fd(fd) };
+        notifier.set_nonblocking(false).unwrap();
         let event = fidl::Event::create();
         let mut out = 0u32;
         let signals = fidl::Signals::from_bits(
@@ -1198,7 +1198,7 @@ mod test {
         };
         assert_eq!(result, zx_status::Status::OK);
         let mut notifier_buf = [0u8; 4];
-        let bytes_read = notifier_file.read(&mut notifier_buf).unwrap();
+        let bytes_read = notifier.read(&mut notifier_buf).unwrap();
         let mut notifier_buf_reader = std::io::Cursor::new(notifier_buf);
         assert_eq!(bytes_read, 4);
         let read_handle = notifier_buf_reader.read_u32::<NativeEndian>().unwrap();
@@ -1215,8 +1215,8 @@ mod test {
     fn user_signal_peer_pending() {
         let lib_ctx = testing_lib_context();
         let fd: RawFd = unsafe { ffx_connect_handle_notifier(lib_ctx) };
-        assert!(fd > 0);
-        let mut notifier_file = unsafe { File::from_raw_fd(fd) };
+        let mut notifier = unsafe { UnixStream::from_raw_fd(fd) };
+        notifier.set_nonblocking(false).unwrap();
         let (tx, rx) = fidl::EventPair::create();
         let mut out = 0u32;
         let signals = fidl::Signals::from_bits(
@@ -1238,7 +1238,7 @@ mod test {
         };
         assert_eq!(result, zx_status::Status::OK);
         let mut notifier_buf = [0u8; 4];
-        let bytes_read = notifier_file.read(&mut notifier_buf).unwrap();
+        let bytes_read = notifier.read(&mut notifier_buf).unwrap();
         let mut notifier_buf_reader = std::io::Cursor::new(notifier_buf);
         assert_eq!(bytes_read, 4);
         let read_handle = notifier_buf_reader.read_u32::<NativeEndian>().unwrap();

@@ -25,7 +25,7 @@ rustc_binary("bin") {
     "//src/starnix/tests/diagnostics/lib/parse_starnix_inspect",
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 

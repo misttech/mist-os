@@ -583,7 +583,10 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             // Capture the port mappings for user mode networking.
             let now = fuchsia_async::MonotonicInstant::now();
             match self.read_port_mappings().await {
-                Ok(_) => (),
+                Ok(_) => {
+                    tracing::debug!("Writing updated mappings");
+                    self.save_to_disk().await?;
+                }
                 Err(e) => {
                     if self.is_running().await {
                         return Err(e);
@@ -905,8 +908,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         if modified
                             && !self.emu_config().host.port_map.values().any(|m| m.host.is_none())
                         {
-                            tracing::debug!("Writing updated mappings");
-                            self.save_to_disk().await?;
                             return Ok(());
                         }
                     } else {

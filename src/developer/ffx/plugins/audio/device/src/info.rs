@@ -4,7 +4,7 @@
 
 use crate::{connect, serde_ext};
 use camino::Utf8PathBuf;
-use ffx_command::{bug, user_error, FfxContext};
+use ffx_command_error::{bug, user_error, FfxContext as _, Result};
 use fuchsia_audio::dai::{
     DaiFormatSet, DaiFrameFormat, DaiFrameFormatClocking, DaiFrameFormatJustification,
 };
@@ -1575,7 +1575,7 @@ impl Info {
 }
 
 /// Returns information about a Codec device from its hardware protocol.
-async fn get_hw_codec_info(codec: &fhaudio::CodecProxy) -> fho::Result<HardwareCodecInfo> {
+async fn get_hw_codec_info(codec: &fhaudio::CodecProxy) -> Result<HardwareCodecInfo> {
     let properties =
         codec.get_properties().await.bug_context("Failed to call Codec.GetProperties")?;
 
@@ -1593,7 +1593,7 @@ async fn get_hw_codec_info(codec: &fhaudio::CodecProxy) -> fho::Result<HardwareC
 }
 
 /// Returns information about a Dai device from its hardware protocol.
-async fn get_hw_dai_info(dai: &fhaudio::DaiProxy) -> fho::Result<HardwareDaiInfo> {
+async fn get_hw_dai_info(dai: &fhaudio::DaiProxy) -> Result<HardwareDaiInfo> {
     let properties = dai.get_properties().await.bug_context("Failed to call Dai.GetProperties")?;
 
     let dai_formats = dai
@@ -1616,7 +1616,7 @@ async fn get_hw_dai_info(dai: &fhaudio::DaiProxy) -> fho::Result<HardwareDaiInfo
 /// Returns information about a Composite device from its hardware protocol.
 async fn get_hw_composite_info(
     composite: &fhaudio::CompositeProxy,
-) -> fho::Result<HardwareCompositeInfo> {
+) -> Result<HardwareCompositeInfo> {
     let properties =
         composite.get_properties().await.bug_context("Failed to call Composite.GetProperties")?;
 
@@ -1632,7 +1632,7 @@ async fn get_hw_composite_info(
 /// Returns information about a StreamConfig device from its hardware protocol.
 async fn get_hw_stream_config_info(
     stream_config: &fhaudio::StreamConfigProxy,
-) -> fho::Result<HardwareStreamConfigInfo> {
+) -> Result<HardwareStreamConfigInfo> {
     let properties = stream_config
         .get_properties()
         .await
@@ -1660,7 +1660,7 @@ async fn get_hw_stream_config_info(
 async fn get_hardware_info(
     dev_class: &fio::DirectoryProxy,
     selector: DevfsSelector,
-) -> fho::Result<HardwareInfo> {
+) -> Result<HardwareInfo> {
     let protocol_path = selector.relative_path();
 
     match selector.device_type().0 {
@@ -1693,7 +1693,7 @@ async fn get_hardware_info(
 async fn get_registry_info(
     registry: &Registry,
     selector: RegistrySelector,
-) -> fho::Result<RegistryInfo> {
+) -> Result<RegistryInfo> {
     let token_id = selector.token_id();
 
     let device_info = registry
@@ -1732,7 +1732,7 @@ pub async fn get_info(
     dev_class: &fio::DirectoryProxy,
     registry: Option<&Registry>,
     selector: Selector,
-) -> fho::Result<Info> {
+) -> Result<Info> {
     match selector {
         Selector::Devfs(devfs_selector) => {
             let hw_info = get_hardware_info(dev_class, devfs_selector).await?;

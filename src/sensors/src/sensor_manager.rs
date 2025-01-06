@@ -66,7 +66,7 @@ async fn handle_sensors_request(
             let _ = responder.send(manager.configure_playback(source_config).await);
         }
         ManagerRequest::_UnknownMethod { ordinal, .. } => {
-            tracing::warn!("ManagerRequest::_UnknownMethod with ordinal {}", ordinal);
+            log::warn!("ManagerRequest::_UnknownMethod with ordinal {}", ordinal);
         }
     }
 
@@ -104,7 +104,7 @@ impl SensorManager {
         let fidl_sensors: Vec<SensorInfo> =
             self.sensors.values().into_iter().map(|x| x.info.clone()).collect();
         if fidl_sensors.is_empty() {
-            tracing::warn!("Failed to get any sensors from driver. Sending empty list");
+            log::warn!("Failed to get any sensors from driver. Sending empty list");
         }
 
         fidl_sensors
@@ -114,14 +114,14 @@ impl SensorManager {
         if let Some(sensor) = self.sensors.get_mut(&id) {
             let res = sensor.driver.activate_sensor(id).await;
             if let Err(e) = res {
-                tracing::warn!("Error while activating sensor: {:#?}", e);
+                log::warn!("Error while activating sensor: {:#?}", e);
                 Err(ActivateSensorError::DriverUnavailable)
             } else {
                 sensor.clients.insert(client);
                 Ok(())
             }
         } else {
-            tracing::warn!("Received request to activate unknown sensor id: {}", id);
+            log::warn!("Received request to activate unknown sensor id: {}", id);
             Err(ActivateSensorError::InvalidSensorId)
         }
     }
@@ -136,12 +136,12 @@ impl SensorManager {
             // If this is the last subscriber for this sensor, deactivate it.
             if sensor.clients.len() == 1 {
                 if let Err(e) = sensor.driver.deactivate_sensor(id).await {
-                    tracing::warn!("Error while deactivating sensor: {:#?}", e);
+                    log::warn!("Error while deactivating sensor: {:#?}", e);
                     response = Err(DeactivateSensorError::DriverUnavailable);
                 }
             } else {
                 if !sensor.clients.is_empty() {
-                    tracing::info!(
+                    log::info!(
                         "Unsubscribing client from sensor {:#?}, but there are other subscribers.",
                         id,
                     );
@@ -149,7 +149,7 @@ impl SensorManager {
             }
             sensor.clients.remove(&client);
         } else {
-            tracing::warn!("Received request to deactivate unknown sensor id: {}", id);
+            log::warn!("Received request to deactivate unknown sensor id: {}", id);
             response = Err(DeactivateSensorError::InvalidSensorId);
         }
 
@@ -165,27 +165,27 @@ impl SensorManager {
             match sensor.driver.configure_sensor_rate(id, &sensor_rate_config).await {
                 Ok(Ok(())) => Ok(()),
                 Ok(Err(driver_fidl::ConfigureSensorRateError::InvalidSensorId)) => {
-                    tracing::warn!(
+                    log::warn!(
                         "Received ConfigureSensorRates request for unknown sensor id: {}",
                         id
                     );
                     Err(ConfigureSensorRateError::InvalidSensorId)
                 }
                 Ok(Err(driver_fidl::ConfigureSensorRateError::InvalidConfig)) => {
-                    tracing::warn!(
+                    log::warn!(
                         "Received ConfigureSensorRates request for invalid config: {:#?}",
                         sensor_rate_config
                     );
                     Err(ConfigureSensorRateError::InvalidConfig)
                 }
                 Err(e) => {
-                    tracing::warn!("Error while configuring sensor rates: {:#?}", e);
+                    log::warn!("Error while configuring sensor rates: {:#?}", e);
                     Err(ConfigureSensorRateError::DriverUnavailable)
                 }
                 Ok(Err(_)) => unreachable!(),
             }
         } else {
-            tracing::warn!("Received ConfigureSensorRates request for unknown sensor id: {}", id);
+            log::warn!("Received ConfigureSensorRates request for unknown sensor id: {}", id);
             Err(ConfigureSensorRateError::InvalidSensorId)
         }
     }
@@ -211,7 +211,7 @@ impl SensorManager {
                     response = Ok(());
                 }
                 Err(e) => {
-                    tracing::warn!("Error while configuring sensor playback: {:#?}", e);
+                    log::warn!("Error while configuring sensor playback: {:#?}", e);
                     response = Err(ConfigurePlaybackError::PlaybackUnavailable);
                 }
                 Ok(Err(e)) => {
@@ -268,9 +268,10 @@ impl SensorManager {
         // playback is configured and exit early if it is not.
         svc.watch().await?;
 
-        fuchsia_async::Task::spawn(async move {
+        let svc = fclient::Service::open(driver_fidl::ServiceMarker)?;
+        fuchsia_async::Task::local(async move {
             if let Err(e) = watch_service_directory(svc, manager).await {
-                tracing::error!("Failed to open sensor service! Error: {:#?}", e);
+                log::error!("Failed to open sensor service! Error: {:#?}", e);
             }
         })
         .detach();
@@ -289,7 +290,7 @@ impl SensorManager {
 
         if let Err(_) = self.start_service_watcher(manager.clone()).await {
             if self.playback.is_some() {
-                tracing::warn!("Failed to open sensor driver service directory. Starting with playback sensors only.");
+                log::warn!("Failed to open sensor driver service directory. Starting with playback sensors only.");
             } else {
                 return Err(anyhow::anyhow!(
                     "Failed to open sensors service and sensor playback is not enabled on the system"

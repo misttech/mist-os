@@ -18,6 +18,7 @@ rustc_test("nat") {
     "//src/connectivity/network/tests/fidl/filter-deprecated/common",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",

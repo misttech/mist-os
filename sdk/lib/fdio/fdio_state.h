@@ -8,16 +8,24 @@
 #include <lib/fdio/limits.h>
 #include <lib/fdio/namespace.h>
 #include <sys/types.h>  // mode_t
-#include <threads.h>    // mtx_t
 
 #include <array>
+#include <mutex>
 
 #include "sdk/lib/fdio/cleanpath.h"
 #include "sdk/lib/fdio/fdio_slot.h"
 
 struct fdio_state_t {
-  mtx_t lock;
-  mtx_t cwd_lock __TA_ACQUIRED_BEFORE(lock);
+  std::optional<int> bind_to_fd_locked(const fbl::RefPtr<fdio>& io) __TA_REQUIRES(lock);
+  std::optional<int> bind_to_fd(const fbl::RefPtr<fdio>& io) __TA_EXCLUDES(lock);
+  fbl::RefPtr<fdio> fd_to_io_locked(int fd) __TA_REQUIRES(lock);
+  fbl::RefPtr<fdio> fd_to_io(int fd) __TA_EXCLUDES(lock);
+  fbl::RefPtr<fdio> unbind_from_fd_locked(int fd) __TA_REQUIRES(lock);
+  fbl::RefPtr<fdio> unbind_from_fd(int fd) __TA_EXCLUDES(lock);
+
+  // TODO(tamird): make these private and make this a class.
+  std::mutex lock;
+  std::mutex cwd_lock __TA_ACQUIRED_BEFORE(lock);
   mode_t umask __TA_GUARDED(lock);
   fdio_slot root __TA_GUARDED(lock);
   fdio_slot cwd __TA_GUARDED(lock);
@@ -26,14 +34,6 @@ struct fdio_state_t {
   fdio_internal::PathBuffer cwd_path __TA_GUARDED(cwd_lock);
 };
 
-extern fdio_state_t __fdio_global_state;
-
-#define fdio_lock (__fdio_global_state.lock)
-#define fdio_root_handle (__fdio_global_state.root)
-#define fdio_cwd_handle (__fdio_global_state.cwd)
-#define fdio_cwd_lock (__fdio_global_state.cwd_lock)
-#define fdio_cwd_path (__fdio_global_state.cwd_path)
-#define fdio_fdtab (__fdio_global_state.fdtab)
-#define fdio_root_ns (__fdio_global_state.ns)
+fdio_state_t& fdio_global_state();
 
 #endif  // LIB_FDIO_FDIO_STATE_H_

@@ -2266,8 +2266,8 @@ pub mod composed_protocol {
     }
 }
 
-/// A helper trait for the `ComposedProtocol` client protocol.
-pub trait ComposedProtocolClient<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `ComposedProtocol` client sender.
+pub trait ComposedProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     fn one_way_anon_composed<___R>(
         &self,
         request: &mut ___R,
@@ -2282,7 +2282,7 @@ pub trait ComposedProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, composed_protocol::TwoWayAnonComposed>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, composed_protocol::TwoWayAnonComposed>,
         ::fidl_next::EncodeError,
     >
     where
@@ -2295,11 +2295,7 @@ pub trait ComposedProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
-            '_,
-            ___T,
-            composed_protocol::TwoWayAnonComposedWithError,
-        >,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, composed_protocol::TwoWayAnonComposedWithError>,
         ::fidl_next::EncodeError,
     >
     where
@@ -2320,7 +2316,7 @@ pub trait ComposedProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, composed_protocol::TwoWayNamedComposed>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, composed_protocol::TwoWayNamedComposed>,
         ::fidl_next::EncodeError,
     >
     where
@@ -2331,7 +2327,7 @@ pub trait ComposedProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
+        ::fidl_next::bind::ResponseFuture<
             '_,
             ___T,
             composed_protocol::TwoWayNamedComposedWithError,
@@ -2343,7 +2339,8 @@ pub trait ComposedProtocolClient<___T: ::fidl_next::protocol::Transport> {
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTablePayload<'buf>>;
 }
 
-impl<___T> ComposedProtocolClient<___T> for ::fidl_next::bind::Client<___T, ComposedProtocol>
+impl<___T> ComposedProtocolClientSender<___T>
+    for ::fidl_next::bind::ClientSender<___T, ComposedProtocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -2357,14 +2354,14 @@ where
             Encoded<'buf> = crate::WireComposedProtocolOneWayAnonComposedRequest<'buf>,
         >,
     {
-        self.untyped().send_request(7960710870216447007, request)
+        self.as_untyped().send_one_way(7960710870216447007, request)
     }
 
     fn two_way_anon_composed<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, composed_protocol::TwoWayAnonComposed>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, composed_protocol::TwoWayAnonComposed>,
         ::fidl_next::EncodeError,
     >
     where
@@ -2373,20 +2370,16 @@ where
             Encoded<'buf> = crate::WireComposedProtocolTwoWayAnonComposedRequest,
         >,
     {
-        self.untyped()
-            .send_transaction(8107448265006659060, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(8107448265006659060, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn two_way_anon_composed_with_error<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
-            '_,
-            ___T,
-            composed_protocol::TwoWayAnonComposedWithError,
-        >,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, composed_protocol::TwoWayAnonComposedWithError>,
         ::fidl_next::EncodeError,
     >
     where
@@ -2395,9 +2388,9 @@ where
             Encoded<'buf> = crate::WireComposedProtocolTwoWayAnonComposedWithErrorRequest<'buf>,
         >,
     {
-        self.untyped()
-            .send_transaction(5751989932125743144, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(5751989932125743144, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_named_composed<___R>(
@@ -2408,30 +2401,30 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTablePayload<'buf>>,
     {
-        self.untyped().send_request(1159174053475281336, request)
+        self.as_untyped().send_one_way(1159174053475281336, request)
     }
 
     fn two_way_named_composed<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, composed_protocol::TwoWayNamedComposed>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, composed_protocol::TwoWayNamedComposed>,
         ::fidl_next::EncodeError,
     >
     where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireUnionPayload>,
     {
-        self.untyped()
-            .send_transaction(5022872388073111636, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(5022872388073111636, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn two_way_named_composed_with_error<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<
+        ::fidl_next::bind::ResponseFuture<
             '_,
             ___T,
             composed_protocol::TwoWayNamedComposedWithError,
@@ -2442,9 +2435,9 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTablePayload<'buf>>,
     {
-        self.untyped()
-            .send_transaction(4973436213756973807, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(4973436213756973807, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 }
 
@@ -2453,11 +2446,15 @@ where
 pub trait ComposedProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_anon_composed(
         &mut self,
+        sender: &::fidl_next::bind::ClientSender<___T, ComposedProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<___T, composed_protocol::OnAnonComposed>,
     );
 
     fn on_named_composed(
         &mut self,
+        sender: &::fidl_next::bind::ClientSender<___T, ComposedProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<___T, composed_protocol::OnNamedComposed>,
     );
 }
@@ -2485,40 +2482,48 @@ where
     for<'buf> crate::WireUnionPayload:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             5307191872315199016 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.on_anon_composed(buffer);
+                handler.on_anon_composed(sender, buffer);
             }
 
             1712755118419701115 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.on_named_composed(buffer);
+                handler.on_named_composed(sender, buffer);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }
 
-/// A helper trait for the `ComposedProtocol` server protocol.
-pub trait ComposedProtocolServer<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `ComposedProtocol` server sender.
+pub trait ComposedProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn on_anon_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
     fn on_named_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> ComposedProtocolServer<___T> for ::fidl_next::bind::Server<___T, ComposedProtocol>
+impl<___T> ComposedProtocolServerSender<___T>
+    for ::fidl_next::bind::ServerSender<___T, ComposedProtocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn on_anon_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(5307191872315199016, &mut ())
+        self.as_untyped().send_event(5307191872315199016, &mut ())
     }
 
     fn on_named_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(1712755118419701115, &mut ())
+        self.as_untyped().send_event(1712755118419701115, &mut ())
     }
 }
 
@@ -2527,41 +2532,57 @@ where
 pub trait ComposedProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_anon_composed(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, ComposedProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, composed_protocol::OneWayAnonComposed>,
     );
 
     fn two_way_anon_composed(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, ComposedProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, composed_protocol::TwoWayAnonComposed>,
+
         responder: ::fidl_next::bind::Responder<composed_protocol::TwoWayAnonComposed>,
     );
 
     fn two_way_anon_composed_with_error(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, ComposedProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<
             ___T,
             composed_protocol::TwoWayAnonComposedWithError,
         >,
+
         responder: ::fidl_next::bind::Responder<composed_protocol::TwoWayAnonComposedWithError>,
     );
 
     fn one_way_named_composed(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, ComposedProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, composed_protocol::OneWayNamedComposed>,
     );
 
     fn two_way_named_composed(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, ComposedProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, composed_protocol::TwoWayNamedComposed>,
+
         responder: ::fidl_next::bind::Responder<composed_protocol::TwoWayNamedComposed>,
     );
 
     fn two_way_named_composed_with_error(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, ComposedProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<
             ___T,
             composed_protocol::TwoWayNamedComposedWithError,
         >,
+
         responder: ::fidl_next::bind::Responder<composed_protocol::TwoWayNamedComposedWithError>,
     );
 }
@@ -2589,26 +2610,34 @@ where
     for<'buf> crate::WireTablePayload<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             7960710870216447007 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_anon_composed(buffer);
+                handler.one_way_anon_composed(sender, buffer);
             }
 
             1159174053475281336 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_named_composed(buffer);
+                handler.one_way_named_composed(sender, buffer);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
@@ -2616,31 +2645,33 @@ where
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_anon_composed(buffer, responder);
+                handler.two_way_anon_composed(sender, buffer, responder);
             }
 
             5751989932125743144 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_anon_composed_with_error(buffer, responder);
+                handler.two_way_anon_composed_with_error(sender, buffer, responder);
             }
 
             5022872388073111636 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_named_composed(buffer, responder);
+                handler.two_way_named_composed(sender, buffer, responder);
             }
 
             4973436213756973807 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_named_composed_with_error(buffer, responder);
+                handler.two_way_named_composed_with_error(sender, buffer, responder);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }
@@ -4622,8 +4653,8 @@ pub mod main_protocol {
     }
 }
 
-/// A helper trait for the `MainProtocol` client protocol.
-pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `MainProtocol` client sender.
+pub trait MainProtocolClientSender<___T: ::fidl_next::protocol::Transport> {
     fn one_way_anon_composed<___R>(
         &self,
         request: &mut ___R,
@@ -4638,7 +4669,7 @@ pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayAnonComposed>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayAnonComposed>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4651,7 +4682,7 @@ pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayAnonComposedWithError>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayAnonComposedWithError>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4672,7 +4703,7 @@ pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayNamedComposed>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayNamedComposed>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4683,7 +4714,7 @@ pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayNamedComposedWithError>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayNamedComposedWithError>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4702,7 +4733,7 @@ pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayLocal>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayLocal>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4713,7 +4744,7 @@ pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayLocalWithError>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayLocalWithError>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4734,7 +4765,7 @@ pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayAnon>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayAnon>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4747,7 +4778,7 @@ pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayAnonWithError>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayAnonWithError>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4757,7 +4788,7 @@ pub trait MainProtocolClient<___T: ::fidl_next::protocol::Transport> {
         >;
 }
 
-impl<___T> MainProtocolClient<___T> for ::fidl_next::bind::Client<___T, MainProtocol>
+impl<___T> MainProtocolClientSender<___T> for ::fidl_next::bind::ClientSender<___T, MainProtocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -4771,14 +4802,14 @@ where
             Encoded<'buf> = crate::WireComposedProtocolOneWayAnonComposedRequest<'buf>,
         >,
     {
-        self.untyped().send_request(7960710870216447007, request)
+        self.as_untyped().send_one_way(7960710870216447007, request)
     }
 
     fn two_way_anon_composed<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayAnonComposed>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayAnonComposed>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4787,16 +4818,16 @@ where
             Encoded<'buf> = crate::WireComposedProtocolTwoWayAnonComposedRequest,
         >,
     {
-        self.untyped()
-            .send_transaction(8107448265006659060, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(8107448265006659060, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn two_way_anon_composed_with_error<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayAnonComposedWithError>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayAnonComposedWithError>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4805,9 +4836,9 @@ where
             Encoded<'buf> = crate::WireComposedProtocolTwoWayAnonComposedWithErrorRequest<'buf>,
         >,
     {
-        self.untyped()
-            .send_transaction(5751989932125743144, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(5751989932125743144, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_named_composed<___R>(
@@ -4818,39 +4849,39 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTablePayload<'buf>>,
     {
-        self.untyped().send_request(1159174053475281336, request)
+        self.as_untyped().send_one_way(1159174053475281336, request)
     }
 
     fn two_way_named_composed<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayNamedComposed>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayNamedComposed>,
         ::fidl_next::EncodeError,
     >
     where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireUnionPayload>,
     {
-        self.untyped()
-            .send_transaction(5022872388073111636, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(5022872388073111636, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn two_way_named_composed_with_error<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayNamedComposedWithError>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayNamedComposedWithError>,
         ::fidl_next::EncodeError,
     >
     where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTablePayload<'buf>>,
     {
-        self.untyped()
-            .send_transaction(4973436213756973807, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(4973436213756973807, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_local<___R>(
@@ -4861,39 +4892,39 @@ where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTablePayload<'buf>>,
     {
-        self.untyped().send_request(4131125523789731521, request)
+        self.as_untyped().send_one_way(4131125523789731521, request)
     }
 
     fn two_way_local<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayLocal>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayLocal>,
         ::fidl_next::EncodeError,
     >
     where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireUnionPayload>,
     {
-        self.untyped()
-            .send_transaction(2781407403924167255, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(2781407403924167255, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn two_way_local_with_error<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayLocalWithError>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayLocalWithError>,
         ::fidl_next::EncodeError,
     >
     where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTablePayload<'buf>>,
     {
-        self.untyped()
-            .send_transaction(5367158046384127463, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(5367158046384127463, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn one_way_anon<___R>(
@@ -4906,14 +4937,14 @@ where
             Encoded<'buf> = crate::WireMainProtocolOneWayAnonRequest<'buf>,
         >,
     {
-        self.untyped().send_request(8596232895075765804, request)
+        self.as_untyped().send_one_way(8596232895075765804, request)
     }
 
     fn two_way_anon<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayAnon>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayAnon>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4922,16 +4953,16 @@ where
             Encoded<'buf> = crate::WireMainProtocolTwoWayAnonRequest,
         >,
     {
-        self.untyped()
-            .send_transaction(4600336371166510638, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(4600336371166510638, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 
     fn two_way_anon_with_error<___R>(
         &self,
         request: &mut ___R,
     ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, main_protocol::TwoWayAnonWithError>,
+        ::fidl_next::bind::ResponseFuture<'_, ___T, main_protocol::TwoWayAnonWithError>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4940,9 +4971,9 @@ where
             Encoded<'buf> = crate::WireMainProtocolTwoWayAnonWithErrorRequest<'buf>,
         >,
     {
-        self.untyped()
-            .send_transaction(2104032160763523653, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(2104032160763523653, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 }
 
@@ -4951,20 +4982,31 @@ where
 pub trait MainProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_anon_composed(
         &mut self,
+        sender: &::fidl_next::bind::ClientSender<___T, MainProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<___T, main_protocol::OnAnonComposed>,
     );
 
     fn on_named_composed(
         &mut self,
+        sender: &::fidl_next::bind::ClientSender<___T, MainProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<___T, main_protocol::OnNamedComposed>,
     );
 
     fn on_local(
         &mut self,
+        sender: &::fidl_next::bind::ClientSender<___T, MainProtocol>,
+
         message: ::fidl_next::bind::ResponseBuffer<___T, main_protocol::OnLocal>,
     );
 
-    fn on_anon(&mut self, message: ::fidl_next::bind::ResponseBuffer<___T, main_protocol::OnAnon>);
+    fn on_anon(
+        &mut self,
+        sender: &::fidl_next::bind::ClientSender<___T, MainProtocol>,
+
+        message: ::fidl_next::bind::ResponseBuffer<___T, main_protocol::OnAnon>,
+    );
 }
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for MainProtocol
@@ -5008,35 +5050,42 @@ where
     for<'buf> crate::WireMainProtocolOnAnonRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             5307191872315199016 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.on_anon_composed(buffer);
+                handler.on_anon_composed(sender, buffer);
             }
 
             1712755118419701115 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.on_named_composed(buffer);
+                handler.on_named_composed(sender, buffer);
             }
 
             8208103053879750285 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.on_local(buffer);
+                handler.on_local(sender, buffer);
             }
 
             977183060572945300 => {
                 let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                handler.on_anon(buffer);
+                handler.on_anon(sender, buffer);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }
 
-/// A helper trait for the `MainProtocol` server protocol.
-pub trait MainProtocolServer<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `MainProtocol` server sender.
+pub trait MainProtocolServerSender<___T: ::fidl_next::protocol::Transport> {
     fn on_anon_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 
     fn on_named_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
@@ -5046,24 +5095,24 @@ pub trait MainProtocolServer<___T: ::fidl_next::protocol::Transport> {
     fn on_anon(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> MainProtocolServer<___T> for ::fidl_next::bind::Server<___T, MainProtocol>
+impl<___T> MainProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, MainProtocol>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn on_anon_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(5307191872315199016, &mut ())
+        self.as_untyped().send_event(5307191872315199016, &mut ())
     }
 
     fn on_named_composed(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(1712755118419701115, &mut ())
+        self.as_untyped().send_event(1712755118419701115, &mut ())
     }
 
     fn on_local(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(8208103053879750285, &mut ())
+        self.as_untyped().send_event(8208103053879750285, &mut ())
     }
 
     fn on_anon(&self) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-        self.untyped().send_event(977183060572945300, &mut ())
+        self.as_untyped().send_event(977183060572945300, &mut ())
     }
 }
 
@@ -5072,72 +5121,104 @@ where
 pub trait MainProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_anon_composed(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::OneWayAnonComposed>,
     );
 
     fn two_way_anon_composed(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::TwoWayAnonComposed>,
+
         responder: ::fidl_next::bind::Responder<main_protocol::TwoWayAnonComposed>,
     );
 
     fn two_way_anon_composed_with_error(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::TwoWayAnonComposedWithError>,
+
         responder: ::fidl_next::bind::Responder<main_protocol::TwoWayAnonComposedWithError>,
     );
 
     fn one_way_named_composed(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::OneWayNamedComposed>,
     );
 
     fn two_way_named_composed(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::TwoWayNamedComposed>,
+
         responder: ::fidl_next::bind::Responder<main_protocol::TwoWayNamedComposed>,
     );
 
     fn two_way_named_composed_with_error(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<
             ___T,
             main_protocol::TwoWayNamedComposedWithError,
         >,
+
         responder: ::fidl_next::bind::Responder<main_protocol::TwoWayNamedComposedWithError>,
     );
 
     fn one_way_local(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::OneWayLocal>,
     );
 
     fn two_way_local(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::TwoWayLocal>,
+
         responder: ::fidl_next::bind::Responder<main_protocol::TwoWayLocal>,
     );
 
     fn two_way_local_with_error(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::TwoWayLocalWithError>,
+
         responder: ::fidl_next::bind::Responder<main_protocol::TwoWayLocalWithError>,
     );
 
     fn one_way_anon(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::OneWayAnon>,
     );
 
     fn two_way_anon(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::TwoWayAnon>,
+
         responder: ::fidl_next::bind::Responder<main_protocol::TwoWayAnon>,
     );
 
     fn two_way_anon_with_error(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, MainProtocol>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, main_protocol::TwoWayAnonWithError>,
+
         responder: ::fidl_next::bind::Responder<main_protocol::TwoWayAnonWithError>,
     );
 }
@@ -5183,36 +5264,44 @@ where
     for<'buf> crate::WireMainProtocolTwoWayAnonWithErrorRequest<'buf>:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
             7960710870216447007 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_anon_composed(buffer);
+                handler.one_way_anon_composed(sender, buffer);
             }
 
             1159174053475281336 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_named_composed(buffer);
+                handler.one_way_named_composed(sender, buffer);
             }
 
             4131125523789731521 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_local(buffer);
+                handler.one_way_local(sender, buffer);
             }
 
             8596232895075765804 => {
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.one_way_anon(buffer);
+                handler.one_way_anon(sender, buffer);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
@@ -5220,59 +5309,61 @@ where
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_anon_composed(buffer, responder);
+                handler.two_way_anon_composed(sender, buffer, responder);
             }
 
             5751989932125743144 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_anon_composed_with_error(buffer, responder);
+                handler.two_way_anon_composed_with_error(sender, buffer, responder);
             }
 
             5022872388073111636 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_named_composed(buffer, responder);
+                handler.two_way_named_composed(sender, buffer, responder);
             }
 
             4973436213756973807 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_named_composed_with_error(buffer, responder);
+                handler.two_way_named_composed_with_error(sender, buffer, responder);
             }
 
             2781407403924167255 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_local(buffer, responder);
+                handler.two_way_local(sender, buffer, responder);
             }
 
             5367158046384127463 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_local_with_error(buffer, responder);
+                handler.two_way_local_with_error(sender, buffer, responder);
             }
 
             4600336371166510638 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_anon(buffer, responder);
+                handler.two_way_anon(sender, buffer, responder);
             }
 
             2104032160763523653 => {
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.two_way_anon_with_error(buffer, responder);
+                handler.two_way_anon_with_error(sender, buffer, responder);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }

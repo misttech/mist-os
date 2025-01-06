@@ -15,7 +15,6 @@
 
 namespace fake_object {
 
-__EXPORT
 bool FakeHandleTable::IsValidFakeHandle(zx_handle_t handle) {
   char prop_name[ZX_MAX_NAME_LEN] = {0};
 
@@ -34,7 +33,6 @@ bool FakeHandleTable::IsValidFakeHandle(zx_handle_t handle) {
   return (strncmp(prop_name, kFakeObjectPropName, ZX_MAX_NAME_LEN) == 0);
 }
 
-__EXPORT
 zx::result<std::shared_ptr<FakeObject>> FakeHandleTable::Get(zx_handle_t handle)
     __TA_EXCLUDES(lock_) {
   std::lock_guard guard(lock_);
@@ -49,7 +47,6 @@ zx::result<std::shared_ptr<FakeObject>> FakeHandleTable::Get(zx_handle_t handle)
   return zx::success(obj);
 }
 
-__EXPORT
 zx::result<zx_handle_t> FakeHandleTable::Add(std::shared_ptr<FakeObject> obj) {
   // Fake objects are represented as empty VMOs because:
   // 1. We need a simple object that will have minimal effect on the test environment
@@ -78,7 +75,6 @@ zx::result<zx_handle_t> FakeHandleTable::Add(std::shared_ptr<FakeObject> obj) {
   return zx::success(handle);
 }
 
-__EXPORT
 zx::result<> FakeHandleTable::Remove(zx_handle_t handle) {
   // Pull the object out of the handle table so that we can release the handle
   // table lock before running the object's dtor. This prevents issues like
@@ -94,13 +90,11 @@ zx::result<> FakeHandleTable::Remove(zx_handle_t handle) {
   return zx::ok();
 }
 
-__EXPORT
 void FakeHandleTable::Clear() {
   std::lock_guard guard(lock_);
   handles_.clear();
 }
 
-__EXPORT
 void FakeHandleTable::Dump() {
   std::lock_guard guard(lock_);
   printf("Fake Handle Table [size: %zu]:\n", handles_.size());

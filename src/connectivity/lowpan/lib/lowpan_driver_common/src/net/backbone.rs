@@ -8,10 +8,10 @@ use fidl_fuchsia_net_interfaces::*;
 use fuchsia_async::net::DatagramSocket;
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::BoxStream;
+use log::{debug, info};
 use socket2::{Domain, Protocol};
 use std::collections::HashSet;
 use std::num::NonZeroU64;
-use tracing::{debug, info};
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
 pub struct BackboneNetworkChanged;

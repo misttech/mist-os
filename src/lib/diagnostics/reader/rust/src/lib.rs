@@ -569,6 +569,7 @@ mod tests {
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use diagnostics_log::{Publisher, PublisherOptions};
+    use fidl::endpoints::ServerEnd;
     use fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
     };
@@ -878,44 +879,10 @@ mod tests {
                         ..
                     } => {
                         let data = data_to_send.clone();
-                        fasync::Task::spawn(async move {
-                            let mut called = false;
-                            let mut stream = result_stream.into_stream();
-                            while let Some(req) = stream.try_next().await.expect("stream request") {
-                                match req {
-                                    fdiagnostics::BatchIteratorRequest::WaitForReady {
-                                        responder,
-                                    } => {
-                                        let _ = responder.send();
-                                    }
-                                    fdiagnostics::BatchIteratorRequest::GetNext { responder } => {
-                                        if called {
-                                            responder.send(Ok(Vec::new())).expect("send response");
-                                            continue;
-                                        }
-                                        called = true;
-                                        let content = serde_json::to_string_pretty(&data)
-                                            .expect("json pretty");
-                                        let vmo_size = content.len() as u64;
-                                        let vmo = zx::Vmo::create(vmo_size).expect("create vmo");
-                                        vmo.write(content.as_bytes(), 0).expect("write vmo");
-                                        let buffer =
-                                            fidl_fuchsia_mem::Buffer { vmo, size: vmo_size };
-                                        responder
-                                            .send(Ok(vec![fdiagnostics::FormattedContent::Json(
-                                                buffer,
-                                            )]))
-                                            .expect("send response");
-                                    }
-                                    fdiagnostics::BatchIteratorRequest::_UnknownMethod {
-                                        ..
-                                    } => {
-                                        unreachable!("Unexpected method call");
-                                    }
-                                }
-                            }
-                        })
-                        .detach();
+                        fasync::Task::spawn(handle_batch_iterator(data, result_stream)).detach();
+                    }
+                    fdiagnostics::ArchiveAccessorRequest::WaitForReady { responder, .. } => {
+                        let _ = responder.send();
                     }
                     fdiagnostics::ArchiveAccessorRequest::_UnknownMethod { .. } => {
                         unreachable!("Unexpected method call");
@@ -925,6 +892,39 @@ mod tests {
         })
         .detach();
         proxy
+    }
+
+    async fn handle_batch_iterator(
+        data: serde_json::Value,
+        result_stream: ServerEnd<fdiagnostics::BatchIteratorMarker>,
+    ) {
+        let mut called = false;
+        let mut stream = result_stream.into_stream();
+        while let Some(req) = stream.try_next().await.expect("stream request") {
+            match req {
+                fdiagnostics::BatchIteratorRequest::WaitForReady { responder } => {
+                    let _ = responder.send();
+                }
+                fdiagnostics::BatchIteratorRequest::GetNext { responder } => {
+                    if called {
+                        responder.send(Ok(Vec::new())).expect("send response");
+                        continue;
+                    }
+                    called = true;
+                    let content = serde_json::to_string_pretty(&data).expect("json pretty");
+                    let vmo_size = content.len() as u64;
+                    let vmo = zx::Vmo::create(vmo_size).expect("create vmo");
+                    vmo.write(content.as_bytes(), 0).expect("write vmo");
+                    let buffer = fidl_fuchsia_mem::Buffer { vmo, size: vmo_size };
+                    responder
+                        .send(Ok(vec![fdiagnostics::FormattedContent::Json(buffer)]))
+                        .expect("send response");
+                }
+                fdiagnostics::BatchIteratorRequest::_UnknownMethod { .. } => {
+                    unreachable!("Unexpected method call");
+                }
+            }
+        }
     }
 
     async fn create_realm() -> RealmBuilder {

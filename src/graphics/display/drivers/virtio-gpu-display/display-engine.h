@@ -21,10 +21,10 @@
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-interface.h"
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-interface.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/imported-images.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/virtio-gpu-device.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-interface.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -42,17 +42,18 @@ namespace virtio_display {
 
 class Ring;
 
-class DisplayEngine final : public DisplayEngineInterface {
+class DisplayEngine final : public display::DisplayEngineInterface {
  public:
   static zx::result<std::unique_ptr<DisplayEngine>> Create(
       fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client, zx::bti bti,
-      std::unique_ptr<virtio::Backend> backend, DisplayEngineEventsInterface* engine_events);
+      std::unique_ptr<virtio::Backend> backend,
+      display::DisplayEngineEventsInterface* engine_events);
 
   // Exposed for testing. Production code must use the Create() factory method.
   //
   // `engine_events` must not be null, and must outlive the newly created
   // instance. `gpu_device` must not be null.
-  DisplayEngine(DisplayEngineEventsInterface* engine_events,
+  DisplayEngine(display::DisplayEngineEventsInterface* engine_events,
                 fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_client,
                 std::unique_ptr<VirtioGpuDevice> gpu_device);
   ~DisplayEngine();
@@ -111,7 +112,7 @@ class DisplayEngine final : public DisplayEngineInterface {
   // The sysmem allocator client used to bind incoming buffer collection tokens.
   ImportedImages imported_images_;
 
-  DisplayEngineEventsInterface& engine_events_;
+  display::DisplayEngineEventsInterface& engine_events_;
 
   uint32_t latest_framebuffer_resource_id_ = virtio_abi::kInvalidResourceId;
   uint32_t displayed_framebuffer_resource_id_ = virtio_abi::kInvalidResourceId;

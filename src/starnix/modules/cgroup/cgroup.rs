@@ -29,7 +29,7 @@ use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::ops::Deref;
 use std::sync::{Arc, OnceLock, Weak};
 
-use crate::freezer::FreezerFile;
+use crate::freezer::{FreezerFile, FreezerState};
 
 const CONTROLLERS_FILE: &str = "cgroup.controllers";
 const PROCS_FILE: &str = "cgroup.procs";
@@ -292,12 +292,51 @@ struct CgroupState {
 
     /// Wait queue to thaw all blocked tasks in this cgroup.
     wait_queue: WaitQueue,
+
+    /// State of the cgroup freezer.
+    freezer_state: FreezerState,
 }
 
 impl CgroupState {
     // Goes through `processes` and remove processes that are no longer alive.
     fn update_processes(&mut self) {
-        self.processes.retain(|_pid, thread_group| thread_group.upgrade().is_some());
+        self.processes.retain(|_pid, thread_group| {
+            let Some(thread_group) = thread_group.upgrade() else {
+                return false;
+            };
+            let terminating = thread_group.read().terminating;
+            !terminating
+        });
+    }
+
+    fn freeze_process(&self, pid: pid_t) -> Result<(), Errno> {
+        // Only freeze a process when the freezer is in frozen state.
+        if self.freezer_state != FreezerState::Frozen {
+            return error!(EINVAL);
+        }
+
+        let thread_group = self
+            .processes
+            .get(&pid)
+            .ok_or_else(|| errno!(ENOENT))?
+            .upgrade()
+            .ok_or_else(|| errno!(ENOENT))?;
+
+        self.freeze_thread_group(&thread_group)
+    }
+
+    fn freeze_thread_group(&self, thread_group: &ThreadGroup) -> Result<(), Errno> {
+        // Create static-lifetime TempRefs of Tasks so that we avoid don't hold the ThreadGroup
+        // lock while iterating and sending the signal.
+        // SAFETY: static TempRefs are released after all signals are queued.
+        let tasks = thread_group.read().tasks().map(TempRef::into_static).collect::<Vec<_>>();
+        for task in tasks {
+            let waiter = Waiter::new();
+            let wait_canceler = self.wait_queue.wait_async(&waiter);
+            send_freeze_signal(&task, waiter, wait_canceler)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -379,6 +418,12 @@ impl Cgroup {
             return error!(ENOENT);
         }
         state.processes.insert(pid, thread_group);
+
+        // Check if the cgroup is frozen. If so, freeze the new process.
+        if state.freezer_state == FreezerState::Frozen {
+            state.freeze_process(pid)?;
+        }
+
         Ok(())
     }
 
@@ -416,6 +461,7 @@ impl CgroupOps for Cgroup {
                 entry.insert(self.weak_self.clone());
             }
         }
+
         Ok(())
     }
 
@@ -466,27 +512,22 @@ impl CgroupOps for Cgroup {
     }
 
     fn freeze(&self) -> Result<(), Errno> {
-        let state = self.state.lock();
+        let mut state = self.state.lock();
 
         for (_, thread_group) in state.processes.iter() {
             let Some(thread_group) = thread_group.upgrade() else {
                 continue;
             };
-            // Create static-lifetime TempRefs of Tasks so that we avoid don't hold the ThreadGroup
-            // lock while iterating and sending the signal.
-            // SAFETY: static TempRefs are released after all signals are queued.
-            let tasks = thread_group.read().tasks().map(TempRef::into_static).collect::<Vec<_>>();
-            for task in tasks {
-                let waiter = Waiter::new();
-                let wait_canceler = state.wait_queue.wait_async(&waiter);
-                send_freeze_signal(&task, waiter, wait_canceler)?;
-            }
+            state.freeze_thread_group(&thread_group)?;
         }
+        state.freezer_state = FreezerState::Frozen;
         Ok(())
     }
 
     fn thaw(&self) {
-        self.state.lock().wait_queue.notify_all();
+        let mut state = self.state.lock();
+        state.wait_queue.notify_all();
+        state.freezer_state = FreezerState::Thawed;
     }
 }
 

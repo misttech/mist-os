@@ -310,7 +310,7 @@ zx_status_t Astro::SdioInit() {
 
   const std::vector<fpbus::Metadata> sd_emmc_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_SDMMC),
+          .id = fuchsia_hardware_sdmmc::wire::SdmmcMetadata::kSerializableName,
           .data = std::move(sdmmc_metadata.value()),
       }},
   };

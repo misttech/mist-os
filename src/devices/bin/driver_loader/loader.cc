@@ -58,9 +58,13 @@ std::unique_ptr<Loader> Loader::Create(async_dispatcher_t* dispatcher,
                                             diag, std::move(*stub_ld_vmo)));
 }
 
-zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
-    zx::process process, zx::vmar root_vmar, zx::vmo exec_vmo, zx::vmo vdso_vmo,
-    fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
+void Loader::Connect(fidl::ServerEnd<fuchsia_driver_loader::DriverHostLauncher> server_end) {
+  bindings_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+}
+
+zx::result<> Loader::Start(zx::process process, zx::vmar root_vmar, zx::vmo exec_vmo,
+                           zx::vmo vdso_vmo, fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+                           fidl::ServerEnd<fuchsia_driver_loader::DriverHost> server_end) {
   auto diag = MakeDiagnostics();
 
   Linker linker;
@@ -171,7 +175,6 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
     return process_state.take_error();
   }
 
-  auto [client_end, server_end] = fidl::Endpoints<fuchsia_driver_loader::DriverHost>::Create();
   status = process_state->BindServer(dispatcher_, std::move(server_end));
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to bind server endpoint to process state: %s",
@@ -185,7 +188,18 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
     return zx::error(status);
   }
   started_processes_.push_back(std::move(*process_state));
-  return zx::ok(std::move(client_end));
+  return zx::ok();
+}
+
+void Loader::Launch(LaunchRequestView request, LaunchCompleter::Sync& completer) {
+  auto result = Start(std::move(request->process()), std::move(request->root_vmar()),
+                      std::move(request->driver_host_binary()), std::move(request->vdso()),
+                      std::move(request->driver_host_libs()), std::move(request->driver_host()));
+  if (result.is_error()) {
+    completer.ReplyError(result.status_value());
+    return;
+  }
+  completer.ReplySuccess();
 }
 
 // static
@@ -287,22 +301,26 @@ zx_status_t Loader::ProcessState::Start(zx::channel bootstrap_receiver) {
 
 void Loader::ProcessState::LoadDriver(LoadDriverRequestView request,
                                       LoadDriverCompleter::Sync& completer) {
-  auto result =
-      LoadDriverModule(std::string(request->driver_soname().get()),
-                       std::move(request->driver_binary()), std::move(request->driver_libs()));
+  fidl::VectorView<fuchsia_driver_loader::wire::RootModule> additional_root_modules;
+  if (request->has_additional_root_modules()) {
+    additional_root_modules = request->additional_root_modules();
+  }
+  auto result = LoadDriverModule(std::string(request->driver_soname().get()),
+                                 std::move(request->driver_binary()),
+                                 std::move(request->driver_libs()), additional_root_modules);
   if (result.is_error()) {
     completer.ReplyError(result.status_value());
     return;
   }
   fidl::Arena arena;
   completer.ReplySuccess(fuchsia_driver_loader::wire::DriverHostLoadDriverResponse::Builder(arena)
-                             .runtime_load_address(*result)
+                             .dynamic_linking_abi(*result)
                              .Build());
 }
 
-zx::result<Loader::DriverStartAddr> Loader::ProcessState::LoadDriverModule(
-    std::string driver_name, zx::vmo driver_module,
-    fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
+zx::result<Loader::DynamicLinkingPassiveAbi> Loader::ProcessState::LoadDriverModule(
+    std::string driver_name, zx::vmo driver_module, fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+    fidl::VectorView<fuchsia_driver_loader::wire::RootModule> additional_root_modules) {
   auto diag = MakeDiagnostics();
 
   Linker::Soname root_module_name{driver_name};
@@ -322,6 +340,20 @@ zx::result<Loader::DriverStartAddr> Loader::ProcessState::LoadDriverModule(
   Linker::InitModuleList initial_modules = preloaded_modules_;
   initial_modules.emplace_back(Linker::RootModule(decoded_module, root_module_name));
 
+  // We need to keep these strings alive for |Linker.Init|.
+  std::vector<std::string> additional_root_modules_names;
+  for (auto& module : additional_root_modules) {
+    additional_root_modules_names.emplace_back(std::string(module.name().get()));
+    Linker::Soname name{additional_root_modules_names.back()};
+    Linker::Module::DecodedPtr decoded_module =
+        Linker::Module::Decoded::Create(diag, std::move(module.binary()), kPageSize);
+    if (!decoded_module) {
+      LOGF(ERROR, "Failed to decode additional root module module %s", name.c_str());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    initial_modules.emplace_back(Linker::RootModule(decoded_module, name));
+  }
+
   auto init_result =
       linker.Init(diag, std::move(initial_modules), GetDepFunction(diag, std::move(lib_dir)));
   if (!init_result) {
@@ -333,9 +365,13 @@ zx::result<Loader::DriverStartAddr> Loader::ProcessState::LoadDriverModule(
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  ZX_ASSERT_MSG(init_result->size() == 3u,
-                "Linker.Init returned an unexpected number of elements, want %u got %lu", 3u,
-                init_result->size());
+  // We expect the |init_result| vector to be the same size as the number of |initial_modules|.
+  // This includes the driver module, the two preloaded modules (driver host and vdso),
+  // and any additional root modules.
+  size_t expected_init_result_size = 3u + additional_root_modules.count();
+  ZX_ASSERT_MSG(init_result->size() == expected_init_result_size,
+                "Linker.Init returned an unexpected number of elements, want %lu got %lu",
+                expected_init_result_size, init_result->size());
 
   if (!linker.Allocate(diag, root_vmar_.borrow())) {
     // As |Init| has succeeded, |Allocate| should only fail due to system errors such as resource
@@ -374,22 +410,15 @@ zx::result<Loader::DriverStartAddr> Loader::ProcessState::LoadDriverModule(
 
   linker.Commit();
 
-  // Look up the module's entry-point symbol.
-  // TODO(https://fxbug.dev/365155458): we should return abi_vaddr() instead.
-  constexpr elfldltl::SymbolName kDriverStart{kDriverStartSymbol};
-  auto* symbol = kDriverStart.Lookup(linker.main_module().module().symbols);
-  if (!symbol) {
-    LOGF(ERROR, "Could not find driver start symbol");
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-  DriverStartAddr addr = symbol->value + linker.main_module().load_bias();
-  ZX_ASSERT_MSG(addr != 0u, "Got null for driver start address");
+  DynamicLinkingPassiveAbi passive_abi = linker.abi_vaddr();
+
+  ZX_ASSERT_MSG(passive_abi != 0u, "Got null for dynamic linking passive abi address");
 
   if (load_driver_handler_for_testing_) {
-    load_driver_handler_for_testing_(bootstrap_sender_.borrow(), addr);
+    load_driver_handler_for_testing_(bootstrap_sender_.borrow(), passive_abi);
   }
 
-  return zx::ok(addr);
+  return zx::ok(passive_abi);
 }
 
 }  // namespace driver_loader

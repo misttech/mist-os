@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/virtio-gpu-display/gpu-device-driver.h"
 
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/start_completer.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -24,15 +23,15 @@
 #include <bind/fuchsia/display/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-banjo-adapter.h"
-#include "src/graphics/display/drivers/virtio-gpu-display/display-engine-events-banjo.h"
 #include "src/graphics/display/drivers/virtio-gpu-display/display-engine.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 
 namespace virtio_display {
 
 zx::result<> GpuDeviceDriver::InitResources() {
   fbl::AllocChecker alloc_checker;
-  engine_events_ = fbl::make_unique_checked<DisplayEngineEventsBanjo>(&alloc_checker);
+  engine_events_ = fbl::make_unique_checked<display::DisplayEngineEventsBanjo>(&alloc_checker);
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineEventsBanjo");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -69,7 +68,7 @@ zx::result<> GpuDeviceDriver::InitResources() {
   }
   display_engine_ = std::move(display_engine_result).value();
 
-  engine_banjo_adapter_ = fbl::make_unique_checked<DisplayEngineBanjoAdapter>(
+  engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
       &alloc_checker, display_engine_.get(), engine_events_.get());
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineBanjoAdapter");
@@ -100,7 +99,7 @@ zx::result<> GpuDeviceDriver::InitDisplayNode() {
     return compat_server_init_result.take_error();
   }
 
-  const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
+  const fuchsia_driver_framework::NodeProperty node_properties[] = {
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_ENGINE),
   };
   const std::vector<fuchsia_driver_framework::Offer> node_offers =
@@ -132,13 +131,13 @@ zx::result<> GpuDeviceDriver::InitGpuControlNode() {
 
   static constexpr std::string_view kGpuControlChildNodeName = "virtio-gpu-control";
 
-  const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {};
-  const std::vector<fuchsia_driver_framework::Offer> node_offers = {
+  const fuchsia_driver_framework::Offer node_offers[] = {
       fdf::MakeOffer2<fuchsia_gpu_virtio::Service>(component::kDefaultInstance),
   };
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
-      gpu_control_node_controller_client_result =
-          AddChild(kGpuControlChildNodeName, node_properties, node_offers);
+      gpu_control_node_controller_client_result = AddChild(
+          kGpuControlChildNodeName, cpp20::span<const fuchsia_driver_framework::NodeProperty>(),
+          cpp20::span<const fuchsia_driver_framework::Offer>(node_offers, 1));
   if (gpu_control_node_controller_client_result.is_error()) {
     FDF_LOG(ERROR, "Failed to add child node: %s",
             gpu_control_node_controller_client_result.status_string());

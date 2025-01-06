@@ -35,8 +35,8 @@ rustc_binary("bin") {
   test_deps = [
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/diagnostics/reader/rust",
-    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:tracing",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }

@@ -1,0 +1,208 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This lists all the different kinds of public headers that libc is responsible
+# for.  See README.md for more details.  These are in a separate .gni file so
+# that they can be used by the sysroot_entries.gni machinery and in BUILD.gn.
+libc_headers = {
+  # The *_dir values and *_headers lists are used by BUILD.gn code.
+  root_dir = "//zircon/system/ulib/c/include"
+  golden_dir = "$root_dir/llvm-libc-golden"
+  musl_dir = "//zircon/third_party/ulib/musl/include"
+
+  # Files maintained here in $libc/include.  These are Fuchsia inventions and
+  # their only source of truth is right here.
+  root_headers = [
+    "zircon/dlfcn.h",
+    "zircon/lookup.h",
+    "zircon/sanitizer.h",
+    "zircon/threads.h",
+    "zircon/utc.h",
+  ]
+
+  # Files taken from llvm-libc's include/ directory in some fashion.
+  # See README.md about the two different fashions.
+  llvm_libc_headers = [ "__llvm-libc-common.h" ]
+
+  # Files inherited from the legacy musl fork.  These are maintained within the
+  # source tree and have no other active source of truth, but they are not
+  # original to Fuchsia.  These will eventually be replaced or moved elsewhere.
+  musl_headers = [
+    "alloca.h",
+    "ar.h",
+    "arpa/ftp.h",
+    "arpa/inet.h",
+    "arpa/nameser.h",
+    "arpa/nameser_compat.h",
+    "arpa/telnet.h",
+    "arpa/tftp.h",
+    "assert.h",
+    "bits/aarch64/fenv.h",
+    "bits/aarch64/setjmp.h",
+    "bits/alltypes.h",
+    "bits/errno.h",
+    "bits/fenv.h",
+    "bits/io.h",
+    "bits/ioctl.h",
+    "bits/ipc.h",
+    "bits/limits.h",
+    "bits/null.h",
+    "bits/poll.h",
+    "bits/posix.h",
+    "bits/resource.h",
+    "bits/riscv64/fenv.h",
+    "bits/riscv64/setjmp.h",
+    "bits/setjmp.h",
+    "bits/signal.h",
+    "bits/stat.h",
+    "bits/statfs.h",
+    "bits/termios.h",
+    "bits/x86_64/fenv.h",
+    "bits/x86_64/io.h",
+    "bits/x86_64/setjmp.h",
+    "byteswap.h",
+    "complex.h",
+    "cpio.h",
+    "ctype.h",
+    "dirent.h",
+    "dlfcn.h",
+    "elf.h",
+    "endian.h",
+    "err.h",
+    "errno.h",
+    "fcntl.h",
+    "features.h",
+    "fenv.h",
+    "fnmatch.h",
+    "getopt.h",
+    "glob.h",
+    "grp.h",
+    "iconv.h",
+    "ifaddrs.h",
+    "inttypes.h",
+    "iso646.h",
+    "langinfo.h",
+    "libgen.h",
+    "limits.h",
+    "link.h",
+    "locale.h",
+    "malloc.h",
+    "math.h",
+    "memory.h",
+    "monetary.h",
+    "net/ethernet.h",
+    "net/if.h",
+    "net/if_arp.h",
+    "net/route.h",
+    "netdb.h",
+    "netinet/ether.h",
+    "netinet/icmp6.h",
+    "netinet/if_ether.h",
+    "netinet/igmp.h",
+    "netinet/in.h",
+    "netinet/in_systm.h",
+    "netinet/ip.h",
+    "netinet/ip6.h",
+    "netinet/ip_icmp.h",
+    "netinet/tcp.h",
+    "netinet/udp.h",
+    "netpacket/packet.h",
+    "nl_types.h",
+    "paths.h",
+    "poll.h",
+    "pthread.h",
+    "pwd.h",
+    "regex.h",
+    "resolv.h",
+    "sched.h",
+    "semaphore.h",
+    "setjmp.h",
+    "signal.h",
+    "spawn.h",
+    "stdio.h",
+    "stdlib.h",
+    "string.h",
+    "strings.h",
+    "stropts.h",
+    "sys/acct.h",
+    "sys/auxv.h",
+    "sys/dir.h",
+    "sys/errno.h",
+    "sys/eventfd.h",
+    "sys/fcntl.h",
+    "sys/file.h",
+    "sys/inotify.h",
+    "sys/io.h",
+    "sys/ioctl.h",
+    "sys/ipc.h",
+    "sys/mman.h",
+    "sys/mount.h",
+    "sys/msg.h",
+    "sys/mtio.h",
+    "sys/param.h",
+    "sys/poll.h",
+    "sys/random.h",
+    "sys/select.h",
+    "sys/sem.h",
+    "sys/shm.h",
+    "sys/signal.h",
+    "sys/socket.h",
+    "sys/stat.h",
+    "sys/statfs.h",
+    "sys/statvfs.h",
+    "sys/stropts.h",
+    "sys/syslog.h",
+    "sys/termios.h",
+    "sys/time.h",
+    "sys/timeb.h",
+    "sys/timerfd.h",
+    "sys/times.h",
+    "sys/ttydefaults.h",
+    "sys/types.h",
+    "sys/ucontext.h",
+    "sys/uio.h",
+    "sys/un.h",
+    "sys/utsname.h",
+    "sys/vfs.h",
+    "sys/wait.h",
+    "sysexits.h",
+    "syslog.h",
+    "tar.h",
+    "termios.h",
+    "threads.h",
+    "time.h",
+    "uchar.h",
+    "ucontext.h",
+    "unistd.h",
+    "utime.h",
+    "values.h",
+    "wait.h",
+    "wchar.h",
+    "wctype.h",
+    "wordexp.h",
+  ]
+
+  # This is in the format used by sysroot_entries.gni; it uses only this.
+  sysroot_entries = [
+    {
+      sdk = {
+        include_dir = root_dir
+        headers = root_headers
+      }
+    },
+    {
+      sdk = {
+        include_dir = golden_dir
+        headers = llvm_libc_headers
+        deps = [ root_dir ]
+      }
+    },
+    {
+      sdk = {
+        include_dir = musl_dir
+        headers = musl_headers
+      }
+    },
+  ]
+}

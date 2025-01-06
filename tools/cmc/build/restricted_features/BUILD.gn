@@ -23,7 +23,6 @@ group("delivery_type") {
     "//src/connectivity/policy/http-client/*",
     "//src/devices/bin/driver-index:*",
     "//src/sys/component_manager/tests/*",
-    "//src/sys/pkg/bin/system-update-committer/*",
   ]
 }
 

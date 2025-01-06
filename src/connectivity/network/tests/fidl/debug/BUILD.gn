@@ -20,7 +20,7 @@ rustc_test("debug") {
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",

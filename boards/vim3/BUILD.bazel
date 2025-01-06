@@ -4,7 +4,9 @@
 
 load(
     "@rules_fuchsia//fuchsia:assembly.bzl",
+    "fuchsia_board_configuration",
     "fuchsia_board_input_bundle",
+    "fuchsia_prebuilt_board_input_bundle",
 )
 
 package(default_visibility = ["//visibility:public"])
@@ -20,4 +22,156 @@ fuchsia_board_input_bundle(
         "//src/ui/input/drivers/adc-buttons",
         "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite",
     ],
+)
+
+fuchsia_prebuilt_board_input_bundle(
+    name = "devicetree_board_driver",
+    files = "@gn_targets//boards/vim3:devicetree_board_driver",
+)
+
+fuchsia_prebuilt_board_input_bundle(
+    name = "main_bundle",
+    files = "@gn_targets//boards/vim3:main_bundle",
+)
+
+fuchsia_prebuilt_board_input_bundle(
+    name = "paver",
+    files = "@gn_targets//boards/vim3:paver",
+)
+
+fuchsia_prebuilt_board_input_bundle(
+    name = "vulkan_arm_mali",
+    files = "@gn_targets//boards/vim3:vulkan_arm_mali",
+)
+
+fuchsia_prebuilt_board_input_bundle(
+    name = "rtc_driver",
+    files = "@gn_targets//boards/vim3:rtc_driver",
+)
+
+_COMMON_BOARD_INPUT_BUNDLES = [
+    ":devicetree_board_driver",
+    ":main_bundle",
+    ":paver",
+    ":vulkan_arm_mali",
+    ":rtc_driver",
+    ":bazel_drivers",
+]
+
+_COMMON_FILESYSTEMS = {
+    "vbmeta": {
+        "key": "LABEL(//src/firmware/avb_keys/vim3/vim3-dev-key:vim3_devkey_atx_psk.pem)",
+        "key_metadata": "LABEL(//src/firmware/avb_keys/vim3/vim3-dev-key:vim3_dev_atx_metadata.bin)",
+    },
+    "zbi": {
+        "compression": "zstd.17",
+    },
+    "fvm": {
+        "blobfs": {
+            "size_checker_maximum_bytes": 5216665600,
+        },
+        "sparse_output": {
+        },
+        "fastboot_output": {
+            # For VIM3, FVM partition uses all of the remaining eMMC.
+            # However, the total size of the eMMC storage maybe 16G or 32G
+            # depending on whether it is a basic or pro version. In
+            # addition, the actual size of the user block allocated by
+            # Fuchsia can be further different. (i.e. 'lsblk' shows a 29G
+            # size user block for the 32Gb version). To avoid the risk of
+            # overflowing available size, here we set it to be the same as
+            # sherlock (3280mb), which is clearly safe and sufficient for
+            # now.
+            "truncate_to_length": 3439329280,
+        },
+    },
+    "fxfs": {
+        "size_checker_maximum_bytes": 5216665600,
+    },
+}
+
+_COMMON_PLATFORM = {
+    "connectivity": {
+        "network": {
+            # Prefer using the built-in NIC to the CDC-ether interface.
+            "netsvc_interface": "/dwmac-ff3f0000_group/dwmac/Designware-MAC/network-device",
+        },
+    },
+    "development_support": {
+        # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
+        "enable_debug_access_port_for_soc": "amlogic-a311d",
+    },
+    "sysmem_defaults": {
+        # The AMlogic display engine needs contiguous physical memory for each
+        # frame buffer, because it does not have a page table walker.
+        #
+        # The maximum supported resolution is documented below.
+        # * "A311D Quick Reference Manual" revision 01, pages 2-3
+        # * "A311D Datasheet" revision 08, section 2.2 "Features", pages 4-5
+        #
+        # These pages can be loaned back to zircon for use in pager-backed VMOs,
+        # but these pages won't be used in "anonymous" VMOs (at least for now).
+        # Whether the loaned-back pages can be absorbed by pager-backed VMOs is
+        # workload dependent. The "k ppb stats_on" command can be used to
+        # determine whether all loaned pages are being used by pager-backed VMOs.
+        #
+        # This board-level default can be overridden by platform-level config.
+        "contiguous_memory_size": {
+            # 200 MiB
+            "fixed": 209715200,
+        },
+        "protected_memory_size": {
+            "fixed": 0,
+        },
+        "contiguous_guard_pages_unused": False,
+    },
+}
+
+_COMMON_PROVIDED_FEATURES = [
+    "fuchsia::aml-hrtimer",
+    "fuchsia::bt_transport_uart",
+    "fuchsia::bus_pci",
+    "fuchsia::fake_battery",
+    "fuchsia::fan",
+    "fuchsia::mali_gpu",
+    "fuchsia::paver",
+    "fuchsia::pmm_checker",
+    "fuchsia::real_time_clock",
+    "fuchsia::realtek_8211f",
+    "fuchsia::suspender",
+    "fuchsia::suspending_token",
+    "fuchsia::usb_peripheral_support",
+    "fuchsia::wlan_fullmac",
+    "fuchsia::xhci",
+]
+
+fuchsia_board_configuration(
+    name = "vim3",
+    board_input_bundles = _COMMON_BOARD_INPUT_BUNDLES,
+    board_name = "vim3",
+    devicetree = "@gn_targets//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
+    filesystems = _COMMON_FILESYSTEMS,
+    kernel = {
+        "contiguous_physical_pages": True,
+    },
+    platform = _COMMON_PLATFORM,
+    provided_features = _COMMON_PROVIDED_FEATURES,
+)
+
+fuchsia_board_configuration(
+    name = "reduced_perf_variation",
+    board_input_bundles = _COMMON_BOARD_INPUT_BUNDLES,
+    board_name = "vim3",
+    devicetree = "@gn_targets//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
+    filesystems = _COMMON_FILESYSTEMS,
+    kernel = {
+        "contiguous_physical_pages": True,
+        # Disable serial console printing during early boot, a phase during which
+        # UART communication is single-threaded and synchronous. In production,
+        # the serial console will be disabled, and so early boot benchmarks that
+        # include this work is sensibly avoided.
+        "quiet_early_boot": True,
+    },
+    platform = _COMMON_PLATFORM,
+    provided_features = _COMMON_PROVIDED_FEATURES,
 )

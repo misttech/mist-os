@@ -68,17 +68,6 @@
             from: "parent",
             availability: "optional",
         },
-
-        // TODO(https://fxbug.dev/42077029): As of 2023-04-26, this is only used to allow
-        // developers to stop the session from automatically launching on boot.
-        // Once structured configuration provides first-class support for this
-        // kind of override, consider removing this stanza.
-        {
-            directory: "root-data",
-            from: "parent",
-            rights: [ "r*" ],
-            path: "/data",
-        },
         {
             config: "fuchsia.session.SessionUrl",
             key: "session_url",

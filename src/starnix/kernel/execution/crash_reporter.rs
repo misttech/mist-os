@@ -142,10 +142,10 @@ impl CrashReporter {
                     match reporter.file_report(crash_report).await {
                         Ok(Ok(_)) => (),
                         Ok(Err(filing_error)) => {
-                            log_error!(?filing_error, "Couldn't file crash report.");
+                            log_error!(filing_error:?; "Couldn't file crash report.");
                         }
                         Err(fidl_error) => log_warn!(
-                            ?fidl_error,
+                            fidl_error:?;
                             "Couldn't file crash report due to error on underlying channel."
                         ),
                     };
@@ -155,12 +155,12 @@ impl CrashReporter {
                 });
             } else {
                 log_info!(
-                    ?crash_report,
+                    crash_report:?;
                     "Skipping sending crash report, too many already in-flight."
                 );
             }
         } else {
-            log_info!(?crash_report, "no crash reporter available for crash");
+            log_info!(crash_report:?; "no crash reporter available for crash");
         }
     }
 

@@ -56,8 +56,8 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
     bazel_product_image_target =
         "//products/microfuchsia:microfuchsia_eng.pkvm-${board_name}"
     bazel_inputs_from_gn = [
+      "//boards/pkvm:bazel_inputs",
       "//build/images/flash:esp.bazel_input",
-      "//boards/pkvm:${board_name}.bazel_input",
       "//src/tee/ta/noop:ta-noop_for_bazel",
     ]
   }

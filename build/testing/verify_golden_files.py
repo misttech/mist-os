@@ -9,7 +9,9 @@ import filecmp
 import json
 import os
 import shutil
+import subprocess
 import sys
+from pathlib import Path
 
 # Verifies that the candidate golden file matches the provided golden.
 
@@ -20,6 +22,13 @@ Please run the following to acknowledge this change:
 MANUAL_UPDATE_BODY_ENTRY = """fx run-in-build-dir cp \\
     {candidate} \\
     {golden}
+"""
+
+MANUAL_UPDATE_BODY_DEAD_GOLDENS = """
+Some old golden files are no longer being checked and should be removed with:
+fx run-in-build-dir git rm -f {dead_goldens}
+If new golden files have been added then it may also be necessary to then do:
+fx run-in-build-dir git add {golden_dir}
 """
 
 MANUAL_UPDATE_FOOTER = """```
@@ -33,12 +42,20 @@ is in your GN graph.
 """
 
 
-def print_failure_msg(manual_updates, label):
-    print(MANUAL_UPDATE_HEADER)
+def print_failure_msg(manual_updates, dead_goldens, golden_dir, label):
+    if manual_updates:
+        print(MANUAL_UPDATE_HEADER)
     for update in manual_updates:
         print(
             MANUAL_UPDATE_BODY_ENTRY.format(
                 candidate=update["candidate"], golden=update["golden"]
+            )
+        )
+    if dead_goldens:
+        print(
+            MANUAL_UPDATE_BODY_DEAD_GOLDENS.format(
+                dead_goldens=" ".join(str(f) for f in sorted(dead_goldens)),
+                golden_dir=golden_dir,
             )
         )
     print(MANUAL_UPDATE_FOOTER.format(label=label))
@@ -92,6 +109,11 @@ def main():
         help="Use binary comparison for the files.",
         action="store_true",
     )
+    parser.add_argument(
+        "--golden-dir",
+        type=Path,
+        help="Directory to clear of unchecked files.",
+    )
     args = parser.parse_args()
 
     with open(args.comparisons) as f:
@@ -99,12 +121,14 @@ def main():
 
     inputs = []
     manual_updates = []
+    goldens = set()
     for comparison in comparisons:
         # Unlike the candidate and formatted_golden, which are build directory
         # -relative paths, the golden is source-relative.
         golden = os.path.join(args.source_root, comparison["golden"])
         candidate = comparison["candidate"]
         inputs.extend([candidate, golden])
+        goldens.add(Path(golden))
 
         # A formatted golden might have been supplied. Compare against that if
         # present. (In the case of a non-existent golden, this file is empty.)
@@ -150,10 +174,40 @@ def main():
             else:
                 manual_updates.append(dict(golden=golden, candidate=candidate))
 
+    dead_goldens = []
+    if args.golden_dir:
+        outside_goldens = sorted(
+            {
+                file
+                for file in goldens
+                if not Path(golden).is_relative_to(args.golden_dir)
+            }
+        )
+        if outside_goldens:
+            sys.stderr.write(
+                f"""
+*** Some golden files are not within {args.golden_dir}:
+*** {outside_goldens}
+"""
+            )
+            return 2
+        dir_files = set(
+            file for file in args.golden_dir.rglob("*") if not file.is_dir()
+        )
+        dead_goldens = dir_files - goldens
+        if dead_goldens and args.bless:
+            subprocess.check_call(
+                ["git", "rm", "-f", "--ignore-unmatch"] + sorted(dead_goldens)
+            )
+            dead_goldens = []
+            subprocess.check_call(["git", "add", args.golden_dir])
+
     # Print all of the manual update instructions once at the end to reduce the
     # amount of rebuilding and copy-pasting.
-    if manual_updates:
-        print_failure_msg(manual_updates, args.label)
+    if manual_updates or dead_goldens:
+        print_failure_msg(
+            manual_updates, dead_goldens, args.golden_dir, args.label
+        )
         if not args.warn:
             return 1
 

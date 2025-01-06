@@ -19,7 +19,7 @@ if (is_host) {
       "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
       "//src/connectivity/overnet/lib/circuit",
       "//src/connectivity/overnet/lib/core",
-      "//src/developer/ffx/command:lib",
+      "//src/developer/ffx/command/error:lib",
       "//src/developer/ffx/config:lib",
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/addr:lib",

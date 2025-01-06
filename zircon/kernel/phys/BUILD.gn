@@ -887,6 +887,7 @@ if (is_kernel) {
     public_deps = [ ":physboot.h" ]
     sources = [ "physboot.cc" ]
     deps = [
+      ":address-space",
       ":allocation",
       ":boot-zbi",
       ":handoff",
@@ -921,6 +922,7 @@ if (is_kernel) {
     sources = [ "physboot-elf-kernel.cc" ]
     include_dirs = [ "//zircon/kernel/arch/$zircon_cpu/include" ]
     deps = [
+      ":address-space",
       ":allocation",
       ":boot-zbi",
       ":elf-image",

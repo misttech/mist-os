@@ -40,11 +40,11 @@
 #include <utility>
 #include <variant>
 
-#include <fbl/auto_lock.h>
 #include <fbl/string_buffer.h>
 #include <safemath/checked_math.h>
 
 #include "sdk/lib/fdio/cleanpath.h"
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/internal.h"
 #include "sdk/lib/fdio/namespace/namespace.h"
@@ -200,18 +200,19 @@ fdio_ptr fdio_iodir(int dirfd, std::string_view& in_out_path) {
       }
     }
   }
-  const fbl::AutoLock lock(&fdio_lock);
+  fdio_state_t& gstate = fdio_global_state();
+  std::lock_guard lock(gstate.lock);
   if (root) {
-    return fdio_root_handle.get();
+    return gstate.root.get();
   }
   if (dirfd == AT_FDCWD) {
-    return fdio_cwd_handle.get();
+    return gstate.cwd.get();
   }
-  return fd_to_io_locked(dirfd);
+  return gstate.fd_to_io_locked(dirfd);
 }
 
 int close_impl(int fd, bool should_wait) {
-  fdio_ptr io = unbind_from_fd(fd);
+  fdio_ptr io = fdio_global_state().unbind_from_fd(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -354,7 +355,7 @@ zx::result<fdio_ptr> open(const char* path, int flags, uint32_t mode) {
   return open_at(AT_FDCWD, path, flags, mode);
 }
 
-void update_cwd_path(const char* path) __TA_REQUIRES(fdio_cwd_lock) {
+void update_cwd_path(fdio_internal::PathBuffer& fdio_cwd_path, const char* path) {
   if (path[0] == '/') {
     // it's "absolute", but we'll still parse it as relative (from /)
     // so that we normalize the path (resolving, ., .., //, etc)
@@ -513,7 +514,7 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
 
 // hook into libc process startup
 // this is called prior to main to set up the fdio world
-// and thus does not use the fdio_lock
+// and thus does not use fdio_global_state().lock
 //
 // extern "C" is required here, since the corresponding declaration is in an internal musl header:
 // zircon/third_party/ulib/musl/src/internal/libc.h
@@ -522,8 +523,10 @@ zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {
 extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle_t handle[],
                                                 uint32_t handle_info[], uint32_t name_count,
                                                 char** names) __TA_NO_THREAD_SAFETY_ANALYSIS {
+  fdio_state_t& gstate = fdio_global_state();
+
   {
-    const zx_status_t status = fdio_ns_create(&fdio_root_ns);
+    const zx_status_t status = fdio_ns_create(&gstate.ns);
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to create root namespace: %s",
                   zx_status_get_string(status));
   }
@@ -547,7 +550,7 @@ extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle
         ZX_ASSERT_MSG(arg_fd < FDIO_MAX_FD,
                       "unreasonably large fd number %u in PA_FD (must be less than %u)", arg_fd,
                       FDIO_MAX_FD);
-        ZX_ASSERT_MSG(fdio_fdtab[arg_fd].try_set(io.value()), "duplicate fd number %u in PA_FD",
+        ZX_ASSERT_MSG(gstate.fdtab[arg_fd].try_set(io.value()), "duplicate fd number %u in PA_FD",
                       arg_fd);
 
         if (arg & FDIO_FLAG_USE_FOR_STDIO) {
@@ -561,7 +564,7 @@ extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle
       }
       case PA_NS_DIR:
         if (arg < name_count) {
-          if (zx_status_t status = fdio_ns_bind(fdio_root_ns, names[arg], h); status != ZX_OK) {
+          if (zx_status_t status = fdio_ns_bind(gstate.ns, names[arg], h); status != ZX_OK) {
             ZX_PANIC("fdio_ns_bind(%s): %s", names[arg], zx_status_get_string(status));
           }
         }
@@ -577,7 +580,7 @@ extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle
 
   {
     const char* cwd = getenv("PWD");
-    fdio_internal::update_cwd_path(cwd ? cwd : "/");
+    fdio_internal::update_cwd_path(gstate.cwd_path, cwd ? cwd : "/");
   }
 
   if (use_for_stdio == nullptr) {
@@ -588,7 +591,7 @@ extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle
 
   // configure stdin/out/err if not init'd
   for (uint32_t n = 0; n < 3; n++) {
-    fdio_fdtab[n].try_set(use_for_stdio);
+    gstate.fdtab[n].try_set(use_for_stdio);
   }
 
   fdio_ptr default_io = nullptr;
@@ -601,18 +604,18 @@ extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle
     return default_io;
   };
 
-  zx::result root = fdio_ns_open_root(fdio_root_ns);
+  zx::result root = fdio_ns_open_root(gstate.ns);
   if (root.is_ok()) {
-    ZX_ASSERT(fdio_root_handle.try_set(root.value()));
-    zx::result cwd = fdio_internal::open(fdio_cwd_path.c_str(), O_RDONLY | O_DIRECTORY, 0);
+    ZX_ASSERT(gstate.root.try_set(root.value()));
+    zx::result cwd = fdio_internal::open(gstate.cwd_path.c_str(), O_RDONLY | O_DIRECTORY, 0);
     if (cwd.is_ok()) {
-      ZX_ASSERT(fdio_cwd_handle.try_set(cwd.value()));
+      ZX_ASSERT(gstate.cwd.try_set(cwd.value()));
     } else {
-      ZX_ASSERT(fdio_cwd_handle.try_set(get_default()));
+      ZX_ASSERT(gstate.cwd.try_set(get_default()));
     }
   } else {
-    ZX_ASSERT(fdio_root_handle.try_set(get_default()));
-    ZX_ASSERT(fdio_cwd_handle.try_set(get_default()));
+    ZX_ASSERT(gstate.root.try_set(get_default()));
+    ZX_ASSERT(gstate.cwd.try_set(get_default()));
   }
 }
 
@@ -624,25 +627,30 @@ extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle
 // zircon/third_party/ulib/musl/src/internal/libc.h
 //
 // NOLINTNEXTLINE(bugprone-reserved-identifier)
-extern "C" __EXPORT void __libc_extensions_fini(void) __TA_ACQUIRE(fdio_lock) {
-  mtx_lock(&fdio_lock);
-  [[maybe_unused]] auto root = fdio_root_handle.release();
-  [[maybe_unused]] auto cwd = fdio_cwd_handle.release();
-  for (auto& var : fdio_fdtab) {
+extern "C" __EXPORT void __libc_extensions_fini(void) __TA_NO_THREAD_SAFETY_ANALYSIS {
+  fdio_state_t& gstate = fdio_global_state();
+
+  gstate.lock.lock();
+  [[maybe_unused]] auto root = gstate.root.release();
+  [[maybe_unused]] auto cwd = gstate.cwd.release();
+  for (auto& var : gstate.fdtab) {
     [[maybe_unused]] const fdio_ptr io = var.release();
   }
+   // Automatic destructor registration is prevented for this object. Now that it's safely after all
+   // others, call its destructor explicitly. See commentary in `fdio_global_state`.
+  gstate.~fdio_state_t();
 }
 
 __EXPORT
 zx_status_t fdio_ns_get_installed(fdio_ns_t** ns) {
-  zx_status_t status = ZX_OK;
-  const fbl::AutoLock lock(&fdio_lock);
-  if (fdio_root_ns == nullptr) {
-    status = ZX_ERR_NOT_FOUND;
-  } else {
-    *ns = fdio_root_ns;
+  fdio_state_t& gstate = fdio_global_state();
+
+  std::lock_guard lock(gstate.lock);
+  if (gstate.ns == nullptr) {
+    return ZX_ERR_NOT_FOUND;
   }
-  return status;
+  *ns = gstate.ns;
+  return ZX_OK;
 }
 
 zx_status_t fdio_wait(const fdio_ptr& io, uint32_t events, zx::time deadline,
@@ -741,7 +749,7 @@ ssize_t preadv(int fd, const struct iovec* iov, int iovcnt, off_t offset) {
   if (iovcnt > IOV_MAX) {
     return ERRNO(EINVAL);
   }
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -785,7 +793,7 @@ ssize_t pwritev(int fd, const struct iovec* iov, int iovcnt, off_t offset) {
   if (iovcnt > IOV_MAX) {
     return ERRNO(EINVAL);
   }
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -863,24 +871,28 @@ int dup2(int oldfd, int newfd) {
   // Don't release under lock.
   fdio_ptr io_to_close = nullptr;
   {
-    const fbl::AutoLock lock(&fdio_lock);
-    const fdio_ptr io = fd_to_io_locked(oldfd);
+    fdio_state_t& gstate = fdio_global_state();
+
+    std::lock_guard lock(gstate.lock);
+    const fdio_ptr io = gstate.fd_to_io_locked(oldfd);
     if (io == nullptr) {
       return ERRNO(EBADF);
     }
-    io_to_close = fdio_fdtab[newfd].replace(io);
+    io_to_close = gstate.fdtab[newfd].replace(io);
   }
   return newfd;
 }
 
 __EXPORT
 int dup(int oldfd) {
-  const fbl::AutoLock lock(&fdio_lock);
-  const fdio_ptr io = fd_to_io_locked(oldfd);
+  fdio_state_t& gstate = fdio_global_state();
+
+  std::lock_guard lock(gstate.lock);
+  const fdio_ptr io = gstate.fd_to_io_locked(oldfd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
-  std::optional fd = bind_to_fd_locked(io);
+  std::optional fd = gstate.bind_to_fd_locked(io);
   if (fd.has_value()) {
     return fd.value();
   }
@@ -915,6 +927,8 @@ int fcntl(int fd, int cmd, ...) {
   const int(ARG) = va_arg(args, int); \
   va_end(args)
 
+  fdio_state_t& gstate = fdio_global_state();
+
   switch (cmd) {
     case F_DUPFD:
     case F_DUPFD_CLOEXEC: {
@@ -923,20 +937,20 @@ int fcntl(int fd, int cmd, ...) {
       if (starting_fd < 0) {
         return ERRNO(EINVAL);
       }
-      const fbl::AutoLock lock(&fdio_lock);
-      const fdio_ptr io = fd_to_io_locked(fd);
+      std::lock_guard lock(gstate.lock);
+      const fdio_ptr io = gstate.fd_to_io_locked(fd);
       if (io == nullptr) {
         return ERRNO(EBADF);
       }
       for (fd = starting_fd; fd < FDIO_MAX_FD; fd++) {
-        if (fdio_fdtab[fd].try_set(io)) {
+        if (gstate.fdtab[fd].try_set(io)) {
           return fd;
         }
       }
       return ERRNO(EMFILE);
     }
     case F_GETFD: {
-      const fdio_ptr io = fd_to_io(fd);
+      const fdio_ptr io = gstate.fd_to_io(fd);
       if (io == nullptr) {
         return ERRNO(EBADF);
       }
@@ -946,7 +960,7 @@ int fcntl(int fd, int cmd, ...) {
       return flags;
     }
     case F_SETFD: {
-      const fdio_ptr io = fd_to_io(fd);
+      const fdio_ptr io = gstate.fd_to_io(fd);
       if (io == nullptr) {
         return ERRNO(EBADF);
       }
@@ -957,7 +971,7 @@ int fcntl(int fd, int cmd, ...) {
       return 0;
     }
     case F_GETFL: {
-      const fdio_ptr io = fd_to_io(fd);
+      const fdio_ptr io = gstate.fd_to_io(fd);
       if (io == nullptr) {
         return ERRNO(EBADF);
       }
@@ -973,7 +987,7 @@ int fcntl(int fd, int cmd, ...) {
       return fdio_flags;
     }
     case F_SETFL: {
-      const fdio_ptr io = fd_to_io(fd);
+      const fdio_ptr io = gstate.fd_to_io(fd);
       if (io == nullptr) {
         return ERRNO(EBADF);
       }
@@ -1049,7 +1063,7 @@ int flock(int fd, int operation) {
 
 __EXPORT
 off_t lseek(int fd, off_t offset, int whence) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -1087,7 +1101,7 @@ int truncate(const char* path, off_t len) { return truncateat(AT_FDCWD, path, le
 
 __EXPORT
 int ftruncate(int fd, off_t len) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -1186,7 +1200,7 @@ int vopenat(int dirfd, const char* path, int flags, va_list args) {
   if (flags & O_NONBLOCK) {
     io->ioflag() |= IOFLAG_NONBLOCK;
   }
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     return fd.value();
   }
@@ -1225,7 +1239,7 @@ int mkdirat(int dirfd, const char* path, mode_t mode) {
 
 __EXPORT
 int fsync(int fd) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -1250,7 +1264,7 @@ int syncfs(int fd) {
 
 __EXPORT
 int fstat(int fd, struct stat* s) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -1283,15 +1297,16 @@ char* realpath(const char* __restrict filename, char* __restrict resolved) {
   if (!cpp20::starts_with(filename_view, '/')) {
     // Convert 'filename' from a relative path to an absolute path.
     {
-      const fbl::AutoLock cwd_lock(&fdio_cwd_lock);
-      if (fdio_cwd_path.length() + 1 + filename_view.length() >= PATH_MAX) {
+      fdio_state_t& gstate = fdio_global_state();
+      std::lock_guard cwd_lock(gstate.cwd_lock);
+      if (gstate.cwd_path.length() + 1 + filename_view.length() >= PATH_MAX) {
         errno = ENAMETOOLONG;
         return nullptr;
       }
-      if (std::string_view{fdio_cwd_path} == kUnreachable) {
+      if (std::string_view{gstate.cwd_path} == kUnreachable) {
         do_stat = false;
       }
-      abspath_buffer.Append(fdio_cwd_path);
+      abspath_buffer.Append(gstate.cwd_path);
     }
     abspath_buffer.Append('/');
     abspath_buffer.Append(filename);
@@ -1358,7 +1373,7 @@ int utimensat(int dirfd, const char* path, const struct timespec times[2], int f
 
 __EXPORT
 int futimens(int fd, const struct timespec times[2]) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -1391,9 +1406,10 @@ int socketpair_create(int fd[2], uint32_t options, int flags) {
 
   size_t n = 0;
 
-  const fbl::AutoLock lock(&fdio_lock);
-  for (int i = 0; i < static_cast<int>(fdio_fdtab.size()); ++i) {
-    if (fdio_fdtab[i].try_set(ios[n])) {
+  fdio_state_t& gstate = fdio_global_state();
+  std::lock_guard lock(gstate.lock);
+  for (int i = 0; i < static_cast<int>(gstate.fdtab.size()); ++i) {
+    if (gstate.fdtab[i].try_set(ios[n])) {
       fd[n] = i;
       n++;
       if (n == 2) {
@@ -1500,12 +1516,13 @@ char* getcwd(char* buf, size_t size) {
 
   char* out = nullptr;
   {
-    const fbl::AutoLock lock(&fdio_cwd_lock);
-    const size_t len = fdio_cwd_path.length() + 1;  // +1 to include null-terminating character
+    fdio_state_t& gstate = fdio_global_state();
+    std::lock_guard lock(gstate.cwd_lock);
+    const size_t len = gstate.cwd_path.length() + 1;  // +1 to include null-terminating character
 
     // |size| is inclusive of null-terminating character.
     if (len <= size) {
-      memcpy(buf, fdio_cwd_path.data(), len);
+      memcpy(buf, gstate.cwd_path.data(), len);
       out = buf;
     } else {
       errno = ERANGE;
@@ -1519,10 +1536,11 @@ char* getcwd(char* buf, size_t size) {
 }
 
 void fdio_chdir(fdio_ptr io, const char* path) {
-  const fbl::AutoLock cwd_lock(&fdio_cwd_lock);
-  fdio_internal::update_cwd_path(path);
-  const fbl::AutoLock lock(&fdio_lock);
-  fdio_cwd_handle.replace(std::move(io));
+  fdio_state_t& gstate = fdio_global_state();
+  std::lock_guard cwd_lock(gstate.cwd_lock);
+  fdio_internal::update_cwd_path(gstate.cwd_path, path);
+  std::lock_guard lock(gstate.lock);
+  gstate.cwd.replace(std::move(io));
 }
 
 __EXPORT
@@ -1544,8 +1562,9 @@ bool resolve_path(const char* relative, fdio_internal::PathBuffer* out_resolved)
 
   fdio_internal::PathBuffer buffer;
   {
-    const fbl::AutoLock cwd_lock(&fdio_cwd_lock);
-    buffer.Append(fdio_cwd_path);
+    fdio_state_t& gstate = fdio_global_state();
+    std::lock_guard cwd_lock(gstate.cwd_lock);
+    buffer.Append(gstate.cwd_path);
   }
   const size_t cwd_length = buffer.length();
   const size_t relative_length = strlen(relative);
@@ -1582,14 +1601,15 @@ int chroot(const char* path) {
     // throughout the |chroot| operation. If there is a concurrent call to |chdir| during the
     // |fdio_internal::open| operation, then we could end up in an inconsistent state, but the only
     // inconsistency would be the name we apply to the cwd session in the new chrooted namespace.
-    const fbl::AutoLock cwd_lock(&fdio_cwd_lock);
-    const fbl::AutoLock lock(&fdio_lock);
+    fdio_state_t& gstate = fdio_global_state();
+    std::lock_guard cwd_lock(gstate.cwd_lock);
+    std::lock_guard lock(gstate.lock);
 
-    const zx_status_t status = fdio_ns_set_root(fdio_root_ns, io.value().get());
+    const zx_status_t status = fdio_ns_set_root(gstate.ns, io.value().get());
     if (status != ZX_OK) {
       return ERROR(status);
     }
-    old_root = fdio_root_handle.replace(io.value());
+    old_root = gstate.root.replace(io.value());
 
     // We are now committed to the root.
 
@@ -1597,11 +1617,11 @@ int chroot(const char* path) {
     // path in the new root by trimming off the prefix. Otherwise, we no longer have a name for the
     // cwd.
     if (root_path.length() > 1) {
-      const std::string_view cwd_view(fdio_cwd_path);
-      if (cwd_view.starts_with(root_path) && fdio_cwd_path[root_path.length()] == '/') {
-        fdio_cwd_path.RemovePrefix(root_path.length());
+      const std::string_view cwd_view(gstate.cwd_path);
+      if (cwd_view.starts_with(root_path) && gstate.cwd_path[root_path.length()] == '/') {
+        gstate.cwd_path.RemovePrefix(root_path.length());
       } else {
-        fdio_cwd_path.Set(kUnreachable);
+        gstate.cwd_path.Set(kUnreachable);
       }
     }
   }
@@ -1610,7 +1630,7 @@ int chroot(const char* path) {
 }
 
 struct __dirstream {
-  mtx_t lock;
+  std::mutex lock;
 
   // fd number of the directory under iteration.
   int fd;
@@ -1627,7 +1647,6 @@ namespace {
 
 DIR* internal_opendir(int fd) {
   DIR* dir = new __dirstream;
-  mtx_init(&dir->lock, mtx_plain);
   dir->fd = fd;
   return dir;
 }
@@ -1650,7 +1669,7 @@ __EXPORT
 DIR* fdopendir(int fd) {
   // Check the fd for validity, but we'll just store the fd
   // number so we don't save the fdio_t pointer.
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     errno = EBADF;
     return nullptr;
@@ -1664,7 +1683,7 @@ DIR* fdopendir(int fd) {
 __EXPORT
 int closedir(DIR* dir) {
   if (dir->iterator) {
-    const fdio_ptr io = fd_to_io(dir->fd);
+    const fdio_ptr io = fdio_global_state().fd_to_io(dir->fd);
     io->dirent_iterator_destroy(dir->iterator.get());
     dir->iterator.reset();
   }
@@ -1691,10 +1710,10 @@ zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr& io) {
 
 __EXPORT
 struct dirent* readdir(DIR* dir) {
-  const fbl::AutoLock lock(&dir->lock);
+  std::lock_guard lock(dir->lock);
   struct dirent* de = &dir->de;
 
-  const fdio_ptr io = fd_to_io(dir->fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(dir->fd);
 
   if (const zx_status_t status = lazy_init_dirent_iterator(dir, io); status != ZX_OK) {
     errno = fdio_status_to_errno(status);
@@ -1746,8 +1765,8 @@ struct dirent* readdir(DIR* dir) {
 
 __EXPORT
 void rewinddir(DIR* dir) {
-  const fbl::AutoLock lock(&dir->lock);
-  const fdio_ptr io = fd_to_io(dir->fd);
+  std::lock_guard lock(dir->lock);
+  const fdio_ptr io = fdio_global_state().fd_to_io(dir->fd);
 
   // Always try to initialize and rewind the directory stream. If a client were to create |dir| via
   // |dup()|ing another file descriptor and then |fdopendir()|, |dir->iterator| will be
@@ -1772,7 +1791,7 @@ int dirfd(DIR* dir) { return dir->fd; }
 
 __EXPORT
 int isatty(int fd) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     errno = EBADF;
     return 0;
@@ -1792,10 +1811,11 @@ int isatty(int fd) {
 
 __EXPORT
 mode_t umask(mode_t mask) {
+  fdio_state_t& gstate = fdio_global_state();
   mode_t oldmask;
-  const fbl::AutoLock lock(&fdio_lock);
-  oldmask = __fdio_global_state.umask;
-  __fdio_global_state.umask = mask & 0777;
+  std::lock_guard lock(gstate.lock);
+  oldmask = gstate.umask;
+  gstate.umask = mask & 0777;
   return oldmask;
 }
 
@@ -1843,10 +1863,11 @@ int ppoll(struct pollfd* fds, nfds_t n, const struct timespec* timeout_ts,
   // entry in |items|. It is true for FDs that have an entry in |items|.
   bool items_set[n];
 
+  fdio_state_t& gstate = fdio_global_state();
   for (nfds_t i = 0; i < n; ++i) {
     auto& pfd = fds[i];
     auto& io = ios[i];
-    io = fd_to_io(pfd.fd);
+    io = gstate.fd_to_io(pfd.fd);
     if (io == nullptr) {
       // fd is not opened
       pfd.revents = POLLNVAL;
@@ -1947,6 +1968,7 @@ int select(int n, fd_set* __restrict rfds, fd_set* __restrict wfds, fd_set* __re
   zx_wait_item_t items[n];
   size_t nitems = 0;
 
+  fdio_state_t& gstate = fdio_global_state();
   for (int fd = 0; fd < n; ++fd) {
     uint32_t events = 0;
     if (rfds && FD_ISSET(fd, rfds))
@@ -1962,7 +1984,7 @@ int select(int n, fd_set* __restrict rfds, fd_set* __restrict wfds, fd_set* __re
       continue;
     }
 
-    io = fd_to_io(fd);
+    io = gstate.fd_to_io(fd);
     if (io == nullptr) {
       return ERROR(ZX_ERR_INVALID_ARGS);
     }
@@ -2038,7 +2060,7 @@ int select(int n, fd_set* __restrict rfds, fd_set* __restrict wfds, fd_set* __re
 
 __EXPORT
 int ioctl(int fd, int req, ...) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -2092,7 +2114,7 @@ ssize_t recvfrom(int fd, void* __restrict buf, size_t buflen, int flags,
 
 __EXPORT
 ssize_t sendmsg(int fd, const struct msghdr* msg, int flags) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -2146,7 +2168,7 @@ ssize_t sendmsg(int fd, const struct msghdr* msg, int flags) {
 
 __EXPORT
 ssize_t recvmsg(int fd, struct msghdr* msg, int flags) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -2196,7 +2218,7 @@ ssize_t recvmsg(int fd, struct msghdr* msg, int flags) {
 
 __EXPORT
 int shutdown(int fd, int how) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -2233,7 +2255,7 @@ namespace {
 // fstatvfs, which align on most fields. The fs version is more easily
 // computed from the fuchsia_io::FilesystemInfo, so this takes a struct statfs.
 int statfs_impl(int fd, struct statfs* buf) {
-  const fdio_ptr io = fd_to_io(fd);
+  const fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }

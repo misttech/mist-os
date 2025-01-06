@@ -460,7 +460,7 @@ fn netstack_test_inner(
         let result = quote! {
             #(#impl_attrs)*
             #(#attributes)*
-            #[fuchsia_async::run_singlethreaded(test)]
+            #[fuchsia::test]
             async fn #name < #(#generics),* > ( #(#impl_inputs),* ) #output #where_clause {
                 #item
                 #name ( #(#args),* ).await
@@ -484,7 +484,7 @@ fn netstack_test_inner(
             quote! {
                 #(#impl_attrs)*
                 #(#attributes)*
-                #[fuchsia_async::run_singlethreaded(test)]
+                #[fuchsia::test]
                 async fn #test_name < #(#generics),* > ( #(#impl_inputs),* ) #output #where_clause {
                     #name :: < #(#params),* > ( #(#args),* ).await
                 }
@@ -500,8 +500,8 @@ fn netstack_test_inner(
     result.into()
 }
 
-/// Runs a test `fn` over different variations of known type parameters. based
-///  on the test `fn`'s type parameters.
+/// Runs a test `fn` over different variations of known type parameters based
+/// on the test `fn`'s type parameters.
 ///
 /// Each supported type parameter substitution must be informed with a call to
 /// the `#[variant(X, Variant)]` attribute where `X` is the type parameter
@@ -509,6 +509,12 @@ fn netstack_test_inner(
 ///
 /// See [`VariantType`] for the supported variants passed to the
 /// `#[variant(..)]` attribute.
+///
+/// Tests are annotated with `#[fuchsia::test]` from `//src/lib/fuchsia` in order
+/// to provide async test support and hook up the standard logging backend.
+/// This means that log-severity limits will apply to tests, i.e. an error log
+/// due to a panic will fail a test even if the test is configured to expect to
+/// fail via //src/lib/testing/expectation.
 ///
 /// Example:
 ///
@@ -521,11 +527,11 @@ fn netstack_test_inner(
 /// Expands to:
 /// ```
 /// async fn test_foo<N: Netstack>(name: &str){/*...*/}
-/// #[fuchsia_async::run_singlethreaded(test)]
+/// #[fuchsia::test]
 /// async fn test_foo_ns2() {
 ///     test_foo::<netstack_testing_common::realms::Netstack2>("test_foo_ns2").await
 /// }
-/// #[fuchsia_async::run_singlethreaded(test)]
+/// #[fuchsia::test]
 /// async fn test_foo_ns3() {
 ///     test_foo::<netstack_testing_common::realms::Netstack3>("test_foo_ns3").await
 /// }
@@ -552,7 +558,7 @@ fn netstack_test_inner(
 /// Expands to:
 /// ```
 /// async fn test_foo<N1: Netstack, N2: Netstack>(name: &str) {/*...*/}
-/// #[fuchsia_async::run_singlethreaded(test)]
+/// #[fuchsia::test]
 /// async fn test_foo_ns2_ns2() {
 ///     test_foo::<
 ///         netstack_testing_common::realms::Netstack2,
@@ -560,7 +566,7 @@ fn netstack_test_inner(
 ///     >("test_foo_ns2_ns2")
 ///     .await
 /// }
-/// #[fuchsia_async::run_singlethreaded(test)]
+/// #[fuchsia::test]
 /// async fn test_foo_ns2_ns3() {
 ///     test_foo::<
 ///         netstack_testing_common::realms::Netstack2,
@@ -568,7 +574,7 @@ fn netstack_test_inner(
 ///     >("test_foo_ns2_ns3")
 ///     .await
 /// }
-/// #[fuchsia_async::run_singlethreaded(test)]
+/// #[fuchsia::test]
 /// async fn test_foo_ns3_ns2() {
 ///     test_foo::<
 ///         netstack_testing_common::realms::Netstack3,
@@ -576,7 +582,7 @@ fn netstack_test_inner(
 ///     >("test_foo_ns3_ns2")
 ///     .await
 /// }
-/// #[fuchsia_async::run_singlethreaded(test)]
+/// #[fuchsia::test]
 /// async fn test_foo_ns3_ns3() {
 ///     test_foo::<
 ///         netstack_testing_common::realms::Netstack3,
@@ -595,7 +601,7 @@ fn netstack_test_inner(
 ///
 /// Expands to
 /// ```
-/// #[fuchsia_async::run_singlethreaded(test)]
+/// #[fuchsia::test]
 /// async fn test_foo() {
 ///    async fn test_foo(name: &str){/*...*/}
 ///    test_foo("test_foo").await

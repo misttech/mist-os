@@ -39,7 +39,6 @@ impl Symbolizer {
         let sdk = context.get_sdk().await.map_err(CreateSymbolizerError::NoSdkAvailable)?;
 
         symbol_index::ensure_symbol_index_registered(&sdk)
-            .await
             .map_err(CreateSymbolizerError::SymbolIndexRegistration)?;
 
         let _global_init = global_init::GlobalInitHandle::new();

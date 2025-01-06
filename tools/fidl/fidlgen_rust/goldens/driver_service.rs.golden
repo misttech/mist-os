@@ -115,7 +115,11 @@ impl fidl::endpoints::ServiceProxy for DriverOnlyServiceProxy {
 }
 
 #[cfg(target_os = "fuchsia")]
-impl DriverOnlyServiceProxy {}
+impl DriverOnlyServiceProxy {
+    pub fn instance_name(&self) -> &str {
+        self.0.instance_name()
+    }
+}
 
 mod internal {
     use super::*;

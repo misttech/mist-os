@@ -78,7 +78,7 @@ Replace the contents of `src/main.rs` with the following code:
 ```
 
 This code initializes the system log and then prints "Hello World!".
-`tracing::info!` is a macro that prints to the log with a level of `info`.
+`log::info!` is a macro that prints to the log with a level of `info`.
 There are similar macros for `error` and `warn`.
 
 ## Writing the `BUILD.gn` {#writing-the-build-gn}

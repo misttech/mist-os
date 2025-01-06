@@ -4,7 +4,6 @@
 
 # Public Fuchsia rules.
 
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
 load("//fuchsia/private:fuchsia_api_level.bzl", "fuchsia_api_level")
 load(
     "//fuchsia/private/assembly:fuchsia_assembly_developer_overrides.bzl",
@@ -94,24 +93,22 @@ label_flag(
     build_setting_default = ":empty_assembly_developer_overrides_list",
 )
 
-# Set --@fuchsia_sdk//fuchsia:fuchsia_targets_enabled=false to effectively mark
-# (almost) all @fuchsia_sdk instantiated rules/targets as
-# `target_compatible_with = ["@platforms//:incompatible"]`.
-# Specifically, this marks any target using any of the
-# `@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl` > `COMPATIBILITY`
-# helpers as incompatible.
-bool_flag(
+#TODO(386845692) remove this alias once all users have been migrated.
+alias(
     name = "fuchsia_targets_enabled",
-    build_setting_default = True,
+    actual = "@rules_fuchsia//fuchsia/flags:fuchsia_targets_enabled",
+    deprecation = "Use @rules_fuchsia//fuchsia/flags:fuchsia_targets_enabled instead",
 )
 
 fuchsia_assembly_developer_overrides_list(
     name = "empty_assembly_developer_overrides_list",
 )
 
-# Toolchain type for the Fuchsia toolchain.
-toolchain_type(
+#TODO(386793401) remove this alias once all users have been migrated.
+alias(
     name = "toolchain",
+    actual = "//fuchsia/toolchains:sdk",
+    deprecation = "Use //fuchsia/toolchains:sdk instead",
 )
 
 # Toolchain type for the Fuchsia devicetree toolchain.

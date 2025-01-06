@@ -24,8 +24,7 @@ struct ArchPhysHandoff {
   std::optional<zbi_swfb_t> framebuffer;
 };
 
-// This is not actually used for real on x86, but needs to be defined.
-inline constexpr uint64_t kArchHandoffVirtualAddress = 0;
+inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffff'ffff'0000'0000;
 
 // Whether a peripheral range for the UART needs to be synthesized.
 inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = false;

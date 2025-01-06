@@ -424,6 +424,15 @@ if (using_old_prebuilt) {
   }
 }
 
+if (!using_old_prebuilt) {
+  llvm_library("LLVMFrontendAtomic") {
+    deps = [
+      ":LLVMAnalysis",
+      ":LLVMTargetParser",
+    ]
+  }
+}
+
 if (using_old_prebuilt) {
   llvm_library("LLVMFrontendOffloading") {
     deps = [
@@ -460,7 +469,10 @@ llvm_library("LLVMFrontendOpenMP") {
   ]
 
   if (!using_old_prebuilt) {
-    deps += [ ":LLVMDemangle" ]
+    deps += [
+      ":LLVMDemangle",
+      ":LLVMFrontendAtomic",
+    ]
   }
 }
 

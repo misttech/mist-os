@@ -6,52 +6,18 @@
 // tests.
 {
     include: [
-        "//sdk/lib/inspect/client.shard.cml",
         "//src/sys/fuzzing/realmfuzzer/coverage/fuzzed-env.shard.cml",
+        "//src/sys/fuzzing/realmfuzzer/engine/default.shard.cml",
         "//src/sys/test_runners/gtest/default.shard.cml",
-        "inspect/offer.shard.cml",
-        "syslog/client.shard.cml",
     ],
     program: {
         binary: "test/realmfuzzer_integration_tests",
     },
     children: [
         {
-            name: "coverage",
-            url: "#meta/coverage.cm",
-        },
-        {
-            name: "engine",
-            url: "#meta/engine.cm",
-        },
-        {
-            name: "fuzzer",
-            url: "#meta/fuzzer.cm",
+            name: "adapter",
+            url: "#meta/adapter.cm",
             environment: "#fuzzed-env",
-        },
-    ],
-    use: [
-        {
-            protocol: "fuchsia.fuzzer.TargetAdapter",
-            from: "#fuzzer",
-        },
-        {
-            protocol: "fuchsia.fuzzer.CoverageDataProvider",
-            from: "#coverage",
-        },
-        {
-            protocol: [ "fuchsia.process.Launcher" ],
-            from: "parent",
-        },
-    ],
-    offer: [
-        {
-            protocol: [ "fuchsia.process.Launcher" ],
-            from: "parent",
-            to: [
-                "#coverage",
-                "#fuzzer",
-            ],
         },
     ],
 }

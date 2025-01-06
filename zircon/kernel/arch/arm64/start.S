@@ -99,7 +99,13 @@ FUNCTION(_start)
 
 .Lno_save_bootinfo:
     // If we entered at a higher EL than 1, drop to EL1.
-    bl      ArmDropToEl1WithoutEl2Monitor
+    //
+    // Make sure to clear the stack pointer first. The call will reuse in EL1
+    // whatever is currently installed, but on a cold boot this might be
+    // garbage and run afoul of EL1 sp alignment checks if blindly installed.
+    mov     x0, xzr
+    mov     sp, x0
+    bl      arm64_elX_to_el1
 
     // Make sure no old exception handlers are installed.
     msr     vbar_el1, xzr
@@ -293,9 +299,14 @@ FUNCTION(_start)
     b   .
 
 .Lsecondary_boot:
+    // Before we set sp, ensure that it's 'linked' to the current SP_ELX and
+    // not SP_EL0.
+    msr     SPSel, #1
+
     bl      arm64_get_secondary_sp
     cbz     x0, .Lunsupported_cpu_trap
     mov     sp, x0
+
     msr     tpidr_el1, x1
 #if __has_feature(shadow_call_stack)
     mov     shadow_call_sp, x2

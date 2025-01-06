@@ -6,7 +6,6 @@ mod futex_table;
 pub mod memory;
 mod memory_manager;
 pub mod syscalls;
-pub mod vmar;
 mod vmex_resource;
 mod vmsplice;
 

@@ -100,7 +100,7 @@ pub fn from_driver_playback_error(
         }
         driver_fidl::ConfigurePlaybackError::__SourceBreaking { unknown_ordinal } => {
             // This should be unreachable because playback is subpackaged with the sensor manager.
-            tracing::error!(
+            log::error!(
                 "Received unknown error from Sensor Playback with ordinal: {:#?}",
                 unknown_ordinal
             );

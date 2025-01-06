@@ -15,6 +15,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/developer/ffx/command:lib",
+    "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/core:lib",
     "//src/developer/ffx/daemon/proxy:lib",
@@ -68,7 +69,6 @@ group("tests") {
     ":lib_test",
     "macro:lib_test",
     "metadata:lib_test",
-    "search:lib_test",
   ]
 }
 

@@ -119,7 +119,7 @@ expiry dates.
 
 A handle to the UTC clock provided to the runtime is retrievable using
 the `zx_utc_reference_get` method provided in
-[`zircon/utc.h`](/zircon/third_party/ulib/musl/include/zircon/utc.h).
+[`<zircon/utc.h>`](/zircon/system/ulib/c/include/zircon/utc.h).
 
 The
 [`ZX_CLOCK_STARTED`](/docs/reference/kernel_objects/clock.md#starting-a-clock)

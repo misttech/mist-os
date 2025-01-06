@@ -5,7 +5,10 @@
     include: [ "//src/starnix/containers/container.shard.cml" ],
     program: {
         runner: "starnix",
-        features: [ "container" ],
+        features: [
+            "rootfs_rw",
+            "container",
+        ],
         init: [],
         init_user: "root:x:0:0",
         kernel_cmdline: "",

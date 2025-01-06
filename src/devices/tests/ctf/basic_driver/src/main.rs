@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashSet;
-
-use anyhow::{anyhow, Error, Result};
+use anyhow::{Error, Result};
 use fidl::endpoints::{create_endpoints, create_proxy, DiscoverableProtocolMarker, ServiceMarker};
-use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance_at};
+use fuchsia_component::client::{connect_to_protocol, Service};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_fs::directory::WatchEvent;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use realm_client::{extend_namespace, InstalledNamespace};
@@ -132,35 +129,10 @@ async fn test_basic_driver() -> Result<()> {
     )
     .unwrap();
 
-    let mut watcher = fuchsia_fs::directory::Watcher::new(&service).await?;
-    let mut instances: HashSet<String> = Default::default();
-    let mut event = None;
-    while instances.len() != 1 {
-        event = watcher.next().await;
-        let Some(Ok(ref message)) = event else { break };
-        let filename = message.filename.as_path().to_str().unwrap().to_owned();
-        if filename == "." {
-            continue;
-        }
-        match message.event {
-            WatchEvent::ADD_FILE | WatchEvent::EXISTING => _ = instances.insert(filename),
-            WatchEvent::REMOVE_FILE => _ = instances.remove(&filename),
-            WatchEvent::IDLE => {}
-            WatchEvent::DELETED => break,
-        }
-    }
-    if instances.len() != 1 {
-        return Err(anyhow!(
-            "Expected to find one instance within the service directory. \
-            Last event: {event:?}. Instances: {instances:?}"
-        ));
-    }
-
-    let service_instance = connect_to_service_instance_at::<ctf::ServiceMarker>(
-        test_ns.prefix(),
-        instances.iter().next().unwrap(),
-    )?;
-    let device = service_instance.connect_to_device()?;
+    let device = Service::from_service_dir_proxy(service, ctf::ServiceMarker)
+        .watch_for_any()
+        .await?
+        .connect_to_device()?;
 
     // Talk to the device!
     let pong = device.ping().await?;

@@ -10,8 +10,7 @@ use async_trait::async_trait;
 use doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorRecorder, Recorder};
 use errors::{ffx_bail, ffx_error};
 use ffx_build_version::VersionInfo;
-use ffx_config::environment::EnvironmentContext;
-use ffx_config::{get, global_env_context, print_config};
+use ffx_config::{print_config, EnvironmentContext};
 use ffx_daemon::DaemonConfig;
 use ffx_doctor_args::DoctorCommand;
 use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
@@ -156,8 +155,11 @@ impl DefaultDoctorStepHandler {
     }
 }
 
-async fn get_config_permission<W: Write>(mut writer: W) -> Result<bool> {
-    match get(RECORD_CONFIG_SETTING) {
+async fn get_config_permission<W: Write>(
+    context: &EnvironmentContext,
+    mut writer: W,
+) -> Result<bool> {
+    match context.get(RECORD_CONFIG_SETTING) {
         Ok(true) => {
             writeln!(
                 &mut writer,
@@ -251,6 +253,7 @@ pub struct DoctorTool {
     cmd: DoctorCommand,
     version_info: VersionInfo,
     show_tool: ShowToolWrapper,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(DoctorTool);
@@ -265,12 +268,14 @@ impl FfxMain for DoctorTool {
         // this is to refactor `ffx doctor` to make testing things like this less cumbersome.
         // TODO(b/373723080): Add actual tests for the usage of `ffx target show` within `ffx
         // doctor`.
-        doctor_cmd_impl(self.version_info, self.cmd, Some(self.show_tool), stdout()).await?;
+        doctor_cmd_impl(self.context, self.version_info, self.cmd, Some(self.show_tool), stdout())
+            .await?;
         Ok(())
     }
 }
 
 pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
+    context: EnvironmentContext,
     version_info: VersionInfo,
     cmd: DoctorCommand,
     show_tool: Option<ShowToolWrapper>,
@@ -278,14 +283,11 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
 ) -> Result<()> {
     let node = overnet_core::Router::new(None)
         .with_context(|| ffx_error!("Could not initialize Overnet"))?;
-    let context = ffx_config::global_env_context()
-        .with_context(|| ffx_error!("No environment context loaded"))?;
     let ascendd_path = context.get_ascendd_path().await?;
     let daemon_manager = DefaultDaemonManager::new(node, ascendd_path);
     let delay = Duration::from_millis(cmd.retry_delay);
-
-    let ffx: ffx_command::Ffx = argh::from_env();
-    let target_str = ffx.target.unwrap_or(String::default());
+    let target_spec = ffx_target::get_target_specifier(&context).await?;
+    let target_str = target_spec.unwrap_or_else(String::default);
 
     let mut log_root = None;
     let mut output_dir = None;
@@ -348,7 +350,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     let user_config_enabled = if !record || cmd.no_config {
         false
     } else {
-        match get_config_permission(&mut writer).await {
+        match get_config_permission(&context, &mut writer).await {
             Ok(b) => b,
             Err(e) => {
                 writeln!(&mut writer, "Failed to get permission to record config data: {}", e)?;
@@ -359,7 +361,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     };
 
     if cmd.repair_keys {
-        let keys = SshKeyFiles::load(None).await?;
+        let keys = SshKeyFiles::load(Some(&context)).await?;
         let message = keys.check_keys(true)?;
         writeln!(&mut writer, "{message}")?;
     }
@@ -390,7 +392,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
         cmd.restart_daemon,
         version_info,
         target_spec,
-        &global_env_context().context("No global environment configured")?,
+        &context,
         DoctorRecorderParameters {
             record,
             user_config_enabled,

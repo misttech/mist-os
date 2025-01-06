@@ -223,38 +223,32 @@ pub mod two_way {
     }
 }
 
-/// A helper trait for the `TwoWay` client protocol.
-pub trait TwoWayClient<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `TwoWay` client sender.
+pub trait TwoWayClientSender<___T: ::fidl_next::protocol::Transport> {
     fn add<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, two_way::Add>,
-        ::fidl_next::EncodeError,
-    >
+    ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, two_way::Add>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTwoWayAddRequest>;
 }
 
-impl<___T> TwoWayClient<___T> for ::fidl_next::bind::Client<___T, TwoWay>
+impl<___T> TwoWayClientSender<___T> for ::fidl_next::bind::ClientSender<___T, TwoWay>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
     fn add<___R>(
         &self,
         request: &mut ___R,
-    ) -> Result<
-        ::fidl_next::bind::TransactionFuture<'_, ___T, two_way::Add>,
-        ::fidl_next::EncodeError,
-    >
+    ) -> Result<::fidl_next::bind::ResponseFuture<'_, ___T, two_way::Add>, ::fidl_next::EncodeError>
     where
         for<'buf> ___R:
             ::fidl_next::Encode<___T::Encoder<'buf>, Encoded<'buf> = crate::WireTwoWayAddRequest>,
     {
-        self.untyped()
-            .send_transaction(989730524426044687, request)
-            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+        self.as_untyped()
+            .send_two_way(989730524426044687, request)
+            .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
 }
 
@@ -270,17 +264,24 @@ where
     for<'buf> crate::WireTwoWayAddResponse:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_event(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }
 
-/// A helper trait for the `TwoWay` server protocol.
-pub trait TwoWayServer<___T: ::fidl_next::protocol::Transport> {}
+/// A helper trait for the `TwoWay` server sender.
+pub trait TwoWayServerSender<___T: ::fidl_next::protocol::Transport> {}
 
-impl<___T> TwoWayServer<___T> for ::fidl_next::bind::Server<___T, TwoWay> where
+impl<___T> TwoWayServerSender<___T> for ::fidl_next::bind::ServerSender<___T, TwoWay> where
     ___T: ::fidl_next::protocol::Transport
 {
 }
@@ -290,7 +291,10 @@ impl<___T> TwoWayServer<___T> for ::fidl_next::bind::Server<___T, TwoWay> where
 pub trait TwoWayServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn add(
         &mut self,
+        sender: &::fidl_next::bind::ServerSender<___T, TwoWay>,
+
         request: ::fidl_next::bind::RequestBuffer<___T, two_way::Add>,
+
         responder: ::fidl_next::bind::Responder<two_way::Add>,
     );
 }
@@ -303,16 +307,24 @@ where
     for<'buf> crate::WireTwoWayAddRequest:
         ::fidl_next::Decode<<___T as ::fidl_next::protocol::Transport>::Decoder<'buf>>,
 {
-    fn on_event(handler: &mut ___H, ordinal: u64, buffer: ___T::RecvBuffer) {
+    fn on_one_way(
+        handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
+        ordinal: u64,
+        buffer: ___T::RecvBuffer,
+    ) {
         match ordinal {
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
@@ -320,10 +332,12 @@ where
                 let responder = ::fidl_next::bind::Responder::from_untyped(responder);
 
                 let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                handler.add(buffer, responder);
+                handler.add(sender, buffer, responder);
             }
 
-            ordinal => todo!(),
+            ordinal => {
+                sender.close();
+            }
         }
     }
 }

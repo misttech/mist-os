@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::get_bpf_object;
-use crate::bpf::helpers::get_common_helpers;
-use crate::bpf::map::{Map, PinnedMap};
 use crate::task::CurrentTask;
 use crate::vfs::{FdNumber, OutputBuffer};
 use ebpf::{
@@ -13,7 +11,7 @@ use ebpf::{
     VerifiedEbpfProgram, VerifierLogger, BPF_LDDW, BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC,
     BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX, BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
-use ebpf_api::ProgramType;
+use ebpf_api::{get_common_helpers, Map, PinnedMap, ProgramType};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, bpf_insn, errno, error};

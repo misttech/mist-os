@@ -257,23 +257,15 @@ TEST_F(VnodeTest, SyncFile) {
   ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
   fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
 
-  // 1. Check need_cp
+  // For other fsync tests, see FsyncRecoveryTest.
+  // 1. Check vnode is clean
   uint64_t pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  fs_->GetSuperblockInfo().ClearOpt(MountOption::kDisableRollForward);
-  file_vnode->SetDirty();
+  file_vnode->ClearDirty();
   ASSERT_EQ(file_vnode->SyncFile(false), ZX_OK);
   uint64_t curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
-  fs_->GetSuperblockInfo().SetOpt(MountOption::kDisableRollForward);
 
-  // 2. Check vnode is clean
-  pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  file_vnode->ClearDirty();
-  ASSERT_EQ(file_vnode->SyncFile(false), ZX_OK);
-  curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  ASSERT_EQ(pre_checkpoint_ver, curr_checkpoint_ver);
-
-  // 3. Check kNeedCp
+  // 2. Check kNeedCp
   pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   file_vnode->SetFlag(InodeInfoFlag::kNeedCp);
   file_vnode->SetDirty();
@@ -282,7 +274,7 @@ TEST_F(VnodeTest, SyncFile) {
   curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
 
-  // 4. Check SpaceForRollForward()
+  // 3. Check SpaceForRollForward()
   pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   block_t temp_user_block_count = fs_->GetSuperblockInfo().GetTotalBlockCount();
   fs_->GetSuperblockInfo().SetTotalBlockCount(0);

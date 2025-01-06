@@ -9,7 +9,7 @@ use std::fmt::Debug;
 use zx_status::Status as ZxStatus;
 
 #[allow(unused_imports)]
-use tracing::{debug, error, info, trace, warn};
+use log::{debug, error, info, trace, warn};
 
 /// Used for wrapping around error types so that they can be
 /// converted to [`::zx_status::Status`] values

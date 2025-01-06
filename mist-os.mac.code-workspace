@@ -121,7 +121,7 @@
 
     // Matches the default Fuchsia code style.
     "editor.rulers": [
-      100
+        100
     ],
 
     // Disable graph visualization of incoming/outgoing changes. This feature
@@ -130,6 +130,11 @@
     // in the "Source Control" tab.
     "scm.showHistoryGraph": false,
 
+    ////////
+    // Dart
+    //
+
+    "dart.sdkPath": "${workspaceFolder}/prebuilt/third_party/dart/linux-x64",
 
     ////////
     // Rust
@@ -225,10 +230,10 @@
     // Markdown
     //
     "[markdown]": {
-      // Matches our static checks in infra.
-      "editor.rulers": [
-          80
-      ]
+        // Matches our static checks in infra.
+        "editor.rulers": [
+            80
+        ]
     },
 
     ////////

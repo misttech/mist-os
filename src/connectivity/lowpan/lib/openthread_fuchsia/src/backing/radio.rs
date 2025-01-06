@@ -22,7 +22,7 @@ impl PlatformBacking {
             )
         }
 
-        debug!(tag = "rcp", "OT-TO-RCP: {:?}", SpinelFrameRef::try_unpack_from_slice(buffer));
+        debug!(tag = "rcp"; "OT-TO-RCP: {:?}", SpinelFrameRef::try_unpack_from_slice(buffer));
         self.ot_to_rcp_sender.borrow_mut().send(buffer.to_vec()).expect("ot_to_rcp_sender::send");
     }
 
@@ -68,7 +68,7 @@ impl PlatformBacking {
 
         if !duration.is_zero() {
             trace!(
-                tag = "rcp",
+                tag = "rcp";
                 "on_recv_wait_spinel_frame_from_rcp: Waiting {:?} for spinel frame",
                 duration
             );
@@ -76,7 +76,7 @@ impl PlatformBacking {
         match self.rcp_to_ot_receiver.borrow_mut().recv_timeout(duration) {
             Ok(vec) => {
                 debug!(
-                    tag = "rcp",
+                    tag = "rcp";
                     "RCP-TO-OT: {:?}",
                     SpinelFrameRef::try_unpack_from_slice(vec.as_slice())
                 );
@@ -85,7 +85,7 @@ impl PlatformBacking {
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 if !duration.is_zero() {
-                    trace!(tag = "rcp", "on_recv_wait_spinel_frame_from_rcp: Timeout");
+                    trace!(tag = "rcp"; "on_recv_wait_spinel_frame_from_rcp: Timeout");
                 }
                 0
             }

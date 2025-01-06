@@ -32,10 +32,13 @@ class ClockImplVisitor : public fdf_devicetree::Visitor {
   zx::result<> Visit(fdf_devicetree::Node& node,
                      const devicetree::PropertyDecoder& decoder) override;
 
-
  private:
   struct ClockController {
-    std::vector<uint8_t> clock_ids_metadata;
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    fuchsia_hardware_clockimpl::ClockIdsMetadata clock_ids_metadata;
+#endif
+    // TODO(b/373903133): Remove once no longer referenced.
+    std::vector<uint8_t> clock_ids_metadata_legacy;
     fuchsia_hardware_clockimpl::InitMetadata init_metadata;
   };
 

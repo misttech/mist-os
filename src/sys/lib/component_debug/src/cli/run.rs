@@ -86,7 +86,11 @@ impl Stdio {
                 if bytes_read == 0 {
                     return Ok::<(), anyhow::Error>(());
                 }
-                local_in.write(&buf[..bytes_read])?;
+                let mut buf = &buf[..bytes_read];
+                while !buf.is_empty() {
+                    let bytes = local_in.write(buf)?;
+                    buf = &buf[bytes..];
+                }
             }
         });
 

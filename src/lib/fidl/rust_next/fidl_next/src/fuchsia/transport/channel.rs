@@ -336,21 +336,21 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn send_receive() {
+    async fn one_way() {
         let (client_end, server_end) = Channel::create();
-        test_send_receive(client_end, server_end).await;
+        test_one_way(client_end, server_end).await;
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn transaction() {
+    async fn two_way() {
         let (client_end, server_end) = Channel::create();
-        test_transaction(client_end, server_end).await;
+        test_two_way(client_end, server_end).await;
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn multiple_transactions() {
+    async fn multiple_two_way() {
         let (client_end, server_end) = Channel::create();
-        test_multiple_transactions(client_end, server_end).await;
+        test_multiple_two_way(client_end, server_end).await;
     }
 
     #[fasync::run_singlethreaded(test)]

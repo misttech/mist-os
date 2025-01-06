@@ -1,0 +1,135 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/testing/golden_files.gni")
+import("../libc.gni")
+import("libc_headers.gni")
+
+# See README.md for a full explanation.
+#
+# This file (with libc_headers.gni) manages all the public libc header files.
+# These go into the "sysroot" built by //zircon/public/sysroot; that's used to
+# compile most Fuchsia user code, and it goes into the SDK.
+#
+# Any changes to these files require manual API review approval.  Some of
+# these files come from llvm-libc so changes do not land directly in this
+# repository where they could be tied to the API review and metadata updates.
+# Instead, an automated roller job updates the integration pin for
+# //third_party/llvm-libc/src.  To allow the automated roll commits to land,
+# there must be no changes to what goes into the SDK directly caused by that
+# commit.  To avoid this problem, the llvm-libc headers copied into the SDK
+# never come from //third_party/llvm-libc/src/include; instead they come from
+# the llvm-libc-golden subdirectory here.
+#
+# Ordinarily the build will check that all llvm-libc-golden files match the
+# source of truth found in //third_party/llvm-libc/src/include.  When there is
+# a change, rolls will fail with a golden_files() error pointing here.  Then a
+# temporary change must be landed setting this flag to true to allow an
+# llvm-libc roll to complete.  Finally, the flag must be set back to false
+# along with rebuilding with `update_goldens=true` in `args.gn` to update the
+# API summary files for the SDK, for a change that go through API review.
+llvm_libc_soft_transition = true  # TODO(https://fxbug.dev/376333113)
+
+# This target is in an sdk.deps list in sysroot_entries, to ensure that the
+# llvm-libc-golden copies are up to date.  It does nothing during a soft
+# transition declared by setting llvm_libc_soft_transition=true above.  This
+# checking only happens in the $default_toolchain and is not repeated
+# elsewhere.
+# TODO(https://fxbug.dev/376333113): header generation will happen here too.
+group("include") {
+  if (!llvm_libc_soft_transition) {
+    public_deps = [ ":check-llvm-libc-golden($default_toolchain)" ]
+  }
+}
+
+if (current_toolchain == default_toolchain) {
+  # If the comparisons list goes directly into golden_files() as a list of
+  # scopes, then each golden file will be an input and Ninja will insist that
+  # it already exist before running anything.  With the list it in a JSON file,
+  # the golden_files() action gets a chance to run and create new files.
+  generated_file("check-llvm-libc-golden.manifest") {
+    visibility = [ ":check-llvm-libc-golden" ]
+    outputs = [ "$target_gen_dir/$target_name" ]
+    output_conversion = "json"
+    contents = []
+    foreach(file, libc_headers.llvm_libc_headers) {
+      contents += [
+        {
+          candidate = rebase_path(file, root_build_dir, "$llvm_libc/include")
+          golden = rebase_path(file, "//", libc_headers.golden_dir)
+        },
+      ]
+    }
+  }
+
+  golden_files("check-llvm-libc-golden") {
+    visibility = [ ":*" ]
+    dir = libc_headers.golden_dir
+    message = "Changes to copied llvm-libc headers will require API review." +
+              " First land a `llvm_libc_soft_transition = true` update to " +
+              get_path_info("BUILD.gn", "abspath") +
+              " to allow //third_party/llvm-libc/src to be updated." +
+              " Then flip the flag back, build with `update_goldens=true`." +
+              " This will update API summary files."
+    deps = [ ":check-llvm-libc-golden.manifest" ]
+    _outputs = get_target_outputs(deps[0])
+    comparisons = _outputs[0]
+  }
+}
+
+# This reaches all the public libc headers (ones that will be installed)
+# directly at the source of truth.  It's only used for compiling libc code.
+# Note this includes the libc unit test code, as well as the hermetic partial
+# libc bits built for special environments.  These headers are meant to match
+# the libc source code being built.  During a soft transition, they will not
+# match the public headers in the SDK and used by most normal Fuchsia user
+# code in the build.
+#
+# source_set() is actually a template that injects additional deps...that
+# reach back here.  So this must use basic_source_set() to have only the
+# direct effects spelled out here and nothing else explicit.
+basic_source_set("headers") {
+  visibility = [
+    "../*",
+    "//build/config/zircon:user_deps",
+    "//zircon/kernel/lib/userabi/userboot/*",
+    "//zircon/system/ulib/ldmsg/*",
+    "//zircon/third_party/scudo/*",
+    "//zircon/third_party/ulib/musl/*",
+  ]
+
+  # Make sure no set_defaults() configs contribute anything that might
+  # propagate up from here.
+  configs = []
+
+  public_configs = [ ":headers.config" ]
+  public = []
+  foreach(file, libc_headers.root_headers) {
+    public += [ file ]
+  }
+  foreach(file, libc_headers.musl_headers) {
+    public += [ "${libc_headers.musl_dir}/$file" ]
+  }
+  foreach(file, libc_headers.llvm_libc_headers) {
+    public += [ "$llvm_libc/include/$file" ]
+  }
+  public_deps = [ "//zircon/system/public" ]
+}
+
+config("headers.config") {
+  visibility = [ ":*" ]
+  cflags = []
+  foreach(dir,
+          [
+            ".",
+            libc_headers.musl_dir,
+            "$llvm_libc/include",
+          ]) {
+    cflags += [
+      "-idirafter",
+      rebase_path(dir, root_build_dir),
+    ]
+  }
+  asmflags = cflags
+}

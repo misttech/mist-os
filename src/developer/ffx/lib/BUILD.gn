@@ -25,6 +25,7 @@ if (is_host) {
     "netext",
     "pbms",
     "pkg",
+    "port_picker",
     "protocols",
     "rcs",
     "sdk",

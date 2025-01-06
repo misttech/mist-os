@@ -12,7 +12,7 @@ rustc_library("ffx_optional_moniker") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/developer/ffx/command:lib",
+    "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/lib/fidl/rust/fidl",

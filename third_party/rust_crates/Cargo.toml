@@ -307,7 +307,7 @@ parking_lot = "0.12.0"
 petgraph = { version = "0.6.2" }
 proc-macro2 = { version = "1.0.86", features = ["span-locations"] }
 pulldown-cmark = { version = "0.9.3", features = ["serde"] }
-quote = "1.0.35"
+quote = "1.0.38"
 rustfix = "0.6.1"
 rustls-native-certs = "0.6.3"
 semver = "1.0.23"
@@ -723,12 +723,6 @@ rustflags = ["--cfg=span_locations", "--cfg=wrap_proc_macro"]
 
 [gn.package.pulldown-cmark."0.9.3"]
 # Has build script but no config needed.
-
-# The `build.rs` file in this version of quote checks for rustc versions less
-# than 53; for later rustc versions (including the one that we vendor with
-# Fuchsia), the logic in `build.rs` is a no-op.
-[gn.package.quote."1.0.35"]
-rustflags = []
 
 [gn.package.rand."0.6.5"]
 rustflags = ["--cfg=rustc_1_25","--cfg=rustc_1_26",  "--cfg=rustc_1_27",]

@@ -7,7 +7,7 @@ import argparse
 import subprocess
 from typing import List, Tuple
 
-from fuchsia_task_lib import *
+from fuchsia.tools.fuchsia_task_lib import *
 
 
 class FuchsiaTaskRunTestComponent(FuchsiaTask):

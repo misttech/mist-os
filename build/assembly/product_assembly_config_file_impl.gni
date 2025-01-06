@@ -107,7 +107,6 @@ template("product_assembly_config_file") {
         "version",
         "jiri_snapshot",
         "latest_commit_date",
-        "minimum_utc_stamp",
       ]
     },
   ]

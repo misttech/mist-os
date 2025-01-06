@@ -1,0 +1,23 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+""" Defines the public flags used by rules. """
+
+# It is important to limit what is loaded in this file as any loads will need
+# to be loaded whenever the flag is used.
+
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+
+package(default_visibility = ["//visibility:public"])
+
+# Set --@rules_fuchsia//fuchsia:fuchsia_targets_enabled=false to effectively mark
+# (almost) all @rules_fuchsia instantiated rules/targets as
+# `target_compatible_with = ["@platforms//:incompatible"]`.
+# Specifically, this marks any target using any of the
+# `@rules_fuchsia//fuchsia/constraints:target_compatibility.bzl` > `COMPATIBILITY`
+# helpers as incompatible.
+bool_flag(
+    name = "fuchsia_targets_enabled",
+    build_setting_default = True,
+)

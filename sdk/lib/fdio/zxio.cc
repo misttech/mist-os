@@ -22,10 +22,6 @@
 
 #include <algorithm>
 
-#include <fbl/auto_lock.h>
-
-#include "fdio_unistd.h"
-
 namespace fio = fuchsia_io;
 
 namespace fdio_internal {

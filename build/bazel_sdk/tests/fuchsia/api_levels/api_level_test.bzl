@@ -35,7 +35,7 @@ level_setting_test_no_checks_test = analysistest.make(
         "expected_level": attr.string(),
     },
     config_settings = {
-        "@fuchsia_sdk//fuchsia:fuchsia_targets_enabled": False,
+        "@rules_fuchsia//fuchsia/flags:fuchsia_targets_enabled": False,
     },
 )
 

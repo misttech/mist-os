@@ -28,17 +28,6 @@
             {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
-                source_name: "data",
-                capability: "directory",
-                target_monikers: [
-                    // TODO(https://fxbug.dev/42077029): Remove once session_manager gets autolaunch override
-                    // from structured configuration
-                    "/core/session-manager",
-                ],
-            },
-            {
-                source_moniker: "/bootstrap/fshost",
-                source: "component",
                 source_name: "tmp",
                 capability: "directory",
                 target_monikers: [

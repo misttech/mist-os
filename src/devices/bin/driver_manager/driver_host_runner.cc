@@ -146,22 +146,23 @@ zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_p
   return ZX_OK;
 }
 
-void DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
-                                       fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
-                                       StartDriverHostCallback callback) {
+void DriverHostRunner::StartDriverHost(
+    fidl::WireSharedClient<fuchsia_driver_loader::DriverHostLauncher> driver_host_launcher,
+    fidl::ServerEnd<fuchsia_io::Directory> exposed_dir, std::shared_ptr<bool> exposed_dir_connected,
+    StartDriverHostCallback callback) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
   std::string name = "driver-host-new-" + std::to_string(next_driver_host_id_++);
 
   StartDriverHostComponent(
-      name, kUrl, std::move(exposed_dir),
-      [this, name, loader, callback = std::move(callback)](
+      name, kUrl, std::move(exposed_dir), std::move(exposed_dir_connected),
+      [this, name, launcher = std::move(driver_host_launcher), callback = std::move(callback)](
           zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
         if (component.is_error()) {
           LOGF(ERROR, "Failed to start driver host: %s", component.status_string());
           callback(component.take_error());
           return;
         }
-        LoadDriverHost(loader, component->info, name, std::move(callback));
+        LoadDriverHost(std::move(launcher), component->info, name, std::move(callback));
       });
 }
 
@@ -174,8 +175,9 @@ std::unordered_set<const DriverHostRunner::DriverHost*> DriverHostRunner::Driver
 }
 
 void DriverHostRunner::LoadDriverHost(
-    driver_loader::Loader* loader, const fuchsia_component_runner::ComponentStartInfo& start_info,
-    std::string_view name, StartDriverHostCallback callback) {
+    fidl::WireSharedClient<fuchsia_driver_loader::DriverHostLauncher> driver_host_launcher,
+    const fuchsia_component_runner::ComponentStartInfo& start_info, std::string_view name,
+    StartDriverHostCallback callback) {
   auto url = *start_info.resolved_url();
   fidl::Arena arena;
   fuchsia_data::wire::Dictionary wire_program = fidl::ToWire(arena, *start_info.program());
@@ -237,18 +239,37 @@ void DriverHostRunner::LoadDriverHost(
     return;
   }
 
-  auto loader_result = loader->Start(std::move(process), std::move(root_vmar), std::move(exec_vmo),
-                                     std::move(vdso_vmo), std::move(*lib_dir));
-  if (loader_result.is_error()) {
-    LOGF(ERROR, "Loader failed to start driver host: %s", loader_result.status_string());
-    callback(loader_result.take_error());
-    return;
-  }
-  callback(std::move(loader_result));
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_driver_loader::DriverHost>::Create();
+  auto args = fuchsia_driver_loader::wire::DriverHostLauncherLaunchRequest::Builder(arena)
+                  .process(std::move(process))
+                  .root_vmar(std::move(root_vmar))
+                  .driver_host_binary(std::move(exec_vmo))
+                  .vdso(std::move(vdso_vmo))
+                  .driver_host_libs(std::move(*lib_dir))
+                  .driver_host(std::move(server_end))
+                  .Build();
+
+  driver_host_launcher->Launch(args).ThenExactlyOnce(
+      [client_end = std::move(client_end), cb = std::move(callback),
+       _ = std::move(driver_host_launcher)](auto& result) mutable {
+        if (!result.ok()) {
+          LOGF(ERROR, "Failed to start driver host: %s", result.FormatDescription().c_str());
+          cb(zx::error(result.status()));
+          return;
+        }
+        if (result->is_error()) {
+          LOGF(ERROR, "Failed to start driver host: %s",
+               zx_status_get_string(result->error_value()));
+          cb(result->take_error());
+          return;
+        }
+        cb(zx::ok(std::move(client_end)));
+      });
 }
 
 void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::string_view url,
                                                 fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
+                                                std::shared_ptr<bool> exposed_dir_connected,
                                                 StartComponentCallback callback) {
   zx::event token;
   zx_status_t status = zx::event::create(0, &token);
@@ -290,7 +311,9 @@ void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::s
       fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(&handle_info, 1));
   auto create_callback =
       [this, child_moniker = std::string(moniker.data()), koid = koid.value(),
-       exposed_dir = std::move(exposed_dir), open_callback = std::move(open_callback)](
+       exposed_dir = std::move(exposed_dir),
+       exposed_dir_connected = std::move(exposed_dir_connected),
+       open_callback = std::move(open_callback)](
           fidl::WireUnownedResult<fcomponent::Realm::CreateChild>& result) mutable {
         bool is_error = false;
         if (!result.ok()) {
@@ -316,6 +339,7 @@ void DriverHostRunner::StartDriverHostComponent(std::string_view moniker, std::s
         };
         realm_->OpenExposedDir(child_ref, std::move(exposed_dir))
             .ThenExactlyOnce(std::move(open_callback));
+        *exposed_dir_connected = true;
       };
   realm_
       ->CreateChild(

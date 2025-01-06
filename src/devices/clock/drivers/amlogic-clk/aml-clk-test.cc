@@ -45,6 +45,10 @@ class Environment : public fdf_testing::Environment {
     pdev_config.mmios[AmlClock::kHiuMmio] = std::move(hiu_buffer);
     pdev_config.mmios[AmlClock::kDosbusMmio] = std::move(dos_buffer);
     ASSERT_OK(pdev_.SetConfig(std::move(pdev_config)));
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+    pdev_.AddFidlMetadata(fuchsia_hardware_clockimpl::ClockIdsMetadata::kSerializableName,
+                          fuchsia_hardware_clockimpl::ClockIdsMetadata{{.clock_ids{}}});
+#endif
   }
 
  private:

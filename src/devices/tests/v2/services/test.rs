@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Result};
-use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::client;
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
-use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_services_test as ft};
+use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_services_test as ft, fuchsia_async as fasync};
 
 #[fasync::run_singlethreaded(test)]
 async fn test_services() -> Result<()> {
@@ -30,29 +29,12 @@ async fn test_services() -> Result<()> {
     };
     realm.driver_test_realm_start(args).await?;
 
-    // Find an instance of the `Device` service.
-    let instance;
-    let service = client::open_service_at_dir::<ft::DeviceMarker>(realm.root.get_exposed_dir())
-        .context("Failed to open service")?;
-    loop {
-        // TODO(https://fxbug.dev/42124541): Once component manager supports watching for
-        // service instances, this loop shousld be replaced by a watcher.
-        let entries = fuchsia_fs::directory::readdir(&service)
-            .await
-            .context("Failed to read service instances")?;
-        if let Some(entry) = entries.iter().next() {
-            instance = entry.name.clone();
-            break;
-        }
-        Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
-    }
-
     // Connect to the `Device` service.
-    let device = client::connect_to_service_instance_at_dir::<ft::DeviceMarker>(
-        realm.root.get_exposed_dir(),
-        &instance,
-    )
-    .context("Failed to open service")?;
+    let device = client::Service::open_from_dir(realm.root.get_exposed_dir(), ft::DeviceMarker)
+        .context("Failed to open service")?
+        .watch_for_any()
+        .await
+        .context("Failed to find instance")?;
     // Use the `ControlPlane` protocol from the `Device` service.
     let control = device.connect_to_control()?;
     control.control_do().await?;

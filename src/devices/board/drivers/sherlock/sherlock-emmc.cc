@@ -177,7 +177,7 @@ zx_status_t Sherlock::EmmcInit() {
           .data = std::move(encoded.value()),
       }},
       {{
-          .id = std::to_string(DEVICE_METADATA_SDMMC),
+          .id = fuchsia_hardware_sdmmc::wire::SdmmcMetadata::kSerializableName,
           .data = std::move(sdmmc_metadata.value()),
       }},
   };

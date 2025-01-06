@@ -1,0 +1,374 @@
+# Public headers for the Fuchsia C library
+
+The C library provides a suite of public header files.  These are the files
+found by `#include <something.h>` for the various `<something.h>` APIs required
+by the C standard or by other standard or traditional system C library APIs,
+plus some Fuchsia-specific (Zircon) extensions.
+
+The current implementation provides not only standard C library APIs but also a
+subset of POSIX plus some BSD and GNU extensions and some Linux-specific APIs.
+In the future, the distinctions between standard C and other APIs will be made
+more formal, and some of these things will move elsewhere.  The set of Zircon
+extensions and their precise API details are also subject to change.
+
+This directory drives the build logic for all of the public C library headers.
+Only some of those headers are maintained directly in this directory.  These
+and the other kinds of headers handled here are described below.
+
+## Sources of header files
+
+### Zircon extensions
+
+The Fuchsia C library provides a handful of new APIs that are idiosyncratic to
+Fuchsia and mesh with the Zircon system call APIs.  All of these are declared
+in `<zircon/*.h>` header files.  Those are maintained [right here](zircon).
+
+### musl headers
+
+The Fuchsia C library began as a fork of [musl](https://musl.libc.org/).  A
+great deal of implementation code, and most of the public header files, are
+still those inherited from musl (and much modified).  These are maintained
+within this repository as the sole source of truth (without reference to
+upstream musl, which has long since diverged from Fuchsia's fork).  They are
+found in a [separate directory](/zircon/third_party/ulib/musl/include) to
+reflect their lineage.
+
+### llvm-libc headers
+
+The future of the Fuchsia C library lies with the
+[llvm-libc](https://libc.llvm.org/) project.  The LLVM C Library is not an
+alternative to the Fuchsia C library.  It's one of the building blocks.  The
+Fuchsia C library is steadily migrating to using both implementation code and
+public header files from llvm-libc where possible.  This will eventually
+replace everything inherited from musl, though much Fuchsia-specific
+implementation detail (and the Zircon extension APIs) will continue to be
+maintained in this repository and not in LLVM.
+
+For code and header files from llvm-libc, the ultimate source of truth is in
+the upstream [LLVM repository](https://github.com/llvm/llvm-project).  The
+[`libc`](https://github.com/llvm/llvm-project/tree/main/libc) subdirectory of
+that is [mirrored by Google](https://llvm.googlesource.com/llvm-project/libc/).
+[Fuchsia `integration`](https://fuchsia.googlesource.com/integration) places
+that mirror at [`//third_party/llvm-libc/src`](/third_party/llvm-libc/src) in a
+Fuchsia checkout.  The [build rules here](../libc.gni) refer to that code.  An
+automated "roller" job attempts to update the pinned revision whenever the
+mirror repository's `main` branch is updated (the mirror usually updates within
+a few minutes of upstream LLVM repository changes).  This uses a normal Gerrit
+change that must pass all automated build and test steps across many Fuchsia
+builders before the update lands.
+
+The llvm-libc [`include`](/third_party/llvm-libc/src/include) subdirectory
+contains the public header files.  Some of these are used as public headers by
+the Fuchsia C library.
+
+#### Generated llvm-libc headers
+
+_**TODO(https://fxbug.dev/376333113):** Describe generation scheme_
+
+## Uses of header files
+
+In "end-user" scenarios, the C library header files are always found implicitly
+by the compiler without `-I` switches or build system plumbing about it.
+Moreover, the compiler comes with header files of its own and is part of a
+toolchain providing other libraries such as [libc++](https://libcxx.llvm.org/).
+These toolchain-supplied header files can have some arcane interactions with C
+library header files.  Normally, the compiler will first see header files from
+the user's own build (via `-I` switches supplied through the build system);
+then the toolchain's own header files; then the C library's header files.  If
+instead the order is changed so that the C library's header files take
+precedence over the toolchain-supplied header files, things go wrong.
+
+### sysroot
+
+The compiler and linker can take a `--sysroot=...` switch.  The directory this
+points to is often called "the sysroot".  This is the root directory in which
+header files and libraries will be found by default search paths.  When no
+switch is provided, the compiler may be configured with a default sysroot
+directory or may have default behavior that's roughly similar to `--sysroot=/`.
+(In a traditional self-hosted Unix-style situation, that finds `/usr/include`,
+`/usr/lib`, etc.)  The compiler's defaults for include paths, library paths,
+and link inputs (such as the C library itself) are all relative to the sysroot
+(except for those supplied by the toolchain itself, which are always relative
+to the compiler's own location).
+
+For most users, this is how both header files and link-time artifacts for the C
+library (and perhaps other "system" libraries) are usually found.  To do
+anything else requires special build plumbing and a potentially complex array
+of compiler switches.  However, this usual way of things cannot apply to
+building the C library itself, or anything else that goes into the sysroot,
+without creating a circular dependency.
+
+### Fuchsia SDK
+
+The [Fuchsia SDK](/docs/development/sdk) includes the C library's headers along
+with prebuilt binary artifacts for linking against the C library; for
+redistributing the shared library binaries in Fuchsia packages; and for
+debugging those binaries.  These headers and link-time artifacts are included
+in a [sysroot](#sysroot) that is the foundation of public C and C++ APIs (and
+public ABIs across languages) for Fuchsia SDK users.  As such, there are strict
+controls on changes to the API and ABI surfaces defined by these header files
+(as for the rest of the SDK).
+
+In particular, every change to a header file in the sysroot (or any other
+public header file in the SDK) requires an update to a `.api` file and must go
+through [API review](/docs/contribute/governance/api_council.md#api-review).
+This **cannot be fully automated, as a matter of prudently rigid policy**:
+human intervention by an API reviewer is always required to provide approval
+before a change can land.
+
+### Fuchsia platform GN build
+
+The Fuchsia GN build does not use the Fuchsia SDK per se.  Rather, it builds
+many of the binary artifacts and assembles many of the source and header files
+that will go into the SDK.  Among these, it builds the [sysroot](#sysroot) to
+go into the SDK.  This contains copies of all the public header files for the C
+library.
+
+This sysroot is used to compile most Fuchsia userland code in the GN build.
+It's automatically updated before it's used, so it automatically gets any
+changes made to the header files maintained here in this repository and its
+submodules (such as [llvm-libc](/third_party/llvm-libc/src)) in the local
+checkout.  When this happens, those changes cannot land without necessary API
+review procedures.
+
+#### sysroot.api
+
+For the C library, [`sysroot.api`](/zircon/public/sysroot/sdk/sysroot.api) is
+the file that must be updated.  This will usually happen incidentally in a
+build.  But it can always be checked explicitly with:
+
+```shell
+fx build //zircon/public/sysroot/sdk:sysroot_sdk
+```
+
+This will fail for any changes by default.  To update it in the source tree,
+set [`update_goldens = true`](/docs/gen/build_arguments.md#update_goldens) in
+`args.gn` first.
+
+The updated `.api` file must be included in the same commit that touches the
+header files in the source tree.  Gerrit will not allow the change to land
+without [API review](/docs/contribute/governance/api_council.md#api-review).
+(Changing any `.api` file will trigger the API review requirement in Gerrit;
+failing to change it will make the CQ bots fail.)
+
+#### No automatic API review
+
+As mentioned earlier, [llvm-libc](/third_party/llvm-libc/src) is usually
+updated to a new revision in Fuchsia integration by an automatic "roller" job.
+No integration change can land that invalidates any `.api` file in the Fuchsia
+repository.  Manual approval is required--but that's in the Fuchsia repository.
+Commits to the Fuchsia repository are usually independent of integration
+commits and vice versa.  Hence, an upstream change will break the roller if it
+would cause a change to the sysroot.  This problem is addressed below.
+
+### Building libc
+
+When building the C library itself, no sysroot is used.  Instead, the header
+files are used directly from [the source tree](#sources-of-header-files).  This
+ensures that the header files always correspond to the code being compiled.
+For the public C library headers that come from llvm-libc, this means they come
+directly from [`//third_party/llvm-libc/src`](/third_party/llvm-libc/src).
+
+_**TODO(https://fxbug.dev/376333113):** generation case_
+
+### Hermetic partial libc for special environments
+
+A few parts of the C library code are used in the kernel, the dynamic linker,
+and other special environments.  These are not like most Fuchsia userland code,
+and do not use the sysroot.  A subset of the C library code is compiled
+separately in these special environments (via other GN toolchains).  (Compiling
+the C library itself is really just another one of these special environments.)
+All these cases use the headers directly from the source tree in the same way.
+
+### Building llvm-libc unit tests
+
+Most C library code is built a second time for testing purposes.  This version
+is used with the [llvm-libc unit tests](/third_party/llvm-libc/src/test).
+Unlike when the same code is built for the C library itself or in other special
+environments, this is largely treated as normal Fuchsia userland code.  It uses
+the default GN toolchain used for the rest of the platform GN build, and thus
+uses that same sysroot.  However, this code also uses the public C library
+headers directly from the source tree instead of those in the sysroot.
+
+The files in the source tree should preempt the sysroot copies in most cases,
+though there are some arcane cases in which the sysroot headers could still be
+used.  The rationale is that the library and test code should get the headers
+that match, even when Fuchsia userland code generally is still getting a
+different version.  During soft transitions, the source tree and the sysroot
+may diverge in the contents of some header files.  If this causes problems,
+temporary workarounds may be needed to to get through a particular transition.
+(It may be sufficient and expedient to temporarily disable big chunks of test
+code during a short transition period.)
+
+## The conundrum of the llvm-libc roller vs API review
+
+Two competing principles are particularly relevant to the Fuchsia C library:
+ 1. Automation is essential to effective software development.
+ 2. Careful human review is essential to effective API maintenance.
+
+The first is exemplified by the auto-roller from the LLVM repository.  The
+second is exemplified by the strict API review requirement for all changes to
+public header files.  The compromise between these two is reached by
+_semi-automated copying_ and _soft transitions_.
+
+### llvm-libc-golden
+
+The [`llvm-libc-golden`](llvm-libc-golden) subdirectory contains all the header
+files from llvm-libc that will be copied into [the sysroot](#sysroot) by the
+[Fuchsia platform GN build](#fuchsia-platform-gn-build).  These in turn are
+_copied_ from [the llvm-libc sources](/third_party/llvm-libc/src), but **not
+entirely automatically**.
+
+Ordinarily, a Fuchsia build will simply check that all the files in
+[`llvm-libc-golden`](llvm-libc-golden) are already up to date: the build will
+fail if any header file's source of truth in the checkout's revision of
+llvm-libc has changed.  This checking is implemented using the same ["golden
+files" mechanism](/build/testing/golden_files.gni) used for the `.api` files in
+the source tree.  The `llvm-libc-golden` subdirectory of the local checkout can
+be updated using the same [procedure described above](#sysroot_api).
+
+**NOTE:** This means that any upstream header change will cause the auto-roller
+to start failing.  Any such change will require a _soft transition_.
+
+_**TODO(https://fxbug.dev/376333113):** generation case_
+
+#### Soft transition procedure
+
+When public header files taken from llvm-libc have changed upstream, the
+llvm-libc auto-roller will fail until a _soft transition_ is completed.  A
+_soft_ transition is a sequence of commits that can each land separately via
+the CQ and pass all the normal automated checks, so no developer or bot build
+is broken in the intermediate states.  All the changes in the sequence must
+land in the correct order, but unrelated changes can safely land between them.
+
+The soft transition for an llvm-libc header change will have these steps:
+ 1. Temporarily disable checking [`llvm-libc-golden`](llvm-libc-golden).
+ 2. Complete the llvm-libc "roll": update the pinned revision.
+ 3. Update [`llvm-libc-golden`](llvm-libc-golden) and resume checking.
+
+To start any soft transition, first make sure there is a bug filed specifically
+to track the whole sequence of steps.  This bug won't be closed until the
+entire soft transition sequence is complete, but every commit in the sequence
+will be tagged with the same bug number.  (If there is already a tracking bug
+for the specific libc changes of which these upstream header changes are a
+known component, then it can be reused even if it's not going to be marked
+closed immediately upon completion of the header soft transition per se.  If
+instead there is a generic "llvm-libc auto-roller is broken for some reason"
+bug that turns out to just be the need for a header-change soft transition,
+then it can be reused.)  We'll use `https://fxbug.dev/nnn` to refer to that
+bug's canonical (short) URL.
+
+The precise details for each step are:
+
+ * Disable checking.
+   1. Edit [this `BUILD.gn` file](BUILD.gn) to find the line that reads:
+      ```gn
+      llvm_libc_soft_transition = false
+      ```
+   2. Change this line to:
+      ```gn
+      llvm_libc_soft_transition = true # TODO(https://fxbug.dev/nnn)
+      ```
+   3. Land this change as a normal commit through Gerrit.
+      Be sure to use `Bug: nnn` in the commit log.  For example:
+      ```
+      [libc] Start soft transition for llvm-libc header changes
+
+      Bug: nnn
+      Change-Id: ...
+      ```
+ * Complete the roll with a Gerrit integration commit.  This can be done
+   manually through Gerrit, but it's best to leave it to the auto-roller job.
+   1. Manually trigger it through the LUCI web UI (requires ACL privileges)
+   2. A new upstream LLVM commit in the `libc` subdirectory will trigger it.
+   3. Just wait a few hours, and it will try a job with the latest llvm-libc
+      revision even if there haven't been more commits since the last (failed)
+      roll attempt.
+ * Update goldens and resume checking.
+   1. Put `update_goldens = true` the `args.gn` of your local build.
+   2. Reverse the edit to [this `BUILD.gn` file](BUILD.gn), so it reads:
+      ```gn
+      llvm_libc_soft_transition = false
+      ```
+   3. Update your local build, with whatever you usually do, or:
+      ```shell
+      fx build //zircon/public/sysroot/sdk:sysroot_sdk
+      ```
+      This should modify the `llvm-libc-golden` files in the source tree.
+   4. Land this change as a normal commit through Gerrit.
+      Be sure to use `Fixed: nnn` in the commit log.  For example:
+      ```
+      [libc] Complete soft transition for llvm-libc header changes
+
+      Fixed: nnn
+      Change-Id: ...
+      ```
+
+#### Mid-transition state
+
+After the first two steps of the soft transition procedure, there will be
+differences between the header files in the llvm-libc "source of truth" that's
+used to compile the C library, its tests, etc.; and those in the sysroot, as
+copied from [`llvm-libc-golden`](llvm-libc-golden).
+
+In this state, there could be arcane unexpected effects of ABI drift between
+callers compiled with older headers and callees compiled with newer headers.
+If any such issues prevent landing either the llvm-libc roll step or the
+golden-updates completion step, then ad hoc workarounds may be required.
+
+However, some such issues could affect downstream SDK users not directly tested
+in Fuchsia CQ/CI or not noticed very quickly.  It's important to minimize the
+window of time and unrelated Fuchsia commits where `llvm_libc_soft_transition`
+remains set to `true`.  Ideally no Fuchsia SDK built during that window would
+be used by anything outside the Fuchsia build.
+
+**Make absolutely sure that no new release branch is cut from a mid-transition
+state of the Fuchsia repository!**
+
+#### Adding or removing llvm-libc header files
+
+The soft transition procedure above may run into problems if llvm-libc adds or
+removes some of its header files.  All the llvm-libc headers to be used are
+listed in [`libc_headers.gni`](libc_headers.gni).  Any newly added or removed
+files must be updated in that list before `llvm-libc-golden` can be updated.
+
+That same list of header file names drives both the checking / updating of
+`llvm-libc-golden` and the copying from there into the sysroot, and both are
+part of the same GN / Ninja build.  This creates a bit of a circularity when
+adding a new file.  Follow these steps to add a new file to the list:
+
+ 1. Edit [`libc_headers.gni`](libc_headers.gni), and go to the end of the file.
+    Inside the final `}`, add a line like this:
+    ```gn
+      llvm_libc_headers += [ "new-header-file.h" ]
+    ```
+    This gets it into the list that drives the `llvm-libc-golden` update, but
+    not into the list that drives the sysroot construction.
+ 2. Run a build.  Any build will probably do it, but all that's needed is:
+    ```shell
+    fx build -- check-llvm-libc-golden
+    ```
+    This should create the new files in `llvm-libc-golden` (assuming you
+    have `update_goldens = true` set already).
+ 3. Go back to `libc_headers.gni` and remove what was added above.  Instead,
+    merge the new files into the main `llvm_libc_headers` list near the top.
+ 4. Run another build.  What's essential is:
+    ```shell
+    fx build //zircon/public/sysroot/sdk:sysroot_sdk
+    ```
+
+To remove files, it should be simpler:
+
+ 1. Edit [`libc_headers.gni`](libc_headers.gni) to remove the obsolete file
+    names from the `llvm_libc_headers` list near the top of the file.
+ 2. Run a build, as in the final step for adding a file.
+
+In either case, make sure that `git` is up to date with the new or removed
+files in `llvm-libc-golden` before creating your Gerrit change.  The checking /
+update script with `update_goldens = true` will try to handle this for you by
+running some `git rm` and `git add` commands.  But that won't catch all cases.
+After the local build with `update_goldens = true` is happy, then it should
+always be safe and sufficient to do:
+```shell
+git add -A zircon/system/ulib/c/include/llvm-libc-golden
+```

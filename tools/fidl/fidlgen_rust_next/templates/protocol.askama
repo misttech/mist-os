@@ -42,11 +42,11 @@ pub mod {{ module_name }} {
     {% endfor %}
 }
 
-{% let client_trait_name = format!("{protocol_base_name}Client") %}
+{% let client_sender_name = format!("{protocol_base_name}ClientSender") %}
 {% let client_handler_name = format!("{protocol_base_name}ClientHandler") %}
 
-/// A helper trait for the `{{ non_canonical_name }}` client protocol.
-pub trait {{ client_trait_name }}<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `{{ non_canonical_name }}` client sender.
+pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.snake())? %}
         {% let method_type_name = filters::ident(method.name.camel())? %}
@@ -77,7 +77,7 @@ pub trait {{ client_trait_name }}<___T: ::fidl_next::protocol::Transport> {
                         &self,
                         request: &mut ___R,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<
+                        ::fidl_next::bind::ResponseFuture<
                             '_,
                             ___T,
                             {{ module_name }}::{{ method_type_name }},
@@ -93,7 +93,7 @@ pub trait {{ client_trait_name }}<___T: ::fidl_next::protocol::Transport> {
                     fn {{ method_name }}(
                         &self,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<
+                        ::fidl_next::bind::ResponseFuture<
                             '_,
                             ___T,
                             {{ module_name }}::{{ method_type_name }},
@@ -106,7 +106,7 @@ pub trait {{ client_trait_name }}<___T: ::fidl_next::protocol::Transport> {
     {% endfor %}
 }
 
-impl<___T> {{ client_trait_name }}<___T> for ::fidl_next::bind::Client<___T, {{ protocol_name }}>
+impl<___T> {{ client_sender_name }}<___T> for ::fidl_next::bind::ClientSender<___T, {{ protocol_name }}>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -130,13 +130,13 @@ where
                             Encoded<'buf> = {{ context.wire_type(request) }},
                         >,
                     {
-                        self.untyped().send_request({{ method.ordinal }}, request)
+                        self.as_untyped().send_one_way({{ method.ordinal }}, request)
                     }
                 {% else %}
                     fn {{ method_name }}(
                         &self,
                     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-                        self.untyped().send_request({{ method.ordinal }}, &mut ())
+                        self.as_untyped().send_one_way({{ method.ordinal }}, &mut ())
                     }
                 {% endif %}
             {% when ProtocolMethodKind::TwoWay %}
@@ -145,7 +145,7 @@ where
                         &self,
                         request: &mut ___R,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
+                        ::fidl_next::bind::ResponseFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
                         ::fidl_next::EncodeError,
                     >
                     where
@@ -154,18 +154,18 @@ where
                             Encoded<'buf> = {{ context.wire_type(request) }},
                         >,
                     {
-                        self.untyped().send_transaction({{ method.ordinal }}, request)
-                            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+                        self.as_untyped().send_two_way({{ method.ordinal }}, request)
+                            .map(::fidl_next::bind::ResponseFuture::from_untyped)
                     }
                 {% else %}
                     fn {{ method_name }}(
                         &self,
                     ) -> Result<
-                        ::fidl_next::bind::TransactionFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
+                        ::fidl_next::bind::ResponseFuture<'_, ___T, {{ module_name }}::{{ method_type_name }}>,
                         ::fidl_next::EncodeError,
                     > {
-                        self.untyped().send_transaction({{ method.ordinal }}, &mut ())
-                            .map(::fidl_next::bind::TransactionFuture::from_untyped)
+                        self.as_untyped().send_two_way({{ method.ordinal }}, &mut ())
+                            .map(::fidl_next::bind::ResponseFuture::from_untyped)
                     }
                 {% endif %}
             {% when ProtocolMethodKind::Event %}
@@ -187,22 +187,25 @@ pub trait {{ client_handler_name }}<___T: ::fidl_next::protocol::Transport> {
             {% if let Some(doc) = method.attributes.doc_string() %}
                 #[doc = "{{ doc.escape_default() }}"]
             {% endif %}
-            {% if let Some(response) = method.maybe_response_payload %}
-                fn {{ method_name }}(
-                    &mut self,
+            fn {{ method_name }}(
+                &mut self,
+                sender: &::fidl_next::bind::ClientSender<___T, {{ protocol_name }}>,
+                {% if let Some(response) = method.maybe_response_payload %}
                     message: ::fidl_next::bind::ResponseBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
-                );
-            {% else %}
-                fn {{ method_name }}(&mut self);
-            {% endif %}
+                {% endif %}
+            );
         {% endif %}
     {% endfor %}
 
     {% if protocol.openness != ProtocolOpenness::Closed %}
-        fn handle_unknown_interaction(
+        fn on_unknown_interaction(
             &mut self,
+            sender: &::fidl_next::bind::ClientSender<___T, {{ protocol_name }}>,
             ordinal: u64,
-        );
+        ) {
+            {# TODO: send epitaph before closing #}
+            sender.close();
+        }
     {% endif %}
 }
 
@@ -219,6 +222,7 @@ where
 {
     fn on_event(
         handler: &mut ___H,
+        sender: &::fidl_next::bind::ClientSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -229,27 +233,30 @@ where
                     {{ method.ordinal }} => {
                         {% if let Some(response) = method.maybe_response_payload %}
                             let buffer = ::fidl_next::bind::ResponseBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(buffer);
+                            handler.{{ method_name }}(sender, buffer);
                         {% else %}
-                            handler.{{ method_name}}();
+                            handler.{{ method_name}}(sender);
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.handle_unknown_interaction(ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal),
             {% else %}
-                ordinal => todo!(),
+                ordinal => {
+                    {# TODO: send epitaph #}
+                    sender.close();
+                }
             {% endif %}
         }
     }
 }
 
-{% let server_trait_name = format!("{protocol_base_name}Server") %}
+{% let server_sender_name = format!("{protocol_base_name}ServerSender") %}
 {% let server_handler_name = format!("{protocol_base_name}ServerHandler") %}
 
-/// A helper trait for the `{{ non_canonical_name }}` server protocol.
-pub trait {{ server_trait_name }}<___T: ::fidl_next::protocol::Transport> {
+/// A helper trait for the `{{ non_canonical_name }}` server sender.
+pub trait {{ server_sender_name }}<___T: ::fidl_next::protocol::Transport> {
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.snake())? %}
 
@@ -276,7 +283,7 @@ pub trait {{ server_trait_name }}<___T: ::fidl_next::protocol::Transport> {
     {% endfor %}
 }
 
-impl<___T> {{ server_trait_name }}<___T> for ::fidl_next::bind::Server<___T, {{ protocol_name }}>
+impl<___T> {{ server_sender_name }}<___T> for ::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>
 where
     ___T: ::fidl_next::protocol::Transport,
 {
@@ -298,13 +305,13 @@ where
                         Encoded<'buf> = {{ context.wire_type(request) }},
                     >,
                 {
-                    self.untyped().send_event({{ method.ordinal }}, request)
+                    self.as_untyped().send_event({{ method.ordinal }}, request)
                 }
             {% else %}
                 fn {{ method_name }}(
                     &self,
                 ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError> {
-                    self.untyped().send_event({{ method.ordinal }}, &mut ())
+                    self.as_untyped().send_event({{ method.ordinal }}, &mut ())
                 }
             {% endif %}
         {% endif %}
@@ -326,39 +333,38 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::protocol::Transport> {
                 {% if let Some(doc) = method.attributes.doc_string() %}
                     #[doc = "{{ doc.escape_default() }}"]
                 {% endif %}
-                {% if let Some(request) = method.maybe_request_payload %}
-                    fn {{ method_name }}(
-                        &mut self,
+                fn {{ method_name }}(
+                    &mut self,
+                    sender: &::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>,
+                    {% if let Some(request) = method.maybe_request_payload %}
                         request: ::fidl_next::bind::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
-                    );
-                {% else %}
-                    fn {{ method_name }}(&mut self);
-                {% endif %}
+                    {% endif %}
+                );
             {% when ProtocolMethodKind::TwoWay %}
                 {% if let Some(doc) = method.attributes.doc_string() %}
                     #[doc = "{{ doc.escape_default() }}"]
                 {% endif %}
-                {% if let Some(request) = method.maybe_request_payload %}
-                    fn {{ method_name }}(
-                        &mut self,
+                fn {{ method_name }}(
+                    &mut self,
+                    sender: &::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>,
+                    {% if let Some(request) = method.maybe_request_payload %}
                         request: ::fidl_next::bind::RequestBuffer<___T, {{ module_name }}::{{ method_type_name }}>,
-                        responder: ::fidl_next::bind::Responder<{{ module_name }}::{{ method_type_name }}>,
-                    );
-                {% else %}
-                    fn {{ method_name }}(
-                        &mut self,
-                        responder: ::fidl_next::bind::Responder<{{ module_name }}::{{ method_type_name }}>,
-                    );
-                {% endif %}
+                    {% endif %}
+                    responder: ::fidl_next::bind::Responder<{{ module_name }}::{{ method_type_name }}>,
+                );
             {% when ProtocolMethodKind::Event %}
         {% endmatch %}
     {% endfor %}
 
     {% if protocol.openness != ProtocolOpenness::Closed %}
-        fn handle_unknown_interaction(
+        fn on_unknown_interaction(
             &mut self,
+            sender: &::fidl_next::bind::ServerSender<___T, {{ protocol_name }}>,
             ordinal: u64,
-        );
+        ) {
+            {# TODO: send epitaph before closing #}
+            sender.close();
+        }
     {% endif %}
 }
 
@@ -373,8 +379,9 @@ where
         {% endif %}
     {% endfor %}
 {
-    fn on_event(
+    fn on_one_way(
         handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -385,25 +392,29 @@ where
                     {{ method.ordinal }} => {
                         {% if let Some(request) = method.maybe_request_payload %}
                             let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(buffer);
+                            handler.{{ method_name }}(sender, buffer);
                         {% else %}
-                            handler.{{ method_name}}();
+                            handler.{{ method_name}}(sender);
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.handle_unknown_interaction(ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal),
             {% else %}
-                ordinal => todo!(),
+                ordinal => {
+                    {# TODO: send epitaph #}
+                    sender.close();
+                }
             {% endif %}
         }
     }
 
-    fn on_transaction(
+    fn on_two_way(
         handler: &mut ___H,
+        sender: &::fidl_next::bind::ServerSender<___T, Self>,
         ordinal: u64,
-        mut buffer: ___T::RecvBuffer,
+        buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
     ) {
         match ordinal {
@@ -415,17 +426,20 @@ where
 
                         {% if let Some(request) = method.maybe_request_payload %}
                             let buffer = ::fidl_next::bind::RequestBuffer::from_untyped(buffer);
-                            handler.{{ method_name }}(buffer, responder);
+                            handler.{{ method_name }}(sender, buffer, responder);
                         {% else %}
-                            handler.{{ method_name}}(responder);
+                            handler.{{ method_name}}(sender, responder);
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.handle_unknown_interaction(ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal),
             {% else %}
-                ordinal => todo!(),
+                ordinal => {
+                    {# TODO: send epitaph #}
+                    sender.close();
+                }
             {% endif %}
         }
     }

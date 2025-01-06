@@ -17,6 +17,7 @@
 #include <zircon/assert.h>
 
 #include <ktl/move.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>
 #include <phys/handoff.h>
@@ -200,6 +201,20 @@ void FreeDataZbi(BootZbi& boot) {
   }
 
   ktl::span zbi = boot.DataZbi().storage();
+
+// TODO(https://fxbug.dev/42164859): It's far easier to construct the kernel
+// mapping here than it is in the kernel's start.S, the second of which encodes
+// load address assumptions that are on track to be invalidated. Removing the
+// start.S logic enables us to more easily translate to ELF-loading the x86
+// kernel, at which point this whole file will be deleted.
+#ifdef __x86_64__
+  constexpr uint64_t kX86LegacyVirtLoadAddr = 0xffff'ffff'0010'0000;
+  constexpr AddressSpace::MapSettings kRwx{
+      .access = {.readable = true, .writable = true, .executable = true}};
+  uint64_t aligned_memory_size = (boot.KernelMemorySize() + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE;
+  AddressSpace::PanicIfError(gAddressSpace->Map(kX86LegacyVirtLoadAddr, aligned_memory_size,
+                                                TrampolineBoot::kLegacyLoadAddress, kRwx));
+#endif
 
   if (gBootOptions->phys_verbose) {
     boot.Log();

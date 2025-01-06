@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use ffx_command::{bug, user_error, FfxContext};
+use ffx_command_error::{bug, user_error, FfxContext, Result};
 use fuchsia_audio::dai::DaiFormat;
 use zx_status::Status;
 use {fidl_fuchsia_audio_device as fadevice, fidl_fuchsia_hardware_audio as fhaudio, zx_types};
@@ -14,13 +14,13 @@ pub trait DeviceControl {
         &self,
         dai_format: DaiFormat,
         element_id: Option<fadevice::ElementId>,
-    ) -> fho::Result<()>;
+    ) -> Result<()>;
 
-    async fn start(&self) -> fho::Result<zx_types::zx_time_t>;
+    async fn start(&self) -> Result<zx_types::zx_time_t>;
 
-    async fn stop(&self) -> fho::Result<zx_types::zx_time_t>;
+    async fn stop(&self) -> Result<zx_types::zx_time_t>;
 
-    async fn reset(&self) -> fho::Result<()>;
+    async fn reset(&self) -> Result<()>;
 }
 
 pub struct HardwareCodec(pub fhaudio::CodecProxy);
@@ -31,7 +31,7 @@ impl DeviceControl for HardwareCodec {
         &self,
         dai_format: DaiFormat,
         _element_id: Option<fadevice::ElementId>,
-    ) -> fho::Result<()> {
+    ) -> Result<()> {
         let _ = self
             .0
             .set_dai_format(&dai_format.into())
@@ -42,17 +42,17 @@ impl DeviceControl for HardwareCodec {
         Ok(())
     }
 
-    async fn start(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn start(&self) -> Result<zx_types::zx_time_t> {
         let start_time = self.0.start().await.bug_context("Failed to call Start")?;
         Ok(start_time)
     }
 
-    async fn stop(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn stop(&self) -> Result<zx_types::zx_time_t> {
         let stop_time = self.0.stop().await.bug_context("Failed to call Stop")?;
         Ok(stop_time)
     }
 
-    async fn reset(&self) -> fho::Result<()> {
+    async fn reset(&self) -> Result<()> {
         let _ = self.0.reset().await.bug_context("Failed to call Reset")?;
         Ok(())
     }
@@ -66,7 +66,7 @@ impl DeviceControl for HardwareComposite {
         &self,
         dai_format: DaiFormat,
         element_id: Option<fadevice::ElementId>,
-    ) -> fho::Result<()> {
+    ) -> Result<()> {
         let element_id = element_id
             .ok_or_else(|| user_error!("element ID is required for Composite devices"))?;
         self.0
@@ -77,15 +77,15 @@ impl DeviceControl for HardwareComposite {
         Ok(())
     }
 
-    async fn start(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn start(&self) -> Result<zx_types::zx_time_t> {
         Err(user_error!("start is not supported for Composite devices"))
     }
 
-    async fn stop(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn stop(&self) -> Result<zx_types::zx_time_t> {
         Err(user_error!("stop is not supported for Composite devices"))
     }
 
-    async fn reset(&self) -> fho::Result<()> {
+    async fn reset(&self) -> Result<()> {
         let _ = self
             .0
             .reset()
@@ -104,19 +104,19 @@ impl DeviceControl for HardwareDai {
         &self,
         _dai_format: DaiFormat,
         _element_id: Option<fadevice::ElementId>,
-    ) -> fho::Result<()> {
+    ) -> Result<()> {
         Err(user_error!("set dai-format is not supported for DAI devices"))
     }
 
-    async fn start(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn start(&self) -> Result<zx_types::zx_time_t> {
         Err(user_error!("start is not supported for DAI devices"))
     }
 
-    async fn stop(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn stop(&self) -> Result<zx_types::zx_time_t> {
         Err(user_error!("stop is not supported for DAI devices"))
     }
 
-    async fn reset(&self) -> fho::Result<()> {
+    async fn reset(&self) -> Result<()> {
         let _ = self.0.reset().await.bug_context("Failed to call Reset")?;
         Ok(())
     }
@@ -130,19 +130,19 @@ impl DeviceControl for HardwareStreamConfig {
         &self,
         _dai_format: DaiFormat,
         _element_id: Option<fadevice::ElementId>,
-    ) -> fho::Result<()> {
+    ) -> Result<()> {
         Err(user_error!("set dai-format is not supported for StreamConfig devices"))
     }
 
-    async fn start(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn start(&self) -> Result<zx_types::zx_time_t> {
         Err(user_error!("start is not supported for StreamConfig devices"))
     }
 
-    async fn stop(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn stop(&self) -> Result<zx_types::zx_time_t> {
         Err(user_error!("stop is not supported for StreamConfig devices"))
     }
 
-    async fn reset(&self) -> fho::Result<()> {
+    async fn reset(&self) -> Result<()> {
         Err(user_error!("reset is not supported for StreamConfig devices"))
     }
 }
@@ -155,7 +155,7 @@ impl DeviceControl for Registry {
         &self,
         dai_format: DaiFormat,
         element_id: Option<fadevice::ElementId>,
-    ) -> fho::Result<()> {
+    ) -> Result<()> {
         let _ = self
             .0
             .set_dai_format(&fadevice::ControlSetDaiFormatRequest {
@@ -169,7 +169,7 @@ impl DeviceControl for Registry {
         Ok(())
     }
 
-    async fn start(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn start(&self) -> Result<zx_types::zx_time_t> {
         let response = self
             .0
             .codec_start()
@@ -182,7 +182,7 @@ impl DeviceControl for Registry {
         Ok(start_time)
     }
 
-    async fn stop(&self) -> fho::Result<zx_types::zx_time_t> {
+    async fn stop(&self) -> Result<zx_types::zx_time_t> {
         let response = self
             .0
             .codec_stop()
@@ -194,7 +194,7 @@ impl DeviceControl for Registry {
         Ok(stop_time)
     }
 
-    async fn reset(&self) -> fho::Result<()> {
+    async fn reset(&self) -> Result<()> {
         let _ = self
             .0
             .reset()

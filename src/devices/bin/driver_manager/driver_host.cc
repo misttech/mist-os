@@ -45,6 +45,8 @@ std::string_view GetFilename(std::string_view path) {
 
 }  // namespace
 
+static constexpr std::string_view kCompatDriverRelativePath = "driver/compat.so";
+
 // static
 zx::result<DriverHost::DriverLoadArgs> DriverHost::DriverLoadArgs::Create(
     fuchsia_component_runner::wire::ComponentStartInfo start_info) {
@@ -73,8 +75,25 @@ zx::result<DriverHost::DriverLoadArgs> DriverHost::DriverLoadArgs::Create(
     return lib_dir.take_error();
   }
 
+  std::vector<fuchsia_driver_loader::RootModule> additional_root_modules;
+  if (binary == kCompatDriverRelativePath) {
+    zx::result<std::string> compat = fdf_internal::ProgramValue(wire_program, "compat");
+    if (compat.is_error()) {
+      LOGF(ERROR, "Failed to start driver with compat shim, missing 'compat' argument: %s",
+           compat.status_string());
+      return compat.take_error();
+    }
+    auto v1_driver_file = pkg_utils::OpenPkgFile(*pkg, *compat);
+    if (v1_driver_file.is_error()) {
+      LOGF(ERROR, "Failed to open v1 driver file: %s", driver_file.status_string());
+      return v1_driver_file.take_error();
+    }
+    additional_root_modules.push_back(
+        fuchsia_driver_loader::RootModule{{.name = *compat, .binary = std::move(*v1_driver_file)}});
+  }
   return zx::ok(DriverHost::DriverLoadArgs(GetFilename(*binary), std::move(*driver_file),
-                                           std::move(*lib_dir)));
+                                           std::move(*lib_dir),
+                                           std::move(additional_root_modules)));
 }
 
 zx::result<> SetEncodedConfig(fidl::WireTableBuilder<fdf::wire::DriverStartArgs>& args,
@@ -113,12 +132,17 @@ zx::result<> SetEncodedConfig(fidl::WireTableBuilder<fdf::wire::DriverStartArgs>
 DriverHostComponent::DriverHostComponent(
     fidl::ClientEnd<fdh::DriverHost> driver_host, async_dispatcher_t* dispatcher,
     fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>>* driver_hosts,
-    std::shared_ptr<bool> server_connected)
+    std::shared_ptr<bool> server_connected,
+    fidl::ClientEnd<fuchsia_driver_loader::DriverHost> dynamic_linker_driver_loader)
     : driver_host_(std::move(driver_host), dispatcher,
                    fidl::ObserveTeardown([this, driver_hosts] { driver_hosts->erase(*this); })),
       dispatcher_(dispatcher),
       server_connected_(std::move(server_connected)) {
   InitializeElfDir();
+
+  if (dynamic_linker_driver_loader.is_valid()) {
+    dynamic_linker_driver_loader_.Bind(std::move(dynamic_linker_driver_loader), dispatcher_);
+  }
 }
 
 void DriverHostComponent::InitializeElfDir() {
@@ -263,30 +287,27 @@ zx::result<> DriverHostComponent::InstallLoader(
   return zx::ok();
 }
 
-DynamicLinkerDriverHostComponent::DynamicLinkerDriverHostComponent(
-    fidl::ClientEnd<fuchsia_driver_host::DriverHost> driver_host,
-    fidl::ClientEnd<fuchsia_driver_loader::DriverHost> client, async_dispatcher_t* dispatcher,
-    std::unique_ptr<driver_loader::Loader> loader,
-    fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>* driver_hosts)
-    : driver_host_(std::move(driver_host), dispatcher,
-                   fidl::ObserveTeardown([this, driver_hosts] { driver_hosts->erase(*this); })),
-      driver_host_loader_(std::move(client), dispatcher),
-      loader_(std::move(loader)) {}
-
-void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
+void DriverHostComponent::StartWithDynamicLinker(
     fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
     DriverLoadArgs load_args, DriverStartArgs start_args,
     fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) {
+  if (!IsDynamicLinkingEnabled()) {
+    cb(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
+  }
+
   fidl::Arena arena;
   auto args = fuchsia_driver_loader::wire::DriverHostLoadDriverRequest::Builder(arena)
                   .driver_soname(fidl::StringView::FromExternal(load_args.driver_soname))
                   .driver_binary(std::move(load_args.driver_file))
                   .driver_libs(std::move(load_args.lib_dir))
+                  .additional_root_modules(
+                      fidl::ToWire(arena, std::move(load_args.additional_root_modules)))
                   .Build();
 
   std::string driver_name = std::string(load_args.driver_soname);
-  driver_host_loader_->LoadDriver(args).ThenExactlyOnce(
-      [driver = std::move(driver), node = std::move(node), node_name,
+  dynamic_linker_driver_loader_->LoadDriver(args).ThenExactlyOnce(
+      [this, driver = std::move(driver), node = std::move(node), node_name,
        start_args = std::move(start_args), driver_name, cb = std::move(cb)](auto& result) mutable {
         if (!result.ok()) {
           LOGF(ERROR, "Failed to start driver %s in driver host: %s", driver_name.c_str(),
@@ -301,10 +322,11 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
           return;
         }
 
-        // TODO(https://fxbug.dev/355233670): send node client, driver client, and start args as
-        // part of |fuchsia_driver_host::DriverHost::Start|.
-
-        cb(zx::ok());
+        fidl::Arena arena;
+        Start(std::move(node), node_name, fidl::ToWire(arena, start_args.node_properties_),
+              fidl::ToWire(arena, start_args.symbols_), fidl::ToWire(arena, start_args.offers_),
+              fidl::ToWire(arena, std::move(start_args.start_info_)), std::move(driver),
+              std::move(cb));
       });
 }
 

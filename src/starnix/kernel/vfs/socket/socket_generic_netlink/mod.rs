@@ -133,7 +133,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
             }
             None => {
                 log_error!(
-                    tag = NETLINK_LOG_TAG,
+                    tag = NETLINK_LOG_TAG;
                     "Failed to add generic netlink family: too many families"
                 );
             }
@@ -167,12 +167,12 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
         match genl_ctrl.cmd {
             GenlCtrlCmd::GetFamily => {
                 let family_names = extract_family_names(genl_ctrl);
-                log_info!(tag = NETLINK_LOG_TAG, "Netlink GetFamily request: {:?}", family_names);
+                log_info!(tag = NETLINK_LOG_TAG; "Netlink GetFamily request: {:?}", family_names);
 
                 for family in &family_names {
                     if let Some(id) = self.family_ids.get(family) {
                         log_info!(
-                            tag = NETLINK_LOG_TAG,
+                            tag = NETLINK_LOG_TAG;
                             "Serving requested netlink family {}",
                             family
                         );
@@ -234,7 +234,7 @@ impl<S: Sender<GenericMessage>> GenericNetlinkServerState<S> {
                         }
                     } else {
                         log_warn!(
-                            tag = NETLINK_LOG_TAG,
+                            tag = NETLINK_LOG_TAG;
                             "Cannot serve requested netlink family {}",
                             family
                         );
@@ -304,7 +304,7 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlinkServer<S> {
         let req = match payload {
             NetlinkPayload::InnerMessage(p) => p,
             p => {
-                log_error!(tag = NETLINK_LOG_TAG, "Dropping unexpected netlink payload: {:?}", p);
+                log_error!(tag = NETLINK_LOG_TAG; "Dropping unexpected netlink payload: {:?}", p);
                 return;
             }
         };
@@ -319,7 +319,7 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlinkServer<S> {
                         family.handle_message(netlink_header, payload, sender).await;
                     }
                     None => log_info!(
-                        tag = NETLINK_LOG_TAG,
+                        tag = NETLINK_LOG_TAG;
                         "Ignoring generic netlink message with unsupported family {}",
                         family_id,
                     ),
@@ -329,12 +329,12 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlinkServer<S> {
     }
 
     async fn run_generic_netlink_client(self, mut client: GenericNetlinkClient<S>) {
-        log_info!(tag = NETLINK_LOG_TAG, "Registered new generic netlink client");
+        log_info!(tag = NETLINK_LOG_TAG; "Registered new generic netlink client");
         loop {
             match client.receiver.next().await {
                 Some(message) => self.handle_generic_message(message, &mut client.sender).await,
                 None => {
-                    log_info!(tag = NETLINK_LOG_TAG, "Generic netlink client exited");
+                    log_info!(tag = NETLINK_LOG_TAG; "Generic netlink client exited");
                     let mut state = self.state.lock();
                     for memberships in state.multicast_group_memberships.values_mut() {
                         memberships.remove(&client.client_id);
@@ -359,7 +359,7 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlinkServer<S> {
             .is_some()
         {
             log_error!(
-                tag = NETLINK_LOG_TAG,
+                tag = NETLINK_LOG_TAG;
                 "pipe_single_multicast_group called on group {} but group is already served",
                 mcast_group_id.0
             );
@@ -444,7 +444,7 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlink<S> {
                 Ok(nl80211_family) => server.state.lock().add_family(Arc::new(nl80211_family) as _),
                 Err(e) => {
                     log_error!(
-                        tag = NETLINK_LOG_TAG,
+                        tag = NETLINK_LOG_TAG;
                         "Failed to connect to Nl80211 netlink family: {}",
                         e
                     );
@@ -456,7 +456,7 @@ impl<S: Sender<GenericMessage> + Send> GenericNetlink<S> {
                 }
                 Err(e) => {
                     log_error!(
-                        tag = NETLINK_LOG_TAG,
+                        tag = NETLINK_LOG_TAG;
                         "Failed to connect to TASKSTATS netlink family: {}",
                         e
                     );

@@ -18,7 +18,9 @@
     .quad _temp_gdt
 .end_object
 
-.object _temp_gdt, scope=global, type=rodata, align=8
+// Not rodata since the it gets mutated by calls to set_global_desc_64() in
+// //zircon/kernel/arch/x86/descriptor.cc.
+.object _temp_gdt, scope=global, type=data, align=8
     /* null entry */
     .int 0
     .int 0

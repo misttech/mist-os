@@ -10,11 +10,11 @@ use crate::cpu_element_manager::{CpuElementManager, SystemActivityGovernorFactor
 use crate::system_activity_governor::SystemActivityGovernor;
 use anyhow::{Context, Result};
 use fuchsia_async::{DurationExt, TimeoutExt};
-use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance, open_service};
+use fuchsia_component::client::{connect_to_protocol, Service};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::BoolProperty as IBool;
-use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use futures::{FutureExt, StreamExt};
 use sag_config::Config;
 use std::rc::Rc;
 use std::time::Duration;
@@ -28,41 +28,12 @@ const SUSPEND_DEVICE_TIMEOUT: MonotonicDuration = MonotonicDuration::from_second
 const SUSPENDER_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(3);
 
 async fn connect_to_suspender() -> Result<fhsuspend::SuspenderProxy> {
-    let service_dir =
-        open_service::<fhsuspend::SuspendServiceMarker>().expect("failed to open service dir");
-
-    let mut watcher = fuchsia_fs::directory::Watcher::new(&service_dir)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to create watcher: {:?}", e))?;
-
-    // Connect to the first suspend service instance that is discovered.
-    let filename = loop {
-        let next = watcher
-            .try_next()
-            .map_err(|e| anyhow::anyhow!("Failed to get next watch message: {e:?}"))
-            .on_timeout(SUSPEND_DEVICE_TIMEOUT.after_now(), || {
-                Err(anyhow::anyhow!("Timeout waiting for next watcher message."))
-            })
-            .await?;
-
-        if let Some(watch_msg) = next {
-            let filename = watch_msg.filename.as_path().to_str().unwrap().to_owned();
-            if filename != "." {
-                if watch_msg.event == fuchsia_fs::directory::WatchEvent::ADD_FILE
-                    || watch_msg.event == fuchsia_fs::directory::WatchEvent::EXISTING
-                {
-                    break Ok(filename);
-                }
-            }
-        } else {
-            break Err(anyhow::anyhow!("Suspend service watcher returned None entry."));
-        }
-    }?;
-
-    let svc_inst =
-        connect_to_service_instance::<fhsuspend::SuspendServiceMarker>(filename.as_str())?;
-
-    svc_inst
+    Service::open(fhsuspend::SuspendServiceMarker)?
+        .watch_for_any()
+        .on_timeout(SUSPEND_DEVICE_TIMEOUT.after_now(), || {
+            Err(anyhow::anyhow!("Timeout waiting for next watcher message."))
+        })
+        .await?
         .connect_to_suspender()
         .map_err(|e| anyhow::anyhow!("Failed to connect to suspender: {:?}", e))
 }

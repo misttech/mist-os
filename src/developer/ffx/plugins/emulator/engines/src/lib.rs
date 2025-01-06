@@ -18,7 +18,8 @@ use emulator_instance::{
 };
 use errors::ffx_bail;
 use ffx_emulator_config::EmulatorEngine;
-use fho::{bug, return_user_error, Result};
+use fho::{bug, return_bug, return_user_error, Result};
+use port_picker::{is_free_tcp_port, pick_unused_port};
 use qemu_based::crosvm::CrosvmEngine;
 use qemu_based::femu::FemuEngine;
 use qemu_based::qemu::QemuEngine;
@@ -206,4 +207,51 @@ impl EngineBuilder {
 pub fn process_flags_from_str(text: &str, emu_config: &EmulatorConfiguration) -> Result<FlagData> {
     arg_templates::process_flags_from_str(text, emu_config)
         .map_err(|e| bug!("Error processing flags: {e}"))
+}
+
+#[allow(dead_code)]
+/// Ensures all ports are mapped with available port values, assigning free ports any that are
+/// missing, and making sure there are no conflicts within the map.
+pub(crate) fn finalize_port_mapping(emu_config: &mut EmulatorConfiguration) -> Result<()> {
+    let port_map = &mut emu_config.host.port_map;
+    let mut used_ports = Vec::new();
+    for (name, port) in port_map {
+        if let Some(value) = port.host {
+            if is_free_tcp_port(value).is_some() && !used_ports.contains(&value) {
+                // This port is good, so we claim it to make sure there are no conflicts later.
+                used_ports.push(value);
+            } else {
+                return_user_error!("Host port {} was mapped to multiple guest ports.", value);
+            }
+        } else {
+            tracing::warn!(
+                "No host-side port specified for '{:?}', a host port will be dynamically \
+                assigned. Check `ffx emu show {}` to see which port is assigned.",
+                name,
+                emu_config.runtime.name
+            );
+
+            // There have been some incidents in automated tests of the same port
+            // being returned multiple times.
+            // So we'll try multiple times and avoid duplicates.
+            for _ in 0..10 {
+                if let Some(value) = pick_unused_port() {
+                    if !used_ports.contains(&value) {
+                        port.host = Some(value);
+                        used_ports.push(value);
+                        break;
+                    } else {
+                        tracing::warn!("pick unused port returned: {} multiple times\n", value);
+                    }
+                } else {
+                    tracing::warn!("pick unused port returned: None\n");
+                }
+            }
+            if !port.host.is_some() {
+                return_bug!("Unable to assign a host port for '{}'. Terminating emulation.", name);
+            }
+        }
+    }
+    tracing::debug!("Port map finalized: {:?}\n", &emu_config.host.port_map);
+    Ok(())
 }

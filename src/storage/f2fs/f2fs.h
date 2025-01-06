@@ -104,7 +104,6 @@ class F2fs final {
   void PutSuper();
   void Sync(SyncCallback closure = nullptr) __TA_EXCLUDES(f2fs::GetGlobalLock());
   zx_status_t SyncFs(bool bShutdown = false) __TA_EXCLUDES(f2fs::GetGlobalLock());
-  zx_status_t SyncFile(VnodeF2fs &vnode) __TA_EXCLUDES(f2fs::GetGlobalLock());
 
   zx_status_t DoCheckpoint(bool is_umount) __TA_REQUIRES(f2fs::GetGlobalLock());
   zx_status_t WriteCheckpoint(bool is_umount) __TA_EXCLUDES(f2fs::GetGlobalLock());
@@ -167,6 +166,7 @@ class F2fs final {
 
   zx::result<uint32_t> StartGc(uint32_t needed = 0) __TA_REQUIRES(f2fs::GetGlobalLock());
   void BalanceFs(uint32_t needed = 0) __TA_EXCLUDES(f2fs::GetGlobalLock(), writeback_mutex_);
+  void AllocateFreeSections(uint32_t needed = 0) __TA_REQUIRES(f2fs::GetGlobalLock());
   bool GetMemoryStatus(MemoryStatus action);
   void WaitForAvailableMemory() __TA_EXCLUDES(writeback_mutex_);
 

@@ -8,8 +8,8 @@ use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
 use kernel_manager::kernels::Kernels;
 use kernel_manager::{serve_starnix_manager, SuspendContext};
+use log::{info, warn};
 use std::sync::Arc;
-use tracing::{info, warn};
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_settings as fsettings,
     fidl_fuchsia_starnix_runner as fstarnixrunner, zx,
@@ -77,7 +77,7 @@ async fn serve_component_runner(
                 kernels.start(start_info, controller).await?;
             }
             frunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown ComponentRunner request");
+                warn!(ordinal:%; "Unknown ComponentRunner request");
             }
         }
     }

@@ -103,5 +103,9 @@ impl {{ .Name }}Proxy {
     }
     {{- end }}
     {{- end }}
+
+    pub fn instance_name(&self) -> &str {
+        self.0.instance_name()
+    }
 }
 {{- end }}

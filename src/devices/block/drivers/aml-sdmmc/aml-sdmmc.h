@@ -363,9 +363,7 @@ class AmlSdmmc : public fdf::DriverBase,
   // Dedicated dispatcher for inlining fuchsia_hardware_sdmmc::Sdmmc FIDL requests.
   fdf::Dispatcher worker_dispatcher_;
 
-  fdf_metadata::MetadataServer<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata_server_{
-      fuchsia_hardware_sdmmc::SdmmcMetadata::kSerializableName,
-      component::OutgoingDirectory::kDefaultServiceInstance};
+  fdf_metadata::MetadataServer<fuchsia_hardware_sdmmc::SdmmcMetadata> metadata_server_;
 };
 
 }  // namespace aml_sdmmc

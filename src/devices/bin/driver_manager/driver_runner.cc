@@ -522,12 +522,6 @@ void DriverRunner::CreateDriverHostDynamicLinker(
     completion_cb(zx::error(ZX_ERR_NOT_SUPPORTED));
     return;
   }
-  auto dynamic_linker_service_client = dynamic_linker_args_->linker_service_factory();
-  if (!dynamic_linker_service_client) {
-    LOGF(ERROR, "Failed to create dynamic linker client");
-    completion_cb(zx::error(ZX_ERR_INTERNAL));
-    return;
-  }
 
   auto endpoints = fidl::Endpoints<fio::Directory>::Create();
 
@@ -539,21 +533,34 @@ void DriverRunner::CreateDriverHostDynamicLinker(
     return;
   }
 
+  // TODO(https://fxbug.dev/349831408): for now we use the same driver host launcher client
+  // channel for each driver host.
+  if (!driver_host_launcher_.has_value()) {
+    auto client = dynamic_linker_args_->linker_service_factory();
+    if (client.is_error()) {
+      LOGF(ERROR, "Failed to create driver host launcher client");
+      completion_cb(client.take_error());
+      return;
+    }
+    driver_host_launcher_ = fidl::WireSharedClient<fuchsia_driver_loader::DriverHostLauncher>(
+        std::move(*client), dispatcher_);
+  }
+  std::shared_ptr<bool> connected = std::make_shared<bool>(false);
   dynamic_linker_args_->driver_host_runner->StartDriverHost(
-      dynamic_linker_service_client.get(), std::move(endpoints.server),
-      [this, linker = std::move(dynamic_linker_service_client),
-       completion_cb = std::move(completion_cb), client_end = std::move(client_end)](
+      driver_host_launcher_->Clone(), std::move(endpoints.server), connected,
+      [this, completion_cb = std::move(completion_cb), client_end = std::move(client_end),
+       connected = std::move(connected)](
           zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) mutable {
         if (result.is_error()) {
           completion_cb(result.take_error());
           return;
         }
-        auto driver_host = std::make_unique<DynamicLinkerDriverHostComponent>(
-            std::move(*client_end), std::move(*result), dispatcher_, std::move(linker),
-            &dynamic_linker_driver_hosts_);
+
+        auto driver_host = std::make_unique<DriverHostComponent>(
+            std::move(*client_end), dispatcher_, &driver_hosts_, connected, std::move(*result));
 
         auto driver_host_ptr = driver_host.get();
-        dynamic_linker_driver_hosts_.push_back(std::move(driver_host));
+        driver_hosts_.push_back(std::move(driver_host));
         completion_cb(zx::ok(driver_host_ptr));
       });
 }

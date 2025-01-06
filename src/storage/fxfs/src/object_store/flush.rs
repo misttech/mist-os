@@ -389,14 +389,13 @@ impl ObjectStore {
 
         self.write_store_info(&mut end_transaction, &new_store_info).await?;
 
-        let total_layer_size = layer_size_from_encrypted_mutations_size(handle.get_size())
-            + self
-                .tree
-                .immutable_layer_set()
-                .layers
-                .iter()
-                .map(|l| l.handle().map(ReadObjectHandle::get_size).unwrap_or(0))
-                .sum::<u64>();
+        let mut total_layer_size = 0;
+        for &oid in &new_store_info.layers {
+            total_layer_size += parent_store.get_file_size(oid).await?;
+        }
+        total_layer_size +=
+            layer_size_from_encrypted_mutations_size(handle.get_size() + len as u64);
+
         reservation_update =
             ReservationUpdate::new(tree::reservation_amount_from_layer_size(total_layer_size));
 
@@ -428,11 +427,13 @@ impl ObjectStore {
 #[cfg(test)]
 mod tests {
     use crate::filesystem::{FxFilesystem, FxFilesystemBuilder, JournalingObject, SyncOptions};
-    use crate::object_handle::ObjectHandle;
+    use crate::object_handle::{ObjectHandle, INVALID_OBJECT_ID};
     use crate::object_store::directory::Directory;
     use crate::object_store::transaction::{lock_keys, Options};
     use crate::object_store::volume::root_volume;
-    use crate::object_store::{HandleOptions, LockKey, ObjectStore};
+    use crate::object_store::{
+        layer_size_from_encrypted_mutations_size, tree, HandleOptions, LockKey, ObjectStore,
+    };
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
@@ -614,6 +615,26 @@ mod tests {
 
         // Flushing the store whilst locked should create an encrypted mutations file.
         store.flush().await.expect("flush failed");
+
+        // Check the reservation.
+        let info = store.load_store_info().await.unwrap();
+        let parent_store = store.parent_store().unwrap();
+        let mut total_layer_size = 0;
+        for &oid in &info.layers {
+            total_layer_size +=
+                parent_store.get_file_size(oid).await.expect("get_file_size failed");
+        }
+        assert_ne!(info.encrypted_mutations_object_id, INVALID_OBJECT_ID);
+        total_layer_size += layer_size_from_encrypted_mutations_size(
+            parent_store
+                .get_file_size(info.encrypted_mutations_object_id)
+                .await
+                .expect("get_file_size failed"),
+        );
+        assert_eq!(
+            fs.object_manager().reservation(store.store_object_id()),
+            Some(tree::reservation_amount_from_layer_size(total_layer_size))
+        );
 
         // Unlocking the store should replay that encrypted mutations file.
         store.unlock(crypt).await.expect("unlock failed");

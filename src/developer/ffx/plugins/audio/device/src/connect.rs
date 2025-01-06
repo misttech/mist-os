@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use crate::control::{self as control, DeviceControl};
-use ffx_command::{bug, FfxContext};
-use fho::return_bug;
+use ffx_command_error::{bug, return_bug, FfxContext as _, Result};
 use fidl::endpoints::create_proxy;
 use fuchsia_audio::device::Selector;
 use {
@@ -18,7 +17,7 @@ use {
 fn connect_to_named_protocol_at_dir_root<P: fidl::endpoints::ProtocolMarker>(
     directory: &fio::DirectoryProxy,
     path: &str,
-) -> fho::Result<P::Proxy> {
+) -> Result<P::Proxy> {
     let (proxy, server_end) = create_proxy::<P>();
     directory
         .open(
@@ -36,7 +35,7 @@ fn connect_to_named_protocol_at_dir_root<P: fidl::endpoints::ProtocolMarker>(
 pub fn connect_hw_codec(
     dev_class: &fio::DirectoryProxy,
     path: &str,
-) -> fho::Result<fhaudio::CodecProxy> {
+) -> Result<fhaudio::CodecProxy> {
     let connector_proxy =
         connect_to_named_protocol_at_dir_root::<fhaudio::CodecConnectorMarker>(dev_class, path)
             .bug_context("Failed to connect to CodecConnector")?;
@@ -49,10 +48,7 @@ pub fn connect_hw_codec(
 
 /// Connects to the `fuchsia.hardware.audio.Dai` protocol node in the `dev_class` directory
 /// at `path`.
-pub fn connect_hw_dai(
-    dev_class: &fio::DirectoryProxy,
-    path: &str,
-) -> fho::Result<fhaudio::DaiProxy> {
+pub fn connect_hw_dai(dev_class: &fio::DirectoryProxy, path: &str) -> Result<fhaudio::DaiProxy> {
     let connector_proxy =
         connect_to_named_protocol_at_dir_root::<fhaudio::DaiConnectorMarker>(dev_class, path)
             .bug_context("Failed to connect to DaiConnector")?;
@@ -68,7 +64,7 @@ pub fn connect_hw_dai(
 pub fn connect_hw_composite(
     dev_class: &fio::DirectoryProxy,
     path: &str,
-) -> fho::Result<fhaudio::CompositeProxy> {
+) -> Result<fhaudio::CompositeProxy> {
     // DFv2 Composite drivers do not use a connector/trampoline like Codec/Dai/StreamConfig.
     connect_to_named_protocol_at_dir_root::<fhaudio::CompositeMarker>(dev_class, path)
         .bug_context("Failed to connect to Composite")
@@ -79,7 +75,7 @@ pub fn connect_hw_composite(
 pub fn connect_hw_streamconfig(
     dev_class: &fio::DirectoryProxy,
     path: &str,
-) -> fho::Result<fhaudio::StreamConfigProxy> {
+) -> Result<fhaudio::StreamConfigProxy> {
     let connector_proxy = connect_to_named_protocol_at_dir_root::<
         fhaudio::StreamConfigConnectorMarker,
     >(dev_class, path)
@@ -95,7 +91,7 @@ pub fn connect_hw_streamconfig(
 pub async fn connect_registry_control(
     control_creator: &fadevice::ControlCreatorProxy,
     token_id: fadevice::TokenId,
-) -> fho::Result<fadevice::ControlProxy> {
+) -> Result<fadevice::ControlProxy> {
     let (proxy, server_end) = create_proxy::<fadevice::ControlMarker>();
 
     control_creator
@@ -116,7 +112,7 @@ pub async fn connect_device_control(
     dev_class: &fio::DirectoryProxy,
     control_creator: Option<&fadevice::ControlCreatorProxy>,
     selector: Selector,
-) -> fho::Result<Box<dyn DeviceControl>> {
+) -> Result<Box<dyn DeviceControl>> {
     let device_control: Box<dyn DeviceControl> = match selector {
         Selector::Devfs(devfs_selector) => {
             let protocol_path = devfs_selector.relative_path();

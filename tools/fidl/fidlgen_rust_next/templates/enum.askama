@@ -13,6 +13,8 @@
     {% if context.config.emit_debug_impls -%}
         Debug,
     {%- endif %}
+    PartialEq,
+    Eq,
 )]
 #[repr({{ natural_int }})]
 pub enum {{ name }} {
@@ -79,6 +81,8 @@ impl ::fidl_next::TakeFrom<{{ wire_name }}> for {{ name }} {
     {% if context.config.emit_debug_impls -%}
         Debug,
     {%- endif %}
+    PartialEq,
+    Eq,
 )]
 #[repr(transparent)]
 pub struct {{ wire_name }} {

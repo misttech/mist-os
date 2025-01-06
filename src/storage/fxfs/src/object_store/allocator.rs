@@ -209,11 +209,11 @@ impl<T: Borrow<U> + Clone + Send + Sync, U: ReservationOwner + ?Sized> Reservati
         assert!(inner.reserved <= inner.amount);
     }
 
-    /// Returns a partial amount of the reservation.  If the reservation is smaller than |amount|,
-    /// returns less than the requested amount, and this can be *zero*.
-    fn reserve_at_most(&self, amount: u64) -> ReservationImpl<&Self, Self> {
+    /// Returns a partial amount of the reservation. |amount| is passed the |limit| and should
+    /// return the amount, which can be zero.
+    fn reserve_with(&self, amount: impl FnOnce(u64) -> u64) -> ReservationImpl<&Self, Self> {
         let mut inner = self.inner.lock().unwrap();
-        let taken = std::cmp::min(amount, inner.amount - inner.reserved);
+        let taken = amount(inner.amount - inner.reserved);
         inner.reserved += taken;
         ReservationImpl::new(self, self.owner_object_id, taken)
     }
@@ -1310,7 +1310,9 @@ impl Allocator {
                 // If it has an owner, it should not be different than the allocating owner.
                 Some(res_owner_object_id) => assert_eq!(owner_object_id, res_owner_object_id),
             };
-            let r = reservation.reserve_at_most(len);
+            // Reservation limits aren't necessarily a multiple of the block size.
+            let r = reservation
+                .reserve_with(|limit| std::cmp::min(len, round_down(limit, self.block_size)));
             len = r.amount();
             Left(r)
         } else {
@@ -1698,25 +1700,28 @@ impl Allocator {
         Some(Reservation::new(self, owner_object_id, amount))
     }
 
-    /// Like reserve, but returns as much as available if not all of amount is available, which
-    /// could be zero bytes.
-    pub fn reserve_at_most(
+    /// Like reserve, but takes a callback is passed the |limit| and should return the amount,
+    /// which can be zero.
+    pub fn reserve_with(
         self: Arc<Self>,
         owner_object_id: Option<u64>,
-        mut amount: u64,
+        amount: impl FnOnce(u64) -> u64,
     ) -> Reservation {
-        {
+        let amount = {
             let mut inner = self.inner.lock().unwrap();
 
             let device_free = (Saturating(self.device_size) - inner.used_bytes()).0;
 
-            let limit = match owner_object_id {
+            let amount = amount(match owner_object_id {
                 Some(id) => std::cmp::min(inner.owner_id_bytes_left(id), device_free),
                 None => device_free,
-            };
-            amount = std::cmp::min(limit, amount);
+            });
+
             inner.add_reservation(owner_object_id, amount);
-        }
+
+            amount
+        };
+
         Reservation::new(self, owner_object_id, amount)
     }
 
@@ -2159,10 +2164,11 @@ mod tests {
     use crate::object_store::allocator::{
         Allocator, AllocatorKey, AllocatorValue, CoalescingIterator,
     };
-    use crate::object_store::transaction::{lock_keys, Options};
+    use crate::object_store::transaction::{lock_keys, Options, TRANSACTION_METADATA_MAX_AMOUNT};
     use crate::object_store::volume::root_volume;
     use crate::object_store::{Directory, LockKey, ObjectStore};
     use crate::range::RangeExt;
+    use crate::round::round_up;
     use fuchsia_async as fasync;
     use std::cmp::{max, min};
     use std::ops::{Bound, Range};
@@ -3125,5 +3131,37 @@ mod tests {
         }
 
         alloc_task.await;
+    }
+
+    #[fuchsia::test]
+    async fn test_allocation_with_reservation_not_multiple_of_block_size() {
+        const STORE_OBJECT_ID: u64 = 99;
+        let (fs, allocator) = test_fs().await;
+
+        // Reserve an amount that isn't a multiple of the block size.
+        const RESERVATION_AMOUNT: u64 = TRANSACTION_METADATA_MAX_AMOUNT + 5000;
+        let reservation =
+            allocator.clone().reserve(Some(STORE_OBJECT_ID), RESERVATION_AMOUNT).unwrap();
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![],
+                Options { allocator_reservation: Some(&reservation), ..Options::default() },
+            )
+            .await
+            .expect("new failed");
+
+        let range = allocator
+            .allocate(
+                &mut transaction,
+                STORE_OBJECT_ID,
+                round_up(RESERVATION_AMOUNT, fs.block_size()).unwrap(),
+            )
+            .await
+            .expect("allocate faiiled");
+        assert_eq!((range.end - range.start) % fs.block_size(), 0);
+
+        println!("{}", range.end - range.start);
     }
 }

@@ -43,6 +43,7 @@
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
         { service: "fuchsia.hardware.sdmmc.SdmmcService" },
+        { service: "fuchsia.hardware.sdmmc.SdmmcMetadata" },
     ],
     expose: [
         {

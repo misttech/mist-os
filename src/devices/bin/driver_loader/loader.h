@@ -26,22 +26,30 @@
 
 namespace driver_loader {
 
-class Loader {
+class Loader : public fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher> {
  public:
   using Linker = ld::RemoteDynamicLinker<>;
-  using DriverStartAddr = Linker::size_type;
-  using LoadDriverHandler =
-      fit::function<void(zx::unowned_channel bootstrap_sender, DriverStartAddr addr)>;
+  // This is the ABI returned from dynamic linking that provides immutable access to
+  // the data structures and symbols of loaded modules.
+  using DynamicLinkingPassiveAbi = Linker::size_type;
+  using LoadDriverHandler = fit::function<void(zx::unowned_channel bootstrap_sender,
+                                               DynamicLinkingPassiveAbi passive_abi)>;
 
   // If |load_driver_handler_for_testing| is provided, it will be called each time a driver has been
   // loaded. This allows tests to inject custom bootstrap behavior.
   static std::unique_ptr<Loader> Create(async_dispatcher_t* dispatcher,
                                         LoadDriverHandler load_driver_handler_for_testing = {});
 
-  // Launches the |exec| driver host binary into |process|.
-  zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Start(
-      zx::process process, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
-      fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
+  void Connect(fidl::ServerEnd<fuchsia_driver_loader::DriverHostLauncher> server_end);
+
+  // fidl::WireServer<fuchsia_driver_loader::DriverHostLauncher>
+  void Launch(LaunchRequestView request, LaunchCompleter::Sync& completer) override;
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_driver_loader::DriverHostLauncher> md,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    completer.Close(ZX_ERR_UNAVAILABLE);
+  }
 
  private:
   using RemoteModule = ld::RemoteLoadModule<>;
@@ -91,9 +99,11 @@ class Loader {
     ProcessState() = default;
 
     // Loads a driver module into the driver host process.
-    // Returns the start address of the driver.
-    zx::result<DriverStartAddr> LoadDriverModule(std::string driver_name, zx::vmo driver_module,
-                                                 fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
+    // Returns the dynamic linking passive ABI for the loaded modules.
+    zx::result<DynamicLinkingPassiveAbi> LoadDriverModule(
+        std::string driver_name, zx::vmo driver_module,
+        fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+        fidl::VectorView<fuchsia_driver_loader::wire::RootModule> additional_root_modules);
 
     // Allocates the stack for the initial thread of the process.
     zx_status_t AllocateStack();
@@ -126,6 +136,11 @@ class Loader {
         load_driver_handler_for_testing_(std::move(load_driver_handler_for_testing)),
         remote_abi_stub_(ld::RemoteAbiStub<>::Create(diag, std::move(stub_ld_vmo), kPageSize)) {}
 
+  // Launches the |exec| driver host binary into |process|.
+  zx::result<> Start(zx::process process, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
+                     fidl::ClientEnd<fuchsia_io::Directory> lib_dir,
+                     fidl::ServerEnd<fuchsia_driver_loader::DriverHost> driver_host);
+
   // Retrieves the vmo for |libname| from |lib_dir|.
   static zx::result<zx::vmo> GetDepVmo(fidl::UnownedClientEnd<fuchsia_io::Directory> lib_dir,
                                        const char* libname);
@@ -157,6 +172,8 @@ class Loader {
   ld::RemoteAbiStub<>::Ptr remote_abi_stub_;
 
   fbl::DoublyLinkedList<std::unique_ptr<ProcessState>> started_processes_;
+
+  fidl::ServerBindingGroup<fuchsia_driver_loader::DriverHostLauncher> bindings_;
 };
 
 }  // namespace driver_loader

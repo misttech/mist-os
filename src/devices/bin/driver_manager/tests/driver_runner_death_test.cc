@@ -37,7 +37,7 @@ const char* kBannedChildName = "node-0";
 
 // This type of test creates two children, one with an allowed class name
 // and the other without.
-class DriverRunnerDeathTest : public DriverRunnerTest {
+class DriverRunnerDeathTest : public DriverRunnerTestBase {
  public:
   void SetUp() override {
     SetupDriverRunner();

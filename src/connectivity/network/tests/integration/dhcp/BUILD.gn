@@ -26,6 +26,7 @@ rustc_test("dhcp") {
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",

@@ -12,8 +12,7 @@
 #include <time.h>
 #include <zircon/assert.h>
 
-#include <fbl/auto_lock.h>
-
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/zxio.h"
 
@@ -24,7 +23,7 @@ struct fdio_timer_t {
   // The zx::timer object that implements the timerfd.
   zx::timer handle;
 
-  mtx_t lock;
+  std::mutex lock;
 
   zx::time current_deadline __TA_GUARDED(lock);
   zx::duration interval __TA_GUARDED(lock);
@@ -63,7 +62,7 @@ zx_status_t fdio_timer_readv(zxio_t* io, const zx_iovec_t* vector, size_t vector
 
   fdio_timer_t* timer = reinterpret_cast<fdio_timer_t*>(io);
 
-  fbl::AutoLock lock(&timer->lock);
+  std::lock_guard lock(timer->lock);
   if (timer->current_deadline == zx::time()) {
     // The timer was never set.
     return ZX_ERR_SHOULD_WAIT;
@@ -182,7 +181,7 @@ int timerfd_create(int clockid, int flags) {
     io->ioflag() |= IOFLAG_NONBLOCK;
   }
 
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     return fd.value();
   }
@@ -205,7 +204,7 @@ void fdio_timer_get_current_timespec(fdio_timer_t* timer, struct itimerspec* out
 
 __EXPORT int timerfd_settime(int fd, int flags, const struct itimerspec* new_value,
                              struct itimerspec* old_value) {
-  fdio_ptr io = fd_to_io(fd);
+  fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -229,7 +228,7 @@ __EXPORT int timerfd_settime(int fd, int flags, const struct itimerspec* new_val
     return ERRNO(EINVAL);
   }
 
-  fbl::AutoLock lock(&timer->lock);
+  std::lock_guard lock(timer->lock);
 
   struct itimerspec old = {};
   if (old_value) {
@@ -259,7 +258,7 @@ __EXPORT int timerfd_settime(int fd, int flags, const struct itimerspec* new_val
 
 __EXPORT
 int timerfd_gettime(int fd, struct itimerspec* curr_value) {
-  fdio_ptr io = fd_to_io(fd);
+  fdio_ptr io = fdio_global_state().fd_to_io(fd);
   if (io == nullptr) {
     return ERRNO(EBADF);
   }
@@ -268,7 +267,7 @@ int timerfd_gettime(int fd, struct itimerspec* curr_value) {
   if (!timer) {
     return ERRNO(EINVAL);
   }
-  fbl::AutoLock lock(&timer->lock);
+  std::lock_guard lock(timer->lock);
   fdio_timer_get_current_timespec(timer, curr_value);
   return 0;
 }

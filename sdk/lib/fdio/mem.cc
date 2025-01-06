@@ -12,6 +12,7 @@
 
 #include <algorithm>
 
+#include "sdk/lib/fdio/fdio_state.h"
 #include "sdk/lib/fdio/fdio_unistd.h"
 #include "sdk/lib/fdio/zxio.h"
 
@@ -44,7 +45,7 @@ int memfd_create(const char* name, unsigned int flags) {
     return io.status_value();
   }
 
-  std::optional fd = bind_to_fd(io.value());
+  std::optional fd = fdio_global_state().bind_to_fd(io.value());
   if (fd.has_value()) {
     return fd.value();
   }

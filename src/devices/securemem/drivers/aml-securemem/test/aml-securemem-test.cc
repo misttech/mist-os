@@ -8,6 +8,7 @@
 #include <lib/async/cpp/task.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/env.h>
 #include <lib/fpromise/result.h>
@@ -20,7 +21,6 @@
 #include <zxtest/zxtest.h>
 
 #include "device.h"
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
@@ -87,11 +87,10 @@ class AmlogicSecureMemTest : public zxtest::Test {
     ASSERT_OK(incoming_loop_.StartThread("incoming"));
 
     // Create pdev fragment
-    fake_pdev::FakePDevFidl::Config config;
-    config.use_fake_bti = true;
-    pdev_.SyncCall(&fake_pdev::FakePDevFidl::SetConfig, std::move(config));
-    auto pdev_handler = pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
-                                       async_patterns::PassDispatcher);
+    fdf_fake::FakePDev::Config config{.use_fake_bti = true};
+    pdev_.SyncCall(&fdf_fake::FakePDev::SetConfig, std::move(config));
+    auto pdev_handler =
+        pdev_.SyncCall(&fdf_fake::FakePDev::GetInstanceHandler, async_patterns::PassDispatcher);
     auto pdev_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                           std::move(pdev_endpoints.client), "pdev");
@@ -164,8 +163,8 @@ class AmlogicSecureMemTest : public zxtest::Test {
 
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   std::shared_ptr<MockDevice> root_{MockDevice::FakeRootParent()};
-  async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> pdev_{incoming_loop_.dispatcher(),
-                                                                     std::in_place};
+  async_patterns::TestDispatcherBound<fdf_fake::FakePDev> pdev_{incoming_loop_.dispatcher(),
+                                                                std::in_place};
   async_patterns::TestDispatcherBound<FakeSysmem> sysmem_{incoming_loop_.dispatcher(),
                                                           std::in_place};
   async_patterns::TestDispatcherBound<FakeTee> tee_{incoming_loop_.dispatcher(), std::in_place};

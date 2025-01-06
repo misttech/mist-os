@@ -347,6 +347,26 @@ impl<T> Clone for WeakRef<T> {
     }
 }
 
+/// Wrapper around `WeakRef` allowing to use it in a Set or as a key of a Map.
+pub struct WeakRefKey<T>(pub WeakRef<T>);
+impl<T> PartialEq for WeakRefKey<T> {
+    fn eq(&self, other: &Self) -> bool {
+        WeakRef::ptr_eq(&self.0, &other.0)
+    }
+}
+impl<T> Eq for WeakRefKey<T> {}
+impl<T> Hash for WeakRefKey<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        WeakRef::as_ptr(&self.0).hash(state);
+    }
+}
+impl<T> std::ops::Deref for WeakRefKey<T> {
+    type Target = WeakRef<T>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 /// A temporary reference to a shared owned object. This permits access to the shared object, but
 /// will block any thread trying to release the last `OwnedRef`. As such, such reference must be
 /// released as soon as possible. In particular, one must not do any blocking operation while

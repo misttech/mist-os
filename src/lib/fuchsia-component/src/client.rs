@@ -18,6 +18,7 @@ use pin_project::pin_project;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::pin::pin;
+use std::sync::Arc;
 use std::task::Poll;
 
 use crate::directory::{open_directory_async, AsRefDirectory};
@@ -219,30 +220,33 @@ pub fn connect_to_protocol_at_dir_svc<P: DiscoverableProtocolMarker>(
 
 /// This wraps an instance directory for a service capability and provides the MemberOpener trait
 /// for it. This can be boxed and used with a |ServiceProxy::from_member_opener|.
-pub struct ServiceInstanceDirectory(pub fio::DirectoryProxy);
+pub struct ServiceInstanceDirectory(pub fio::DirectoryProxy, pub String);
 
 impl MemberOpener for ServiceInstanceDirectory {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
-        let Self(directory) = self;
+        let Self(directory, _) = self;
         directory.open3(member, fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), server_end)
+    }
+    fn instance_name(&self) -> &str {
+        let Self(_, instance_name) = self;
+        return &instance_name;
     }
 }
 
 /// An instance of an aggregated fidl service that has been enumerated by [`ServiceWatcher::watch`]
 /// or [`ServiceWatcher::watch_for_any`].
-pub struct ServiceInstance<'a, S> {
+struct ServiceInstance<S> {
     /// The name of the service instance within the service directory
-    pub name: String,
-    service: &'a Service<S>,
+    name: String,
+    service: Arc<Service<S>>,
 }
 
-// note: complicated bounds here can help the compiler deduce the service marker from a known
-// proxy type.
-impl<'a, P: ServiceProxy, S: ServiceMarker<Proxy = P>> ServiceInstance<'a, S> {
-    /// Connects to the instance named by [`Self::name`] in the service directory that enumerated
-    /// it.
-    pub async fn connect(&self) -> Result<P, Error> {
-        self.service.connect_to_instance(&self.name)
+impl<S: ServiceMarker> MemberOpener for ServiceInstance<S> {
+    fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
+        self.service.connect_to_instance_member_with_channel(&self.name, member, server_end)
+    }
+    fn instance_name(&self) -> &str {
+        return &self.name;
     }
 }
 
@@ -305,16 +309,29 @@ impl<S: ServiceMarker> Service<S> {
         connect_to_instance_in_service_dir::<S>(&self.dir, name.as_ref())
     }
 
+    /// Connects to the named instance member without waiting for it to appear. You should only use this
+    /// after the instance name has been returned by the [`Self::watch`] stream, or if the
+    /// instance is statically routed so component manager will lazily load it.
+    fn connect_to_instance_member_with_channel(
+        &self,
+        instance: impl AsRef<str>,
+        member: impl AsRef<str>,
+        server_end: zx::Channel,
+    ) -> Result<(), fidl::Error> {
+        let path = format!("{}/{}", instance.as_ref(), member.as_ref());
+        self.dir.open3(&path, fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), server_end)
+    }
+
     /// Returns an async stream of service instances that are enumerated within this service
     /// directory.
-    pub async fn watch(&self) -> Result<ServiceInstanceStream<'_, S>, Error> {
+    pub async fn watch(self) -> Result<ServiceInstanceStream<S>, Error> {
         let watcher = Watcher::new(&self.dir).await?;
         let finished = false;
-        Ok(ServiceInstanceStream { service: self, watcher, finished })
+        Ok(ServiceInstanceStream { service: Arc::new(self), watcher, finished })
     }
 
     /// Asynchronously returns the first service instance available within this service directory.
-    pub async fn watch_for_any(&self) -> Result<ServiceInstance<'_, S>, Error> {
+    pub async fn watch_for_any(self) -> Result<S::Proxy, Error> {
         self.watch()
             .await?
             .next()
@@ -329,13 +346,13 @@ impl<S: ServiceMarker> Service<S> {
 /// Normally, this stream will only terminate if the service directory being watched is removed, so
 /// the client must decide when it has found all the instances it's looking for.
 #[pin_project]
-pub struct ServiceInstanceStream<'a, S> {
-    service: &'a Service<S>,
+pub struct ServiceInstanceStream<S> {
+    service: Arc<Service<S>>,
     watcher: Watcher,
     finished: bool,
 }
-impl<'a, S> Stream for ServiceInstanceStream<'a, S> {
-    type Item = Result<ServiceInstance<'a, S>, Error>;
+impl<S: ServiceMarker> Stream for ServiceInstanceStream<S> {
+    type Item = Result<S::Proxy, Error>;
 
     fn poll_next(
         self: std::pin::Pin<&mut Self>,
@@ -358,10 +375,11 @@ impl<'a, S> Stream for ServiceInstanceStream<'a, S> {
                     WatchEvent::ADD_FILE | WatchEvent::EXISTING => {
                         let filename = state.filename.to_str().unwrap();
                         if filename != "." {
-                            return Ready(Some(Ok(ServiceInstance {
-                                service: this.service,
+                            let proxy = S::Proxy::from_member_opener(Box::new(ServiceInstance {
+                                service: this.service.clone(),
                                 name: filename.to_owned(),
-                            })));
+                            }));
+                            return Ready(Some(Ok(proxy)));
                         }
                     }
                     _ => {}
@@ -380,7 +398,7 @@ impl<'a, S> Stream for ServiceInstanceStream<'a, S> {
     }
 }
 
-impl<'a, S> FusedStream for ServiceInstanceStream<'a, S> {
+impl<S: ServiceMarker> FusedStream for ServiceInstanceStream<S> {
     fn is_terminated(&self) -> bool {
         self.finished
     }
@@ -409,7 +427,10 @@ pub fn connect_to_service_instance_at<S: ServiceMarker>(
     let service_path = format!("{}/{}/{}", path_prefix, S::SERVICE_NAME, instance);
     let directory_proxy =
         fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())?;
-    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
+    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
+        directory_proxy,
+        instance.to_string(),
+    ))))
 }
 
 /// Connect to an instance of a FIDL service hosted on the directory protocol channel `directory`.
@@ -420,7 +441,10 @@ pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
 ) -> Result<S::Proxy, Error> {
     let directory_proxy =
         fuchsia_fs::directory::open_directory_async(directory, instance, fio::Flags::empty())?;
-    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
+    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
+        directory_proxy,
+        instance.to_string(),
+    ))))
 }
 
 /// Connect to a named instance of a FIDL service hosted in the service subdirectory under the
@@ -435,7 +459,10 @@ pub fn connect_to_service_instance_at_dir<S: ServiceMarker>(
     let service_path = format!("{}/{}", S::SERVICE_NAME, instance);
     let directory_proxy =
         fuchsia_fs::directory::open_directory_async(directory, &service_path, fio::Flags::empty())?;
-    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
+    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
+        directory_proxy,
+        instance.to_string(),
+    ))))
 }
 
 /// Connect to an instance of a FIDL service hosted in `directory`, in the `svc/` subdir.
@@ -449,7 +476,10 @@ pub fn connect_to_service_instance_at_dir_svc<S: ServiceMarker>(
     // resolved one way or the other.
     let service_path = service_path.strip_prefix('/').unwrap();
     let directory_proxy = open_directory_async(directory, service_path, fio::Rights::empty())?;
-    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
+    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
+        directory_proxy,
+        instance.as_ref().to_string(),
+    ))))
 }
 
 /// Opens a FIDL service as a directory, which holds instances of the service.
@@ -524,7 +554,6 @@ pub mod test_util {
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
-    use std::sync::Arc;
 
     use super::*;
     use fidl::endpoints::ServiceMarker as _;
@@ -603,9 +632,10 @@ mod tests {
             .watch()
             .await?
             .take(2)
-            .and_then(|service| future::ready(Ok(service.name)))
+            .and_then(|proxy| future::ready(Ok(proxy.instance_name().to_owned())))
             .try_collect()
             .await?;
+
         assert_eq!(
             found_names,
             HashSet::from_iter(["default".to_owned(), "another_instance".to_owned()])
@@ -622,9 +652,10 @@ mod tests {
             .watch()
             .await?
             .take(2)
-            .and_then(|service| future::ready(Ok(service.name)))
+            .and_then(|proxy| future::ready(Ok(proxy.instance_name().to_owned())))
             .try_collect()
             .await?;
+
         assert_eq!(
             found_names,
             HashSet::from_iter(["default".to_owned(), "another_instance".to_owned()])
@@ -637,13 +668,7 @@ mod tests {
     async fn test_connect_to_all_services() -> Result<(), Error> {
         let dir_proxy = test_util::run_directory_server(make_service_instance_tree());
         let watcher = Service::open_from_dir_prefix(&dir_proxy, SVC_DIR, ServiceMarker)?;
-        let _: Vec<_> = watcher
-            .watch()
-            .await?
-            .take(2)
-            .and_then(|service| async move { service.connect().await })
-            .try_collect()
-            .await?;
+        let _: Vec<_> = watcher.watch().await?.take(2).try_collect().await?;
 
         Ok(())
     }
@@ -653,8 +678,7 @@ mod tests {
         let dir_proxy = test_util::run_directory_server(make_service_instance_tree());
         let watcher = Service::open_from_dir_prefix(&dir_proxy, SVC_DIR, ServiceMarker)?;
         let found = watcher.watch_for_any().await?;
-        assert!(["default", "another_instance"].contains(&&*found.name));
-        found.connect().await?;
+        assert!(["default", "another_instance"].contains(&found.instance_name()));
 
         Ok(())
     }

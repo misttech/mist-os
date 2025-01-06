@@ -236,6 +236,15 @@ TEST_F(CmpctmallocTest, SizedFree) {
   cmpct_sized_free(p, kAllocSize);
 }
 
+// Regression test for https://fxbug.dev/386377108.
+TEST_F(CmpctmallocTest, SizedFreeFromMemalign) {
+  constexpr size_t kAllocSize = 1;
+  constexpr size_t kAlignment = 128;
+  void* const p = cmpct_memalign(kAlignment, kAllocSize);
+  ASSERT_NOT_NULL(p);
+  cmpct_sized_free(p, kAllocSize);
+}
+
 TEST_F(CmpctmallocTest, LargeAllocsAreNull) {
   void* p = cmpct_alloc(kHeapMaxAllocSize);
   EXPECT_NOT_NULL(p);

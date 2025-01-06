@@ -7,18 +7,18 @@ use anyhow::Error;
 use serde::Deserialize;
 use std::{io, path};
 
-/// Allows us to directly use [`tracing::Level`] in our config struct.
+/// Allows us to directly use [`log::Level`] in our config struct.
 mod serde_with_level {
     use serde::de::{Deserializer, Error, Visitor};
 
-    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<tracing::Level, D::Error>
+    pub(super) fn deserialize<'de, D>(deserializer: D) -> Result<log::Level, D::Error>
     where
         D: Deserializer<'de>,
     {
         struct Helper;
 
         impl<'de> Visitor<'de> for Helper {
-            type Value = tracing::Level;
+            type Value = log::Level;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 write!(formatter, "a string")
@@ -69,7 +69,7 @@ pub(crate) struct DriverArgs {
     pub backbone_name: Option<String>,
 
     #[argh(option, long = "log-level", description = "log level")]
-    pub log_level: Option<tracing::Level>,
+    pub log_level: Option<log::Level>,
 
     #[argh(
         option,
@@ -94,7 +94,7 @@ pub(crate) struct Config {
     pub backbone_name: Option<String>,
 
     #[serde(default = "Config::default_log_level", with = "serde_with_level")]
-    pub log_level: tracing::Level,
+    pub log_level: log::Level,
 
     #[serde(default = "Config::default_ot_radio_path")]
     pub ot_radio_path: Option<String>,
@@ -123,8 +123,8 @@ impl Config {
         20
     }
 
-    fn default_log_level() -> tracing::Level {
-        tracing::Level::INFO
+    fn default_log_level() -> log::Level {
+        log::Level::Info
     }
 
     fn default_name() -> String {

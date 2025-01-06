@@ -95,7 +95,7 @@ impl RealmServer {
     fn replace_realm(self: &Rc<Self>, realm: Option<RealmInstance>) {
         let mut r = self.realm.borrow_mut();
         if r.is_some() && realm.is_some() {
-            tracing::warn!(concat!(
+            log::warn!(concat!(
                 "a realm was previously created. ",
                 "That realm will be shut down, and a new one created. ",
                 "Make sure this is what you wanted."
@@ -120,15 +120,15 @@ impl RealmServer {
                     Ok(fftsu::RealmRequest::Create { responder, .. }) => {
                         let realm = create_realm().await.expect("failed to build the test realm");
                         self.replace_realm(Some(realm));
-                        tracing::debug!("Test realm created, proceeding.");
+                        log::debug!("Test realm created, proceeding.");
                         let _ = responder.send().unwrap();
                     }
                     Err(err) => {
-                        tracing::error!("error while serving Realm: {:?}", &err);
+                        log::error!("error while serving Realm: {:?}", &err);
                     }
                 }
             }
-            tracing::debug!("no longer serving the suspend realm, realm will be torn down now.");
+            log::debug!("no longer serving the suspend realm, realm will be torn down now.");
             self.replace_realm(None);
         })
         .detach();
@@ -147,6 +147,6 @@ async fn main() -> Result<()> {
         server.clone().serve_realm_factory(stream).await;
     })
     .await;
-    tracing::debug!("realm proxy shutting down. presumably the realm has been torn down.");
+    log::debug!("realm proxy shutting down. presumably the realm has been torn down.");
     Ok(())
 }

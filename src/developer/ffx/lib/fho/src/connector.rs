@@ -5,6 +5,7 @@
 use crate::{FfxContext, Result};
 use async_lock::{Mutex, MutexGuard};
 use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
+use ffx_command_error::user_error;
 use ffx_config::EnvironmentContext;
 use ffx_target::connection::{Connection, ConnectionError};
 use ffx_target::ssh_connector::SshConnector;
@@ -79,7 +80,7 @@ impl TryFromEnvContext for ffx_target::Resolution {
             let unspecified_target = ffx_target::UNSPECIFIED_TARGET_NAME.to_owned();
             let target_spec = Option::<String>::try_from_env_context(env).await?;
             let target_spec_unwrapped = if env.is_strict() {
-                target_spec.as_ref().ok_or(ffx_command::user_error!(
+                target_spec.as_ref().ok_or(user_error!(
                     "You must specify a target via `-t <target_name>` before any command arguments"
                 ))?
             } else {
@@ -88,7 +89,7 @@ impl TryFromEnvContext for ffx_target::Resolution {
             tracing::trace!("resolving target spec address from {}", target_spec_unwrapped);
             let resolution = ffx_target::resolve_target_address(&target_spec, env)
                 .await
-                .map_err(|e| ffx_command::Error::User(crate::NonFatalError(e).into()))?;
+                .map_err(|e| ffx_command_error::Error::User(crate::NonFatalError(e).into()))?;
             Ok(resolution)
         })
     }

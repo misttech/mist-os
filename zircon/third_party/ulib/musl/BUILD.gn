@@ -4,18 +4,6 @@
 
 import("//build/config/clang/clang_cpu.gni")
 
-config("headers") {
-  visibility = [
-    "./*",
-    "//zircon/system/ulib/c:*",
-  ]
-  cflags = [
-    "-idirafter",
-    rebase_path("include", root_build_dir),
-  ]
-  asmflags = cflags
-}
-
 group("musl_internal") {
   visibility = [
     "./*",
@@ -24,13 +12,11 @@ group("musl_internal") {
   ]
   public_deps = [
     "//zircon/system/public",
+    "//zircon/system/ulib/c/include:headers",
     "//zircon/system/ulib/runtime:headers",
     "//zircon/system/ulib/zircon-internal:headers",
   ]
-  public_configs = [
-    ":headers",
-    ":musl_internal.config",
-  ]
+  public_configs = [ ":musl_internal.config" ]
 }
 
 group("musl_internal_testing") {

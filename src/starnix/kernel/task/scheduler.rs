@@ -294,7 +294,7 @@ pub fn set_thread_role(
     policy: SchedulerPolicy,
 ) -> Result<(), Errno> {
     let role_name = policy.kind.role_name();
-    log_debug!(?policy, role_name, "setting thread role");
+    log_debug!(policy:?, role_name; "setting thread role");
     let thread = thread.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(impossible_error)?;
     let request = RoleManagerSetRoleRequest {
         target: Some(RoleTarget::Thread(thread)),
@@ -302,7 +302,7 @@ pub fn set_thread_role(
         ..Default::default()
     };
     let _ = role_manager.set_role(request, zx::MonotonicInstant::INFINITE).map_err(|err| {
-        log_warn!(?err, "Unable to set thread role.");
+        log_warn!(err:?; "Unable to set thread role.");
         errno!(EINVAL)
     })?;
     Ok(())

@@ -16,7 +16,11 @@ from operator import add
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from fuchsia_task_lib import FuchsiaTask, TaskExecutionException, Terminal
+from fuchsia.tools.fuchsia_task_lib import (
+    FuchsiaTask,
+    TaskExecutionException,
+    Terminal,
+)
 
 WorkflowArguments = namedtuple(
     "WorkflowArguments",

@@ -318,6 +318,9 @@ template("rustc_artifact") {
                              "output_prefix_override",
                            ])
 
+    # Add the global lint defaults.
+    configs += [ "//build/config/rust/lints:clippy_warn_default" ]
+
     # Add production-oriented lints to non-test code.
     if (!(defined(testonly) && testonly)) {
       configs += [ "//build/config/rust/lints:clippy_warn_production" ]

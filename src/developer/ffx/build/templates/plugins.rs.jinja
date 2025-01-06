@@ -1,5 +1,8 @@
+// TODO(wilkinsonclay): Clean up dependencies added by ffx templates.
+use ffx_core as _;
+
 pub async fn ffx_plugin_impl(
-  _injector: &Option<std::sync::Arc<dyn ffx_core::Injector>>,
+  _env: &fho::FhoEnvironment,
   _cmd: {{suite_args_lib}}::FfxPluginCommand,
 ) -> fho::Result<()>
 {
@@ -13,7 +16,7 @@ pub async fn ffx_plugin_impl(
   match Some(_cmd.subcommand) {
 {% endif %}
 {% for plugin in plugins %}
-    Some({{suite_subcommand_lib}}::SubCommand::{{plugin.enum}}(c)) => return {{plugin.lib}}_suite::ffx_plugin_impl(_injector, c).await.map_err(fho::Error::from),
+    Some({{suite_subcommand_lib}}::SubCommand::{{plugin.enum}}(c)) => return {{plugin.lib}}_suite::ffx_plugin_impl(_env, c).await.map_err(fho::Error::from),
 {% endfor %}
     // This handles everything that does not match. This falls through to not implemented.
     None => (),
@@ -21,7 +24,7 @@ pub async fn ffx_plugin_impl(
 {% endif %}
 
 {% if includes_execution %}
-  {{execution_lib}}::ffx_plugin_impl(_injector, _cmd).await.map_err(fho::Error::from)
+  {{execution_lib}}::ffx_plugin_impl(_env, _cmd).await.map_err(fho::Error::from)
 {% else %}
   eprintln!("This subCommand is not implemented yet.");
   Ok(())
@@ -120,7 +123,7 @@ pub fn ffx_plugin_has_schema(
 /// //src/developer/ffx/core/macro/src/impl.rs
 struct SuiteAdapter {
     cmd: {{suite_args_lib}}::FfxPluginCommand,
-    injector: Option<std::sync::Arc<dyn ffx_core::Injector>>,
+    env:  fho::FhoEnvironment,
 }
 
 #[fho::macro_deps::async_trait(?Send)]
@@ -143,9 +146,7 @@ impl fho::FfxTool for SuiteAdapter {
     }
 
     async fn from_env(env: fho::FhoEnvironment, cmd: Self::Command) -> fho::Result<Self> {
-        #[allow(deprecated)]
-        let injector = env.injector.clone();
-        Ok(SuiteAdapter { cmd, injector })
+        Ok(SuiteAdapter { cmd, env })
     }
 }
 
@@ -157,11 +158,11 @@ impl fho::FfxMain for SuiteAdapter {
     type Writer = fho::SimpleWriter;
 
     async fn main(self, _writer:  Self::Writer) -> fho::Result<()> {
-        ffx_plugin_impl(&self.injector, self.cmd).await
+        ffx_plugin_impl(&self.env, self.cmd).await
     }
 
     async fn try_print_schema(self, _writer: Self::Writer)  -> fho::Result<()> {
-      ffx_plugin_impl(&self.injector, self.cmd).await
+      ffx_plugin_impl(&self.env, self.cmd).await
     }
 }
 

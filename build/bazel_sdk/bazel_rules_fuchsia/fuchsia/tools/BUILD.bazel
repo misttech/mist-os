@@ -37,6 +37,7 @@ py_binary(
     name = "publish_packages",
     srcs = ["publish_packages.py"],
     python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
 )
 
 py_binary(
@@ -141,12 +142,6 @@ py_binary(
 py_binary(
     name = "json_comparator",
     srcs = ["json_comparator.py"],
-    python_version = "PY3",
-)
-
-py_binary(
-    name = "create_pave_script",
-    srcs = ["create_pave_script.py"],
     python_version = "PY3",
 )
 

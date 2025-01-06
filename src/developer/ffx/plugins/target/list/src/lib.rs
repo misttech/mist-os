@@ -109,13 +109,17 @@ const DEFAULT_SSH_TIMEOUT_MS: u64 = 10000;
 async fn try_get_target_info(
     spec: String,
     context: &EnvironmentContext,
-) -> Result<(Option<String>, Option<String>), KnockError> {
+) -> Result<(ffx::RemoteControlState, Option<String>, Option<String>), KnockError> {
     let mut resolution = ffx_target::resolve_target_address(&Some(spec), context).await?;
-    let (pc, bc) = match resolution.identify(context).await {
-        Ok(id_result) => (id_result.product_config.clone(), id_result.board_config.clone()),
-        _ => (None, None),
+    let (rcs_state, pc, bc) = match resolution.identify(context).await {
+        Ok(id_result) => (
+            ffx::RemoteControlState::Up,
+            id_result.product_config.clone(),
+            id_result.board_config.clone(),
+        ),
+        _ => (ffx::RemoteControlState::Down, None, None),
     };
-    Ok((pc, bc))
+    Ok((rcs_state, pc, bc))
 }
 
 #[tracing::instrument]
@@ -138,8 +142,8 @@ async fn get_target_info(
             })
             .await
         {
-            Ok((product_config, board_config)) => {
-                return Ok((ffx::RemoteControlState::Up, product_config, board_config));
+            Ok(res) => {
+                return Ok(res);
             }
             Err(KnockError::NonCriticalError(e)) => {
                 tracing::debug!("Could not connect to {addr:?}: {e:?}");

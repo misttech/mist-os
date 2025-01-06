@@ -92,10 +92,7 @@ group("unittests") {
 # internals are fully replaced, only llvm-libc.config will be needed.
 config("internal.config") {
   visibility = [ "./*" ]
-  configs = [
-    "//zircon/third_party/ulib/musl:headers",
-    ":llvm-libc.config",
-  ]
+  configs = [ ":llvm-libc.config" ]
 }
 
 # This is needed for the expectations of the llvm-libc source code, whether
@@ -191,6 +188,22 @@ config("llvm-libc-function-attr.config") {
   defines = [ "LLVM_LIBC_FUNCTION_ATTR=[[gnu::visibility(\"default\")]]" ]
 }
 
+# Every libc_source_set() implicitly depends on this.
+group("libc_source_set.deps") {
+  visibility = [ "./*" ]
+  public_deps = [ "include:headers" ]
+}
+
+# Every libc_test() implicitly depends on this.
+group("libc_test.deps") {
+  visibility = [ "./*" ]
+  testonly = true
+  public_deps = [
+    "include:headers",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
 if (current_toolchain == default_toolchain) {
   import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 
@@ -210,6 +223,7 @@ if (current_toolchain == default_toolchain) {
       is_pic_default = true
       strip = "--strip-sections"
       configs = [ "//zircon/system/ulib/c:libc_config" ]
+      source_deps = [ "//zircon/system/ulib/c:libc_config_deps" ]
 
       # NOTE: kernel artifacts currently do not build under fuzzer
       # variants. This was also true with the Zircon build, but
@@ -260,6 +274,7 @@ if (current_toolchain == default_toolchain) {
   }
 
   group("libc_config_deps") {
+    public_deps = [ "include:headers" ]
   }
 }
 
@@ -273,34 +288,7 @@ if (toolchain_variant.suffix != "") {
   libc_toolchain = system_libc_toolchain
 }
 
-# When built with the default/user Fuchsia toolchain, zx_library()
-# will not create a :headers sub-target for zx_library("c") below,
-# so add one manually as a special case.
-if (zircon_toolchain == false) {
-  group("headers") {
-    public_configs = [
-      ":headers.config",
-      "//zircon/third_party/ulib/musl:headers",
-    ]
-  }
-
-  config("headers.config") {
-    include_dirs = [ "include" ]
-  }
-} else {
-  config("headers.config") {
-    include_dirs = [ "include" ]
-  }
-
-  group("headers") {
-    public_configs = [
-      "//zircon/third_party/ulib/musl:headers",
-
-      # Order of configs matters. This comment prevents re-ordering from 'gn format'.
-      ":headers.config",
-    ]
-  }
-
+if (zircon_toolchain != false) {
   # This builds the actual shared library.  It's only used indirectly via the
   # "libc" target, see below.
   shared_library("libc.so") {
@@ -335,8 +323,6 @@ if (zircon_toolchain == false) {
         },
       ]
     }
-
-    public_deps = [ ":headers" ]
 
     deps = [
       ":components",

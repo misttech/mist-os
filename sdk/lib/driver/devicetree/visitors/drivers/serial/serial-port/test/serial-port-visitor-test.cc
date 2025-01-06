@@ -52,7 +52,8 @@ TEST(SerialPortVisitorTest, TestMetadataAndBindProperty) {
 
       // Test metadata properties.
       ASSERT_TRUE(metadata);
-      ASSERT_EQ(1lu, metadata->size());
+      ASSERT_EQ(2lu, metadata->size());
+
       std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[0].data());
       fit::result serial_port =
           fidl::Unpersist<fuchsia_hardware_serial::SerialPortInfo>(metadata_blob);
@@ -61,6 +62,15 @@ TEST(SerialPortVisitorTest, TestMetadataAndBindProperty) {
                 static_cast<fuchsia_hardware_serial::Class>(TEST_CLASS));
       EXPECT_EQ(serial_port->serial_vid(), static_cast<uint32_t>(TEST_VID));
       EXPECT_EQ(serial_port->serial_pid(), static_cast<uint32_t>(TEST_PID));
+
+      std::vector<uint8_t> metadata_blob2 = std::move(*(*metadata)[1].data());
+      fit::result serial_port2 =
+          fidl::Unpersist<fuchsia_hardware_serial::SerialPortInfo>(metadata_blob2);
+      ASSERT_TRUE(serial_port2.is_ok());
+      EXPECT_EQ(serial_port2->serial_class(),
+                static_cast<fuchsia_hardware_serial::Class>(TEST_CLASS));
+      EXPECT_EQ(serial_port2->serial_vid(), static_cast<uint32_t>(TEST_VID));
+      EXPECT_EQ(serial_port2->serial_pid(), static_cast<uint32_t>(TEST_PID));
     }
   }
 

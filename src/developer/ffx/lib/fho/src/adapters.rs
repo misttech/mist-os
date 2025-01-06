@@ -10,7 +10,7 @@
 macro_rules! embedded_plugin {
     ($tool:ty) => {
         pub async fn ffx_plugin_impl(
-            injector: &Option<::std::sync::Arc<dyn ffx_core::Injector>>,
+            env: &$crate::macro_deps::fho::FhoEnvironment,
             cmd: <$tool as $crate::FfxTool>::Command,
         ) -> $crate::Result<()> {
             #[allow(unused_imports)]
@@ -20,25 +20,13 @@ macro_rules! embedded_plugin {
             };
             use $crate::FfxMain as _;
 
-            let ffx = FfxCommandLine::from_env()?;
+            //TODO(wilkinsonclay): Clean up dependencies added by ffx templates.
+            use ffx_core as _;
+
             $crate::macro_deps::check_strict_constraints(
-                &ffx.global,
+                &env.ffx.global,
                 <$tool as $crate::FfxTool>::requires_target(),
             )?;
-            let context = if let Some(gc) = global_env_context() {
-                gc
-            } else {
-                $crate::macro_deps::return_bug!("global env context unavailable")
-            };
-            let injector = injector.clone();
-            #[allow(deprecated)] // injector field.
-            let env = $crate::FhoEnvironment {
-                behavior: $crate::connection_behavior(&ffx, &injector, &context).await?,
-                ffx,
-                context,
-                injector,
-                lookup: std::sync::Arc::new($crate::DeviceLookupDefaultImpl),
-            };
 
             // Create the writer, and if the schema is flag is set,
             // try to print it and then exit.
@@ -56,7 +44,7 @@ macro_rules! embedded_plugin {
                 return Ok(());
             }
 
-            let tool = <$tool as $crate::FfxTool>::from_env(env.clone(), cmd).await?;
+            let tool = <$tool as $crate::subtool::FfxTool>::from_env(env.clone(), cmd).await?;
             env.update_log_file(tool.log_basename())?;
             let res = $crate::FfxMain::main(tool, writer).await;
             // The env must not be dropped entirely until after the main function has completed, as
@@ -80,7 +68,8 @@ macro_rules! embedded_plugin {
 #[cfg(test)]
 mod tests {
     use crate::subtool::{FhoHandler, ToolCommand};
-    use crate::testing::*;
+    use crate::testing::{FakeTool, ToolEnv, SIMPLE_CHECK_COUNTER};
+    use crate::{FhoConnectionBehavior, FhoEnvironment};
     use argh::FromArgs;
     use ffx_command::FfxCommandLine;
     use std::sync::Arc;
@@ -118,7 +107,12 @@ mod tests {
         };
 
         let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
-        ffx_plugin_impl(&Some(injector), fake_tool).await.expect("Plugin to run successfully");
+        let behavior = FhoConnectionBehavior::DaemonConnector(injector.clone());
+        let lookup = Arc::new(crate::from_env::DeviceLookupDefaultImpl);
+        let env =
+            FhoEnvironment::new_for_test(&_config_env.context, &ffx_cmd_line, behavior, lookup);
+
+        ffx_plugin_impl(&env, fake_tool).await.expect("Plugin to run successfully");
 
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),

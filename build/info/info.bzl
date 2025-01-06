@@ -11,7 +11,6 @@ DEFAULT_PRODUCT_BUILD_INFO = {
     "version": "LABEL(@//build/info:version)",
     "jiri_snapshot": "LABEL(@//build/info:jiri_snapshot)",
     "latest_commit_date": "LABEL(@//build/info:latest_commit_date)",
-    "minimum_utc_stamp": "LABEL(@//build/info:minimum_utc_stamp)",
 }
 
 PY_TOOLCHAIN_DEPS = {

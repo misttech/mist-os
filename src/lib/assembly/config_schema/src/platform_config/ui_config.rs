@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
-use input_device_constants::InputDeviceType as PlatformInputDeviceType;
+use input_device_constants::InputDeviceType;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -84,32 +84,6 @@ impl Default for PlatformUiConfig {
         }
     }
 }
-
-// LINT.IfChange
-/// Options for input devices that may be supported.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
-#[serde(rename_all = "lowercase", deny_unknown_fields)]
-pub enum InputDeviceType {
-    Button,
-    Keyboard,
-    LightSensor,
-    Mouse,
-    Touchscreen,
-}
-
-// This impl verifies that the platform and assembly enums are kept in sync.
-impl From<InputDeviceType> for PlatformInputDeviceType {
-    fn from(src: InputDeviceType) -> PlatformInputDeviceType {
-        match src {
-            InputDeviceType::Button => PlatformInputDeviceType::ConsumerControls,
-            InputDeviceType::Keyboard => PlatformInputDeviceType::Keyboard,
-            InputDeviceType::LightSensor => PlatformInputDeviceType::LightSensor,
-            InputDeviceType::Mouse => PlatformInputDeviceType::Mouse,
-            InputDeviceType::Touchscreen => PlatformInputDeviceType::Touch,
-        }
-    }
-}
-// LINT.ThenChange(/src/ui/lib/input-device-constants/src/lib.rs)
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]

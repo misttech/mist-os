@@ -35,15 +35,18 @@ const std::string root_driver_url = "fuchsia-boot:///#meta/root-driver.cm";
 const std::string root_driver_binary = "driver/root-driver.so";
 
 const std::string second_driver_url = "fuchsia-boot:///#meta/second-driver.cm";
-const std::string second_driver_binary = "driver/second-driver.so-";
+const std::string second_driver_binary = "driver/second-driver.so";
+
+const std::string compat_driver_url = "fuchsia-boot:///#meta/compat.cm";
+const std::string compat_driver_binary = "driver/compat.so";
 
 using driver_manager::Devfs;
 using driver_manager::DriverRunner;
 using driver_manager::InspectManager;
 
 static const test_utils::TestPkg::Config kDefaultDriverHostPkgConfig = {
-    .module_test_pkg_path = "/pkg/bin/fake_driver_host_with_bootstrap",
-    .module_open_path = "bin/driver_host2",
+    .main_module = {.test_pkg_path = "/pkg/bin/fake_driver_host_with_bootstrap",
+                    .open_path = "bin/driver_host2"},
     .expected_libs =
         {
             "libdh-deps-a.so",
@@ -52,13 +55,47 @@ static const test_utils::TestPkg::Config kDefaultDriverHostPkgConfig = {
         },
 };
 
-static const test_utils::TestPkg::Config kDefaultDriverPkgConfig = {
-    .module_test_pkg_path = "/pkg/lib/fake_root_driver.so",
-    .module_open_path = "driver/fake_root_driver.so",
+static const test_utils::TestPkg::Config kDefaultRootDriverPkgConfig = {
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_root_driver.so",
+                    .open_path = root_driver_binary},
     .expected_libs =
         {
             "libfake_root_driver_deps.so",
         },
+};
+
+static const test_utils::TestPkg::Config kCompatDriverPkgConfig = {
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_compat_driver.so",
+                    .open_path = compat_driver_binary},
+    .expected_libs = {},
+    .additional_modules = {test_utils::TestPkg::ModuleConfig{
+        .test_pkg_path = "/pkg/lib/fake_v1_driver.so", .open_path = "driver/fake_v1_driver.so"}},
+};
+
+// The tests that use these configs don't actually run the driver, so we can
+// just point it at the placeholder fake_driver.so that will be accepted
+// by the loader library. We can replace them in future with a custom .so
+// if needed.
+static const test_utils::TestPkg::Config kDefaultSecondDriverPkgConfig = {
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_driver.so", .open_path = second_driver_binary},
+    .expected_libs = {},
+};
+
+static const test_utils::TestPkg::Config kDefaultThirdDriverPkgConfig = {
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_driver.so",
+                    .open_path = "driver/third-driver.so"},
+    .expected_libs = {},
+};
+
+static const test_utils::TestPkg::Config kDefaultDriverPkgConfig = {
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_driver.so", .open_path = "driver/driver.so"},
+    .expected_libs = {},
+};
+
+static const test_utils::TestPkg::Config kDefaultCompositeDriverPkgConfig = {
+    .main_module = {.test_pkg_path = "/pkg/lib/fake_driver.so",
+                    .open_path = "driver/composite-driver.so"},
+    .expected_libs = {},
 };
 
 struct NodeChecker {
@@ -147,6 +184,8 @@ struct Driver {
   bool host_restart_on_crash = false;
   bool use_next_vdso = false;
   bool use_dynamic_linker = false;
+  // The driver to load under the compatibility shim.
+  std::string compat;
 };
 
 class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
@@ -222,7 +261,7 @@ fdecl::ChildRef CreateChildRef(std::string name, std::string collection);
 
 struct Driver;
 
-class DriverRunnerTest : public gtest::TestLoopFixture {
+class DriverRunnerTestBase : public gtest::TestLoopFixture {
  public:
   void TearDown() override { Unbind(); }
 
@@ -241,9 +280,19 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
 
   void SetupDriverRunner(FakeDriverIndex driver_index);
 
+  // If |wait_for_num_drivers| is set , the driver host will be sent a message to exit after that
+  // many drivers have been loaded. This only needs to be set if the test is explicitly waiting for
+  // the driver host process to exit, usually to verify the exit value.
   void SetupDriverRunnerWithDynamicLinker(
       async_dispatcher_t* loader_dispatcher,
-      std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner);
+      std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner,
+      FakeDriverIndex fake_driver_index,
+      std::optional<uint32_t> wait_for_num_drivers = std::nullopt);
+
+  void SetupDriverRunnerWithDynamicLinker(
+      async_dispatcher_t* loader_dispatcher,
+      std::unique_ptr<driver_manager::DriverHostRunner> driver_host_runner,
+      std::optional<uint32_t> wait_for_num_drivers = std::nullopt);
 
   void SetupDriverRunner();
 
@@ -276,13 +325,21 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
       fidl::ClientEnd<fuchsia_io::Directory> driver_host_pkg =
           fidl::ClientEnd<fuchsia_io::Directory>());
 
+  // Variant of |StartDriver| that takes in a test pkg config rather than the pkg directory client.
+  // If the driver has opted into dynamic linking, the fake /pkg directory will be provided to
+  // the driver component's namespace.
+  StartDriverResult StartDriverWithConfig(
+      Driver driver, std::optional<StartDriverHandler> start_handler = std::nullopt,
+      test_utils::TestPkg::Config driver_config = kDefaultRootDriverPkgConfig,
+      test_utils::TestPkg::Config driver_host_config = kDefaultDriverHostPkgConfig);
+
   zx::result<StartDriverResult> StartRootDriver();
   zx::result<StartDriverResult> StartRootDriverDynamicLinking(
       test_utils::TestPkg::Config driver_host_config = kDefaultDriverHostPkgConfig,
-      test_utils::TestPkg::Config driver_config = kDefaultDriverPkgConfig);
+      test_utils::TestPkg::Config driver_config = kDefaultRootDriverPkgConfig);
 
   StartDriverResult StartSecondDriver(bool colocate = false, bool host_restart_on_crash = false,
-                                      bool use_next_vdso = false);
+                                      bool use_next_vdso = false, bool use_dynamic_linker = false);
 
   void Unbind();
 
@@ -290,7 +347,8 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
                               std::string_view binary, std::string_view colocate,
                               std::string_view host_restart_on_crash,
                               std::string_view use_next_vdso,
-                              std::string_view use_dynamic_linker = "false");
+                              std::string_view use_dynamic_linker = "false",
+                              std::string_view compat = "");
 
   static void AssertNodeBound(const std::shared_ptr<CreatedChild>& child);
 
@@ -325,6 +383,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
   InspectManager inspect_{dispatcher()};
   std::optional<FakeDriverIndex> driver_index_;
   std::optional<DriverRunner> driver_runner_;
+  std::unique_ptr<driver_loader::Loader> dynamic_linker_;
 };
 
 }  // namespace driver_runner

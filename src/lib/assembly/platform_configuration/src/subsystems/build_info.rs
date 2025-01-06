@@ -40,10 +40,6 @@ impl DefineSubsystemConfiguration<Option<BuildInfoConfig>> for BuildInfoSubsyste
                 source: build_info.latest_commit_date.clone().into(),
                 destination: "latest-commit-date".into(),
             })?;
-            dir.entry(FileEntry {
-                source: build_info.minimum_utc_stamp.clone().into(),
-                destination: "minimum-utc-stamp".into(),
-            })?;
         }
         Ok(())
     }

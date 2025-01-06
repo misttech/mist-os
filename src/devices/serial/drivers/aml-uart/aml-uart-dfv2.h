@@ -27,9 +27,6 @@ class AmlUartV2 : public fdf::DriverBase {
   AmlUart& aml_uart_for_testing();
 
  private:
-  void OnReceivedMetadata(
-      fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetMetadata>& metadata_result);
-
   void OnDeviceServerInitialized(zx::result<> device_server_init_result);
 
   void OnAddChildResult(
@@ -38,7 +35,6 @@ class AmlUartV2 : public fdf::DriverBase {
   void CompleteStart(zx::result<> result);
 
   std::optional<fdf::StartCompleter> start_completer_;
-  fidl::WireClient<fuchsia_driver_compat::Device> compat_client_;
   fidl::WireClient<fuchsia_driver_framework::Node> parent_node_client_;
   fuchsia_hardware_serial::wire::SerialPortInfo serial_port_info_;
   std::optional<AmlUart> aml_uart_;

@@ -8,10 +8,10 @@ use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_net_ext::FromExt as _;
 use fidl_fuchsia_net_multicast_admin as fnet_mcast;
 use fuchsia_component::client::connect_to_protocol;
+use log::{error, info, warn};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use zx_status::Status as ZxStatus;
 
 // min_ttl value to be used for all routes added.
@@ -91,7 +91,7 @@ impl MulticastRoutingManager {
                     }
 
                     info!(
-                        tag = "mcast_routing",
+                        tag = "mcast_routing";
                         "Got routing event {:?} for addresses: {:?} on interface: {:?}",
                         event,
                         PiiWrap(&addresses),
@@ -125,7 +125,7 @@ impl MulticastRoutingManager {
 
                         fnet_mcast::RoutingEvent::WrongInputInterface(interface) => {
                             warn!(
-                                tag = "mcast_routing",
+                                tag = "mcast_routing";
                                 "Got routing event WrongInputInterface({:?})", interface
                             );
                             continue;
@@ -143,7 +143,7 @@ impl MulticastRoutingManager {
                     match multicast_routing_client_end.add_route(&addresses, &route).await {
                         Err(err) => {
                             error!(
-                                tag="mcast_routing", "Got FIDL error {:?} when trying to add route {:?} for address {:?}",
+                                tag="mcast_routing"; "Got FIDL error {:?} when trying to add route {:?} for address {:?}",
                                 err, route, PiiWrap(&addresses)
                             );
 
@@ -155,7 +155,7 @@ impl MulticastRoutingManager {
                             // programmer error.
                             match err {
                                 fnet_mcast::Ipv6RoutingTableControllerAddRouteError::InterfaceNotFound
-                                    => error!(tag="mcast_routing", "Got error `{err:?}` when trying to add route {route:?} for address {:?}",
+                                    => error!(tag="mcast_routing"; "Got error `{err:?}` when trying to add route {route:?} for address {:?}",
                                               PiiWrap(&addresses)) ,
 
                                 fnet_mcast::Ipv6RoutingTableControllerAddRouteError::InvalidAddress |
@@ -173,7 +173,7 @@ impl MulticastRoutingManager {
                             // addresses are required.
                             source_list_matching_dest_address.push(addresses.unicast_source);
                             info!(
-                                tag = "mcast_routing",
+                                tag = "mcast_routing";
                                 "Route added successfully and also updated hash table {:?}",
                                 multicast_forwarding_cache
                             );
@@ -182,7 +182,7 @@ impl MulticastRoutingManager {
                 }
                 Err(err) => {
                     warn!(
-                        tag = "mcast_routing",
+                        tag = "mcast_routing";
                         "Got error in waiting for routing events: {:?}", err
                     );
 

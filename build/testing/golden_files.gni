@@ -28,6 +28,12 @@ import("//build/testing/config.gni")
 #        - Required: The file under test.
 #        - Type: path
 #
+#  * dir
+#    - Optional: If set, then all golden files must be within this directory.
+#      If any other files are present in this directory, the check will fail
+#      with instructions to remove obsolete files from this directory.
+#    - Type: path
+#
 #  * formatter
 #    - Optional: A formatting specification. This may be used to format the
 #      goldens before comparing with the candidates, making the diffs less
@@ -274,6 +280,10 @@ template("golden_files") {
         "--label",
         get_label_info(":${target_name}", "label_with_toolchain"),
       ]
+    }
+
+    if (defined(invoker.dir)) {
+      args += [ "--golden-dir=" + rebase_path(invoker.dir, root_build_dir) ]
     }
 
     if (update_goldens) {

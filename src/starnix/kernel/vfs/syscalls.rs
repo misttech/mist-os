@@ -570,7 +570,7 @@ fn open_file_at(
     resolve_flags: ResolveFlags,
 ) -> Result<FileHandle, Errno> {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
-    log_trace!(%dir_fd, %path, "open_file_at");
+    log_trace!(dir_fd:%, path:%; "open_file_at");
     current_task.open_file_at(
         locked,
         dir_fd,
@@ -593,7 +593,7 @@ where
     F: Fn(&mut Locked<'_, Unlocked>, LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
 {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
-    log_trace!(%dir_fd, %path, "lookup_parent_at");
+    log_trace!(dir_fd:%, path:%; "lookup_parent_at");
     if path.is_empty() {
         return error!(ENOENT);
     }
@@ -666,7 +666,7 @@ where
     L: LockEqualOrBefore<FileOpsCore>,
 {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
-    log_trace!(%dir_fd, %path, "lookup_at");
+    log_trace!(dir_fd:%, path:%; "lookup_at");
     if path.is_empty() {
         if options.allow_empty_path {
             let (node, _) = current_task.resolve_dir_fd(
@@ -1774,9 +1774,9 @@ fn do_mount_bind(
     let source =
         lookup_at(locked, current_task, FdNumber::AT_FDCWD, source_addr, LookupFlags::default())?;
     log_trace!(
-        source=%source.path(current_task),
-        target=%target.path(current_task),
-        ?flags,
+        source:% = source.path(current_task),
+        target:% = target.path(current_task),
+        flags:?;
         "do_mount_bind",
     );
     target.mount(WhatToMount::Bind(source), flags)
@@ -1788,8 +1788,8 @@ fn do_mount_change_propagation_type(
     flags: MountFlags,
 ) -> Result<(), Errno> {
     log_trace!(
-        target=%target.path(current_task),
-        ?flags,
+        target:% = target.path(current_task),
+        flags:?;
         "do_mount_change_propagation_type",
     );
 
@@ -1840,10 +1840,10 @@ fn do_mount_create(
         current_task.read_c_string(data_addr, &mut data_buf)?
     };
     log_trace!(
-        %source,
-        target=%target.path(current_task),
-        %fs_type,
-        %data,
+        source:%,
+        target:% = target.path(current_task),
+        fs_type:%,
+        data:%;
         "do_mount_create",
     );
 
