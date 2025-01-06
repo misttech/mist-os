@@ -7,8 +7,8 @@
 use anyhow::{anyhow, Context as _, Error};
 use assert_matches::assert_matches;
 use fidl::endpoints::create_endpoints;
+use fidl_fuchsia_net::SocketAddress;
 use fidl_fuchsia_posix_socket::{self as fposix_socket, MarkDomain, OptionalUint32};
-use fuchsia_async::{self as fasync, DurationExt as _};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -599,6 +599,22 @@ async fn test_dns_server_watcher_no_double_connect() -> Result<(), Error> {
     Ok(())
 }
 
+// Query the DNS servers from the DnsServerWatcher until the
+// list of servers matches the expected value.
+async fn wait_on_dns_server_list_response(
+    proxy: &fnp_socketproxy::DnsServerWatcherProxy,
+    expected: Vec<(u32, Vec<SocketAddress>)>,
+) -> Result<(), Error> {
+    let expected = expected.into_iter().map(|info| info.to_dns_server_list()).collect::<Vec<_>>();
+    loop {
+        let mut incoming = proxy.watch_servers().await?;
+        incoming.sort_by_key(|a| a.source_network_id);
+        if incoming == expected {
+            break Ok(());
+        }
+    }
+}
+
 #[fuchsia::test]
 async fn watch_dns_and_use_registry() -> Result<(), Error> {
     let builder = RealmBuilder::new().await?;
@@ -628,94 +644,60 @@ async fn watch_dns_and_use_registry() -> Result<(), Error> {
         .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
         .context("trying to connect to StarnixNetworks")?;
 
-    let dns_history = Arc::new(Mutex::new(Vec::new()));
+    // Add network 1 with 1 v4 address
+    assert_eq!(starnix_networks.add(&(1, vec![fidl_ip!["192.0.2.0"]]).to_network()).await?, Ok(()));
+    wait_on_dns_server_list_response(
+        &dns_watcher,
+        vec![(1, vec![fidl_socket_addr!("192.0.2.0:53")])],
+    )
+    .await?;
 
-    let pause = || fasync::Timer::new(zx::MonotonicDuration::from_millis(1).after_now());
-
-    // `select_all` runs a Vec of futures with identical return values until one of them completes.
-    // Once the first future resolves, it returns a tuple containing the result of the completed
-    // future, the index of that future in the original Vec, and a Vec containing the remaining
-    // incomplete futures.
-    let (result, ix, remaining): (Result<(), Error>, _, _) = futures::future::select_all(vec![
-        {
-            let dns_history = dns_history.clone();
-            async move {
-                loop {
-                    let mut update = dns_watcher.watch_servers().await?;
-                    update.sort_by_key(|a| a.source_network_id);
-                    dns_history.lock().await.push(update);
-                }
-            }
-            .boxed()
-        },
-        async move {
-            // Add network 1 with 1 v4 address
-            assert_eq!(
-                starnix_networks.add(&(1, vec![fidl_ip!["192.0.2.0"]]).to_network()).await?,
-                Ok(())
-            );
-            pause().await;
-
-            // Add network 2 with 1 v6 address
-            assert_eq!(
-                starnix_networks.add(&(2, vec![fidl_ip!["2001:db8::3"]]).to_network()).await?,
-                Ok(())
-            );
-            pause().await;
-
-            // Update network 2 with the same information. Should not cause any DNS updates
-            assert_eq!(
-                starnix_networks.update(&(2, vec![fidl_ip!["2001:db8::3"]]).to_network()).await?,
-                Ok(())
-            );
-            pause().await;
-
-            // Update network 1 so that it has 1 v4 address and 1 v6 address.
-            assert_eq!(
-                starnix_networks
-                    .update(&(1, vec![fidl_ip!["192.0.2.1"], fidl_ip!["2001:db8::4"]]).to_network())
-                    .await?,
-                Ok(())
-            );
-            pause().await;
-
-            // Remove network 2.
-            assert_eq!(starnix_networks.remove(2).await?, Ok(()));
-            pause().await;
-            Ok(())
-        }
-        .boxed(),
-    ])
-    .await;
-
-    // Make sure the starnix_networks future completed successfully.
-    result?;
-    // Ensure that the expected future resolved.
-    assert_eq!(ix, 1);
-    // Ensure that the DNS Watcher future is not finished.
-    assert_eq!(remaining.len(), 1);
-
+    // Add network 2 with 1 v6 address
     assert_eq!(
-        *dns_history.lock().await,
-        vec![
-            vec![],
-            vec![(1, vec![fidl_socket_addr!("192.0.2.0:53")]).to_dns_server_list()],
-            vec![
-                (1, vec![fidl_socket_addr!("192.0.2.0:53")]).to_dns_server_list(),
-                (2, vec![fidl_socket_addr!("[2001:db8::3]:53")]).to_dns_server_list(),
-            ],
-            vec![
-                (1, vec![fidl_socket_addr!("192.0.2.1:53"), fidl_socket_addr!("[2001:db8::4]:53")])
-                    .to_dns_server_list(),
-                (2, vec![fidl_socket_addr!("[2001:db8::3]:53")]).to_dns_server_list(),
-            ],
-            vec![(
-                1,
-                vec![fidl_socket_addr!("192.0.2.1:53"), fidl_socket_addr!("[2001:db8::4]:53")]
-            )
-                .to_dns_server_list()],
-        ]
+        starnix_networks.add(&(2, vec![fidl_ip!["2001:db8::3"]]).to_network()).await?,
+        Ok(())
     );
+    wait_on_dns_server_list_response(
+        &dns_watcher,
+        vec![
+            (1, vec![fidl_socket_addr!("192.0.2.0:53")]),
+            (2, vec![fidl_socket_addr!("[2001:db8::3]:53")]),
+        ],
+    )
+    .await?;
+
+    // Update network 1 so that it has 1 v4 address and 1 v6 address.
+    assert_eq!(
+        starnix_networks
+            .update(&(1, vec![fidl_ip!["192.0.2.1"], fidl_ip!["2001:db8::4"]]).to_network())
+            .await?,
+        Ok(())
+    );
+    wait_on_dns_server_list_response(
+        &dns_watcher,
+        vec![
+            (1, vec![fidl_socket_addr!("192.0.2.1:53"), fidl_socket_addr!("[2001:db8::4]:53")]),
+            (2, vec![fidl_socket_addr!("[2001:db8::3]:53")]),
+        ],
+    )
+    .await?;
+
+    // Remove network 2.
+    assert_eq!(starnix_networks.remove(2).await?, Ok(()));
+    wait_on_dns_server_list_response(
+        &dns_watcher,
+        vec![(1, vec![fidl_socket_addr!("192.0.2.1:53"), fidl_socket_addr!("[2001:db8::4]:53")])],
+    )
+    .await?;
+
+    // Update network 1 with the same information. Should not cause any DNS updates
+    assert_eq!(
+        starnix_networks
+            .update(&(1, vec![fidl_ip!["192.0.2.1"], fidl_ip!["2001:db8::4"]]).to_network())
+            .await?,
+        Ok(())
+    );
+    assert!(dns_watcher.watch_servers().now_or_never().is_none());
 
     Ok(())
 }
