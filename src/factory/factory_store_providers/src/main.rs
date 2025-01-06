@@ -68,7 +68,7 @@ fn parse_bootfs<'a>(vmo: zx::Vmo) -> Arc<directory::immutable::Simple> {
     match BootfsParser::create_from_vmo(vmo) {
         Ok(parser) => parser.iter().for_each(|result| match result {
             Ok(entry) => {
-                tracing::info!("Found {} in factory bootfs", &entry.name);
+                log::info!("Found {} in factory bootfs", &entry.name);
 
                 let name = entry.name;
                 let path_parts: Vec<&str> = name.split("/").collect();
@@ -77,21 +77,17 @@ fn parse_bootfs<'a>(vmo: zx::Vmo) -> Arc<directory::immutable::Simple> {
                     .add_entry(
                         &path_parts,
                         read_only(payload.unwrap_or_else(|| {
-                            tracing::error!("Failed to buffer bootfs entry {}", name);
+                            log::error!("Failed to buffer bootfs entry {}", name);
                             Vec::new()
                         })),
                     )
                     .unwrap_or_else(|err| {
-                        tracing::error!(
-                            "Failed to add bootfs entry {} to directory: {}",
-                            name,
-                            err
-                        );
+                        log::error!("Failed to add bootfs entry {} to directory: {}", name, err);
                     });
             }
-            Err(err) => tracing::error!("BootfsParser: {}", err),
+            Err(err) => log::error!("BootfsParser: {}", err),
         }),
-        Err(err) => tracing::error!("BootfsParser: {}", err),
+        Err(err) => log::error!("BootfsParser: {}", err),
     };
 
     tree_builder.build()
@@ -125,7 +121,7 @@ async fn create_dir_from_context<'a>(
         let contents = match read_file_from_proxy(dir, path).await {
             Ok(contents) => contents,
             Err(_) => {
-                tracing::error!("Failed to find {}, skipping", &path);
+                log::error!("Failed to find {}, skipping", &path);
                 continue;
             }
         };
@@ -135,9 +131,9 @@ async fn create_dir_from_context<'a>(
 
         for validator_context in &context.validator_contexts {
             if validator_context.paths_to_validate.contains(path) {
-                tracing::info!("Validating {} with {} validator", &path, &validator_context.name);
+                log::info!("Validating {} with {} validator", &path, &validator_context.name);
                 if let Err(err) = validator_context.validator.validate(&path, &contents[..]) {
-                    tracing::error!("{}", err);
+                    log::error!("{}", err);
                     failed_validation = true;
                     break;
                 }
@@ -150,10 +146,10 @@ async fn create_dir_from_context<'a>(
             let path_parts: Vec<&str> = dest.split("/").collect();
             let file = read_only(contents);
             tree_builder.add_entry(&path_parts, file).unwrap_or_else(|err| {
-                tracing::error!("Failed to add file {} to directory: {}", dest, err);
+                log::error!("Failed to add file {} to directory: {}", dest, err);
             });
         } else if !validated {
-            tracing::error!("{} was never validated, ignored", &path);
+            log::error!("{} was never validated, ignored", &path);
         }
     }
 
@@ -194,7 +190,7 @@ where
     while let Some(request) = stream.try_next().await? {
         if let Some(server_end) = get_directory_request_fn(request) {
             if let Err(err) = directory_mutex.lock().await.clone(server_end.into_channel().into()) {
-                tracing::error!(
+                log::error!(
                     "Failed to clone directory connection for {}: {:?}",
                     RS::Protocol::DEBUG_NAME,
                     err
@@ -209,13 +205,10 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
     let (directory_proxy, directory_server_end) = create_proxy::<fio::DirectoryMarker>();
     match factory_config {
         FactoryConfig::FactoryItems => {
-            tracing::info!("{}", "Reading from FactoryItems service");
+            log::info!("{}", "Reading from FactoryItems service");
             let factory_items_directory =
                 fetch_new_factory_item().await.map(|vmo| parse_bootfs(vmo)).unwrap_or_else(|err| {
-                    tracing::error!(
-                        "Failed to get factory item, returning empty item list: {}",
-                        err
-                    );
+                    log::error!("Failed to get factory item, returning empty item list: {}", err);
                     directory::immutable::simple()
                 });
 
@@ -229,9 +222,9 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
             Ok(directory_proxy)
         }
         FactoryConfig::Ext4(partition_path) => {
-            tracing::info!("Reading from EXT4-formatted source: {}", partition_path);
+            log::info!("Reading from EXT4-formatted source: {}", partition_path);
             let block_path = find_block_device_filepath(&partition_path).await?;
-            tracing::info!("found the block path {}", block_path);
+            log::info!("found the block path {}", block_path);
             let proxy = fuchsia_component::client::connect_to_protocol_at_path::<
                 fhardware_block::BlockMarker,
             >(&block_path)?;
@@ -255,7 +248,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
 
             let ext4_server = fuchsia_component::client::connect_to_protocol::<Server_Marker>()?;
 
-            tracing::info!("Mounting EXT4 VMO");
+            log::info!("Mounting EXT4 VMO");
             match ext4_server.mount_vmo(vmo, directory_server_end).await {
                 Ok(MountVmoResult::Success(_)) => Ok(directory_proxy),
                 Ok(MountVmoResult::VmoReadFailure(status)) => {
@@ -269,7 +262,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
             }
         }
         FactoryConfig::FactoryVerity => {
-            tracing::info!("reading from factory verity");
+            log::info!("reading from factory verity");
             fdio::open("/factory", fio::PERM_READABLE, directory_server_end.into_channel())?;
             Ok(directory_proxy)
         }
@@ -278,13 +271,13 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
 
 #[fuchsia::main(logging_tags = ["factory_store_providers"])]
 async fn main() -> Result<(), Error> {
-    tracing::info!("{}", "Starting factory_store_providers");
+    log::info!("{}", "Starting factory_store_providers");
 
     let factory_config = load_config_file(FACTORY_DEVICE_CONFIG).unwrap_or_default();
     let directory_proxy = open_factory_source(factory_config)
         .await
         .map_err(|e| {
-            tracing::error!("{:?}", e);
+            log::error!("{:?}", e);
             e
         })
         .unwrap();
@@ -299,7 +292,7 @@ async fn main() -> Result<(), Error> {
         .add_fidl_service(IncomingServices::WidevineFactoryStoreProvider);
     fs.take_and_serve_directory_handle().expect("Failed to serve factory providers");
 
-    tracing::info!("{}", "Setting up factory directories");
+    log::info!("{}", "Setting up factory directories");
     let dir_mtx = Arc::new(Mutex::new(directory_proxy));
     let alpha_config = Config::load::<AlphaFactoryStoreProviderMarker>().unwrap_or_default();
     let alpha_directory = Arc::new(Mutex::new(apply_config(alpha_config, dir_mtx.clone()).await));
@@ -401,7 +394,7 @@ async fn main() -> Result<(), Error> {
                 }
             }
         }
-        .unwrap_or_else(|err| tracing::error!("Failed to handle incoming service: {}", err))
+        .unwrap_or_else(|err| log::error!("Failed to handle incoming service: {}", err))
     })
     .await;
     Ok(())

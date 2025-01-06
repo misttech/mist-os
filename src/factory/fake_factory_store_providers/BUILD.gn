@@ -21,9 +21,9 @@ rustc_binary("bin") {
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:structopt",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [ "src/main.rs" ]

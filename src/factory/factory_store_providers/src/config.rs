@@ -57,7 +57,7 @@ impl Config {
         T: DiscoverableProtocolMarker,
     {
         let config_data_file = format!("/config/data/{}.config", &T::PROTOCOL_NAME);
-        tracing::info!("Loading {}", &config_data_file);
+        log::info!("Loading {}", &config_data_file);
         Config::load_file(&config_data_file)
     }
 
@@ -68,7 +68,7 @@ impl Config {
         // De-dupe validator configurations over the collection of file specs.
         for file in self.files.into_iter() {
             if file.validators.is_empty() {
-                tracing::warn!(
+                log::warn!(
                     "Entry {:?} must have at least one validator to be processed, skipping",
                     &file.path
                 );
@@ -91,7 +91,7 @@ impl Config {
             let dest = file.dest.unwrap_or_else(|| file.path.clone());
             match file_path_map.get(&file.path) {
                 Some(old_dest) => {
-                    tracing::warn!(
+                    log::warn!(
                         "Entry {:?} already mapped to destination {:?}, ignoring mapping to {:?}",
                         &file.path,
                         old_dest,

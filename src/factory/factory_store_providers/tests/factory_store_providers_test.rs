@@ -39,7 +39,7 @@ async fn read_file_from_proxy<'a>(
 
 async fn wait_for_ramdisk() -> Result<(), Error> {
     if !Path::new(FACTORY_DEVICE_CONFIG).exists() {
-        tracing::info!("{} doesn't exist. Assuming none ext4 test", FACTORY_DEVICE_CONFIG);
+        log::info!("{} doesn't exist. Assuming none ext4 test", FACTORY_DEVICE_CONFIG);
         return Ok(());
     }
     let dev = fuchsia_fs::directory::open_in_namespace("/dev", fio::Flags::empty())?;
