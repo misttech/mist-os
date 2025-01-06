@@ -24,9 +24,9 @@ rustc_library("fuchsia-hyper") {
   if (is_host) {
     deps += [
       "//src/developer/ffx/lib/netext:lib",
+      "//third_party/rust_crates:log",
       "//third_party/rust_crates:rustls-native-certs",
       "//third_party/rust_crates:tokio",
-      "//third_party/rust_crates:tracing",
     ]
     test_deps += [ "//third_party/rust_crates:anyhow" ]
   } else {

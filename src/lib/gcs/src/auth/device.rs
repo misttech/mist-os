@@ -119,7 +119,7 @@ async fn inner_new_refresh_token<I>(https_client: &HttpsClient, ui: &I) -> Resul
 where
     I: structured_ui::Interface,
 {
-    tracing::debug!("device_new_refresh_token");
+    log::debug!("device_new_refresh_token");
     let device_info = get_device_code(&https_client).await.context("getting device code")?;
 
     let mut notice = structured_ui::Notice::builder();
@@ -159,11 +159,11 @@ async fn get_device_code(https_client: &HttpsClient) -> Result<DeviceCodeRespons
         .body(Body::from(body))?;
 
     let res = https_client.request(req).await?;
-    tracing::debug!("{:?}", res);
+    log::debug!("{:?}", res);
     if !res.status().is_success() {
         let bytes = hyper::body::to_bytes(res.into_body()).await?;
         let error: DeviceCodeError = serde_json::from_slice(&bytes)?;
-        tracing::debug!(
+        log::debug!(
             "Error while getting device code: {:?}, {:?}, {:?}",
             error.error,
             error.error_description,
@@ -204,7 +204,7 @@ async fn poll_for_refresh_token(
     if !res.status().is_success() {
         let bytes = hyper::body::to_bytes(res.into_body()).await?;
         let body: DeviceRefreshTokenError = serde_json::from_slice(&bytes)?;
-        tracing::debug!("Polling for device refresh token: {:?}", body);
+        log::debug!("Polling for device refresh token: {:?}", body);
         return Ok(None);
     }
     let bytes = hyper::body::to_bytes(res.into_body()).await?;

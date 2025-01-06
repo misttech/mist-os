@@ -81,7 +81,7 @@ pub(crate) struct RedirectUrl(pub String);
 ///
 /// Returns (auth_code, code_verifier).
 async fn get_auth_code() -> Result<(AuthCode, CodeVerifier, RedirectUrl)> {
-    tracing::debug!("get_auth_code");
+    log::debug!("get_auth_code");
     let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0);
     let listener = TcpListener::bind(&addr).context("TcpListener::bind")?;
 
@@ -93,7 +93,7 @@ async fn get_auth_code() -> Result<(AuthCode, CodeVerifier, RedirectUrl)> {
     // Local loopback URL.
     let local_addr = listener.local_addr().context("getting local address")?;
     let redirect_uri = format!("http://{}/", local_addr);
-    tracing::info!("redirect URI: {:?}", redirect_uri);
+    log::info!("redirect URI: {:?}", redirect_uri);
 
     // OAuth2 URL.
     let mut authorization_request = url::Url::parse(AUTHORIZATION_ENDPOINT)?;
@@ -109,7 +109,7 @@ async fn get_auth_code() -> Result<(AuthCode, CodeVerifier, RedirectUrl)> {
 
     // Simple background listener.
     let handle = std::thread::spawn(move || {
-        tracing::debug!("OAuth2: listening for local connection.");
+        log::debug!("OAuth2: listening for local connection.");
         let mut incoming = listener.incoming();
         match incoming.next() {
             Some(Ok(stream)) => {
@@ -126,18 +126,18 @@ async fn get_auth_code() -> Result<(AuthCode, CodeVerifier, RedirectUrl)> {
 
     browser_open(&authorization_request.as_str())?;
 
-    tracing::debug!("Joining background thread");
+    log::debug!("Joining background thread");
     let auth_code = handle.join().expect("handling thread join")?;
-    tracing::info!("HTTP server stopped.");
+    log::info!("HTTP server stopped.");
 
     assert!(!auth_code.is_empty(), "auth_code must not be empty");
     assert!(!code_verifier.is_empty(), "code_verifier must not be empty");
-    tracing::debug!("get_auth_code success");
+    log::debug!("get_auth_code success");
     Ok((AuthCode(auth_code), CodeVerifier(code_verifier), RedirectUrl(redirect_uri)))
 }
 
 fn handle_connection(mut stream: TcpStream, state: &str) -> Result<String> {
-    tracing::debug!("handle_connection");
+    log::debug!("handle_connection");
     // More than enough for the expected message.
     const BUF_LEN: usize = 8 * 1024;
     let mut data = [0; BUF_LEN];
@@ -155,7 +155,7 @@ fn handle_connection(mut stream: TcpStream, state: &str) -> Result<String> {
     let uri = url_from_buf(&data[..length])?;
     let mut incoming_state = "".to_string();
     let mut auth_code = "".to_string();
-    tracing::debug!("Scanning for code and state");
+    log::debug!("Scanning for code and state");
     for (key, value) in uri.query_pairs() {
         match &key {
             std::borrow::Cow::Borrowed("code") => auth_code = value.to_string(),
@@ -164,7 +164,7 @@ fn handle_connection(mut stream: TcpStream, state: &str) -> Result<String> {
         }
     }
     if incoming_state != state {
-        tracing::debug!("Incoming state mismatch");
+        log::debug!("Incoming state mismatch");
         let response_string = "\
                 HTTP/1.1 400 Bad Request\r\n\
                 \r\n\
@@ -182,7 +182,7 @@ fn handle_connection(mut stream: TcpStream, state: &str) -> Result<String> {
         )
     }
 
-    tracing::debug!("Sending response page");
+    log::debug!("Sending response page");
     let response_string = "\
             HTTP/1.1 200 OK\r\n\
             \r\n\
@@ -195,13 +195,13 @@ fn handle_connection(mut stream: TcpStream, state: &str) -> Result<String> {
     stream.write_all(&response_string.as_bytes()).context("writing response to auth")?;
     stream.flush().context("flushing response stream")?;
 
-    tracing::debug!("Got auth code");
+    log::debug!("Got auth code");
     Ok(auth_code)
 }
 
 /// Convert a byte array to a URL.
 fn url_from_buf(data: &[u8]) -> Result<url::Url> {
-    tracing::debug!("url_from_buf");
+    log::debug!("url_from_buf");
     let message = std::str::from_utf8(data).context("OAuth2 convert to utf8")?;
     let uri_start = message.find(" ").context("OAuth2 find first space")? + 1;
     let uri_end = message[uri_start..].find(" ").context("OAuth2 find second space")?;
@@ -213,7 +213,7 @@ fn url_from_buf(data: &[u8]) -> Result<url::Url> {
 /// Open the given 'url' in the default browser.
 fn browser_open(url: &str) -> Result<()> {
     use std::process::{Command, Stdio};
-    tracing::info!("browser_open");
+    log::info!("browser_open");
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     bail!(
@@ -243,7 +243,7 @@ fn browser_open(url: &str) -> Result<()> {
         .stderr(Stdio::null())
         .spawn()?;
 
-    tracing::debug!("opened browser");
+    log::debug!("opened browser");
     Ok(())
 }
 
@@ -256,7 +256,7 @@ pub(crate) async fn auth_code_to_refresh(
     code_verifier: &CodeVerifier,
     redirect_url: &RedirectUrl,
 ) -> Result<(String, Option<String>), GcsError> {
-    tracing::debug!("auth_code_to_refresh");
+    log::debug!("auth_code_to_refresh");
     assert!(!auth_code.0.is_empty(), "The auth code must not be empty");
 
     // Add POST parameters to exchange the auth_code for a refresh_token

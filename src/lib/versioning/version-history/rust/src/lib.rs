@@ -5,12 +5,12 @@
 use anyhow::{bail, Context};
 use chrono::NaiveDate;
 use itertools::Itertools;
+use log::error;
 use serde::de::{Error, Unexpected};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::array::TryFromSliceError;
 use std::collections::BTreeMap;
 use std::fmt;
-use tracing::error;
 
 const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history.json";
 const VERSION_HISTORY_NAME: &str = "Platform version map";

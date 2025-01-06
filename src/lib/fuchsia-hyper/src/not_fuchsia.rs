@@ -6,13 +6,13 @@ use crate::{parse_ip_addr, HyperConnectorFuture, SocketOptions, TcpOptions, TcpS
 use futures::io;
 use http::uri::{Scheme, Uri};
 use hyper::service::Service;
+use log::warn;
 use netext::TokioAsyncReadExt;
 use rustls::RootCertStore;
 use std::net::ToSocketAddrs;
 use std::sync::{Arc, LazyLock};
 use std::task::{Context, Poll};
 use tokio::net;
-use tracing::warn;
 
 pub fn new_root_cert_store() -> Arc<RootCertStore> {
     // It can be expensive to parse the certs, so cache them

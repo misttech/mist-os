@@ -4,11 +4,11 @@
 
 use fuchsia_runtime as runtime;
 use lazy_static::lazy_static;
+use log::error;
 use std::borrow::Borrow;
 use std::ffi::CStr;
 use std::ops::Deref;
 use std::panic;
-use tracing::error;
 
 lazy_static! {
     static ref SCOPED_JOB: Scoped<zx::Job> = initialize();
@@ -183,7 +183,7 @@ fn kill<T: zx::Task>(process: &T, what: &'static str) {
         Ok(()) => {}
         Err(status) => {
             eprintln!("error: could not kill {what}: {status}");
-            error!(%status, "error: could not kill {what}");
+            error!(status:%; "error: could not kill {what}");
         }
     }
 }

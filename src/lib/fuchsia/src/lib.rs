@@ -16,9 +16,9 @@
 pub use fidl_fuchsia_diagnostics::{Interest, Severity};
 pub use fuchsia_macro::{main, test};
 use libc as _;
-use std::future::Future;
 #[doc(hidden)]
-pub use tracing::error;
+pub use log::error;
+use std::future::Future;
 
 //
 // LOGGING INITIALIZATION

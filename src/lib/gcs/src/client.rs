@@ -187,7 +187,7 @@ impl Client {
                 use std::io::{Seek, SeekFrom};
                 let mut file = File::open(&output_path).context("open file")?;
                 let file_size = file.seek(SeekFrom::End(0)).context("getting file size")?;
-                tracing::debug!(
+                log::debug!(
                     "Wrote gs://{}/{} to {:?}, {} bytes in {} seconds.",
                     bucket,
                     object,
