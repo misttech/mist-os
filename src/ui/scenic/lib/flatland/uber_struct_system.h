@@ -5,11 +5,12 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_UBER_STRUCT_SYSTEM_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_UBER_STRUCT_SYSTEM_H_
 
-#include <mutex>
+#include <atomic>
 #include <optional>
 #include <queue>
 #include <unordered_map>
 
+#include "src/lib/containers/cpp/mpsc_queue.h"
 #include "src/ui/scenic/lib/flatland/transform_handle.h"
 #include "src/ui/scenic/lib/flatland/uber_struct.h"
 #include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
@@ -51,14 +52,11 @@ class UberStructSystem {
     // std::nullopt.
     std::optional<PendingUberStruct> Pop();
 
-    // Returns the number of PendingUberStructs in this queue.
-    size_t GetPendingSize();
-
    private:
-    // TODO(https://fxbug.dev/42135625): add a lock-free queue.
-    // Protects access to |pending_structs_|.
-    std::mutex queue_mutex_;
-    std::queue<PendingUberStruct> pending_structs_;
+#ifndef NDEBUG
+    std::atomic<scheduling::PresentId> last_present_id_;
+#endif
+    containers::MpscQueue<PendingUberStruct> pending_structs_;
   };
 
   // Allocates an UberStructQueue for |session_id| and returns a shared reference to that
