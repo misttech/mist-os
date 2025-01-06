@@ -8,17 +8,18 @@
 #define _ALL_SOURCE  // To get MTX_INIT
 #endif
 
-#include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/process.h>
 #include <zircon/syscalls.h>
+
+#include <mutex>
 
 #define EXPORT __attribute__((visibility("default")))
 
 namespace {
 
 syslog_runtime::internal::LogState* state = nullptr;
-mtx_t state_lock = MTX_INIT;
+std::mutex state_lock;
 // This thread's koid.
 // Initialized on first use.
 thread_local zx_koid_t tls_thread_koid{ZX_KOID_INVALID};
@@ -46,9 +47,9 @@ zx_koid_t FuchsiaLogGetCurrentThreadKoid() {
 EXPORT
 void FuchsiaLogSetStateLocked(syslog_runtime::internal::LogState* new_state) { state = new_state; }
 
-EXPORT void FuchsiaLogAcquireState() __TA_NO_THREAD_SAFETY_ANALYSIS { mtx_lock(&state_lock); }
+EXPORT void FuchsiaLogAcquireState() __TA_NO_THREAD_SAFETY_ANALYSIS { return state_lock.lock(); }
 
-EXPORT void FuchsiaLogReleaseState() __TA_NO_THREAD_SAFETY_ANALYSIS { mtx_unlock(&state_lock); }
+EXPORT void FuchsiaLogReleaseState() __TA_NO_THREAD_SAFETY_ANALYSIS { return state_lock.unlock(); }
 
 EXPORT
 syslog_runtime::internal::LogState* FuchsiaLogGetStateLocked() { return state; }
