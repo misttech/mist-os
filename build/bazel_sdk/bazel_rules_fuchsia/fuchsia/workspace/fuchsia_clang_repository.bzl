@@ -5,6 +5,7 @@
 """Defines a WORKSPACE rule for loading a version of clang."""
 
 load("//fuchsia/workspace:utils.bzl", "fetch_cipd_contents", "normalize_arch", "normalize_os", "workspace_path")
+load("//common:toolchains/clang/repository_utils.bzl", "prepare_clang_repository")
 
 # Base URL for Fuchsia clang archives.
 _CLANG_URL_TEMPLATE = "https://chrome-infra-packages.appspot.com/dl/fuchsia/third_party/clang/{os}-amd64/+/{tag}"
@@ -30,11 +31,7 @@ def _instantiate_from_local_dir(ctx, local_clang):
 
     ctx.report_progress("Copying local clang from %s" % local_clang)
 
-    # Symlink top-level items from Clang prebuilt install to repository directory
-    # Note that this is possible because our C++ toolchain configuration redefine
-    # the "dependency_file" feature to use relative file paths.
-    for f in local_clang.readdir():
-        ctx.symlink(f, f.basename)
+    prepare_clang_repository(ctx, str(local_clang))
 
     # If a version file is provided, that is relative to the workspace,
     # record its path to ensure this repository rule is re-run when its

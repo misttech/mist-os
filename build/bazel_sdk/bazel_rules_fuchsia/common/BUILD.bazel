@@ -4,6 +4,10 @@
 
 filegroup(
     name = "bzl_srcs",
-    srcs = glob(["*.bzl"]),
+    srcs = glob([
+        "**/*.bzl",
+    ]) + [
+        "//common/platforms:bzl_srcs",
+    ],
     visibility = ["//fuchsia:__pkg__"],
 )

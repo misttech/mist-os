@@ -17,13 +17,20 @@ load(
     "feature_flag",
 )
 load(
+    "//common:toolchains/clang/repository_utils.bzl",
+    "setup_clang_repository",
+)
+load(
     ":cc_toolchain_config.bzl",
     "cc_toolchain_config",
 )
+load("//:generated_constants.bzl", clang_constants = "constants")
 
 licenses(["notice"])
 
 package(default_visibility = ["//visibility:public"])
+
+setup_clang_repository(clang_constants)
 
 _FUCHSIA_SYSROOT_HEADERS_FILEGROUPS = {
     "aarch64": "%{SYSROOT_HEADERS_AARCH64}",
@@ -65,48 +72,11 @@ _TO_BAZEL_CPU_MAP = {
 
 TARGET_CPUS = [_TO_BAZEL_CPU_MAP.get(cpu, cpu) for cpu in sdk_constants.target_cpus]
 
-filegroup(
-    name = "empty",
-)
-
 exports_files([
     "bin/clang-format",
     "bin/clang-tidy",
     "bin/llvm-readelf",
 ])
-
-filegroup(
-    name = "cc-compiler-prebuilts",
-    srcs = [
-        "//:bin/clang",
-        "//:bin/clang++",
-        "//:bin/clang-cpp",
-        "//:bin/llvm-strip",
-    ],
-)
-
-filegroup(
-    name = "cc-linker-prebuilts",
-    srcs = [
-        "//:bin/clang",
-        "//:bin/ld.lld",
-        "//:bin/ld64.lld",
-        "//:bin/lld",
-        "//:bin/lld-link",
-    ],
-)
-
-filegroup(
-    name = "libunwind-headers",
-    srcs = [
-        "include/libunwind.h",
-        "include/libunwind.modulemap",
-        "include/mach-o/compact_unwind_encoding.h",
-        "include/unwind.h",
-        "include/unwind_arm_ehabi.h",
-        "include/unwind_itanium.h",
-    ],
-)
 
 [
     filegroup(
@@ -140,11 +110,6 @@ filegroup(
     for cpu in TARGET_CPUS
 ]
 
-filegroup(
-    name = "ar",
-    srcs = ["//:bin/llvm-ar"],
-)
-
 [
     filegroup(
         name = "compile-" + cpu,
@@ -167,35 +132,6 @@ filegroup(
     )
     for cpu in TARGET_CPUS
 ]
-
-filegroup(
-    name = "objcopy",
-    srcs = [
-        "//:bin/llvm-objcopy",
-    ],
-)
-
-filegroup(
-    name = "objdump",
-    srcs = [
-        "//:bin/llvm-objdump",
-    ],
-)
-
-filegroup(
-    name = "strip",
-    srcs = [
-        "//:bin/llvm-strip",
-    ],
-)
-
-filegroup(
-    name = "nm",
-    srcs = [
-        "//:bin/llvm-nm",
-    ],
-)
-
 [
     filegroup(
         name = "every-file-" + cpu,

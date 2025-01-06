@@ -182,10 +182,6 @@ def setup_clang_repository(constants):
     # The following filegroups are referenced from toolchain definitions
     # created by the generate_clang_cc_toolchain() function from
     # toolchain_utils.bzl.
-    native.filegroup(
-        name = "clang_empty",
-        srcs = [],
-    )
 
     native.filegroup(
         name = "clang_all",
@@ -196,32 +192,61 @@ def setup_clang_repository(constants):
     )
 
     native.filegroup(
-        name = "clang_compiler_binaries",
+        name = "cc-compiler-prebuilts",
         srcs = [
-            "bin/clang",
-            "bin/clang++",
-            "bin/llvm-nm",
+            "//:bin/clang",
+            "//:bin/clang++",
+            "//:bin/llvm-nm",
+            "//:bin/llvm-strip",
         ],
     )
 
     native.filegroup(
-        name = "clang_linker_binaries",
-        srcs = native.glob(["bin/*"]),  # TODO(digit): Restrict this
+        name = "cc-linker-prebuilts",
+        srcs = [
+            "//:bin/clang",
+            "//:bin/ld.lld",
+            "//:bin/ld64.lld",
+            "//:bin/lld",
+            "//:bin/lld-link",
+        ],
     )
 
     native.filegroup(
-        name = "clang_ar_binaries",
-        srcs = ["bin/llvm-ar"],
+        name = "ar",
+        srcs = ["//:bin/llvm-ar"],
     )
 
     native.filegroup(
-        name = "clang_objcopy_binaries",
-        srcs = ["bin/llvm-objcopy"],
+        name = "objcopy",
+        srcs = ["//:bin/llvm-objcopy"],
     )
 
     native.filegroup(
-        name = "clang_strip_binaries",
-        srcs = ["bin/llvm-strip"],
+        name = "objdump",
+        srcs = ["//:bin/llvm-objdump"],
+    )
+
+    native.filegroup(
+        name = "strip",
+        srcs = ["//:bin/llvm-strip"],
+    )
+
+    native.filegroup(
+        name = "nm",
+        srcs = ["//:bin/llvm-nm"],
+    )
+
+    native.filegroup(
+        name = "libunwind-headers",
+        srcs = [
+            "include/libunwind.h",
+            "include/libunwind.modulemap",
+            "include/mach-o/compact_unwind_encoding.h",
+            "include/unwind.h",
+            "include/unwind_arm_ehabi.h",
+            "include/unwind_itanium.h",
+        ],
     )
 
 def _empty_host_cpp_toolchain_repository_impl(repo_ctx):
