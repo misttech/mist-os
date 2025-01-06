@@ -31,10 +31,7 @@
         {
             dictionary: "diagnostics",
             from: "self",
-            to: [
-                "#pkg-cache",
-                "#pkg-shell-commands",
-            ],
+            to: [ "#pkg-cache" ],
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",
