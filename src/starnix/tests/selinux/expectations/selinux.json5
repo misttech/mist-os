@@ -16,7 +16,7 @@
                 "*entrypoint*",
                 "*execshare*",
 
-                // TODO(http://b/364568874): `inherit` tests will pass once the `file_security_ops`
+                // TODO(http://b/385121365): `inherit` tests will pass once the `file_permission`
                 // hook correctly enforces the `write` permission.
                 "*inherit*",
 
