@@ -306,7 +306,15 @@ impl<S: ServiceMarker> Service<S> {
     /// after the instance name has been returned by the [`Self::watch`] stream, or if the
     /// instance is statically routed so component manager will lazily load it.
     pub fn connect_to_instance(&self, name: impl AsRef<str>) -> Result<S::Proxy, Error> {
-        connect_to_instance_in_service_dir::<S>(&self.dir, name.as_ref())
+        let directory_proxy = fuchsia_fs::directory::open_directory_async(
+            &self.dir,
+            name.as_ref(),
+            fio::Flags::empty(),
+        )?;
+        Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
+            directory_proxy,
+            name.as_ref().to_string(),
+        ))))
     }
 
     /// Connects to the named instance member without waiting for it to appear. You should only use this
@@ -443,20 +451,6 @@ pub fn connect_to_service_instance_at<S: ServiceMarker>(
     let service_path = format!("{}/{}/{}", path_prefix, S::SERVICE_NAME, instance);
     let directory_proxy =
         fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())?;
-    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
-        directory_proxy,
-        instance.to_string(),
-    ))))
-}
-
-/// Connect to an instance of a FIDL service hosted on the directory protocol channel `directory`.
-/// `instance` is a path of one or more components.
-pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
-    directory: &fio::DirectoryProxy,
-    instance: &str,
-) -> Result<S::Proxy, Error> {
-    let directory_proxy =
-        fuchsia_fs::directory::open_directory_async(directory, instance, fio::Flags::empty())?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(
         directory_proxy,
         instance.to_string(),
