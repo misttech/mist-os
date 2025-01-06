@@ -338,6 +338,22 @@ impl<S: ServiceMarker> Service<S> {
             .await
             .context("No instances found before service directory was removed")?
     }
+
+    /// Returns an list of all instances that are currently available.
+    pub async fn enumerate(self) -> Result<Vec<S::Proxy>, Error> {
+        let this = Arc::new(self);
+        let instances: Vec<S::Proxy> = fuchsia_fs::directory::readdir(&this.dir)
+            .await?
+            .into_iter()
+            .map(|dirent| {
+                S::Proxy::from_member_opener(Box::new(ServiceInstance {
+                    service: this.clone(),
+                    name: dirent.name,
+                }))
+            })
+            .collect();
+        Ok(instances)
+    }
 }
 
 /// A stream iterator for a service directory that produces one item for every service instance
