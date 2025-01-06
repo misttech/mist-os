@@ -101,7 +101,7 @@ class Device final : public DeviceType,
       ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Snoop> metadata,
       ::fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  mtx_t mutex() { return mutex_; }
+  std::mutex& mutex() { return mutex_; }
 
  private:
   struct IsocEndpointDescriptors {
@@ -163,7 +163,7 @@ class Device final : public DeviceType,
   void HandleUsbResponseError(usb_request_t* req, const char* req_description)
       __TA_REQUIRES(mutex_);
 
-  mtx_t mutex_;
+  std::mutex mutex_;
 
   usb_protocol_t usb_ __TA_GUARDED(mutex_);
 
@@ -209,7 +209,7 @@ class Device final : public DeviceType,
   std::atomic_size_t allocated_requests_count_ = 0u;
   std::atomic_size_t pending_request_count_ = 0u;
   std::atomic_size_t pending_sco_write_request_count_ = 0u;
-  cnd_t pending_sco_write_request_count_0_cnd_;
+  std::condition_variable pending_sco_write_request_count_0_cnd_;
   sync_completion_t requests_freed_completion_;
 
   // Whether or not we are being unbound.
@@ -224,7 +224,7 @@ class Device final : public DeviceType,
   // requests remain).
   // This is separate from mutex_ so that request operations don't need to acquire mutex_ (which
   // may degrade performance).
-  mtx_t pending_request_lock_ __TA_ACQUIRED_AFTER(mutex_);
+  std::mutex pending_request_lock_ __TA_ACQUIRED_AFTER(mutex_);
 
   std::optional<component::OutgoingDirectory> outgoing_;
 

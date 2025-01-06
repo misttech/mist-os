@@ -114,10 +114,6 @@ zx_status_t Device::Create(zx_device_t* parent, async_dispatcher_t* dispatcher) 
 zx_status_t Device::Bind() {
   zxlogf(DEBUG, "%s", __FUNCTION__);
 
-  mtx_init(&mutex_, mtx_plain);
-  mtx_init(&pending_request_lock_, mtx_plain);
-  cnd_init(&pending_sco_write_request_count_0_cnd_);
-
   usb_protocol_t usb;
   zx_status_t status = device_get_protocol(parent(), ZX_PROTOCOL_USB, &usb);
   if (status != ZX_OK) {
@@ -278,12 +274,13 @@ zx_status_t Device::Bind() {
     }
   }
 
-  mtx_lock(&mutex_);
-  QueueInterruptRequestsLocked();
-  QueueAclReadRequestsLocked();
+  {
+    std::lock_guard lock(mutex_);
+    QueueInterruptRequestsLocked();
+    QueueAclReadRequestsLocked();
+  }
   // We don't need to queue SCO packets here because they will be queued when the alt setting is
   // changed.
-  mtx_unlock(&mutex_);
 
   // Copy the PID and VID from the underlying BT so that it can be filtered on
   // for HCI drivers
@@ -386,16 +383,16 @@ void Device::DdkUnbind(ddk::UnbindTxn txn) {
       loop_->Quit();
     }
 
-    mtx_lock(&mutex_);
-    mtx_lock(&pending_request_lock_);
+    const uint8_t isoc_alt_setting = [&]() {
+      std::lock_guard lock(mutex_);
 
-    unbound_ = true;
+      {
+        std::lock_guard lock(pending_request_lock_);
+        unbound_ = true;
+      }
 
-    mtx_unlock(&pending_request_lock_);
-
-    const uint8_t isoc_alt_setting = isoc_alt_setting_;
-
-    mtx_unlock(&mutex_);
+      return isoc_alt_setting_;
+    }();
 
     zxlogf(DEBUG, "DdkUnbind: canceling all requests");
     // usb_cancel_all synchronously cancels all requests.
@@ -482,18 +479,18 @@ void Device::DdkRelease() {
     zxlogf(DEBUG, "read thread joined");
   }
 
-  mtx_lock(&mutex_);
-
-  const auto reqs_lists = {&free_event_reqs_, &free_acl_read_reqs_, &free_acl_write_reqs_,
-                           &free_sco_read_reqs_, &free_sco_write_reqs_};
-  for (list_node_t* list : reqs_lists) {
-    usb_request_t* req;
-    while ((req = usb_req_list_remove_head(list, parent_req_size_)) != nullptr) {
-      InstrumentedRequestRelease(req);
+  {
+    std::lock_guard lock(mutex_);
+    const auto reqs_lists = {&free_event_reqs_, &free_acl_read_reqs_, &free_acl_write_reqs_,
+                             &free_sco_read_reqs_, &free_sco_write_reqs_};
+    for (list_node_t* list : reqs_lists) {
+      usb_request_t* req;
+      while ((req = usb_req_list_remove_head(list, parent_req_size_)) != nullptr) {
+        InstrumentedRequestRelease(req);
+      }
     }
   }
 
-  mtx_unlock(&mutex_);
   // Wait for all the requests in the pipeline to asynchronously fail.
   // Either the completion routine or the submitter should free the requests.
   // It shouldn't be possible to have any "stray" requests that aren't in-flight at this point,
@@ -518,7 +515,7 @@ void Device::DdkRelease() {
 void Device::DdkSuspend(ddk::SuspendTxn txn) {
   zxlogf(DEBUG, "%s", __FUNCTION__);
 
-  fbl::AutoLock _(&pending_request_lock_);
+  std::lock_guard lock(pending_request_lock_);
   unbound_ = true;
 
   txn.Reply(ZX_OK, 0);
@@ -587,55 +584,65 @@ void Device::InstrumentedRequestRelease(usb_request_t* req) {
 // * Requests are properly freed during shutdown.
 void Device::UsbRequestCallback(usb_request_t* req) {
   zxlogf(TRACE, "%s", __FUNCTION__);
-  // Invoke the real completion if not shutting down.
-  mtx_lock(&pending_request_lock_);
+
   const uint8_t endp_addr = req->header.ep_address;
-  if (!unbound_) {
+
+  auto epilogue = [this, endp_addr, function = __FUNCTION__](std::lock_guard<std::mutex>& guard) {
+    size_t pending_request_count = std::atomic_fetch_sub(&pending_request_count_, 1);
+    zxlogf(TRACE, "%s: pending requests: %zu", function, pending_request_count - 1);
+
+    if (!isoc_endp_descriptors_.empty() &&
+        endp_addr == isoc_endp_descriptors_[0].out.b_endpoint_address) {
+      size_t prev_sco_count = std::atomic_fetch_sub(&pending_sco_write_request_count_, 1);
+      if (prev_sco_count == 1) {
+        pending_sco_write_request_count_0_cnd_.notify_one();
+      }
+    }
+  };
+
+  usb_callback_t callback;
+  {
+    std::lock_guard lock(pending_request_lock_);
+    if (unbound_) {
+      InstrumentedRequestRelease(req);
+      epilogue(lock);
+      return;
+    }
+    // Invoke the real completion if not shutting down.
+    //
     // Request callback pointer is stored at the end of the usb_request_t after
     // other data that has been appended to the request by drivers elsewhere in the stack.
     // memcpy is necessary here to prevent undefined behavior since there are no guarantees
     // about the alignment of data that other drivers append to the usb_request_t.
-    usb_callback_t callback;
     memcpy(static_cast<void*>(&callback),
            reinterpret_cast<unsigned char*>(req) + parent_req_size_ + sizeof(usb_req_internal_t),
            sizeof(callback));
-    // Our threading model allows a callback to immediately re-queue a request here
-    // which would result in attempting to recursively lock pending_request_lock.
-    // Unlocking the mutex is necessary to prevent a crash.
-    mtx_unlock(&pending_request_lock_);
-    callback(this, req);
-    mtx_lock(&pending_request_lock_);
-  } else {
-    InstrumentedRequestRelease(req);
   }
-  size_t pending_request_count = std::atomic_fetch_sub(&pending_request_count_, 1);
-  zxlogf(TRACE, "%s: pending requests: %zu", __FUNCTION__, pending_request_count - 1);
+  // Our threading model allows a callback to immediately re-queue a request here
+  // which would result in attempting to recursively lock pending_request_lock.
+  // Unlocking the mutex is necessary to prevent a crash.
+  callback(this, req);
 
-  if (!isoc_endp_descriptors_.empty() &&
-      endp_addr == isoc_endp_descriptors_[0].out.b_endpoint_address) {
-    size_t prev_sco_count = std::atomic_fetch_sub(&pending_sco_write_request_count_, 1);
-    if (prev_sco_count == 1) {
-      cnd_signal(&pending_sco_write_request_count_0_cnd_);
-    }
-  }
-  mtx_unlock(&pending_request_lock_);
+  std::lock_guard lock(pending_request_lock_);
+  epilogue(lock);
 }
 
 void Device::UsbRequestSend(usb_protocol_t* function, usb_request_t* req, usb_callback_t callback) {
-  mtx_lock(&pending_request_lock_);
-  if (unbound_) {
-    mtx_unlock(&pending_request_lock_);
-    return;
-  }
-  std::atomic_fetch_add(&pending_request_count_, 1);
+  size_t parent_req_size;
+  {
+    std::lock_guard lock(pending_request_lock_);
+    if (unbound_) {
+      return;
+    }
+    std::atomic_fetch_add(&pending_request_count_, 1);
 
-  if (!isoc_endp_descriptors_.empty() &&
-      req->header.ep_address == isoc_endp_descriptors_[0].out.b_endpoint_address) {
-    std::atomic_fetch_add(&pending_sco_write_request_count_, 1);
-  }
+    if (!isoc_endp_descriptors_.empty() &&
+        req->header.ep_address == isoc_endp_descriptors_[0].out.b_endpoint_address) {
+      std::atomic_fetch_add(&pending_sco_write_request_count_, 1);
+    }
 
-  size_t parent_req_size = parent_req_size_;
-  mtx_unlock(&pending_request_lock_);
+    parent_req_size = parent_req_size_;
+  };
 
   usb_request_complete_callback_t internal_completion = {
       .callback =
@@ -744,11 +751,10 @@ void Device::RemoveDeviceLocked() {
 
 void Device::HciEventComplete(usb_request_t* req) {
   zxlogf(TRACE, "bt-transport-usb: Event received");
-  mtx_lock(&mutex_);
+  std::lock_guard lock(mutex_);
 
   if (req->response.status != ZX_OK) {
     HandleUsbResponseError(req, "hci event");
-    mtx_unlock(&mutex_);
     return;
   }
 
@@ -762,7 +768,6 @@ void Device::HciEventComplete(usb_request_t* req) {
     zx_status_t status = usb_req_list_add_head(&free_event_reqs_, req, parent_req_size_);
     ZX_ASSERT(status == ZX_OK);
     QueueInterruptRequestsLocked();
-    mtx_unlock(&mutex_);
     return;
   }
 
@@ -770,7 +775,6 @@ void Device::HciEventComplete(usb_request_t* req) {
   zx_status_t status = usb_request_mmap(req, &buffer);
   if (status != ZX_OK) {
     zxlogf(ERROR, "bt-transport-usb: usb_req_mmap failed: %s", zx_status_get_string(status));
-    mtx_unlock(&mutex_);
     return;
   }
   size_t length = req->response.actual;
@@ -804,7 +808,6 @@ void Device::HciEventComplete(usb_request_t* req) {
       status = usb_req_list_add_head(&free_event_reqs_, req, parent_req_size_);
       ZX_ASSERT(status == ZX_OK);
       QueueInterruptRequestsLocked();
-      mtx_unlock(&mutex_);
       return;
     }
   }
@@ -813,7 +816,6 @@ void Device::HciEventComplete(usb_request_t* req) {
 
   if (event_buffer_offset_ + length > sizeof(event_buffer_)) {
     zxlogf(ERROR, "bt-transport-usb: event_buffer would overflow!");
-    mtx_unlock(&mutex_);
     return;
   }
 
@@ -863,12 +865,11 @@ void Device::HciEventComplete(usb_request_t* req) {
   status = usb_req_list_add_head(&free_event_reqs_, req, parent_req_size_);
   ZX_ASSERT(status == ZX_OK);
   QueueInterruptRequestsLocked();
-  mtx_unlock(&mutex_);
 }
 
 void Device::HciAclReadComplete(usb_request_t* req) {
   zxlogf(TRACE, "bt-transport-usb: ACL frame received");
-  mtx_lock(&mutex_);
+  std::lock_guard lock(mutex_);
 
   if (req->response.status == ZX_ERR_IO_INVALID) {
     zxlogf(TRACE, "bt-transport-usb: request stalled, ignoring.");
@@ -876,13 +877,11 @@ void Device::HciAclReadComplete(usb_request_t* req) {
     ZX_DEBUG_ASSERT(status == ZX_OK);
     QueueAclReadRequestsLocked();
 
-    mtx_unlock(&mutex_);
     return;
   }
 
   if (req->response.status != ZX_OK) {
     HandleUsbResponseError(req, "ACL read");
-    mtx_unlock(&mutex_);
     return;
   }
 
@@ -890,7 +889,6 @@ void Device::HciAclReadComplete(usb_request_t* req) {
   zx_status_t status = usb_request_mmap(req, &buffer);
   if (status != ZX_OK) {
     zxlogf(ERROR, "bt-transport-usb: usb_req_mmap failed: %s", zx_status_get_string(status));
-    mtx_unlock(&mutex_);
     return;
   }
 
@@ -924,16 +922,13 @@ void Device::HciAclReadComplete(usb_request_t* req) {
   status = usb_req_list_add_head(&free_acl_read_reqs_, req, parent_req_size_);
   ZX_DEBUG_ASSERT(status == ZX_OK);
   QueueAclReadRequestsLocked();
-
-  mtx_unlock(&mutex_);
 }
 
 void Device::HciAclWriteComplete(usb_request_t* req) {
-  mtx_lock(&mutex_);
+  std::lock_guard lock(mutex_);
 
   if (req->response.status != ZX_OK) {
     HandleUsbResponseError(req, "ACL write");
-    mtx_unlock(&mutex_);
     return;
   }
 
@@ -951,26 +946,22 @@ void Device::HciAclWriteComplete(usb_request_t* req) {
     zx_status_t status = usb_request_mmap(req, &buffer);
     if (status != ZX_OK) {
       zxlogf(ERROR, "bt-transport-usb: usb_req_mmap failed: %s", zx_status_get_string(status));
-      mtx_unlock(&mutex_);
       return;
     }
 
     SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_ACL, /*is_received=*/false,
                             static_cast<uint8_t*>(buffer), req->response.actual);
   }
-
-  mtx_unlock(&mutex_);
 }
 
 void Device::HciScoReadComplete(usb_request_t* req) {
   zxlogf(TRACE, "SCO frame received");
-  mtx_lock(&mutex_);
+  std::lock_guard lock(mutex_);
 
   // When the alt setting is changed, requests are cenceled and should not be requeued.
   if (req->response.status == ZX_ERR_CANCELED) {
     zx_status_t status = usb_req_list_add_head(&free_sco_read_reqs_, req, parent_req_size_);
     ZX_ASSERT(status == ZX_OK);
-    mtx_unlock(&mutex_);
     return;
   }
 
@@ -979,13 +970,11 @@ void Device::HciScoReadComplete(usb_request_t* req) {
     zx_status_t status = usb_req_list_add_head(&free_sco_read_reqs_, req, parent_req_size_);
     ZX_DEBUG_ASSERT(status == ZX_OK);
     QueueScoReadRequestsLocked();
-    mtx_unlock(&mutex_);
     return;
   }
 
   if (req->response.status != ZX_OK) {
     HandleUsbResponseError(req, "SCO read");
-    mtx_unlock(&mutex_);
     return;
   }
 
@@ -998,8 +987,6 @@ void Device::HciScoReadComplete(usb_request_t* req) {
   status = usb_req_list_add_head(&free_sco_read_reqs_, req, parent_req_size_);
   ZX_ASSERT(status == ZX_OK);
   QueueScoReadRequestsLocked();
-
-  mtx_unlock(&mutex_);
 }
 
 void Device::OnScoReassemblerPacketLocked(cpp20::span<const uint8_t> packet) {
@@ -1025,11 +1012,10 @@ void Device::OnScoReassemblerPacketLocked(cpp20::span<const uint8_t> packet) {
 }
 
 void Device::HciScoWriteComplete(usb_request_t* req) {
-  mtx_lock(&mutex_);
+  std::lock_guard lock(mutex_);
 
   if (req->response.status != ZX_OK) {
     HandleUsbResponseError(req, "SCO write");
-    mtx_unlock(&mutex_);
     return;
   }
 
@@ -1048,19 +1034,16 @@ void Device::HciScoWriteComplete(usb_request_t* req) {
     zx_status_t status = usb_request_mmap(req, &buffer);
     if (status != ZX_OK) {
       zxlogf(ERROR, "usb_req_mmap failed: %s", zx_status_get_string(status));
-      mtx_unlock(&mutex_);
       return;
     }
 
     SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_SCO, /*is_received=*/false,
                             static_cast<uint8_t*>(buffer), req->response.actual);
   }
-
-  mtx_unlock(&mutex_);
 }
 
 void Device::OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> callback) {
-  fbl::AutoLock<mtx_t> lock(&mutex_);
+  std::lock_guard lock(mutex_);
 
   list_node_t* node = list_peek_head(&free_sco_write_reqs_);
 
@@ -1104,7 +1087,7 @@ void Device::OnScoStop() {
 
   uint8_t isoc_alt_setting = 0;
   {
-    fbl::AutoLock<mtx_t> lock(&mutex_);
+    std::lock_guard lock(mutex_);
     isoc_alt_setting = isoc_alt_setting_;
 
     // Clear any partial SCO packets in the reassembler.
@@ -1129,9 +1112,9 @@ void Device::OnScoStop() {
   // controller buffer slot count (no HCI_Number_Of_Completed_Packets event would be received for
   // canceled packets). Instead, we must wait for them to complete normally.
   {
-    fbl::AutoLock<mtx_t> req_lock(&pending_request_lock_);
+    std::unique_lock req_lock(pending_request_lock_);
     while (pending_sco_write_request_count_) {
-      cnd_wait(&pending_sco_write_request_count_0_cnd_, &pending_request_lock_);
+      pending_sco_write_request_count_0_cnd_.wait(req_lock);
     }
   }
 
@@ -1202,7 +1185,7 @@ void Device::Send(SendRequest& request, SendCompleter::Sync& completer) {
       // There's no callback for command write operation.
       completer.Reply();
       {
-        fbl::AutoLock<mtx_t> lock(&mutex_);
+        std::lock_guard lock(mutex_);
         SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_CMD, /*is_received=*/false,
                                 request.command().value().data(), request.command().value().size());
       }
@@ -1272,7 +1255,7 @@ void Device::ConfigureSco(ConfigureScoRequest& request, ConfigureScoCompleter::S
     return;
   }
 
-  fbl::AutoLock<mtx_t> lock(&mutex_);
+  std::lock_guard lock(mutex_);
 
   if (new_alt_setting >= isoc_endp_descriptors_.size()) {
     zxlogf(ERROR, "isoc alt setting %hhu not supported, cannot configure SCO", new_alt_setting);
