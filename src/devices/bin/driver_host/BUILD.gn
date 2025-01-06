@@ -67,8 +67,6 @@ source_set("lib") {
     "//zircon/system/ulib/inspect",
     "//zircon/system/ulib/zx",
   ]
-
-  deps = [ "//src/storage/lib/vfs/cpp:cpp" ]
 }
 
 fidl("fuchsia.driverhost.test") {
