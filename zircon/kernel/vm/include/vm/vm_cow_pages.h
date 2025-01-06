@@ -61,6 +61,21 @@ enum class VmCowPagesOptions : uint32_t {
 };
 FBL_ENABLE_ENUM_BITS(VmCowPagesOptions)
 
+struct VmCowRange {
+  uint64_t offset;
+  uint64_t len;
+
+  VmCowRange() : offset(0), len(0) {}
+  VmCowRange(uint64_t offset, uint64_t len) : offset(offset), len(len) {}
+
+  uint64_t end() const { return offset + len; }
+  bool is_empty() const { return len == 0; }
+  bool is_page_aligned() const { return IS_PAGE_ALIGNED(offset) && IS_PAGE_ALIGNED(len); }
+
+  VmCowRange OffsetBy(uint64_t delta) const { return VmCowRange(offset + delta, len); }
+  bool IsBoundedBy(uint64_t max) const;
+};
+
 // Implements a copy-on-write hierarchy of pages in a VmPageList.
 // VmCowPages have a life cycle where they start in an Init state to allow them to have
 // initialization finished outside the constructor. A VmCowPages in the Init state may be
@@ -194,8 +209,7 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t ResizeLocked(uint64_t size) TA_REQ(lock());
 
   // See VmObject::Lookup
-  zx_status_t LookupLocked(uint64_t offset, uint64_t len, VmObject::LookupFunction lookup_fn)
-      TA_REQ(lock());
+  zx_status_t LookupLocked(VmCowRange range, VmObject::LookupFunction lookup_fn) TA_REQ(lock());
 
   // Similar to LookupLocked, but enumerate all readable pages in the hierarchy within the requested
   // range. The offset passed to the |lookup_fn| is the offset this page is visible at in this
@@ -206,7 +220,7 @@ class VmCowPages final : public VmHierarchyBase,
   // can terminate iteration early by returning ZX_ERR_STOP.
   using LookupReadableFunction =
       fit::inline_function<zx_status_t(uint64_t offset, paddr_t pa), 4 * sizeof(void*)>;
-  zx_status_t LookupReadableLocked(uint64_t offset, uint64_t len, LookupReadableFunction lookup_fn)
+  zx_status_t LookupReadableLocked(VmCowRange range, LookupReadableFunction lookup_fn)
       TA_REQ(lock());
 
   // See VmObject::TakePages
@@ -235,8 +249,7 @@ class VmCowPages final : public VmHierarchyBase,
                           MultiPageRequest* page_request) TA_EXCL(lock());
 
   // See VmObject::FailPageRequests
-  zx_status_t FailPageRequestsLocked(uint64_t offset, uint64_t len, zx_status_t error_status)
-      TA_REQ(lock());
+  zx_status_t FailPageRequestsLocked(VmCowRange range, zx_status_t error_status) TA_REQ(lock());
 
   // Used to track dirty_state in the vm_page_t.
   //
@@ -282,12 +295,12 @@ class VmCowPages final : public VmHierarchyBase,
   // ZX_ERR_SHOULD_WAIT is returned the caller should wait on |page_request|. |alloc_list| will hold
   // any pages that were allocated but not used in case of delayed PMM allocations, so that it can
   // be reused across multiple successive calls whilst ensuring forward progress.
-  zx_status_t DirtyPagesLocked(uint64_t offset, uint64_t len, list_node_t* alloc_list,
+  zx_status_t DirtyPagesLocked(VmCowRange range, list_node_t* alloc_list,
                                AnonymousPageRequest* page_request) TA_REQ(lock());
 
   using DirtyRangeEnumerateFunction = VmObject::DirtyRangeEnumerateFunction;
   // See VmObject::EnumerateDirtyRanges
-  zx_status_t EnumerateDirtyRangesLocked(uint64_t offset, uint64_t len,
+  zx_status_t EnumerateDirtyRangesLocked(VmCowRange range,
                                          DirtyRangeEnumerateFunction&& dirty_range_fn)
       TA_REQ(lock());
 
@@ -311,11 +324,10 @@ class VmCowPages final : public VmHierarchyBase,
   void ResetPagerVmoStatsLocked() TA_REQ(lock()) { pager_stats_modified_ = false; }
 
   // See VmObject::WritebackBegin
-  zx_status_t WritebackBeginLocked(uint64_t offset, uint64_t len, bool is_zero_range)
-      TA_REQ(lock());
+  zx_status_t WritebackBeginLocked(VmCowRange range, bool is_zero_range) TA_REQ(lock());
 
   // See VmObject::WritebackEnd
-  zx_status_t WritebackEndLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
+  zx_status_t WritebackEndLocked(VmCowRange range) TA_REQ(lock());
 
   // Tries to prepare the range [offset, offset + len) for writing by marking pages dirty or
   // verifying that they are already dirty. It is possible for only some or none of the pages in the
@@ -333,12 +345,12 @@ class VmCowPages final : public VmHierarchyBase,
   // require dirty transitions to be trapped, ZX_OK is returned.
   //
   // |offset| and |len| should be page-aligned.
-  zx_status_t PrepareForWriteLocked(uint64_t offset, uint64_t len, LazyPageRequest* page_request,
+  zx_status_t PrepareForWriteLocked(VmCowRange range, LazyPageRequest* page_request,
                                     uint64_t* dirty_len_out) TA_REQ(lock());
 
   class LookupCursor;
   // See VmObjectPaged::GetLookupCursorLocked
-  zx::result<LookupCursor> GetLookupCursorLocked(uint64_t offset, uint64_t max_len) TA_REQ(lock());
+  zx::result<LookupCursor> GetLookupCursorLocked(VmCowRange range) TA_REQ(lock());
 
   // Controls the type of content that can be overwritten by the Add[New]Page[s]Locked functions.
   enum class CanOverwriteContent : uint8_t {
@@ -380,7 +392,7 @@ class VmCowPages final : public VmHierarchyBase,
   // For consistency if there is a parent or a backing page source, such that the range would not
   // explicitly copy-on-write the zero page then this will fail. Use ZeroPagesLocked for an
   // operation that is guaranteed to succeed, but may not release memory.
-  zx_status_t DecommitRangeLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
+  zx_status_t DecommitRangeLocked(VmCowRange range) TA_REQ(lock());
 
   // After successful completion the range of pages will all read as zeros. The mechanism used to
   // achieve this is not guaranteed to decommit, but it will try to.
@@ -409,7 +421,7 @@ class VmCowPages final : public VmHierarchyBase,
   //                        not need to retried.
   //  * => Any other error, the number of pages committed is undefined.
   // The |offset| and |len| are assumed to be page aligned and within the range of |size_|.
-  zx_status_t CommitRangeLocked(uint64_t offset, uint64_t len, uint64_t* committed_len,
+  zx_status_t CommitRangeLocked(VmCowRange range, uint64_t* committed_len,
                                 MultiPageRequest* page_request) TA_REQ(lock());
 
   // Increases the pin count of the range of pages given by |offset| and |len|. The full range must
@@ -418,13 +430,13 @@ class VmCowPages final : public VmHierarchyBase,
   // The |offset| and |len| are assumed to be page aligned and within the range of |size_|.
   // All pages in the specified range are assumed to be non-loaned pages, so the caller is expected
   // to replace any loaned pages beforehand if required.
-  zx_status_t PinRangeLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
+  zx_status_t PinRangeLocked(VmCowRange range) TA_REQ(lock());
 
   // See VmObject::Unpin
-  void UnpinLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
+  void UnpinLocked(VmCowRange range) TA_REQ(lock());
 
   // See VmObject::DebugIsRangePinned
-  bool DebugIsRangePinnedLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
+  bool DebugIsRangePinnedLocked(VmCowRange range) TA_REQ(lock());
 
   // Returns true if a page is not currently committed, and if the offset were to be read from, it
   // would be read as zero. Requested offset must be page aligned and within range.
@@ -432,8 +444,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // see VmObject::GetAttributedMemoryInRange
   using AttributionCounts = VmObject::AttributionCounts;
-  AttributionCounts GetAttributedMemoryInRangeLocked(uint64_t offset_bytes,
-                                                     uint64_t len_bytes) const TA_REQ(lock());
+  AttributionCounts GetAttributedMemoryInRangeLocked(VmCowRange range) const TA_REQ(lock());
 
   enum class EvictionHintAction : uint8_t {
     Follow,
@@ -477,8 +488,7 @@ class VmCowPages final : public VmHierarchyBase,
   // |non_loaned_len| is set to the length (starting at |offset|) that contains only non-loaned
   // pages. |offset| and |len| must be page-aligned. In case of slices, replaces corresponding pages
   // in the parent.
-  zx_status_t ReplacePagesWithNonLoanedLocked(uint64_t offset, uint64_t len,
-                                              AnonymousPageRequest* page_request,
+  zx_status_t ReplacePagesWithNonLoanedLocked(VmCowRange range, AnonymousPageRequest* page_request,
                                               uint64_t* non_loaned_len) TA_REQ(lock());
 
   // If page is still at offset, replace it with a loaned page.
@@ -578,13 +588,13 @@ class VmCowPages final : public VmHierarchyBase,
   };
   // Apply the specified operation to all mappings in the given range. This is applied to all
   // descendants within the range.
-  void RangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeChangeOp op) TA_REQ(lock());
+  void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
 
   // Promote pages in the specified range for reclamation under memory pressure. |offset| will be
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary.
   // Currently used only for pager-backed VMOs to move their pages to the end of the
   // pager-backed queue, so that they can be evicted first.
-  void PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
+  void PromoteRangeForReclamationLocked(VmCowRange range) TA_REQ(lock());
 
   // Protect pages in the specified range from reclamation under memory pressure. |offset| will be
   // rounded down to the page boundary, and |len| will be rounded up to the page boundary. Any
@@ -595,21 +605,20 @@ class VmCowPages final : public VmHierarchyBase,
   // If the |ignore_errors| flag is set then any per page errors will be ignored and future pages in
   // the range will still be operated on. If this flag is not set then any kind of error causes an
   // immediate abort.
-  zx_status_t ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len, bool set_always_need,
+  zx_status_t ProtectRangeFromReclamationLocked(VmCowRange range, bool set_always_need,
                                                 bool ignore_errors, Guard<CriticalMutex>* guard)
       TA_REQ(lock());
 
   // Ensures any pages in the specified range are not compressed, but does not otherwise commit any
   // pages. In order to handle delayed memory allocations, |guard| may be dropped one or more times.
-  zx_status_t DecompressInRangeLocked(uint64_t offset, uint64_t len, Guard<CriticalMutex>* guard)
-      TA_REQ(lock());
+  zx_status_t DecompressInRangeLocked(VmCowRange range, Guard<CriticalMutex>* guard) TA_REQ(lock());
 
   // See VmObject::ChangeHighPriorityCountLocked
   void ChangeHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
 
-  zx_status_t LockRangeLocked(uint64_t offset, uint64_t len, zx_vmo_lock_state_t* lock_state_out);
-  zx_status_t TryLockRangeLocked(uint64_t offset, uint64_t len);
-  zx_status_t UnlockRangeLocked(uint64_t offset, uint64_t len);
+  zx_status_t LockRangeLocked(VmCowRange range, zx_vmo_lock_state_t* lock_state_out);
+  zx_status_t TryLockRangeLocked(VmCowRange range);
+  zx_status_t UnlockRangeLocked(VmCowRange range);
 
   uint64_t DebugGetPageCountLocked() const TA_REQ(lock());
   bool DebugIsPage(uint64_t offset) const;
@@ -1329,7 +1338,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Helper to check whether the requested range for LockRangeLocked() / TryLockRangeLocked() /
   // UnlockRangeLocked() is valid.
-  bool IsLockRangeValidLocked(uint64_t offset, uint64_t len) const TA_REQ(lock());
+  bool IsLockRangeValidLocked(VmCowRange range) const TA_REQ(lock());
 
   // Returns the root parent's page source.
   fbl::RefPtr<PageSource> GetRootPageSourceLocked() const TA_REQ(lock());
@@ -1433,8 +1442,7 @@ class VmCowPages final : public VmHierarchyBase,
   VmPageList page_list_ TA_GUARDED(lock());
 
   RangeChangeNodeState range_change_state_;
-  uint64_t range_change_offset_ TA_GUARDED(lock());
-  uint64_t range_change_len_ TA_GUARDED(lock());
+  VmCowRange range_change_range_ TA_GUARDED(lock());
 
   // Reference back to a VmObjectPaged, which should be valid at all times after creation until the
   // VmObjectPaged has been destroyed, unless this is a hidden node. We use this in places where we
@@ -1608,10 +1616,10 @@ class VmCowPages::LookupCursor {
   }
 
  private:
-  LookupCursor(VmCowPages* target, uint64_t offset, uint64_t len)
+  LookupCursor(VmCowPages* target, VmCowRange range)
       : target_(target),
-        offset_(offset),
-        end_offset_(offset + len),
+        offset_(range.offset),
+        end_offset_(range.end()),
         target_preserving_page_content_(target->is_source_preserving_page_content()),
         zero_fork_(!target_preserving_page_content_ && target->can_decommit_zero_pages_locked()) {}
 

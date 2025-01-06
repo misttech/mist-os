@@ -4403,9 +4403,9 @@ static bool vmo_skip_range_update_test() {
     // Perform the requested range update.
     {
       Guard<CriticalMutex> guard{hidden_parent->lock()};
-      hidden_parent->RangeChangeUpdateLocked(range.page_start * PAGE_SIZE,
-                                             range.num_pages * PAGE_SIZE,
-                                             VmCowPages::RangeChangeOp::Unmap);
+      hidden_parent->RangeChangeUpdateLocked(
+          VmCowRange(range.page_start * PAGE_SIZE, range.num_pages * PAGE_SIZE),
+          VmCowPages::RangeChangeOp::Unmap);
     }
     // Check all the mappings are either there or not there as expected.
     bool expected[kNumPages];

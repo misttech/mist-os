@@ -134,7 +134,7 @@ class VmObjectPaged final : public VmObject {
   AttributionCounts GetAttributedMemoryInReferenceOwner() const override {
     DEBUG_ASSERT(is_reference());
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->GetAttributedMemoryInRangeLocked(0, size_locked());
+    return cow_pages_locked()->GetAttributedMemoryInRangeLocked(VmCowRange(0, size_locked()));
   }
 
   zx_status_t CommitRange(uint64_t offset, uint64_t len) override {
@@ -159,13 +159,13 @@ class VmObjectPaged final : public VmObject {
 
   void Unpin(uint64_t offset, uint64_t len) override {
     Guard<CriticalMutex> guard{lock()};
-    cow_pages_locked()->UnpinLocked(offset, len);
+    cow_pages_locked()->UnpinLocked(VmCowRange(offset, len));
   }
 
   // See VmObject::DebugIsRangePinned
   bool DebugIsRangePinned(uint64_t offset, uint64_t len) override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->DebugIsRangePinnedLocked(offset, len);
+    return cow_pages_locked()->DebugIsRangePinnedLocked(VmCowRange(offset, len));
   }
 
   zx_status_t LockRange(uint64_t offset, uint64_t len,
@@ -188,14 +188,15 @@ class VmObjectPaged final : public VmObject {
                           SupplyOptions options) override;
   zx_status_t FailPageRequests(uint64_t offset, uint64_t len, zx_status_t error_status) override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->FailPageRequestsLocked(offset, len, error_status);
+    return cow_pages_locked()->FailPageRequestsLocked(VmCowRange(offset, len), error_status);
   }
 
   zx_status_t DirtyPages(uint64_t offset, uint64_t len) override;
   zx_status_t EnumerateDirtyRanges(uint64_t offset, uint64_t len,
                                    DirtyRangeEnumerateFunction&& dirty_range_fn) override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->EnumerateDirtyRangesLocked(offset, len, ktl::move(dirty_range_fn));
+    return cow_pages_locked()->EnumerateDirtyRangesLocked(VmCowRange(offset, len),
+                                                          ktl::move(dirty_range_fn));
   }
 
   zx_status_t QueryPagerVmoStats(bool reset, zx_pager_vmo_stats_t* stats) override {
@@ -210,11 +211,11 @@ class VmObjectPaged final : public VmObject {
 
   zx_status_t WritebackBegin(uint64_t offset, uint64_t len, bool is_zero_range) override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->WritebackBeginLocked(offset, len, is_zero_range);
+    return cow_pages_locked()->WritebackBeginLocked(VmCowRange(offset, len), is_zero_range);
   }
   zx_status_t WritebackEnd(uint64_t offset, uint64_t len) override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->WritebackEndLocked(offset, len);
+    return cow_pages_locked()->WritebackEndLocked(VmCowRange(offset, len));
   }
 
   // See VmObject::SetUserContentSize
@@ -246,7 +247,7 @@ class VmObjectPaged final : public VmObject {
   // See |VmCowPages::LookupCursor|.
   zx::result<VmCowPages::LookupCursor> GetLookupCursorLocked(uint64_t offset, uint64_t max_len)
       TA_REQ(lock()) {
-    return cow_pages_locked()->GetLookupCursorLocked(offset, max_len);
+    return cow_pages_locked()->GetLookupCursorLocked(VmCowRange(offset, max_len));
   }
 
   zx_status_t CreateClone(Resizability resizable, CloneType type, uint64_t offset, uint64_t size,
@@ -316,7 +317,7 @@ class VmObjectPaged final : public VmObject {
 
   using RangeChangeOp = VmCowPages::RangeChangeOp;
   // Apply the specified operation to all mappings in the given range.
-  void RangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeChangeOp op) TA_REQ(lock());
+  void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
 
   // This is exposed so that VmCowPages can call it. It is used to update the VmCowPages object
   // that this VMO points to for its operations. When updating it must be set to a non-null
