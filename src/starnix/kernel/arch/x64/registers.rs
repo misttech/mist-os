@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use starnix_uapi::errors::Errno;
-use starnix_uapi::{error, user_regs_struct};
+use starnix_uapi::{__NR_restart_syscall, error, user_regs_struct};
 
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`].
@@ -31,6 +31,16 @@ impl RegisterState {
 
         // `orig_rax` should hold the original value loaded into `rax` by the userspace process.
         self.orig_rax = syscall_number;
+    }
+
+    /// Custom restart, invoke restart_syscall instead of the original syscall.
+    pub fn prepare_for_custom_restart(&mut self) {
+        self.rax = __NR_restart_syscall as u64;
+    }
+
+    /// Restores `rax` to match its value before restarting.
+    pub fn restore_original_return_register(&mut self) {
+        self.rax = self.orig_rax;
     }
 
     /// Returns the register that indicates the single-machine-word return value from a

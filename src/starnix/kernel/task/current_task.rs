@@ -38,7 +38,7 @@ use starnix_types::ownership::{
 };
 use starnix_uapi::auth::{Credentials, UserAndOrGroupId, CAP_SYS_ADMIN};
 use starnix_uapi::device_type::DeviceType;
-use starnix_uapi::errors::Errno;
+use starnix_uapi::errors::{Errno, ErrnoCode};
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -138,6 +138,9 @@ pub struct ThreadState {
     /// Copy of the current extended processor state including floating point and vector registers.
     pub extended_pstate: ExtendedPstateState,
 
+    /// The errno code (if any) that indicated this task should restart a syscall.
+    pub restart_code: Option<ErrnoCode>,
+
     /// A custom function to resume a syscall that has been interrupted by SIGSTOP.
     /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
     /// will eventually call it.
@@ -154,6 +157,7 @@ impl ThreadState {
         Self {
             registers: self.registers,
             extended_pstate: Default::default(),
+            restart_code: self.restart_code,
             syscall_restart_func: None,
             arch_width: self.arch_width,
         }
@@ -163,6 +167,7 @@ impl ThreadState {
         Self {
             registers: self.registers.clone(),
             extended_pstate: self.extended_pstate.clone(),
+            restart_code: self.restart_code,
             syscall_restart_func: None,
             arch_width: self.arch_width,
         }

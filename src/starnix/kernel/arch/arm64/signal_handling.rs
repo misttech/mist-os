@@ -7,13 +7,13 @@ use crate::signals::{SignalInfo, SignalState};
 use crate::task::{CurrentTask, Task};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_debug, track_stub};
-use starnix_uapi::errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK};
+use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::signals::{SIGBUS, SIGSEGV};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    __NR_restart_syscall, _aarch64_ctx, errno, error, esr_context, fpsimd_context, sigaction_t,
-    sigaltstack, sigcontext, siginfo_t, ucontext, ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
+    _aarch64_ctx, errno, error, esr_context, fpsimd_context, sigaction_t, sigaltstack, sigcontext,
+    siginfo_t, ucontext, ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
 };
 use zerocopy::{FromBytes, IntoBytes};
 
@@ -131,16 +131,6 @@ pub fn restore_registers(
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {
     round_up_to_increment(pointer, 16).expect("Failed to round up stack pointer")
-}
-
-pub fn update_register_state_for_restart(registers: &mut RegisterState, err: ErrnoCode) {
-    if err == ERESTART_RESTARTBLOCK {
-        // Update the register containing the syscall number to reference `restart_syscall`.
-        registers.r[8] = __NR_restart_syscall as u64;
-    }
-    // Reset the x0 register value to what it was when the original syscall trap occurred. This
-    // needs to be done because x0 may have been overwritten in the syscall dispatch loop.
-    registers.r[0] = registers.orig_x0;
 }
 
 // Size of `sigcontext::__reserved`.

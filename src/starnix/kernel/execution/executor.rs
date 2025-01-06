@@ -277,7 +277,12 @@ fn restricted_exit_callback(
     error_context: &mut Option<ErrorContext>,
     exit_status: &mut Result<ExitStatus, Error>,
 ) -> bool {
-    match process_restricted_exit(
+    debug_assert_eq!(
+        current_task.thread_state.restart_code, None,
+        "restart_code should only ever be Some() in normal mode",
+    );
+
+    let ret = match process_restricted_exit(
         reason_code,
         current_task,
         restricted_state,
@@ -297,7 +302,14 @@ fn restricted_exit_callback(
             *exit_status = Err(error);
             false
         }
-    }
+    };
+
+    debug_assert_eq!(
+        current_task.thread_state.restart_code, None,
+        "restart_code should only ever be Some() in normal mode",
+    );
+
+    ret
 }
 
 fn process_restricted_exit(
@@ -811,6 +823,9 @@ pub fn execute_syscall(
         }
         Err(errno) => {
             log_trace!("!-> {:?}", errno);
+            if errno.is_restartable() {
+                current_task.thread_state.restart_code = Some(errno.code);
+            }
             current_task.thread_state.registers.set_return_register(errno.return_value());
             Some(ErrorContext { error: errno, syscall })
         }
@@ -841,11 +856,7 @@ pub fn process_completed_restricted_exit(
                 }
                 // The syscall may need to restart for a non-signal-related
                 // reason. This call does nothing if we aren't restarting.
-                prepare_to_restart_syscall(
-                    &mut current_task.thread_state.registers,
-                    None,
-                    current_task.thread_state.arch_width,
-                );
+                prepare_to_restart_syscall(&mut current_task.thread_state, None);
             }
         }
 

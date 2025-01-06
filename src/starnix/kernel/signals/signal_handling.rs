@@ -4,22 +4,20 @@
 
 use crate::arch::registers::RegisterState;
 use crate::arch::signal_handling::{
-    align_stack_pointer, restore_registers, update_register_state_for_restart, SignalStackFrame,
-    RED_ZONE_SIZE, SIG_STACK_SIZE, SYSCALL_INSTRUCTION_SIZE_BYTES,
+    align_stack_pointer, restore_registers, SignalStackFrame, RED_ZONE_SIZE, SIG_STACK_SIZE,
+    SYSCALL_INSTRUCTION_SIZE_BYTES,
 };
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::signals::{KernelSignal, KernelSignalInfo, SignalDetail, SignalInfo, SignalState};
 use crate::task::{
-    CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard, WaitCanceler, Waiter,
+    CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskWriteGuard, ThreadState, WaitCanceler,
+    Waiter,
 };
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::{log_trace, log_warn};
 use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::SyscallResult;
-use starnix_types::arch::ArchWidth;
-use starnix_uapi::errors::{
-    Errno, ErrnoCode, EINTR, ERESTARTNOHAND, ERESTARTNOINTR, ERESTARTSYS, ERESTART_RESTARTBLOCK,
-};
+use starnix_uapi::errors::{Errno, EINTR, ERESTART_RESTARTBLOCK};
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{
     sigaltstack_contains_pointer, SigSet, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE,
@@ -29,8 +27,7 @@ use starnix_uapi::signals::{
 };
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
-    errno, error, sigaction_t, SA_NODEFER, SA_ONSTACK, SA_RESETHAND, SA_RESTART, SA_SIGINFO,
-    SIG_DFL, SIG_IGN,
+    errno, error, sigaction_t, SA_NODEFER, SA_ONSTACK, SA_RESETHAND, SA_SIGINFO, SIG_DFL, SIG_IGN,
 };
 
 /// Indicates where in the signal queue a signal should go.  Signals
@@ -213,7 +210,7 @@ pub fn action_for_signal(siginfo: &SignalInfo, sigaction: sigaction_t) -> Delive
 
 /// Dequeues and handles a pending signal for `current_task`.
 pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut CurrentTask) {
-    let CurrentTask { task, thread_state, .. } = current_task;
+    let &mut CurrentTask { ref task, ref mut thread_state, .. } = current_task;
     let mut task_state = task.write();
     // This code is occasionally executed as the task is stopping. Stopping /
     // stopped threads should not get signals.
@@ -225,9 +222,8 @@ pub fn dequeue_signal(locked: &mut Locked<'_, Unlocked>, current_task: &mut Curr
     let kernel_signal = task_state.take_kernel_signal();
     let siginfo = if kernel_signal.is_some() { None } else { task_state.take_any_signal() };
     prepare_to_restart_syscall(
-        &mut thread_state.registers,
+        thread_state,
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
-        thread_state.arch_width,
     );
 
     if let Some(ref siginfo) = siginfo {
@@ -472,42 +468,38 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
 }
 
 /// Maybe adjust a task's registers to restart a syscall once the task switches back to userspace,
-/// based on whether the return value is one of the restartable error codes such as ERESTARTSYS.
-pub fn prepare_to_restart_syscall(
-    registers: &mut RegisterState,
-    sigaction: Option<sigaction_t>,
-    arch_width: ArchWidth,
-) {
-    let err = ErrnoCode::from_return_value(registers.return_register());
-    // If sigaction is None, the syscall must be restarted if it is restartable. The default
-    // sigaction will not have a sighandler, which will guarantee a restart.
-    let sigaction = sigaction.unwrap_or_default();
-
-    let should_restart = match err {
-        ERESTARTSYS => sigaction.sa_flags & SA_RESTART as u64 != 0,
-        ERESTARTNOINTR => true,
-        ERESTARTNOHAND | ERESTART_RESTARTBLOCK => false,
-
-        // The syscall did not request to be restarted.
-        _ => return,
-    };
-    // Always restart if the signal did not call a handler (i.e. SIGSTOP).
-    let should_restart = should_restart || sigaction.sa_handler.addr == 0;
-
-    if !should_restart {
-        registers.set_return_register(EINTR.return_value());
+/// based on whether the task previously had a syscall return with an error code indicating that a
+/// restart was required.
+pub fn prepare_to_restart_syscall(thread_state: &mut ThreadState, sigaction: Option<sigaction_t>) {
+    // Taking the value ensures each syscall is only considered for restart once.
+    let Some(err) = thread_state.restart_code.take() else {
+        // Don't interact with register state at all unless other kernel code indicates that we may
+        // need to restart.
         return;
-    }
+    };
 
-    update_register_state_for_restart(registers, err);
+    if err.should_restart(sigaction) {
+        if thread_state.arch_width.is_arch32() {
+            // TODO(https://fxbug.dev/380405833): Fix pc post syscall for restart.
+            panic!("pc is being changed incorrectly post syscall for restart!");
+        }
 
-    if arch_width.is_arch32() {
-        // TODO(https://fxbug.dev/380405833): Fix pc post syscall for restart.
-        panic!("pc is being changed incorrectly post syscall for restart!");
+        // This error code is returned for system calls that need restart_syscall() to adjust time
+        // related arguments when the syscall is restarted. Other syscall restarts can be dispatched
+        // directly to the original syscall implementation.
+        if err == ERESTART_RESTARTBLOCK {
+            thread_state.registers.prepare_for_custom_restart();
+        } else {
+            thread_state.registers.restore_original_return_register();
+        }
+
+        // TODO(https://fxbug.dev/388051291) figure out whether Linux relies on registers here
+        thread_state.registers.set_instruction_pointer_register(
+            thread_state.registers.instruction_pointer_register() - SYSCALL_INSTRUCTION_SIZE_BYTES,
+        );
+    } else {
+        thread_state.registers.set_return_register(EINTR.return_value());
     }
-    registers.set_instruction_pointer_register(
-        registers.instruction_pointer_register() - SYSCALL_INSTRUCTION_SIZE_BYTES,
-    );
 }
 
 pub fn sys_restart_syscall(

@@ -8,7 +8,7 @@ use crate::task::{CurrentTask, Task};
 use extended_pstate::riscv64::{RiscvVectorCsrs, NUM_V_REGISTERS, VLEN};
 use extended_pstate::ExtendedPstateState;
 use starnix_logging::log_debug;
-use starnix_uapi::errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK};
+use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
@@ -210,16 +210,6 @@ pub fn restore_registers(
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {
     round_up_to_increment(pointer, 16).expect("Failed to round up stack pointer")
-}
-
-pub fn update_register_state_for_restart(registers: &mut RegisterState, err: ErrnoCode) {
-    if err == ERESTART_RESTARTBLOCK {
-        // Update the register containing the syscall number to reference `restart_syscall`.
-        registers.a7 = uapi::__NR_restart_syscall as u64;
-    }
-    // Reset the a0 register value to what it was when the original syscall trap occurred. This
-    // needs to be done because a0 may have been overwritten in the syscall dispatch loop.
-    registers.a0 = registers.orig_a0;
 }
 
 // Generates `__riscv_fp_state` struct from ExtendedPstateState.

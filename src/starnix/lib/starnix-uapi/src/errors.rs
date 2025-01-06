@@ -4,6 +4,7 @@
 
 #![allow(dead_code)]
 
+use crate::{sigaction_t, SA_RESTART};
 use std::fmt::{Debug, Display, Formatter};
 
 #[derive(Clone, Debug)]
@@ -26,6 +27,11 @@ impl Errno {
 
     pub fn return_value(&self) -> u64 {
         self.code.return_value()
+    }
+
+    /// Returns whether this `Errno` indicates that a restartable syscall was interrupted.
+    pub fn is_restartable(&self) -> bool {
+        self.code.is_restartable()
     }
 }
 
@@ -112,6 +118,39 @@ impl ErrnoCode {
 
     pub const fn error_code(&self) -> u32 {
         self.0
+    }
+
+    /// Returns whether this `ErrnoCode` indicates that a restartable syscall was interrupted.
+    pub fn is_restartable(&self) -> bool {
+        matches!(*self, ERESTARTSYS | ERESTARTNOINTR | ERESTARTNOHAND | ERESTART_RESTARTBLOCK)
+    }
+
+    /// Returns whether a combination of this `ErrnoCode` and a given `sigaction_t` mean that an
+    /// interrupted syscall should be restarted.
+    ///
+    /// Conditions for restarting syscalls:
+    ///
+    /// * the error code is `ERESTARTSYS`, `ERESTARTNOINTR`, `ERESTARTNOHAND`, or
+    ///   `ERESTART_RESTARTBLOCK` and
+    /// * `ERESTARTNOINTR` is always restarted
+    /// * `ERESTARTSYS` is only restarted if the `SA_RESTART` flag is set in the `sigaction_t`
+    /// * all four error codes are restarted if no signal handler was present in the `sigaction_t`
+    pub fn should_restart(&self, sigaction: Option<sigaction_t>) -> bool {
+        // If sigaction is None, the syscall must be restarted if it is restartable. The default
+        // sigaction will not have a sighandler, which will guarantee a restart.
+        let sigaction = sigaction.unwrap_or_default();
+
+        let should_restart_even_if_sigaction_handler_not_null = match *self {
+            ERESTARTSYS => sigaction.sa_flags & SA_RESTART as u64 != 0,
+            ERESTARTNOINTR => true,
+            ERESTARTNOHAND | ERESTART_RESTARTBLOCK => false,
+
+            // Never restart a syscall unless it's one of the above errno codes.
+            _ => return false,
+        };
+
+        // Always restart if the signal did not call a handler (i.e. SIGSTOP).
+        should_restart_even_if_sigaction_handler_not_null || sigaction.sa_handler.addr == 0
     }
 }
 
