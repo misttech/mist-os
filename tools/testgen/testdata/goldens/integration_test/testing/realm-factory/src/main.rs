@@ -8,7 +8,7 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::{error, info};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

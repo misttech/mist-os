@@ -6,6 +6,7 @@ use anyhow::{anyhow, bail, Context as _, Result};
 use argh::FromArgs;
 use camino::{Utf8Path, Utf8PathBuf};
 use gnaw_lib::CrateOutputMetadata;
+use simplelog::{Config, LevelFilter, SimpleLogger};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
@@ -58,7 +59,9 @@ struct Options {
 }
 
 fn main() -> Result<()> {
-    tracing_subscriber::fmt().compact().with_max_level(tracing::Level::INFO).init();
+    SimpleLogger::init(LevelFilter::Info, Config::default()).unwrap_or_else(|err| {
+        eprintln!("WARN: failed to initialize logger: {err:#?}");
+    });
     let options = argh::from_env();
 
     OwnersDb::new(options)?.update_all_files()
@@ -224,7 +227,7 @@ impl OwnersDb {
 
     /// Update all OWNERS files for all projects.
     fn update_all_files(&self) -> Result<()> {
-        tracing::info!("Updating OWNERS files...");
+        log::info!("Updating OWNERS files...");
 
         for metadata in &self.projects {
             if !metadata.path.starts_with("third_party/rust_crates/mirrors") {
@@ -233,7 +236,7 @@ impl OwnersDb {
             }
         }
 
-        tracing::info!("Done!");
+        log::info!("Done!");
 
         Ok(())
     }
@@ -248,7 +251,7 @@ impl OwnersDb {
             if let Some(owners_path) =
                 find_owners_including_secondary(&self.fuchsia_dir, &metadata.path)
             {
-                tracing::info!("{} has OWNERS file at {}, skipping", metadata.path, owners_path);
+                log::info!("{} has OWNERS file at {}, skipping", metadata.path, owners_path);
                 return Ok(());
             }
         }
@@ -260,7 +263,7 @@ impl OwnersDb {
         let owners_path = self.fuchsia_dir.join(&metadata.path).join("OWNERS");
 
         if self.dry_run {
-            tracing::info!("Dry-run: generated {} with content:\n", owners_path);
+            log::info!("Dry-run: generated {} with content:\n", owners_path);
             output_buffer.write_all(file.to_string().as_bytes())?;
         } else {
             // We need to write every OWNERS file, even if it would be empty,
@@ -310,7 +313,7 @@ impl OwnersDb {
         // non-rust projects are sometimes referenced by file. If no deps were found, search for
         // references to any of the files in the project.
         if deps.is_empty() && !metadata.path.starts_with("third_party/rust_crates") {
-            tracing::info!(
+            log::info!(
                 "{} has no target references, searching for all file references",
                 metadata.path
             );
@@ -391,7 +394,7 @@ impl OwnersDb {
             return Ok(if let Some(path) = self.owners_path_cache.get(target) {
                 Some(path.join("OWNERS"))
             } else {
-                tracing::warn!(
+                log::warn!(
                     "{} not in {}",
                     target,
                     self.rust_metadata.as_ref().expect("metadata is set")
@@ -1067,7 +1070,7 @@ mod tests {
                 .expect("making parent of file to copy");
             std::fs::copy(to_copy, destination).expect("copying file");
         }
-        tracing::trace!("done copying files");
+        log::trace!("done copying files");
     }
 
     /// All the paths to runfiles and tools which are used in this test.

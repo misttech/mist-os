@@ -26,7 +26,7 @@ rustc_binary("fuchsia-sdk-run-bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [ ":sdk_exported" ]

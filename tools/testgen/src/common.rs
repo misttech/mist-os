@@ -4,9 +4,9 @@
 
 use anyhow::{Error, Result};
 use handlebars::Handlebars;
+use log::info;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
-use tracing::info;
 use walkdir::{DirEntry, WalkDir};
 
 /// Creates a `TemplateFile` for a handlebars template.

@@ -142,8 +142,8 @@ fn parse_ffx_args(cmd: &str, args: &[impl AsRef<str>]) -> Result<Ffx, Exit> {
 fn run_update_command(mut command: Command) -> Result<Output, Exit> {
     let program = command.get_program().to_owned();
     let output = command.stderr(Stdio::inherit()).output().map_err(|err| {
-        tracing::warn!("Command could not be run: {command:?}");
-        tracing::warn!("Error from failed command: {err:?}");
+        log::warn!("Command could not be run: {command:?}");
+        log::warn!("Error from failed command: {err:?}");
         Exit {
             message: Box::new(format!("Failed to run check script {program:?}:\n{err}")),
             code: SCRIPT_FAILED,
@@ -151,11 +151,11 @@ fn run_update_command(mut command: Command) -> Result<Output, Exit> {
     })?;
 
     if output.status.success() {
-        tracing::trace!("Command succeeded: {command:?}");
+        log::trace!("Command succeeded: {command:?}");
         Ok(output)
     } else {
-        tracing::debug!("Command failed: {command:?}");
-        tracing::debug!("Failed command output: {output:?}");
+        log::debug!("Command failed: {command:?}");
+        log::debug!("Failed command output: {output:?}");
         Err(Exit {
             message: Box::new(format!(
                 "Check script {program:?} did not succeed. Output:\n\n{}",
@@ -177,7 +177,7 @@ fn sdk_tool_not_found_err(err: anyhow::Error) -> Exit {
 fn ensure_config(domain: &mut ConfigDomain) -> Result<(), Exit> {
     if let Some(cmd) = domain.needs_config_bootstrap() {
         // run the command
-        tracing::trace!("Running bootstrap command: {cmd:?}");
+        log::trace!("Running bootstrap command: {cmd:?}");
         let output = run_update_command(cmd)?;
         // double check we don't still need bootstrapping, and return an
         // error if we do.
@@ -204,7 +204,7 @@ async fn load_domain_sdk_root(
     };
     if let Some(cmd) = domain.needs_sdk_update(&sdk_root, &mut known_states) {
         // run the command
-        tracing::trace!("Running sdk update command: {cmd:?}");
+        log::trace!("Running sdk update command: {cmd:?}");
         let output = run_update_command(cmd)?;
         // double check we have an sdk in place now.
         if !sdk_root.manifest_exists() {

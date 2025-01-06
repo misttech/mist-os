@@ -108,7 +108,7 @@ pub(crate) async fn do_ssh<W: Write>(
     ssh_cmd = ssh_cmd.process_group(0);
 
     // Spawn
-    tracing::debug!("About to ssh with command: {:#?}", ssh_cmd);
+    log::debug!("About to ssh with command: {:#?}", ssh_cmd);
     let mut ssh = ssh_cmd.spawn()?;
     match ssh.wait() {
         Ok(e) => match e.code() {
@@ -129,7 +129,7 @@ fn build_ssh_args<W: Write>(
     additional_port_forwards: Vec<u32>,
 ) -> Result<Vec<String>, TunnelError> {
     let mut addrs: Vec<TargetAddr> = target.addresses.into_iter().collect::<Vec<TargetAddr>>();
-    tracing::debug!("Discovered addresses for target: {:?}", addrs);
+    log::debug!("Discovered addresses for target: {:?}", addrs);
     // Flip the sorting so that Ipv6 comes before Ipv4 as we will take the first
     // address, and (generally) Ipv4 addresses from the Target are ephemeral
     addrs.sort_by(|a, b| b.cmp(a));
@@ -139,7 +139,7 @@ fn build_ssh_args<W: Write>(
         .ok_or_else(|| TunnelError::NoAddressesError { target: target.nodename.clone() })?;
 
     if addrs.len() > 1 {
-        tracing::warn!(
+        log::warn!(
             "Target: {} has {} addresses associated with it: {:?}. Choosing the first one: {}",
             target.nodename,
             addrs.len(),
@@ -258,7 +258,7 @@ pub(crate) fn close_existing_tunnel(host: String) -> Result<(), CloseExistingTun
         "exit".to_string(),
         host,
     ];
-    tracing::info!("executing ssh command with args: {:?}", args);
+    log::info!("executing ssh command with args: {:?}", args);
     let mut ssh = Command::new("ssh").args(args).spawn()?;
     ssh.wait()?;
     Ok(())
