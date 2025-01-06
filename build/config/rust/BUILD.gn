@@ -25,9 +25,6 @@ declare_args() {
   # (see https://github.com/rust-lang/rfcs/blob/HEAD/text/2603-rust-symbol-name-mangling-v0.md).
   rust_v0_symbol_mangling = true
 
-  # Enable debug assertions, e.g. for overflow checking.
-  rust_debug_assertions = is_debug
-
   # Enable the rust parallel front-end with N threads
   rust_parallel_frontend_threads = false
 }
