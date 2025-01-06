@@ -21,30 +21,6 @@ if (bazel_fuchsia_sdk_all_cpus) {
   _bazel_in_tree_idk_cpus = [ target_cpu ]
 }
 
-# Generate remote service configs into a bazelrc file.
-# This is only used when running the Bazel SDK test suite, which
-# can happen even if no internal Bazel workspace is setup.
-action("remote_services_bazelrc") {
-  script = "//build/bazel/scripts/generate_services_bazelrc.py"
-  _output = "$target_out_dir/remote_services.bazelrc"
-  outputs = [ _output ]
-  _template = "//build/bazel/templates/template.remote_services.bazelrc"
-  _configs = [
-    "//build/rbe/fuchsia-reproxy.cfg",
-    "//build/rbe/fuchsia-rewrapper.cfg",
-  ]
-  inputs = [ _template ] + _configs
-  args = [
-           "--template",
-           rebase_path(_template, root_build_dir),
-           "--output",
-           rebase_path(_output, root_build_dir),
-           "--remote_download_outputs",
-           bazel_rbe_download_outputs,
-           "--cfgs",
-         ] + rebase_path(_configs, root_build_dir)
-}
-
 # Generate a Bazel SDK directly from the content of ://sdk:bazel_in_tree_idk
 # and verify that it matches the content of @fuchsia_sdk. This is performed
 # using Bazel actions, to verify that there are no differences between

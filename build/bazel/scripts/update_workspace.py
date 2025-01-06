@@ -803,20 +803,6 @@ def main() -> int:
         platform_mappings_content,
     )
 
-    # Generate the remote_services.bazelrc file.
-    generated.add_file(
-        os.path.join(
-            "workspace", "fuchsia_build_generated", "remote_services.bazelrc"
-        ),
-        expand_template_file(
-            "template.remote_services.bazelrc",
-            **remote_services_bazelrc_format_args(
-                build_config=build_config,
-                remote_download_outputs=args.remote_download_outputs,
-            ),
-        ),
-    )
-
     # Generate the content of .bazelrc
     bazelrc_content = expand_template_file(
         "template.bazelrc",
@@ -826,6 +812,12 @@ def main() -> int:
             topdir=topdir,
             default_platform=f"fuchsia_{args.target_arch}",
             host_platform=host_tag_alt,
+        ),
+    ) + expand_template_file(
+        "template.remote_services.bazelrc",
+        **remote_services_bazelrc_format_args(
+            build_config=build_config,
+            remote_download_outputs=args.remote_download_outputs,
         ),
     )
     if args.use_bzlmod:

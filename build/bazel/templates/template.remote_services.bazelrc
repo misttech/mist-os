@@ -7,7 +7,9 @@
 # Enable gcert authentication, which will automatically refresh OAuth
 # tokens while gcert certificate (unrestricted) is still valid.
 # Use build/rbe/check_loas_restrictions.sh to determine certificate type.
+# LINT.IfChange
 build:gcertauth --credential_helper=*.googleapis.com=/google/src/head/depot/google3/devtools/blaze/bazel/credhelper/credhelper
+# LINT.ThenChange(//build/bazel_sdk/tests/.bazelrc)
 
 # Setup remote build (RBE)
 build:_remote_common --remote_instance_name={remote_instance_name}

@@ -4,7 +4,6 @@
 
 import("//build/bazel/bazel_action.gni")
 import("//build/bazel/bazel_inputs.gni")
-import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 
 declare_args() {
@@ -242,15 +241,19 @@ template("run_fuchsia_bazel_sdk_tests") {
       if (defined(invoker.remote_build_strategy)) {
         _remote_build_strategy = invoker.remote_build_strategy
       }
-      if (_remote_build) {
+      if (_remote_build || bazel_upload_build_events != "") {
         _remote_services_bazelrc_target =
-            "//build/bazel/bazel_sdk:remote_services_bazelrc"
-        _remote_services_bazelrc =
+            "//build/bazel:remote_services_bazelrc"
+        _remote_services_bazelrc_path =
             get_label_info(_remote_services_bazelrc_target, "target_out_dir") +
             "/remote_services.bazelrc"
+        args += [
+          "--bazelrc",
+          rebase_path(_remote_services_bazelrc_path, root_build_dir),
+        ]
         deps += [ _remote_services_bazelrc_target ]
-        args += [ "--bazelrc=" +
-                  rebase_path(_remote_services_bazelrc, root_build_dir) ]
+      }
+      if (_remote_build) {
         if (_remote_build_strategy == "remote") {
           args += [ "--bazel-config=remote" ]
         } else if (_remote_build_strategy == "local") {

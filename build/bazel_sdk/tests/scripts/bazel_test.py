@@ -876,13 +876,7 @@ def main() -> int:
 
     # With unrestricted LOAS credentials, the credential helper
     # can renew OAuth tokens automatically.
-    is_remote_build = any(
-        a.startswith("--config=remote") for a in bazel_config_args
-    )
-    if (
-        is_remote_build
-        and os.environ.get("FX_BUILD_LOAS_TYPE", "") == "unrestricted"
-    ):
+    if os.environ.get("FX_BUILD_LOAS_TYPE", "") == "unrestricted":
         bazel_config_args += ["--config=gcertauth"]
 
     bazel_config_args += build_metadata_flags(siblings_link_template)

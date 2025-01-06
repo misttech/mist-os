@@ -12,7 +12,6 @@ readonly _OUTPUT_USER_ROOT="${{_SCRIPT_DIR}}/{output_user_root}"
 readonly _LOG_DIR="${{_SCRIPT_DIR}}/{logs_dir}"
 readonly _BAZEL_BIN="${{_SCRIPT_DIR}}/{bazel_bin_path}"
 readonly _PYTHON_PREBUILT_DIR="${{_SCRIPT_DIR}}/{python_prebuilt_dir}"
-readonly _REMOTE_SERVICES_BAZELRC="${{_WORKSPACE_DIR}}/fuchsia_build_generated/remote_services.bazelrc"
 
 # Exported explicitly to be used by repository rules to reference the
 # Ninja output directory and binary.
@@ -145,7 +144,6 @@ fi
 _user="${{USER:-unused-bazel-build-user}}"
 cd "${{_WORKSPACE_DIR}}" && USER="$_user" "${{_BAZEL_BIN}}"\
       --nohome_rc \
-      --bazelrc="${{_REMOTE_SERVICES_BAZELRC}}" \
       --output_base="${{_OUTPUT_BASE}}" \
       --output_user_root="${{_OUTPUT_USER_ROOT}}" \
       "$@" \
