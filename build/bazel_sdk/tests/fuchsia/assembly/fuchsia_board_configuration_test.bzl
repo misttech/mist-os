@@ -31,3 +31,28 @@ fuchsia_board_configuration_test = rule(
         ),
     } | CREATE_VALIDATION_SCRIPT_ATTRS,
 )
+
+def _fuchsia_hybrid_board_configuration_test_impl(ctx):
+    board_config_files = ctx.attr.hybrid_board_config[FuchsiaBoardConfigInfo].files
+    bib_file = (
+        ([file for file in board_config_files if file.path.endswith("board_input_bundle.json")] + [None])[0]
+    )
+    return [create_validation_script_provider(ctx, bib_file, ctx.file.golden_bib)]
+
+fuchsia_hybrid_board_configuration_test = rule(
+    doc = """Validate the hybrid board has replaced BIB. Note this test assumes there is only one BIB to verify.""",
+    test = True,
+    implementation = _fuchsia_hybrid_board_configuration_test_impl,
+    attrs = {
+        "hybrid_board_config": attr.label(
+            doc = "Built hybrid board config target",
+            providers = [FuchsiaBoardConfigInfo],
+            mandatory = True,
+        ),
+        "golden_bib": attr.label(
+            doc = "Golden BIB file to match against",
+            allow_single_file = True,
+            mandatory = True,
+        ),
+    } | CREATE_VALIDATION_SCRIPT_ATTRS,
+)

@@ -1,0 +1,10 @@
+{
+    "filesystems": {},
+    "input_bundles": [
+        "input_bundles/bib"
+    ],
+    "kernel": {},
+    "name": "x64",
+    "platform": {},
+    "provided_features": []
+}

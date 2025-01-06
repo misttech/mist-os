@@ -11,11 +11,13 @@ load(
     "fuchsia_bootloader_partition",
     "fuchsia_bootstrap_partition",
     "fuchsia_gen_android_starnix_container",
+    "fuchsia_hybrid_board_configuration",
     "fuchsia_hybrid_product_configuration",
     "fuchsia_package_with_configs",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
     "fuchsia_post_processing_script",
+    "fuchsia_prebuilt_board_configuration",
     "fuchsia_prebuilt_board_input_bundle",
     "fuchsia_prebuilt_package",
     "fuchsia_prebuilt_product_configuration",
@@ -34,7 +36,11 @@ load(
     "get_fuchsia_api_levels",
 )
 load("//fuchsia/packaging/fuchsia_package:fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test")
-load(":fuchsia_board_configuration_test.bzl", "fuchsia_board_configuration_test")
+load(
+    ":fuchsia_board_configuration_test.bzl",
+    "fuchsia_board_configuration_test",
+    "fuchsia_hybrid_board_configuration_test",
+)
 load(":fuchsia_board_input_bundle_test.bzl", "fuchsia_board_input_bundle_test")
 load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
 load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test", "fuchsia_product_ota_config_test")
@@ -148,6 +154,39 @@ fuchsia_board_configuration_test(
     name = "board_configuration_golden_test",
     board_config = ":testing_board_configuration",
     golden_file = ":test_data/board_configuration_golden_file.json",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "prebuilt_board_config_files",
+    srcs = glob(["test_data/prebuilt_board_config/**/*"]),
+)
+
+fuchsia_prebuilt_board_configuration(
+    name = "prebuilt_board_config",
+    files = ":prebuilt_board_config_files",
+)
+
+filegroup(
+    name = "prebuilt_replacement_board_config_files",
+    srcs = glob(["test_data/prebuilt_replacement_board_config/**/*"]),
+)
+
+fuchsia_prebuilt_board_configuration(
+    name = "prebuilt_replacement_board_config",
+    files = ":prebuilt_replacement_board_config_files",
+)
+
+fuchsia_hybrid_board_configuration(
+    name = "test_hybrid_board_config",
+    board_configuration = ":prebuilt_board_config",
+    replacement_board_input_bundles = ":prebuilt_replacement_board_config",
+)
+
+fuchsia_hybrid_board_configuration_test(
+    name = "hybrid_board_configuration_golden_test",
+    golden_bib = ":test_data/prebuilt_replacement_board_config/input_bundles/bib/board_input_bundle.json",
+    hybrid_board_config = ":test_hybrid_board_config",
     visibility = ["//visibility:public"],
 )
 
