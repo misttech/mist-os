@@ -27,7 +27,7 @@ rustc_test("bin") {
     "//src/lib/fuchsia-component",
     "//src/testing/realm_proxy/client",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 
