@@ -95,26 +95,13 @@ async fn connect_to_instances_test(test_type: TestType) {
     start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
-    let service_dir = fuchsia_fs::directory::open_directory(
-        branch.get_exposed_dir(),
-        fexamples::BankAccountMarker::SERVICE_NAME,
-        fio::Flags::empty(),
-    )
-    .await
-    .expect("failed to open service dir");
-    let instances = fuchsia_fs::directory::readdir(&service_dir)
-        .await
-        .expect("failed to read entries from service dir")
-        .into_iter()
-        .map(|dirent| dirent.name);
+    let service =
+        client::Service::open_from_dir(branch.get_exposed_dir(), fexamples::BankAccountMarker)
+            .expect("failed to open service");
+    let instances = service.enumerate().await.expect("failed to read entries from service dir");
 
     // Connect to every instance and ensure the protocols are functional.
-    for instance in instances {
-        let proxy = client::connect_to_service_instance_at_dir::<fexamples::BankAccountMarker>(
-            branch.get_exposed_dir(),
-            &instance,
-        )
-        .expect("failed to connect to service instance");
+    for proxy in instances {
         let read_only_account = proxy.connect_to_read_only().expect("read_only protocol");
         let owner = read_only_account.get_owner().await.expect("failed to get owner");
         let initial_balance = read_only_account.get_balance().await.expect("failed to get_balance");
@@ -306,30 +293,16 @@ async fn static_aggregate_expose() {
     let realm = builder.build().await.unwrap();
 
     let exposed_dir = realm.root.get_exposed_dir();
-    let echo_svc = fuchsia_fs::directory::open_directory(
-        exposed_dir,
-        fecho::EchoServiceMarker::SERVICE_NAME,
-        fio::Flags::empty(),
-    )
-    .await
-    .unwrap();
-    let instances = fuchsia_fs::directory::readdir(&echo_svc)
-        .await
+    let instances = client::Service::open_from_dir(exposed_dir, fecho::EchoServiceMarker)
         .unwrap()
-        .into_iter()
-        .map(|dirent| dirent.name);
+        .enumerate()
+        .await
+        .unwrap();
     // self, child in the aggregate x 3 instances each
     assert_eq!(instances.len(), 3 * 2);
-    drop(echo_svc);
 
     // Connect to every instance and ensure the protocols are functional.
-    for instance in instances {
-        let proxy = client::connect_to_service_instance_at_dir::<fecho::EchoServiceMarker>(
-            exposed_dir,
-            &instance,
-        )
-        .unwrap();
-
+    for proxy in instances {
         let echo_proxy = proxy.connect_to_regular_echo().unwrap();
         let res = echo_proxy.echo_string("hello").await.unwrap();
         assert!(res.ends_with("hello"));
