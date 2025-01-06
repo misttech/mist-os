@@ -10,7 +10,7 @@ use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

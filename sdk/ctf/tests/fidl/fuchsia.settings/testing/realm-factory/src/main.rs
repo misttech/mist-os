@@ -14,8 +14,8 @@ use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
 };
 use futures::{StreamExt, TryStreamExt};
+use log::*;
 use std::sync::Arc;
-use tracing::*;
 use vfs::directory::entry_container::Directory;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
