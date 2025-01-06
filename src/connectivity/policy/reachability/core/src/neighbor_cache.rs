@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::error;
 use std::collections::HashMap;
-use tracing::error;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_neighbor as fnet_neighbor,
     fidl_fuchsia_net_neighbor_ext as fnet_neighbor_ext,
@@ -126,7 +126,7 @@ impl NeighborCache {
             match fnet_neighbor_ext::Entry::try_from(entry) {
                 Ok(entry) => entry,
                 Err(e) => {
-                    error!(e = ?e, "invalid neighbor entry");
+                    error!(e:? = e; "invalid neighbor entry");
                     return;
                 }
             };
@@ -138,7 +138,7 @@ impl NeighborCache {
         match event {
             Event::Added => match neighbors.entry(neighbor) {
                 std::collections::hash_map::Entry::Occupied(occupied) => {
-                    error!(entry = ?occupied, "received entry for already existing neighbor");
+                    error!(entry:? = occupied; "received entry for already existing neighbor");
                     return;
                 }
                 std::collections::hash_map::Entry::Vacant(vacant) => {
@@ -151,7 +151,7 @@ impl NeighborCache {
                 let NeighborState { health } = match neighbors.get_mut(&neighbor) {
                     Some(s) => s,
                     None => {
-                        error!(neigh = ?neighbor, "got changed event for unseen neighbor");
+                        error!(neigh:? = neighbor; "got changed event for unseen neighbor");
                         return;
                     }
                 };
@@ -167,7 +167,7 @@ impl NeighborCache {
                     }
                 }
                 None => {
-                    error!(neigh = ?neighbor, "got removed event for unseen neighbor");
+                    error!(neigh:? = neighbor; "got removed event for unseen neighbor");
                 }
             },
         }

@@ -12,8 +12,8 @@ use futures::future::Either;
 use futures::prelude::*;
 use futures::StreamExt;
 use http_client_config::Config;
+use log::{debug, error, info, trace};
 use std::str::FromStr as _;
-use tracing::{debug, error, info, trace};
 use zx::{self as zx, AsHandleRef};
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_net_http as net_http,
@@ -448,7 +448,7 @@ enum HttpServices {
 
 #[fuchsia::main]
 pub async fn main() -> Result<(), anyhow::Error> {
-    tracing::info!("http-client starting");
+    log::info!("http-client starting");
 
     // TODO(https://fxbug.dev/333080598): This is quite some boilerplate to escrow the outgoing dir.
     // Design some library function to handle the lifecycle requests.
@@ -505,8 +505,8 @@ pub async fn main() -> Result<(), anyhow::Error> {
     match futures::future::select(lifecycle_task.boxed_local(), outgoing_dir_task.boxed_local())
         .await
     {
-        Either::Left(_) => tracing::info!("http-client stopping because we are told to stop"),
-        Either::Right(_) => tracing::info!("http-client stopping because it is idle"),
+        Either::Left(_) => log::info!("http-client stopping because we are told to stop"),
+        Either::Right(_) => log::info!("http-client stopping because it is idle"),
     }
 
     Ok(())

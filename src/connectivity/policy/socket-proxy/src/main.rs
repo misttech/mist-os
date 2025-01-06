@@ -15,8 +15,8 @@ use fuchsia_inspect_derive::{Inspect, WithInspect as _};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::StreamExt as _;
+use log::error;
 use std::sync::Arc;
-use tracing::error;
 
 mod dns_watcher;
 mod registry;

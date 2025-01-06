@@ -23,12 +23,12 @@ use fuchsia_inspect::{Inspector, Node as InspectNode};
 use futures::channel::mpsc;
 use inspect::InspectInfo;
 use itertools::Itertools;
+use log::{debug, error, info};
 use named_timer::DeadlineId;
 use net_declare::{fidl_subnet, std_ip};
 use net_types::ScopeableAddress as _;
 use num_derive::FromPrimitive;
 use std::collections::hash_map::{Entry, HashMap};
-use tracing::{debug, error, info};
 use {
     fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
     fuchsia_async as fasync,

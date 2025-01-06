@@ -13,9 +13,9 @@ use fuchsia_inspect_derive::{IValue, Inspect, Unit};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
+use log::{error, info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_posix_socket as fposix_socket};
 
 /// RFC-1035§4.2 specifies port 53 (decimal) as the default port for DNS requests.

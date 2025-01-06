@@ -13,8 +13,8 @@ use fidl_fuchsia_net_filter_ext::{
 use fnet_masquerade::Error;
 use futures::stream::LocalBoxStream;
 use futures::{future, StreamExt as _, TryStreamExt as _};
+use log::{error, warn};
 use net_declare::fidl_subnet;
-use tracing::{error, warn};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
     fidl_fuchsia_net_masquerade as fnet_masquerade,

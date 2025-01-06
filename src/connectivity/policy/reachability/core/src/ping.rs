@@ -6,9 +6,9 @@ use anyhow::{anyhow, Context as _};
 use async_trait::async_trait;
 use fuchsia_async::{self as fasync, TimeoutExt as _};
 use futures::{FutureExt as _, SinkExt as _, TryFutureExt as _, TryStreamExt as _};
+use log::warn;
 use net_types::ip::{Ipv4, Ipv6};
 use std::net::SocketAddr;
-use tracing::warn;
 
 const PING_MESSAGE: &str = "Hello from reachability monitor!";
 const SEQ_MIN: u16 = 1;

@@ -11,8 +11,8 @@ use fuchsia_inspect_derive::{IValue, Inspect, Unit};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
+use log::{info, warn};
 use std::sync::Arc;
-use tracing::{info, warn};
 
 #[derive(Unit, Debug, Default)]
 struct DnsServerWatcherState {

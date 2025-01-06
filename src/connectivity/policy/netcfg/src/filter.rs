@@ -19,7 +19,7 @@ use {
 };
 
 use anyhow::{bail, Context as _};
-use tracing::{error, info, warn};
+use log::{error, info, warn};
 
 use crate::{exit_with_fidl_error, FilterConfig, InterfaceId, InterfaceType};
 

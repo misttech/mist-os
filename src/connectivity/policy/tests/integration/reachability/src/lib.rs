@@ -16,6 +16,7 @@ use fidl::endpoints::Proxy;
 use futures::channel::mpsc;
 use futures::future::FusedFuture;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
+use log::info;
 use net_declare::{net_ip_v4, net_ip_v6, net_mac};
 use netstack_testing_common::constants::{ipv4 as ipv4_consts, ipv6 as ipv6_consts};
 use netstack_testing_common::realms::{
@@ -38,7 +39,6 @@ use std::collections::HashMap;
 use std::pin::pin;
 use std::rc::Rc;
 use test_case::test_case;
-use tracing::info;
 
 const INTERNET_V4: net_types::ip::Ipv4Addr = net_ip_v4!("8.8.8.8");
 const INTERNET_V6: net_types::ip::Ipv6Addr = net_ip_v6!("2001:4860:4860::8888");

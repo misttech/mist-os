@@ -47,12 +47,12 @@ use async_utils::stream::WithTag as _;
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
 use futures::stream::BoxStream;
 use futures::{FutureExt, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use log::{debug, error, info, trace, warn};
 use net_declare::fidl_ip_v4;
 use net_declare::net::prefix_length_v4;
 use net_types::ip::{IpAddress as _, Ipv4, PrefixLength};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tracing::{debug, error, info, trace, warn};
 
 use self::devices::DeviceInfo;
 use self::errors::{accept_error, ContextExt as _};
@@ -1354,7 +1354,7 @@ impl<'a> NetCfg<'a> {
 
                         match state {
                             None => {
-                                tracing::error!(
+                                log::error!(
                                     "Trying to handle DHCPv4 client shutdown \
                                 (id={interface_id}), but no client is running on that interface"
                                 );
@@ -2971,7 +2971,7 @@ impl<'a> NetCfg<'a> {
                     fnet_dhcp_ext::Error::UnexpectedExit(reason) => match reason {
                         Some(reason) => match reason {
                             fnet_dhcp::ClientExitReason::AddressRemovedByUser => {
-                                tracing::warn!(
+                                log::warn!(
                                     "DHCP client exited because its \
                                     bound address was removed (iface={interface_id})"
                                 );
@@ -2989,14 +2989,14 @@ impl<'a> NetCfg<'a> {
                                 | fnet_dhcp::ClientExitReason::GracefulShutdown
                                 | fnet_dhcp::ClientExitReason::AddressStateProviderError
                             ) => {
-                                tracing::error!("DHCP client unexpectedly exited \
+                                log::error!("DHCP client unexpectedly exited \
                                                 (iface={interface_id}, reason={reason:?})");
                                 // The exit was unexpected, so we should restart the client.
                                 AllowClientRestart::Yes
                             }
                         },
                         None => {
-                            tracing::error!(
+                            log::error!(
                                 "DHCP client unexpectedly exited without \
                                 giving a reason (iface={interface_id})"
                             );
@@ -3008,7 +3008,7 @@ impl<'a> NetCfg<'a> {
                     | fnet_dhcp_ext::Error::Fidl(_)
                     | fnet_dhcp_ext::Error::WrongExitReason(_)
                     | fnet_dhcp_ext::Error::MissingExitReason) => {
-                        tracing::error!("DHCP client exited due to error \
+                        log::error!("DHCP client exited due to error \
                                         (iface={interface_id}, error={error:?})");
                                         AllowClientRestart::Yes
                     }
@@ -3325,7 +3325,7 @@ fn map_address_state_provider_error(
 //
 // TODO(https://fxbug.dev/42070352): add a test that works as intended.
 pub(crate) fn exit_with_fidl_error(cause: fidl::Error) -> ! {
-    error!(%cause, "exiting due to fidl error");
+    error!(cause:%; "exiting due to fidl error");
     std::process::exit(1);
 }
 

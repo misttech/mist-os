@@ -117,7 +117,7 @@ impl InterfaceNamingConfig {
         // with the same identifier is re-installed, re-attempt name generation
         // since the MAC identifiers used may have changed.
         match self.interfaces.remove(&interface_naming_id) {
-            Some(name) => tracing::info!(
+            Some(name) => log::info!(
                 "{name} already existed for this identifier\
             {interface_naming_id:?}. inserting a new one."
             ),
@@ -130,7 +130,7 @@ impl InterfaceNamingConfig {
         if let Some(name) =
             self.interfaces.insert(interface_naming_id.clone(), generated_name.clone())
         {
-            tracing::error!(
+            log::error!(
                 "{name} was unexpectedly found for {interface_naming_id:?} \
             when inserting a new name"
             );
@@ -450,7 +450,7 @@ impl NamingRule {
                     continue;
                 }
 
-                tracing::warn!(
+                log::warn!(
                     "name ({name}) already used for an interface installed by netcfg. \
                  using name since it is possible that the interface using this name is no \
                  longer active"

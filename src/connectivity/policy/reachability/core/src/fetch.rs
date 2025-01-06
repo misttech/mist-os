@@ -8,8 +8,8 @@ use fuchsia_async::net::TcpStream;
 use fuchsia_async::TimeoutExt;
 
 use futures::{AsyncReadExt, AsyncWriteExt, TryFutureExt};
+use log::warn;
 use std::net;
-use tracing::warn;
 
 const FETCH_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 

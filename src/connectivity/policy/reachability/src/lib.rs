@@ -7,8 +7,8 @@ use fidl::endpoints::ControlHandle;
 use fuchsia_component::server::{ServiceFsDir, ServiceObjLocal};
 use futures::lock::Mutex;
 use futures::{TryFutureExt as _, TryStreamExt as _};
+use log::error;
 use std::sync::Arc;
-use tracing::error;
 use {fidl_fuchsia_net_reachability as freachability, fuchsia_async as fasync};
 
 type WatchResponder = freachability::MonitorWatchResponder;

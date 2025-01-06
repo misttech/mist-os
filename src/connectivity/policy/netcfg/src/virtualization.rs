@@ -19,7 +19,7 @@ use async_trait::async_trait;
 use derivative::Derivative;
 use futures::channel::oneshot;
 use futures::{future, FutureExt as _, StreamExt as _, TryStreamExt as _};
-use tracing::{debug, error, info, warn};
+use log::{debug, error, info, warn};
 
 use crate::errors::{self, ContextExt as _};
 use crate::{exit_with_fidl_error, DeviceClass};

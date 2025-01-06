@@ -16,7 +16,7 @@ use async_utils::stream::{StreamMap, Tagged};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource};
 use futures::future::TryFutureExt as _;
 use futures::stream::{Stream, TryStreamExt as _};
-use tracing::warn;
+use log::warn;
 
 use crate::{dns, errors, DnsServerWatchers, InterfaceId};
 
