@@ -95,11 +95,27 @@ pub struct RoutingTable<I: Ip, D> {
     /// then by locality (prefer on-link routes over off-link routes), and
     /// finally by the entry's tenure in the table.
     pub(super) table: Vec<EntryAndGeneration<I::Addr, D>>,
+
+    /// The Bindings ID of this table. This is much more readable than the
+    /// Core id because it is a small integer rather than a random pointer to
+    /// the memory.
+    ///
+    /// The value must be a [`Some`] if this table is created by Bindings. If
+    /// the value is [`None`] it means the table is created by Core; only main
+    /// tables are created by Core.
+    pub(super) bindings_id: Option<u32>,
 }
 
 impl<I: Ip, D> Default for RoutingTable<I, D> {
     fn default() -> RoutingTable<I, D> {
-        RoutingTable { table: Vec::default() }
+        RoutingTable { table: Vec::default(), bindings_id: None }
+    }
+}
+
+impl<I: Ip, D> RoutingTable<I, D> {
+    /// Creates a new routing table with the bindings ID.
+    pub fn with_bindings_id(bindings_id: u32) -> Self {
+        RoutingTable { table: Vec::default(), bindings_id: Some(bindings_id) }
     }
 }
 
@@ -115,7 +131,7 @@ impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> RoutingTable<I, D> {
         D: PartialOrd,
     {
         debug!("adding route: {}", entry);
-        let Self { table } = self;
+        let Self { table, bindings_id: _ } = self;
 
         if table.contains(&entry) {
             // If we already have this exact route, don't add it again.
@@ -142,7 +158,7 @@ impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> RoutingTable<I, D> {
     ) -> alloc::vec::Vec<Entry<I::Addr, D>> {
         // TODO(https://github.com/rust-lang/rust/issues/43244): Use
         // drain_filter to avoid extra allocation.
-        let Self { table } = self;
+        let Self { table, bindings_id: _ } = self;
         let owned_table = core::mem::take(table);
         let (removed, owned_table) =
             owned_table.into_iter().partition(|entry| predicate(&entry.entry));
@@ -187,7 +203,7 @@ impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> RoutingTable<I, D> {
         address: I::Addr,
         mut f: impl FnMut(&mut CC, &D) -> Option<R> + 'a,
     ) -> impl Iterator<Item = (Destination<I::Addr, &D>, R)> + 'a {
-        let Self { table } = self;
+        let Self { table, bindings_id: _ } = self;
 
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]

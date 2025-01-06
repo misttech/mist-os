@@ -20,6 +20,7 @@ use netstack3_fuchsia::{FuchsiaInspector, InspectorDeviceIdProvider};
 use crate::bindings::devices::{
     DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, EthernetInfo,
 };
+use crate::bindings::routes::main_table_id;
 use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt as _};
 
 /// An opaque struct that encapsulates the process of starting the Inspect
@@ -85,8 +86,13 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     let inspector = fuchsia_inspect::Inspector::new(Default::default());
     let mut bindings_inspector = FuchsiaInspector::<BindingsCtx>::new(inspector.root());
-    ctx.api().routes::<Ipv4>().inspect(&mut bindings_inspector);
-    ctx.api().routes::<Ipv6>().inspect(&mut bindings_inspector);
+    // Group inspect data according to the IP version so that it's easier to decode.
+    bindings_inspector.record_child("Ipv4", |inspector| {
+        ctx.api().routes::<Ipv4>().inspect(inspector, main_table_id::<Ipv4>().into());
+    });
+    bindings_inspector.record_child("Ipv6", |inspector| {
+        ctx.api().routes::<Ipv6>().inspect(inspector, main_table_id::<Ipv6>().into());
+    });
     inspector
 }
 

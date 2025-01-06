@@ -186,6 +186,13 @@ impl MarkDomain {
             Self::Mark2 => &mut storage[1],
         }
     }
+
+    pub(crate) fn to_str(&self) -> &'static str {
+        match self {
+            MarkDomain::Mark1 => "Mark_1",
+            MarkDomain::Mark2 => "Mark_2",
+        }
+    }
 }
 
 impl Marks {
@@ -236,6 +243,12 @@ impl MarkMatchers {
             assert_eq!(core::mem::replace(domain.get_mut(&mut mark_matchers), Some(matcher)), None);
         }
         MarkMatchers(mark_matchers)
+    }
+
+    /// Returns an iterator over the mark matchers of all domains.
+    pub fn iter(&self) -> impl Iterator<Item = (MarkDomain, Option<MarkMatcher>)> {
+        let Self(matchers) = self;
+        [(MarkDomain::Mark1, matchers[0]), (MarkDomain::Mark2, matchers[1])].into_iter()
     }
 }
 
