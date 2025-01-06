@@ -5,8 +5,8 @@
 use crate::cobalt;
 use anyhow::anyhow;
 use fidl::endpoints::{create_proxy, ServerEnd};
+use log::info;
 use thiserror::Error;
-use tracing::info;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
@@ -118,7 +118,7 @@ pub async fn launch_session(
     exposed_dir: ServerEnd<fio::DirectoryMarker>,
     realm: &fcomponent::RealmProxy,
 ) -> Result<fcomponent::ExecutionControllerProxy, StartupError> {
-    info!(session_url, "Launching session");
+    info!(session_url; "Launching session");
 
     let start_time = zx::MonotonicInstant::get();
     let controller = set_session(session_url, config_capabilities, realm, exposed_dir).await?;

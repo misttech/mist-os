@@ -8,8 +8,8 @@ use fidl::endpoints::{create_proxy, ClientEnd, ServerEnd};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use log::{error, warn};
 use std::sync::{Arc, Mutex};
-use tracing::{error, warn};
 use zx::HandleBased;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -132,13 +132,13 @@ impl PowerState {
         &self,
     ) -> Result<ClientEnd<fbroker::LeaseControlMarker>, fpower::HandoffError> {
         if !self.suspend_enabled {
-            tracing::warn!(
+            log::warn!(
                 "Session component wants to take our power lease, but the platform is \
                 configured to not support suspend"
             );
             return Err(fpower::HandoffError::Unavailable);
         }
-        tracing::info!("Session component is taking our power lease");
+        log::info!("Session component is taking our power lease");
         let lease = match &mut *self.power_element.lock().await {
             Some(power_element) => power_element.take_lease(),
             None => return Err(fpower::HandoffError::Unavailable),
@@ -348,7 +348,7 @@ impl SessionManager {
             async move {
                 session_manager
                     .handle_incoming_request(request)
-                    .unwrap_or_else(|err| error!(?err))
+                    .unwrap_or_else(|err| error!("{err:?}"))
                     .await
             }
         })
@@ -466,7 +466,7 @@ impl SessionManager {
                     let _ = responder.send(result);
                 }
                 fsession::LifecycleRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(%ordinal, "Lifecycle received an unknown method");
+                    warn!(ordinal:%; "Lifecycle received an unknown method");
                 }
             };
         }
@@ -486,7 +486,7 @@ impl SessionManager {
                     let _ = responder.send(result.map(|lease| lease.into_channel().into_handle()));
                 }
                 fpower::HandoffRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(%ordinal, "Lifecycle received an unknown method")
+                    warn!(ordinal:%; "Lifecycle received an unknown method")
                 }
             }
         }

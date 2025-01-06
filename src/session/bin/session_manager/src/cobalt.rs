@@ -6,8 +6,8 @@ use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_metrics::{MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
+use log::warn;
 use session_framework_metrics_registry::cobalt_registry as metrics;
-use tracing::warn;
 
 /// Creates a `LoggerProxy` connected to Cobalt.
 ///
@@ -29,7 +29,7 @@ pub fn get_logger() -> Result<MetricEventLoggerProxy, Error> {
             )
             .await
         {
-            warn!(%err, "Failed to create Cobalt logger");
+            warn!(err:%; "Failed to create Cobalt logger");
         }
     })
     .detach();

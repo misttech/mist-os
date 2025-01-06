@@ -23,8 +23,8 @@ use fidl_connector::ServiceReconnector;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
+use log::{error, info};
 use std::rc::Rc;
-use tracing::{error, info};
 use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement};
 
 /// This enum allows the session to match on incoming messages.
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Error> {
     fs.take_and_serve_directory_handle()?;
 
     if let Err(err) = element_manager.start_persistent_elements().await {
-        error!(?err, "Unable to start persistent elements");
+        error!(err:?; "Unable to start persistent elements");
     }
 
     fs.for_each_concurrent(NUM_CONCURRENT_REQUESTS, |service_request: ExposedServices| async {
@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
         match service_request {
             ExposedServices::Manager(request_stream) => {
                 if let Err(err) = element_manager.handle_requests(request_stream).await {
-                    error!(?err, "Failed to handle element manager requests");
+                    error!(err:?; "Failed to handle element manager requests");
                 }
             }
         }

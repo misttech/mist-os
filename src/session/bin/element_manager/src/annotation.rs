@@ -8,9 +8,9 @@ use derivative::Derivative;
 use fidl::endpoints::{ControlHandle, RequestStream};
 use futures::lock::Mutex;
 use futures::TryStreamExt;
+use log::error;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::error;
 use {fidl_fuchsia_element as felement, fidl_fuchsia_mem as fmem};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

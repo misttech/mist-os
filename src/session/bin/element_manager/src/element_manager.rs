@@ -23,6 +23,7 @@ use futures::channel::oneshot;
 use futures::future::Fuse;
 use futures::lock::Mutex;
 use futures::{select, FutureExt, StreamExt, TryStreamExt};
+use log::{error, info, warn};
 use rand::distributions::{Alphanumeric, DistString};
 use rand::thread_rng;
 use std::collections::HashMap;
@@ -30,7 +31,6 @@ use std::io::Write;
 use std::os::fd::AsRawFd;
 use std::pin::pin;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_element as felement, fidl_fuchsia_element_manager_persistence as persistence,
@@ -169,7 +169,7 @@ impl ElementManager {
         info!(
             child_name,
             child_url,
-            collection = %collection,
+            collection:% = collection;
             "launch_v2_element"
         );
 
@@ -287,7 +287,7 @@ impl ElementManager {
             let mut had_errors = false;
             for element in elements {
                 if let Err(err) = self.start_persistent_element(&element).await {
-                    error!(?err, "Failed to start persistent element ({element:?})");
+                    error!(err:?; "Failed to start persistent element ({element:?})");
                     had_errors = true;
                 }
             }
@@ -426,7 +426,7 @@ impl ElementManager {
                 Ok(file) => file,
                 Err(err) => {
                     error!(
-                        ?err,
+                        err:?;
                         "Unable to write to the persistent elements file (routing error?)"
                     );
                     return Err(felement::ManagerError::UnableToPersist);
@@ -455,7 +455,7 @@ impl ElementManager {
         // Create AnnotationHolder and populate the initial annotations from the Spec.
         let mut annotation_holder = AnnotationHolder::new();
         annotation_holder.update_annotations(initial_annotations, vec![]).map_err(|err| {
-            error!(?err, "ProposeElement() failed to set initial annotations");
+            error!(err:?; "ProposeElement() failed to set initial annotations");
             felement::ManagerError::InvalidArgs
         })?;
 
@@ -467,7 +467,7 @@ impl ElementManager {
                 persistence::Element { annotations: Some(annotations), ..Default::default() },
             );
             if let Err(err) = self.write_persistent_elements(&persistent_elements, temp_file) {
-                error!(?err, "Unable to write persistent elements");
+                error!(err:?; "Unable to write persistent elements");
                 // There's not much we can do; this shouldn't happen.  We've launched the element.
             }
         }
@@ -486,7 +486,7 @@ impl ElementManager {
             self.launch_element(component_url, child_name).await.map_err(|err| match err {
                 ElementManagerError::NotCreated { .. } => felement::ManagerError::NotFound,
                 err => {
-                    error!(?err, "ProposeElement() failed to launch element");
+                    error!(err:?; "ProposeElement() failed to launch element");
                     felement::ManagerError::InvalidArgs
                 }
             })?;
@@ -506,7 +506,7 @@ impl ElementManager {
                     .await
                     .map_err(|err| {
                         // TODO(https://fxbug.dev/42163510): ProposeElement should propagate GraphicalPresenter errors back to caller
-                        error!(?err, "ProposeElement() failed to present element");
+                        error!(err:?; "ProposeElement() failed to present element");
                         felement::ManagerError::InvalidArgs
                     })?,
                 )

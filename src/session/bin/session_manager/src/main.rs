@@ -8,9 +8,9 @@ use anyhow::Error;
 use fidl_fuchsia_component as fcomponent;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
+use log::info;
 use session_manager_config::Config;
 use session_manager_lib::session_manager::SessionManager;
-use tracing::info;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
