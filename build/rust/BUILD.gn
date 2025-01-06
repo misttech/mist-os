@@ -118,7 +118,6 @@ if (current_toolchain != default_toolchain) {
     ]
     deps = [
       "//build/rust:api_level_cfg_flags",
-      "//zircon/kernel:rust-cfg-big-zircon-kernel($host_toolchain)",
       gn_desc_label,
     ]
   }

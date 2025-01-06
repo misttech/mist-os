@@ -102,7 +102,7 @@ static constexpr uint64_t kNumKernelPageTables = (sizeof(linear_map_pdp) / PAGE_
 // script to know the target relocated address.
 // TODO(thgarnie): Move to a dynamically generated base address
 #if DISABLE_KASLR
-uint64_t kernel_relocated_base = KERNEL_BASE - KERNEL_LOAD_OFFSET;
+uint64_t kernel_relocated_base = KERNEL_BASE;
 #else
 uint64_t kernel_relocated_base = 0xffffffff00000000;
 #endif

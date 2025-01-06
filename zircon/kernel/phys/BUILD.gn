@@ -691,11 +691,7 @@ group("boot_tests") {
 }
 
 group("physboot") {
-  if (use_elf_kernel) {
-    public_deps = [ ":physboot-elf-kernel.package" ]
-  } else {
-    public_deps = [ ":physboot-zbi-kernel.package" ]
-  }
+  public_deps = [ ":physboot-elf-kernel.package" ]
 }
 
 source_set("handoff") {
@@ -742,19 +738,6 @@ source_set("handoff") {
   }
 
   public_configs = [ ":includes" ]
-}
-
-# The physboot-zbi-kernel target provides the distribution_entries metadata via
-# kernel_elf_binary() for "physboot".  This target reifies that to be directly
-# in the root of the STORAGE_KERNEL filesystem layout, whereas if another
-# kernel_package() took a dependency on the kernel_elf_binary() target, then it
-# would wind up under "package_name/physboot" instead.
-kernel_package("physboot-zbi-kernel.package") {
-  visibility = [ ":*" ]
-
-  # Just "physboot" at top level is the default for `kernel.phys.next`.
-  prefix = ""
-  deps = [ ":physboot-zbi-kernel(:kernel.phys_$current_cpu)" ]
 }
 
 kernel_package("physboot-elf-kernel.package") {
@@ -838,37 +821,6 @@ if (is_kernel) {
       ldflags = [
         "-Wl,-z,relro",
         "-Wl,-T," + rebase_path(inputs[0], root_build_dir),
-      ]
-    }
-  }
-
-  # TODO(https://fxbug.dev/42164859): Delete me!
-  kernel_elf_binary("physboot-zbi-kernel") {
-    target_type = "loadable_module"
-    has_patches = false
-
-    sources = [ "physboot-elf-main.cc" ]
-    deps = [
-      ":elf-image",
-      ":log",
-      ":physboot-main",
-      ":physload.module",
-      ":stdio",
-      ":symbolize",
-      "//zircon/kernel/lib/boot-options",
-      "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/libc",
-    ]
-
-    metadata = {
-      # This is what kernel.phys.next expects by default
-      distribution_entries = [
-        {
-          source = rebase_path("$target_out_dir/physboot-zbi-kernel.bin",
-                               root_build_dir)
-          destination = "physboot"
-          label = get_label_info(":$target_name", "label_with_toolchain")
-        },
       ]
     }
   }
