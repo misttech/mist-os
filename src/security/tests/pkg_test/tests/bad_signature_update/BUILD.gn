@@ -32,7 +32,7 @@ rustc_test("bad_signature_update-test") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   sources =
       [ "//src/security/tests/pkg_test/tests/bad_signature_update/src/main.rs" ]

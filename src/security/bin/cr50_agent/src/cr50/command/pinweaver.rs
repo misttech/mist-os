@@ -7,11 +7,10 @@ use fidl_fuchsia_tpm_cr50::{
     DELAY_SCHEDULE_MAX_COUNT, HASH_SIZE, HE_SECRET_MAX_SIZE, LE_SECRET_MAX_SIZE, MAC_SIZE,
     MAX_LOG_ENTRIES,
 };
-
+use log::warn;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::marker::PhantomData;
-use tracing::warn;
 
 use crate::cr50::command::{Deserializable, Header, Serializable, Subcommand, TpmRequest};
 use crate::util::{DeserializeError, Deserializer, Serializer};
@@ -376,7 +375,7 @@ impl Serializable for PinweaverTryAuth {
     fn serialize(&self, serializer: &mut Serializer) {
         let size = self.low_entropy_secret.len() + self.cred_metadata.len() + self.h_aux.len();
         serializer.put_le_u16(size.try_into().unwrap_or_else(|err| {
-            warn!(?err, "TryAuth request too long!");
+            warn!(err:?; "TryAuth request too long!");
             0
         }));
         self.low_entropy_secret.as_slice().serialize(serializer);
@@ -626,7 +625,7 @@ impl Serializable for PinweaverLogReplay {
             (HASH_SIZE as usize + self.leaf_data.len() + self.h_aux.len())
                 .try_into()
                 .unwrap_or_else(|err| {
-                    warn!(?err, "LogReplay request too long");
+                    warn!(err:?; "LogReplay request too long");
                     0
                 }),
         );

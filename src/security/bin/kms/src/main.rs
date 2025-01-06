@@ -16,10 +16,10 @@ use fidl_fuchsia_kms::{KeyManagerRequestStream, KeyProvider};
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
+use log::{error, info};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::sync::Arc;
-use tracing::{error, info};
 
 const CONFIG_PATH: &str = "/config/data/crypto_provider_config.json";
 

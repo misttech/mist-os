@@ -19,8 +19,8 @@ use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use futures::prelude::*;
 use futures::stream::TryStreamExt;
+use log::{debug, info, warn};
 use std::sync::Arc;
-use tracing::{debug, info, warn};
 
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.
@@ -48,8 +48,8 @@ async fn is_cr50(dir: &fio::DirectoryProxy, name: &str) -> Result<Option<TpmDevi
     }
 
     info!(
-        vendor_id = %format!("{:x}", vendor_id),
-        device_id = %format!("{:x}", device_id),
+        vendor_id:% = format!("{:x}", vendor_id),
+        device_id:% = format!("{:x}", device_id);
         "Ignoring TPM with incorrect");
     Ok(None)
 }

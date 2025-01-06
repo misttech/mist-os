@@ -6,13 +6,13 @@ use crate::blobfs::{BlobFsReader, BlobFsReaderBuilder};
 use crate::fs::tempdir;
 use crate::io::{ReadSeek, TryClonableBufReaderFile, TryClone};
 use anyhow::{anyhow, Context, Result};
+use log::warn;
 use pathdiff::diff_paths;
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::warn;
 
 /// Interface for fetching raw bytes by file path.
 pub trait ArtifactReader: Send + Sync {
@@ -47,8 +47,8 @@ impl BlobFsArtifactReader<TryClonableBufReaderFile> {
             Ok(path) => path,
             Err(err) => {
                 warn!(
-                    path = ?build_path_ref,
-                    %err,
+                    path:? = build_path_ref,
+                    err:%;
                     "Blobfs artifact reader failed to canonicalize build path"
                 );
                 build_path_ref.to_path_buf()
@@ -58,8 +58,8 @@ impl BlobFsArtifactReader<TryClonableBufReaderFile> {
             Ok(path) => path,
             Err(err) => {
                 warn!(
-                    path = ?build_path_ref,
-                    %err,
+                    path:? = build_path_ref,
+                    err:%;
                     "File artifact reader failed to canonicalize blobfs archive path",
                 );
                 blobfs_path_ref.to_path_buf()

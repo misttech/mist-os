@@ -5,15 +5,15 @@
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
+use log::info;
 use mock_reboot::MockRebootService;
 use std::sync::Arc;
-use tracing::info;
 
 #[fuchsia::main]
 async fn main() {
     info!("Starting mock reboot component");
     let reboot_service = Arc::new(MockRebootService::new(Box::new(|reboot_reason| {
-        info!(?reboot_reason, "fuchsia.hardware.power.statecontrol.Admin",);
+        info!(reboot_reason:?; "fuchsia.hardware.power.statecontrol.Admin",);
         Ok(())
     })));
     let mut fs = ServiceFs::new();

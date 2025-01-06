@@ -5,9 +5,9 @@
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
+use log::info;
 use mock_paver::MockPaverServiceBuilder;
 use std::sync::Arc;
-use tracing::info;
 
 #[fuchsia::main]
 async fn main() {

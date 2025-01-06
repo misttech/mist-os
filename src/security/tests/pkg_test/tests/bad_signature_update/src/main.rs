@@ -20,10 +20,10 @@ use fuchsia_hash::Hash;
 use fuchsia_merkle::MerkleTree;
 use futures::channel::oneshot::channel;
 use futures::{join, TryStreamExt};
+use log::info;
 use security_pkg_test_util::config::load_config;
 use security_pkg_test_util::storage::mount_image_as_ramdisk;
 use std::fs::File;
-use tracing::info;
 
 /// Flags for bad_signature_update.
 #[derive(FromArgs, Debug, PartialEq)]
@@ -146,7 +146,7 @@ async fn attempt_update(update_url: &str) -> Result<State> {
 async fn bad_signature_update() {
     info!("Starting bad_signature_update test");
     let args @ Args { v1_update_far_path, test_config_path, .. } = &from_env();
-    info!(?args, "Initalizing bad_signature_update");
+    info!(args:?; "Initalizing bad_signature_update");
 
     // Load test environment configuration.
     let config = load_config(test_config_path);

@@ -16,6 +16,7 @@ use config_encoder::ConfigFields;
 use fidl::unpersist;
 use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::AbsoluteComponentUrl;
+use log::{error, info, warn};
 use moniker::Moniker;
 use once_cell::sync::Lazy;
 use routing::environment::RunnerRegistry;
@@ -29,7 +30,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal};
 
 // The default root component URL used to identify the root instance of the component model
@@ -131,8 +131,8 @@ impl V2ComponentModelDataCollector {
                         }
                         Err(err) => {
                             error!(
-                                %err,
-                                %url,
+                                err:%,
+                                url:%;
                                 "Manifest for component is corrupted"
                             );
                         }
@@ -260,7 +260,7 @@ impl V2ComponentModelDataCollector {
         )?;
 
         info!(
-            total = decls_by_url.len(),
+            total = decls_by_url.len();
             "V2ComponentModelDataCollector: Found v2 component declarations",
         );
 
@@ -275,13 +275,13 @@ impl V2ComponentModelDataCollector {
         );
 
         for err in build_result.errors.iter() {
-            warn!(%err, "V2ComponentModelDataCollector");
+            warn!(err:%; "V2ComponentModelDataCollector");
         }
 
         match build_result.model {
             Some(component_model) => {
                 info!(
-                    total_instances = component_model.len(),
+                    total_instances = component_model.len();
                     "V2ComponentModelDataCollector: Built v2 component model"
                 );
                 let core_deps_collection: Arc<CoreDataDeps> = model.get().map_err(|err| {

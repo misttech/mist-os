@@ -16,6 +16,7 @@ use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_merkle::Hash;
 use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::{AbsoluteComponentUrl, AbsolutePackageUrl, PackageName, PackageVariant};
+use log::{info, warn};
 use scrutiny_collection::core::{
     Component, ComponentSource, Components, CoreDataDeps, Manifest, ManifestData, Manifests,
     Package, Packages,
@@ -29,7 +30,6 @@ use std::io::Cursor;
 use std::path::PathBuf;
 use std::str;
 use std::sync::Arc;
-use tracing::{info, warn};
 use url::Url;
 
 // The root v2 component manifest.
@@ -60,8 +60,8 @@ impl<'a> StaticPackageDescription<'a> {
         let url_match = match_absolute_pkg_urls(&url, &pkg.url);
         if url_match == PkgUrlMatch::WeakMatch {
             warn!(
-                StaticPackageDescription.url = %url,
-                PackageDefinition.url = %pkg.url,
+                StaticPackageDescription_url:% = url,
+                PackageDefinition_url:% = pkg.url;
                 "Lossy match of absolute package URLs",
             );
         }
@@ -211,7 +211,7 @@ impl PackageDataCollector {
 
                     if let Ok(cm_decl) = unpersist::<fdecl::Component>(&decl_bytes) {
                         if let Err(err) = cm_fidl_validator::validate(&cm_decl) {
-                            warn!(%err, %url, "Invalid cm");
+                            warn!(err:%, url:%; "Invalid cm");
                         } else {
                             if let Some(schema) = cm_decl.config {
                                 match schema
@@ -234,7 +234,7 @@ impl PackageDataCollector {
                             }
                         }
                     } else {
-                        warn!(%url, "cm failed to be decoded");
+                        warn!(url:%; "cm failed to be decoded");
                     }
                     Manifest {
                         component_id: *component_id,
@@ -285,7 +285,7 @@ impl PackageDataCollector {
         file_name: &str,
         file_data: &Vec<u8>,
     ) -> Result<()> {
-        info!(%file_name, "Extracting bootfs manifest");
+        info!(file_name:%; "Extracting bootfs manifest");
         let url = BootUrl::new_resource("/".to_string(), file_name.to_string())?;
         let url = Url::parse(&url.to_string())
             .with_context(|| format!("Failed to convert boot URL to standard URL: {}", url))?;
@@ -370,11 +370,11 @@ impl PackageDataCollector {
         file_name: &str,
         file_data: &Vec<u8>,
     ) -> Result<()> {
-        info!(%file_name, "Extracting bootfs manifest");
+        info!(file_name:%; "Extracting bootfs manifest");
         let cm_base64 = BASE64_STANDARD.encode(&file_data);
         if let Ok(cm_decl) = unpersist::<fdecl::Component>(&file_data) {
             if let Err(err) = cm_fidl_validator::validate(&cm_decl) {
-                warn!(%file_name, %err, "Invalid cm");
+                warn!(file_name:%, err:%; "Invalid cm");
             } else {
                 // Retrieve this component's config values, if any.
                 let cvf_bytes = if let Some(schema) = cm_decl.config {
@@ -428,9 +428,9 @@ impl PackageDataCollector {
 
         // Iterate through all served packages, for each manifest they define, create a node.
         let mut component_id = 0;
-        info!(total = fuchsia_packages.len(), "Found package");
+        info!(total = fuchsia_packages.len(); "Found package");
         for pkg in fuchsia_packages.iter() {
-            info!(url = %pkg.url, "Extracting package");
+            info!(url:% = pkg.url; "Extracting package");
             let merkle = pkg.url.hash().ok_or_else(||
                 anyhow!("Unable to extract precise package information from URL without package hash: {}", pkg.url)
             )?.clone();
@@ -458,11 +458,11 @@ impl PackageDataCollector {
                 Self::extract_zbi_data(&mut component_id, &mut components, &mut manifests, &zbi)?;
             }
             Err(err) => {
-                warn!(%err);
+                warn!("{err}");
             }
         }
 
-        info!(components = components.len(), manifests = manifests.len());
+        info!(components = components.len(), manifests = manifests.len(); "");
 
         Ok(PackageDataResponse::new(components, packages, manifests))
     }
@@ -474,7 +474,7 @@ impl PackageDataCollector {
     ) -> Result<()> {
         let served_packages =
             Self::get_packages(&mut package_reader).context("Failed to read packages listing")?;
-        info!(packages = served_packages.len(), "Done collecting. Found listed in the sys realm");
+        info!(packages = served_packages.len(); "Done collecting. Found listed in the sys realm");
 
         let static_pkgs_result = model.get();
         let static_pkgs = Self::get_static_pkgs(&static_pkgs_result);

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::warn;
 use pathdiff::diff_paths;
 use std::path::{Path, PathBuf};
-use tracing::warn;
 
 /// Attempt to build a canonical path of the form `base`/`path`. If `path` is absolute,
 /// then `base` is ignored. If paths do not actually exist on the filesystem, the resulting path
@@ -37,9 +37,9 @@ pub fn relativize_path<P1: AsRef<Path>, P2: AsRef<Path>>(base: P1, path: P2) -> 
     let base_path = canonicalize(base_ref, "base path for relativize");
     diff_paths(path_ref, &base_path).unwrap_or_else(|| {
         warn!(
-            path = ?path_ref,
-            base = ?base_ref,
-            canonical_base = ?base_path,
+            path:? = path_ref,
+            base:? = base_ref,
+            canonical_base:? = base_path;
             "Failed to relativize path; returning path unchanged",
         );
         path_ref.to_path_buf()
@@ -51,7 +51,7 @@ fn canonicalize<P: AsRef<Path>>(path: P, path_name: &str) -> PathBuf {
     match path_ref.canonicalize() {
         Ok(path) => path,
         Err(err) => {
-            warn!(%path_name, ?path_ref, %err, "Failed to canonicalize");
+            warn!(path_name:%, path_ref:?, err:%; "Failed to canonicalize");
             path_ref.to_path_buf()
         }
     }

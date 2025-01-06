@@ -22,10 +22,10 @@ use fuchsia_hash::Hash;
 use fuchsia_merkle::MerkleTree;
 use futures::channel::oneshot::channel;
 use futures::{join, TryStreamExt};
+use log::info;
 use security_pkg_test_util::config::load_config;
 use security_pkg_test_util::storage::mount_image_as_ramdisk;
 use std::fs::File;
-use tracing::info;
 use zx::{AsHandleRef, Rights, Status};
 
 const DEFAULT_DOMAIN: &str = "fuchsia.com";
@@ -141,7 +141,7 @@ impl AccessCheckRequest {
 
         // Open package as executable via pkg-cache's fuchsia.pkg/PackageCache.Get API.
         let pkg_cache_get_rx_result = if self.selectors.pkg_cache_get {
-            info!(%package_merkle, "Opening package via fuchsia.pkg/PackageCache.Get");
+            info!(package_merkle:%; "Opening package via fuchsia.pkg/PackageCache.Get");
             // In all of the uses of this check in these tests, the package's blobs are already
             // present in blobfs.
             // If this stops being the case, get_already_cached will fail (notifying a developer to
@@ -161,7 +161,7 @@ impl AccessCheckRequest {
             ))
         } else {
             info!(
-                %package_merkle,
+                package_merkle:%;
                 "Skipping open package via fuchsia.pkg/PackageCache.Get"
             );
             None
@@ -173,14 +173,14 @@ impl AccessCheckRequest {
             &self.config.domain_with_hash, &self.config.package_name, &package_merkle
         );
         let pkg_resolver_with_hash_rx_result = if self.selectors.pkg_resolver_with_hash {
-            info!(%url_with_hash, "Opening package via pkg-resolver");
+            info!(url_with_hash:%; "Opening package via pkg-resolver");
             let package_directory_proxy = self.resolve_package(&url_with_hash).await;
             Some((
                 self.attempt_readable(&package_directory_proxy).await,
                 self.attempt_executable(&package_directory_proxy).await,
             ))
         } else {
-            info!(%url_with_hash, "Skipping open package via pkg-resolver");
+            info!(url_with_hash:%; "Skipping open package via pkg-resolver");
             None
         };
 
@@ -189,14 +189,14 @@ impl AccessCheckRequest {
             &self.config.domain_without_hash, &self.config.package_name
         );
         let pkg_resolver_without_hash_rx_result = if self.selectors.pkg_resolver_without_hash {
-            info!(%url_without_hash, "Opening package via pkg-resolver");
+            info!(url_without_hash:%; "Opening package via pkg-resolver");
             let package_directory_proxy = self.resolve_package(&url_without_hash).await;
             Some((
                 self.attempt_readable(&package_directory_proxy).await,
                 self.attempt_executable(&package_directory_proxy).await,
             ))
         } else {
-            info!(%url_without_hash, "Skipping open package via pkg-resolver");
+            info!(url_without_hash:%; "Skipping open package via pkg-resolver");
             None
         };
 
@@ -398,7 +398,7 @@ async fn access_ota_blob_as_executable() {
         test_config_path,
         ..
     } = &from_env();
-    info!(?args, "Initalizing access_ota_blob_as_executable");
+    info!(args:?; "Initalizing access_ota_blob_as_executable");
 
     // Load test environment configuration.
     let config = load_config(test_config_path);
@@ -496,7 +496,7 @@ async fn access_ota_blob_as_executable() {
     let update_url =
         format!("fuchsia-pkg://{}/update/0?hash={}", config.update_domain, update_merkle);
 
-    info!(%update_url, "Initiating update");
+    info!(update_url:%; "Initiating update");
 
     perform_update(&update_url).await;
 

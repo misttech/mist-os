@@ -59,14 +59,14 @@ async fn main() -> Result<(), Error> {
         Ok(config) => {
             for app_uuid in config.application_uuids {
                 let service_name = format!("fuchsia.tee.Application.{}", app_uuid.as_hyphenated());
-                tracing::debug!("Serving {}", service_name);
+                log::debug!("Serving {}", service_name);
                 let fidl_uuid = uuid_to_fuchsia_tee_uuid(&app_uuid);
                 fs.dir("svc").add_service_at(service_name, move |channel| {
                     Some(IncomingRequest::Application(ServerEnd::new(channel), fidl_uuid))
                 });
             }
         }
-        Err(error) => tracing::warn!("Unable to serve applications: {:?}", error),
+        Err(error) => log::warn!("Unable to serve applications: {:?}", error),
     }
 
     fs.take_and_serve_directory_handle()?;
@@ -83,14 +83,14 @@ async fn serve(
         service_stream.for_each_concurrent(None, |request: IncomingRequest| async {
             match request {
                 IncomingRequest::Application(channel, uuid) => {
-                    tracing::trace!("Connecting application: {:?}", uuid);
+                    log::trace!("Connecting application: {:?}", uuid);
                     serve_application_passthrough(uuid, dev_connector_proxy.clone(), channel).await
                 }
                 IncomingRequest::DeviceInfo(channel) => {
                     serve_device_info_passthrough(dev_connector_proxy.clone(), channel).await
                 }
             }
-            .unwrap_or_else(|e| tracing::error!("{:?}", e));
+            .unwrap_or_else(|e| log::error!("{:?}", e));
         });
 
     select! {

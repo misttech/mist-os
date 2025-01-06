@@ -5,8 +5,8 @@
 use anyhow::{Context, Error};
 use fidl_fuchsia_power_button::{Action, MonitorMarker, MonitorProxy};
 use fuchsia_async::Task;
+use log::error;
 use std::sync::{Arc, Mutex};
-use tracing::error;
 
 struct PowerButtonInner {
     proxy: MonitorProxy,

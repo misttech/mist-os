@@ -19,13 +19,13 @@ use hyper::server::accept::from_stream;
 use hyper::server::Server;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, StatusCode};
+use log::{info, warn};
 use rustls::{Certificate, ServerConfig};
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_rustls::TlsAcceptor;
-use tracing::{info, warn};
 
 /// Flags for pkg_server.
 #[derive(FromArgs, Debug, PartialEq)]
@@ -82,8 +82,8 @@ impl RequestHandler {
 
     fn not_found(path: &str, err: Option<Error>) -> Result<Response<Body>> {
         match err {
-            Some(err) => warn!(%path, ?err, "Not found"),
-            None => warn!(%path, "Not found"),
+            Some(err) => warn!(path:%, err:?; "Not found"),
+            None => warn!(path:%; "Not found"),
         }
         Response::builder()
             .status(StatusCode::NOT_FOUND)
@@ -92,7 +92,7 @@ impl RequestHandler {
     }
 
     fn ok(path: &str, body: Vec<u8>) -> Result<Response<Body>> {
-        info!(?path, "OK");
+        info!(path:?; "OK");
         Response::builder().status(StatusCode::OK).body(body.into()).map_err(Error::from)
     }
 
@@ -128,7 +128,7 @@ fn serve_package_server_protocol(url_recv: Receiver<String>) {
                         PackageServer_Request::GetUrl { responder } => {
                             let local_url = local_url.await.unwrap();
                             info!(
-                                %local_url,
+                                local_url:%;
                                 "Responding to test.security.pkg.PackageServer.GetUrl request",
                             );
                             responder.send(&local_url).unwrap();
@@ -149,7 +149,7 @@ async fn main() {
     info!("Starting pkg_server");
     let args @ Args { tls_certificate_chain_path, tls_private_key_path, repository_path } =
         &from_env();
-    info!(?args, "Initalizing pkg_server");
+    info!(args:?; "Initalizing pkg_server");
 
     let (url_send, url_recv) = channel();
     serve_package_server_protocol(url_recv);
@@ -208,7 +208,7 @@ async fn main() {
     let server: Server<_, _, Executor> =
         Server::builder(from_stream(connections)).executor(Executor).serve(make_service);
 
-    info!(%addr, "pkg_server listening");
+    info!(addr:%; "pkg_server listening");
 
     url_send.send("https://localhost".to_string()).unwrap();
 
