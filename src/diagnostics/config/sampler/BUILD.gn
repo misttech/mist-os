@@ -46,7 +46,7 @@ config_data_for_assembly("sampler_config_internal") {
 resource("sampler-validation-resources") {
   sources = sampler_files
 
-  # The component will see this as /pkg/config/fuchsia/metrics/foo.json
+  # The component will see this as /pkg/config/metrics/fuchsia/foo.json
   outputs = [ "config/metrics/fuchsia/{{source_file_part}}" ]
 }
 
