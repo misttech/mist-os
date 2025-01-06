@@ -11,8 +11,15 @@
     #address-cells = <2>;
     #size-cells = <2>;
 
-    bt-uart {
+    bt_uart: bt-uart {
       compatible = "test,bt-uart";
       serial-port = <TEST_CLASS TEST_VID TEST_PID>;
+      #uart-cells = <0>;
+    };
+
+    bt {
+      compatible = "bt-controller";
+      uarts = <&bt_uart>;
+      uart-names = TEST_NAME;
     };
 };

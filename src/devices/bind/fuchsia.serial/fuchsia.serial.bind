@@ -19,3 +19,5 @@ extend uint fuchsia.BIND_SERIAL_CLASS {
   // Kernel debug serial
   KERNEL_DEBUG = 0x04,
 };
+
+string NAME;
