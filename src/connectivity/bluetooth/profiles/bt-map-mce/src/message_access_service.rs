@@ -10,7 +10,7 @@ use bt_obex::header::{Header, HeaderSet};
 use bt_obex::ObexError;
 use fuchsia_bluetooth::types::Channel;
 use fuchsia_sync::Mutex;
-use tracing::trace;
+use log::trace;
 use uuid::{uuid, Uuid};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_map as fidl_map};
 

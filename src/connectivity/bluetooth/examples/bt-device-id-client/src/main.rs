@@ -5,7 +5,7 @@
 use anyhow::{Context, Error};
 use fidl_fuchsia_bluetooth_deviceid as di;
 use futures::Future;
-use tracing::info;
+use log::info;
 
 fn example_di_record() -> di::DeviceIdentificationRecord {
     di::DeviceIdentificationRecord {

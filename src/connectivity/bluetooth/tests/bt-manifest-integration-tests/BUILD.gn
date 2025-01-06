@@ -20,7 +20,7 @@ rustc_test("bt_rfcomm_smoke_test_bin") {
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/bt_rfcomm_smoke_test.rs" ]
@@ -52,7 +52,7 @@ rustc_test("bt_avrcp_smoke_test_bin") {
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/bt_avrcp_smoke_test.rs" ]
@@ -85,7 +85,7 @@ rustc_test("bt_avrcp_target_smoke_test_bin") {
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/bt_avrcp_target_smoke_test.rs" ]
@@ -122,7 +122,7 @@ rustc_test("bt_hfp_audio_gateway_smoke_test_bin") {
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/bt_hfp_audio_gateway_smoke_test.rs" ]
@@ -180,7 +180,7 @@ rustc_binary("bt_a2dp_topology_fake_bin") {
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/bt_a2dp_topology_fake.rs" ]
@@ -220,7 +220,7 @@ rustc_test("bt_a2dp_smoke_test_bin") {
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/bt_a2dp_smoke_test.rs" ]
@@ -275,7 +275,7 @@ rustc_test("bt_init_smoke_test_bin") {
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/bt_init_smoke_test.rs" ]
@@ -346,7 +346,7 @@ rustc_test("bt_gap_smoke_test_bin") {
     "//src/lib/fuchsia-component-test",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "src/bt_gap_smoke_test.rs" ]

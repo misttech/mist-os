@@ -7,8 +7,8 @@ use fuchsia_bluetooth::profile::ValidScoConnectionParameters;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect_derive::Unit;
 use futures::{Future, FutureExt, StreamExt};
+use log::{debug, info, warn};
 use std::collections::HashSet;
-use tracing::{debug, info, warn};
 use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 use crate::error::ScoConnectError;
@@ -218,7 +218,7 @@ impl ScoConnector {
         codecs: Vec<CodecId>,
     ) -> impl Future<Output = Result<ScoConnection, ScoConnectError>> + 'static {
         let params = self.parameters_for_codecs(codecs);
-        info!(%peer_id, ?params, "Initiating SCO connection");
+        info!(peer_id:%, params:?; "Initiating SCO connection");
 
         let proxy = self.proxy.clone();
         async move {
@@ -234,10 +234,12 @@ impl ScoConnector {
                     // Return early if there is a FIDL issue, or we succeeded.
                     Err(ScoConnectError::Fidl { .. }) | Ok(_) => return result,
                     // Otherwise continue to try the next params.
-                    Err(e) => debug!(%peer_id, ?param, ?e, "Connection failed, trying next set.."),
+                    Err(e) => {
+                        debug!(peer_id:%, param:?, e:?; "Connection failed, trying next set..")
+                    }
                 }
             }
-            info!(%peer_id, "Exhausted SCO connection parameters");
+            info!(peer_id:%; "Exhausted SCO connection parameters");
             Err(ScoConnectError::ScoFailed)
         }
     }
@@ -248,7 +250,7 @@ impl ScoConnector {
         codecs: Vec<CodecId>,
     ) -> impl Future<Output = Result<ScoConnection, ScoConnectError>> + 'static {
         let params = self.parameters_for_codecs(codecs);
-        info!(%peer_id, ?params, "Accepting SCO connection");
+        info!(peer_id:%, params:?; "Accepting SCO connection");
 
         let proxy = self.proxy.clone();
         Self::setup_sco_connection(proxy, peer_id, ScoInitiatorRole::Accept, params)

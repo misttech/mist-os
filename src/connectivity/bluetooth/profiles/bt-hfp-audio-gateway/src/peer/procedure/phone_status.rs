@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use at_commands as at;
-use tracing::debug;
+use log::debug;
 
 use super::{Procedure, ProcedureError, ProcedureMarker, ProcedureRequest};
 use crate::peer::service_level_connection::SlcState;

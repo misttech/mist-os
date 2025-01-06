@@ -10,8 +10,8 @@ use fidl_fuchsia_bluetooth_avrcp::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use futures::TryStreamExt;
+use log::{trace, warn};
 use std::sync::Arc;
-use tracing::{trace, warn};
 
 use crate::media::media_sessions::MediaSessions;
 
@@ -20,7 +20,7 @@ async fn handle_target_request(
     request: TargetHandlerRequest,
     media_sessions: Arc<MediaSessions>,
 ) -> Result<(), fidl::Error> {
-    trace!(request = request.method_name(), "Received target request");
+    trace!(request = request.method_name(); "Received target request");
     match request {
         TargetHandlerRequest::GetEventsSupported { responder } => {
             // Send a static response of TG supported events.

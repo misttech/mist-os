@@ -21,10 +21,10 @@ use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{Future, FutureExt, TryFutureExt};
 use futures::StreamExt;
+use log::warn;
 use objects::Parser;
 use std::collections::HashMap;
 use std::io::Cursor;
-use tracing::warn;
 use uuid::{uuid, Uuid};
 
 use crate::profile::transport_type_from_protocol;
@@ -167,7 +167,7 @@ impl Session {
                                 ..Default::default()
                             })
                             .await
-                            .inspect_err(|err| warn!(%err, "Failed to send new event report"));
+                            .inspect_err(|err| warn!(err:%; "Failed to send new event report"));
                     }
                     // FIDL server end closed which means the client no longer needs the service.
                     _ = fidl_closed_fut => return Ok(()),
@@ -351,7 +351,7 @@ impl ObexServerHandler for ServerHandler {
 
         let maybe_notification: Result<Notification, _> = (&event_report).try_into();
         let Ok(mut notification) = maybe_notification else {
-            warn!(e = %maybe_notification.err().unwrap(),  "Failed to convert event report to notification: {event_report:?}");
+            warn!(e:% = maybe_notification.err().unwrap();  "Failed to convert event report to notification: {event_report:?}");
             return Ok(());
         };
 
@@ -360,7 +360,7 @@ impl ObexServerHandler for ServerHandler {
         let _ = self
             .notification_sender
             .unbounded_send((notification, received_time))
-            .inspect_err(|err| warn!(%err, "Failed to relay notification"));
+            .inspect_err(|err| warn!(err:%; "Failed to relay notification"));
         Ok(())
     }
 

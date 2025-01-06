@@ -5,7 +5,7 @@
 use anyhow::{format_err, Result};
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::{select, StreamExt};
-use tracing::{debug, info, warn};
+use log::{debug, info, warn};
 use {at_commands as at, fidl_fuchsia_bluetooth_hfp as fidl_hfp, fuchsia_async as fasync};
 
 use crate::config::HandsFreeFeatureSupport;
@@ -46,11 +46,11 @@ impl PeerTask {
     }
 
     pub async fn run(mut self) {
-        info!(peer=%self.peer_id, "Starting task.");
+        info!(peer:% = self.peer_id; "Starting task.");
         let result = (&mut self).run_inner().await;
         match result {
-            Ok(_) => info!(peer=%self.peer_id, "Successfully finished task."),
-            Err(err) => warn!(peer = %self.peer_id, error = %err, "Finished task with error"),
+            Ok(_) => info!(peer:% =self.peer_id; "Successfully finished task."),
+            Err(err) => warn!(peer:% = self.peer_id, error:% = err; "Finished task with error"),
         }
     }
 

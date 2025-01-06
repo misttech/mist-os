@@ -13,8 +13,8 @@ use fuchsia_inspect_derive::Inspect;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
 use futures::FutureExt;
+use log::{error, info, warn};
 use profile_client::ProfileEvent;
-use tracing::{error, info, warn};
 
 mod browse_controller_service;
 mod controller_service;

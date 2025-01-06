@@ -31,7 +31,7 @@ use fidl::endpoints::create_request_stream;
 use fidl_fuchsia_power_battery as fpower;
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::{FusedStream, Stream, StreamExt};
-use tracing::debug;
+use log::debug;
 
 /// Error type used by this library.
 mod error;

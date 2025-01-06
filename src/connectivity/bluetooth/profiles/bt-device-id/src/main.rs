@@ -7,8 +7,8 @@ use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fuchsia_component::server::ServiceFs;
 use futures::channel::mpsc;
 use futures::future;
+use log::{error, info, warn};
 use std::pin::pin;
-use tracing::{error, info, warn};
 
 use crate::device_id::{DIRecord, DeviceIdServer};
 use crate::fidl_service::run_services;

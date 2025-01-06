@@ -15,8 +15,8 @@ use futures::channel::mpsc;
 use futures::stream::{FusedStream, StreamExt};
 use futures::{select, FutureExt};
 use host_watcher::{HostEvent, HostWatcher};
+use log::{debug, info, trace, warn};
 use std::pin::pin;
-use tracing::{debug, info, trace, warn};
 
 use crate::advertisement::LowEnergyAdvertiser;
 use crate::config::Config;
@@ -289,7 +289,7 @@ impl Provider {
 
         // Some key-based pairing requests require additional steps.
         // TODO(https://fxbug.dev/42178310): Track the salt in `request` to prevent replay attacks.
-        debug!(%peer_id, "Received key based pairing request: {:?}", request);
+        debug!(peer_id:%; "Received key based pairing request: {:?}", request);
         let pairing_type = PairingType::from_action(&request.action, discoverable);
         use bt_metrics::FastpairProviderPeerRequestMetricDimensionRequestType as PeerRequestType;
         match request.action {
@@ -331,7 +331,7 @@ impl Provider {
 
         // Notify the Seeker with the current local host name if known.
         if request.notify_name && name.is_some() {
-            debug!(%peer_id, "Notifying local name (name={name:?})");
+            debug!(peer_id:%; "Notifying local name (name={name:?})");
             let encrypted_response = personalized_name_response(&key, name.unwrap());
             if let Err(e) = self.gatt.notify_additional_data(peer_id, encrypted_response) {
                 warn!("Error notifying Additional Data characteristic: {e:?}");
@@ -448,12 +448,12 @@ impl Provider {
         };
         let result = match parse_fn() {
             Ok(name) => {
-                debug!(%peer_id, "Received request to save personalized name: {}", name);
+                debug!(peer_id:%; "Received request to save personalized name: {}", name);
                 self.set_personalized_name(name);
                 Ok(())
             }
             Err(e) => {
-                warn!(%peer_id, "Couldn't process additional data request: {:?}", e);
+                warn!(peer_id:%; "Couldn't process additional data request: {:?}", e);
                 Err(gatt::Error::UnlikelyError)
             }
         };
@@ -472,9 +472,9 @@ impl Provider {
         match update {
             GattRequest::KeyBasedPairing { peer_id, encrypted_request, response } => {
                 match self.handle_key_based_pairing_request(peer_id, encrypted_request, response) {
-                    Ok(_) => info!(%peer_id, "Successfully started key-based pairing"),
+                    Ok(_) => info!(peer_id:%; "Successfully started key-based pairing"),
                     Err(e) => {
-                        warn!(%peer_id, "Couldn't start key-based pairing: {e:?}");
+                        warn!(peer_id:%; "Couldn't start key-based pairing: {e:?}");
                         log_pairing_status(&self.metrics, /* success= */ false);
                     }
                 }
@@ -492,7 +492,7 @@ impl Provider {
     }
 
     fn handle_message_stream_update(&mut self, id: PeerId) {
-        debug!(%id, "Incoming Message Stream connection");
+        debug!(id:%; "Incoming Message Stream connection");
         // Send the Model Id and current BLE address to the connected Seeker.
         let Some(address) = self.host_watcher.ble_address() else {
             return;
@@ -500,13 +500,13 @@ impl Provider {
 
         let model_id_packet = MessageStreamPacket::new_model_id(self.state.config.model_id);
         if let Err(e) = self.message_stream.send(model_id_packet) {
-            warn!(%id, "Couldn't send Model ID over message stream: {e:?}");
+            warn!(id:%; "Couldn't send Model ID over message stream: {e:?}");
             return;
         }
 
         let address_packet = MessageStreamPacket::new_address(address);
         if let Err(e) = self.message_stream.send(address_packet) {
-            warn!(%id, "Couldn't send Address over message stream: {e:?}");
+            warn!(id:%; "Couldn't send Address over message stream: {e:?}");
         }
     }
 
@@ -586,7 +586,7 @@ impl Provider {
                         Some(id) => {
                             // Pairing completed for peer - notify the Fast Pair FIDL client,
                             // the `sys.Pairing` FIDL client, and record to metrics.
-                            info!(%id, "Fast Pair pairing completed");
+                            info!(id:%; "Fast Pair pairing completed");
                             self.upstream.notify_pairing_complete(id);
                             if let Some(pairing) = self.pairing.inner_mut() {
                                 pairing.notify_pairing_complete(id);

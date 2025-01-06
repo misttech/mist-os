@@ -9,6 +9,7 @@ use futures::future::{FusedFuture, MaybeDone};
 use futures::stream::Stream;
 use futures::task::{Context, Poll, Waker};
 use futures::{ready, Future, FutureExt, TryFutureExt};
+use log::{info, trace, warn};
 use packet_encoding::{Decodable, Encodable};
 use slab::Slab;
 use std::collections::VecDeque;
@@ -16,7 +17,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::{info, trace, warn};
 use zx::{self as zx, MonotonicDuration};
 
 #[cfg(test)]

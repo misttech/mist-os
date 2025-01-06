@@ -9,9 +9,9 @@ use fuchsia_async::{self as fasync, DurationExt, Timer};
 use futures::channel::oneshot::Sender;
 use futures::future::{Fuse, FusedFuture};
 use futures::{select, Future, FutureExt, StreamExt};
+use log::{info, trace, warn};
 use std::fmt::Debug;
 use std::pin::pin;
-use tracing::{info, trace, warn};
 use {
     fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
     fidl_fuchsia_settings as settings,

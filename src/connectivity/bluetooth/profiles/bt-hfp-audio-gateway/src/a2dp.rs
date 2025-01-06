@@ -5,7 +5,7 @@
 use fidl_fuchsia_bluetooth_internal_a2dp as a2dp;
 use fuchsia_bluetooth::types::PeerId;
 use futures::{Future, FutureExt, StreamExt};
-use tracing::warn;
+use log::warn;
 
 /// A client for fuchsia.bluetooth.internal.a2dp.
 

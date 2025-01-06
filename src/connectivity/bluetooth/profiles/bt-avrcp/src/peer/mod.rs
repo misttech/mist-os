@@ -12,12 +12,12 @@ use fuchsia_sync::RwLock;
 use futures::channel::mpsc;
 use futures::stream::StreamExt;
 use futures::Future;
+use log::{info, trace, warn};
 use packet_encoding::{Decodable, Encodable};
 use std::collections::{HashMap, HashSet};
 use std::mem::{discriminant, Discriminant};
 use std::num::NonZeroU16;
 use std::sync::Arc;
-use tracing::{info, trace, warn};
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
     fuchsia_async as fasync,
@@ -627,7 +627,7 @@ impl RemotePeer {
 
     fn update_available_players(&mut self, players: &[MediaPlayerItem]) {
         self.available_players.clear();
-        trace!(%self.peer_id, "Available players updated: {players:?}");
+        trace!(peer_id:% = self.peer_id; "Available players updated: {players:?}");
         players.iter().for_each(|p| {
             let _ = self.available_players.insert(p.player_id(), p.clone());
         });
@@ -832,7 +832,7 @@ impl RemotePeerHandle {
     pub fn set_browsable_player(&self, player: Option<BrowsablePlayer>) {
         let mut lock = self.peer.write();
         let peer_id = lock.peer_id;
-        info!(%peer_id, "Changing browsable player to {:?}", player.as_ref().map(|p| p.player_id));
+        info!(peer_id:%; "Changing browsable player to {:?}", player.as_ref().map(|p| p.player_id));
         lock.browsable_player = player;
     }
 

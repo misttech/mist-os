@@ -6,10 +6,10 @@ use anyhow::{format_err, Result};
 use fuchsia_bluetooth::types::PeerId;
 use futures::stream::FusedStream;
 use futures::Stream;
+use log::warn;
 use std::collections::VecDeque;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
-use tracing::warn;
 
 use super::procedure::{Procedure, ProcedureInputT, ProcedureOutputT};
 use super::procedure_manipulated_state::ProcedureManipulatedState;

@@ -14,11 +14,11 @@ use fidl_fuchsia_io::DirectoryProxy;
 use fuchsia_async as fasync;
 
 use futures::{ready, Stream, StreamExt};
+use log::warn;
 use std::fmt;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tracing::warn;
 
 use crate::bounded_queue::{CreatedAt, SizeOf};
 

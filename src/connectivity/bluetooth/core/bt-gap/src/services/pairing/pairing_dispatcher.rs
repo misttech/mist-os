@@ -41,7 +41,7 @@ use futures::future::{BoxFuture, FutureExt};
 use futures::select;
 use futures::sink::SinkExt;
 use futures::stream::StreamExt;
-use tracing::{info, warn};
+use log::{info, warn};
 
 use crate::services::pairing::pairing_requests::PairingRequests;
 

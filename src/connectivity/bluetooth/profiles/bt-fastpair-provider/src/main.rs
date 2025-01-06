@@ -7,8 +7,8 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
 use futures::channel::mpsc;
 use futures::future;
+use log::{debug, info, warn};
 use std::pin::pin;
-use tracing::{debug, info, warn};
 
 mod advertisement;
 mod config;

@@ -4,8 +4,8 @@
 
 use chrono::NaiveDateTime;
 use fuchsia_bluetooth::types::Uuid;
+use log::trace;
 use packet_encoding::{decodable_enum, Decodable, Encodable};
-use tracing::trace;
 
 pub use self::header_set::HeaderSet;
 use self::obex_string::ObexString;
@@ -701,7 +701,7 @@ impl Decodable for Header {
             HeaderEncoding::OneByte => 1, // Otherwise, a 1-byte payload is included.
             HeaderEncoding::FourBytes => 4, // Otherwise, a 4-byte payload is included.
         };
-        trace!(?id, %data_length, "Parsed OBEX packet");
+        trace!(id:?, data_length:%; "Parsed OBEX packet");
 
         if buf.len() < start_idx + data_length {
             return Err(PacketError::BufferTooSmall);

@@ -11,11 +11,11 @@ use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
 use fuchsia_sync::Mutex;
 use futures::channel::mpsc;
 use futures::{select, StreamExt};
+use log::{info, warn};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{info, warn};
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
     fidl_fuchsia_bluetooth_rfcomm_test as rfcomm, fuchsia_async as fasync,

@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Error};
 use at_commands as at;
-use tracing::warn;
+use log::warn;
 
 use super::{at_cmd, at_ok, at_resp, Procedure, ProcedureInput, ProcedureOutput};
 

@@ -8,7 +8,7 @@ use fidl_fuchsia_bluetooth_rfcomm_test::RfcommTestRequestStream;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use futures::channel::mpsc;
 use futures::{Future, SinkExt, StreamExt};
-use tracing::info;
+use log::info;
 
 /// The maximum number of FIDL service client connections that will be serviced concurrently.
 const MAX_CONCURRENT_CONNECTIONS: usize = 10;

@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use log::{trace, warn};
 use packet_encoding::Encodable;
 use std::collections::VecDeque;
-use tracing::{trace, warn};
 
 use crate::error::Error;
 use crate::header::{Header, HeaderSet, SingleResponseMode};

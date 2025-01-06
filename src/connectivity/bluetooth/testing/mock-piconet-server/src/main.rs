@@ -17,11 +17,11 @@ use futures::future::FutureExt;
 use futures::select;
 use futures::sink::SinkExt;
 use futures::stream::{SelectAll, StreamExt};
+use log::{error, info, warn};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 use std::pin::pin;
 use std::sync::Arc;
-use tracing::{error, info, warn};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,
     fuchsia_async as fasync,
@@ -339,7 +339,7 @@ impl MockPiconetServerInner {
     ) {
         let res = match self.peers.entry(id) {
             Entry::Vacant(_) => {
-                info!(%id, "Peer not registered");
+                info!(id:%; "Peer not registered");
                 return;
             }
             Entry::Occupied(mut entry) => entry.get_mut().new_advertisement(services, receiver),
@@ -354,7 +354,7 @@ impl MockPiconetServerInner {
                 fasync::Task::spawn(closed_fut).detach();
                 self.find_matching_searches(id, svc_ids);
             }
-            Err(e) => info!(%id, "Couldn't advertise services: {e:?}"),
+            Err(e) => info!(id:%; "Couldn't advertise services: {e:?}"),
         }
     }
 

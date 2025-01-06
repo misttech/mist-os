@@ -14,9 +14,9 @@ use fuchsia_bluetooth::types::{Address, BondingData, HostData, HostId, HostInfo,
 use fuchsia_sync::RwLock;
 use futures::future::try_join_all;
 use futures::{Future, FutureExt, TryFutureExt};
+use log::{debug, error, info, trace, warn};
 use std::pin::pin;
 use std::sync::{Arc, Weak};
-use tracing::{debug, error, info, trace, warn};
 use {fidl_fuchsia_bluetooth_sys as sys, fuchsia_async as fasync};
 
 #[cfg(test)]

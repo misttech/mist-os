@@ -13,8 +13,8 @@ use fuchsia_bluetooth::types::{Address, BondingData, HostData, PeerId};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{Future, FutureExt};
 use futures::stream::StreamExt;
+use log::{error, info, warn};
 use std::collections::HashMap;
-use tracing::{error, info, warn};
 
 #[cfg(test)]
 use {

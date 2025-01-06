@@ -10,7 +10,7 @@ use fuchsia_component::server::{ServiceFs, ServiceObj};
 use futures::channel::mpsc::Sender;
 use futures::future::BoxFuture;
 use futures::{FutureExt, SinkExt, StreamExt};
-use tracing::{trace, warn};
+use log::{trace, warn};
 
 use crate::pairing::PairingArgs;
 use crate::provider::ServiceRequest;

@@ -16,8 +16,8 @@ use fidl_fuchsia_sysmem2::{
 use futures::future::{FusedFuture, Future};
 use futures::task::{Context, Poll};
 use futures::{ready, FutureExt};
+use log::error;
 use std::pin::Pin;
-use tracing::error;
 use zx::{self as zx, AsHandleRef};
 
 /// A set of buffers that have been allocated with the SysmemAllocator.

@@ -7,11 +7,11 @@ use fuchsia_bluetooth::types::{A2dpDirection, Channel};
 use fuchsia_sync::Mutex;
 use futures::stream::Stream;
 use futures::{io, FutureExt};
+use log::warn;
 use std::fmt;
 use std::pin::Pin;
 use std::sync::{Arc, RwLock, Weak};
 use std::task::{Context, Poll};
-use tracing::warn;
 use zx::{MonotonicDuration, Status};
 
 use crate::types::{

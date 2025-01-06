@@ -10,11 +10,11 @@ use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 use futures::future::Either;
 use futures::{Future, FutureExt};
+use log::{trace, warn};
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::{HashMap, VecDeque};
 use std::pin::pin;
 use std::sync::Arc;
-use tracing::{trace, warn};
 use zx::MonotonicDuration;
 
 pub mod browse_channel;

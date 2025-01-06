@@ -8,9 +8,9 @@ use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component_test::{Capability, RealmInstance};
 use futures::future::Either;
 use futures::{Future, FutureExt, StreamExt};
+use log::info;
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
 use std::pin::pin;
-use tracing::info;
 
 const DEVICE_ID_URL: &str =
     "fuchsia-pkg://fuchsia.com/bt-device-id-integration-tests#meta/bt-device-id.cm";

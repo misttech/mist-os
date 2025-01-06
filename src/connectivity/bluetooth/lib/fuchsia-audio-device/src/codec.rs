@@ -130,11 +130,11 @@ impl CodecRequest {
             responder: Box::new(move |time| {
                 let mut lock = state.lock();
                 let StartState::Starting(ref mut responder) = *lock else {
-                    tracing::warn!("Not in starting state, noop response");
+                    log::warn!("Not in starting state, noop response");
                     return;
                 };
                 let Some(responder) = responder.take() else {
-                    tracing::warn!("Responder missing for start, noop");
+                    log::warn!("Responder missing for start, noop");
                     return;
                 };
                 let Ok(time) = time else {
@@ -153,11 +153,11 @@ impl CodecRequest {
             responder: Box::new(move |time| {
                 let mut lock = state.lock();
                 let StartState::Stopping(ref mut responder) = *lock else {
-                    tracing::warn!("Not in stopping state, noop response");
+                    log::warn!("Not in stopping state, noop response");
                     return;
                 };
                 let Some(responder) = responder.take() else {
-                    tracing::warn!("Responder missing for stop, noop");
+                    log::warn!("Responder missing for stop, noop");
                     return;
                 };
                 let Ok(time) = time else {
@@ -262,7 +262,7 @@ impl SoftCodec {
                 Some(Ok(request)) => request,
             };
             use fidl_fuchsia_hardware_audio::CodecRequest::*;
-            tracing::info!("Handling codec request: {request:?}");
+            log::info!("Handling codec request: {request:?}");
             match request {
                 GetHealthState { responder } => {
                     let _ = responder.send(&fidl_fuchsia_hardware_audio::HealthState::default());
@@ -303,13 +303,13 @@ impl SoftCodec {
                         }
                         StartState::Starting(ref mut existing_responder) => {
                             // Started while starting
-                            tracing::warn!("Got start while starting, closing codec");
+                            log::warn!("Got start while starting, closing codec");
                             drop(responder);
                             drop(existing_responder.take());
                         }
                         _ => {
                             // Started while stopping
-                            tracing::warn!("Got start while stopping, closing codec");
+                            log::warn!("Got start while stopping, closing codec");
                             drop(responder);
                         }
                     }
@@ -329,13 +329,13 @@ impl SoftCodec {
                         }
                         StartState::Stopping(ref mut existing_responder) => {
                             // Stopped while stopping
-                            tracing::warn!("Got stop while stopping, closing codec");
+                            log::warn!("Got stop while stopping, closing codec");
                             drop(responder);
                             drop(existing_responder.take());
                         }
                         _ => {
                             // Started while stopping.
-                            tracing::warn!("Got stop while starting, closing codec");
+                            log::warn!("Got stop while starting, closing codec");
                             drop(responder);
                         }
                     }

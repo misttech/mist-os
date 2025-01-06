@@ -13,9 +13,9 @@ use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::lock::Mutex;
 use futures::FutureExt;
+use log::{debug, info, trace, warn};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::{debug, info, trace, warn};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use crate::rfcomm::session::Session;
@@ -81,7 +81,7 @@ impl Clients {
         let new_channel =
             ServerChannel::all().find(|sc| !inner.channel_receivers.contains_key(&sc));
         new_channel.map(|channel| {
-            trace!(server_channel = %channel, "Reserving RFCOMM channel");
+            trace!(server_channel:% = channel; "Reserving RFCOMM channel");
             let tagged_client = RegisteredClient {
                 connection_receiver: proxy,
                 _channel_number: inner
@@ -101,7 +101,7 @@ impl Clients {
         server_channel: ServerChannel,
         channel: Channel,
     ) -> Result<(), Error> {
-        trace!(%peer_id, %server_channel, "Delivering RFCOMM channel to client");
+        trace!(peer_id:%, server_channel:%; "Delivering RFCOMM channel to client");
         let inner = self.inner.lock().await;
         let client = inner
             .channel_receivers
@@ -194,7 +194,7 @@ impl RfcommServer {
         server_channel: ServerChannel,
         responder: bredr::ProfileConnectResponder,
     ) -> Result<(), Error> {
-        trace!(%peer_id, %server_channel, "Opening RFCOMM channel");
+        trace!(peer_id:%, server_channel:%; "Opening RFCOMM channel");
 
         match self.sessions.get(&peer_id).and_then(|s| s.upgrade()) {
             None => {
@@ -222,7 +222,7 @@ impl RfcommServer {
         if self.is_active_session(&peer_id) {
             return Err(format_err!("RFCOMM Session already exists with peer {peer_id}"));
         }
-        info!(%peer_id, max_tx = %l2cap.max_tx_size(), "Handling new L2CAP connection for the RFCOMM PSM");
+        info!(peer_id:%, max_tx:% = l2cap.max_tx_size(); "Handling new L2CAP connection for the RFCOMM PSM");
 
         // Create a new RFCOMM Session with the provided `channel_opened_callback` which will be
         // called anytime an RFCOMM channel is created. Opened RFCOMM channels will be delivered
@@ -237,7 +237,7 @@ impl RfcommServer {
         let _ = session.iattach(&self.inspect, inspect::unique_name("peer_"));
         let closed_fut = session.finished();
         if self.sessions.insert(peer_id, session).is_some() {
-            debug!(%peer_id, "Overwriting existing RFCOMM session");
+            debug!(peer_id:%; "Overwriting existing RFCOMM session");
         }
 
         // Task eagerly removes the Session from the set of active sessions upon termination.

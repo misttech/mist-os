@@ -8,7 +8,7 @@ use fidl_fuchsia_bluetooth_hfp_test::{HfpTestRequest, HfpTestRequestStream};
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use futures::channel::mpsc::Sender;
 use futures::{FutureExt, SinkExt, StreamExt, TryStreamExt};
-use tracing::info;
+use log::info;
 
 /// The maximum number of fidl service client connections that will be serviced concurrently.
 const MAX_CONCURRENT_CONNECTIONS: usize = 10;

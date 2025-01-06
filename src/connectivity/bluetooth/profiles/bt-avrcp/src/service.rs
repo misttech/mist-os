@@ -13,7 +13,7 @@ use futures::channel::mpsc;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{StreamExt, TryStreamExt};
 use futures::Future;
-use tracing::{info, warn};
+use log::{info, warn};
 
 use crate::peer::Controller;
 use crate::peer_manager::ServiceRequest;

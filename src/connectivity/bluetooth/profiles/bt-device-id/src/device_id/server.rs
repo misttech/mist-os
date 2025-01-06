@@ -7,7 +7,7 @@ use core::task::{Context, Poll};
 use futures::channel::mpsc;
 use futures::stream::{FlattenUnordered, FuturesUnordered};
 use futures::{ready, select, Future, StreamExt};
-use tracing::{info, trace, warn};
+use log::{info, trace, warn};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_deviceid as di};
 
 use crate::device_id::service_record::{DIRecord, DeviceIdentificationService};
@@ -91,11 +91,11 @@ impl DeviceIdServer {
     /// Advertises the default Device Identification provided to the server on startup.
     fn make_default_advertisement(&mut self) -> Result<(), Error> {
         let Some(record) = self.default.as_ref() else { return Ok(()) };
-        trace!(?record, "Publishing default DI record");
+        trace!(record:?; "Publishing default DI record");
         let bredr_record: bredr::ServiceDefinition = record.into();
         let advertisement = Self::advertise(&self.profile, vec![bredr_record.clone()])?;
         self.default_di_advertisement = Some(advertisement);
-        info!(?bredr_record, "Successfully published DI record");
+        info!(bredr_record:?; "Successfully published DI record");
         Ok(())
     }
 

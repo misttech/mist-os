@@ -22,8 +22,8 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::future::BoxFuture;
 use futures::stream::{FusedStream, FuturesUnordered, Stream, StreamExt};
 use futures::{Future, FutureExt};
+use log::{debug, info, trace, warn};
 use std::collections::HashMap;
-use tracing::{debug, info, trace, warn};
 
 use crate::types::packets::KeyBasedPairingAction;
 use crate::types::{Error, SharedSecret};
@@ -425,7 +425,7 @@ impl PairingManager {
         if let Err(e) =
             self.upstream_client.delegate.on_pairing_complete(&id.into(), /* success */ true)
         {
-            warn!(%id, "Couldn't notify `sys.Pairing` client: {e:}");
+            warn!(id:%; "Couldn't notify `sys.Pairing` client: {e:}");
         }
     }
 
@@ -508,7 +508,7 @@ impl PairingManager {
         key: SharedSecret,
         pairing_type: PairingType,
     ) -> Result<(), Error> {
-        debug!(%le_id, "Starting a new pairing procedure ({pairing_type:?})");
+        debug!(le_id:%; "Starting a new pairing procedure ({pairing_type:?})");
         if self.procedures.contains_key(&le_id) {
             return Err(Error::internal(&format!("Pairing with {le_id} already in progress")));
         }
@@ -554,7 +554,7 @@ impl PairingManager {
     // pairing request before `compare_passkey` is called with the GATT passkey. While the GFPS
     // does specify this ordering, this may not always be the case in practice.
     pub fn compare_passkey(&mut self, le_id: PeerId, gatt_passkey: u32) -> Result<u32, Error> {
-        debug!(%le_id, %gatt_passkey, "Comparing passkey");
+        debug!(le_id:%, gatt_passkey:%; "Comparing passkey");
         let procedure = self
             .procedures
             .inner()
@@ -579,7 +579,7 @@ impl PairingManager {
     // { success = true }) before `account_key_write` is called. While the GFPS does specify this
     // ordering, this may not always be the case in practice.
     pub fn account_key_write(&mut self, le_id: PeerId) -> Result<(), Error> {
-        debug!(%le_id, "Processing account key write");
+        debug!(le_id:%; "Processing account key write");
         let procedure = self
             .procedures
             .inner()
@@ -651,7 +651,7 @@ impl PairingManager {
     ) -> Result<(), Error> {
         // Unsupported pairing methods will always be rejected.
         if method != PairingMethod::PasskeyComparison {
-            warn!(?le_or_bredr_id, ?method, "Received unsupported pairing method");
+            warn!(le_or_bredr_id:?, method:?; "Received unsupported pairing method");
             let _ = responder.send(false, 0u32);
             self.cancel_pairing_procedure(&le_or_bredr_id)?;
             return Ok(());
@@ -670,7 +670,7 @@ impl PairingManager {
                     self.procedures.inner().iter_mut().find(|(_le_id, p)| p.is_started());
                 if procedure.is_none() {
                     warn!(
-                        %le_or_bredr_id,
+                        le_or_bredr_id:%;
                         "Couldn't match pairing request with inflight Fast Pair procedure"
                     );
                     // TODO(https://fxbug.dev/42052578): Consider relaying upstream if I/O capabilities are
@@ -686,7 +686,7 @@ impl PairingManager {
             // state. Error.
             Some(p) => {
                 warn!(
-                    %le_or_bredr_id, ?p.state,
+                    le_or_bredr_id:%, p_state:? = p.state;
                     "Received unexpected pairing request",
                 );
                 // The current pairing procedure is no longer valid.
@@ -708,7 +708,7 @@ impl PairingManager {
         le_or_bredr_id: PeerId,
         success: bool,
     ) -> Result<Option<PeerId>, Error> {
-        debug!(%le_or_bredr_id, success, "pairing complete");
+        debug!(le_or_bredr_id:%, success; "pairing complete");
         // Try to match the request to the peer's LE or BR/EDR PeerId.
         let procedure = self
             .procedures
@@ -716,7 +716,7 @@ impl PairingManager {
             .iter_mut()
             .find(|(id, p)| **id == le_or_bredr_id || p.bredr_id == Some(le_or_bredr_id));
         if procedure.is_none() {
-            debug!(%le_or_bredr_id, "Pairing complete for non-Fast Pair peer. Ignoring..");
+            debug!(le_or_bredr_id:%; "Pairing complete for non-Fast Pair peer. Ignoring..");
             // TODO(https://fxbug.dev/42052578): Consider relaying upstream if I/O capabilities are defined
             // per peer.
             return Ok(None);
@@ -731,11 +731,11 @@ impl PairingManager {
         }
 
         if success {
-            warn!(%le_id, ?procedure.state, "Unexpected pairing success for Fast Pair procedure");
+            warn!(le_id:%, procedure_state:? = procedure.state; "Unexpected pairing success for Fast Pair procedure");
             // TODO(https://fxbug.dev/42054225): This indicates Fast Pair pairing was completed in an
             // non spec-compliant manner. We should remove the bond via sys.Access/Forget.
         } else {
-            info!(%le_id, "Pairing failure");
+            info!(le_id:%; "Pairing failure");
         }
 
         let id = *le_id;
@@ -747,7 +747,7 @@ impl PairingManager {
         &mut self,
         request: PairingDelegateRequest,
     ) -> Result<Option<PeerId>, Error> {
-        debug!(?request, "Received PairingDelegate request");
+        debug!(request:?; "Received PairingDelegate request");
         if !self.owner.is_fast_pair() {
             debug!("Relaying PairingDelegate request to upstream");
             let relay_task =
@@ -780,7 +780,7 @@ impl PairingManager {
         }
 
         if let Poll::Ready(Some(id)) = self.procedures.poll_next_unpin(cx) {
-            info!(%id, "Deadline reached for Fast Pair procedure. Canceling");
+            info!(id:%; "Deadline reached for Fast Pair procedure. Canceling");
             // Deadline was reached (e.g no updates within the expected time). Procedure is no
             // longer active. In most cases, this signifies an end to the "mandatory" part of the
             // Fast Pair flow. As such, the inspect data is saved.

@@ -8,13 +8,13 @@ use fuchsia_sync::Mutex;
 use futures::ready;
 use futures::stream::{FusedStream, Stream};
 use futures::task::{Context, Poll, Waker};
+use log::{info, trace, warn};
 use packet_encoding::{Decodable, Encodable};
 use slab::Slab;
 use std::collections::VecDeque;
 use std::mem;
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::{info, trace, warn};
 
 #[cfg(test)]
 mod tests;

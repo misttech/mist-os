@@ -12,9 +12,9 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::Mutex;
 use futures::stream::{StreamExt, TryStreamExt};
 use futures::try_join;
+use log::{info, warn};
 use std::collections::HashSet;
 use std::str::FromStr;
-use tracing::{info, warn};
 
 /// Arbitrary Handle assigned to the Battery Service.
 const BATTERY_SERVICE_HANDLE: gatt::ServiceHandle = gatt::ServiceHandle { value: 10 };
@@ -104,7 +104,7 @@ async fn gatt_service_delegate(
                 peer_id, notify, responder, ..
             } => {
                 let peer_id = peer_id.into();
-                info!(%peer_id, "Configured characteristic (notify: {notify})");
+                info!(peer_id:%; "Configured characteristic (notify: {notify})");
                 if notify {
                     state.add_peer(peer_id);
                 } else {

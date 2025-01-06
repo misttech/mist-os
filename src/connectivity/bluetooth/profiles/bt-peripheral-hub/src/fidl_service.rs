@@ -7,8 +7,8 @@ use fidl_fuchsia_bluetooth_power::{ReporterRequestStream, WatcherRequestStream};
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
+use log::info;
 use std::sync::Arc;
-use tracing::info;
 
 use crate::peripheral_state::PeripheralState;
 use crate::reporter::Reporter;

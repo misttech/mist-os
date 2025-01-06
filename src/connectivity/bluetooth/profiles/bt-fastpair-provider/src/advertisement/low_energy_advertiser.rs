@@ -19,7 +19,7 @@ use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::stream::{FusedStream, Stream, StreamExt};
 use futures::{ready, Future, FutureExt};
-use tracing::{debug, info, trace, warn};
+use log::{debug, info, trace, warn};
 
 use crate::gatt_service::FAST_PAIR_SERVICE_UUID;
 use crate::types::{AccountKeyList, Error, ModelId};

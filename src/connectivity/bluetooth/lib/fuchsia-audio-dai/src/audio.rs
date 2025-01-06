@@ -7,8 +7,8 @@ use fidl::prelude::*;
 use fidl_fuchsia_hardware_audio::*;
 use futures::future::MaybeDone;
 use futures::StreamExt;
+use log::info;
 use std::sync::Arc;
-use tracing::info;
 use {fidl_fuchsia_media as media, fuchsia_async as fasync};
 
 use crate::driver::{ensure_dai_format_is_supported, ensure_pcm_format_is_supported};

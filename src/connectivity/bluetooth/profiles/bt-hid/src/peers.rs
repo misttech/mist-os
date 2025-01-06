@@ -6,9 +6,9 @@ use async_utils::stream::FutureMap;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::types::PeerId;
 use futures::StreamExt;
+use log::{debug, error, info};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::collections::hash_map::Entry;
-use tracing::{debug, error, info};
 
 use crate::peer_task::PeerTask;
 

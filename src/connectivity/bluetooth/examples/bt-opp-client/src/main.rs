@@ -11,8 +11,8 @@ use fuchsia_bluetooth::profile::{Attribute, ProtocolDescriptor};
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::client::connect_to_protocol;
 use futures::stream::StreamExt;
+use log::{info, warn};
 use profile_client::{ProfileClient, ProfileEvent};
-use tracing::{info, warn};
 
 /// An example data buffer to be sent to the remote peer.
 // TODO(https://fxbug.dev/42083292): Replace this with a well-formatted OPP type.
@@ -20,19 +20,19 @@ const EXAMPLE_DATA: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
 async fn write_example_data(id: PeerId, client: ObexClient) -> Result<(), Error> {
     // An OPP client write requires sending Connect, Put, Disconnect.
-    info!(%id, "Attempting to initiate OBEX session");
+    info!(id:%; "Attempting to initiate OBEX session");
     let input = HeaderSet::from_header(Header::Description("example OPP client service".into()));
     let response = client.connect(input).await?;
-    info!(%id, "connected to OBEX server: {response:?}");
+    info!(id:%; "connected to OBEX server: {response:?}");
 
     let put_operation = client.put()?;
     let response = put_operation.write_final(&EXAMPLE_DATA, HeaderSet::default()).await?;
-    info!(%id, "wrote data: {response:?}");
+    info!(id:%; "wrote data: {response:?}");
 
     // Either calling `ObexClient::disconnect` or dropping `client` signals disconnection from the
     // OBEX service.
     let response = client.disconnect(HeaderSet::default()).await?;
-    info!(%id, "disconnected session: {response:?}");
+    info!(id:%; "disconnected session: {response:?}");
     Ok(())
 }
 
@@ -52,19 +52,19 @@ async fn handle_profile_events(
                     .iter()
                     .map(|a| Attribute::try_from(a))
                     .collect::<Result<Vec<_>, _>>()?;
-                info!(%id, "Found search result: {protocol:?}");
+                info!(id:%; "Found search result: {protocol:?}");
                 let Some(connect_parameters) = parse_obex_search_result(&protocol, &attributes)
                 else {
-                    warn!(%id, "No OBEX service in protocol");
+                    warn!(id:%; "No OBEX service in protocol");
                     continue;
                 };
                 let client = match connect_to_obex_service(id, &profile, connect_parameters).await {
                     Ok(obex_client) => {
-                        info!(%id, "successfully connected to OPP service");
+                        info!(id:%; "successfully connected to OPP service");
                         obex_client
                     }
                     Err(e) => {
-                        warn!(%id, "couldn't connect to OPP service: {e:?}");
+                        warn!(id:%; "couldn't connect to OPP service: {e:?}");
                         continue;
                     }
                 };
@@ -72,7 +72,7 @@ async fn handle_profile_events(
                 // in the config.
                 match write_example_data(id, client).await {
                     Ok(_) => info!("Finished writing data"),
-                    Err(e) => warn!(%id, "couldn't write data {e:?}"),
+                    Err(e) => warn!(id:%; "couldn't write data {e:?}"),
                 }
             }
             ProfileEvent::PeerConnected { id, protocol, .. } => {

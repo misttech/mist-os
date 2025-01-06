@@ -13,7 +13,7 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_bluetooth::constants::{DEV_DIR, HCI_DEVICE_DIR, INTEGRATION_TIMEOUT as WATCH_TIMEOUT};
 
 use futures::TryFutureExt as _;
-use tracing::error;
+use log::error;
 
 pub mod types;
 

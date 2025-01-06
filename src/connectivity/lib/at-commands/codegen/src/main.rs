@@ -4,11 +4,11 @@
 
 use anyhow::{Context, Result};
 use codegen_lib::{codegen, definition, parser};
+use log::info;
 use simplelog::{Config as LogConfig, LevelFilter, SimpleLogger};
 use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
-use tracing::info;
 
 // This code just confirms we've correctly linked in the parsers.
 #[derive(argh::FromArgs)]

@@ -17,10 +17,10 @@ use fuchsia_fs::directory::{WatchEvent, WatchMessage, Watcher};
 use futures::future::{join, ready, Join, Ready};
 use futures::select;
 use futures::stream::{FusedStream, FuturesUnordered, Stream, StreamExt, StreamFuture};
+use log::{debug, error, info, trace, warn};
 use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
-use tracing::{debug, error, info, trace, warn};
 use {fidl_fuchsia_io as fio, fuchsia_inspect as inspect, fuchsia_trace as trace};
 
 use crate::packet_logs::PacketLogs;
@@ -96,7 +96,7 @@ fn handle_hci_device_event(
             if filename == std::path::Path::new(".") {
                 return;
             }
-            info!(path, "Opening snoop channel");
+            info!(path; "Opening snoop channel");
             match Snooper::new(directory, &path) {
                 Ok(snooper) => {
                     snoopers.push(snooper.into_future());

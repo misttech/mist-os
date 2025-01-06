@@ -5,8 +5,8 @@
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_component::server::ServiceObj;
+use log::{debug, error};
 use profile_client::ProfileClient;
-use tracing::{debug, error};
 
 use crate::peers::Peers;
 

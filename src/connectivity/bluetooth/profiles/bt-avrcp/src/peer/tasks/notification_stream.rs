@@ -7,11 +7,11 @@ use bt_avctp::{AvcCommandResponse, AvcCommandType, AvcResponseType, Error as Avc
 use fuchsia_sync::RwLock;
 use futures::stream::{FusedStream, StreamExt};
 use futures::{ready, Stream};
+use log::trace;
 use packet_encoding::{Decodable, Encodable};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tracing::trace;
 
 use crate::packets::PacketEncodable;
 use crate::peer::{

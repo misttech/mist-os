@@ -10,8 +10,8 @@ use fidl_fuchsia_sysmem2::AllocatorMarker;
 use fidl_fuchsia_tracing_provider::RegistryMarker;
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, RealmInstance};
+use log::info;
 use mock_piconet_client::{BtProfileComponent, PiconetHarness};
-use tracing::info;
 
 const A2DP_SOURCE_URL: &str = "#meta/bt-a2dp.cm";
 const A2DP_SINK_URL: &str = "#meta/bt-a2dp-sink.cm";

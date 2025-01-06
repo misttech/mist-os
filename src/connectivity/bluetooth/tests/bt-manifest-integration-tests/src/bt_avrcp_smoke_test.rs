@@ -11,8 +11,8 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt};
+use log::info;
 use realmbuilder_mock_helpers::mock_component;
-use tracing::info;
 
 /// AVRCP component URL.
 const AVRCP_URL: &str = "fuchsia-pkg://fuchsia.com/bt-avrcp-smoke-test#meta/bt-avrcp.cm";

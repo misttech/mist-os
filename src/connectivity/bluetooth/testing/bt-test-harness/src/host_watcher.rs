@@ -13,11 +13,11 @@ use fuchsia_bluetooth::types::{Address, HostId, HostInfo};
 
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use hci_emulator_client::Emulator;
+use log::error;
 use std::collections::HashMap;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use test_harness::{SharedState, TestHarness, SHARED_STATE_TEST_COMPONENT_INDEX};
-use tracing::error;
 
 use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
 use crate::timeout_duration;

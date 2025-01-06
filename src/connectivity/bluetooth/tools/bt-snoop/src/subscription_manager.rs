@@ -9,9 +9,9 @@ use fidl_fuchsia_bluetooth_snoop::{
 use fuchsia_sync::Mutex;
 use futures::stream::{FuturesUnordered, StreamExt};
 use futures::FutureExt;
+use log::{trace, warn};
 use std::collections::HashMap;
 use std::iter;
-use tracing::{trace, warn};
 
 use crate::snooper::SnoopPacket;
 use crate::{ClientId, DeviceId};

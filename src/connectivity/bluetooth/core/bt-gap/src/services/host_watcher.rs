@@ -8,7 +8,7 @@ use fidl_fuchsia_bluetooth_sys::{self as sys, HostWatcherRequest, HostWatcherReq
 use fuchsia_bluetooth::types::host_info::HostInfo;
 
 use futures::StreamExt;
-use tracing::warn;
+use log::warn;
 
 use crate::host_dispatcher::*;
 

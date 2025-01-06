@@ -10,7 +10,7 @@ use fuchsia_bluetooth::types::{Address, HostInfo};
 use fuchsia_bluetooth::Error;
 use futures::ready;
 use futures::stream::{FusedStream, Stream, StreamExt};
-use tracing::trace;
+use log::trace;
 
 /// Item type returned by `<HostWatcher as Stream>::poll_next`.
 #[derive(Clone, Copy, Debug, PartialEq)]

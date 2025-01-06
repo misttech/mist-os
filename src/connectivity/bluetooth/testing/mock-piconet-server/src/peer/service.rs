@@ -5,9 +5,9 @@
 use fidl_fuchsia_bluetooth_bredr::ServiceClassProfileIdentifier;
 use fuchsia_bluetooth::profile::Psm;
 use fuchsia_bluetooth::types::PeerId;
+use log::warn;
 use slab::Slab;
 use std::collections::{HashMap, HashSet};
-use tracing::warn;
 
 use crate::types::{RegisteredServiceId, ServiceRecord};
 

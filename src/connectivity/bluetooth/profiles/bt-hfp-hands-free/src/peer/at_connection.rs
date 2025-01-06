@@ -12,12 +12,12 @@ use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::io::AsyncWriteExt;
 use futures::stream::FusedStream;
 use futures::Stream;
+use log::warn;
 use std::collections::VecDeque;
 use std::io::Cursor;
 use std::mem;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tracing::warn;
 
 pub struct AtConnection {
     peer_id: PeerId,

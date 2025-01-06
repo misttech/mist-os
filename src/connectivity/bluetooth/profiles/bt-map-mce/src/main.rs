@@ -13,8 +13,8 @@ use fuchsia_inspect::health::Reporter;
 use futures::channel::mpsc::{self, UnboundedReceiver};
 use futures::stream::FuturesUnordered;
 use futures::{future, pin_mut, StreamExt};
+use log::{error, info, warn};
 use profile_client::{ProfileClient, ProfileEvent};
-use tracing::{error, info, warn};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_map as fidl_map};
 
 mod message_access_service;
@@ -81,51 +81,51 @@ async fn run_messaging_client(
         futures::select! {
             request = profile_client.select_next_some() => {
                 if let Err(e) = request {
-                    warn!(%e, "Failed to get profile client event");
+                    warn!(e:%; "Failed to get profile client event");
                     break;
                 }
                 let maybe_peer: Result<Peer, _> = request.unwrap().try_into();
                 match maybe_peer {
-                    Err(e) => warn!(?e, "Failed to process profile event"),
+                    Err(e) => warn!(e:?; "Failed to process profile event"),
                     Ok(Peer::MnsClient(id, protocol, channel)) => {
                         match messaging_client.new_mns_connection(id, protocol, channel).await {
                             Ok(service_fut) => {
-                                info!(peer_id = %id, "Accepted connection from MNS client");
+                                info!(peer_id:% = id; "Accepted connection from MNS client");
                                 notification_service_futs.push(service_fut);
                             }
-                            Err(e) => warn!(peer_id = %id, %e, "Failed to establish MNS connection"),
+                            Err(e) => warn!(peer_id:% = id, e:%; "Failed to establish MNS connection"),
                         }
                     }
                     Ok(Peer::MasServer(id, mas_config)) => {
                         if let Err(e) = messaging_client.connect_new_mas(id, mas_config).await {
-                            warn!(peer_id = %id, %e, "Could not connect to MAS");
+                            warn!(peer_id:% = id, e:%; "Could not connect to MAS");
                             continue;
                         }
-                        info!(peer_id = %id, "Connected to new MAS");
+                        info!(peer_id:% = id; "Connected to new MAS");
                     }
                 }
             }
             stream = fidl_stream_receiver.select_next_some() => {
                 if let Err(e) = messaging_client.set_fidl_stream(stream) {
-                    warn!(?e);
+                    warn!(e:?; "");
                 }
             }
             accessor_fut = messaging_client.select_next_some() => {
                 accessor_service_futs.push(accessor_fut);
             }
             peer_id = accessor_service_futs.select_next_some() => {
-                info!(%peer_id, "Accessor FIDL server terminated");
+                info!(peer_id:%; "Accessor FIDL server terminated");
             }
             result = notification_service_futs.select_next_some() => {
                 let (peer_id, fut_res) = result;
                 if let Err(e) = fut_res {
-                    warn!(%peer_id, %e, "RepositoryNotifier server terminated unexpectedly");
+                    warn!(peer_id:%, e:%; "RepositoryNotifier server terminated unexpectedly");
                 }
                 // We need to reset the MNS session if the notifier service is no longer running.
                 if let Err(e) = messaging_client.reset_notification_registration(peer_id).await {
-                    warn!(%peer_id, %e, "Failed to reset MNS session")
+                    warn!(peer_id:%, e:%; "Failed to reset MNS session")
                 }
-                info!(%peer_id, "Cleaned up MNS session");
+                info!(peer_id:%; "Cleaned up MNS session");
             }
             complete => break,
         }
@@ -160,7 +160,7 @@ async fn main() -> Result<(), Error> {
         |Service::MessagingClient(stream)| async {
             let _ = fidl_stream_sender
                 .unbounded_send(stream)
-                .inspect_err(|e| warn!(%e, "failed to send MessagingClientRequestStream"));
+                .inspect_err(|e| warn!(e:%; "failed to send MessagingClientRequestStream"));
         },
     );
     pin_mut!(fidl_fut);

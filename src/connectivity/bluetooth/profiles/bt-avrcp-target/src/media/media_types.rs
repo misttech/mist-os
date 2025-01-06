@@ -5,7 +5,7 @@
 use fidl_fuchsia_bluetooth_avrcp::{self as fidl_avrcp, MediaAttributes, PlayStatus};
 use fidl_fuchsia_media::{self as fidl_media_types, Metadata, TimelineFunction};
 use fidl_table_validation::ValidFidlTable;
-use tracing::{debug, trace, warn};
+use log::{debug, trace, warn};
 use {fidl_fuchsia_media_sessions2 as fidl_media, fuchsia_async as fasync};
 
 /// Converts time (i64, in nanoseconds) to milliseconds (u32).
@@ -433,7 +433,7 @@ impl MediaInfo {
                 }
                 _ => {
                     trace!(
-                        value = %property.value, "Media metadata ({:?}) not supported",
+                        value:% = property.value; "Media metadata ({:?}) not supported",
                         property.label,
                     );
                 }

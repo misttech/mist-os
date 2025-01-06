@@ -34,8 +34,8 @@ use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::stream::{FusedStream, Stream, StreamExt};
 use futures::task::{Context, Poll, Waker};
 use futures::FutureExt;
+use log::trace;
 use std::pin::Pin;
-use tracing::trace;
 use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 /// Error type used by this library.
@@ -76,7 +76,7 @@ impl TryFrom<bredr::SearchResultsRequest> for ProfileEvent {
         };
         let id: PeerId = peer_id.into();
         responder.send()?;
-        trace!(%id, ?protocol, ?attributes, "Profile Search Result");
+        trace!(id:%, protocol:?, attributes:?; "Profile Search Result");
         Ok(ProfileEvent::SearchResult { id, protocol, attributes })
     }
 }
@@ -90,7 +90,7 @@ impl TryFrom<bredr::ConnectionReceiverRequest> for ProfileEvent {
         };
         let id = peer_id.into();
         let channel = channel.try_into().map_err(Error::connection_receiver)?;
-        trace!(%id, ?protocol, "Incoming connection");
+        trace!(id:%, protocol:?; "Incoming connection");
         Ok(ProfileEvent::PeerConnected { id, channel, protocol })
     }
 }

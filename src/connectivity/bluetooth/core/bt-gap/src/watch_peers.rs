@@ -4,9 +4,9 @@
 
 use fuchsia_bluetooth::types::{Peer, PeerId};
 use fuchsia_sync::Mutex;
+use log::{info, warn};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::{info, warn};
 use {fidl_fuchsia_bluetooth as btfidl, fidl_fuchsia_bluetooth_sys as sys};
 
 pub struct PeerWatcher {

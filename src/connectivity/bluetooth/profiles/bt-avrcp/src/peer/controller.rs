@@ -5,9 +5,9 @@
 use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
 use futures::channel::mpsc;
 use futures::Future;
+use log::trace;
 use packet_encoding::{Decodable, Encodable};
 use std::collections::HashSet;
-use tracing::trace;
 
 use crate::packets::{Error as PacketError, *};
 use crate::peer::{BrowsablePlayer, RemotePeerHandle};

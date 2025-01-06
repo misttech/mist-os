@@ -4,8 +4,8 @@
 
 use fuchsia_inspect_contrib::nodes::NodeTimeExt;
 use fuchsia_inspect_derive::{AttachError, Inspect};
+use log::warn;
 use thiserror::Error;
-use tracing::warn;
 use {at_commands as at, fuchsia_inspect as inspect};
 
 use crate::peer::service_level_connection::{Command, SlcState};

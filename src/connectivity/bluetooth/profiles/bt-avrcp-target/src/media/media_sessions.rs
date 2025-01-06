@@ -13,9 +13,9 @@ use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_sync::RwLock;
 use futures::{future, Future, TryStreamExt};
+use log::{trace, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{trace, warn};
 
 use crate::media::media_state::{
     MediaState, MEDIA_SESSION_ADDRESSED_PLAYER_ID, MEDIA_SESSION_DISPLAYABLE_NAME,
@@ -101,7 +101,7 @@ impl MediaSessions {
         pos_change_interval: u32,
         responder: fidl_avrcp::TargetHandlerWatchNotificationResponder,
     ) -> Result<(), fidl::Error> {
-        trace!(?current, %pos_change_interval, "Registering notification for {event_id:?}");
+        trace!(current:?, pos_change_interval:%; "Registering notification for {event_id:?}");
         let timeout = {
             let mut write = self.inner.write();
             write.register_notification(event_id, current, pos_change_interval, responder)?
@@ -135,7 +135,7 @@ impl MediaSessions {
                     responder,
                 } => {
                     responder.send()?;
-                    trace!(%id, ?delta, "MediaSession update");
+                    trace!(id:%, delta:?; "MediaSession update");
 
                     // Since we are listening to all sessions, update the currently
                     // active media session id every time a watcher event is triggered and
@@ -162,7 +162,7 @@ impl MediaSessions {
                         &create_session_control_proxy,
                     )?;
 
-                    trace!(state = ?sessions_inner, "MediaSession state after update");
+                    trace!(state:? = sessions_inner; "MediaSession state after update");
                 }
                 SessionsWatcherRequest::SessionRemoved { session_id, responder } => {
                     // A media session with id `session_id` has been removed.
@@ -172,7 +172,7 @@ impl MediaSessions {
                     // Clear the currently active session, if it equals `session_id`.
                     // Clear entry in state map.
                     let _ = sessions_inner.write().clear_session(&MediaSessionId(session_id));
-                    trace!(%session_id, state = ?sessions_inner,
+                    trace!(session_id:%, state:? = sessions_inner;
                         "Removed session from MediaSession state",
                     );
                 }

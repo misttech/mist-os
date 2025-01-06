@@ -128,7 +128,7 @@ async fn expect_peer_advertising(
         panic!("unknown method")
     };
     assert_eq!(expected_id, peer_id.into());
-    tracing::info!("Discovered service with protocol: {:?}", protocol);
+    log::info!("Discovered service with protocol: {:?}", protocol);
     responder.send().unwrap();
     let protocol =
         protocol.unwrap().iter().map(|p| ProtocolDescriptor::try_from(p).unwrap()).collect();

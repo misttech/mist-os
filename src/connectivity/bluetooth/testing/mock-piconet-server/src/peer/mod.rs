@@ -9,9 +9,9 @@ use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_sync::RwLock;
 use futures::stream::StreamExt;
 use futures::Future;
+use log::{info, warn};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::{info, warn};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test};
 
 mod search;
@@ -172,7 +172,7 @@ impl MockPeer {
                 }
                 detached_service.detach();
                 let removed = service_mgr_clone.write().unregister_service(&reg_handle_clone);
-                info!(%peer_id, ?removed, "Unregistered service advertisement");
+                info!(peer_id:%, removed:?; "Unregistered service advertisement");
             }
         };
         // TODO(b/327758656): Return an updated `services` when the MPS supports dynamic PSMs.
@@ -230,7 +230,7 @@ impl MockPeer {
         let closed_fut = async move {
             let _ = search_stream.map(|_| ()).collect::<()>().await;
             if search_mgr_clone.write().remove(search_handle) {
-                info!(%peer_id, ?uuid, "Unregistering service search");
+                info!(peer_id:%, uuid:?; "Unregistering service search");
             }
         };
 

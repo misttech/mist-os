@@ -9,7 +9,7 @@ use crate::peer::slc_request::SlcRequest;
 use crate::peer::update::AgUpdate;
 
 use at_commands as at;
-use tracing::info;
+use log::info;
 
 /// The maximum number of characters of a long alphanumeric name.
 /// Defined in HFP v1.9, Section 4.8.

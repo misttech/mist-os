@@ -14,8 +14,8 @@ use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::{select, StreamExt};
+use log::{debug, info, trace};
 use std::fmt::Debug;
-use tracing::{debug, info, trace};
 use zx::MonotonicDuration;
 use {
     fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
@@ -155,7 +155,7 @@ impl AvrcpRelay {
             self.session_relay(avrcp_svc, peer_id, player_request_stream, battery_client);
         Ok(fasync::Task::spawn(async move {
             if let Err(e) = session_fut.await {
-                info!(?e, "session completed");
+                info!(e:?; "session completed");
             }
         }))
     }
@@ -205,13 +205,13 @@ impl AvrcpRelay {
             .on_timeout(INITIAL_AVRCP_RESPONSE_WAIT_TIME, || Err(Error::msg("timed out")))
             .await
         {
-            info!(%e, %peer_id, "Failed to update initial attributes");
+            info!(e:%, peer_id:%; "Failed to update initial attributes");
         }
         if let Err(e) = update_status(&controller, &mut last_player_status)
             .on_timeout(INITIAL_AVRCP_RESPONSE_WAIT_TIME, || Err(Error::msg("timed out")))
             .await
         {
-            info!(%e, %peer_id, "Failed to update initial play status");
+            info!(e:%, peer_id:%; "Failed to update initial play status");
         }
         building.player_status = Some(last_player_status.clone().into());
         self.update_player_status_inspect(&last_player_status);
@@ -260,16 +260,16 @@ impl AvrcpRelay {
                         sessions2::PlayerRequest::BindVolumeControl { .. } => {
                             // Drop incoming channel, we don't support this interface.
                         },
-                        x => info!(%peer_id, "unhandled player request {x:?}"),
+                        x => info!(peer_id:%; "unhandled player request {x:?}"),
                     }
                 }
                 event = avrcp_notify_fut => {
                     if event.is_none() {
-                        info!(%peer_id, "AVRCP relay stop: notification stream end");
+                        info!(peer_id:%; "AVRCP relay stop: notification stream end");
                         break;
                     }
                     let avrcp::ControllerEvent::OnNotification { timestamp: _, notification } = event.unwrap()?;
-                    trace!(%peer_id, ?notification, "Notification from AVRCP");
+                    trace!(peer_id:%, notification:?; "Notification from AVRCP");
 
                     let mut player_status_updated = false;
 
@@ -284,7 +284,7 @@ impl AvrcpRelay {
                                 .await;
                         match res {
                             Ok(Ok(players)) => {
-                                debug!(%peer_id, "Media players: {players:?}");
+                                debug!(peer_id:%; "Media players: {players:?}");
                                 let mut valid_players = players.iter().filter_map(|p| {
                                     // Return player if and only if it's in active playback status.
                                     use avrcp::PlaybackStatus::*;
@@ -299,8 +299,8 @@ impl AvrcpRelay {
                                 }
                             }
                             // Sometimes, browse connection is not yet established when we make the call.
-                            Ok(Err(avrcp::BrowseControllerError::RemoteNotConnected)) => debug!(%peer_id, "Couldn't get media player items because browse connection isn't established"),
-                            e => info!(%peer_id, ?e, "Error checking available player"),
+                            Ok(Err(avrcp::BrowseControllerError::RemoteNotConnected)) => debug!(peer_id:%; "Couldn't get media player items because browse connection isn't established"),
+                            e => info!(peer_id:%, e:?; "Error checking available player"),
                         }
                     }
 
@@ -309,7 +309,7 @@ impl AvrcpRelay {
                         notification.addressed_player.is_some() {
                         let mut building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::default());
                         if let Err(e) = update_attributes(&controller, &mut building, &mut last_player_status).await {
-                            info!(%peer_id, ?e, "Couldn't update AVRCP attributes");
+                            info!(peer_id:%, e:?; "Couldn't update AVRCP attributes");
                         }
                         player_status_updated = true;
 
@@ -317,7 +317,7 @@ impl AvrcpRelay {
 
                     if notification.status.is_some() {
                         if let Err(e) = update_status(&controller, &mut last_player_status).await {
-                            info!(%peer_id, ?e, "Error updating AVRCP status (notification)");
+                            info!(peer_id:%, e:?; "Error updating AVRCP status (notification)");
                         }
                         player_status_updated = true;
                     }
@@ -325,7 +325,7 @@ impl AvrcpRelay {
                     if player_status_updated {
                         let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::default());
                         building.player_status = Some(last_player_status.clone().into());
-                        debug!(%peer_id, ?building, "Updated player status");
+                        debug!(peer_id:%, building:?; "Updated player status");
                         self.update_player_status_inspect(&last_player_status);
                     }
 
@@ -334,7 +334,7 @@ impl AvrcpRelay {
                 }
                 _event = update_status_fut => {
                     if let Err(e) = update_status(&controller, &mut last_player_status).await {
-                        info!(%peer_id, ?e, "Error updating AVRCP status (interval)");
+                        info!(peer_id:%, e:?; "Error updating AVRCP status (interval)");
                     }
                     let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::default());
                     building.player_status = Some(last_player_status.clone().into());
@@ -343,13 +343,13 @@ impl AvrcpRelay {
                 update = battery_client_fut => {
                     match update {
                         None => {
-                            debug!(%peer_id, "BatteryClient finished");
+                            debug!(peer_id:%; "BatteryClient finished");
                             self.battery_watcher_active.set(false);
                         }
-                        Some(Err(e)) => info!(%peer_id, ?e, "BatteryClient stream error"),
+                        Some(Err(e)) => info!(peer_id:%, e:?; "BatteryClient stream error"),
                         Some(Ok(info)) => {
                             if let Err(e) = update_battery_status(&controller, info).await {
-                                info!(%peer_id, ?e, "Error updating AVRCP battery status");
+                                info!(peer_id:%, e:?; "Error updating AVRCP battery status");
                             }
                         }
                     }

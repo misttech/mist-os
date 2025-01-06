@@ -193,7 +193,7 @@ async fn add_mock_audio_device_enumerator_provider(builder: &RealmBuilder) {
     let (sender, mut receiver) = mpsc::channel(0);
     fasync::Task::spawn(async move {
         while let Some(req) = receiver.next().await {
-            tracing::info!("Received AudioDeviceEnumerator request: {:?}", req);
+            log::info!("Received AudioDeviceEnumerator request: {:?}", req);
         }
     })
     .detach();

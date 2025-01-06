@@ -15,11 +15,11 @@ use fuchsia_sync::Mutex;
 use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::select;
 use futures::stream::StreamExt;
+use log::{debug, info};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::collections::hash_map::Entry;
 use std::matches;
 use std::sync::Arc;
-use tracing::{debug, info};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp_test as hfp_test};
 
 use crate::audio::{AudioControl, AudioControlEvent};
@@ -248,7 +248,7 @@ impl Hfp {
                 })
                 .is_some()
             {
-                info!(%id, "Search returned AudioGateway, skipping");
+                info!(id:%; "Search returned AudioGateway, skipping");
                 return Ok(());
             }
         }

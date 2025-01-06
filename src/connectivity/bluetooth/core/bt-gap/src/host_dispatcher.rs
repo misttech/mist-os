@@ -29,11 +29,11 @@ use fuchsia_sync::RwLock;
 use futures::channel::{mpsc, oneshot};
 use futures::future::{self, BoxFuture, FusedFuture, Future, Shared};
 use futures::FutureExt;
+use log::{debug, error, info, trace, warn};
 use slab::Slab;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
-use tracing::{debug, error, info, trace, warn};
 use zx::{self as zx, AsHandleRef, MonotonicDuration};
 
 use crate::host_device::{HostDevice, HostDiscoverableSession, HostListener};

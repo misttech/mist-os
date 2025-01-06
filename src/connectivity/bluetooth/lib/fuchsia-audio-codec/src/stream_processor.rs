@@ -14,11 +14,11 @@ use futures::io::{self, AsyncWrite};
 use futures::stream::{FusedStream, Stream};
 use futures::task::{Context, Poll, Waker};
 use futures::{ready, Future, StreamExt};
+use log::{trace, warn};
 use std::collections::{HashSet, VecDeque};
 use std::mem;
 use std::pin::Pin;
 use std::sync::Arc;
-use tracing::{trace, warn};
 
 use crate::buffer_collection_constraints::buffer_collection_constraints_default;
 use crate::sysmem_allocator::{BufferName, SysmemAllocatedBuffers, SysmemAllocation};

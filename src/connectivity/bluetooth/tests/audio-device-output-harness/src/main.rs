@@ -7,7 +7,7 @@ use fidl_fuchsia_media::{AudioChannelId, AudioDeviceEnumeratorMarker, AudioPcmMo
 use fuchsia_audio_device::stream_config::SoftStreamConfig;
 
 use futures::StreamExt;
-use tracing::info;
+use log::info;
 
 #[fuchsia::main(logging_tags = ["audio-device-output-harness"])]
 async fn main() -> Result<(), anyhow::Error> {

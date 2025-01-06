@@ -5,10 +5,10 @@
 use bitfield::bitfield;
 use fuchsia_bluetooth::types::Address;
 use hmac::{Hmac, Mac};
+use log::debug;
 use packet_encoding::{decodable_enum, Encodable as PacketEncodable};
 use rand::Rng;
 use sha2::Sha256;
-use tracing::debug;
 
 use crate::types::keys::public_key_from_bytes;
 use crate::types::{AccountKey, Error, ModelId, SharedSecret};
@@ -115,7 +115,7 @@ pub fn decrypt_key_based_pairing_request(
     match message_type {
         MessageType::Pairing => {
             let flags = KeyBasedPairingFlags(request[1]);
-            debug!(?flags, "Key-based pairing request");
+            debug!(flags:?; "Key-based pairing request");
             let mut received_provider_address = [0; 6];
             received_provider_address.copy_from_slice(&request[2..8]);
             // The received Provider address can be either the Public or Random address. It is
@@ -153,7 +153,7 @@ pub fn decrypt_key_based_pairing_request(
         }
         MessageType::DeviceAction => {
             let flags = DeviceActionFlags(request[1]);
-            debug!(?flags, "Device Action request");
+            debug!(flags:?; "Device Action request");
             let mut received_provider_address = [0; 6];
             received_provider_address.copy_from_slice(&request[2..8]);
             received_provider_address.reverse();

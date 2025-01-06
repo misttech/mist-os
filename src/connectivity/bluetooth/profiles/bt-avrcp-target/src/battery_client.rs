@@ -5,8 +5,8 @@
 use battery_client::{BatteryClient, BatteryInfo, BatteryLevel};
 use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
 use futures::StreamExt;
+use log::{info, trace};
 use std::sync::Arc;
-use tracing::{info, trace};
 
 use crate::media::media_sessions::MediaSessions;
 
@@ -33,7 +33,7 @@ async fn handle_battery_client_updates(
                 media_sessions.update_battery_status(status);
             }
             Err(e) => {
-                info!(?e, "Ignoring battery update error");
+                info!(e:?; "Ignoring battery update error");
             }
         }
     }
@@ -45,7 +45,7 @@ async fn handle_battery_client_updates(
 pub(crate) async fn process_battery_client_requests(media_sessions: Arc<MediaSessions>) {
     let battery_client = match BatteryClient::create() {
         Err(e) => {
-            info!(?e, "Power integration unavailable");
+            info!(e:?; "Power integration unavailable");
             return;
         }
         Ok(batt) => batt,

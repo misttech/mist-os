@@ -14,7 +14,7 @@ use fidl_fuchsia_bluetooth_hfp::{
 
 use futures::ready;
 use futures::stream::{FusedStream, Stream, StreamExt};
-use tracing::info;
+use log::info;
 
 use super::update::AgUpdate;
 use crate::error::Error;

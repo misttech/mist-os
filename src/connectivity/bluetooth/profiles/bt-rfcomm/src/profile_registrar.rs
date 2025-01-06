@@ -18,9 +18,9 @@ use fuchsia_inspect_derive::Inspect;
 use futures::channel::mpsc;
 use futures::select;
 use futures::stream::{FusedStream, Stream, StreamExt};
+use log::{info, trace, warn};
 use std::collections::HashSet;
 use std::ops::RangeFrom;
-use tracing::{info, trace, warn};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync};
 
 use crate::fidl_service::Service;
@@ -211,7 +211,7 @@ impl ProfileRegistrar {
         channel: bredr::Channel,
         protocol: Vec<bredr::ProtocolDescriptor>,
     ) -> Result<(), Error> {
-        trace!(%peer_id, ?protocol, "Incoming L2CAP connection request");
+        trace!(peer_id:%, protocol:?; "Incoming L2CAP connection request");
         let local = protocol
             .iter()
             .map(|p| ProtocolDescriptor::try_from(p))
@@ -247,7 +247,7 @@ impl ProfileRegistrar {
                 return Err(e);
             }
             Err(e) => {
-                warn!(%peer_id, "Couldn't establish L2CAP connection {e:?}");
+                warn!(peer_id:%; "Couldn't establish L2CAP connection {e:?}");
                 return Err(ErrorCode::Failed);
             }
         };
@@ -265,7 +265,7 @@ impl ProfileRegistrar {
         connection: bredr::ConnectParameters,
         responder: bredr::ProfileConnectResponder,
     ) -> Result<(), Error> {
-        trace!(%peer_id, "Making outgoing connection request {connection:?}");
+        trace!(peer_id:%; "Making outgoing connection request {connection:?}");
         // If the provided `connection` is for a non-RFCOMM PSM, simply forward the outbound
         // connection to the upstream Profile service.
         // Otherwise, route to the RFCOMM server.
@@ -312,10 +312,10 @@ impl ProfileRegistrar {
             // Revoke the current advertisement and wait for the upstream Profile server to
             // process the cancellation. The `connection_relay` will terminate after
             // the upstream has unregistered the advertisement.
-            trace!(id, "Unregistering existing advertisement");
+            trace!(id; "Unregistering existing advertisement");
             let _ = connection_receiver_handle.send_on_revoke();
             connection_relay.map(|_| ()).collect::<()>().await;
-            trace!(id, "Finished waiting for unregistration");
+            trace!(id; "Finished waiting for unregistration");
         }
 
         // We are ready to advertise. Attempt to build the advertisement parameters and set up the
@@ -325,7 +325,7 @@ impl ProfileRegistrar {
             return Ok(vec![]);
         };
         let id = self.get_next_id();
-        trace!(?id, ?params, "Refreshing advertisement from registered services");
+        trace!(id:?, params:?; "Refreshing advertisement from registered services");
         let (connect_client, connect_requests) =
             create_request_stream::<bredr::ConnectionReceiverMarker>();
         // The control handle will be used to revoke the advertisement any time a refresh is
@@ -345,7 +345,7 @@ impl ProfileRegistrar {
             connection_receiver_handle,
             connection_relay: connect_requests.with_epitaph(id),
         });
-        info!(?id, ?advertised_services, "Advertising via the upstream `Profile` server");
+        info!(id:?, advertised_services:?; "Advertising via the upstream `Profile` server");
         Ok(advertised_services)
     }
 
@@ -499,7 +499,7 @@ impl ProfileRegistrar {
                 if let Err(e) =
                     self.handle_outgoing_connection(peer_id, connection, responder).await
                 {
-                    warn!(%peer_id, "Error making outgoing connection: {e:?}");
+                    warn!(peer_id:%; "Error making outgoing connection: {e:?}");
                 }
             }
             bredr::ProfileRequest::Search { payload, .. } => {
@@ -599,10 +599,10 @@ impl ProfileRegistrar {
                         Some(StreamItem::Epitaph(id)) => (id, "closed"),
                         _ => continue,
                     };
-                    info!(?service_id, "Client {log_str} service advertisement");
+                    info!(service_id:?; "Client {log_str} service advertisement");
                     // Unregister the service from the ProfileRegistrar.
                     if let Err(e) = self.unregister_service(service_id).await {
-                        warn!(?service_id, "Error unregistering service: {e:?}");
+                        warn!(service_id:?; "Error unregistering service: {e:?}");
                     }
                 }
                 request = test_requests.select_next_some() => {

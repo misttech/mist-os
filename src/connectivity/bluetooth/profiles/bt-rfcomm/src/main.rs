@@ -10,8 +10,8 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect_derive::Inspect;
 use futures::channel::mpsc;
 use futures::future;
+use log::{debug, warn};
 use std::pin::pin;
-use tracing::{debug, warn};
 
 mod fidl_service;
 mod profile;

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use tracing::warn;
+use log::warn;
 use {fidl_fuchsia_metrics as metrics, fuchsia_async as fasync};
 
 pub use bt_metrics_registry::*;

@@ -10,7 +10,7 @@ use fuchsia_inspect_derive::{AttachError, IValue, Inspect};
 use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Shared};
 use futures::{select, FutureExt, SinkExt, StreamExt};
-use tracing::{error, info, trace};
+use log::{error, info, trace};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use crate::rfcomm::inspect::{DuplexDataStreamInspect, SessionChannelInspect, FLOW_CONTROLLER};
@@ -199,7 +199,7 @@ impl CreditFlowController {
         outgoing_sender: mpsc::Sender<Frame>,
         initial_credits: Credits,
     ) -> Self {
-        trace!(?initial_credits, "Creating credit flow controller");
+        trace!(initial_credits:?; "Creating credit flow controller");
         Self {
             role,
             dlci,
@@ -405,7 +405,7 @@ impl SessionChannel {
                 data_from_client = channel.next() => {
                     match data_from_client {
                         Some(Ok(bytes)) => {
-                            trace!(%dlci, "Sending user-data packet {:?}", bytes);
+                            trace!(dlci:%; "Sending user-data packet {:?}", bytes);
                             let user_data = UserData { information: bytes };
                             flow_controller.send_data_to_peer(user_data).await;
                         }
@@ -413,7 +413,7 @@ impl SessionChannel {
                             error!("Error receiving data from client {e:?}");
                         }
                         None => {
-                            trace!(%dlci, "RFCOMM channel closed by profile");
+                            trace!(dlci:%; "RFCOMM channel closed by profile");
                             // The client has disconnected the RFCOMM channel. We should relay
                             // a Disconnect frame to the remote peer.
                             let disc = Frame::make_disc_command(role, dlci);
@@ -430,7 +430,7 @@ impl SessionChannel {
                 complete => break,
             }
         }
-        info!(%dlci, "SessionChannel processing task finished");
+        info!(dlci:%; "SessionChannel processing task finished");
         // Client closed the `channel` - notify listener of termination.
         let _ = termination_sender.send(());
     }
@@ -480,7 +480,7 @@ impl SessionChannel {
         ));
         let terminated = receiver.map(|_| ()).boxed().shared();
         self.processing_task = Some(SessionChannelTask { _task, user_data_queue, terminated });
-        trace!(dlci = %self.dlci, "Started SessionChannel processing task");
+        trace!(dlci:% = self.dlci; "Started SessionChannel processing task");
     }
 
     /// Receive a user data payload from the remote peer, which will be queued to be sent

@@ -11,8 +11,8 @@ use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_component_test::LocalComponentHandles;
 use futures::channel::mpsc;
 use futures::{SinkExt, StreamExt, TryStream, TryStreamExt};
+use log::info;
 use std::sync::Arc;
-use tracing::info;
 use vfs::directory::entry_container::Directory;
 use vfs::directory::spawn_directory;
 

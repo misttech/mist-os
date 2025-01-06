@@ -9,11 +9,11 @@ use fuchsia_bluetooth::profile::ProtocolDescriptor;
 use fuchsia_bluetooth::types::PeerId;
 use futures::stream::{FusedStream, FuturesUnordered};
 use futures::{select, FutureExt, StreamExt};
+use log::{debug, info, warn};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use tracing::{debug, info, warn};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp as fidl_hfp,
     fuchsia_async as fasync,

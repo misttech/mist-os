@@ -16,11 +16,11 @@ use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_sync::Mutex;
 use futures::stream::{FusedStream, Stream};
 use futures::{Future, StreamExt};
+use log::{trace, warn};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::task::{Poll, Waker};
-use tracing::{trace, warn};
 
 use crate::message_access_service::MasInstance;
 use crate::message_notification_service::Session;
@@ -249,7 +249,7 @@ async fn run_accessor_fidl_server(
     mut accessor_request_stream: AccessorRequestStream,
 ) -> PeerId {
     let peer_id = accessor.peer_id;
-    trace!(%peer_id, "New Accessor server running");
+    trace!(peer_id:%; "New Accessor server running");
     accessor.is_fidl_running.store(true, Ordering::SeqCst);
     while let Some(item) = accessor_request_stream.next().await {
         match item {
@@ -257,7 +257,7 @@ async fn run_accessor_fidl_server(
                 accessor.handle_fidl_request(request).await;
             }
             Err(e) => {
-                warn!(%e, %peer_id, "Accessor FIDL server for peer will terminate.");
+                warn!(e:%, peer_id:%; "Accessor FIDL server for peer will terminate.");
                 break;
             }
         }
@@ -339,7 +339,7 @@ impl Accessor {
 
         for instance in need_registration {
             if let Err(e) = instance.set_register_notification(true).await {
-                warn!(%e, %peer_id, "Failed to register notifications for MAS instance {:?}", instance.id());
+                warn!(e:%, peer_id:%; "Failed to register notifications for MAS instance {:?}", instance.id());
             }
         }
         Ok(mns_server_fut)
@@ -352,7 +352,7 @@ impl Accessor {
         // Turn off notification registrations for all MAS instances.
         for instance in instances {
             if let Err(e) = instance.set_register_notification(false).await {
-                warn!(%e, "Failed to set notification registration to off for MAS {}", instance.id());
+                warn!(e:%; "Failed to set notification registration to off for MAS {}", instance.id());
             }
         }
         self.mns_session.terminate();
@@ -380,7 +380,7 @@ impl Accessor {
                 if discovered_mas_instances.is_empty() {
                     let _ = responder
                         .send(Err(fidl_fuchsia_bluetooth_map::Error::Unavailable))
-                        .inspect_err(|e| warn!(%e, "Failed to send FIDL response"));
+                        .inspect_err(|e| warn!(e:%; "Failed to send FIDL response"));
                     return;
                 }
                 let instances: Vec<fidl_fuchsia_bluetooth_map::MasInstance> =
@@ -390,13 +390,13 @@ impl Accessor {
                         .collect();
                 let _ = responder
                     .send(Ok(instances.as_slice()))
-                    .inspect_err(|e| warn!(%e, "Failed to send FIDL response"));
+                    .inspect_err(|e| warn!(e:%; "Failed to send FIDL response"));
             }
             AccessorRequest::SetNotificationRegistration { payload, responder } => {
                 let Some(relayer) = payload.server else {
                     let _ = responder
                         .send(Err(fidl_fuchsia_bluetooth_map::Error::BadRequest))
-                        .inspect_err(|e| warn!(%e, "Failed to send FIDL response"));
+                        .inspect_err(|e| warn!(e:%; "Failed to send FIDL response"));
                     return;
                 };
 
@@ -405,7 +405,7 @@ impl Accessor {
                 if self.mas_instances.lock().is_empty() {
                     let _ = responder
                         .send(Err(fidl_fuchsia_bluetooth_map::Error::PeerDisconnected))
-                        .inspect_err(|e| warn!(%e, "Failed to send FIDL response"));
+                        .inspect_err(|e| warn!(e:%; "Failed to send FIDL response"));
                     return;
                 }
 
@@ -429,7 +429,7 @@ impl Accessor {
                 if registered_instances.len() != instance_ids.len() {
                     let _ = responder
                         .send(Err(fidl_fuchsia_bluetooth_map::Error::NotFound))
-                        .inspect_err(|e| warn!(%e, "Failed to send FIDL response"));
+                        .inspect_err(|e| warn!(e:%; "Failed to send FIDL response"));
                     return;
                 }
 
@@ -440,10 +440,10 @@ impl Accessor {
                 let mas_to_register = registered_instances.get(&mas_instance_id).unwrap();
 
                 if let Err(e) = mas_to_register.set_register_notification(true).await {
-                    warn!(%e, %peer_id, "Failed to register notifications for MAS {mas_instance_id}");
+                    warn!(e:%, peer_id:%; "Failed to register notifications for MAS {mas_instance_id}");
                     let _ = responder
                         .send(Err((&e).into()))
-                        .inspect_err(|e| warn!(%e, "Failed to send FIDL response"));
+                        .inspect_err(|e| warn!(e:%; "Failed to send FIDL response"));
                     return;
                 }
 
@@ -455,7 +455,7 @@ impl Accessor {
                     relayer,
                     responder,
                 ) {
-                    warn!(%e, %peer_id, "Failed to initialize MNS session");
+                    warn!(e:%, peer_id:%; "Failed to initialize MNS session");
                 }
             }
             unimplemented => {

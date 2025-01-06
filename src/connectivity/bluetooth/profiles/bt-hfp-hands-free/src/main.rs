@@ -6,7 +6,7 @@ use anyhow::{Context, Error};
 use fidl_fuchsia_bluetooth_hfp as fidl_hfp;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use futures::StreamExt;
-use tracing::{debug, error, info};
+use log::{debug, error, info};
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::hfp::Hfp;

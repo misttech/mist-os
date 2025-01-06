@@ -4,9 +4,9 @@
 
 use fuchsia_bluetooth::types::Channel;
 use futures::stream::{FusedStream, TryStreamExt};
+use log::{info, trace};
 use packet_encoding::Encodable;
 use std::cell::{RefCell, RefMut};
-use tracing::{info, trace};
 
 use crate::error::{Error, PacketError};
 use crate::operation::{OpCode, ResponsePacket, MAX_PACKET_SIZE, MIN_MAX_PACKET_SIZE};

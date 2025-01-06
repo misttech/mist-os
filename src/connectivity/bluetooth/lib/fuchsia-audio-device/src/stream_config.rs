@@ -11,8 +11,8 @@ use fuchsia_inspect_derive::{IValue, Inspect};
 use fuchsia_sync::Mutex;
 
 use futures::{select, StreamExt};
+use log::{info, warn};
 use std::sync::Arc;
-use tracing::{info, warn};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use crate::audio_frame_sink::AudioFrameSink;
@@ -270,11 +270,11 @@ impl SoftStreamConfig {
                     match stream_config_request {
                         Some(Ok(r)) => {
                             if let Err(e) = self.handle_stream_request(r) {
-                                warn!(?e, "stream config request")
+                                warn!(e:?; "stream config request")
                             }
                         },
                         Some(Err(e)) => {
-                            warn!(?e, "stream config error, stopping");
+                            warn!(e:?; "stream config error, stopping");
                             return Err(e.into());
                         },
                         None => {
@@ -287,11 +287,11 @@ impl SoftStreamConfig {
                     match ring_buffer_request {
                         Some(Ok(r)) => {
                             if let Err(e) = self.handle_ring_buffer_request(r) {
-                                warn!(?e, "ring buffer request")
+                                warn!(e:?; "ring buffer request")
                             }
                         },
                         Some(Err(e)) => {
-                            warn!(?e, "ring buffer error, dropping stream");
+                            warn!(e:?; "ring buffer error, dropping stream");
                             let _ = MaybeStream::take(&mut self.ring_buffer_stream);
                         },
                         None => {
@@ -437,7 +437,7 @@ impl SoftStreamConfig {
                     clock_recovery_notifications_per_ring,
                 ) {
                     Err(e) => {
-                        warn!(?e, "Error on vmo set format");
+                        warn!(e:?; "Error on vmo set format");
                         responder.send(Err(GetVmoError::InternalError))?;
                     }
                     Ok(vmo_handle) => {
@@ -451,7 +451,7 @@ impl SoftStreamConfig {
                 match self.frame_vmo.lock().start(time.into()) {
                     Ok(()) => responder.send(time.into_nanos() as i64)?,
                     Err(e) => {
-                        warn!(?e, "Error on frame vmo start");
+                        warn!(e:?; "Error on frame vmo start");
                         responder.control_handle().shutdown_with_epitaph(zx::Status::BAD_STATE);
                     }
                 }
@@ -468,7 +468,7 @@ impl SoftStreamConfig {
                     responder.send()?;
                 }
                 Err(e) => {
-                    warn!(?e, "Error on frame vmo stop");
+                    warn!(e:?; "Error on frame vmo stop");
                     responder.control_handle().shutdown_with_epitaph(zx::Status::BAD_STATE);
                 }
             },
