@@ -54,32 +54,9 @@ import("//build/toolchain/rbe.gni")
 #     compiler. These can be accessed at compile time with
 #     [`std::env!`](https://doc.rust-lang.org/stable/std/macro.env.html)
 #
-#   configs (optional)
-#     A list of config labels applying to this target.
-#
-#   deps
-#     List of GN targets on which this crate depends.
-#
-#   public_deps
-#     List of GN targets on which this crate depends publicly.
-#
 #   pass_through
 #     A scope of arguments to pass directly to the underlying wrapped target.
 #     Only the primary target generated will receive these arguments.
-#
-#   metadata (optional)
-#     Metadata to apply to the primary wrapped target.
-#
-#   inputs (optional)
-#     List of additional non-source files read by the compiler. These are typically
-#     configuration or test-data files included in the build with the `include_str!`
-#     macro.
-#
-#   sources
-#     List of source files which this crate is allowed to compile.
-#     The Rust compiler discovers source files by following `mod` declarations
-#     starting at the `crate_root`. The discovered source files must match this
-#     list.
 #
 #   disable_rbe (optional)
 #     Set to true to force this target to build locally, overriding the global
@@ -109,22 +86,19 @@ import("//build/toolchain/rbe.gni")
 #     The name of the target as it appears in the BUILD file. Enables tooling
 #     to find the template invocation in a BUILD file where this target was defined.
 #
-#   testonly (optional)
-#     Standard GN meaning. Testonly option for the generated targets.
 #
-#   visibility (optional)
-#     Standard GN meaning. The visibility option for the generated targets.
-#
-#   assert_no_deps (optional)
-#     Ensure no deps on these targets, see [assert_no_deps](https://gn.googlesource.com/gn/+/main/docs/reference.md#var_assert_no_deps)
-#
-#   applicable_licenses (optional)
+#   applicable_licenses
+#   assert_no_deps
+#   configs
+#   deps
+#   inputs
+#   metadata
+#   public_deps
+#   sources
+#   testonly
+#   visibility
 #     The usual GN meaning.
 template("rustc_artifact") {
-  # rustc does not support dashes in crate names
-  _crate_name = string_replace(invoker.crate_name, "-", "_")
-  _crate_root = invoker.crate_root
-
   _remote_inputs = []
   if (defined(invoker.inputs)) {
     _remote_inputs = invoker.inputs
@@ -142,7 +116,7 @@ template("rustc_artifact") {
   _rustflags = [ "-Cmetadata=${_codegen_metadata}" ]
 
   _flag_deps = [ "//build/rust:api_level_cfg_flags" ]
-  _flag_inputs = [ "$root_build_dir/rust_api_level_cfg_flags.txt" ]
+  _flag_inputs = [ "${root_build_dir}/rust_api_level_cfg_flags.txt" ]
   _rustflags += [ "@rust_api_level_cfg_flags.txt" ]
 
   if (defined(invoker.features)) {
@@ -159,18 +133,8 @@ template("rustc_artifact") {
     _rustflags += invoker.rustflags
   }
 
-  assert(
-      defined(invoker.edition),
-      "Rust targets must set an edition. For new rust targets use: `edition = \"2021\"`")
-  _configs = []
-  if (defined(invoker.configs)) {
-    _configs += invoker.configs
-  }
-  _edition = invoker.edition
-  _configs += [ "//build/config/rust:edition_${_edition}" ]
-
   _group_name = target_name
-  _target_name = "$target_name.actual"
+  _actual_target_name = "${target_name}.actual"
 
   _use_rbe = rust_rbe_enable
   if (defined(invoker.disable_rbe) && invoker.disable_rbe) {
@@ -182,11 +146,11 @@ template("rustc_artifact") {
     _rustflags += [ "--remote-disable" ]
   }
   if (_use_rbe) {
-    # Depend on Rust/RBE scripts and tools
+    # Depend on Rust/RBE scripts and tools.
     _local_inputs += rust_rbe_deps
   }
 
-  # These do not have aux targets (yet)
+  # These do not have aux targets (yet).
   _should_define_rust_aux = invoker.rust_crate_type != "cdylib" &&
                             invoker.rust_crate_type != "dylib" &&
                             (invoker.rust_crate_type != "proc-macro" ||
@@ -196,10 +160,9 @@ template("rustc_artifact") {
     # See //build/rust/rust_auxiliary.gni for more info about .aux targets. We
     # depend on this specific name (without the .actual suffix), so declare it
     # here.
+    _aux_target_name = "${target_name}.aux"
     if (defined(invoker.rust_auxiliary_name)) {
-      _rust_auxiliary_name = invoker.rust_auxiliary_name
-    } else {
-      _rust_auxiliary_name = "$target_name.aux"
+      _aux_target_name = invoker.rust_auxiliary_name
     }
   }
 
@@ -214,27 +177,43 @@ template("rustc_artifact") {
                              "testonly",
                              "visibility",
                            ])
-    public_deps = [ ":$_target_name" ]
+    public_deps = [ ":${_actual_target_name}" ]
     if (_should_define_rust_aux) {
-      public_deps += [ ":$_rust_auxiliary_name" ]
+      public_deps += [ ":${_aux_target_name}" ]
     }
     metadata = {
-      test_component_manifest_program_barrier = [ ":$_target_name" ]
-      link_output_barrier = [ ":$_target_name" ]
+      test_component_manifest_program_barrier = [ ":${_actual_target_name}" ]
+      link_output_barrier = [ ":${_actual_target_name}" ]
     }
   }
 
-  # forwards to: rust_library, rust_proc_macro, executable, shared_library,
-  # or static_library in //build/config/BUILDCONFIG.gn
-  target(invoker.target_type, _target_name) {
-    crate_root = _crate_root
-    crate_name = _crate_name
+  # Forwards to: rust_library, rust_proc_macro, executable, shared_library,
+  # or static_library in //build/config/BUILDCONFIG.gn.
+  target(invoker.target_type, _actual_target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "assert_no_deps",
+                             "deps",
+                             "emit_tool_path",
+                             "metadata",
+                             "output_prefix_override",
+                             "pool",
+                             "public_deps",
+                             "rustenv",
+                             "testonly",
+                             "visibility",
+                           ])
 
-    rustflags = []
+    # rustc does not support dashes in crate names.
+    crate_name = string_replace(invoker.crate_name, "-", "_")
+    crate_root = invoker.crate_root
+
+    rustflags = _rustflags
     if (rust_rbe_enable) {
-      rustflags +=
-          [ "--remote-flag=--label='" +
-            get_label_info(":$_target_name", "label_with_toolchain") + "'" ]
+      rustflags += [ "--remote-flag=--label='" +
+                     get_label_info(":${_actual_target_name}",
+                                    "label_with_toolchain") + "'" ]
     }
     if (_use_rbe && _remote_inputs != []) {
       # Signal to rustc-remote-wrapper.sh that there are additional
@@ -244,15 +223,16 @@ template("rustc_artifact") {
           [ "--remote-inputs=" +
             string_join(",", rebase_path(_remote_inputs, root_build_dir)) ]
     }
-    rustflags += _rustflags
 
     configs = []
-    configs = _configs
-    forward_variables_from(invoker,
-                           [
-                             "deps",
-                             "public_deps",
-                           ])
+    if (defined(invoker.configs)) {
+      configs = invoker.configs
+    }
+    assert(
+        defined(invoker.edition),
+        "Rust targets must set an edition. For new rust targets use: `edition = \"2021\"`")
+    configs += [ "//build/config/rust:edition_${invoker.edition}" ]
+
     inputs = _local_inputs + _flag_inputs
     deps += _flag_deps
 
@@ -260,13 +240,13 @@ template("rustc_artifact") {
         invoker.enforce_source_listing) {
       # fail early when the user forgets to list sources
       assert(defined(invoker.sources), "sources must be listed")
-      _sources = invoker.sources
+      sources = invoker.sources
     } else {
       not_needed(invoker, [ "sources" ])
 
       # This is a hack to workaround the fact that a GN `tool` invocation can't receive arbitrary input.
       # Add a sentinel value so that enforcement is skipped.
-      _sources = [ "//build/rust/__SKIP_ENFORCEMENT__.rs" ]
+      sources = [ "//build/rust/__SKIP_ENFORCEMENT__.rs" ]
 
       # Opting out of strict sources check requires that the package is present
       # in a global allow-list.
@@ -279,15 +259,13 @@ template("rustc_artifact") {
       }
     }
 
-    rustenv = []
-    if (defined(invoker.rustenv)) {
-      rustenv += invoker.rustenv
-    }
-
     # _pass_through and not_needed are to workaround https://crbug.com/gn/10
     _pass_through = invoker.pass_through
     assert(!defined(_pass_through.metadata))
     not_needed([ "_pass_through" ])
+
+    # Pass through these variables unmodified.
+    forward_variables_from(invoker.pass_through, "*")
 
     # The Fuchsia standard library has an implicit #[link] directive
     # pointing to libfdio.so
@@ -296,26 +274,6 @@ template("rustc_artifact") {
                        invoker.target_type == "loadable_module")) {
       deps += [ "//src/lib/fdio/rust:fdio_for_rust_stdlib" ]
     }
-
-    metadata = {
-      if (defined(invoker.metadata)) {
-        forward_variables_from(invoker.metadata, "*")
-      }
-    }
-
-    # pass through these variables unmodified
-    forward_variables_from(invoker.pass_through, "*")
-
-    forward_variables_from(invoker,
-                           [
-                             "emit_tool_path",
-                             "applicable_licenses",
-                             "assert_no_deps",
-                             "pool",
-                             "testonly",
-                             "visibility",
-                             "output_prefix_override",
-                           ])
 
     # Add the global lint defaults.
     configs += [ "//build/config/rust/lints:clippy_warn_default" ]
@@ -327,24 +285,23 @@ template("rustc_artifact") {
     if (defined(visibility)) {
       visibility += [ ":${_group_name}" ]
     }
-    sources = _sources
 
     if (_should_define_rust_aux) {
       forward_variables_from(invoker,
                              [
-                               "zip_rustdoc_to",
+                               "define_rustdoc_test_override",
+                               "disable_clippy",
+                               "disable_rustdoc",
+                               "original_target_name",
+                               "quiet_clippy",
+                               "rust_crate_type",
                                "rustdoc_args",
                                "rustdoc_merge",
                                "rustdoc_out_dir",
-                               "disable_rustdoc",
-                               "disable_clippy",
-                               "rust_crate_type",
-                               "quiet_clippy",
-                               "original_target_name",
-                               "define_rustdoc_test_override",
+                               "zip_rustdoc_to",
                              ])
 
-      rust_auxiliary_name = _rust_auxiliary_name
+      rust_auxiliary_name = _aux_target_name
 
       # We already depend on the aux target here, in the group above.
       # This keeps rustdoc and clippy out of the critical path for
@@ -355,7 +312,7 @@ template("rustc_artifact") {
       # rustdoc should not be data_dep'd for third party crates
       include_rustdoc_first_party = true
 
-      # we should only generate clippy lints for first party crates,
+      # We should only generate clippy lints for first party crates,
       # as lints for third party crates aren't actionable
       enable_clippy_first_party = true
     } else {
