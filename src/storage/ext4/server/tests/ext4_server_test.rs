@@ -201,10 +201,11 @@ async fn ext4_server_mounts_vmo_nested_dirs() -> Result<(), Error> {
 
 #[fuchsia::test]
 async fn ext4_unified_service_mounts_vmo() -> Result<(), Error> {
-    let ext4_service =
-        fuchsia_component::client::connect_to_service_instance::<ServiceMarker>("default")
-            .expect("Failed to connect to service");
-    let ext4 = ext4_service.connect_to_server()?;
+    let ext4 = fuchsia_component::client::Service::open(ServiceMarker)
+        .expect("failed to open service")
+        .connect_to_instance("default")
+        .expect("Failed to connect to service instance")
+        .connect_to_server()?;
 
     let mut file_buf = io::BufReader::new(fs::File::open("/pkg/data/nest.img")?);
     let size = file_buf.seek(io::SeekFrom::End(0))?;
