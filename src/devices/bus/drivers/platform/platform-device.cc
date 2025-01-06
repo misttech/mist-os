@@ -26,7 +26,6 @@
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/resource/cpp/bind.h>
-#include <fbl/string_printf.h>
 
 #include "lib/inspect/component/cpp/component.h"
 #include "src/devices/bus/drivers/platform/node-util.h"
@@ -168,8 +167,8 @@ zx_status_t PlatformDevice::Init() {
     for (uint32_t i = 0; i < node_.irq()->size(); i++) {
       auto fragment = std::make_unique<PlatformInterruptFragment>(
           parent(), this, i, fdf::Dispatcher::GetCurrent()->async_dispatcher());
-      zx_status_t status = fragment->Add(fbl::StringPrintf("%s-irq%03u", name_, i).data(), this,
-                                         node_.irq().value()[i]);
+      auto name = std::format("{}-irq{:03}", std::string_view(name_), i);
+      zx_status_t status = fragment->Add(name.c_str(), this, node_.irq().value()[i]);
       if (status != ZX_OK) {
         zxlogf(WARNING, "Failed to create interrupt fragment %u", i);
         continue;
