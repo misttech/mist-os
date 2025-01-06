@@ -22,7 +22,7 @@ enum IncomingRequest {
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    tracing::info!("Starting vsock service");
+    log::info!("Starting vsock service");
     let config = Config::take_from_startup_handle();
 
     if !config.guest_to_host_supported && !config.loopback_supported {

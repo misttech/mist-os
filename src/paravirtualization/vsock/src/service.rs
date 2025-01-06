@@ -316,7 +316,7 @@ impl Vsock {
         self.borrow_mut().tasks.local(
             self.clone()
                 .run_connection_listener(stream, acceptor)
-                .unwrap_or_else(|err| tracing::warn!("Error {} running connection listener", err)),
+                .unwrap_or_else(|err| log::warn!("Error {} running connection listener", err)),
         );
         Ok(())
     }
@@ -332,7 +332,7 @@ impl Vsock {
         self.borrow_mut().tasks.local(
             self.clone()
                 .run_connection_listener2(stream, port)
-                .unwrap_or_else(|err| tracing::warn!("Error {} running connection listener", err)),
+                .unwrap_or_else(|err| log::warn!("Error {} running connection listener", err)),
         );
         Ok(())
     }
@@ -374,7 +374,7 @@ impl Vsock {
                     .or_else(|e| future::ready(if e.is_comm_failure() { Err(e) } else { Ok(()) }))
             });
         if let Err(e) = fut.await {
-            tracing::info!("Failed to handle request {}", e);
+            log::info!("Failed to handle request {}", e);
         }
     }
     fn alloc_ephemeral_port(self, cid: Cid) -> Option<AllocatedPort> {
@@ -385,7 +385,7 @@ impl Vsock {
     // These requests come from the device via the run_callbacks future.
     fn listen_port(&self, port: u32) -> Result<ListenStream, Error> {
         if port::is_ephemeral(port) {
-            tracing::info!("Rejecting request to listen on ephemeral port {}", port);
+            log::info!("Rejecting request to listen on ephemeral port {}", port);
             return Err(Error::ConnectionRefused);
         }
         match self.borrow_mut().listeners.entry(Addr(VMADDR_CID_HOST, port)) {
@@ -397,7 +397,7 @@ impl Vsock {
                 Ok(listen)
             }
             _ => {
-                tracing::info!("Attempt to listen on already bound port {}", port);
+                log::info!("Attempt to listen on already bound port {}", port);
                 Err(Error::AlreadyBound)
             }
         }
@@ -405,7 +405,7 @@ impl Vsock {
 
     fn bind_port(&self, port: Addr) -> Result<(), Error> {
         if port::is_ephemeral(port.1) {
-            tracing::info!("Rejecting request to listen on ephemeral port {}", port.1);
+            log::info!("Rejecting request to listen on ephemeral port {}", port.1);
             return Err(Error::ConnectionRefused);
         }
         match self.borrow_mut().listeners.entry(port) {
@@ -414,7 +414,7 @@ impl Vsock {
                 Ok(())
             }
             _ => {
-                tracing::info!("Attempt to listen on already bound port {:?}", port);
+                log::info!("Attempt to listen on already bound port {:?}", port);
                 Err(Error::AlreadyBound)
             }
         }
@@ -524,14 +524,14 @@ impl Vsock {
         match self.borrow_mut().listeners.entry(socket.port()) {
             std::collections::hash_map::Entry::Vacant(_) => {
                 // We should be in bound state. Something went wrong if we end up here.
-                tracing::warn!("Expected listener to be in bound state, but listener not found!");
+                log::warn!("Expected listener to be in bound state, but listener not found!");
                 return Err(Error::AlreadyBound);
             }
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 if !matches!(entry.get(), Listener::Bound) {
                     // Listen was probably already called. The call to socket.listen should
                     // probably already have failed in this case.
-                    tracing::warn!("Listen called multiple times.");
+                    log::warn!("Listen called multiple times.");
                     return Err(Error::AlreadyBound);
                 }
                 entry.insert(Listener::Queue(socket.clone()));
@@ -553,7 +553,7 @@ impl Vsock {
             self.borrow_mut().tasks.local(
                 self.clone()
                     .run_connection(addr.clone(), shutdown_event, con, None)
-                    .map_err(|err| tracing::warn!("Error {} whilst running connection", err))
+                    .map_err(|err| log::warn!("Error {} whilst running connection", err))
                     .map(|_| ()),
             );
             // TODO: check if we want want to return the local port for the connection or the local
@@ -597,7 +597,7 @@ impl Vsock {
                     .or_else(|e| future::ready(if e.is_comm_failure() { Err(e) } else { Ok(()) }))
             });
         if let Err(e) = fut.await {
-            tracing::info!("Failed to handle request {}", e);
+            log::info!("Failed to handle request {}", e);
         }
         self.deregister(Deregister::Listen(socket.port()));
         Ok(())
@@ -624,7 +624,7 @@ impl Vsock {
                             self.clone()
                                 .run_connection(addr, shutdown_event, con, None)
                                 .map_err(|err| {
-                                    tracing::warn!("Error {} whilst running connection", err)
+                                    log::warn!("Error {} whilst running connection", err)
                                 })
                                 .map(|_| ()),
                         );
@@ -648,7 +648,7 @@ impl Vsock {
         con: ConnectionTransport,
     ) -> Result<u32, Error> {
         if !self.supported_cid(remote_cid) {
-            tracing::info!("Rejecting request to connect to unsupported CID {}", remote_cid);
+            log::info!("Rejecting request to connect to unsupported CID {}", remote_cid);
             return Err(Error::ConnectionRefused);
         }
         let data = con.data;
@@ -670,7 +670,7 @@ impl Vsock {
         self.borrow_mut().tasks.local(
             self.clone()
                 .run_connection(addr, shutdown_event, con, Some(port))
-                .unwrap_or_else(|err| tracing::warn!("Error {} whilst running connection", err)),
+                .unwrap_or_else(|err| log::warn!("Error {} whilst running connection", err)),
         );
         Ok(port_value)
     }
@@ -755,7 +755,7 @@ impl State {
                 };
                 match self.listeners.get(&Addr(addr.remote_cid, addr.local_port)) {
                     Some(Listener::Bound) => {
-                        tracing::warn!(
+                        log::warn!(
                             "Request on port {} denied due to socket only bound, not yet listening",
                             addr.local_port
                         );
@@ -766,7 +766,7 @@ impl State {
                     }
                     Some(Listener::Queue(socket)) => {
                         if !socket.push_addr(addr.clone()) {
-                            tracing::warn!(
+                            log::warn!(
                                 "Request on port {} denied due to full backlog",
                                 addr.local_port
                             );
@@ -774,7 +774,7 @@ impl State {
                         }
                     }
                     None => {
-                        tracing::warn!("Request on port {} with no listener", addr.local_port);
+                        log::warn!("Request on port {} with no listener", addr.local_port);
                         reset(self);
                     }
                 }

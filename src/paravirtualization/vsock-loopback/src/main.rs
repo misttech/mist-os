@@ -190,7 +190,7 @@ impl LoopbackDevice {
                     .or_else(|e| future::ready(if e.is_comm_failure() { Err(e) } else { Ok(()) }))
             });
         if let Err(e) = fut.await {
-            tracing::info!("Failed to handle request {}", e);
+            log::info!("Failed to handle request {}", e);
         }
     }
 }
@@ -215,7 +215,7 @@ async fn main() -> Result<(), anyhow::Error> {
     service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
 
     component::health().set_ok();
-    tracing::debug!("Initialized.");
+    log::debug!("Initialized.");
 
     let device = LoopbackDevice::new();
     service_fs
