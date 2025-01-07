@@ -11,9 +11,9 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::StreamExt;
 use futures_util::stream::TryStreamExt;
+use log::{info, warn};
 use std::sync::Arc;
 use test_manager_lib::{constants, AboveRootCapabilitiesForTest, RootDiagnosticNode};
-use tracing::{info, warn};
 use {
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_pkg as fpkg,
     fuchsia_async as fasync,
@@ -117,7 +117,7 @@ async fn main() -> Result<(), Error> {
                     &*root_inspect,
                 )
                 .await
-                .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
+                .unwrap_or_else(|error| warn!(error:?; "test manager returned error"))
             });
         })
         .add_fidl_service(move |stream| {
@@ -135,14 +135,14 @@ async fn main() -> Result<(), Error> {
                     &*root_inspect,
                 )
                 .await
-                .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
+                .unwrap_or_else(|error| warn!(error:?; "test manager returned error"));
             });
         })
         .add_fidl_service(move |stream| {
             scope_for_early_boot_profiles.spawn(async move {
                 test_manager_lib::serve_early_boot_profiles(stream)
                     .await
-                    .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
+                    .unwrap_or_else(|error| warn!(error:?; "test manager returned error"))
             });
         })
         .add_fidl_service(move |stream| {
@@ -160,7 +160,7 @@ async fn main() -> Result<(), Error> {
                     &*root_inspect,
                 )
                 .await
-                .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
+                .unwrap_or_else(|error| warn!(error:?; "test manager returned error"))
             });
         })
         .add_fidl_service(move |stream| {
@@ -178,7 +178,7 @@ async fn main() -> Result<(), Error> {
                     &*root_inspect,
                 )
                 .await
-                .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
+                .unwrap_or_else(|error| warn!(error:?; "test manager returned error"))
             });
         });
 

@@ -33,6 +33,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::future::join_all;
 use futures::prelude::*;
 use futures::{lock, FutureExt};
+use log::{debug, error, info, warn};
 use moniker::{ChildName, Moniker};
 use resolver::AllowedPackages;
 use std::collections::HashSet;
@@ -40,7 +41,6 @@ use std::fmt;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{debug, error, info, warn};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_diagnostics_host as fhost,
@@ -92,7 +92,7 @@ impl RunningSuite {
         suite_realm: &Option<SuiteRealm>,
         use_debug_agent: bool,
     ) -> Result<Self, LaunchTestError> {
-        info!(test_url, ?diagnostics, collection = facets.collection, "Starting test suite.");
+        info!(test_url, diagnostics:?, collection = facets.collection; "Starting test suite.");
 
         let test_package = match AbsoluteComponentUrl::parse(test_url) {
             Ok(component_url) => component_url.package_url().name().to_string(),
@@ -469,16 +469,16 @@ impl RunningSuite {
                 .unwrap_or_else(|_| zx::Signals::empty())
         });
         if let Some(mock_ready_task) = self.mock_ready_task {
-            info!(?diagnostics, "Waiting on mock_ready_task...");
+            info!(diagnostics:?; "Waiting on mock_ready_task...");
             mock_ready_task.await;
         }
-        info!(?diagnostics, "Waiting on tokens_closed_signals...");
+        info!(diagnostics:?; "Waiting on tokens_closed_signals...");
         futures::future::join_all(tokens_closed_signals).await;
 
-        info!(?diagnostics, "Waiting on exposed_dir_close_task...");
+        info!(diagnostics:?; "Waiting on exposed_dir_close_task...");
         exposed_dir_close_task.await;
 
-        info!(?diagnostics, "Start destroying test realm...");
+        info!(diagnostics:?; "Start destroying test realm...");
 
         // TODO(https://fxbug.dev/42174479) Remove timeout once component manager hangs are removed.
         // This value is set to be slightly longer than the shutdown timeout for tests (30 sec).

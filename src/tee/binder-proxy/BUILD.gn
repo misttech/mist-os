@@ -46,7 +46,7 @@ rustc_binary("bin") {
     "//src/tee/lib/dev_urandom_compat",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:libc",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
   test_deps = [ "//third_party/rust_crates:test-case" ]
 }

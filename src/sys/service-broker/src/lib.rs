@@ -56,7 +56,7 @@ async fn first_instance_to_protocol<'a>(
         if let Err(_) =
             fdio::service_connect_at(&svc, &format!("{instance_dir}/{protocol_name}"), request)
         {
-            tracing::error!(
+            log::error!(
                 "[service-broker] Failed to forward connection to {instance_dir}/{protocol_name}"
             );
         }
@@ -163,7 +163,7 @@ pub async fn main(
         policy => Err(format_err!("Unsupported policy specified: {policy}")),
     }?;
 
-    tracing::debug!("[service-broker] Initialized.");
+    log::debug!("[service-broker] Initialized.");
 
     fs.serve_connection(directory_request).context("failed to serve outgoing namespace")?;
     fs.collect::<()>().await;

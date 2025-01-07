@@ -23,10 +23,10 @@ use handlebars::{
     handlebars_helper, Handlebars, Helper, HelperResult, Output, RenderContext, RenderError,
 };
 use lazy_static::lazy_static;
+use log::debug;
 use rayon::prelude::*;
 use rayon::ThreadPoolBuilder;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, span, Level};
 
 #[derive(FromArgs)]
 /// collect and generate stats on Fuchsia packages
@@ -94,8 +94,8 @@ struct PrintArgs {
     output: Option<PathBuf>,
 }
 
+#[fuchsia::main]
 fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
     let args: Args = argh::from_env();
 
     match args.cmd {
@@ -419,12 +419,6 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     let start = Instant::now();
 
     manifests.par_iter().for_each(|manifest_path| {
-        let span = span!(
-            Level::DEBUG,
-            "processing manifest",
-            path = manifest_path.to_string_lossy().to_string()
-        );
-        let _enter = span.enter();
         debug!("Starting");
         manifest_count.fetch_add(1, Ordering::Relaxed);
         macro_rules! do_on_error {
@@ -433,7 +427,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                     Ok(v) => v,
                     Err(e) => {
                         $error_counter.fetch_add(1, Ordering::Relaxed);
-                        debug!(status = "Failed", step = $step);
+                        debug!(status = "Failed", step = $step;"");
                         eprintln!(
                             "[{}] Failed {}: {:?}",
                             manifest_path.to_string_lossy(),
@@ -449,7 +443,7 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                     Ok(v) => v,
                     Err(e) => {
                         $error_counter.fetch_add(1, Ordering::Relaxed);
-                        debug!(status = "Failed", step = $step);
+                        debug!(status = "Failed", step = $step;"");
                         eprintln!(
                             "[{}] Failed {} for {}: {:?}",
                             manifest_path.to_string_lossy(),
@@ -517,12 +511,6 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
                 }
 
                 for manifest_path in manifest_paths {
-                    let span = span!(
-                        Level::DEBUG,
-                        "processing component",
-                        path = String::from_utf8_lossy(&manifest_path).to_string()
-                    );
-                    let _entry = span.enter();
                     debug!("Starting");
                     let data = do_on_error!(
                         reader.read_file(&manifest_path),
@@ -660,8 +648,6 @@ fn do_process_command(args: ProcessArgs) -> Result<()> {
     }
 
     content_hash_to_path.lock().unwrap().par_iter().for_each(|(hash, path)| {
-        let span = span!(Level::DEBUG, "processing blob", hash = hash, path = path);
-        let _entry = span.enter();
         if path.is_empty() {
             debug!("Skipping, no path");
             return;

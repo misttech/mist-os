@@ -10,8 +10,8 @@ use futures::prelude::*;
 use futures::stream::FusedStream;
 use futures::{pin_mut, StreamExt, TryStreamExt};
 use itertools::Either;
+use log::warn;
 use test_diagnostics::zstd_compress::{Encoder, Error as CompressionError};
-use tracing::warn;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync};
 
 const DEBUG_DATA_TIMEOUT_SECONDS: i64 = 15;
@@ -20,7 +20,7 @@ const EARLY_BOOT_DEBUG_DATA_PATH: &'static str = "/debugdata";
 pub(crate) async fn send_kernel_debug_data(
     iterator: ftest_manager::DebugDataIteratorRequestStream,
 ) -> Result<(), Error> {
-    tracing::info!("Serving kernel debug data");
+    log::info!("Serving kernel debug data");
     let directory = fuchsia_fs::directory::open_in_namespace(
         EARLY_BOOT_DEBUG_DATA_PATH,
         fuchsia_fs::PERM_READABLE,
@@ -219,7 +219,7 @@ pub(crate) async fn serve_iterator(
                     server,
                 )?;
 
-                tracing::info!("Serving debug data file {}: {}", dir_path, file_name);
+                log::info!("Serving debug data file {}: {}", dir_path, file_name);
                 let (client, server) = zx::Socket::create_stream();
                 let t = fasync::Task::spawn(serve_file_over_socket(
                     file_name.clone(),

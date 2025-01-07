@@ -8,15 +8,15 @@
 /// Initialize the bridge, configuring the C++ logging backend with the same settings as those for
 /// Rust at the time of this call.
 pub fn init() {
-    let cpp_severity = if tracing::enabled!(tracing::Level::TRACE) {
+    let cpp_severity = if log::log_enabled!(log::Level::Trace) {
         FUCHSIA_LOG_TRACE
-    } else if tracing::enabled!(tracing::Level::DEBUG) {
+    } else if log::log_enabled!(log::Level::Debug) {
         FUCHSIA_LOG_DEBUG
-    } else if tracing::enabled!(tracing::Level::INFO) {
+    } else if log::log_enabled!(log::Level::Info) {
         FUCHSIA_LOG_INFO
-    } else if tracing::enabled!(tracing::Level::WARN) {
+    } else if log::log_enabled!(log::Level::Warn) {
         FUCHSIA_LOG_WARNING
-    } else if tracing::enabled!(tracing::Level::ERROR) {
+    } else if log::log_enabled!(log::Level::Error) {
         FUCHSIA_LOG_ERROR
     } else {
         FUCHSIA_LOG_FATAL

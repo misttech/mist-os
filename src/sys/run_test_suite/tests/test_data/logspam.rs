@@ -9,8 +9,8 @@ use fuchsia_component_test::{
 };
 use futures::stream::{self as stream, StreamExt, TryStreamExt};
 use futures::TryFutureExt;
+use log::Log;
 use std::sync::Arc;
-use tracing::{info, subscriber};
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_logger as flogger,
     fuchsia_async as fasync,
@@ -24,7 +24,7 @@ async fn echo_server_mock(handles: LocalComponentHandles) -> Result<(), Error> {
     let publisher = diagnostics_log::Publisher::new(
         diagnostics_log::PublisherOptions::default().use_log_sink(log_proxy),
     )?;
-    let publisher: Arc<dyn subscriber::Subscriber + Sync + Send + 'static> = Arc::new(publisher);
+    let publisher = Arc::new(publisher);
 
     // Add the echo protocol to the ServiceFs
     fs.dir("svc").add_fidl_service(move |mut stream: fecho::EchoRequestStream| {
@@ -33,9 +33,10 @@ async fn echo_server_mock(handles: LocalComponentHandles) -> Result<(), Error> {
             while let Some(fecho::EchoRequest::EchoString { value, responder }) =
                 stream.try_next().await.expect("failed to serve echo service")
             {
-                subscriber::with_default(publisher_clone.clone(), || {
-                    info!("Got echo request: {:?}", value);
-                });
+                let mut builder = log::Record::builder();
+                builder.level(log::Level::Info);
+                publisher_clone
+                    .log(&builder.args(format_args!("Got echo request: {:?}", value)).build());
                 responder.send(value.as_ref().map(|s| &**s)).expect("failed to send echo response");
             }
         }));

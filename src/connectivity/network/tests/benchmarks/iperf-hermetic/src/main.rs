@@ -311,17 +311,17 @@ mod test {
             .expect("subscribe to logs");
 
         let watch_exit_fut = async move {
-            tracing::info!("waiting for {:?} to exit", IPERF_MONIKER);
+            log::info!("waiting for {:?} to exit", IPERF_MONIKER);
             let status = watch_for_exit(&realm, IPERF_MONIKER).await;
-            tracing::info!("observed {:?} exit", IPERF_MONIKER);
+            log::info!("observed {:?} exit", IPERF_MONIKER);
             assert_eq!(status, component_events::events::ExitStatus::Clean);
         };
 
         let watch_log_fut = async move {
             const WAIT_FOR_LOG: &str = "iperf 3.7-FUCHSIA";
-            tracing::info!("waiting for log {:?}", WAIT_FOR_LOG);
+            log::info!("waiting for log {:?}", WAIT_FOR_LOG);
             wait_for_log(stream, WAIT_FOR_LOG).await;
-            tracing::info!("observed log {:?}", WAIT_FOR_LOG);
+            log::info!("observed log {:?}", WAIT_FOR_LOG);
         };
 
         let ((), ()) = futures::future::join(watch_exit_fut, watch_log_fut).await;

@@ -4,7 +4,7 @@
 
 use futures::prelude::*;
 use futures::StreamExt;
-use tracing::info;
+use log::info;
 
 /// Convert iterator fidl method into stream of events.
 /// ie convert

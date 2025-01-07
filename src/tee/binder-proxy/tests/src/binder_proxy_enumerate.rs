@@ -9,7 +9,6 @@ use anyhow::Error;
 use rpcbinder::RpcSession;
 use std::{os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd}, sync::Once};
 use vsock_sys::{create_virtio_stream_socket, sockaddr_vm};
-use tracing;
 use binder_proxy_tests_config;
 
 extern "C" {
@@ -29,7 +28,7 @@ fn init_dev_urandom_compat_once() {
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    tracing::info!("binder proxy enumerate main");
+    log::info!("binder proxy enumerate main");
     init_dev_urandom_compat_once();
 
     let session = RpcSession::new();
@@ -43,7 +42,7 @@ async fn main() -> Result<(), Error> {
             let status =
                 zx::Status::from_raw(unsafe { create_virtio_stream_socket(&mut socket_fd) });
             if status != zx::Status::OK {
-                tracing::error!("Could not create virtio stream socket: {status:?}");
+                log::error!("Could not create virtio stream socket: {status:?}");
                 return None;
             }
             let socket_fd = unsafe { OwnedFd::from_raw_fd(socket_fd) };
@@ -65,7 +64,7 @@ async fn main() -> Result<(), Error> {
                 )
             };
             if r == -1 {
-                tracing::error!("connect failed: {:?}", std::io::Error::last_os_error());
+                log::error!("connect failed: {:?}", std::io::Error::last_os_error());
                 return None;
             }
 

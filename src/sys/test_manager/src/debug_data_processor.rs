@@ -16,7 +16,7 @@ use futures::channel::mpsc;
 use futures::future::FutureExt;
 use futures::stream::{FuturesUnordered, StreamExt, TryStreamExt};
 use futures::{pin_mut, select_biased, SinkExt};
-use tracing::info;
+use log::info;
 use {
     fidl_fuchsia_debugdata as fdebug, fidl_fuchsia_io as fio,
     fidl_fuchsia_test_debug as ftest_debug, fuchsia_async as fasync,
