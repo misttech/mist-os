@@ -680,7 +680,7 @@ pub struct NetworkCheckCookie {
 pub enum NetworkCheckResult {
     Ping { parameters: PingParameters, success: bool },
     ResolveDns { parameters: ResolveDnsParameters, ips: Option<ResolvedIps> },
-    Fetch { parameters: FetchParameters, status: Option<u8> },
+    Fetch { parameters: FetchParameters, status: Option<u16> },
 }
 
 #[derive(Debug, Clone)]
@@ -710,7 +710,7 @@ pub struct FetchParameters {
     /// Path to send request to.
     pub path: String,
     /// The expected HTTP status codes.
-    pub expected_statuses: Vec<u8>,
+    pub expected_statuses: Vec<u16>,
 }
 
 impl NetworkCheckResult {
@@ -744,7 +744,7 @@ impl NetworkCheckResult {
         }
     }
 
-    fn fetch_result(self) -> Option<(FetchParameters, Option<u8>)> {
+    fn fetch_result(self) -> Option<(FetchParameters, Option<u16>)> {
         match self {
             NetworkCheckResult::Fetch { parameters, status } => Some((parameters, status)),
             _ => None,
@@ -1596,7 +1596,7 @@ mod tests {
     #[derive(Default, Copy, Clone)]
     struct FakeFetch {
         expected_url: Option<&'static str>,
-        response: Option<u8>,
+        response: Option<u16>,
     }
 
     #[async_trait]
@@ -1607,7 +1607,7 @@ mod tests {
             domain: &str,
             path: &str,
             _addr: &FA,
-        ) -> Option<u8> {
+        ) -> Option<u16> {
             if let Some(expected) = self.expected_url {
                 assert_eq!(
                     format!("http://{domain}{path}"),

@@ -29,7 +29,7 @@ async fn fetch<FA: FetchAddr + std::marker::Sync>(
     host: &str,
     path: &str,
     addr: &FA,
-) -> anyhow::Result<u8> {
+) -> anyhow::Result<u16> {
     let timeout = zx::MonotonicInstant::after(FETCH_TIMEOUT);
     let addr = addr.as_socket_addr();
     let socket = socket2::Socket::new(
@@ -96,7 +96,7 @@ pub trait Fetch {
         host: &str,
         path: &str,
         addr: &FA,
-    ) -> Option<u8>;
+    ) -> Option<u16>;
 }
 
 pub struct Fetcher;
@@ -109,7 +109,7 @@ impl Fetch for Fetcher {
         host: &str,
         path: &str,
         addr: &FA,
-    ) -> Option<u8> {
+    ) -> Option<u16> {
         let r = fetch(interface_name, host, path, addr).await;
         match r {
             Ok(code) => Some(code),
@@ -135,12 +135,14 @@ mod test {
     use futures::{AsyncBufReadExt, FutureExt, StreamExt};
     use test_case::test_case;
 
-    fn server() -> anyhow::Result<(SocketAddr, Fuse<impl futures::Future<Output = Vec<String>>>)> {
+    fn server(
+        code: u16,
+    ) -> anyhow::Result<(SocketAddr, Fuse<impl futures::Future<Output = Vec<String>>>)> {
         let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0);
         let listener = TcpListener::bind(&addr).context("binding TCP")?;
         let addr = listener.local_addr()?;
 
-        let server_fut = async {
+        let server_fut = async move {
             let timeout = zx::MonotonicInstant::after(FETCH_TIMEOUT);
             let mut incoming = listener.accept_stream();
             if let Some(result) = incoming
@@ -163,7 +165,7 @@ mod test {
                     }
                     request.push(s.trim().to_string());
                 }
-                let data = "HTTP/1.1 200 OK\r\n\r\n".to_string();
+                let data = format!("HTTP/1.1 {} OK\r\n\r\n", code);
                 stream
                     .write_all(data.as_bytes())
                     .on_timeout(timeout, || panic!("timeout waiting to write response"))
@@ -179,12 +181,14 @@ mod test {
         Ok((addr, server_fut))
     }
 
-    #[test_case("http://reachability.test/"; "base path")]
-    #[test_case("http://reachability.test/path/"; "sub path")]
+    #[test_case("http://reachability.test/", 200; "base path 200")]
+    #[test_case("http://reachability.test/path/", 200; "sub path 200")]
+    #[test_case("http://reachability.test/", 400; "base path 400")]
+    #[test_case("http://reachability.test/path/", 400; "sub path 400")]
     #[fasync::run_singlethreaded(test)]
-    async fn test_fetch(url_str: &'static str) -> anyhow::Result<()> {
+    async fn test_fetch(url_str: &'static str, code: u16) -> anyhow::Result<()> {
         let url = url::Url::parse(url_str)?;
-        let (addr, server_fut) = server()?;
+        let (addr, server_fut) = server(code)?;
         let domain = url.host().expect("no host").to_string();
         let path = url.path().to_string();
 
@@ -201,7 +205,7 @@ mod test {
         };
 
         assert!(result.is_ok(), "Expected OK, got: {result:?}");
-        assert_eq!(result.ok(), Some(200));
+        assert_eq!(result.ok(), Some(code));
         let request = request.expect("no request body");
         assert!(request.contains(&format!("HEAD {path} HTTP/1.1")));
         assert!(request.contains(&format!("host: {domain}")));
