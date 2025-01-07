@@ -489,8 +489,8 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
       // deferred deletion method. See common in parent else branch for why we can avoid this on a
       // hidden parent.
       if (!parent_locked().is_hidden_locked()) {
-        guard.CallUnlocked([this, parent = ktl::move(parent_)]() mutable {
-          hierarchy_state_ptr_->DoDeferredDelete(ktl::move(parent));
+        guard.CallUnlocked([parent = ktl::move(parent_)]() mutable {
+          VmDeferredDeleter<VmCowPages>::DoDeferredDelete(ktl::move(parent));
         });
       } else {
         parent_locked().MaybeDeadTransitionLocked(guard);

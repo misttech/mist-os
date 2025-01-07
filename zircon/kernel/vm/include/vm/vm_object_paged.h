@@ -29,7 +29,7 @@
 #include <vm/vm_object.h>
 
 // the main VM object type, based on a copy-on-write set of pages.
-class VmObjectPaged final : public VmObject {
+class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPaged> {
  public:
   // |options_| is a bitmask of:
   static constexpr uint32_t kResizable = (1u << 0);
@@ -349,6 +349,8 @@ class VmObjectPaged final : public VmObject {
   void ChangeHighPriorityCountLocked(int64_t delta) override TA_REQ(lock()) {
     cow_pages_locked()->ChangeHighPriorityCountLocked(delta);
   }
+
+  void MaybeDeadTransition() {}
 
  private:
   // private constructor (use Create())

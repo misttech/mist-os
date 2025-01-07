@@ -24,7 +24,7 @@
 #include <vm/vm_object.h>
 
 // VMO representing a physical range of memory
-class VmObjectPhysical final : public VmObject {
+class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjectPhysical> {
  public:
   static zx_status_t Create(paddr_t base, uint64_t size, fbl::RefPtr<VmObjectPhysical>* vmo);
 
@@ -74,6 +74,8 @@ class VmObjectPhysical final : public VmObject {
 
   uint32_t GetMappingCachePolicyLocked() const override TA_REQ(lock());
   zx_status_t SetMappingCachePolicy(const uint32_t cache_policy) override;
+
+  void MaybeDeadTransition() {}
 
  private:
   // private constructor (use Create())

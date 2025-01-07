@@ -78,13 +78,67 @@ enum class SupplyOptions : uint8_t {
 namespace internal {
 struct ChildListTag {};
 struct GlobalListTag {};
-// This needs to be a manual traits definition and not a tag to avoid a class definition ordering
-// issue.
-struct DeferredDeleteTraits {
-  static fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>& node_state(
-      VmHierarchyBase& vm);
-};
 }  // namespace internal
+
+// Base for opting an object into a deferred deletion strategy that allows for object chains to be
+// deleted without causing unbounded recursion due to dropping refptrs in destructors.
+template <typename T>
+class VmDeferredDeleter {
+ public:
+  // Calls MaybeDeadTransition and then drops the refptr to the given object by either placing it on
+  // the deferred delete list for another thread already running deferred delete to drop, or drops
+  // itself.
+  // This can be used to avoid unbounded recursion when dropping chained refptrs, as found in
+  // vmo parent_ refs.
+  static void DoDeferredDelete(fbl::RefPtr<T> object) {
+    Guard<CriticalMutex> guard{DeferredDeleteLock::Get()};
+    // If a parent has multiple children then it's possible for a given object to already be
+    // queued for deletion.
+    if (!object->deferred_delete_state_.InContainer()) {
+      delete_list_.push_front(ktl::move(object));
+    } else {
+      // We know a refptr is being held by the container (which we are holding the lock to), so can
+      // safely drop the vmo ref.
+      object.reset();
+    }
+    if (!running_delete_) {
+      running_delete_ = true;
+      while (!delete_list_.is_empty()) {
+        guard.CallUnlocked([ptr = delete_list_.pop_front()]() mutable {
+          ptr->MaybeDeadTransition();
+          ptr.reset();
+        });
+      }
+      running_delete_ = false;
+    }
+  }
+
+ private:
+  struct ListTraits {
+    static fbl::SinglyLinkedListNodeState<fbl::RefPtr<T>>& node_state(VmDeferredDeleter<T>& node) {
+      return node.deferred_delete_state_;
+    }
+  };
+
+  // Mutex that protects the global delete list. As this class is templated we actually end up with
+  // a single mutex and a global list for each unique object type.
+  DECLARE_SINGLETON_CRITICAL_MUTEX(DeferredDeleteLock);
+
+  static fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<T>, ListTraits> delete_list_
+      TA_GUARDED(DeferredDeleteLock::Get());
+
+  static bool running_delete_ TA_GUARDED(DeferredDeleteLock::Get());
+
+  using DeferredDeleteState = fbl::SinglyLinkedListNodeState<fbl::RefPtr<T>>;
+  DeferredDeleteState deferred_delete_state_ TA_GUARDED(DeferredDeleteLock::Get());
+};
+
+template <typename T>
+bool VmDeferredDeleter<T>::running_delete_ = false;
+
+template <typename T>
+fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<T>, typename VmDeferredDeleter<T>::ListTraits>
+    VmDeferredDeleter<T>::delete_list_;
 
 class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
  public:
@@ -93,13 +147,6 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
 
   Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
   Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
-
-  // Calls MaybeDeadTransition and then drops the refptr to the given object by either placing it on
-  // the deferred delete list for another thread already running deferred delete to drop, or drops
-  // itself.
-  // This can be used to avoid unbounded recursion when dropping chained refptrs, as found in
-  // vmo parent_ refs.
-  void DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) TA_EXCL(lock());
 
   // This should be called whenever a change is made to the VMO tree or the VMO's page list, that
   // could result in memory attribution counts to change for any VMO in this tree.
@@ -115,10 +162,7 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
   }
 
  private:
-  bool running_delete_ TA_GUARDED(lock_) = false;
   mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
-  fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<VmHierarchyBase>, internal::DeferredDeleteTraits>
-      delete_list_ TA_GUARDED(lock_);
 
   // Each VMO hierarchy has a generation count, which is incremented on any change to the hierarchy
   // - either in the VMO tree, or the page lists of VMO's.
@@ -152,10 +196,6 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
   // private destructor, only called from refptr
   virtual ~VmHierarchyBase() = default;
   friend fbl::RefPtr<VmHierarchyBase>;
-  // Objects in the deferred delete queue will have MaybeDeadTransition called on them first, prior
-  // to dropping the RefPtr, allowing them to perform cleanup that they would rather happen before
-  // the destructor executes.
-  virtual void MaybeDeadTransition() {}
   friend class fbl::Recyclable<VmHierarchyBase>;
 
   // Pointer to state shared across all objects in a hierarchy.
@@ -166,19 +206,10 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
   uint64_t GetHierarchyGenerationCountLocked() const TA_REQ(lock());
 
  private:
-  using DeferredDeleteState = fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>;
-
-  friend internal::DeferredDeleteTraits;
   friend VmHierarchyState;
-  DeferredDeleteState deferred_delete_state_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmHierarchyBase);
 };
-
-inline fbl::SinglyLinkedListNodeState<fbl::RefPtr<VmHierarchyBase>>&
-internal::DeferredDeleteTraits::node_state(VmHierarchyBase& vm) {
-  return vm.deferred_delete_state_;
-}
 
 inline void VmHierarchyBase::IncrementHierarchyGenerationCountLocked() {
   AssertHeld(hierarchy_state_ptr_->lock_ref());

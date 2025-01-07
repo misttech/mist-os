@@ -86,7 +86,8 @@ struct VmCowRange {
 // object is unreachable due to having a ref count of 0.
 class VmCowPages final : public VmHierarchyBase,
                          public fbl::ContainableBaseClasses<
-                             fbl::TaggedDoublyLinkedListable<VmCowPages*, internal::ChildListTag>> {
+                             fbl::TaggedDoublyLinkedListable<VmCowPages*, internal::ChildListTag>>,
+                         public VmDeferredDeleter<VmCowPages> {
  public:
   static zx_status_t Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
                             uint32_t pmm_alloc_flags, uint64_t size,
@@ -670,7 +671,7 @@ class VmCowPages final : public VmHierarchyBase,
   void MaybeDeadTransitionLocked(Guard<CriticalMutex>& guard) TA_REQ(lock());
 
   // Unlocked helper around MaybeDeadTransitionLocked
-  void MaybeDeadTransition() override;
+  void MaybeDeadTransition();
 
   // Helper to allocate a new page for the VMO, filling out the page request if necessary.
   zx_status_t AllocPage(vm_page_t** page, AnonymousPageRequest* page_request);

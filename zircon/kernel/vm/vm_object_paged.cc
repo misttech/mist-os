@@ -147,7 +147,7 @@ void VmObjectPaged::DestructorHelper() {
       // As we constructed a RefPtr to our parent, and we are in our own destructor, there is now
       // the potential for recursive destruction if we need to delete the parent due to holding the
       // last ref, hit this same path, etc.
-      hierarchy_state_ptr_->DoDeferredDelete(ktl::move(parent));
+      VmDeferredDeleter<VmObjectPaged>::DoDeferredDelete(ktl::move(parent));
     } else {
       // parent is up for deletion and so there's no need to use RemoveChild since there is no
       // user dispatcher to notify anyway and so just drop ourselves to keep the hierarchy correct.

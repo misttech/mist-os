@@ -329,29 +329,6 @@ zx_status_t VmObject::GetPageBlocking(uint64_t offset, uint pf_flags, list_node*
 VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
     : hierarchy_state_ptr_(ktl::move(state)) {}
 
-void VmHierarchyState::DoDeferredDelete(fbl::RefPtr<VmHierarchyBase> vmo) {
-  Guard<CriticalMutex> guard{&lock_};
-  // If a parent has multiple children then it's possible for a given object to already be
-  // queued for deletion.
-  if (!vmo->deferred_delete_state_.InContainer()) {
-    delete_list_.push_front(ktl::move(vmo));
-  } else {
-    // We know a refptr is being held by the container (which we are holding the lock to), so can
-    // safely drop the vmo ref.
-    vmo.reset();
-  }
-  if (!running_delete_) {
-    running_delete_ = true;
-    while (!delete_list_.is_empty()) {
-      guard.CallUnlocked([ptr = delete_list_.pop_front()]() mutable {
-        ptr->MaybeDeadTransition();
-        ptr.reset();
-      });
-    }
-    running_delete_ = false;
-  }
-}
-
 static int cmd_vm_object(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
   notenoughargs:

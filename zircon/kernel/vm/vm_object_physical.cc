@@ -47,7 +47,7 @@ VmObjectPhysical::~VmObjectPhysical() {
       parent_->RemoveChild(this, guard.take());
       // Avoid recursing destructors when we delete our parent by using the deferred deletion
       // method.
-      hierarchy_state_ptr_->DoDeferredDelete(ktl::move(parent_));
+      VmDeferredDeleter<VmObjectPhysical>::DoDeferredDelete(ktl::move(parent_));
     }
   }
 
