@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <mutex>
+
 #include <acpica/acpi.h>
 #include <fbl/intrusive_double_list.h>
 
@@ -19,9 +21,9 @@ static int AcpiOsExecuteTask(void* arg);
  * AcpiOsWaitEventsComplete */
 static struct {
   thrd_t thread;
-  cnd_t cond;
-  cnd_t idle_cond;
-  mtx_t lock = MTX_INIT;
+  std::condition_variable cond;
+  std::condition_variable idle_cond;
+  std::mutex lock;
   bool shutdown = false;
   bool idle = true;
 
@@ -42,33 +44,17 @@ static ACPI_STATUS thrd_status_to_acpi_status(int status) {
 }
 
 ACPI_STATUS AcpiTaskThreadStart() {
-  ACPI_STATUS status = thrd_status_to_acpi_status(cnd_init(&os_execute_state.cond));
-  if (status != AE_OK) {
-    return status;
-  }
-  status = thrd_status_to_acpi_status(cnd_init(&os_execute_state.idle_cond));
-  if (status != AE_OK) {
-    cnd_destroy(&os_execute_state.cond);
-    return status;
-  }
-
-  status = thrd_status_to_acpi_status(
+  return thrd_status_to_acpi_status(
       thrd_create_with_name(&os_execute_state.thread, AcpiOsExecuteTask, nullptr, "acpi_os_task"));
-  if (status != AE_OK) {
-    return status;
-  }
-
-  return AE_OK;
 }
 
 ACPI_STATUS AcpiTaskThreadTerminate() {
-  mtx_lock(&os_execute_state.lock);
-  os_execute_state.shutdown = true;
-  mtx_unlock(&os_execute_state.lock);
-  cnd_broadcast(&os_execute_state.cond);
+  {
+    std::lock_guard lock(os_execute_state.lock);
+    os_execute_state.shutdown = true;
+  }
+  os_execute_state.cond.notify_all();
   thrd_join(os_execute_state.thread, nullptr);
-  cnd_destroy(&os_execute_state.cond);
-  cnd_destroy(&os_execute_state.idle_cond);
   return AE_OK;
 }
 
@@ -76,22 +62,22 @@ static int AcpiOsExecuteTask(void* arg) {
   while (1) {
     std::unique_ptr<AcpiOsTaskCtx> task;
 
-    mtx_lock(&os_execute_state.lock);
-    while ((task = os_execute_state.tasks.pop_front()) == nullptr) {
-      os_execute_state.idle = true;
-      // If anything is waiting for the queue to empty, notify it.
-      cnd_signal(&os_execute_state.idle_cond);
+    {
+      std::unique_lock lock(os_execute_state.lock);
+      while ((task = os_execute_state.tasks.pop_front()) == nullptr) {
+        os_execute_state.idle = true;
+        // If anything is waiting for the queue to empty, notify it.
+        os_execute_state.idle_cond.notify_one();
 
-      // If we're waiting to shutdown, do it now that there's no more work
-      if (os_execute_state.shutdown) {
-        mtx_unlock(&os_execute_state.lock);
-        return 0;
+        // If we're waiting to shutdown, do it now that there's no more work
+        if (os_execute_state.shutdown) {
+          return 0;
+        }
+
+        os_execute_state.cond.wait(lock);
       }
-
-      cnd_wait(&os_execute_state.cond, &os_execute_state.lock);
+      os_execute_state.idle = false;
     }
-    os_execute_state.idle = false;
-    mtx_unlock(&os_execute_state.lock);
 
     task->func(task->ctx);
   }
@@ -136,10 +122,11 @@ ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Functio
   task->func = Function;
   task->ctx = Context;
 
-  mtx_lock(&os_execute_state.lock);
-  os_execute_state.tasks.push_back(std::move(task));
-  mtx_unlock(&os_execute_state.lock);
-  cnd_signal(&os_execute_state.cond);
+  {
+    std::lock_guard lock(os_execute_state.lock);
+    os_execute_state.tasks.push_back(std::move(task));
+  }
+  os_execute_state.cond.notify_one();
 
   return AE_OK;
 }
@@ -151,9 +138,8 @@ ACPI_STATUS AcpiOsExecute(ACPI_EXECUTE_TYPE Type, ACPI_OSD_EXEC_CALLBACK Functio
  * AcpiOsExecute have completed.
  */
 void AcpiOsWaitEventsComplete(void) {
-  mtx_lock(&os_execute_state.lock);
+  std::unique_lock lock(os_execute_state.lock);
   while (!os_execute_state.idle) {
-    cnd_wait(&os_execute_state.idle_cond, &os_execute_state.lock);
+    os_execute_state.idle_cond.wait(lock);
   }
-  mtx_unlock(&os_execute_state.lock);
 }
