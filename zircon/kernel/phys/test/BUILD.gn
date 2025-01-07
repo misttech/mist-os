@@ -531,10 +531,10 @@ if (current_toolchain != default_toolchain) {
     ]
   }
 
-  kernel_elf_binary("physboot-elf-kernel-hello-world-test") {
+  kernel_elf_binary("physboot-hello-world-test") {
     testonly = true
     output_name = "physzircon"
-    sources = [ "physboot-elf-kernel-hello-world-test.cc" ]
+    sources = [ "physboot-hello-world-test.cc" ]
     defines = [
       "HANDOFF_PTR_DEREF=1",
       "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"",
@@ -554,38 +554,38 @@ if (current_toolchain != default_toolchain) {
     exclude_toolchain_tags = [ "ubsan" ]
   }
 
-  kernel_package("physboot-elf-kernel-test-data") {
+  kernel_package("physboot-test-data") {
     visibility = [ ":*" ]
     testonly = true
 
     deps = [
-      ":physboot-elf-kernel-hello-world-test($phys_toolchain)",
-      ":physboot-elf-kernel-test-data.cmdline",
-      ":physboot-elf-kernel-test-data.version-string",
+      ":physboot-hello-world-test($phys_toolchain)",
+      ":physboot-test-data.cmdline",
+      ":physboot-test-data.version-string",
     ]
   }
 
-  kernel_cmdline("physboot-elf-kernel-test-data.cmdline") {
-    args = [ "kernel.select=physboot-elf-kernel-test-data" ]
+  kernel_cmdline("physboot-test-data.cmdline") {
+    args = [ "kernel.select=physboot-test-data" ]
   }
 
-  generated_resource("physboot-elf-kernel-test-data.version-string") {
+  generated_resource("physboot-test-data.version-string") {
     outputs = [ "version-string.txt" ]
     contents = "fake-version-for-test"
   }
 
-  zbi("physboot-elf-kernel-test-data.zbi") {
+  zbi("physboot-test-data.zbi") {
     visibility = [ ":*" ]
     testonly = true
 
     deps = [
-      ":physboot-elf-kernel-test-data($phys_toolchain)",
-      "..:physboot-elf-kernel.package",
+      ":physboot-test-data($phys_toolchain)",
+      "..:physboot.package",
     ]
   }
 
-  zbi_test("physboot-elf-kernel-test") {
-    deps = [ ":physboot-elf-kernel-test-data.zbi" ]
+  zbi_test("physboot-test") {
+    deps = [ ":physboot-test-data.zbi" ]
   }
 
   group("test") {
@@ -594,7 +594,7 @@ if (current_toolchain != default_toolchain) {
       ":backtrace-test",
       ":hello-world-test",
       ":phys-unittests",
-      ":physboot-elf-kernel-test",
+      ":physboot-test",
       ":physload-handoff-test",
       ":trampoline-boot-zbi-test",
       ":turducken-boot-next-zbi-test",

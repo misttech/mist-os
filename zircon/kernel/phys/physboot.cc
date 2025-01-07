@@ -4,6 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include "physboot.h"
+
 #include <inttypes.h>
 #include <lib/arch/cache.h>
 #include <lib/boot-options/boot-options.h>
@@ -28,10 +30,11 @@
 #include <phys/symbolize.h>
 
 #include "handoff-prep.h"
-#include "physboot.h"
 #include "physload.h"
 
 #include <ktl/enforce.h>
+
+PhysBootTimes gBootTimes;
 
 namespace {
 
@@ -66,20 +69,6 @@ void RelocateElfKernel(ElfImage& elf_kernel) {
   debugf("%s: Relocating ELF kernel to [%#" PRIx64 ", %#" PRIx64 ")...\n", gSymbolize->name(),
          elf_kernel.load_address(), elf_kernel.load_address() + elf_kernel.vaddr_size());
   elf_kernel.Relocate();
-}
-
-}  // namespace
-
-PhysBootTimes gBootTimes;
-
-[[noreturn]] void PhysLoadModuleMain(UartDriver& uart, PhysBootTimes boot_times,
-                                     KernelStorage kernel_storage) {
-  gBootTimes = boot_times;
-
-  gSymbolize->set_name("physboot");
-
-  // Now we're ready for the main physboot logic.
-  BootZircon(uart, ktl::move(kernel_storage));
 }
 
 [[noreturn]] void BootZircon(UartDriver& uart, KernelStorage kernel_storage) {
@@ -155,4 +144,16 @@ PhysBootTimes gBootTimes;
     elf_kernel.Handoff<void(PhysHandoff*)>(handoff);
   };
   prep.DoHandoff(uart, kernel_storage.zbi().storage(), package, patch_info, start_elf_kernel);
+}
+
+}  // namespace
+
+[[noreturn]] void PhysLoadModuleMain(UartDriver& uart, PhysBootTimes boot_times,
+                                     KernelStorage kernel_storage) {
+  gBootTimes = boot_times;
+
+  gSymbolize->set_name("physboot");
+
+  // Now we're ready for the main physboot logic.
+  BootZircon(uart, ktl::move(kernel_storage));
 }

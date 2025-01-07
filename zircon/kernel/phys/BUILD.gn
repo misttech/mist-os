@@ -691,7 +691,7 @@ group("boot_tests") {
 }
 
 group("physboot") {
-  public_deps = [ ":physboot-elf-kernel.package" ]
+  public_deps = [ ":physboot.package" ]
 }
 
 source_set("handoff") {
@@ -740,11 +740,11 @@ source_set("handoff") {
   public_configs = [ ":includes" ]
 }
 
-kernel_package("physboot-elf-kernel.package") {
+kernel_package("physboot.package") {
   visibility = [ "./*" ]
 
   prefix = ""
-  deps = [ ":physboot-elf-kernel(:kernel.phys_$current_cpu)" ]
+  deps = [ ":physboot.module(:kernel.phys_$current_cpu)" ]
 }
 
 zbi_executable("physload") {
@@ -862,11 +862,12 @@ if (is_kernel) {
     configs += [ "//zircon/kernel:kernel_image_max_size" ]
   }
 
-  kernel_elf_binary("physboot-elf-kernel") {
+  kernel_elf_binary("physboot.module") {
     target_type = "loadable_module"
     has_patches = false
 
-    sources = [ "physboot-elf-kernel.cc" ]
+    output_name = "physboot"
+    sources = [ "physboot.cc" ]
     include_dirs = [ "//zircon/kernel/arch/$zircon_cpu/include" ]
     deps = [
       ":address-space",
@@ -887,20 +888,6 @@ if (is_kernel) {
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
     ]
-
-    # TODO(https://fxbug.dev/42164859): This is what kernel.phys.next expects
-    # by default, and we should just rename this target to "physboot" when
-    # ":physboot-zbi-kernel" is removed.
-    metadata = {
-      distribution_entries = [
-        {
-          source = rebase_path("$target_out_dir/physboot-elf-kernel.bin",
-                               root_build_dir)
-          destination = "physboot"
-          label = get_label_info(":$target_name", "label_with_toolchain")
-        },
-      ]
-    }
 
     # Defines the maximum support kernel image size.
     configs += [ "//zircon/kernel:kernel_image_max_size" ]
@@ -926,5 +913,5 @@ if (is_kernel) {
 
 kernel_elf_interp("physboot.interp") {
   visibility = [ ":*" ]
-  deps = [ ":physboot-elf-kernel($phys_toolchain)" ]
+  deps = [ ":physboot($phys_toolchain)" ]
 }
