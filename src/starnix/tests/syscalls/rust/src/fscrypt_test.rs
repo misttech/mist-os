@@ -8,7 +8,8 @@ mod tests {
         fscrypt_add_key_arg, fscrypt_key_specifier, fscrypt_remove_key_arg, FscryptOutput,
     };
     use linux_uapi::{
-        fscrypt_policy_v2, FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER, FSCRYPT_POLICY_FLAGS_PAD_16,
+        fscrypt_policy_v2, FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER, FSCRYPT_MODE_AES_256_CTS,
+        FSCRYPT_MODE_AES_256_HCTR2, FSCRYPT_MODE_AES_256_XTS, FSCRYPT_POLICY_FLAGS_PAD_16,
         FS_IOC_ADD_ENCRYPTION_KEY, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SET_ENCRYPTION_POLICY,
     };
     use rand::Rng;
@@ -17,9 +18,6 @@ mod tests {
     use std::ffi::OsString;
     use std::os::fd::AsRawFd;
     use zerocopy::{FromBytes, IntoBytes};
-
-    const FSCRYPT_MODE_AES_256_XTS: u8 = 1;
-    const FSCRYPT_MODE_AES_256_CTS: u8 = 4;
 
     fn add_encryption_key(root_dir: &std::fs::File) -> (i32, Vec<u8>) {
         let key_spec =
@@ -43,12 +41,47 @@ mod tests {
         (ret, arg_vec)
     }
 
+    fn add_encryption_key_with_key_bytes(
+        root_dir: &std::fs::File,
+        raw_key: &[u8],
+    ) -> (i32, Vec<u8>) {
+        let key_spec =
+            fscrypt_key_specifier { type_: FSCRYPT_KEY_SPEC_TYPE_IDENTIFIER, ..Default::default() };
+        let arg = fscrypt_add_key_arg { key_spec: key_spec, raw_size: 64, ..Default::default() };
+        let mut arg_vec = arg.as_bytes().to_vec();
+        arg_vec.extend(raw_key);
+
+        let ret = unsafe {
+            libc::ioctl(
+                root_dir.as_raw_fd(),
+                FS_IOC_ADD_ENCRYPTION_KEY.try_into().unwrap(),
+                arg_vec.as_ptr(),
+            )
+        };
+        (ret, arg_vec)
+    }
+
     fn set_encryption_policy(dir: &std::fs::File, identifier: [u8; 16]) -> i32 {
         let ret = unsafe {
             let policy = fscrypt_policy_v2 {
                 version: 2,
-                contents_encryption_mode: FSCRYPT_MODE_AES_256_XTS,
-                filenames_encryption_mode: FSCRYPT_MODE_AES_256_CTS,
+                contents_encryption_mode: FSCRYPT_MODE_AES_256_XTS as u8,
+                filenames_encryption_mode: FSCRYPT_MODE_AES_256_CTS as u8,
+                flags: FSCRYPT_POLICY_FLAGS_PAD_16 as u8,
+                master_key_identifier: identifier,
+                ..Default::default()
+            };
+            libc::ioctl(dir.as_raw_fd(), FS_IOC_SET_ENCRYPTION_POLICY.try_into().unwrap(), &policy)
+        };
+        ret
+    }
+
+    fn set_encryption_policy_hctr2(dir: &std::fs::File, identifier: [u8; 16]) -> i32 {
+        let ret = unsafe {
+            let policy = fscrypt_policy_v2 {
+                version: 2,
+                contents_encryption_mode: FSCRYPT_MODE_AES_256_XTS as u8,
+                filenames_encryption_mode: FSCRYPT_MODE_AES_256_HCTR2 as u8,
                 flags: FSCRYPT_POLICY_FLAGS_PAD_16 as u8,
                 master_key_identifier: identifier,
                 ..Default::default()
@@ -479,6 +512,250 @@ mod tests {
             std::io::Error::last_os_error()
         );
         std::fs::remove_dir_all(dir_path).expect("failed to remove my_dir");
+    }
+
+    #[test]
+    #[serial]
+    fn hard_link_encrypted_file_into_unencrypted_dir() {
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let unencrypted_dir_path = std::path::Path::new(&root_path).join("unencrypted");
+        std::fs::create_dir_all(unencrypted_dir_path.clone()).unwrap();
+
+        let encrypted_dir_path = std::path::Path::new(&root_path).join("encrypted");
+        std::fs::create_dir_all(encrypted_dir_path.clone()).unwrap();
+
+        let dir = std::fs::File::open(encrypted_dir_path.clone()).unwrap();
+        let (ret, arg_vec) = add_encryption_key(&root_dir);
+        assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
+        let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
+        let arg_struct_1 = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
+
+        let ret = unsafe { set_encryption_policy(&dir, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "set encryption policy ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+        std::fs::File::create_new(encrypted_dir_path.clone().join("file"))
+            .expect("failed to create file in encrypted directory");
+
+        let ret =
+            unsafe { remove_encryption_key(&root_dir, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "remove encryption key ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+
+        let entries = std::fs::read_dir(encrypted_dir_path.clone()).expect("readdir failed");
+        let mut encrypted_file_name = OsString::new();
+        let mut count = 0;
+        for entry in entries {
+            let entry = entry.expect("invalid entry");
+            encrypted_file_name = entry.file_name();
+            count += 1;
+        }
+        assert_eq!(count, 1);
+
+        std::fs::hard_link(
+            encrypted_dir_path.join(encrypted_file_name),
+            unencrypted_dir_path.clone().join("file"),
+        )
+        .expect("failed to hard link an encrypted file into an unencrypted directory ");
+
+        let _ =
+            std::fs::metadata(unencrypted_dir_path.clone().join("file")).expect("metadata failed");
+        std::fs::File::open(unencrypted_dir_path.clone().join("file"))
+            .expect_err("opening a locked encrypted file should fail");
+
+        std::fs::remove_dir_all(unencrypted_dir_path).expect("failed to remove unencrypted dir");
+        std::fs::remove_dir_all(encrypted_dir_path).expect("failed to remove encrypted dir");
+    }
+
+    #[test]
+    #[serial]
+    fn hard_link_unencrypted_file_into_encrypted_dir() {
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let unencrypted_dir_path = std::path::Path::new(&root_path).join("unencrypted");
+        std::fs::create_dir_all(unencrypted_dir_path.clone()).unwrap();
+        std::fs::File::create_new(unencrypted_dir_path.clone().join("file"))
+            .expect("failed to create file in unencrypted directory");
+
+        let encrypted_dir_path = std::path::Path::new(&root_path).join("encrypted");
+        std::fs::create_dir_all(encrypted_dir_path.clone()).unwrap();
+
+        let dir = std::fs::File::open(encrypted_dir_path.clone()).unwrap();
+        let (ret, arg_vec) = add_encryption_key(&root_dir);
+        assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
+        let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
+        let arg_struct_1 = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
+
+        let ret = unsafe { set_encryption_policy(&dir, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "set encryption policy ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+
+        std::fs::hard_link(
+            unencrypted_dir_path.join("file"),
+            encrypted_dir_path.clone().join("subdir"),
+        )
+        .expect_err(
+            "hard linking an unencrypted file into an encrypted directory should fail with EXDEV",
+        );
+
+        let ret =
+            unsafe { remove_encryption_key(&root_dir, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "remove encryption key ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+        std::fs::remove_dir_all(unencrypted_dir_path).expect("failed to remove unencrypted dir");
+        std::fs::remove_dir_all(encrypted_dir_path).expect("failed to remove encrypted dir");
+    }
+
+    #[test]
+    #[ignore] // TODO(https://fxbug.dev/359885449) use expectations
+    #[serial]
+    // TODO(https://fxbug.dev/358420498) Purge the key manager on FS_IOC_REMOVE_ENCRYPTION_KEY
+    fn hard_link_encrypted_file_into_second_dir_encrypted_with_same_policy() {
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let encrypted_1_dir_path = std::path::Path::new(&root_path).join("encrypted_1");
+        std::fs::create_dir_all(encrypted_1_dir_path.clone()).unwrap();
+
+        let encrypted_2_dir_path = std::path::Path::new(&root_path).join("encrypted_2");
+        std::fs::create_dir_all(encrypted_2_dir_path.clone()).unwrap();
+
+        let (ret, arg_vec) = add_encryption_key(&root_dir);
+        assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
+        let (arg_struct_bytes, arg_struct_raw_key) =
+            arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
+        let arg_struct_1 = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
+
+        let dir_1 = std::fs::File::open(encrypted_1_dir_path.clone()).unwrap();
+        let dir_2 = std::fs::File::open(encrypted_2_dir_path.clone()).unwrap();
+
+        let ret =
+            unsafe { set_encryption_policy(&dir_1, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "set encryption policy ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+
+        std::fs::File::create_new(encrypted_1_dir_path.clone().join("file"))
+            .expect("failed to create file in unencrypted directory");
+
+        let ret =
+            unsafe { set_encryption_policy(&dir_2, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "set encryption policy ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+
+        let ret =
+            unsafe { remove_encryption_key(&root_dir, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "remove encryption key ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+
+        std::fs::hard_link(
+            encrypted_1_dir_path.join("file"),
+            encrypted_2_dir_path.clone().join("subdir"),
+        )
+        .expect_err(
+            "hard linking between two directories encrypted with the same policy should fail if
+                they are locked",
+        );
+
+        let (ret, _) = add_encryption_key_with_key_bytes(&root_dir, arg_struct_raw_key);
+        assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
+
+        std::fs::hard_link(
+            encrypted_1_dir_path.join("file"),
+            encrypted_2_dir_path.clone().join("subdir"),
+        )
+        .expect(
+            "failed to hard link a file from an encrypted directory into another directory
+                encrypted with the same policy",
+        );
+
+        let ret =
+            unsafe { remove_encryption_key(&root_dir, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "remove encryption key ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+        std::fs::remove_dir_all(encrypted_1_dir_path).expect("failed to remove unencrypted dir");
+        std::fs::remove_dir_all(encrypted_2_dir_path).expect("failed to remove encrypted dir");
+    }
+
+    #[test]
+    #[serial]
+    fn hard_link_encrypted_file_into_second_dir_encrypted_with_different_policy() {
+        let Some(root_path) = get_root_path() else { return };
+        let root_dir = std::fs::File::open(&root_path).expect("open failed");
+        let encrypted_1_dir_path = std::path::Path::new(&root_path).join("encrypted_1");
+        std::fs::create_dir_all(encrypted_1_dir_path.clone()).unwrap();
+
+        let encrypted_2_dir_path = std::path::Path::new(&root_path).join("encrypted_2");
+        std::fs::create_dir_all(encrypted_2_dir_path.clone()).unwrap();
+
+        let (ret, arg_vec) = add_encryption_key(&root_dir);
+        assert!(ret == 0, "add encryption key ioctl failed: {:?}", std::io::Error::last_os_error());
+        let (arg_struct_bytes, _) = arg_vec.split_at(std::mem::size_of::<fscrypt_add_key_arg>());
+        let arg_struct_1 = fscrypt_add_key_arg::read_from_bytes(arg_struct_bytes).unwrap();
+
+        let dir_1 = std::fs::File::open(encrypted_1_dir_path.clone()).unwrap();
+        let dir_2 = std::fs::File::open(encrypted_2_dir_path.clone()).unwrap();
+
+        let ret =
+            unsafe { set_encryption_policy(&dir_1, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "set encryption policy ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+
+        std::fs::File::create_new(encrypted_1_dir_path.clone().join("file"))
+            .expect("failed to create file in unencrypted directory");
+
+        let ret = unsafe {
+            set_encryption_policy_hctr2(&dir_2, arg_struct_1.key_spec.u.identifier.value)
+        };
+        assert!(
+            ret == 0,
+            "set encryption policy ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+
+        std::fs::hard_link(
+            encrypted_1_dir_path.join("file"),
+            encrypted_2_dir_path.clone().join("subdir"),
+        )
+        .expect(
+            "hard linking a file in encrypted directory into a second encrypted directory with a
+                different policy should fail",
+        );
+
+        let ret =
+            unsafe { remove_encryption_key(&root_dir, arg_struct_1.key_spec.u.identifier.value) };
+        assert!(
+            ret == 0,
+            "remove encryption key ioctl failed: {:?}",
+            std::io::Error::last_os_error()
+        );
+        std::fs::remove_dir_all(encrypted_1_dir_path).expect("failed to remove unencrypted dir");
+        std::fs::remove_dir_all(encrypted_2_dir_path).expect("failed to remove encrypted dir");
     }
 
     #[test]

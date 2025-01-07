@@ -363,6 +363,9 @@ impl vfs::node::Node for FxFile {
         if self.open_count.load(Ordering::Relaxed) & TO_BE_PURGED != 0 {
             return Err(zx::Status::NOT_FOUND);
         }
+        dir.check_fscrypt_hard_link_conditions(
+            self.fscrypt_wrapping_key_id().await?.map(|x| u128::from_le_bytes(x)),
+        )?;
         dir.link_object(transaction, &name, object_id, ObjectDescriptor::File).await
     }
 

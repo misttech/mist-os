@@ -156,6 +156,10 @@ impl Node for FxSymlink {
         name: Name,
     ) -> Result<(), zx::Status> {
         let dir = destination_dir.into_any().downcast::<FxDirectory>().unwrap();
+        // TODO(https://fxbug.dev/360171961): Add fscrypt symlink support.
+        if dir.directory().wrapping_key_id().is_some() {
+            return Err(zx::Status::INVALID_ARGS);
+        }
         let store = self.handle.store();
         let transaction = store
             .filesystem()

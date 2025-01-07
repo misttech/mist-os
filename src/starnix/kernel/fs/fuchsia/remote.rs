@@ -930,7 +930,11 @@ impl FsNodeOps for RemoteNode {
         }
         let name = get_name_str(name)?;
         let link_into = |zxio: &syncio::Zxio| {
-            zxio.link_into(&self.zxio, name).map_err(|status| from_status_like_fdio!(status))
+            zxio.link_into(&self.zxio, name).map_err(|status| match status {
+                zx::Status::BAD_STATE => errno!(EXDEV),
+                zx::Status::ACCESS_DENIED => errno!(ENOKEY),
+                s => from_status_like_fdio!(s),
+            })
         };
         if let Some(child) = child.downcast_ops::<RemoteNode>() {
             link_into(&child.zxio)

@@ -105,7 +105,7 @@ mod fuchsia {
                 FxfsError::WrongType => Status::WRONG_TYPE,
                 FxfsError::IntegrityError => Status::IO_DATA_INTEGRITY,
                 FxfsError::Unavailable => Status::UNAVAILABLE,
-                FxfsError::NoKey => Status::NOT_FOUND,
+                FxfsError::NoKey => Status::ACCESS_DENIED,
             }
         }
     }
