@@ -68,7 +68,6 @@ handoff_paddr           .req x25
 .text
 FUNCTION(_start)
 .label PhysbootHandoff, global
-
     // As early as possible collect the time stamp.
     sample_ticks
 
@@ -78,10 +77,11 @@ FUNCTION(_start)
     brk #0  // Same as __builtin_trap()
     .code_patching.end
 
-    /* Save the Boot info for the primary CPU only */
+    // Save boot info on the boot CPU alone. Secondaries can jump right to
+    // .Lboot_info_ready.
     mrs     cpuid, mpidr_el1
     ubfx    cpuid, cpuid, #0, #15 /* mask Aff0 and Aff1 fields */
-    cbnz    cpuid, .Lno_save_bootinfo
+    cbnz    cpuid, .Lboot_info_ready
 
     // Record the entry time stamp.
     store_ticks kernel_entry_ticks
@@ -89,15 +89,40 @@ FUNCTION(_start)
     // Save the x0 argument in a register that won't be clobbered.
     mov     handoff_paddr, x0
 
-    /* save entry point physical address in kernel_entry_paddr */
-    adrp    tmp, kernel_entry_paddr
-    adr     tmp2, _start
-    str     tmp2, [tmp, #:lo12:kernel_entry_paddr]
-    adrp    tmp2, arch_boot_el
-    mrs     x2, CurrentEL
-    str     x2, [tmp2, #:lo12:arch_boot_el]
+    //
+    // Care is taken to clean the data cache to the point of coherency (by
+    // identity-mapped virtual address) for each of the following variable
+    // stores so that these writes are visible to secondaries once at
+    // .Lboot_info_ready.
+    //
 
-.Lno_save_bootinfo:
+    // kernel_entry_paddr: physical address of `_start`.
+    adr     tmp, _start
+    adr_global tmp2, kernel_entry_paddr
+    str     tmp, [tmp2]
+    dc      cvac, tmp2
+
+    // arch_boot_el: EL at boot time.
+    mrs     tmp, CurrentEL
+    adr_global tmp2, arch_boot_el
+    str     tmp, [tmp2]
+    dc      cvac, tmp2
+
+    // root_lower_page_table_phys: boot CPU TTBR0_EL1.BADDR.
+    mrs     tmp, ttbr0_el1
+    and     tmp, tmp, MMU_PTE_OUTPUT_ADDR_MASK
+    adr_global tmp2, root_lower_page_table_phys
+    str     tmp, [tmp2]
+    dc      cvac, tmp2
+
+    // root_kernel_page_table_phys: boot CPU TTBR1_EL1.BADDR.
+    mrs     tmp, ttbr1_el1
+    and     tmp, tmp, MMU_PTE_OUTPUT_ADDR_MASK
+    adr_global tmp2, root_kernel_page_table_phys
+    str     tmp, [tmp2]
+    dc      cvac, tmp2
+
+.Lboot_info_ready:
     // If we entered at a higher EL than 1, drop to EL1.
     //
     // Make sure to clear the stack pointer first. The call will reuse in EL1
@@ -119,12 +144,11 @@ FUNCTION(_start)
 
     // This can be any arbitrary (page-aligned) address >= KERNEL_ASPACE_BASE.
     // TODO(https://fxbug.dev/42098994): Choose it randomly.
-    adr_global  tmp, kernel_relocated_base
-    ldr     kernel_vaddr, [tmp]
+    ldr_global kernel_vaddr, kernel_relocated_base
 
     // Load the base of the translation tables.
-    adr_global page_table0, tt_trampoline
-    adr_global page_table1, arm64_kernel_translation_table
+    ldr_global page_table0, root_lower_page_table_phys
+    ldr_global page_table1, root_kernel_page_table_phys
 
     // In between here and .Lmmu_enable is where the boot CPU will have set up
     // the trampoline page tables. If we're a secondary we can jump straight to
@@ -144,19 +168,7 @@ FUNCTION(_start)
     sub     x0, kernel_vaddr, x0 /* compute the delta between virtual and physical addresses */
     bl      arm64_boot_map_init
 
-    /* Save a copy of the physical address of the kernel page table */
-    adr_global tmp, arm64_kernel_translation_table_phys
-    str     page_table1, [tmp]
-
     /* set up the mmu according to mmu_initial_mappings */
-
-    /* clear out the kernel translation table */
-    mov     tmp, #0
-.Lclear_top_page_table_loop:
-    str     xzr, [page_table1, tmp, lsl #3]
-    add     tmp, tmp, #1
-    cmp     tmp, #MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP
-    bne     .Lclear_top_page_table_loop
 
     /* void arm64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len,
      *                     pte_t flags, bool allow_large_pages);
@@ -172,37 +184,6 @@ FUNCTION(_start)
     mov     x5, 1 /* allow large pages */
     bl      arm64_boot_map
 
-    /* map the kernel to a fixed address */
-    /* note: mapping the kernel here with full rwx, this will get locked down later in vm initialization; */
-    mov     x0, page_table1
-    mov     x1, kernel_vaddr
-    adr_global x2, __executable_start
-    adr_global x3, _end
-    sub     x3, x3, x2
-    movlit  x4, MMU_PTE_KERNEL_RWX_FLAGS
-    mov     x5, 1 /* allow large pages */
-    bl      arm64_boot_map
-
-    /* Prepare tt_trampoline page table.
-     * this will identity map the 1GB page holding the physical address of this code.
-     * Used to temporarily help us get switched to the upper virtual address. */
-
-    /* Zero tt_trampoline translation tables */
-    mov     tmp, #0
-.Lclear_tt_trampoline:
-    str     xzr, [page_table0, tmp, lsl#3]
-    add     tmp, tmp, #1
-    cmp     tmp, #MMU_IDENT_PAGE_TABLE_ENTRIES_TOP
-    blt     .Lclear_tt_trampoline
-
-    /* Setup mapping at phys -> phys */
-    adr     tmp, .Lmmu_on_pc
-    lsr     tmp, tmp, #MMU_IDENT_TOP_SHIFT    /* tmp = paddr index */
-    movlit  tmp2, MMU_PTE_IDENT_FLAGS
-    add     tmp2, tmp2, tmp, lsl #MMU_IDENT_TOP_SHIFT  /* tmp2 = pt entry */
-
-    str     tmp2, [page_table0, tmp, lsl #3]  /* tt_trampoline[paddr index] = pt entry */
-
 .Lmmu_enable:
     /* set up the mmu */
 
@@ -211,7 +192,10 @@ FUNCTION(_start)
     dsb     sy
     isb
 
-    /* Initialize Memory Attribute Indirection Register */
+    // Initialize Memory Attribute Indirection Register
+    //
+    // In the case of the boot CPU, care is taken to ensure that currently
+    // active attributes and indices are the same as those in MMU_MAIR_VAL.
     movlit  tmp, MMU_MAIR_VAL
     msr     mair_el1, tmp
 

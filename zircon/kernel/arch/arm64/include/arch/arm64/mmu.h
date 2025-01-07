@@ -50,29 +50,13 @@
 #define MMU_USER_PAGE_SIZE_SHIFT        (USER_PAGE_SIZE_SHIFT)
 #define MMU_GUEST_PAGE_SIZE_SHIFT       (USER_PAGE_SIZE_SHIFT)
 
-// For the identity map used temporarily in start.S as the cpu is trampolining
-// up to the high kernel address, set the max size of the temporary address
-// space constructed.
+// The identity map handed off from physboot uses 4KiB-paging with a maximum
+// virtual address width of 48 bits.
 //
-// Currently if between 30 and 39 the code will automatically use 4K base page
-// granules, which is maximally compatible with all cores.
-#ifndef MMU_IDENT_SIZE_SHIFT
-#define MMU_IDENT_SIZE_SHIFT 39
-#endif
-
-#if MMU_IDENT_SIZE_SHIFT < 25
-#error MMU_IDENT_SIZE_SHIFT too small
-#elif MMU_IDENT_SIZE_SHIFT <= 29 // Use 2MB block mappings (4K page size)
-#define MMU_IDENT_PAGE_SIZE_SHIFT       (SHIFT_4K)
-#elif MMU_IDENT_SIZE_SHIFT <= 30 // Use 512MB block mappings (64K page size)
-#define MMU_IDENT_PAGE_SIZE_SHIFT       (SHIFT_64K)
-#elif MMU_IDENT_SIZE_SHIFT <= 39 // Use 1GB block mappings (4K page size)
-#define MMU_IDENT_PAGE_SIZE_SHIFT       (SHIFT_4K)
-#elif MMU_IDENT_SIZE_SHIFT <= 42 // Use 512MB block mappings (64K page size)
-#define MMU_IDENT_PAGE_SIZE_SHIFT       (SHIFT_64K)
-#else
-#error MMU_IDENT_SIZE_SHIFT too large
-#endif
+// LINT.IfChange
+#define MMU_IDENT_SIZE_SHIFT 48
+#define MMU_IDENT_PAGE_SIZE_SHIFT (SHIFT_4K)
+// LINT.ThenChange(/zircon/kernel/arch/arm64/phys/include/phys/arch/address-space.h)
 
 // TCR TGx values
 //
@@ -261,6 +245,11 @@
 #define MMU_MAIR_ATTR0                  MMU_MAIR_ATTR(0, 0x00)
 #define MMU_PTE_ATTR_STRONGLY_ORDERED   MMU_PTE_ATTR_ATTR_INDEX(0)
 
+// The following two attributes and indices must be kept in sync with those
+// used for the boot CPU in physboot.
+//
+// LINT.IfChange
+
 // Device-nGnRE memory
 #define MMU_MAIR_ATTR1                  MMU_MAIR_ATTR(1, 0x04)
 #define MMU_PTE_ATTR_DEVICE             MMU_PTE_ATTR_ATTR_INDEX(1)
@@ -270,6 +259,8 @@
 //
 #define MMU_MAIR_ATTR2                  MMU_MAIR_ATTR(2, 0xff)
 #define MMU_PTE_ATTR_NORMAL_MEMORY      MMU_PTE_ATTR_ATTR_INDEX(2)
+
+// LINT.ThenChange(/zircon/kernel/arch/arm64/phys/address-space.cc)
 
 // Normal Memory, Inner/Outer uncached, Write Combined
 #define MMU_MAIR_ATTR3                  MMU_MAIR_ATTR(3, 0x44)
@@ -464,8 +455,7 @@ static_assert(((USER_ASPACE_BASE + USER_RESTRICTED_ASPACE_SIZE) &
 const uint16_t MMU_ARM64_MAX_USER_ASID_8 = (1u << 8) - 1;
 const uint16_t MMU_ARM64_MAX_USER_ASID_16 = (1u << 16) - 1;
 
-pte_t* arm64_get_kernel_ptable();
-paddr_t arm64_get_kernel_ptable_phys();
+pte_t* arm64_root_kernel_page_table();
 
 // boot time page mapping routines used in start.S and periphmap
 extern "C" void arm64_boot_map_init(uint64_t vaddr_paddr_delta);
