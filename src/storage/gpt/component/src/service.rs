@@ -72,32 +72,32 @@ impl StorageHostService {
         let svc_dir = vfs::directory::immutable::simple();
         self.export_dir.add_entry("svc", svc_dir.clone()).expect("Unable to create svc dir");
 
-        let weak = Arc::downgrade(&self);
-        let weak2 = weak.clone();
-        let weak3 = weak.clone();
-        svc_dir.add_entry(
-            fstartup::StartupMarker::PROTOCOL_NAME,
-            vfs::service::host(move |requests| {
-                let weak = weak.clone();
-                async move {
-                    if let Some(me) = weak.upgrade() {
-                        let _ = me.handle_start_requests(requests).await;
-                    }
-                }
-            }),
-        )?;
         svc_dir
             .add_entry(
                 fpartitions::PartitionServiceMarker::SERVICE_NAME,
                 self.partitions_dir.clone(),
             )
             .unwrap();
-
+        let weak = Arc::downgrade(&self);
+        svc_dir
+            .add_entry(
+                fstartup::StartupMarker::PROTOCOL_NAME,
+                vfs::service::host(move |requests| {
+                    let weak = weak.clone();
+                    async move {
+                        if let Some(me) = weak.upgrade() {
+                            let _ = me.handle_start_requests(requests).await;
+                        }
+                    }
+                }),
+            )
+            .unwrap();
+        let weak = Arc::downgrade(&self);
         svc_dir
             .add_entry(
                 fpartitions::PartitionsAdminMarker::PROTOCOL_NAME,
                 vfs::service::host(move |requests| {
-                    let weak = weak2.clone();
+                    let weak = weak.clone();
                     async move {
                         if let Some(me) = weak.upgrade() {
                             let _ = me.handle_partitions_admin_requests(requests).await;
@@ -106,12 +106,12 @@ impl StorageHostService {
                 }),
             )
             .unwrap();
-
+        let weak = Arc::downgrade(&self);
         svc_dir
             .add_entry(
                 fpartitions::PartitionsManagerMarker::PROTOCOL_NAME,
                 vfs::service::host(move |requests| {
-                    let weak = weak3.clone();
+                    let weak = weak.clone();
                     async move {
                         if let Some(me) = weak.upgrade() {
                             let _ = me.handle_partitions_manager_requests(requests).await;
@@ -218,7 +218,9 @@ impl StorageHostService {
                 fpartitions::PartitionsManagerRequest::CreateTransaction { responder } => {
                     responder
                         .send(self.create_transaction().await.map_err(|status| status.into_raw()))
-                        .unwrap_or_else(|e| log::error!(e:?; "Failed to send Start response"));
+                        .unwrap_or_else(
+                            |e| log::error!(e:?; "Failed to send CreateTransaction response"),
+                        );
                 }
                 fpartitions::PartitionsManagerRequest::CommitTransaction {
                     transaction,
@@ -230,7 +232,16 @@ impl StorageHostService {
                                 .await
                                 .map_err(|status| status.into_raw()),
                         )
-                        .unwrap_or_else(|e| log::error!(e:?; "Failed to send Start response"));
+                        .unwrap_or_else(
+                            |e| log::error!(e:?; "Failed to send CommitTransaction response"),
+                        );
+                }
+                fpartitions::PartitionsManagerRequest::AddPartition { payload, responder } => {
+                    responder
+                        .send(self.add_partition(payload).await.map_err(|status| status.into_raw()))
+                        .unwrap_or_else(
+                            |e| log::error!(e:?; "Failed to send AddPartition response"),
+                        );
                 }
             }
         }
@@ -264,6 +275,14 @@ impl StorageHostService {
     async fn commit_transaction(&self, transaction: zx::EventPair) -> Result<(), zx::Status> {
         let gpt_manager = self.gpt_manager().await?;
         gpt_manager.commit_transaction(transaction).await
+    }
+
+    async fn add_partition(
+        &self,
+        request: fpartitions::PartitionsManagerAddPartitionRequest,
+    ) -> Result<(), zx::Status> {
+        let gpt_manager = self.gpt_manager().await?;
+        gpt_manager.add_partition(request).await
     }
 
     async fn handle_partitions_admin_requests(

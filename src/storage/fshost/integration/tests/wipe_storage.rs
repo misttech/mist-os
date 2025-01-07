@@ -72,7 +72,7 @@ async fn write_blob() {
                 fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
-            "part-0",
+            "part-000",
         )
         .await
         .unwrap();
@@ -140,7 +140,7 @@ async fn write_blob_no_existing_data_partition() {
                 fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
-            "part-0",
+            "part-000",
         )
         .await
         .unwrap();
@@ -212,7 +212,7 @@ async fn blobfs_formatted() {
                 fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
-            "part-0",
+            "part-000",
         )
         .await
         .unwrap();
@@ -274,7 +274,7 @@ async fn data_unformatted() {
                 fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
-            "part-0",
+            "part-000",
         )
         .await
         .unwrap();
@@ -381,7 +381,7 @@ async fn handles_corrupt_fvm() {
                 fidl_fuchsia_storage_partitions::PartitionServiceMarker::SERVICE_NAME,
                 fio::PERM_READABLE,
             ),
-            "part-0",
+            "part-000",
         )
         .await
         .unwrap();

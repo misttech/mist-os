@@ -12,7 +12,6 @@ use block_client::{
 use block_server::async_interface::SessionManager;
 use block_server::BlockServer;
 
-use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt as _;
 use std::collections::BTreeMap;
@@ -20,6 +19,11 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use zx::AsHandleRef as _;
+use {fidl_fuchsia_storage_partitions as fpartitions, fuchsia_async as fasync};
+
+fn partition_directory_entry_name(index: u32) -> String {
+    format!("part-{:03}", index)
+}
 
 /// A single partition in a GPT device.
 pub struct GptPartition {
@@ -157,6 +161,9 @@ fn convert_partition_info(info: &gpt::PartitionInfo) -> block_server::PartitionI
 struct PendingTransaction {
     transaction: gpt::Transaction,
     client_koid: zx::Koid,
+    // A list of indexes for partitions which were added in the transaction.  When committing, all
+    // newly created partitions are published.
+    added_partitions: Vec<u32>,
     // A task which waits for the client end to be closed and clears the pending transaction.
     _signal_task: fasync::Task<()>,
 }
@@ -184,34 +191,49 @@ impl Inner {
         }
     }
 
-    async fn bind_partitions(&mut self, parent: &Arc<GptManager>) -> Result<(), Error> {
+    async fn bind_partition(
+        &mut self,
+        parent: &Arc<GptManager>,
+        index: u32,
+        info: gpt::PartitionInfo,
+    ) -> Result<(), Error> {
+        log::info!("GPT part {index}: {info:?}");
+        let partition = PartitionBackend::new(GptPartition::new(
+            parent,
+            self.gpt.client().clone(),
+            index,
+            info.start_block
+                ..info
+                    .start_block
+                    .checked_add(info.num_blocks)
+                    .ok_or_else(|| anyhow!("Overflow in partition range"))?,
+        ));
+        // TODO(https://fxbug.dev/376745136): propagate block flags from parent to children
+        let block_server = Arc::new(BlockServer::new(parent.block_size, partition));
+        self.partitions_dir.add_entry(
+            &partition_directory_entry_name(index),
+            Arc::downgrade(&block_server),
+            Arc::downgrade(parent),
+            index as usize,
+        );
+        self.partitions.insert(index, block_server);
+        Ok(())
+    }
+
+    async fn bind_all_partitions(&mut self, parent: &Arc<GptManager>) -> Result<(), Error> {
         self.partitions.clear();
         self.partitions_dir.clear();
-        let mut partitions = BTreeMap::new();
-        for (index, info) in self.gpt.partitions().iter() {
-            log::info!("GPT part {index}: {info:?}");
-            let partition = PartitionBackend::new(GptPartition::new(
-                parent,
-                self.gpt.client().clone(),
-                *index,
-                info.start_block
-                    ..info
-                        .start_block
-                        .checked_add(info.num_blocks)
-                        .ok_or_else(|| anyhow!("Overflow in partition range"))?,
-            ));
-            // TODO(https://fxbug.dev/376745136): propagate block flags from parent to children
-            let block_server = Arc::new(BlockServer::new(parent.block_size, partition));
-            self.partitions_dir.add_entry(
-                &format!("part-{}", index),
-                Arc::downgrade(&block_server),
-                Arc::downgrade(parent),
-                *index as usize,
-            );
-            partitions.insert(*index, block_server);
+        for (index, info) in self.gpt.partitions().clone() {
+            self.bind_partition(parent, index, info).await?;
         }
-        self.partitions = partitions;
         Ok(())
+    }
+
+    fn add_partition(&mut self, info: gpt::PartitionInfo) -> Result<usize, gpt::AddPartitionError> {
+        let pending = self.pending_transaction.as_mut().unwrap();
+        let idx = self.gpt.add_partition(&mut pending.transaction, info)?;
+        pending.added_partitions.push(idx as u32);
+        Ok(idx)
     }
 }
 
@@ -255,7 +277,7 @@ impl GptManager {
             shutdown: AtomicBool::new(false),
         });
         log::info!("Bind to GPT OK, binding partitions");
-        this.inner.lock().await.bind_partitions(&this).await?;
+        this.inner.lock().await.bind_all_partitions(&this).await?;
         log::info!("Starting all partitions OK!");
         Ok(this)
     }
@@ -285,33 +307,77 @@ impl GptManager {
                 inner.pending_transaction = None;
             }
         });
-        inner.pending_transaction =
-            Some(PendingTransaction { transaction, client_koid, _signal_task: task });
+        inner.pending_transaction = Some(PendingTransaction {
+            transaction,
+            client_koid,
+            added_partitions: vec![],
+            _signal_task: task,
+        });
         Ok(client_end)
     }
 
-    pub async fn commit_transaction(&self, transaction: zx::EventPair) -> Result<(), zx::Status> {
+    pub async fn commit_transaction(
+        self: &Arc<Self>,
+        transaction: zx::EventPair,
+    ) -> Result<(), zx::Status> {
         let mut inner = self.inner.lock().await;
         inner.ensure_transaction_matches(&transaction)?;
-        let transaction = std::mem::take(&mut inner.pending_transaction).unwrap().transaction;
-        if let Err(err) = inner.gpt.commit_transaction(transaction).await {
+        let pending = std::mem::take(&mut inner.pending_transaction).unwrap();
+        if let Err(err) = inner.gpt.commit_transaction(pending.transaction).await {
             log::error!(err:?; "Failed to commit transaction");
             return Err(zx::Status::IO);
         }
+        for idx in pending.added_partitions {
+            let info = inner.gpt.partitions().get(&idx).ok_or(zx::Status::BAD_STATE)?.clone();
+            inner.bind_partition(self, idx, info).await.map_err(|err| {
+                log::error!(err:?; "Failed to bind partition");
+                zx::Status::BAD_STATE
+            })?;
+        }
+        Ok(())
+    }
+
+    pub async fn add_partition(
+        &self,
+        request: fpartitions::PartitionsManagerAddPartitionRequest,
+    ) -> Result<(), zx::Status> {
+        let mut inner = self.inner.lock().await;
+        inner.ensure_transaction_matches(
+            request.transaction.as_ref().ok_or(zx::Status::BAD_HANDLE)?,
+        )?;
+        let info = gpt::PartitionInfo {
+            label: request.name.ok_or(zx::Status::INVALID_ARGS)?,
+            type_guid: request
+                .type_guid
+                .map(|value| gpt::Guid::from_bytes(value.value))
+                .ok_or(zx::Status::INVALID_ARGS)?,
+            instance_guid: request
+                .instance_guid
+                .map(|value| gpt::Guid::from_bytes(value.value))
+                .unwrap_or_else(|| gpt::Guid::generate()),
+            start_block: 0,
+            num_blocks: request.num_blocks.ok_or(zx::Status::INVALID_ARGS)?,
+            flags: request.flags.unwrap_or_default(),
+        };
+        let idx = inner.add_partition(info)?;
+        let partition =
+            inner.pending_transaction.as_ref().unwrap().transaction.partitions.get(idx).unwrap();
+        log::info!(
+            "Allocated partition {:?} at {:?}",
+            partition.label,
+            partition.start_block..partition.start_block + partition.num_blocks
+        );
         Ok(())
     }
 
     pub async fn handle_partitions_requests(
         &self,
         gpt_index: usize,
-        mut requests: fidl_fuchsia_storage_partitions::PartitionRequestStream,
+        mut requests: fpartitions::PartitionRequestStream,
     ) -> Result<(), zx::Status> {
         while let Some(request) = requests.try_next().await.unwrap() {
             match request {
-                fidl_fuchsia_storage_partitions::PartitionRequest::UpdateMetadata {
-                    payload,
-                    responder,
-                } => {
+                fpartitions::PartitionRequest::UpdateMetadata { payload, responder } => {
                     responder
                         .send(
                             self.update_partition_metadata(gpt_index, payload)
@@ -330,12 +396,13 @@ impl GptManager {
     async fn update_partition_metadata(
         &self,
         gpt_index: usize,
-        request: fidl_fuchsia_storage_partitions::PartitionUpdateMetadataRequest,
+        request: fpartitions::PartitionUpdateMetadataRequest,
     ) -> Result<(), zx::Status> {
         let mut inner = self.inner.lock().await;
         inner.ensure_transaction_matches(
             request.transaction.as_ref().ok_or(zx::Status::BAD_HANDLE)?,
         )?;
+
         let transaction = &mut inner.pending_transaction.as_mut().unwrap().transaction;
         let entry = transaction.partitions.get_mut(gpt_index).ok_or(zx::Status::BAD_STATE)?;
         if let Some(type_guid) = request.type_guid.as_ref().cloned() {
@@ -362,7 +429,7 @@ impl GptManager {
         inner.gpt.commit_transaction(transaction).await?;
 
         log::info!("Rebinding partitions...");
-        if let Err(err) = inner.bind_partitions(&self).await {
+        if let Err(err) = inner.bind_all_partitions(&self).await {
             log::error!(err:?; "Failed to rebind partitions");
             return Err(zx::Status::BAD_STATE);
         }
@@ -482,8 +549,8 @@ mod tests {
         let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
             .await
             .expect("load should succeed");
-        partitions_dir.get_entry("part-0").expect("No entry found");
-        partitions_dir.get_entry("part-1").map(|_| ()).expect_err("Extra entry found");
+        partitions_dir.get_entry("part-000").expect("No entry found");
+        partitions_dir.get_entry("part-001").map(|_| ()).expect_err("Extra entry found");
         runner.shutdown().await;
     }
 
@@ -523,9 +590,9 @@ mod tests {
         let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
             .await
             .expect("load should succeed");
-        partitions_dir.get_entry("part-0").expect("No entry found");
-        partitions_dir.get_entry("part-1").expect("No entry found");
-        partitions_dir.get_entry("part-2").map(|_| ()).expect_err("Extra entry found");
+        partitions_dir.get_entry("part-000").expect("No entry found");
+        partitions_dir.get_entry("part-001").expect("No entry found");
+        partitions_dir.get_entry("part-002").map(|_| ()).expect_err("Extra entry found");
         runner.shutdown().await;
     }
 
@@ -563,7 +630,7 @@ mod tests {
             .clone()
             .open3(
                 scope.clone(),
-                vfs::path::Path::validate_and_split("part-0").unwrap(),
+                vfs::path::Path::validate_and_split("part-000").unwrap(),
                 flags.clone(),
                 &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
             )
@@ -641,8 +708,8 @@ mod tests {
         let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
             .await
             .expect("load should succeed");
-        partitions_dir.get_entry("part-0").expect("No entry found");
-        partitions_dir.get_entry("part-1").expect("No entry found");
+        partitions_dir.get_entry("part-000").expect("No entry found");
+        partitions_dir.get_entry("part-001").expect("No entry found");
         runner.shutdown().await;
     }
 
@@ -689,8 +756,8 @@ mod tests {
         let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
             .await
             .expect("load should succeed");
-        partitions_dir.get_entry("part-0").expect("No entry found");
-        partitions_dir.get_entry("part-1").expect("No entry found");
+        partitions_dir.get_entry("part-000").expect("No entry found");
+        partitions_dir.get_entry("part-001").expect("No entry found");
         runner.shutdown().await;
     }
 
@@ -748,7 +815,7 @@ mod tests {
             .clone()
             .open3(
                 scope.clone(),
-                vfs::path::Path::validate_and_split("part-0").unwrap(),
+                vfs::path::Path::validate_and_split("part-000").unwrap(),
                 flags.clone(),
                 &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
             )
@@ -816,7 +883,7 @@ mod tests {
             .clone()
             .open3(
                 scope.clone(),
-                vfs::path::Path::validate_and_split("part-0").unwrap(),
+                vfs::path::Path::validate_and_split("part-000").unwrap(),
                 flags.clone(),
                 &mut ObjectRequest::new(flags, &options, server_end_0.into_channel().into()),
             )
@@ -825,7 +892,7 @@ mod tests {
             .clone()
             .open3(
                 scope.clone(),
-                vfs::path::Path::validate_and_split("part-1").unwrap(),
+                vfs::path::Path::validate_and_split("part-001").unwrap(),
                 flags.clone(),
                 &mut ObjectRequest::new(flags, &options, server_end_1.into_channel().into()),
             )
@@ -947,9 +1014,9 @@ mod tests {
             flags: 0,
         };
         runner.reset_partition_table(new_partitions).await.expect("reset_partition_table failed");
-        partitions_dir.get_entry("part-0").expect("No entry found");
-        partitions_dir.get_entry("part-1").map(|_| ()).expect_err("Extra entry found");
-        partitions_dir.get_entry("part-2").expect("No entry found");
+        partitions_dir.get_entry("part-000").expect("No entry found");
+        partitions_dir.get_entry("part-001").map(|_| ()).expect_err("Extra entry found");
+        partitions_dir.get_entry("part-002").expect("No entry found");
 
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
         let flags =
@@ -960,7 +1027,7 @@ mod tests {
             .clone()
             .open3(
                 scope.clone(),
-                vfs::path::Path::validate_and_split("part-0").unwrap(),
+                vfs::path::Path::validate_and_split("part-000").unwrap(),
                 flags.clone(),
                 &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
             )
@@ -1080,6 +1147,49 @@ mod tests {
             .reset_partition_table(new_partitions)
             .await
             .expect_err("reset_partition_table should fail");
+
+        runner.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn add_partition() {
+        let (block_device, partitions_dir) = setup(512, 64, vec![PartitionInfo::nil(); 64]).await;
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+            .await
+            .expect("load should succeed");
+
+        let transaction = runner.create_transaction().await.expect("Create transaction failed");
+        let request = fpartitions::PartitionsManagerAddPartitionRequest {
+            transaction: Some(transaction.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap()),
+            name: Some("a".to_string()),
+            type_guid: Some(fidl_fuchsia_hardware_block_partition::Guid { value: [1u8; 16] }),
+            num_blocks: Some(2),
+            ..Default::default()
+        };
+        runner.add_partition(request).await.expect("add_partition failed");
+        runner.commit_transaction(transaction).await.expect("add_partition failed");
+
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        let flags =
+            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
+        let options = fio::Options::default();
+        let scope = vfs::execution_scope::ExecutionScope::new();
+        partitions_dir
+            .clone()
+            .open3(
+                scope.clone(),
+                vfs::path::Path::validate_and_split("part-000").unwrap(),
+                flags.clone(),
+                &mut ObjectRequest::new(flags, &options, server_end.into_channel().into()),
+            )
+            .unwrap();
+        let block =
+            connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&proxy, "volume")
+                .expect("Failed to open block service");
+        let client = RemoteBlockClient::new(block).await.expect("Failed to create block client");
+
+        assert_eq!(client.block_count(), 2);
+        assert_eq!(client.block_size(), 512);
 
         runner.shutdown().await;
     }

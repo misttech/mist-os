@@ -86,7 +86,7 @@ impl PartitionInfo {
         }
     }
 
-    fn nil() -> Self {
+    pub fn nil() -> Self {
         Self {
             label: String::default(),
             type_guid: Guid::default(),
@@ -229,6 +229,23 @@ impl From<TransactionCommitError> for zx::Status {
             TransactionCommitError::Io => zx::Status::IO,
             TransactionCommitError::InvalidArguments => zx::Status::INVALID_ARGS,
             TransactionCommitError::NoSpace => zx::Status::NO_SPACE,
+        }
+    }
+}
+
+#[derive(Eq, thiserror::Error, Clone, Debug, PartialEq)]
+pub enum AddPartitionError {
+    #[error("Invalid arguments")]
+    InvalidArguments,
+    #[error("No space")]
+    NoSpace,
+}
+
+impl From<AddPartitionError> for zx::Status {
+    fn from(error: AddPartitionError) -> zx::Status {
+        match error {
+            AddPartitionError::InvalidArguments => zx::Status::INVALID_ARGS,
+            AddPartitionError::NoSpace => zx::Status::NO_SPACE,
         }
     }
 }
@@ -385,6 +402,55 @@ impl Gpt {
         Ok(())
     }
 
+    /// Adds a partition in `transaction`.  `info.start_block` must be unset and will be dynamically
+    /// chosen in a first-fit manner.
+    /// The indedx of the partition in the table is returned on success.
+    pub fn add_partition(
+        &mut self,
+        transaction: &mut Transaction,
+        mut info: PartitionInfo,
+    ) -> Result<usize, AddPartitionError> {
+        assert_eq!(info.start_block, 0);
+
+        if info.label.is_empty()
+            || info.type_guid.0.is_nil()
+            || info.instance_guid.0.is_nil()
+            || info.num_blocks == 0
+        {
+            return Err(AddPartitionError::InvalidArguments);
+        }
+
+        let mut allocated_ranges = vec![
+            0..self.header.first_usable,
+            self.header.last_usable + 1..self.client.block_count(),
+        ];
+        let mut slot_idx = None;
+        for i in 0..transaction.partitions.len() {
+            let partition = &transaction.partitions[i];
+            if slot_idx.is_none() && partition.is_nil() {
+                slot_idx = Some(i);
+            }
+            if !partition.is_nil() {
+                allocated_ranges
+                    .push(partition.start_block..partition.start_block + partition.num_blocks);
+            }
+        }
+        let slot_idx = slot_idx.ok_or(AddPartitionError::NoSpace)?;
+        allocated_ranges.sort_by_key(|range| range.start);
+
+        let mut start_block = None;
+        for window in allocated_ranges.windows(2) {
+            if window[1].start - window[0].end >= info.num_blocks {
+                start_block = Some(window[0].end);
+                break;
+            }
+        }
+        info.start_block = start_block.ok_or(AddPartitionError::NoSpace)?;
+
+        transaction.partitions[slot_idx] = info;
+        Ok(slot_idx)
+    }
+
     async fn write_metadata(
         &self,
         header: &format::Header,
@@ -429,7 +495,7 @@ impl Drop for Transaction {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Gpt, Guid, PartitionInfo};
+    use crate::{AddPartitionError, Gpt, Guid, PartitionInfo};
     use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use fake_block_server::{FakeServer, FakeServerOptions};
     use std::ops::Range;
@@ -1463,5 +1529,97 @@ mod tests {
             assert_eq!(partition.start_block, expected.blocks.start);
             assert_eq!(partition.num_blocks, expected.blocks.end - expected.blocks.start);
         }
+    }
+
+    #[fuchsia::test]
+    async fn add_partitions_till_no_blocks_left() {
+        let vmo = zx::Vmo::create(65536).unwrap();
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
+
+        let _task =
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(client.clone(), vec![PartitionInfo::nil(); 32]).await.expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let mut transaction = manager.create_transaction().unwrap();
+        assert_eq!(transaction.partitions.len(), 32);
+        let mut num = 0;
+        loop {
+            match manager.add_partition(
+                &mut transaction,
+                crate::PartitionInfo {
+                    label: format!("part-{num}"),
+                    type_guid: crate::Guid::generate(),
+                    instance_guid: crate::Guid::generate(),
+                    start_block: 0,
+                    num_blocks: 1,
+                    flags: 0,
+                },
+            ) {
+                Ok(_) => {
+                    num += 1;
+                }
+                Err(AddPartitionError::InvalidArguments) => panic!("Unexpected error"),
+                Err(AddPartitionError::NoSpace) => break,
+            };
+        }
+        assert!(num <= 32);
+        manager.commit_transaction(transaction).await.expect("Commit failed");
+
+        // Check state before and after a reload, to ensure both the in-memory and on-disk
+        // representation match.
+        assert_eq!(manager.header().num_parts, 32);
+        assert_eq!(manager.partitions().len(), num);
+
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 32);
+        assert_eq!(manager.partitions().len(), num);
+    }
+
+    #[fuchsia::test]
+    async fn add_partitions_till_no_slots_left() {
+        let vmo = zx::Vmo::create(65536).unwrap();
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
+
+        let _task =
+            fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
+        let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
+        Gpt::format(client.clone(), vec![PartitionInfo::nil(); 4]).await.expect("format failed");
+        let mut manager = Gpt::open(client).await.expect("load should succeed");
+        let mut transaction = manager.create_transaction().unwrap();
+        assert_eq!(transaction.partitions.len(), 4);
+        let mut num = 0;
+        loop {
+            match manager.add_partition(
+                &mut transaction,
+                crate::PartitionInfo {
+                    label: format!("part-{num}"),
+                    type_guid: crate::Guid::generate(),
+                    instance_guid: crate::Guid::generate(),
+                    start_block: 0,
+                    num_blocks: 1,
+                    flags: 0,
+                },
+            ) {
+                Ok(_) => {
+                    num += 1;
+                }
+                Err(AddPartitionError::InvalidArguments) => panic!("Unexpected error"),
+                Err(AddPartitionError::NoSpace) => break,
+            };
+        }
+        assert!(num <= 4);
+        manager.commit_transaction(transaction).await.expect("Commit failed");
+
+        // Check state before and after a reload, to ensure both the in-memory and on-disk
+        // representation match.
+        assert_eq!(manager.header().num_parts, 4);
+        assert_eq!(manager.partitions().len(), num);
+
+        let manager = Gpt::open(manager.take_client()).await.expect("reload should succeed");
+        assert_eq!(manager.header().num_parts, 4);
+        assert_eq!(manager.partitions().len(), num);
     }
 }

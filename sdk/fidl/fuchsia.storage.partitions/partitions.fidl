@@ -12,7 +12,7 @@ using zx;
 closed protocol Partition {
     /// Appends an update to `transaction` (see `PartitionManager.CreateTransaction`)
     /// to modify the partition's metadata.  The update is only applied once the transaction
-    /// is committed.  Fails if the transaction was already committed.
+    /// is committed.
     strict UpdateMetadata(resource table {
         1: transaction zx.Handle:EVENTPAIR;
         2: type_guid fuchsia.hardware.block.partition.Guid;
@@ -42,6 +42,22 @@ closed protocol PartitionsManager {
     /// Commits the changes pending in the transaction.
     strict CommitTransaction(resource struct {
         transaction zx.Handle:EVENTPAIR;
+    }) -> () error zx.Status;
+
+    /// Allocates a new partition in `transaction`.  Fails if there is insufficient space for the
+    /// requested partition.  There must be an empty slot in the partition table (the table will not
+    /// be resized).
+    strict AddPartition(resource table {
+        1: transaction zx.Handle:EVENTPAIR;
+        // Must be set to a non-zero value.
+        2: num_blocks uint64;
+        // Must be set to a non-empty value.
+        3: name string:fuchsia.hardware.block.partition.NAME_LENGTH;
+        // Must be set to a non-nil value.
+        4: type_guid fuchsia.hardware.block.partition.Guid;
+        // If unset, a GUID is generated.
+        5: instance_guid fuchsia.hardware.block.partition.Guid;
+        6: flags uint64;
     }) -> () error zx.Status;
 };
 
