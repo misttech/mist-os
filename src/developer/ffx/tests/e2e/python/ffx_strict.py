@@ -216,6 +216,35 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
         )
         asserts.assert_equal(output[0]["rcs_state"], "N")
 
+    def test_target_wait_strict(self) -> None:
+        """Test `ffx --strict target wait`."""
+        output = self._run_strict_ffx(
+            [
+                "target",
+                "wait",
+            ],
+            f"{self.dut_ssh_address}",
+        )
+        asserts.assert_equal(output, {"ok": {}})
+
+    def test_target_wait_down_strict(self) -> None:
+        """Test `ffx --strict target wait --down`."""
+        with asserts.assert_raises(subprocess.CalledProcessError):
+            try:
+                self._run_strict_ffx(
+                    [
+                        "target",
+                        "wait",
+                        "--timeout",
+                        "1",
+                        "--down",
+                    ],
+                    f"{self.dut_ssh_address}",
+                )
+            except subprocess.CalledProcessError as e:
+                asserts.assert_in(b"Timeout", e.stderr)
+                raise
+
 
 if __name__ == "__main__":
     test_runner.main()
