@@ -1556,6 +1556,7 @@ dependencies = [
  "vk-sys",
  "vm-device",
  "vte",
+ "wait-timeout",
  "walkdir",
  "which",
  "xml-rs",

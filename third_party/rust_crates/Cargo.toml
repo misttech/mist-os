@@ -325,6 +325,7 @@ tinyjson = "2.5.0"
 # supports target-specific feature resolution
 tokio = { version = "=1.32.1", default-features = false }
 tokio-stream = "0.1.14"
+wait-timeout = "0.2.0"
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
 
 # For crates we don't want to vendor, follow instructions at

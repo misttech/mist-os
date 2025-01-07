@@ -1154,6 +1154,12 @@ group("vte") {
   public_deps = [ ":vte-v0_3_3" ]
 }
 
+if (!(current_os == "fuchsia")) {
+  group("wait-timeout") {
+    public_deps = [ ":wait-timeout-v0_2_0" ]
+  }
+}
+
 group("walkdir") {
   public_deps = [ ":walkdir-v2_3_1" ]
 }
