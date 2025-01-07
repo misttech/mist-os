@@ -5,7 +5,7 @@
 use fidl_message::TransactionHeader;
 use futures::channel::mpsc::UnboundedSender;
 use futures::channel::oneshot::Sender;
-use futures::future::{poll_fn, Either};
+use futures::future::Either;
 use futures::stream::Stream as StreamTrait;
 use futures::FutureExt;
 use std::collections::hash_map::Entry;
@@ -514,9 +514,7 @@ impl Client {
     /// protocol.
     ///
     /// The second return item is a future that must be polled to keep
-    /// transactions running. It's *possibly* unnecessary if you always poll the
-    /// futures attached to calls but if you'd like to be able to drop those and
-    /// ignore results you have to poll this one to completion.
+    /// transactions running.
     pub fn new(
         transport: impl FDomainTransport + 'static,
     ) -> (Arc<Self>, impl Future<Output = ()> + Send + 'static) {
@@ -666,7 +664,7 @@ impl Client {
     /// waits for a response.
     ///
     /// Calling this method queues the transaction synchronously. Awaiting is
-    /// only necessary to wait for the response and pump the transport.
+    /// only necessary to wait for the response.
     pub(crate) fn transaction<S: fidl_message::Body, R: 'static>(
         self: &Arc<Self>,
         ordinal: u64,
@@ -675,15 +673,9 @@ impl Client {
     ) -> impl Future<Output = Result<R, Error>> + 'static {
         let mut inner = self.0.lock().unwrap();
 
-        let (sender, mut receiver) = futures::channel::oneshot::channel();
+        let (sender, receiver) = futures::channel::oneshot::channel();
         match inner.request(ordinal, request, f(sender)) {
-            Ok(()) => {
-                let this = Arc::clone(self);
-                Either::Left(poll_fn(move |ctx| {
-                    this.0.lock().unwrap().poll_transport(ctx);
-                    receiver.poll_unpin(ctx).map(|x| x.expect("Oneshot went away without reply!"))
-                }))
-            }
+            Ok(()) => Either::Left(receiver.map(|x| x.expect("Oneshot went away without reply!"))),
             Err(e) => Either::Right(async move { Err(e.into()) }),
         }
     }
