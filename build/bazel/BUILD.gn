@@ -90,6 +90,7 @@ action("generate_main_workspace") {
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/args.json",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/git",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/jiri_snapshot.xml",
+    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/remote_services.bazelrc",
 
     # Other files.
     "${bazel_main_top_dir}/workspace/platform_mappings",
@@ -265,28 +266,6 @@ generate_prebuilt_dir_content_hash(prebuilt_content_hash_targets.clang) {
   source_dir = get_path_info(clang_prefix, "dir")
   output = prebuilt_content_hash_files.clang
   cipd_name = "clang"
-}
-
-# Generate remote service configs into a bazelrc.
-action("remote_services_bazelrc") {
-  script = "//build/bazel/scripts/generate_services_bazelrc.py"
-  _output = "$target_out_dir/remote_services.bazelrc"
-  outputs = [ _output ]
-  _template = "//build/bazel/templates/template.remote_services.bazelrc"
-  _configs = [
-    "//build/rbe/fuchsia-reproxy.cfg",
-    "//build/rbe/fuchsia-rewrapper.cfg",
-  ]
-  inputs = [ _template ] + _configs
-  args = [
-           "--template",
-           rebase_path(_template, root_build_dir),
-           "--output",
-           rebase_path(_output, root_build_dir),
-           "--remote_download_outputs",
-           bazel_rbe_download_outputs,
-           "--cfgs",
-         ] + rebase_path(_configs, root_build_dir)
 }
 
 # Pass the map of which developer overrides to use with which assembly label to
