@@ -2,10 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <arpa/inet.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <net/if.h>
 #include <net/if_arp.h>
+#include <net/route.h>
 #include <netinet/in.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -15,6 +17,8 @@
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <linux/input.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
@@ -130,10 +134,12 @@ void GetIfAddr(fbl::unique_fd& fd, in_addr_t expected_addr) {
   sockaddr_in* s = reinterpret_cast<sockaddr_in*>(&ifr.ifr_addr);
   EXPECT_EQ(s->sin_family, AF_INET);
   EXPECT_EQ(s->sin_port, 0);
-  EXPECT_EQ(ntohl(s->sin_addr.s_addr), expected_addr);
+  EXPECT_EQ(s->sin_addr.s_addr, expected_addr);
 }
 
-TEST_F(IoctlTest, SIOCGIFADDR_Success) { ASSERT_NO_FATAL_FAILURE(GetIfAddr(fd, INADDR_LOOPBACK)); }
+TEST_F(IoctlTest, SIOCGIFADDR_Success) {
+  ASSERT_NO_FATAL_FAILURE(GetIfAddr(fd, htonl(INADDR_LOOPBACK)));
+}
 
 void SetIfAddr(fbl::unique_fd& fd, in_addr_t addr) {
   ifreq ifr;
@@ -152,8 +158,71 @@ TEST_F(IoctlTest, SIOCSIFADDR_Success) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "SIOCSIFADDR requires root, skipping...";
   }
-  ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, INADDR_ANY));
-  ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, INADDR_LOOPBACK));
+
+  ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, htonl(INADDR_ANY)));
+  ASSERT_NO_FATAL_FAILURE(GetIfAddr(fd, htonl(INADDR_ANY)));
+  ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, htonl(INADDR_LOOPBACK)));
+  ASSERT_NO_FATAL_FAILURE(GetIfAddr(fd, htonl(INADDR_LOOPBACK)));
+}
+
+TEST_F(IoctlTest, SIOCSIFADDR_AgreesWithNetlink) {
+  // TODO(https://fxbug.dev/317285180) don't skip on baseline
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "SIOCSIFADDR requires root, skipping...";
+  }
+  ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, htonl(INADDR_ANY)));
+  ASSERT_NO_FATAL_FAILURE(GetIfAddr(fd, htonl(INADDR_ANY)));
+  ASSERT_NO_FATAL_FAILURE(SetIfAddr(fd, htonl(INADDR_LOOPBACK)));
+  ASSERT_NO_FATAL_FAILURE(GetIfAddr(fd, htonl(INADDR_LOOPBACK)));
+
+  // Retrieve the address via netlink and check that the retrieved address is the one we set.
+  // This helps guard against a regression due to mixing up endianness.
+  fbl::unique_fd nlsock(socket(AF_NETLINK, SOCK_RAW, NETLINK_ROUTE));
+  ASSERT_TRUE(nlsock) << strerror(errno);
+
+  struct {
+    nlmsghdr hdr;
+    ifaddrmsg ifa;
+  } req = {};
+
+  req.hdr.nlmsg_len = NLMSG_LENGTH(sizeof(ifaddrmsg));
+  req.hdr.nlmsg_type = RTM_GETADDR;
+  req.hdr.nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP;
+  req.ifa.ifa_family = AF_INET;
+
+  ASSERT_EQ(send(nlsock.get(), &req, req.hdr.nlmsg_len, 0), static_cast<int>(req.hdr.nlmsg_len))
+      << strerror(errno);
+
+  constexpr size_t kBufSize = 4096;
+  char buf[kBufSize];
+
+  ssize_t len = recv(nlsock.get(), &buf, kBufSize, 0);
+  ASSERT_GT(len, 0) << strerror(errno);
+
+  bool found = false;
+  for (nlmsghdr* hdr = reinterpret_cast<nlmsghdr*>(buf); NLMSG_OK(hdr, len);
+       hdr = NLMSG_NEXT(hdr, len)) {
+    if (hdr->nlmsg_type == NLMSG_DONE) {
+      break;
+    }
+    if (hdr->nlmsg_type == NLMSG_ERROR) {
+      FAIL() << "netlink error";
+    }
+
+    ifaddrmsg* ifa = static_cast<ifaddrmsg*>(NLMSG_DATA(hdr));
+    if (ifa->ifa_family != AF_INET || ifa->ifa_index != if_nametoindex(kLoopbackIfName)) {
+      continue;
+    }
+
+    rtattr* rta = IFA_RTA(ifa);
+    in_addr addr;
+    memcpy(&addr, RTA_DATA(rta), sizeof(addr));
+
+    EXPECT_EQ(addr.s_addr, htonl(INADDR_LOOPBACK));
+    found = true;
+  }
+
+  EXPECT_TRUE(found);
 }
 
 short GetLoopbackIfFlags(fbl::unique_fd& fd) {

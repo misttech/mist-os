@@ -594,7 +594,10 @@ impl Socket {
                                 let mut msg = AddressMessage::default();
                                 msg.header.family = AddressFamily::Inet;
                                 msg.header.index = if_index;
-                                let addr = addr.to_be_bytes();
+
+                                // The SIOCSIFADDR ioctl already provides the address to set in
+                                // network byte order.
+                                let addr = addr.to_ne_bytes();
                                 // The request does not include the prefix
                                 // length so we use the default prefix for the
                                 // address's class.
