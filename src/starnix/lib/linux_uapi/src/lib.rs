@@ -39,3 +39,8 @@ mod arm_manual;
 pub mod arch32 {
     pub use crate::arm::*;
 }
+
+#[cfg(not(feature = "arch32"))]
+pub mod arch32 {
+    pub use super::*;
+}

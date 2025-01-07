@@ -34,9 +34,8 @@ use starnix_uapi::signals::{
 use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, robust_list, robust_list_head, sigaction_t,
-    sigaltstack, uapi, ucred, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED,
-    FUTEX_BITSET_MATCH_ANY,
+    errno, error, from_status_like_fdio, pid_t, sigaction_t, sigaltstack, uapi, ucred,
+    CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED, FUTEX_BITSET_MATCH_ANY,
 };
 use std::collections::VecDeque;
 use std::ffi::CString;
@@ -322,21 +321,9 @@ pub struct CapturedThreadState {
     pub dirty: bool,
 }
 
-#[cfg(feature = "arch32")]
-#[allow(non_camel_case_types)]
-pub type arch32_robust_list_head = uapi::arch32::robust_list_head;
-#[cfg(not(feature = "arch32"))]
-#[allow(non_camel_case_types)]
-pub type arch32_robust_list_head = uapi::robust_list_head;
-#[cfg(feature = "arch32")]
-#[allow(non_camel_case_types)]
-pub type arch32_robust_list = uapi::arch32::robust_list;
-#[cfg(not(feature = "arch32"))]
-#[allow(non_camel_case_types)]
-pub type arch32_robust_list = uapi::robust_list;
-
-pub type RobustListHeadPtr = MultiArchUserRef<robust_list_head, arch32_robust_list_head>;
-pub type RobustListPtr = MultiArchUserRef<robust_list, arch32_robust_list>;
+pub type RobustListHeadPtr =
+    MultiArchUserRef<uapi::robust_list_head, uapi::arch32::robust_list_head>;
+pub type RobustListPtr = MultiArchUserRef<uapi::robust_list, uapi::arch32::robust_list>;
 
 #[derive(Debug, Default)]
 pub struct RobustListHead {

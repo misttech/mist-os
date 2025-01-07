@@ -16,11 +16,13 @@ rustc_library("linux_uapi") {
   if (current_cpu == "x64") {
     sources += [ "src/x86_64.rs" ]
   } else if (current_cpu == "arm64") {
-    sources += [
-      "src/arm.rs",
-      "src/arm64.rs",
-      "src/arm_manual.rs",
-    ]
+    sources += [ "src/arm64.rs" ]
+    if (starnix_enable_arch32) {
+      sources += [
+        "src/arm.rs",
+        "src/arm_manual.rs",
+      ]
+    }
   } else if (current_cpu == "riscv64") {
     sources += [ "src/riscv64.rs" ]
   } else {
