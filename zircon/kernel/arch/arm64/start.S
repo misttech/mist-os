@@ -105,7 +105,7 @@ FUNCTION(_start)
     // garbage and run afoul of EL1 sp alignment checks if blindly installed.
     mov     x0, xzr
     mov     sp, x0
-    bl      arm64_elX_to_el1
+    bl      ArmDropToEl1WithoutEl2Monitor
 
     // Make sure no old exception handlers are installed.
     msr     vbar_el1, xzr
