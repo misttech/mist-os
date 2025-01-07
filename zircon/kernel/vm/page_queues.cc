@@ -227,11 +227,15 @@ void PageQueues::StartThreads(zx_duration_t min_mru_rotate_time,
   DEBUG_ASSERT(lru_thread);
   lru_thread->Resume();
 
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  ASSERT(!mru_thread_);
-  ASSERT(!lru_thread_);
-  mru_thread_ = mru_thread;
-  lru_thread_ = lru_thread;
+  {
+    Guard<SpinLock, IrqSave> guard{&lock_};
+    ASSERT(!mru_thread_);
+    ASSERT(!lru_thread_);
+    mru_thread_ = mru_thread;
+    lru_thread_ = lru_thread;
+  }
+  // Kick start any LRU processing that might be pending to ensure it doesn't spuriously timeout.
+  MaybeTriggerLruProcessing();
 }
 
 void PageQueues::StartDebugCompressor() {
@@ -626,11 +630,14 @@ void PageQueues::MruThread() {
 // expected that ProcessDontNeedAndLruQueues perform small units of work to avoid this thread
 // causing excessive lock contention.
 void PageQueues::LruThread() {
+  constexpr uint kLruNeedsProcessingPollSeconds = 90;
+  uint64_t pending_target_gen = UINT64_MAX;
   while (!shutdown_threads_.load(ktl::memory_order_relaxed)) {
-    lru_event_.WaitDeadline(ZX_TIME_INFINITE, Interruptible::No);
+    zx_status_t wait_status =
+        lru_event_.Wait(Deadline::after(ZX_SEC(kLruNeedsProcessingPollSeconds)));
 
     uint64_t target_gen;
-    bool needs_processing;
+    bool needs_processing = false;
     // Take the lock so we can calculate (race free) a target mru-gen.
     {
       Guard<SpinLock, IrqSave> guard{&lock_};
@@ -643,6 +650,24 @@ void PageQueues::LruThread() {
     if (!needs_processing) {
       pq_lru_spurious_wakeup.Add(1);
       continue;
+    }
+    if (wait_status == ZX_ERR_TIMED_OUT) {
+      // The queue needs processing, but we woke up due to a timeout on the event and not a signal.
+      // This could happen due to a race where we woke up before the MruThread could actually set
+      // the signal, in which case we want to record the target_gen that we saw and then go back and
+      // wait for the signal.
+      // In the case where we have timed out *and* the target_gen we want is the same as the last
+      // target_gen we were looking for then this means that we have gone a full poll interval with:
+      //  * Processing needing to happen.
+      //  * No event being signaled.
+      //  * No other thread processing the queue for us.
+      if (pending_target_gen != target_gen) {
+        pending_target_gen = target_gen;
+        continue;
+      }
+      KERNEL_OOPS("LruThread signal was not seen after %u seconds and queue needs processing\n",
+                  kLruNeedsProcessingPollSeconds);
+      Dump();
     }
 
     // Keep processing until we have caught up to what is required. This ensures we are
