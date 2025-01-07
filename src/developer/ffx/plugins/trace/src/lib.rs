@@ -26,6 +26,7 @@ use std::io::{stdin, LineWriter, Stdin, Write};
 use std::path::{Component, PathBuf};
 use std::time::Duration;
 use term_grid::Grid;
+#[cfg_attr(test, allow(unused))]
 use termion::terminal_size;
 
 // This is to make the schema make sense as this plugin can output one of these based on the
@@ -368,7 +369,10 @@ fn print_grid(writer: &mut Writer, values: Vec<String>) -> Result<()> {
         grid.add(term_grid::Cell::from(value.as_str()));
     }
 
+    #[cfg(not(test))]
     let terminal_width = terminal_size().unwrap_or((80, 80)).0;
+    #[cfg(test)]
+    let terminal_width = 80usize;
     let formatted_values = match grid.fit_into_width(terminal_width.into()) {
         Some(grid_display) => grid_display.to_string(),
         None => values.join("\n"),

@@ -298,6 +298,7 @@ group("tests") {
     "lib:tests($host_toolchain)",
     "playground:tests($host_toolchain)",
     "plugins/package:tests($host_toolchain)",
+    "plugins/trace:tests($host_toolchain)",
     "tests($host_toolchain)",
   ]
 }
