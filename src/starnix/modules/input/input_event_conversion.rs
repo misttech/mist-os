@@ -1562,7 +1562,7 @@ pub fn parse_fidl_button_event(
     batch.function_is_pressed = fidl_event.function.unwrap_or(false);
     for (then, now, key_code) in [
         (power_was_pressed, batch.power_is_pressed, uapi::KEY_POWER),
-        (function_was_pressed, batch.function_is_pressed, uapi::KEY_SCREENSAVER),
+        (function_was_pressed, batch.function_is_pressed, uapi::KEY_VOLUMEDOWN),
     ] {
         // Button state changed. Send an event.
         if then != now {
