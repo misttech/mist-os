@@ -317,9 +317,9 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
     if (pln->offset() == node_offset) {
       // We found the node containing offset. Get the slot.
       slot = &pln->Lookup(node_index);
-      // Short circuit the IfOffsetInIntervalHelper call below if the slot itself is an interval
+      // Short circuit the IsOffsetInIntervalHelper call below if the slot itself is an interval
       // sentinel. This is purely an optimization, and it would be okay to call
-      // IfOffsetInIntervalHelper for this case too.
+      // IsOffsetInIntervalHelper for this case too.
       if (slot->IsInterval()) {
         is_in_interval = true;
         found_interval = slot;
@@ -327,7 +327,8 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
     }
 
     if (!is_in_interval) {
-      is_in_interval = IfOffsetInIntervalHelper(offset, *pln, &found_interval);
+      found_interval = IsOffsetInIntervalHelper(offset, *pln);
+      is_in_interval = !!found_interval;
       // If we found an interval, we should have found a valid interval sentinel too.
       DEBUG_ASSERT(!is_in_interval || found_interval->IsInterval());
     }
@@ -719,10 +720,9 @@ bool VmPageList::IsOffsetInZeroInterval(uint64_t offset) const {
   DEBUG_ASSERT(!pln->IsEmpty());
 
   // Check if offset is in an interval also querying the associated sentinel.
-  const VmPageOrMarker* interval = nullptr;
-  bool in_interval = IfOffsetInIntervalHelper(offset, *pln, &interval);
-  DEBUG_ASSERT(!in_interval || interval->IsInterval());
-  return in_interval ? interval->IsIntervalZero() : false;
+  const VmPageOrMarker* interval = IsOffsetInIntervalHelper(offset, *pln);
+  DEBUG_ASSERT(!interval || interval->IsInterval());
+  return interval ? interval->IsIntervalZero() : false;
 }
 
 bool VmPageList::IsOffsetInInterval(uint64_t offset) const {
@@ -739,85 +739,9 @@ bool VmPageList::IsOffsetInInterval(uint64_t offset) const {
   }
   // The page list shouldn't have any empty nodes.
   DEBUG_ASSERT(!pln->IsEmpty());
-  return IfOffsetInIntervalHelper(offset, *pln);
-}
-
-bool VmPageList::IfOffsetInIntervalHelper(uint64_t offset, const VmPageListNode& lower_bound,
-                                          const VmPageOrMarker** interval_out) const {
-  DEBUG_ASSERT(!lower_bound.IsEmpty());
-  if (interval_out) {
-    *interval_out = nullptr;
-  }
-
-  // Helper to return success if an interval sentinel is found.
-  auto found_interval = [&interval_out](const VmPageOrMarker* interval) {
-    if (interval_out) {
-      *interval_out = interval;
-    }
-    return true;
-  };
-
-  const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-  const size_t node_index = offset_to_node_index(offset, list_skew_);
-
-  // For the offset to lie in an interval, it is going to have an interval end so we should have
-  // found some valid node if the offset falls in an interval. See if offset falls in an interval.
-
-  // We found the node containing offset.
-  if (lower_bound.offset() == node_offset) {
-    auto& slot = lower_bound.Lookup(node_index);
-    // Check if the slot is an interval sentinel.
-    if (slot.IsInterval()) {
-      return found_interval(&slot);
-    }
-    if (!slot.IsEmpty()) {
-      // For any other non-empty slot, we know this is not an interval.
-      return false;
-    }
-    // The slot is empty. Walk to the left and right and lookup the closest populated
-    // slots. We should find either an interval start to the left or an end to the right. Try to
-    // find a start to the left first.
-    DEBUG_ASSERT(slot.IsEmpty());
-    for (size_t i = node_index; i > 0; i--) {
-      auto& p = lower_bound.Lookup(i - 1);
-      // Found the first populated slot to the left.
-      if (!p.IsEmpty()) {
-        if (p.IsIntervalStart()) {
-          return found_interval(&p);
-        }
-        // Found a non-empty slot to the left that wasn't a start. We cannot be in an interval.
-        return false;
-      }
-    }
-  }
-
-  // We could end up here under two conditions.
-  //  1. The lower_bound node contained offset, offset was empty, and we could not find a non-empty
-  //  slot to the left. So we have to walk right to try to find an interval end.
-  //  2. The lower_bound node contained offsets larger than offset. For this case too we have to
-  //  walk right and see if the first populated slot is an interval end.
-  // Only the start index for the traversal is different for the two cases.
-  size_t index;
-  if (lower_bound.offset() == node_offset) {
-    index = node_index + 1;
-  } else {
-    DEBUG_ASSERT(lower_bound.offset() > node_offset);
-    index = 0;
-  }
-
-  for (; index < VmPageListNode::kPageFanOut; index++) {
-    auto& p = lower_bound.Lookup(index);
-    // Found the first populated slot to the right.
-    if (!p.IsEmpty()) {
-      if (p.IsIntervalEnd()) {
-        return found_interval(&p);
-      }
-      // Found a non-empty slot to the right that wasn't an end. We cannot be in an interval.
-      return false;
-    }
-  }
-
-  return false;
+  const VmPageOrMarker* interval = IsOffsetInIntervalHelper(offset, *pln);
+  DEBUG_ASSERT(!interval || interval->IsInterval());
+  return interval != nullptr;
 }
 
 zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t end_offset,

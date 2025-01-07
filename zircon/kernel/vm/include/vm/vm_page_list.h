@@ -520,6 +520,48 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
     return ForEveryPageInRange<PTR_TYPE>(this, func, start_offset, end_offset, skew);
   }
 
+  // Checks if the given offset is part of an interval involving this node. This method cannot find
+  // the full interval, since that may require looking at an additional node, but can determine if
+  // in an interval or not. Returns any interval sentinel found, otherwise a nullptr.
+  const VmPageOrMarker* IsOffsetInInterval(uint64_t off) const {
+    DEBUG_ASSERT(off >= offset());
+    DEBUG_ASSERT(off < end_offset());
+    const size_t index = (off - obj_offset_) / PAGE_SIZE;
+    // If the target slot is any kind of interval (start, end, individual slot), then we are in an
+    // interval.
+    if (!pages_[index].IsEmpty()) {
+      return (pages_[index].IsInterval()) ? &pages_[index] : nullptr;
+    }
+    // Check if there is an interval end to the right, which would cause this to be in an interval.
+    // Finding anything else indicates we cannot be in an interval.
+    for (size_t i = index + 1; i < kPageFanOut; i++) {
+      if (!pages_[i].IsEmpty()) {
+        return pages_[i].IsIntervalEnd() ? &pages_[i] : nullptr;
+      }
+    }
+    // Nothing to our right, so check for an interval start to our left.
+    for (size_t i = index; i > 0; i--) {
+      if (!pages_[i - 1].IsEmpty()) {
+        return pages_[i - 1].IsIntervalStart() ? &pages_[i - 1] : nullptr;
+      }
+    }
+    panic("Unexpected empty node");
+    return nullptr;
+  }
+
+  // Check if this node begins in an interval, that is if an interval start was in a preceding node
+  // and this nodes contains the end. If the first non-empty slot is an interval end it is returned,
+  // otherwise we cannot have started in an interval and a nullptr is returned.
+  const VmPageOrMarker* NodeStartsInInterval() const {
+    for (size_t i = 0; i < kPageFanOut; i++) {
+      if (!pages_[i].IsEmpty()) {
+        return pages_[i].IsIntervalEnd() ? &pages_[i] : nullptr;
+      }
+    }
+    panic("Unexpected empty node");
+    return nullptr;
+  }
+
   const VmPageOrMarker& Lookup(size_t index) const {
     canary_.Assert();
     DEBUG_ASSERT(index < kPageFanOut);
@@ -1183,12 +1225,16 @@ class VmPageList final {
   // Internal helper used when checking whether the offset falls in an interval.
   // lower_bound is the node that was queried with a lower_bound() lookup on the list using the
   // offset. This node is passed in here so that we can reuse the node the callsite has looked up
-  // and avoid an extra lookup. The interval sentinel found in lower_bound which is used to
-  // conclude that offset lies is an interval is optionally returned. If this function returns true,
-  // interval_out (if not null) returns the start/end/slot sentinel of the interval that the offset
-  // lies in.
-  bool IfOffsetInIntervalHelper(uint64_t offset, const VmPageListNode& lower_bound,
-                                const VmPageOrMarker** interval_out = nullptr) const;
+  // and avoid an extra lookup. Any interval sentinel found is returned, otherwise a nullptr is
+  // returned.
+  const VmPageOrMarker* IsOffsetInIntervalHelper(uint64_t offset,
+                                                 const VmPageListNode& lower_bound) const {
+    offset += list_skew_;
+    if (offset < lower_bound.offset()) {
+      return lower_bound.NodeStartsInInterval();
+    }
+    return lower_bound.IsOffsetInInterval(offset);
+  }
 
   // Internal helper for AddZeroInterval.
   // |replace_existing_slot| can optionally be set to true if a zero interval spanning a single page
@@ -1246,20 +1292,13 @@ class VmPageList final {
     Skip = false,
     CleanupEmpty = true,
   };
-  template <typename PTR_TYPE, NodeCheck NODE_CHECK = NodeCheck::Skip, typename S, typename F>
-  static zx_status_t ForEveryPageInRange(S self, F per_page_func, uint64_t start_offset,
-                                         uint64_t end_offset) {
+  template <typename PTR_TYPE, NodeCheck NODE_CHECK, typename S, typename F>
+  static zx_status_t ForEveryPageInRangeInternal(S self, F per_page_func, auto cur,
+                                                 uint64_t start_offset, uint64_t end_offset) {
     DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
     DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
     start_offset += self->list_skew_;
     end_offset += self->list_skew_;
-
-    // Find the first node (if any) that will contain our starting offset.
-    auto cur =
-        self->list_.lower_bound(ROUNDDOWN(start_offset, VmPageListNode::kPageFanOut * PAGE_SIZE));
-    if (!cur) {
-      return ZX_OK;
-    }
 
     while (cur && cur->offset() < end_offset) {
       uint64_t start = ktl::max(start_offset, cur->offset());
@@ -1272,14 +1311,27 @@ class VmPageList final {
           self->list_.erase(prev);
         }
       }
-      if (unlikely(status != ZX_ERR_NEXT)) {
-        if (status == ZX_ERR_STOP) {
-          return ZX_OK;
-        }
+      if (status != ZX_ERR_NEXT) {
         return status;
       }
     }
 
+    return ZX_ERR_NEXT;
+  }
+  template <typename PTR_TYPE, NodeCheck NODE_CHECK = NodeCheck::Skip, typename S, typename F>
+  static zx_status_t ForEveryPageInRange(S self, F per_page_func, uint64_t start_offset,
+                                         uint64_t end_offset) {
+    // Find the first node (if any) that will contain our starting offset.
+    auto cur = self->list_.lower_bound(
+        ROUNDDOWN(start_offset + self->list_skew_, VmPageListNode::kPageFanOut * PAGE_SIZE));
+    zx_status_t status = ForEveryPageInRangeInternal<PTR_TYPE, NODE_CHECK>(
+        self, per_page_func, ktl::move(cur), start_offset, end_offset);
+    if (status != ZX_ERR_NEXT) {
+      if (status == ZX_ERR_STOP) {
+        return ZX_OK;
+      }
+      return status;
+    }
     return ZX_OK;
   }
 
@@ -1288,47 +1340,52 @@ class VmPageList final {
   static zx_status_t ForEveryPageAndGapInRange(S self, PAGE_FUNC per_page_func,
                                                GAP_FUNC per_gap_func, uint64_t start_offset,
                                                uint64_t end_offset) {
+    auto cur = self->list_.lower_bound(
+        ROUNDDOWN(start_offset + self->list_skew_, VmPageListNode::kPageFanOut * PAGE_SIZE));
+
     uint64_t expected_next_off = start_offset;
     // Set to true when we encounter an interval start but haven't yet encountered the end.
     bool in_interval = false;
     auto per_page_wrapper_fn = [&](auto* p, uint64_t off) {
+      // Update our interval tracking first. Should the callbacks later request an early exit then
+      // this work is wasted, but doing it first, and unconditionally, lets the compiler perform
+      // better common expression elimination with the per_gap_func check next.
+      if (p->IsIntervalStart()) {
+        // We should not already have been tracking an interval.
+        DEBUG_ASSERT(!in_interval);
+        // Start and end sentinel interval types should match. Since we only support zero
+        // intervals currently, we can simply check for that.
+        DEBUG_ASSERT(p->IsIntervalZero());
+        in_interval = true;
+      } else if (p->IsIntervalEnd()) {
+        // If this is not the first populated slot we encountered, we should have been tracking a
+        // valid interval.
+        DEBUG_ASSERT(in_interval || expected_next_off == start_offset);
+        // Start and end sentinel interval types should match. Since we only support zero
+        // intervals currently, we can simply check for that.
+        DEBUG_ASSERT(p->IsIntervalZero());
+        // Reset interval tracking.
+        in_interval = false;
+      }
       zx_status_t status = ZX_ERR_NEXT;
       // We can move ahead of expected_next_off in the case of an interval too, which represents a
       // run of pages. Make sure this is not an interval before calling the per_gap_func.
       if (expected_next_off != off && !p->IsIntervalEnd()) {
         status = per_gap_func(expected_next_off, off);
       }
-      if (status == ZX_ERR_NEXT) {
-        if (p->IsIntervalStart()) {
-          // We should not already have been tracking an interval.
-          DEBUG_ASSERT(!in_interval);
-          // Start and end sentinel interval types should match. Since we only support zero
-          // intervals currently, we can simply check for that.
-          DEBUG_ASSERT(p->IsIntervalZero());
-          in_interval = true;
-        } else if (p->IsIntervalEnd()) {
-          // If this is not the first populated slot we encountered, we should have been tracking a
-          // valid interval.
-          DEBUG_ASSERT(in_interval || expected_next_off == start_offset);
-          // Start and end sentinel interval types should match. Since we only support zero
-          // intervals currently, we can simply check for that.
-          DEBUG_ASSERT(p->IsIntervalZero());
-          // Reset interval tracking.
-          in_interval = false;
-        }
-        status = per_page_func(p, off);
-      }
       expected_next_off = off + PAGE_SIZE;
-      // Prevent the last call to per_gap_func
-      if (status == ZX_ERR_STOP) {
-        expected_next_off = end_offset;
+      if (status == ZX_ERR_NEXT) {
+        status = per_page_func(p, off);
       }
       return status;
     };
 
-    zx_status_t status = ForEveryPageInRange<PTR_TYPE, NODE_CHECK>(self, per_page_wrapper_fn,
-                                                                   start_offset, end_offset);
-    if (status != ZX_OK) {
+    zx_status_t status = ForEveryPageInRangeInternal<PTR_TYPE, NODE_CHECK>(
+        self, per_page_wrapper_fn, cur, start_offset, end_offset);
+    if (status != ZX_ERR_NEXT) {
+      if (status == ZX_ERR_STOP) {
+        return ZX_OK;
+      }
       return status;
     }
 
@@ -1345,8 +1402,9 @@ class VmPageList final {
       // page at all and the start_offset is in an interval (Note that in this latter case all
       // offsets in the range [start_offset, end_offset) would lie in the same interval, so we can
       // just check one of them).
-      bool ended_in_interval = in_interval || (expected_next_off == start_offset &&
-                                               self->IsOffsetInInterval(start_offset));
+      bool ended_in_interval =
+          in_interval || (expected_next_off == start_offset && cur &&
+                          !!self->IsOffsetInIntervalHelper(start_offset, *cur));
       if (!ended_in_interval) {
         status = per_gap_func(expected_next_off, end_offset);
         if (status != ZX_ERR_NEXT && status != ZX_ERR_STOP) {
