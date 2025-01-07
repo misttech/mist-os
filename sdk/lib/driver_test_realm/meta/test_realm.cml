@@ -97,6 +97,7 @@
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",
+                "fuchsia.power.SuspendEnabled",
             ],
             from: "void",
             to: "#driver_manager",

@@ -38,6 +38,7 @@
 #include "src/devices/bin/driver_manager/driver_host_loader_service.h"
 #include "src/devices/bin/driver_manager/driver_manager_config.h"
 #include "src/devices/bin/driver_manager/driver_runner.h"
+#include "src/devices/bin/driver_manager/offer_injection.h"
 #include "src/devices/bin/driver_manager/shutdown/shutdown_manager.h"
 #include "src/devices/lib/log/log.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -123,7 +124,11 @@ int main(int argc, char** argv) {
 #endif
         return client;
       },
-      loop.dispatcher(), config.enable_test_shutdown_delays());
+      loop.dispatcher(), config.enable_test_shutdown_delays(),
+      driver_manager::OfferInjector{{
+          .power_inject_offer = config.power_inject_offer(),
+          .power_suspend_enabled = config.power_suspend_enabled(),
+      }});
 
   // Setup devfs.
   std::optional<driver_manager::Devfs> devfs;

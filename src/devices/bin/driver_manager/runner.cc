@@ -103,8 +103,10 @@ void Runner::StartDriverComponent(std::string_view moniker, std::string_view url
 
   auto child_args_builder = fcomponent::wire::CreateChildArgs::Builder(arena).numbered_handles(
       fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(&handle_info, 1));
+
+  fidl::VectorView<fdecl::wire::Offer> dynamic_offers(
+      arena, offers.size() + offer_injector_.ExtraOffersCount());
   if (!offers.empty()) {
-    fidl::VectorView<fdecl::wire::Offer> dynamic_offers(arena, offers.size());
     for (size_t i = 0; i < offers.size(); i++) {
       const auto& offer = offers[i];
       zx::result get_offer_result = GetInnerOffer(offer);
@@ -115,9 +117,10 @@ void Runner::StartDriverComponent(std::string_view moniker, std::string_view url
       auto [inner_offer, _] = get_offer_result.value();
       dynamic_offers[i] = inner_offer;
     }
-
-    child_args_builder.dynamic_offers(dynamic_offers);
   }
+  offer_injector_.Inject(arena, dynamic_offers, offers.size());
+
+  child_args_builder.dynamic_offers(dynamic_offers);
   auto create_callback =
       [this, child_moniker = std::string(moniker.data()), koid = koid.value()](
           fidl::WireUnownedResult<fcomponent::Realm::CreateChild>& result) mutable {

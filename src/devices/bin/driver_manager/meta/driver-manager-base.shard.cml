@@ -84,6 +84,15 @@
             availability: "optional",
             type: "bool",
         },
+
+        // TODO(https://fxbug.dev/369189827): Not needed when we don't need to have these
+        // as dynamic offers.
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "power_suspend_enabled",
+            availability: "optional",
+            type: "bool",
+        },
     ],
     expose: [
         {
@@ -134,5 +143,11 @@
             max_size: 100,
         },
         enable_test_shutdown_delays: { type: "bool" },
+
+        // TODO(https://fxbug.dev/369189827): Not needed when we don't need to have these
+        // as dynamic offers.
+        // Used to decide the source of the power dynamic offers.
+        power_inject_offer: { type: "bool" },
+        power_suspend_enabled: { type: "bool" },
     },
 }

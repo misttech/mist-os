@@ -84,6 +84,7 @@
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
                 "fuchsia.driver.manager.EnableTestShutdownDelays",
                 "fuchsia.driver.manager.RootDriver",
+                "fuchsia.power.SuspendEnabled",
             ],
             from: "parent",
             to: "#driver_manager",
@@ -362,21 +363,38 @@
                 "#driver_manager",
             ],
         },
+
+        // TODO(https://fxbug.dev/369189827): Placeholders to keep sag and broker alive.
         {
-            protocol: [
-                "fuchsia.power.system.ActivityGovernor",
-                "fuchsia.power.system.CpuElementManager",
-            ],
+            service: "sag.placeholder",
             from: "#system-activity-governor",
             to: "#boot-drivers",
             source_availability: "unknown",
         },
         {
-            protocol: [ "fuchsia.power.broker.Topology" ],
+            service: "powerbroker.placeholder",
             from: "#power-broker",
             to: "#boot-drivers",
             source_availability: "unknown",
         },
+
+        // TODO(https://fxbug.dev/369189827): Route these statically again when the dictionary
+        // can override them.
+        // {
+        //     protocol: [
+        //         "fuchsia.power.system.ActivityGovernor",
+        //         "fuchsia.power.system.CpuElementManager",
+        //     ],
+        //     from: "#system-activity-governor",
+        //     to: "#boot-drivers",
+        //     source_availability: "unknown",
+        // },
+        // {
+        //     protocol: [ "fuchsia.power.broker.Topology" ],
+        //     from: "#power-broker",
+        //     to: "#boot-drivers",
+        //     source_availability: "unknown",
+        // },
         {
             protocol: "fuchsia.driver.test.DriverLists",
             from: "void",

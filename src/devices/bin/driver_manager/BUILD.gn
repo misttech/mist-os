@@ -24,6 +24,8 @@ fuchsia_structured_config_values("driver_manager_config_default") {
     verbose = false
     root_driver = "fuchsia-boot:///platform-bus#meta/platform-bus.cm"
     enable_test_shutdown_delays = false
+    power_inject_offer = true
+    power_suspend_enabled = false
   }
 }
 
@@ -82,6 +84,8 @@ source_set("driver_runner") {
     "driver_runner.h",
     "node.cc",
     "node.h",
+    "offer_injection.cc",
+    "offer_injection.h",
     "parent_set_collector.cc",
     "parent_set_collector.h",
     "pkg_utils.h",

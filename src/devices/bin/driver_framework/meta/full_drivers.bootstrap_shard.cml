@@ -105,22 +105,25 @@
             from: "#archivist",
             to: "#full-drivers",
         },
-        {
-            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
-            from: "#system-activity-governor",
-            to: "#full-drivers",
 
-            // system-activity-governor depends on the suspend HAL but not all
-            // drivers depend on system-activity-governor.
-            // Weak to resolve dependency cycles.
-            dependency: "weak",
-            source_availability: "unknown",
-        },
-        {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#power-broker",
-            to: "#full-drivers",
-        },
+        // TODO(https://fxbug.dev/369189827): Route these statically again when the dictionary
+        // can override them.
+        // {
+        //     protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+        //     from: "#system-activity-governor",
+        //     to: "#full-drivers",
+
+        //     // system-activity-governor depends on the suspend HAL but not all
+        //     // drivers depend on system-activity-governor.
+        //     // Weak to resolve dependency cycles.
+        //     dependency: "weak",
+        //     source_availability: "unknown",
+        // },
+        // {
+        //     protocol: [ "fuchsia.power.broker.Topology" ],
+        //     from: "#power-broker",
+        //     to: "#full-drivers",
+        // },
     ],
     expose: [
         {

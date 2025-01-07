@@ -252,7 +252,11 @@ FakeDriverIndex DriverRunnerTestBase::CreateDriverIndex() {
 void DriverRunnerTestBase::SetupDriverRunner(FakeDriverIndex driver_index) {
   driver_index_.emplace(std::move(driver_index));
   driver_runner_.emplace(ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory,
-                         dispatcher(), false);
+                         dispatcher(), false,
+                         driver_manager::OfferInjector{{
+                             .power_inject_offer = false,
+                             .power_suspend_enabled = false,
+                         }});
   SetupDevfs();
 }
 
@@ -279,6 +283,10 @@ void DriverRunnerTestBase::SetupDriverRunnerWithDynamicLinker(
       driver_loader::Loader::Create(loader_dispatcher, std::move(load_driver_handler));
   driver_runner_.emplace(
       ConnectToRealm(), driver_index_->Connect(), inspect(), &LoaderFactory, dispatcher(), false,
+      driver_manager::OfferInjector{{
+          .power_inject_offer = false,
+          .power_suspend_enabled = false,
+      }},
       driver_manager::DriverRunner::DynamicLinkerArgs{
           [loader = dynamic_linker_.get()]() { return DynamicLinkerFactory(loader); },
           std::move(driver_host_runner)});

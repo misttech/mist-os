@@ -31,6 +31,7 @@
 #include "src/devices/bin/driver_manager/driver_host_runner.h"
 #include "src/devices/bin/driver_manager/inspect.h"
 #include "src/devices/bin/driver_manager/node.h"
+#include "src/devices/bin/driver_manager/offer_injection.h"
 #include "src/devices/bin/driver_manager/runner.h"
 #include "src/devices/bin/driver_manager/shutdown/node_removal_tracker.h"
 #include "src/devices/bin/driver_manager/shutdown/node_remover.h"
@@ -65,6 +66,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
                fidl::ClientEnd<fuchsia_driver_index::DriverIndex> driver_index,
                InspectManager& inspect, LoaderServiceFactory loader_service_factory,
                async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays,
+               OfferInjector offer_injector,
                std::optional<DynamicLinkerArgs> dynamic_linker_args = std::nullopt);
 
   // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager> interface

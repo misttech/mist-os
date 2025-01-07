@@ -158,6 +158,8 @@ fuchsia_structured_config_values("test_config") {
     verbose = false
     root_driver = "fuchsia-boot:///dtr#meta/test-parent-sys.cm"
     enable_test_shutdown_delays = false
+    power_inject_offer = false
+    power_suspend_enabled = false
   }
 }
 
