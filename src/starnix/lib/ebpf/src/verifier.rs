@@ -648,8 +648,8 @@ pub struct CallingContext {
     pub helpers: HashMap<u32, FunctionSignature>,
     /// The args of the program.
     pub args: Vec<Type>,
-    /// The memory id of the network packets.
-    pub packet_memory_id: Option<MemoryId>,
+    /// Packet type. Normally it should be either `None` or `args[0]`.
+    pub packet_type: Option<Type>,
 }
 
 impl CallingContext {
@@ -665,8 +665,8 @@ impl CallingContext {
         assert!(args.len() <= 5);
         self.args = args.to_vec();
     }
-    pub fn set_packet_memory_id(&mut self, memory_id: MemoryId) {
-        self.packet_memory_id = Some(memory_id);
+    pub fn set_packet_type(&mut self, packet_type: Type) {
+        self.packet_type = Some(packet_type);
     }
 }
 
@@ -3881,12 +3881,14 @@ impl BpfVisitor for ComputationContext {
             register_offset.map(display_register).unwrap_or_else(Default::default),
             print_offset(offset)
         );
-        let Some(memory_id) = context.calling_context.packet_memory_id.clone() else {
-            return Err(format!("incorrect packet access at pc {}", self.pc));
-        };
 
-        if !matches!(self.reg(src)?, Type::PtrToMemory { offset: 0, id, .. } | Type::PtrToStruct { offset: 0, id, .. } if id == memory_id )
-        {
+        // Verify that `src` refers to a packet.
+        let src_type = self.reg(src)?;
+        let src_is_packet = match &context.calling_context.packet_type {
+            Some(packet_type) => src_type == *packet_type,
+            None => false,
+        };
+        if !src_is_packet {
             return Err(format!("R{} is not a packet at pc {}", src, self.pc));
         }
 

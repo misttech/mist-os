@@ -5,8 +5,7 @@
 use crate::converter::cbpf_to_ebpf;
 use crate::executor::execute;
 use crate::verifier::{
-    verify_program, CallingContext, FunctionSignature, NullVerifierLogger, Type,
-    VerifiedEbpfProgram, VerifierLogger,
+    verify_program, CallingContext, NullVerifierLogger, Type, VerifiedEbpfProgram,
 };
 use crate::{
     DataWidth, EbpfError, EbpfInstruction, MapSchema, MemoryId, StructAccess, BPF_CALL, BPF_DW,
@@ -365,65 +364,6 @@ pub fn link_program<C: EbpfRunContext>(
     Ok(EbpfProgram { code, helpers })
 }
 
-#[derive(Derivative)]
-#[derivative(Default(bound = ""))]
-pub struct EbpfProgramBuilder<C: EbpfRunContext> {
-    calling_context: CallingContext,
-    struct_mappings: Vec<StructMapping>,
-    maps: Vec<MapDescriptor>,
-    helper_impls: HashMap<u32, EbpfHelperImpl<C>>,
-}
-
-impl<C: EbpfRunContext> std::fmt::Debug for EbpfProgramBuilder<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("EbpfProgramBuilder")
-            .field("calling_context", &self.calling_context)
-            .field("struct_mappings", &self.struct_mappings)
-            .field("maps", &self.maps)
-            .finish()
-    }
-}
-
-impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
-    // Adds a new map to the calling context. Returns the index that should be used to reference the map.
-    pub fn register_map(&mut self, desc: MapDescriptor) -> usize {
-        let index = self.calling_context.register_map(desc.schema);
-        assert_eq!(self.maps.len(), index);
-        self.maps.push(desc);
-        index
-    }
-
-    pub fn set_args(&mut self, args: &[Type]) {
-        self.calling_context.set_args(args);
-    }
-
-    pub fn set_packet_memory_id(&mut self, packet_memory_id: MemoryId) {
-        self.calling_context.set_packet_memory_id(packet_memory_id);
-    }
-
-    pub fn register_struct_mapping(&mut self, mapping: StructMapping) {
-        self.struct_mappings.push(mapping);
-    }
-
-    pub fn set_helpers(&mut self, helpers: HashMap<u32, FunctionSignature>) {
-        self.calling_context.set_helpers(helpers);
-    }
-
-    pub fn set_helper_impls(&mut self, helper_impls: HashMap<u32, EbpfHelperImpl<C>>) {
-        self.helper_impls = helper_impls;
-    }
-
-    pub fn load(
-        self,
-        code: Vec<EbpfInstruction>,
-        logger: &mut dyn VerifierLogger,
-    ) -> Result<EbpfProgram<C>, EbpfError> {
-        let Self { calling_context, struct_mappings, maps, helper_impls } = self;
-        let verified_program = verify_program(code, calling_context, logger)?;
-        link_program(&verified_program, &struct_mappings, &maps, helper_impls)
-    }
-}
-
 /// An abstraction over an eBPF program and its registered helper functions.
 pub struct EbpfProgram<C: EbpfRunContext> {
     pub code: Vec<EbpfInstruction>,
@@ -432,7 +372,7 @@ pub struct EbpfProgram<C: EbpfRunContext> {
 
 impl<C: EbpfRunContext> std::fmt::Debug for EbpfProgram<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("EbpfProgramBuilder").field("code", &self.code).finish()
+        f.debug_struct("EbpfProgram").field("code", &self.code).finish()
     }
 }
 
@@ -494,19 +434,24 @@ impl EbpfProgram<()> {
 
     /// This method instantiates an EbpfProgram given a cbpf original.
     pub fn from_cbpf(bpf_code: &[sock_filter]) -> Result<Self, EbpfError> {
-        let mut builder = EbpfProgramBuilder::default();
-        let packet_memory_id = new_bpf_type_identifier();
-        builder.set_args(&[
-            // Pointer to the packet (e.g. `__sk_buff`). `buffer_size` is set to 0 because the
-            // packet is supposed to be access only through the `PacketAccessor` which validates
-            // the offset in runtime.
-            Type::PtrToMemory { id: packet_memory_id.clone(), offset: 0, buffer_size: 0 },
-            // Packet size (see `BPF_LEN` in cBPF). This may be different from the size of the
-            // value pointed by the first argument.
-            Type::ScalarValueParameter,
-        ]);
-        builder.set_packet_memory_id(packet_memory_id);
-        builder.load(cbpf_to_ebpf(bpf_code)?, &mut NullVerifierLogger)
+        // Pointer to the packet (e.g. `__sk_buff`). `buffer_size` is set to 0 because the
+        // packet is supposed to be access only through the `PacketAccessor` which validates
+        // the offset in runtime.
+        let packet_type =
+            Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size: 0 };
+        let context = CallingContext {
+            args: vec![
+                packet_type.clone(),
+                // Packet size (see `BPF_LEN` in cBPF). This may be different from the size of the
+                // value pointed by the first argument.
+                Type::ScalarValueParameter,
+            ],
+            packet_type: Some(packet_type),
+            ..Default::default()
+        };
+        let verified_program =
+            verify_program(cbpf_to_ebpf(bpf_code)?, context, &mut NullVerifierLogger)?;
+        link_program(&verified_program, &[], &[], HashMap::new())
     }
 }
 
@@ -851,6 +796,31 @@ mod test {
         }
     }
 
+    fn initialize_test_program(code: Vec<EbpfInstruction>) -> Result<EbpfProgram<()>, EbpfError> {
+        let verified_program = verify_program(
+            code,
+            CallingContext { args: vec![ProgramArgument::get_type()], ..Default::default() },
+            &mut NullVerifierLogger,
+        )?;
+        link_program(&verified_program, &[], &[], HashMap::default())
+    }
+
+    fn initialize_test_program_for_32bit_arg(
+        code: Vec<EbpfInstruction>,
+    ) -> Result<EbpfProgram<()>, EbpfError> {
+        let verified_program = verify_program(
+            code,
+            CallingContext { args: vec![ProgramArgument::get_type_32bit()], ..Default::default() },
+            &mut NullVerifierLogger,
+        )?;
+        link_program(
+            &verified_program,
+            &[ProgramArgument::get_32bit_mapping()],
+            &[],
+            HashMap::default(),
+        )
+    }
+
     #[test]
     fn test_data_end() {
         let program = r#"
@@ -865,11 +835,7 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program(parse_asm(program)).expect("load");
 
         let v = [42];
         let mut data = ProgramArgument::from_data(&v[..]);
@@ -890,11 +856,7 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
@@ -904,11 +866,7 @@ mod test {
           ldxw %r0, [%r1+12]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type_32bit()]);
-        builder.register_struct_mapping(ProgramArgument::get_32bit_mapping());
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program_for_32bit_arg(parse_asm(program)).expect("load");
 
         let mut data = ProgramArgument::default();
         assert_eq!(
@@ -925,11 +883,7 @@ mod test {
           ldxh %r0, [%r1+14]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type_32bit()]);
-        builder.register_struct_mapping(ProgramArgument::get_32bit_mapping());
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program_for_32bit_arg(parse_asm(program)).expect("load");
 
         let mut data = ProgramArgument::default();
         data.mutable_field = 0x12345678;
@@ -951,12 +905,7 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type_32bit()]);
-        builder.register_struct_mapping(ProgramArgument::get_32bit_mapping());
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program_for_32bit_arg(parse_asm(program)).expect("load");
 
         let v = [42];
         let mut data = ProgramArgument::from_data(&v[..]);
@@ -979,12 +928,7 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type_32bit()]);
-        builder.register_struct_mapping(ProgramArgument::get_32bit_mapping());
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program_for_32bit_arg(parse_asm(program)).expect("load");
 
         let v = [42];
         let mut data = ProgramArgument::from_data(&v[..]);
@@ -1021,9 +965,7 @@ mod test {
         "#;
         let code = parse_asm(program);
 
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program(code).expect("load");
 
         let v = [42];
         let mut data = ProgramArgument::from_data(&v[..]);
@@ -1038,20 +980,18 @@ mod test {
         ldpw
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-
-        let packet_memory_id = new_bpf_type_identifier();
-        builder.set_packet_memory_id(packet_memory_id.clone());
-        let second_memory_id = new_bpf_type_identifier();
-        builder.set_args(&[
-            Type::PtrToMemory { id: packet_memory_id, offset: 0, buffer_size: 16 },
-            Type::PtrToMemory { id: second_memory_id, offset: 0, buffer_size: 16 },
-        ]);
+        let args = vec![
+            Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size: 16 },
+            Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size: 16 },
+        ];
+        let verify_result = verify_program(
+            parse_asm(program),
+            CallingContext { args, ..Default::default() },
+            &mut NullVerifierLogger,
+        );
 
         assert_eq!(
-            builder.load(code, &mut NullVerifierLogger).expect_err("validation should fail"),
+            verify_result.expect_err("validation should fail"),
             EbpfError::ProgramVerifyError("R6 is not a packet at pc 2".to_string())
         );
     }
@@ -1063,10 +1003,7 @@ mod test {
           ldxdw %r0, [%r1]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
@@ -1076,10 +1013,7 @@ mod test {
           ldxw %r0, [%r1 + 4]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
@@ -1089,10 +1023,7 @@ mod test {
           ldxw %r0, [%r1 + 8]
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
@@ -1102,10 +1033,7 @@ mod test {
           stw [%r1], 0x42
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 
     #[test]
@@ -1116,10 +1044,7 @@ mod test {
           mov %r0, 1
           exit
         "#;
-        let code = parse_asm(program);
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        let program = builder.load(code, &mut NullVerifierLogger).expect("load");
+        let program = initialize_test_program(parse_asm(program)).expect("load");
 
         let mut data = ProgramArgument::default();
         assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), 1);
@@ -1142,10 +1067,6 @@ mod test {
         ldxdw %r0, [%r1]
         exit
         "#;
-        let code = parse_asm(program);
-
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        builder.set_args(&[ProgramArgument::get_type()]);
-        builder.load(code, &mut NullVerifierLogger).expect_err("incorrect program");
+        initialize_test_program(parse_asm(program)).expect_err("incorrect program");
     }
 }

@@ -5,14 +5,15 @@
 #[cfg(test)]
 pub mod test {
     use crate::{
-        new_bpf_type_identifier, BpfValue, DataWidth, EbpfHelperImpl, EbpfProgramBuilder,
-        EmptyPacketAccessor, FunctionSignature, MemoryParameterSize, NullVerifierLogger,
-        PacketAccessor, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC,
-        BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
-        BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32,
-        BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH,
-        BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG,
-        BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
+        link_program, new_bpf_type_identifier, verify_program, BpfValue, CallingContext, DataWidth,
+        EbpfHelperImpl, EmptyPacketAccessor, FunctionSignature, MemoryParameterSize,
+        NullVerifierLogger, PacketAccessor, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND,
+        BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT,
+        BPF_FETCH, BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT,
+        BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD,
+        BPF_LDX, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH,
+        BPF_SRC_IMM, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG,
+        BPF_XOR,
     };
     use linux_uapi::bpf_insn;
     use pest::iterators::Pair;
@@ -873,18 +874,21 @@ pub mod test {
             return;
         };
 
-        let mut builder = EbpfProgramBuilder::<()>::default();
-        if let Some(memory) = test_case.memory.as_ref() {
-            let memory_id = new_bpf_type_identifier();
-            let buffer_size = memory.len() as u64;
-            builder.set_packet_memory_id(memory_id.clone());
-            builder.set_args(&[
-                Type::PtrToMemory { id: memory_id, offset: 0, buffer_size },
-                Type::from(buffer_size),
-            ]);
-        } else {
-            builder.set_args(&[Type::from(0), Type::from(0)]);
-        }
+        let args;
+        let packet_type;
+        match test_case.memory.as_ref() {
+            Some(memory) => {
+                let buffer_size = memory.len() as u64;
+                let packet =
+                    Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size };
+                args = vec![packet.clone(), Type::from(buffer_size)];
+                packet_type = Some(packet)
+            }
+            None => {
+                args = vec![Type::from(0), Type::from(0)];
+                packet_type = None;
+            }
+        };
 
         let malloc_id = new_bpf_type_identifier();
         let mut helpers = HashMap::<u32, FunctionSignature>::new();
@@ -1018,12 +1022,16 @@ pub mod test {
             free,
         );
 
-        builder.set_helpers(helpers);
-        builder.set_helper_impls(helper_impls);
+        let verified_program = verify_program(
+            test_case.code,
+            CallingContext { maps: vec![], helpers, args, packet_type },
+            &mut NullVerifierLogger,
+        );
 
-        let program = builder.load(test_case.code, &mut NullVerifierLogger);
         if let Some(value) = test_case.result {
-            let program = program.expect("program must be loadable");
+            let verified_program = verified_program.expect("program must be loadable");
+            let program = link_program(&verified_program, &[], &[], helper_impls)
+                .expect("failed to link a test program");
             let result = if let Some(memory) = test_case.memory.as_mut() {
                 program.run_with_slice(
                     &mut (),
@@ -1039,7 +1047,7 @@ pub mod test {
             };
             assert_eq!(result, value);
         } else {
-            assert!(program.is_err());
+            assert!(verified_program.is_err());
         }
     }
 }

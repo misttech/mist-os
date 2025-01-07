@@ -474,23 +474,23 @@ fn array_end_32_field(offset: usize, id: MemoryId) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::PtrToArray { id, is_32_bit: true } }
 }
 
-fn ptr_to_struct_arg(id: MemoryId, fields: Vec<FieldDescriptor>) -> Vec<Type> {
-    vec![Type::PtrToStruct { id, offset: 0, descriptor: Arc::new(StructDescriptor { fields }) }]
+fn ptr_to_struct_type(id: MemoryId, fields: Vec<FieldDescriptor>) -> Type {
+    Type::PtrToStruct { id, offset: 0, descriptor: Arc::new(StructDescriptor { fields }) }
 }
 
-fn ptr_to_mem_arg<T: IntoBytes>(id: MemoryId) -> Vec<Type> {
-    vec![Type::PtrToMemory { id, offset: 0, buffer_size: std::mem::size_of::<T>() as u64 }]
+fn ptr_to_mem_type<T: IntoBytes>(id: MemoryId) -> Type {
+    Type::PtrToMemory { id, offset: 0, buffer_size: std::mem::size_of::<T>() as u64 }
 }
 
 static RING_BUFFER_RESERVATION: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
 
 pub static SK_BUF_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
-static SK_BUF_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
+static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
     let cb_offset = std::mem::offset_of!(__sk_buff, cb);
     let hash_offset = std::mem::offset_of!(__sk_buff, hash);
     let data_id = new_bpf_type_identifier();
 
-    ptr_to_struct_arg(
+    ptr_to_struct_type(
         SK_BUF_ID.clone(),
         vec![
             // All fields from the start of `__sk_buff` to `cb` are read-only scalars.
@@ -507,12 +507,13 @@ static SK_BUF_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
         ],
     )
 });
+static SK_BUF_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![SK_BUF_TYPE.clone()]);
 
 pub static XDP_MD_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
-static XDP_MD_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
+static XDP_MD_TYPE: LazyLock<Type> = LazyLock::new(|| {
     let data_id = new_bpf_type_identifier();
 
-    ptr_to_struct_arg(
+    ptr_to_struct_type(
         XDP_MD_ID.clone(),
         vec![
             array_start_32_field(std::mem::offset_of!(xdp_md, data), data_id.clone()),
@@ -525,26 +526,27 @@ static XDP_MD_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
         ],
     )
 });
+static XDP_MD_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![XDP_MD_TYPE.clone()]);
 
 static BPF_USER_PT_REGS_T_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
 static BPF_USER_PT_REGS_T_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<bpf_user_pt_regs_t>(BPF_USER_PT_REGS_T_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_user_pt_regs_t>(BPF_USER_PT_REGS_T_ID.clone())]);
 
 static BPF_SOCK_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
 static BPF_SOCK_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<bpf_sock>(BPF_SOCK_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sock>(BPF_SOCK_ID.clone())]);
 
 static BPF_SOCKOPT_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
 static BPF_SOCKOPT_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<bpf_sockopt>(BPF_SOCKOPT_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sockopt>(BPF_SOCKOPT_ID.clone())]);
 
 static BPF_SOCK_ADDR_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
 static BPF_SOCK_ADDR_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<bpf_sock_addr>(BPF_SOCK_ADDR_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sock_addr>(BPF_SOCK_ADDR_ID.clone())]);
 
 static BPF_FUSE_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
-static BPF_FUSE_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
-    ptr_to_struct_arg(
+static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
+    ptr_to_struct_type(
         BPF_FUSE_ID.clone(),
         vec![
             FieldDescriptor {
@@ -569,6 +571,7 @@ static BPF_FUSE_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| {
         ],
     )
 });
+static BPF_FUSE_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![BPF_FUSE_TYPE.clone()]);
 
 #[repr(C)]
 #[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
@@ -592,7 +595,7 @@ struct TraceEvent {
 
 static BPF_TRACEPOINT_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
 static BPF_TRACEPOINT_ARGS: LazyLock<Vec<Type>> =
-    LazyLock::new(|| ptr_to_mem_arg::<TraceEvent>(BPF_TRACEPOINT_ID.clone()));
+    LazyLock::new(|| vec![ptr_to_mem_type::<TraceEvent>(BPF_TRACEPOINT_ID.clone())]);
 
 /// The different type of BPF programs.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -674,21 +677,14 @@ impl ProgramType {
         }
     }
 
-    pub fn get_packet_memory_id(self) -> Option<MemoryId> {
-        match self {
+    pub fn create_calling_context(self, maps: Vec<MapSchema>) -> CallingContext {
+        let args = self.get_args().to_vec();
+        let packet_type = match self {
             Self::CgroupSkb | Self::SchedAct | Self::SchedCls | Self::SocketFilter => {
-                Some(SK_BUF_ID.clone())
+                Some(SK_BUF_TYPE.clone())
             }
             _ => None,
-        }
-    }
-
-    pub fn create_calling_context(self, maps: Vec<MapSchema>) -> CallingContext {
-        CallingContext {
-            maps,
-            helpers: self.get_helpers(),
-            args: self.get_args().into(),
-            packet_memory_id: self.get_packet_memory_id(),
-        }
+        };
+        CallingContext { maps, helpers: self.get_helpers(), args, packet_type }
     }
 }
