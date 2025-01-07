@@ -30,7 +30,6 @@
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.kernel.DebugResource",
-                "fuchsia.logger.LogSink",
             ],
         },
     ],

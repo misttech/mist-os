@@ -69,7 +69,7 @@
         },
         {
             dictionary: "diagnostics",
-            from: "parent",
+            from: "self",
             to: [
                 "#boot-drivers",
                 "#devfs",

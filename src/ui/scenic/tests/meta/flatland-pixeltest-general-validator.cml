@@ -16,7 +16,6 @@
     use: [
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.ui.test.context.ScenicRealmFactory",
             ],

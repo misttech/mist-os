@@ -4,6 +4,7 @@
 
 use anyhow::Error;
 use argh::FromArgs;
+use cm_rust::DictionaryDecl;
 use component_events::events::*;
 use component_events::matcher::*;
 use diagnostics_log_encoding::encode::EncoderOpts;
@@ -147,6 +148,12 @@ impl Puppet {
             )
             .await?;
         builder
+            .add_capability(cm_rust::CapabilityDecl::Dictionary(DictionaryDecl {
+                name: "diagnostics".parse().unwrap(),
+                source_path: None,
+            }))
+            .await?;
+        builder
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<LogSinkPuppetMarker>())
@@ -159,6 +166,15 @@ impl Puppet {
                 Route::new()
                     .capability(Capability::protocol::<LogSinkMarker>())
                     .from(&mocks_server)
+                    .to(Ref::dictionary("self/diagnostics"))
+                    .to(&puppet),
+            )
+            .await?;
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::dictionary("diagnostics"))
+                    .from(Ref::self_())
                     .to(&puppet),
             )
             .await?;

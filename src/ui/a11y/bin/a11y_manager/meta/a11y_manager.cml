@@ -31,7 +31,6 @@
             protocol: [
                 "fuchsia.feedback.LastRebootInfoProvider",
                 "fuchsia.intl.PropertyProvider",
-                "fuchsia.logger.LogSink",
                 "fuchsia.settings.Accessibility",
                 "fuchsia.ui.annotation.Registry",
                 "fuchsia.ui.composition.Flatland",

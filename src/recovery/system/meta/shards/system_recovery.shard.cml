@@ -46,7 +46,6 @@
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.hwinfo.Product",
                 "fuchsia.location.namedplace.RegulatoryRegionConfigurator",
-                "fuchsia.logger.LogSink",
                 "fuchsia.recovery.FactoryReset",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",

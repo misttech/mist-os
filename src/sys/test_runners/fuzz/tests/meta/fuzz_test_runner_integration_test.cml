@@ -22,7 +22,6 @@
         },
     ],
     use: [
-        { protocol: "fuchsia.logger.LogSink" },
         {
             protocol: "fuchsia.fuzzer.Manager",
             from: "#fuzz-manager",
