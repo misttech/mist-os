@@ -10,6 +10,7 @@ import(
 rustc_library_with_features("netstack3-datagram") {
   edition = "2021"
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  check_cfgs = [ "test" ]
   sources = [
     "src/datagram.rs",
     "src/lib.rs",

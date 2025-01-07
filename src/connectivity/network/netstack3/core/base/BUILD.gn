@@ -10,7 +10,10 @@ import(
 rustc_library_with_features("netstack3-base") {
   edition = "2021"
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
-  check_cfgs = [ "benchmark" ]
+  check_cfgs = [
+    "benchmark",
+    "test",
+  ]
   sources = [
     "src/context.rs",
     "src/convert.rs",

@@ -149,7 +149,10 @@ network_unified_binary("bin") {
   name = "netstack3"
   edition = "2021"
   with_unit_tests = true
-  check_cfgs = [ "feature, values(\"instrumented\")" ]
+  check_cfgs = [
+    "test",
+    "feature, values(\"instrumented\")",
+  ]
 
   deps = common_deps
   non_test_deps = [

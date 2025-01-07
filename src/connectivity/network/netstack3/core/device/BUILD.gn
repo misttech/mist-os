@@ -10,6 +10,7 @@ import(
 rustc_library_with_features("netstack3-device") {
   edition = "2021"
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
+  check_cfgs = [ "test" ]
   sources = [
     "src/api.rs",
     "src/arp.rs",
