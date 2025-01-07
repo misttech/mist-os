@@ -16,7 +16,9 @@ use assembly_config_schema::platform_config::BuildType;
 use assembly_config_schema::product_config::{
     ProductConfigData, ProductPackageDetails, ProductPackagesConfig,
 };
-use assembly_config_schema::{BoardInformation, DriverDetails, PackageDetails, PackageSet};
+use assembly_config_schema::{
+    BoardInformation, DriverDetails, ImageAssemblyConfig, PackageDetails, PackageSet,
+};
 use assembly_constants::{
     BootfsDestination, BootfsPackageDestination, FileEntry, PackageDestination,
     PackageSetDestination,
@@ -36,9 +38,12 @@ use assembly_structured_config::Repackager;
 use assembly_tool::ToolProvider;
 use assembly_util as util;
 use assembly_util::{DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, NamedMap};
+use assembly_validate_package::{validate_component, validate_package, PackageValidationError};
+use assembly_validate_util::{BootfsContents, PkgNamespace};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use itertools::Itertools;
+use rayon::iter::{ParallelBridge, ParallelIterator};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 use util::MapEntry;
@@ -779,7 +784,7 @@ impl ImageAssemblyConfigBuilder {
     }
 
     /// Construct an ImageAssembly ImageAssemblyConfig from the collected items in the
-    /// builder.
+    /// builder, and report any validation issues.
     ///
     /// If there are config_data entries, the config_data package will be
     /// created in the outdir, and it will be added to the returned
@@ -790,11 +795,26 @@ impl ImageAssemblyConfigBuilder {
     ///
     /// If this cannot create a completed ImageAssemblyConfig, it will return an error
     /// instead.
-    pub fn build(
+    ///
+    /// If this _can_ create a completed ImageAssemblyConfig, but that
+    /// ImageAssemblyConfig does not pass validation checks, it will return
+    /// those validation errors via its second return value.
+    pub fn build_and_validate(
+        self,
+        outdir: impl AsRef<Utf8Path>,
+        tools: &impl ToolProvider,
+        warn_only: bool,
+    ) -> Result<(assembly_config_schema::ImageAssemblyConfig, Option<ProductValidationError>)> {
+        let (config, validator) = self.build(outdir, tools)?;
+        let error = validator.validate_product(&config, warn_only);
+        Ok((config, error.err()))
+    }
+
+    fn build(
         mut self,
         outdir: impl AsRef<Utf8Path>,
         tools: &impl ToolProvider,
-    ) -> Result<assembly_config_schema::ImageAssemblyConfig> {
+    ) -> Result<(assembly_config_schema::ImageAssemblyConfig, Validator)> {
         let outdir = outdir.as_ref();
 
         // Merge the memory buckets into a single file and make it available
@@ -1091,7 +1111,7 @@ impl ImageAssemblyConfigBuilder {
                 )
             );
         }
-        Ok(image_assembly_config)
+        Ok((image_assembly_config, Validator))
     }
 }
 
@@ -1263,6 +1283,141 @@ impl std::fmt::Display for KernelArg {
             f.write_fmt(format_args!("{}={}", self.key, value))
         } else {
             f.write_str(&self.key)
+        }
+    }
+}
+
+struct Validator;
+
+impl Validator {
+    /// Validate a product config.
+    fn validate_product(
+        &self,
+        product: &ImageAssemblyConfig,
+        warn_only: bool,
+    ) -> Result<(), ProductValidationError> {
+        // validate the packages in the system/base/cache package sets
+        let manifests =
+            product.system.iter().chain(product.base.iter()).chain(product.cache.iter());
+        let packages: BTreeMap<_, _> = manifests
+        .par_bridge()
+        .filter_map(|package_manifest_path| {
+            match PackageManifest::try_load_from(&package_manifest_path) {
+                Ok(manifest) => {
+                    // After loading the manifest, validate it
+                    match validate_package(&manifest) {
+                        Ok(()) => None,
+                        Err(e) => {
+                            // If validation issues have been downgraded to warnings, then print
+                            // a warning instead of returning an error.
+                            let print_warning = warn_only && match e {
+                                PackageValidationError::MissingAbiRevisionFile(_) => true,
+                                PackageValidationError::InvalidAbiRevisionFile(_) => true,
+                                PackageValidationError::UnsupportedAbiRevision (_) => true,
+                                _ => false};
+                             if print_warning {
+                                eprintln!("WARNING: The package named '{}', with manifest at {} failed validation:\n{}", manifest.name(), package_manifest_path, e);
+                                None
+                             } else {
+                                // return the error
+                                Some((package_manifest_path.to_owned(), e))
+                            }
+                        }
+                    }
+                }
+                // Convert any error loading the manifest into the appropriate
+                // error type.
+                Err(e) => Some((package_manifest_path.to_owned(), PackageValidationError::LoadPackageManifest(e)))
+            }
+        })
+        .collect();
+
+        // validate the contents of bootfs
+        match validate_bootfs(&product.bootfs_files) {
+            Ok(()) if packages.is_empty() => Ok(()),
+            Ok(()) => Err(ProductValidationError { bootfs: Default::default(), packages }),
+            Err(bootfs) => Err(ProductValidationError { bootfs: Some(bootfs), packages }),
+        }
+    }
+}
+
+/// Validate the contents of bootfs.
+///
+/// Assumes that all component manifests have a `.cm` extension within the destination namespace.
+fn validate_bootfs(bootfs_files: &[FileEntry<String>]) -> Result<(), BootfsValidationError> {
+    let mut bootfs = BootfsContents::from_iter(
+        bootfs_files.iter().map(|entry| (entry.destination.to_string(), &entry.source)),
+    )
+    .map_err(BootfsValidationError::ReadContents)?;
+
+    // validate components
+    let mut errors = BTreeMap::new();
+    for path in bootfs.paths().into_iter().filter(|p| p.ends_with(".cm")) {
+        if let Err(e) = validate_component(&path, &mut bootfs) {
+            errors.insert(path, e);
+        }
+    }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(BootfsValidationError::InvalidComponents(errors))
+    }
+}
+
+/// Collection of all package validation failures within a product.
+#[derive(Debug)]
+pub struct ProductValidationError {
+    /// Files in bootfs which failed validation.
+    bootfs: Option<BootfsValidationError>,
+    /// Packages which failed validation.
+    packages: BTreeMap<Utf8PathBuf, PackageValidationError>,
+}
+
+impl From<ProductValidationError> for anyhow::Error {
+    fn from(e: ProductValidationError) -> anyhow::Error {
+        anyhow::Error::msg(e)
+    }
+}
+
+impl std::fmt::Display for ProductValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Validating product assembly failed:")?;
+        if let Some(error) = &self.bootfs {
+            let error_msg = textwrap::indent(&error.to_string(), "        ");
+            write!(f, "    └── Failed to validate bootfs: {}", error_msg)?;
+        }
+        for (package, error) in &self.packages {
+            let error_msg = textwrap::indent(&error.to_string(), "        ");
+            write!(f, "    └── {}: {}", package, error_msg)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum BootfsValidationError {
+    ReadContents(assembly_validate_util::BootfsContentsError),
+    InvalidComponents(BTreeMap<String, anyhow::Error>),
+}
+
+impl std::fmt::Display for BootfsValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use BootfsValidationError::*;
+        match self {
+            ReadContents(source) => {
+                write!(f, "Unable to read bootfs contents: {}", source)
+            }
+            InvalidComponents(components) => {
+                for (name, error) in components {
+                    write!(f, "\n└── {}: {}", name, error)?;
+                    let mut source = error.source();
+                    while let Some(s) = source {
+                        write!(f, "\n    └── {}", s)?;
+                        source = s.source();
+                    }
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -1475,8 +1630,7 @@ mod tests {
                 make_test_assembly_bundle(&vars.outdir, &vars.bundle_path),
             )
             .unwrap();
-        let result: assembly_config_schema::ImageAssemblyConfig =
-            builder.build(&vars.outdir, &tools).unwrap();
+        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
 
         assert_eq!(
             result.base,
@@ -1532,8 +1686,7 @@ mod tests {
                 make_test_assembly_bundle(&vars.outdir, &vars.bundle_path),
             )
             .unwrap();
-        let result: assembly_config_schema::ImageAssemblyConfig =
-            builder.build(&vars.outdir, &tools).unwrap();
+        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
 
         assert_eq!(
             result.base,
@@ -1584,8 +1737,7 @@ mod tests {
                 make_test_assembly_bundle(&vars.outdir, &vars.bundle_path),
             )
             .unwrap();
-        let result: assembly_config_schema::ImageAssemblyConfig =
-            builder.build(&vars.outdir, &tools).unwrap();
+        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
 
         assert_eq!(
             result.base,
@@ -1679,8 +1831,7 @@ mod tests {
             )
             .unwrap();
         builder.add_parsed_bundle(&vars.bundle_path, bundle).unwrap();
-        let result: assembly_config_schema::ImageAssemblyConfig =
-            builder.build(&vars.outdir, &tools).unwrap();
+        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
 
         // config_data's manifest is in outdir
         let expected_config_data_manifest_path =
@@ -1750,8 +1901,7 @@ mod tests {
         };
         builder.add_domain_config(destination, config).unwrap();
 
-        let result: assembly_config_schema::ImageAssemblyConfig =
-            builder.build(&vars.outdir, &tools).unwrap();
+        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
 
         // The domain config's manifest is in outdir
         let expected_manifest_path = vars.outdir.join("for-test").join("package_manifest.json");
@@ -1776,8 +1926,7 @@ mod tests {
         };
         builder.add_domain_config(destination, config).unwrap();
 
-        let result: assembly_config_schema::ImageAssemblyConfig =
-            builder.build(&vars.outdir, &tools).unwrap();
+        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
 
         // The domain config's manifest is in outdir
         let expected_manifest_path = vars.outdir.join("for-test").join("package_manifest.json");
@@ -1802,8 +1951,7 @@ mod tests {
         );
         let builder = setup_builder(&vars, vec![bundle]);
 
-        let result: assembly_config_schema::ImageAssemblyConfig =
-            builder.build(&vars.outdir, &tools).unwrap();
+        let (result, _) = builder.build_and_validate(&vars.outdir, &tools, false).unwrap();
 
         // config_data's manifest is in outdir
         let expected_manifest_path =
@@ -1868,8 +2016,7 @@ mod tests {
             vec!["platform_a".to_owned(), "platform_b".to_owned()],
         );
         builder.add_product_packages(packages).unwrap();
-        let result: assembly_config_schema::ImageAssemblyConfig =
-            builder.build(outdir, &tools).unwrap();
+        let (result, _) = builder.build_and_validate(outdir, &tools, false).unwrap();
 
         assert_eq!(
             result.base,
@@ -1967,7 +2114,7 @@ mod tests {
 
         let builder = setup_builder(&vars, vec![bundle1, bundle2]);
         let _: assembly_config_schema::ImageAssemblyConfig =
-            builder.build(&vars.outdir, &tools).unwrap();
+            builder.build_and_validate(&vars.outdir, &tools, false).unwrap().0;
 
         // Make sure all the components and CML shards from the separate bundles
         // are merged.
@@ -2185,7 +2332,7 @@ mod tests {
         );
         builder.add_parsed_bundle(outdir, aib).ok();
         builder.add_parsed_bundle(outdir, aib2).ok();
-        assert!(builder.build(outdir, &tools).is_err());
+        assert!(builder.build_and_validate(outdir, &tools, false).is_err());
     }
     /// Asserts that attempting to add a package to the base package set with the same
     /// PackageName but a different package manifest path will result in an error if coming
@@ -2367,7 +2514,7 @@ mod tests {
             )
             .unwrap();
 
-        let config = builder.build(vars.outdir, &tools).unwrap();
+        let config = builder.build_and_validate(vars.outdir, &tools, false).unwrap().0;
 
         assert_eq!(
             config.kernel.args,

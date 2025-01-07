@@ -354,15 +354,19 @@ Resulting product is not supported and may misbehave!
     // Get the tool set.
     let tools = SdkToolProvider::try_new()?;
 
-    // Do the actual building of everything for the Image Assembly config.
-    let image_assembly =
-        builder.build(&outdir, &tools).context("Building Image Assembly config")?;
+    // Do the actual building and validation of everything for the Image
+    // Assembly config.
+    let (image_assembly, validation_error) = builder
+        .build_and_validate(
+            &outdir,
+            &tools,
+            package_validation == PackageValidationHandling::Warning,
+        )
+        .context("Building Image Assembly config")?;
 
-    // Validate the built product assembly.
-    assembly_validate_product::validate_product(
-        &image_assembly,
-        package_validation == PackageValidationHandling::Warning,
-    )?;
+    if let Some(validation_error) = validation_error {
+        return Err(validation_error.into());
+    }
 
     // Serialize out the Image Assembly configuration.
     let image_assembly_path = outdir.join("image_assembly.json");
