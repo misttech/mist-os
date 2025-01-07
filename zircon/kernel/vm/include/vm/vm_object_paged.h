@@ -11,6 +11,7 @@
 #include <lib/user_copy/user_ptr.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <stdint.h>
+#include <zircon/errors.h>
 #include <zircon/listnode.h>
 #include <zircon/types.h>
 
@@ -21,6 +22,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
+#include <kernel/range_check.h>
 #include <vm/page_source.h>
 #include <vm/pmm.h>
 #include <vm/vm.h>
@@ -66,7 +68,11 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   zx_status_t Resize(uint64_t size) override;
 
-  uint64_t size_locked() const override TA_REQ(lock()) { return cow_pages_locked()->size_locked(); }
+  uint64_t size_locked() const override TA_REQ(lock()) {
+    // If this VmObject has a limit to the pages it references from |cow_pages_|, then that limit
+    // determines the size of this object rather than the size of the whole |cow_pages_| object.
+    return ktl::min(cow_pages_locked()->size_locked(), cow_range_.len);
+  }
 
   // Queries the user defined content size, which is distinct from the VMO size. Content size is
   // byte-aligned and is not guaranteed to be in the range of the VMO. The lock does not not guard
@@ -94,6 +100,8 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     return cow_pages_locked()->mark_modified_locked();
   }
   ChildType child_type() const override {
+    // Slices are implemented as references internally so for the purposes of reporting the
+    // expected type back to the user the slice check must be done before the plain reference check.
     if (is_slice()) {
       return ChildType::kSlice;
     }
@@ -159,13 +167,18 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   void Unpin(uint64_t offset, uint64_t len) override {
     Guard<CriticalMutex> guard{lock()};
-    cow_pages_locked()->UnpinLocked(VmCowRange(offset, len));
+    auto cow_range = GetCowRange(offset, len);
+    ASSERT(cow_range);
+    cow_pages_locked()->UnpinLocked(*cow_range);
   }
 
   // See VmObject::DebugIsRangePinned
   bool DebugIsRangePinned(uint64_t offset, uint64_t len) override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->DebugIsRangePinnedLocked(VmCowRange(offset, len));
+    if (auto cow_range = GetCowRange(offset, len)) {
+      return cow_pages_locked()->DebugIsRangePinnedLocked(*cow_range);
+    }
+    return false;
   }
 
   zx_status_t LockRange(uint64_t offset, uint64_t len,
@@ -188,16 +201,15 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
                           SupplyOptions options) override;
   zx_status_t FailPageRequests(uint64_t offset, uint64_t len, zx_status_t error_status) override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->FailPageRequestsLocked(VmCowRange(offset, len), error_status);
+    if (auto cow_range = GetCowRange(offset, len)) {
+      return cow_pages_locked()->FailPageRequestsLocked(*cow_range, error_status);
+    }
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   zx_status_t DirtyPages(uint64_t offset, uint64_t len) override;
   zx_status_t EnumerateDirtyRanges(uint64_t offset, uint64_t len,
-                                   DirtyRangeEnumerateFunction&& dirty_range_fn) override {
-    Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->EnumerateDirtyRangesLocked(VmCowRange(offset, len),
-                                                          ktl::move(dirty_range_fn));
-  }
+                                   DirtyRangeEnumerateFunction&& dirty_range_fn) override;
 
   zx_status_t QueryPagerVmoStats(bool reset, zx_pager_vmo_stats_t* stats) override {
     Guard<CriticalMutex> guard{lock()};
@@ -211,11 +223,17 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   zx_status_t WritebackBegin(uint64_t offset, uint64_t len, bool is_zero_range) override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->WritebackBeginLocked(VmCowRange(offset, len), is_zero_range);
+    if (auto cow_range = GetCowRange(offset, len)) {
+      return cow_pages_locked()->WritebackBeginLocked(*cow_range, is_zero_range);
+    }
+    return ZX_ERR_OUT_OF_RANGE;
   }
   zx_status_t WritebackEnd(uint64_t offset, uint64_t len) override {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->WritebackEndLocked(VmCowRange(offset, len));
+    if (auto cow_range = GetCowRange(offset, len)) {
+      return cow_pages_locked()->WritebackEndLocked(*cow_range);
+    }
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   // See VmObject::SetUserContentSize
@@ -247,7 +265,11 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // See |VmCowPages::LookupCursor|.
   zx::result<VmCowPages::LookupCursor> GetLookupCursorLocked(uint64_t offset, uint64_t max_len)
       TA_REQ(lock()) {
-    return cow_pages_locked()->GetLookupCursorLocked(VmCowRange(offset, max_len));
+    auto cow_range = GetCowRange(offset, max_len);
+    if (likely(cow_range)) {
+      return cow_pages_locked()->GetLookupCursorLocked(*cow_range);
+    }
+    return zx::error{ZX_ERR_OUT_OF_RANGE};
   }
 
   zx_status_t CreateClone(Resizability resizable, CloneType type, uint64_t offset, uint64_t size,
@@ -312,7 +334,10 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
   vm_page_t* DebugGetPage(uint64_t offset) const {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->DebugGetPageLocked(offset);
+    if (auto cow_range = GetCowRange(offset, PAGE_SIZE)) {
+      return cow_pages_locked()->DebugGetPageLocked(cow_range->offset);
+    }
+    return nullptr;
   }
 
   using RangeChangeOp = VmCowPages::RangeChangeOp;
@@ -354,7 +379,8 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
  private:
   // private constructor (use Create())
-  VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> root_state);
+  VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state);
+  VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state, VmCowRange range);
 
   static zx_status_t CreateCommon(uint32_t pmm_alloc_flags, uint32_t options, uint64_t size,
                                   fbl::RefPtr<VmObjectPaged>* vmo);
@@ -373,6 +399,10 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // and locking is still relevant, so having the cleanup logic in a separate method allows for full
   // static analysis to happen.
   void DestructorHelper();
+
+  zx_status_t CreateChildReferenceCommon(uint32_t options, VmCowRange range, bool allow_uncached,
+                                         bool copy_name, bool* first_child,
+                                         fbl::RefPtr<VmObject>* child_vmo);
 
   // Unified function that implements both CommitRange and CommitRangePinned
   zx_status_t CommitRangeInternal(uint64_t offset, uint64_t len, bool pin, bool write);
@@ -414,6 +444,27 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     return cow_pages_.get();
   }
 
+  // Translate a range in this VmObject to a VmCowRange in |cow_pages_|.
+  //
+  // The translated range might extend beyond the end of the cow_pages_ object. This function will
+  // return |ktl::nullopt| if the translated range might have included pages in cow_pages_ that
+  // should not be referenced by this VmObject (e.g., if this VmObject is a slice reference).
+  ktl::optional<VmCowRange> GetCowRange(uint64_t offset, uint64_t len) const {
+    if (likely(InRange(offset, len, cow_range_.len))) {
+      return VmCowRange(offset + cow_range_.offset, len);
+    }
+    return ktl::nullopt;
+  }
+
+  // Similar to GetCowRange, but also checks for being within the range of the cow pages size.
+  ktl::optional<VmCowRange> GetCowRangeSizeCheckLocked(uint64_t offset, uint64_t len) const
+      TA_REQ(lock()) {
+    if (likely(InRange(offset, len, size_locked()))) {
+      return VmCowRange(offset + cow_range_.offset, len);
+    }
+    return ktl::nullopt;
+  }
+
   // This is a debug only state that is used to simplify assertions and validations around blocking
   // on page requests. If false no operations on this VMO will ever fill out the PageRequest
   // that is passed in, and will never block in ops like Commit that say they might block. This
@@ -451,6 +502,11 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // consequence if this is null it implies that the VMO is *not* in the global list. Otherwise it
   // can generally be assumed that this is non-null.
   fbl::RefPtr<VmCowPages> cow_pages_ TA_GUARDED(lock());
+
+  // The range in |cow_pages_| that this VmObject references.
+  //
+  // This range can be less than the whole VmCowPage for a slice reference.
+  const VmCowRange cow_range_;
 
   // A user supplied content size that can be queried. By itself this has no semantic meaning and is
   // only read and used specifically when requested by the user. See VmObject::SetUserContentSize.

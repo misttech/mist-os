@@ -2095,9 +2095,8 @@ static bool vmo_attribution_clones_test() {
   EXPECT_EQ(true,
             verify_object_memory_attribution(slice.get(), expected_gen_count, AttributionCounts{}));
 
-  // Removing the slice should increment the generation count.
+  // Removing the slice does not increment the generation count.
   slice.reset();
-  ++expected_gen_count;
   EXPECT_EQ(true,
             verify_object_memory_attribution(vmo.get(), expected_gen_count,
                                              make_private_attribution_counts(4ul * PAGE_SIZE, 0)));

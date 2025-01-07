@@ -1070,9 +1070,9 @@ static bool vmaspace_priority_slice_test() {
   ASSERT_OK(status);
   VmObjectPaged* slicep = reinterpret_cast<VmObjectPaged*>(vmo_slice.get());
 
-  // Slice does not have priority.
+  // Slice inherits priority.
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
-  EXPECT_FALSE(slicep->DebugGetCowPages()->DebugIsHighMemoryPriority());
+  EXPECT_TRUE(slicep->DebugGetCowPages()->DebugIsHighMemoryPriority());
 
   // Change priority of the VMAR should remove from the VMO.
   EXPECT_OK(vmar->SetMemoryPriority(VmAddressRegion::MemoryPriority::DEFAULT));
@@ -1082,7 +1082,7 @@ static bool vmaspace_priority_slice_test() {
   // Re-enable priority and verify.
   EXPECT_OK(vmar->SetMemoryPriority(VmAddressRegion::MemoryPriority::HIGH));
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugIsHighMemoryPriority());
-  EXPECT_FALSE(slicep->DebugGetCowPages()->DebugIsHighMemoryPriority());
+  EXPECT_TRUE(slicep->DebugGetCowPages()->DebugIsHighMemoryPriority());
   EXPECT_TRUE(aspace->IsHighMemoryPriority());
 
   // Destroy slice and unmap.

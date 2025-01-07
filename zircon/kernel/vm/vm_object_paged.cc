@@ -46,10 +46,14 @@ KCOUNTER(vmo_attribution_cache_misses, "vm.attributed_memory.object.cache_misses
 
 }  // namespace
 
-VmObjectPaged::VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state)
-    : VmObject(VMOType::Paged, ktl::move(hierarchy_state)), options_(options) {
+VmObjectPaged::VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state,
+                             VmCowRange range)
+    : VmObject(VMOType::Paged, ktl::move(hierarchy_state)), options_(options), cow_range_(range) {
   LTRACEF("%p\n", this);
 }
+
+VmObjectPaged::VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state)
+    : VmObjectPaged(options, ktl::move(hierarchy_state), VmCowRange(0, UINT64_MAX)) {}
 
 VmObjectPaged::~VmObjectPaged() {
   canary_.Assert();
@@ -159,11 +163,6 @@ void VmObjectPaged::DestructorHelper() {
 zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint hint) {
   canary_.Assert();
 
-  uint64_t end_offset;
-  if (add_overflow(offset, len, &end_offset)) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
   if (can_block_on_page_requests() && hint == EvictionHint::AlwaysNeed) {
     lockdep::AssertNoLocksHeld();
   }
@@ -178,19 +177,19 @@ zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint
     return ZX_OK;
   }
 
-  VmCowRange range(offset, len);
-  if (!range.IsBoundedBy(size_locked())) {
+  auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
+  if (!cow_range) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   switch (hint) {
     case EvictionHint::DontNeed: {
-      cow_pages_locked()->PromoteRangeForReclamationLocked(range);
+      cow_pages_locked()->PromoteRangeForReclamationLocked(*cow_range);
       break;
     }
     case EvictionHint::AlwaysNeed: {
       // Hints are best effort, so ignore any errors in the paging in process.
-      cow_pages_locked()->ProtectRangeFromReclamationLocked(range, /*set_always_need=*/true,
+      cow_pages_locked()->ProtectRangeFromReclamationLocked(*cow_range, /*set_always_need=*/true,
                                                             /*ignore_errors=*/true, &guard);
       break;
     }
@@ -201,22 +200,22 @@ zx_status_t VmObjectPaged::HintRange(uint64_t offset, uint64_t len, EvictionHint
 
 zx_status_t VmObjectPaged::PrefetchRangeLocked(uint64_t offset, uint64_t len,
                                                Guard<CriticalMutex>* guard) {
-  VmCowRange range(offset, len);
-  if (!range.IsBoundedBy(size_locked())) {
+  auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
+  if (!cow_range) {
     return ZX_ERR_OUT_OF_RANGE;
   }
   // Cannot overflow otherwise IsBoundedBy would have failed.
-  DEBUG_ASSERT(range.is_page_aligned());
-  if (range.is_empty()) {
+  DEBUG_ASSERT(cow_range->is_page_aligned());
+  if (cow_range->is_empty()) {
     return ZX_OK;
   }
   if (cow_pages_locked()->is_root_source_user_pager_backed_locked()) {
-    return cow_pages_locked()->ProtectRangeFromReclamationLocked(range,
+    return cow_pages_locked()->ProtectRangeFromReclamationLocked(*cow_range,
                                                                  /*set_always_need=*/false,
                                                                  /*ignore_errors=*/false, guard);
   } else {
     // Committing high priority pages is best effort, so ignore any errors from decompressing.
-    return cow_pages_locked()->DecompressInRangeLocked(range, guard);
+    return cow_pages_locked()->DecompressInRangeLocked(*cow_range, guard);
   }
 }
 
@@ -497,6 +496,7 @@ zx_status_t VmObjectPaged::CreateFromWiredPages(const void* data, size_t size, b
     }
     if (!exclusive) {
       // Pin all the pages as we must never decommit any of them since they are shared elsewhere.
+      ASSERT(vmo->cow_range_.offset == 0);
       status = vmo->cow_pages_locked()->PinRangeLocked(VmCowRange(0, size));
       ASSERT(status == ZX_OK);
     }
@@ -594,11 +594,16 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  // Slice must be wholly contained. |size()| will read the size holding the lock. This is extra
+  // Slice must be wholly contained. |size()| will read the size holding the lock. This extra
   // acquisition is correct as we must drop the lock in order to perform the allocations.
-  uint64_t our_size = this->size();
-  if (!InRange(offset, size, our_size)) {
-    return ZX_ERR_INVALID_ARGS;
+  VmCowRange range;
+  {
+    Guard<CriticalMutex> guard{lock()};
+    auto cow_range = GetCowRangeSizeCheckLocked(offset, size);
+    if (!cow_range) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+    range = *cow_range;
   }
 
   // Forbid creating children of resizable VMOs. This restriction may be lifted in the future.
@@ -611,55 +616,11 @@ zx_status_t VmObjectPaged::CreateChildSlice(uint64_t offset, uint64_t size, bool
     options |= kContiguous;
   }
 
-  if (can_block_on_page_requests()) {
-    options |= kCanBlockOnPageRequests;
-  }
-
-  fbl::AllocChecker ac;
-  auto vmo = fbl::AdoptRef<VmObjectPaged>(new (&ac) VmObjectPaged(options, hierarchy_state_ptr_));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  {
-    Guard<CriticalMutex> guard{lock()};
-    AssertHeld(vmo->lock_ref());
-
-    // If this VMO is contiguous then we allow creating an uncached slice.  When zeroing pages that
-    // are reclaimed from having been loaned from a contiguous VMO, we will zero the pages and flush
-    // the zeroes to RAM.
-    if (cache_policy_ != ARCH_MMU_FLAG_CACHED && !is_contiguous()) {
-      return ZX_ERR_BAD_STATE;
-    }
-    vmo->cache_policy_ = cache_policy_;
-
-    fbl::RefPtr<VmCowPages> cow_pages;
-    zx_status_t status = cow_pages_locked()->CreateChildSliceLocked(offset, size, &cow_pages);
-    if (status != ZX_OK) {
-      return status;
-    }
-    // Now that everything has succeeded, link up the cow pages and our parents/children.
-    // Both child notification and inserting into the globals list has to happen outside the lock.
-    AssertHeld(cow_pages->lock_ref());
-    cow_pages->set_paged_backlink_locked(vmo.get());
-    cow_pages->TransitionToAliveLocked();
-    vmo->cow_pages_ = ktl::move(cow_pages);
-
-    vmo->parent_ = this;
-    AddChildLocked(vmo.get());
-
-    if (copy_name) {
-      vmo->name_ = name_;
-    }
-    IncrementHierarchyGenerationCountLocked();
-  }
-
-  // Add to the global list now that fully initialized.
-  vmo->AddToGlobalList();
-
-  *child_vmo = ktl::move(vmo);
-
-  return ZX_OK;
+  // If this VMO is contiguous then we allow creating an uncached slice.  When zeroing pages that
+  // are reclaimed from having been loaned from a contiguous VMO, we will zero the pages and flush
+  // the zeroes to RAM.
+  const bool allow_uncached = is_contiguous();
+  return CreateChildReferenceCommon(options, range, allow_uncached, copy_name, nullptr, child_vmo);
 }
 
 zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t offset,
@@ -675,6 +636,11 @@ zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t
     return ZX_ERR_INVALID_ARGS;
   }
 
+  if (is_slice()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  ASSERT(cow_range_.offset == 0);
+
   // Not supported for contiguous VMOs. Can use slices instead as contiguous VMOs are non-resizable
   // and support slices.
   if (is_contiguous()) {
@@ -688,18 +654,32 @@ zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t
     }
   }
 
-  uint32_t options = kReference;
-  if (can_block_on_page_requests()) {
-    options |= kCanBlockOnPageRequests;
-  }
+  uint32_t options = 0;
 
   // Reference inherits resizability from parent.
   if (is_resizable()) {
     options |= kResizable;
   }
 
+  return CreateChildReferenceCommon(options, VmCowRange(0, UINT64_MAX), false, copy_name,
+                                    first_child, child_vmo);
+}
+
+zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRange range,
+                                                      bool allow_uncached, bool copy_name,
+                                                      bool* first_child,
+                                                      fbl::RefPtr<VmObject>* child_vmo) {
+  canary_.Assert();
+
+  options |= kReference;
+
+  if (can_block_on_page_requests()) {
+    options |= kCanBlockOnPageRequests;
+  }
+
   fbl::AllocChecker ac;
-  auto vmo = fbl::AdoptRef<VmObjectPaged>(new (&ac) VmObjectPaged(options, hierarchy_state_ptr_));
+  auto vmo =
+      fbl::AdoptRef<VmObjectPaged>(new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, range));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -709,10 +689,10 @@ zx_status_t VmObjectPaged::CreateChildReference(Resizability resizable, uint64_t
     AssertHeld(vmo->lock_ref());
 
     // We know that we are not contiguous so we should not be uncached either.
-    if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
+    if (cache_policy_ != ARCH_MMU_FLAG_CACHED && !allow_uncached) {
       return ZX_ERR_BAD_STATE;
     }
-    DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
+    vmo->cache_policy_ = cache_policy_;
 
     // Reference shares the same VmCowPages as the parent.
     auto cow_pages = fbl::RefPtr<VmCowPages>(this->cow_pages_locked());
@@ -780,6 +760,10 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
   if (size > MAX_SIZE) {
     return ZX_ERR_OUT_OF_RANGE;
   }
+  auto cow_range = GetCowRange(offset, size);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
 
   uint32_t options = 0;
   if (resizable == Resizability::Resizable) {
@@ -806,8 +790,11 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     }
     DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
 
-    zx_status_t status =
-        cow_pages_locked()->CreateCloneLocked(type, offset, size, &clone_cow_pages);
+    // If we are a slice we require a unidirection clone, as performing a bi-directional clone
+    // through a slice does not yet have defined semantics.
+    bool require_unidirection = is_slice();
+    zx_status_t status = cow_pages_locked()->CreateCloneLocked(type, require_unidirection,
+                                                               *cow_range, &clone_cow_pages);
     if (status != ZX_OK) {
       return status;
     }
@@ -869,11 +856,6 @@ void VmObjectPaged::DumpLocked(uint depth, bool verbose) const {
 
 VmObject::AttributionCounts VmObjectPaged::GetAttributedMemoryInRangeLocked(
     uint64_t offset_bytes, uint64_t len_bytes) const {
-  uint64_t new_len_bytes;
-  if (!TrimRange(offset_bytes, len_bytes, size_locked(), &new_len_bytes)) {
-    return AttributionCounts{};
-  }
-
   vmo_attribution_queries.Add(1);
 
   // A reference never has memory attributed to it. It points to the parent's VmCowPages, and we
@@ -882,6 +864,11 @@ VmObject::AttributionCounts VmObjectPaged::GetAttributedMemoryInRangeLocked(
   // TODO(https://fxbug.dev/42069078): Consider attributing memory to the current VmCowPages
   // backlink for the case where the parent has gone away.
   if (is_reference()) {
+    return AttributionCounts{};
+  }
+  ASSERT(cow_range_.offset == 0);
+  uint64_t new_len_bytes;
+  if (!TrimRange(offset_bytes, len_bytes, size_locked(), &new_len_bytes)) {
     return AttributionCounts{};
   }
 
@@ -901,8 +888,8 @@ VmObject::AttributionCounts VmObjectPaged::GetAttributedMemoryInRangeLocked(
     }
   }
 
-  AttributionCounts counts =
-      cow_pages_locked()->GetAttributedMemoryInRangeLocked(VmCowRange(offset_bytes, new_len_bytes));
+  auto cow_range = GetCowRange(offset_bytes, new_len_bytes);
+  AttributionCounts counts = cow_pages_locked()->GetAttributedMemoryInRangeLocked(*cow_range);
 
   if (update_cached_attribution) {
     // Cache attribution counts along with current generation count.
@@ -994,8 +981,8 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
         // current range of the vmo. Additionally, as pinning a zero length range is invalid, so is
         // unpinning, and so we must avoid.
         if (pin && len > 0 && pinned_end_offset > original_offset) {
-          cow_pages_locked()->UnpinLocked(
-              VmCowRange(original_offset, pinned_end_offset - original_offset));
+          auto cow_range = GetCowRange(original_offset, pinned_end_offset - original_offset);
+          cow_pages_locked()->UnpinLocked(*cow_range);
         } else if (write && offset > original_offset) {
           // Mark modified as we successfully committed pages for writing *and* we did not end up
           // undoing a partial pin (the if-block above).
@@ -1056,7 +1043,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
   while (len > 0) {
     uint64_t committed_len = 0;
     zx_status_t commit_status = cow_pages_locked()->CommitRangeLocked(
-        VmCowRange(offset, len), &committed_len, &page_request);
+        *GetCowRange(offset, len), &committed_len, &page_request);
     DEBUG_ASSERT(committed_len <= len);
 
     // Now we can exit if we received any error states.
@@ -1080,7 +1067,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
         // to repeatedly pin the same pages.
         ASSERT(pinned_end_offset == offset);
         zx_status_t pin_status =
-            cow_pages_locked()->PinRangeLocked(VmCowRange(offset, committed_len));
+            cow_pages_locked()->PinRangeLocked(*GetCowRange(offset, committed_len));
         if (pin_status != ZX_OK) {
           return pin_status;
         }
@@ -1118,7 +1105,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
 
       uint64_t non_loaned_len = 0;
       zx_status_t replace_status = cow_pages_locked()->ReplacePagesWithNonLoanedLocked(
-          VmCowRange(offset, committed_len), page_request.GetAnonymous(), &non_loaned_len);
+          *GetCowRange(offset, committed_len), page_request.GetAnonymous(), &non_loaned_len);
       DEBUG_ASSERT(non_loaned_len <= committed_len);
       if (replace_status == ZX_OK) {
         DEBUG_ASSERT(non_loaned_len == committed_len);
@@ -1132,7 +1119,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
         // to repeatedly pin the same pages.
         ASSERT(pinned_end_offset == offset);
         zx_status_t pin_status =
-            cow_pages_locked()->PinRangeLocked(VmCowRange(offset, non_loaned_len));
+            cow_pages_locked()->PinRangeLocked(*GetCowRange(offset, non_loaned_len));
         if (pin_status != ZX_OK) {
           return pin_status;
         }
@@ -1156,7 +1143,7 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
         while (to_dirty_len > 0) {
           uint64_t dirty_len = 0;
           zx_status_t write_status = cow_pages_locked()->PrepareForWriteLocked(
-              VmCowRange(offset, to_dirty_len), page_request.GetLazyDirtyRequest(), &dirty_len);
+              *GetCowRange(offset, to_dirty_len), page_request.GetLazyDirtyRequest(), &dirty_len);
           DEBUG_ASSERT(dirty_len <= to_dirty_len);
           if (write_status != ZX_OK && write_status != ZX_ERR_SHOULD_WAIT) {
             return write_status;
@@ -1243,10 +1230,15 @@ zx_status_t VmObjectPaged::DecommitRange(uint64_t offset, uint64_t len) {
 zx_status_t VmObjectPaged::DecommitRangeLocked(uint64_t offset, uint64_t len) {
   canary_.Assert();
 
+  auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
   // Decommit of pages from a contiguous VMO relies on contiguous VMOs not being resizable.
   DEBUG_ASSERT(!is_resizable() || !is_contiguous());
 
-  return cow_pages_locked()->DecommitRangeLocked(VmCowRange(offset, len));
+  return cow_pages_locked()->DecommitRangeLocked(*cow_range);
 }
 
 zx_status_t VmObjectPaged::ZeroPartialPageLocked(uint64_t page_base_offset,
@@ -1368,7 +1360,8 @@ zx_status_t VmObjectPaged::ZeroRangeInternal(uint64_t offset, uint64_t len, bool
   while (start < end) {
     uint64_t zeroed_len = 0;
     zx_status_t status =
-        cow_pages_locked()->ZeroPagesLocked(start, end, dirty_track, &page_request, &zeroed_len);
+        cow_pages_locked()->ZeroPagesLocked(start + cow_range_.offset, end + cow_range_.offset,
+                                            dirty_track, &page_request, &zeroed_len);
     if (status == ZX_ERR_SHOULD_WAIT) {
       // If we're not asked to dirty track, we won't be creating any new dirty pages so we shouldn't
       // need to wait on a page request.
@@ -1664,33 +1657,34 @@ zx_status_t VmObjectPaged::Write(const void* _ptr, uint64_t offset, size_t len) 
 
 zx_status_t VmObjectPaged::CacheOp(uint64_t offset, uint64_t len, CacheOpType type) {
   canary_.Assert();
-  VmCowRange range(offset, len);
-  if (unlikely(range.is_empty())) {
+  if (unlikely(len == 0)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   Guard<CriticalMutex> guard{lock()};
 
   // verify that the range is within the object
-  if (unlikely(!range.IsBoundedBy(size_locked()))) {
+  auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
+  if (!cow_range) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   // This cannot overflow as we already checked the range.
-  const uint64_t end_offset = offset + len;
+  const uint64_t cow_end = cow_range->end();
 
   // For syncing instruction caches there may be work that is more efficient to batch together, and
   // so we use an abstract consistency manager to optimize it for the given architecture.
   ArchVmICacheConsistencyManager sync_cm;
 
   return cow_pages_locked()->LookupReadableLocked(
-      range, [&sync_cm, offset, end_offset, type](uint64_t page_offset, paddr_t pa) {
+      *cow_range,
+      [&sync_cm, cow_offset = cow_range->offset, cow_end, type](uint64_t page_offset, paddr_t pa) {
         // This cannot overflow due to the maximum possible size of a VMO.
         const uint64_t page_end = page_offset + PAGE_SIZE;
 
         // Determine our start and end in terms of vmo offset
-        const uint64_t start = ktl::max(page_offset, offset);
-        const uint64_t end = ktl::min(end_offset, page_end);
+        const uint64_t start = ktl::max(page_offset, cow_offset);
+        const uint64_t end = ktl::min(cow_end, page_end);
 
         // Translate to inter-page offset
         DEBUG_ASSERT(start >= page_offset);
@@ -1709,32 +1703,38 @@ zx_status_t VmObjectPaged::Lookup(uint64_t offset, uint64_t len,
                                   VmObject::LookupFunction lookup_fn) {
   canary_.Assert();
   VmCowRange range(offset, len);
-  if (unlikely(range.is_empty())) {
-    return ZX_ERR_INVALID_ARGS;
+  auto cow_range = GetCowRange(offset, len);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
   }
 
   Guard<CriticalMutex> guard{lock()};
 
-  return cow_pages_locked()->LookupLocked(range, ktl::move(lookup_fn));
+  return cow_pages_locked()->LookupLocked(
+      *cow_range, [&lookup_fn, undo_offset = cow_range_.offset](uint64_t offset, paddr_t pa) {
+        // Need to undo the parent_offset before forwarding to the lookup_fn, who is ignorant of
+        // slices.
+        return lookup_fn(offset - undo_offset, pa);
+      });
 }
 
 zx_status_t VmObjectPaged::LookupContiguous(uint64_t offset, uint64_t len, paddr_t* out_paddr) {
   canary_.Assert();
 
-  VmCowRange range(offset, len);
   // We should consider having the callers round up to page boundaries and then check whether the
   // length is page-aligned.
-  if (unlikely(range.is_empty() || !IS_PAGE_ALIGNED(range.offset))) {
+  if (unlikely(len == 0 || !IS_PAGE_ALIGNED(offset))) {
     return ZX_ERR_INVALID_ARGS;
   }
 
   Guard<CriticalMutex> guard{lock()};
 
-  if (unlikely(!range.IsBoundedBy(size_locked()))) {
+  auto cow_range = GetCowRangeSizeCheckLocked(offset, len);
+  if (!cow_range) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  if (unlikely(!is_contiguous() && (range.len != PAGE_SIZE))) {
+  if (unlikely(!is_contiguous() && (cow_range->len != PAGE_SIZE))) {
     // Multi-page lookup only supported for contiguous VMOs.
     return ZX_ERR_BAD_STATE;
   }
@@ -1745,10 +1745,10 @@ zx_status_t VmObjectPaged::LookupContiguous(uint64_t offset, uint64_t len, paddr
   uint64_t first_offset = 0;
   paddr_t first_paddr = 0;
   uint64_t count = 0;
-  // This has to work for child slices with non-zero parent_offset_ also, which means even if all
-  // pages are present, the first cur_offset can be offset + parent_offset_.
+  // This has to work for child slices with non-zero cow_range_.offset also, which means even if all
+  // pages are present, the first cur_offset can be offset + cow_range_.offset.
   zx_status_t status = cow_pages_locked()->LookupLocked(
-      range,
+      *cow_range,
       [&page_seen, &first_offset, &first_paddr, &count](uint64_t cur_offset, paddr_t pa) mutable {
         ++count;
         if (!page_seen) {
@@ -1760,7 +1760,7 @@ zx_status_t VmObjectPaged::LookupContiguous(uint64_t offset, uint64_t len, paddr
         return ZX_ERR_NEXT;
       });
   ASSERT(status == ZX_OK);
-  if (count != range.len / PAGE_SIZE) {
+  if (count != cow_range->len / PAGE_SIZE) {
     return ZX_ERR_NOT_FOUND;
   }
   if (out_paddr) {
@@ -1880,16 +1880,22 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  auto cow_range = GetCowRange(offset, len);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  auto range = *cow_range;
+
   // Initialize the splice list to the right size.
-  *pages = VmPageSpliceList(offset, len, 0);
+  *pages = VmPageSpliceList(range.offset, range.len, 0);
 
   __UNINITIALIZED MultiPageRequest page_request;
-  while (len > 0) {
+  while (!range.is_empty()) {
     Guard<CriticalMutex> guard{lock()};
 
     uint64_t taken_len = 0;
-    zx_status_t status = cow_pages_locked()->TakePagesLocked(VmCowRange(offset, len), pages,
-                                                             &taken_len, &page_request);
+    zx_status_t status =
+        cow_pages_locked()->TakePagesLocked(range, pages, &taken_len, &page_request);
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }
@@ -1897,13 +1903,12 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
     // would be ZX_ERR_SHOULD_WAIT as that is the only non-OK status we can reach here with.
     DEBUG_ASSERT(taken_len > 0 || status == ZX_ERR_SHOULD_WAIT);
     // We should have taken the entire range requested if the status was ZX_OK.
-    DEBUG_ASSERT(status != ZX_OK || taken_len == len);
+    DEBUG_ASSERT(status != ZX_OK || taken_len == range.len);
     // We should not have taken any more than the requested range.
-    DEBUG_ASSERT(taken_len <= len);
+    DEBUG_ASSERT(taken_len <= range.len);
 
     // Record the completed portion.
-    len -= taken_len;
-    offset += taken_len;
+    range = range.TrimedFromStart(taken_len);
 
     if (status == ZX_ERR_SHOULD_WAIT) {
       guard.CallUnlocked([&page_request, &status] { status = page_request.Wait(); });
@@ -1924,28 +1929,32 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
   if (is_contiguous()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+  auto cow_range = GetCowRange(offset, len);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  auto range = *cow_range;
 
   __UNINITIALIZED MultiPageRequest page_request;
-  while (len > 0) {
+  while (!range.is_empty()) {
     Guard<CriticalMutex> guard{lock()};
 
     uint64_t supply_len = 0;
-    zx_status_t status = cow_pages_locked()->SupplyPagesLocked(VmCowRange(offset, len), pages,
-                                                               options, &supply_len, &page_request);
+    zx_status_t status =
+        cow_pages_locked()->SupplyPagesLocked(range, pages, options, &supply_len, &page_request);
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }
     // We would only have failed to supply anything if status was not ZX_OK, which in this case
     // would be ZX_ERR_SHOULD_WAIT as that is the only non-OK status we can reach here with.
     DEBUG_ASSERT(supply_len > 0 || status == ZX_ERR_SHOULD_WAIT);
-    // We shoud have supplied the entire range requested if the status was ZX_OK.
-    DEBUG_ASSERT(status != ZX_OK || supply_len == len);
+    // We should have supplied the entire range requested if the status was ZX_OK.
+    DEBUG_ASSERT(status != ZX_OK || supply_len == range.len);
     // We should not have supplied any more than the requested range.
-    DEBUG_ASSERT(supply_len <= len);
+    DEBUG_ASSERT(supply_len <= range.len);
 
     // Record the completed portion.
-    offset += supply_len;
-    len -= supply_len;
+    range = range.TrimedFromStart(supply_len);
 
     if (status == ZX_ERR_SHOULD_WAIT) {
       guard.CallUnlocked([&page_request, &status] { status = page_request.Wait(); });
@@ -1963,6 +1972,11 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
   // page_request.
   __UNINITIALIZED AnonymousPageRequest page_request;
 
+  auto cow_range = GetCowRange(offset, len);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+
   Guard<CriticalMutex> guard{lock()};
   // Initialize a list of allocated pages that DirtyPagesLocked will allocate any new pages into
   // before inserting them in the VMO. Allocated pages can therefore be shared across multiple calls
@@ -1979,8 +1993,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
     }
   });
   do {
-    status =
-        cow_pages_locked()->DirtyPagesLocked(VmCowRange(offset, len), &alloc_list, &page_request);
+    status = cow_pages_locked()->DirtyPagesLocked(*cow_range, &alloc_list, &page_request);
     if (status == ZX_ERR_SHOULD_WAIT) {
       zx_status_t wait_status;
       guard.CallUnlocked([&page_request, &wait_status]() { wait_status = page_request.Wait(); });
@@ -1992,6 +2005,21 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
     }
   } while (status == ZX_ERR_SHOULD_WAIT);
   return status;
+}
+
+zx_status_t VmObjectPaged::EnumerateDirtyRanges(uint64_t offset, uint64_t len,
+                                                DirtyRangeEnumerateFunction&& dirty_range_fn) {
+  Guard<CriticalMutex> guard{lock()};
+  if (auto cow_range = GetCowRange(offset, len)) {
+    // Need to wrap the callback to translate the cow pages offsets back into offsets as seen by
+    // this object.
+    return cow_pages_locked()->EnumerateDirtyRangesLocked(
+        *cow_range, [&dirty_range_fn, undo_offset = cow_range_.offset](
+                        uint64_t range_offset, uint64_t range_len, bool range_is_zero) {
+          return dirty_range_fn(range_offset - undo_offset, range_len, range_is_zero);
+        });
+  }
+  return ZX_ERR_OUT_OF_RANGE;
 }
 
 zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
@@ -2075,25 +2103,32 @@ void VmObjectPaged::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) 
   canary_.Assert();
 
   // offsets for vmos needn't be aligned, but vmars use aligned offsets
-  const uint64_t aligned_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
-  const uint64_t aligned_len = ROUNDUP(range.end(), PAGE_SIZE) - aligned_offset;
+  uint64_t aligned_offset = ROUNDDOWN(range.offset, PAGE_SIZE);
+  uint64_t aligned_len = ROUNDUP(range.end(), PAGE_SIZE) - aligned_offset;
+  if (GetIntersect(cow_range_.offset, cow_range_.len, aligned_offset, aligned_len, &aligned_offset,
+                   &aligned_len)) {
+    // Found the intersection in cow space, convert back to object space.
+    aligned_offset -= cow_range_.offset;
 
-  for (auto& m : mapping_list_) {
-    m.assert_object_lock();
-    if (op == RangeChangeOp::Unmap) {
-      m.AspaceUnmapLockedObject(aligned_offset, aligned_len, false);
-    } else if (op == RangeChangeOp::UnmapZeroPage) {
-      m.AspaceUnmapLockedObject(aligned_offset, aligned_len, true);
-    } else if (op == RangeChangeOp::RemoveWrite) {
-      m.AspaceRemoveWriteLockedObject(aligned_offset, aligned_len);
-    } else if (op == RangeChangeOp::DebugUnpin) {
-      m.AspaceDebugUnpinLockedObject(aligned_offset, aligned_len);
-    } else {
-      panic("Unknown RangeChangeOp %d\n", static_cast<int>(op));
+    for (auto& m : mapping_list_) {
+      m.assert_object_lock();
+      if (op == RangeChangeOp::Unmap) {
+        m.AspaceUnmapLockedObject(aligned_offset, aligned_len, false);
+      } else if (op == RangeChangeOp::UnmapZeroPage) {
+        m.AspaceUnmapLockedObject(aligned_offset, aligned_len, true);
+      } else if (op == RangeChangeOp::RemoveWrite) {
+        m.AspaceRemoveWriteLockedObject(aligned_offset, aligned_len);
+      } else if (op == RangeChangeOp::DebugUnpin) {
+        m.AspaceDebugUnpinLockedObject(aligned_offset, aligned_len);
+      } else {
+        panic("Unknown RangeChangeOp %d\n", static_cast<int>(op));
+      }
     }
   }
 
-  // Propagate the change to reference children as well.
+  // Propagate the change to reference children as well. This is done regardless of intersection as
+  // we may have become the holder of the reference list even if they were not originally references
+  // made against us, and so their cow views might be different.
   for (auto& ref : reference_list_) {
     AssertHeld(ref.lock_ref());
     // Use the same offset and len. References span the entirety of the parent VMO and hence share
@@ -2107,27 +2142,39 @@ zx_status_t VmObjectPaged::LockRange(uint64_t offset, uint64_t len,
   if (!is_discardable()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+  auto cow_range = GetCowRange(offset, len);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
 
   Guard<CriticalMutex> guard{lock()};
-  return cow_pages_locked()->LockRangeLocked(VmCowRange(offset, len), lock_state_out);
+  return cow_pages_locked()->LockRangeLocked(*cow_range, lock_state_out);
 }
 
 zx_status_t VmObjectPaged::TryLockRange(uint64_t offset, uint64_t len) {
   if (!is_discardable()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+  auto cow_range = GetCowRange(offset, len);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
 
   Guard<CriticalMutex> guard{lock()};
-  return cow_pages_locked()->TryLockRangeLocked(VmCowRange(offset, len));
+  return cow_pages_locked()->TryLockRangeLocked(*cow_range);
 }
 
 zx_status_t VmObjectPaged::UnlockRange(uint64_t offset, uint64_t len) {
   if (!is_discardable()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
+  auto cow_range = GetCowRange(offset, len);
+  if (!cow_range) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
 
   Guard<CriticalMutex> guard{lock()};
-  return cow_pages_locked()->UnlockRangeLocked(VmCowRange(offset, len));
+  return cow_pages_locked()->UnlockRangeLocked(*cow_range);
 }
 
 zx_status_t VmObjectPaged::GetPage(uint64_t offset, uint pf_flags, list_node* alloc_list,

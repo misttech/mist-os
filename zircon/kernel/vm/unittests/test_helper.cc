@@ -232,7 +232,9 @@ bool verify_object_memory_attribution(VmObject* vmo, uint64_t vmo_gen,
     EXPECT_TRUE(expected_counts == vmo_counts);
   }
 
-  {
+  // References (and slices) return an empty attribution and so its meaningless to talk about their
+  // cached attribution.
+  if (!vmo_paged->is_reference()) {
     VmObjectPaged::CachedMemoryAttribution vmo_cached_counts =
         vmo_paged->GetCachedMemoryAttribution();
     EXPECT_EQ(vmo_gen, vmo_cached_counts.generation_count);

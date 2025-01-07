@@ -55,9 +55,8 @@ enum class VmCowPagesOptions : uint32_t {
 
   // Internal-only flags:
   kHidden = (1u << 1),
-  kSlice = (1u << 2),
 
-  kInternalOnlyMask = kHidden | kSlice,
+  kInternalOnlyMask = kHidden,
 };
 FBL_ENABLE_ENUM_BITS(VmCowPagesOptions)
 
@@ -65,14 +64,17 @@ struct VmCowRange {
   uint64_t offset;
   uint64_t len;
 
-  VmCowRange() : offset(0), len(0) {}
-  VmCowRange(uint64_t offset, uint64_t len) : offset(offset), len(len) {}
+  constexpr VmCowRange() : offset(0), len(0) {}
+  constexpr VmCowRange(uint64_t offset, uint64_t len) : offset(offset), len(len) {}
 
   uint64_t end() const { return offset + len; }
   bool is_empty() const { return len == 0; }
   bool is_page_aligned() const { return IS_PAGE_ALIGNED(offset) && IS_PAGE_ALIGNED(len); }
 
   VmCowRange OffsetBy(uint64_t delta) const { return VmCowRange(offset + delta, len); }
+  VmCowRange TrimedFromStart(uint64_t amount) const {
+    return VmCowRange(offset + amount, len - amount);
+  }
   VmCowRange WithLength(uint64_t new_length) const { return VmCowRange(offset, new_length); }
   bool IsBoundedBy(uint64_t max) const;
 };
@@ -101,13 +103,8 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Creates a copy-on-write clone with the desired parameters. This can fail due to various
   // internal states not being correct.
-  zx_status_t CreateCloneLocked(CloneType type, uint64_t offset, uint64_t size,
+  zx_status_t CreateCloneLocked(CloneType type, bool require_unidirection, VmCowRange range,
                                 fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
-
-  // Creates a child that looks back to this VmCowPages for all operations. Once a child slice is
-  // created this node should not ever be Resized.
-  zx_status_t CreateChildSliceLocked(uint64_t offset, uint64_t size,
-                                     fbl::RefPtr<VmCowPages>* cow_slice) TA_REQ(lock());
 
   // VmCowPages are initially created in the Init state and need to be transitioned to Alive prior
   // to being used. This is exposed for VmObjectPaged to call after ensuring that creation is
@@ -159,28 +156,20 @@ class VmCowPages final : public VmHierarchyBase,
   // Returns whether this cow pages node is dirty tracked.
   bool is_dirty_tracked_locked() const TA_REQ(lock()) {
     canary_.Assert();
-    // Pager-backed VMOs require dirty tracking either if:
-    // 1. They are directly backed by the pager, i.e. the root VMO.
-    // OR
-    // 2. They are slice children of root pager-backed VMOs, since slices directly reference the
-    // parent's pages.
-    auto* cow = is_slice_locked() ? parent_.get() : this;
-    return cow->page_source_ && cow->page_source_->properties().is_preserving_page_content;
+    // Pager-backed VMOs require dirty tracking either if they are directly backed by the pager,
+    // i.e. the root VMO.
+    return page_source_ && page_source_->properties().is_preserving_page_content;
   }
 
   // The modified state is only supported for root pager-backed VMOs, and will get queried (and
   // possibly reset) on the next QueryPagerVmoStatsLocked() call. Although the modified state is
-  // only tracked for the root VMO, it can get set by a modification through a slice, since a slice
-  // directly modifies the parent.
+  // only tracked for the root VMO.
   void mark_modified_locked() TA_REQ(lock()) {
     if (!is_dirty_tracked_locked()) {
       return;
     }
-    auto* cow = is_slice_locked() ? parent_.get() : this;
-    AssertHeld(cow->lock_ref());
-    DEBUG_ASSERT(!cow->is_slice_locked());
-    DEBUG_ASSERT(cow->is_source_preserving_page_content());
-    cow->pager_stats_modified_ = true;
+    DEBUG_ASSERT(is_source_preserving_page_content());
+    pager_stats_modified_ = true;
   }
 
   bool is_high_memory_priority_locked() const TA_REQ(lock()) {
@@ -206,8 +195,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   void DetachSourceLocked() TA_REQ(lock());
 
-  // Resizes the range of this cow pages. |size| must be a multiple of the page size and this must
-  // not be called on slices or nodes with slice children.
+  // Resizes the range of this cow pages. |size| must be a multiple of the page size.
   zx_status_t ResizeLocked(uint64_t size) TA_REQ(lock());
 
   // See VmObject::Lookup
@@ -487,8 +475,7 @@ class VmCowPages final : public VmHierarchyBase,
   // replaced, returns early with ZX_ERR_BAD_STATE. If the replacement needs to wait on the PMM for
   // allocation, returns ZX_ERR_SHOULD_WAIT, and the caller should wait on the |page_request|.
   // |non_loaned_len| is set to the length (starting at |offset|) that contains only non-loaned
-  // pages. |offset| and |len| must be page-aligned. In case of slices, replaces corresponding pages
-  // in the parent.
+  // pages. |offset| and |len| must be page-aligned.
   zx_status_t ReplacePagesWithNonLoanedLocked(VmCowRange range, AnonymousPageRequest* page_request,
                                               uint64_t* non_loaned_len) TA_REQ(lock());
 
@@ -735,7 +722,6 @@ class VmCowPages final : public VmHierarchyBase,
   void DeadTransition(Guard<CriticalMutex>& guard) TA_REQ(lock());
 
   bool is_hidden_locked() const TA_REQ(lock()) { return !!(options_ & VmCowPagesOptions::kHidden); }
-  bool is_slice_locked() const TA_REQ(lock()) { return !!(options_ & VmCowPagesOptions::kSlice); }
   bool can_decommit_zero_pages_locked() const TA_REQ(lock()) {
     return !(options_ & VmCowPagesOptions::kCannotDecommitZeroPages);
   }
@@ -812,14 +798,6 @@ class VmCowPages final : public VmHierarchyBase,
       return false;
     }
 
-    // Copy-on-write clones of slices aren't supported at the moment due to the resulting VMO chains
-    // having non hidden VMOs between hidden VMOs. This case cannot be handled be CloneCowPageLocked
-    // at the moment and so we forbid the construction of such cases for the moment.
-    // Bug: 36841
-    if (is_slice_locked()) {
-      return false;
-    }
-
     return true;
   }
 
@@ -837,16 +815,6 @@ class VmCowPages final : public VmHierarchyBase,
     bool result = root->page_source_ && root->page_source_->properties().is_preserving_page_content;
     DEBUG_ASSERT(result == is_root_source_user_pager_backed_locked());
 
-    // Calling snapshot-at-least-on-write of a slice in a snapshot-modified tree is unsupported
-    // as it creates an inconsistent structure.
-    if (is_slice_locked()) {
-      DEBUG_ASSERT(parent_);
-      DEBUG_ASSERT(!is_parent_hidden_locked());
-      if (parent_locked().is_parent_hidden_locked()) {
-        result = false;
-      }
-    }
-
     return result;
   }
 
@@ -861,22 +829,13 @@ class VmCowPages final : public VmHierarchyBase,
       return false;
     }
 
-    // Snapshots of slices aren't supported, unless it's a slice of the root VMO.
-    // Bug: 36841
-    if (is_slice_locked() && parent_locked().parent_) {
-      return false;
-    }
-
-    // Unless we are the root VMO, we can't snapshot if has non-slice children, as it would create
-    // an inconsistent hierarchy.
+    // Unless we are the root VMO, we can't snapshot if has children, as it would create an
+    // inconsistent hierarchy.
     if (!parent_) {
       return true;
     }
-    for (auto& child : children_list_) {
-      AssertHeld(child.lock_ref());
-      if (!child.is_slice_locked()) {
-        return false;
-      }
+    if (children_list_len_ != 0) {
+      return false;
     }
 
     // Snapshot-modified is currently unsupported for at-least-on-write VMO chains of length >2.
@@ -1300,16 +1259,6 @@ class VmCowPages final : public VmHierarchyBase,
   const VmCowPages& parent_locked() const TA_REQ(lock()) TA_ASSERT(parent_locked().lock()) {
     DEBUG_ASSERT(parent_);
     return *parent_;
-  }
-
-  // Only valid to be called when is_slice_locked() is true and returns the immediate parent of
-  // this, that due to the nature of slices can be assumed to not be a slice itself.
-  VmCowPages& slice_parent_locked() TA_REQ(lock()) TA_ASSERT(slice_parent_locked().lock()) {
-    DEBUG_ASSERT(is_slice_locked());
-    // A slice never has a slice parent, as otherwise this slice could have been hung off their
-    // parent.
-    DEBUG_ASSERT(!parent_locked().is_slice_locked());
-    return parent_locked();
   }
 
   void ReplaceChildLocked(VmCowPages* old, VmCowPages* new_child) TA_REQ(lock());
