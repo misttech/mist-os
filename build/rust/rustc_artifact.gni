@@ -99,224 +99,240 @@ import("//build/toolchain/rbe.gni")
 #   visibility
 #     The usual GN meaning.
 template("rustc_artifact") {
-  _remote_inputs = []
-  if (defined(invoker.inputs)) {
-    _remote_inputs = invoker.inputs
-  }
-  _local_inputs = _remote_inputs
-
-  # Compute the metadata used to uniquely identify this target within rustc.
-  # In particular, it is used as a key in the incremental cache to prevent
-  # builds of the same crate name from clobbering each others' cache entries.
-  # It is also used in symbol mangling.
-  #
-  # This is a space-separated list.
-  _codegen_metadata =
-      rebase_path(target_out_dir, root_build_dir) + " " + target_name
-  _rustflags = [ "-Cmetadata=${_codegen_metadata}" ]
-
-  _flag_deps = [ "//build/rust:api_level_cfg_flags" ]
-  _flag_inputs = [ "${root_build_dir}/rust_api_level_cfg_flags.txt" ]
-  _rustflags += [ "@rust_api_level_cfg_flags.txt" ]
-
-  if (defined(invoker.features)) {
-    foreach(i, invoker.features) {
-      _rustflags += [ "--cfg=feature=\"${i}\"" ]
+  if (current_toolchain == shlib_toolchain) {
+    # For Rust targets that are expanded in the shared toolchain, redirect to the
+    # base toolchain with variant. See https://fxbug.dev/387208039.
+    group(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "assert_no_deps",
+                               "testonly",
+                               "visibility",
+                             ])
+      public_deps = [ ":${target_name}(${variant_base_toolchain})" ]
+      not_needed(invoker, "*")
     }
-  }
-  if (defined(invoker.check_cfgs)) {
-    foreach(i, invoker.check_cfgs) {
-      _rustflags += [ "--check-cfg=cfg(${i})" ]
+  } else {
+    _remote_inputs = []
+    if (defined(invoker.inputs)) {
+      _remote_inputs = invoker.inputs
     }
-  }
-  if (defined(invoker.rustflags)) {
-    _rustflags += invoker.rustflags
-  }
+    _local_inputs = _remote_inputs
 
-  _group_name = target_name
-  _actual_target_name = "${target_name}.actual"
+    # Compute the metadata used to uniquely identify this target within rustc.
+    # In particular, it is used as a key in the incremental cache to prevent
+    # builds of the same crate name from clobbering each others' cache entries.
+    # It is also used in symbol mangling.
+    #
+    # This is a space-separated list.
+    _codegen_metadata =
+        rebase_path(target_out_dir, root_build_dir) + " " + target_name
+    _rustflags = [ "-Cmetadata=${_codegen_metadata}" ]
 
-  _use_rbe = rust_rbe_enable
-  if (defined(invoker.disable_rbe) && invoker.disable_rbe) {
-    _use_rbe = false
-  }
-  if (rust_rbe_enable && !_use_rbe) {
-    # Disable RBE for this target through a fake rustflag,
-    # that is intercepted by rustc-remote-wrapper.sh.
-    _rustflags += [ "--remote-disable" ]
-  }
-  if (_use_rbe) {
-    # Depend on Rust/RBE scripts and tools.
-    _local_inputs += rust_rbe_deps
-  }
+    _flag_deps = [ "//build/rust:api_level_cfg_flags" ]
+    _flag_inputs = [ "${root_build_dir}/rust_api_level_cfg_flags.txt" ]
+    _rustflags += [ "@rust_api_level_cfg_flags.txt" ]
 
-  # These do not have aux targets (yet).
-  _should_define_rust_aux = invoker.rust_crate_type != "cdylib" &&
-                            invoker.rust_crate_type != "dylib" &&
-                            (invoker.rust_crate_type != "proc-macro" ||
-                             current_toolchain == toolchain_variant.base)
-
-  if (_should_define_rust_aux) {
-    # See //build/rust/rust_auxiliary.gni for more info about .aux targets. We
-    # depend on this specific name (without the .actual suffix), so declare it
-    # here.
-    _aux_target_name = "${target_name}.aux"
-    if (defined(invoker.rust_auxiliary_name)) {
-      _aux_target_name = invoker.rust_auxiliary_name
+    if (defined(invoker.features)) {
+      foreach(i, invoker.features) {
+        _rustflags += [ "--cfg=feature=\"${i}\"" ]
+      }
     }
-  }
+    if (defined(invoker.check_cfgs)) {
+      foreach(i, invoker.check_cfgs) {
+        _rustflags += [ "--check-cfg=cfg(${i})" ]
+      }
+    }
+    if (defined(invoker.rustflags)) {
+      _rustflags += invoker.rustflags
+    }
 
-  # Every first party Rust target is actually a group of both target_name.actual
-  # and target_name.aux.
-  # There is a group here, and in rust_auxiliary.gni. This group exists so that
-  # rustdoc and clippy targets can be built in parallel with the actual target.
-  group(_group_name) {
-    forward_variables_from(invoker,
-                           [
-                             "applicable_licenses",
-                             "testonly",
-                             "visibility",
-                           ])
-    public_deps = [ ":${_actual_target_name}" ]
+    _group_name = target_name
+    _actual_target_name = "${target_name}.actual"
+
+    _use_rbe = rust_rbe_enable
+    if (defined(invoker.disable_rbe) && invoker.disable_rbe) {
+      _use_rbe = false
+    }
+    if (rust_rbe_enable && !_use_rbe) {
+      # Disable RBE for this target through a fake rustflag,
+      # that is intercepted by rustc-remote-wrapper.sh.
+      _rustflags += [ "--remote-disable" ]
+    }
+    if (_use_rbe) {
+      # Depend on Rust/RBE scripts and tools.
+      _local_inputs += rust_rbe_deps
+    }
+
+    # These do not have aux targets (yet).
+    _should_define_rust_aux = invoker.rust_crate_type != "cdylib" &&
+                              invoker.rust_crate_type != "dylib" &&
+                              (invoker.rust_crate_type != "proc-macro" ||
+                               current_toolchain == toolchain_variant.base)
+
     if (_should_define_rust_aux) {
-      public_deps += [ ":${_aux_target_name}" ]
-    }
-    metadata = {
-      test_component_manifest_program_barrier = [ ":${_actual_target_name}" ]
-      link_output_barrier = [ ":${_actual_target_name}" ]
-    }
-  }
-
-  # Forwards to: rust_library, rust_proc_macro, executable, shared_library,
-  # or static_library in //build/config/BUILDCONFIG.gn.
-  target(invoker.target_type, _actual_target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "applicable_licenses",
-                             "assert_no_deps",
-                             "deps",
-                             "emit_tool_path",
-                             "metadata",
-                             "output_prefix_override",
-                             "pool",
-                             "public_deps",
-                             "rustenv",
-                             "testonly",
-                             "visibility",
-                           ])
-
-    # rustc does not support dashes in crate names.
-    crate_name = string_replace(invoker.crate_name, "-", "_")
-    crate_root = invoker.crate_root
-
-    rustflags = _rustflags
-    if (rust_rbe_enable) {
-      rustflags += [ "--remote-flag=--label='" +
-                     get_label_info(":${_actual_target_name}",
-                                    "label_with_toolchain") + "'" ]
-    }
-    if (_use_rbe && _remote_inputs != []) {
-      # Signal to rustc-remote-wrapper.sh that there are additional
-      # inputs to upload.  This flag is stripped away from the eventual
-      # rustc command.
-      rustflags +=
-          [ "--remote-inputs=" +
-            string_join(",", rebase_path(_remote_inputs, root_build_dir)) ]
-    }
-
-    configs = []
-    if (defined(invoker.configs)) {
-      configs = invoker.configs
-    }
-    assert(
-        defined(invoker.edition),
-        "Rust targets must set an edition. For new rust targets use: `edition = \"2021\"`")
-    configs += [ "//build/config/rust:edition_${invoker.edition}" ]
-
-    inputs = _local_inputs + _flag_inputs
-    deps += _flag_deps
-
-    if (!defined(invoker.enforce_source_listing) ||
-        invoker.enforce_source_listing) {
-      # fail early when the user forgets to list sources
-      assert(defined(invoker.sources), "sources must be listed")
-      sources = invoker.sources
-    } else {
-      not_needed(invoker, [ "sources" ])
-
-      # This is a hack to workaround the fact that a GN `tool` invocation can't receive arbitrary input.
-      # Add a sentinel value so that enforcement is skipped.
-      sources = [ "//build/rust/__SKIP_ENFORCEMENT__.rs" ]
-
-      # Opting out of strict sources check requires that the package is present
-      # in a global allow-list.
-      deps += [ "//build/rust:disable_strict_sources_check_allowlist" ]
-    }
-
-    if (defined(invoker.link_args)) {
-      foreach(link_arg, invoker.link_args) {
-        rustflags += [ "-Clink-args=" + link_arg ]
+      # See //build/rust/rust_auxiliary.gni for more info about .aux targets. We
+      # depend on this specific name (without the .actual suffix), so declare it
+      # here.
+      _aux_target_name = "${target_name}.aux"
+      if (defined(invoker.rust_auxiliary_name)) {
+        _aux_target_name = invoker.rust_auxiliary_name
       }
     }
 
-    # _pass_through and not_needed are to workaround https://crbug.com/gn/10
-    _pass_through = invoker.pass_through
-    assert(!defined(_pass_through.metadata))
-    not_needed([ "_pass_through" ])
-
-    # Pass through these variables unmodified.
-    forward_variables_from(invoker.pass_through, "*")
-
-    # The Fuchsia standard library has an implicit #[link] directive
-    # pointing to libfdio.so
-    if (is_fuchsia && (invoker.target_type == "executable" ||
-                       invoker.target_type == "shared_library" ||
-                       invoker.target_type == "loadable_module")) {
-      deps += [ "//src/lib/fdio/rust:fdio_for_rust_stdlib" ]
-    }
-
-    # Add the global lint defaults.
-    configs += [ "//build/config/rust/lints:clippy_warn_default" ]
-
-    # Add production-oriented lints to non-test code.
-    if (!(defined(testonly) && testonly)) {
-      configs += [ "//build/config/rust/lints:clippy_warn_production" ]
-    }
-    if (defined(visibility)) {
-      visibility += [ ":${_group_name}" ]
-    }
-
-    if (_should_define_rust_aux) {
+    # Every first party Rust target is actually a group of both target_name.actual
+    # and target_name.aux.
+    # There is a group here, and in rust_auxiliary.gni. This group exists so that
+    # rustdoc and clippy targets can be built in parallel with the actual target.
+    group(_group_name) {
       forward_variables_from(invoker,
                              [
-                               "define_rustdoc_test_override",
-                               "disable_clippy",
-                               "disable_rustdoc",
-                               "original_target_name",
-                               "quiet_clippy",
-                               "rust_crate_type",
-                               "rustdoc_args",
-                               "rustdoc_merge",
-                               "rustdoc_out_dir",
-                               "zip_rustdoc_to",
+                               "applicable_licenses",
+                               "testonly",
+                               "visibility",
+                             ])
+      public_deps = [ ":${_actual_target_name}" ]
+      if (_should_define_rust_aux) {
+        public_deps += [ ":${_aux_target_name}" ]
+      }
+      metadata = {
+        test_component_manifest_program_barrier = [ ":${_actual_target_name}" ]
+        link_output_barrier = [ ":${_actual_target_name}" ]
+      }
+    }
+
+    # Forwards to: rust_library, rust_proc_macro, executable, shared_library,
+    # or static_library in //build/config/BUILDCONFIG.gn.
+    target(invoker.target_type, _actual_target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "assert_no_deps",
+                               "deps",
+                               "emit_tool_path",
+                               "metadata",
+                               "output_prefix_override",
+                               "pool",
+                               "public_deps",
+                               "rustenv",
+                               "testonly",
+                               "visibility",
                              ])
 
-      rust_auxiliary_name = _aux_target_name
+      # rustc does not support dashes in crate names.
+      crate_name = string_replace(invoker.crate_name, "-", "_")
+      crate_root = invoker.crate_root
 
-      # We already depend on the aux target here, in the group above.
-      # This keeps rustdoc and clippy out of the critical path for
-      # rustc_artifact targets, which are the ones that get built by default
-      # anyway.
-      no_rust_aux_build_config_dep = true
+      rustflags = _rustflags
+      if (rust_rbe_enable) {
+        rustflags += [ "--remote-flag=--label='" +
+                       get_label_info(":${_actual_target_name}",
+                                      "label_with_toolchain") + "'" ]
+      }
+      if (_use_rbe && _remote_inputs != []) {
+        # Signal to rustc-remote-wrapper.sh that there are additional
+        # inputs to upload.  This flag is stripped away from the eventual
+        # rustc command.
+        rustflags +=
+            [ "--remote-inputs=" +
+              string_join(",", rebase_path(_remote_inputs, root_build_dir)) ]
+      }
 
-      # rustdoc should not be data_dep'd for third party crates
-      include_rustdoc_first_party = true
+      configs = []
+      if (defined(invoker.configs)) {
+        configs = invoker.configs
+      }
+      assert(
+          defined(invoker.edition),
+          "Rust targets must set an edition. For new rust targets use: `edition = \"2021\"`")
+      configs += [ "//build/config/rust:edition_${invoker.edition}" ]
 
-      # We should only generate clippy lints for first party crates,
-      # as lints for third party crates aren't actionable
-      enable_clippy_first_party = true
-    } else {
-      not_needed(invoker, [ "original_target_name" ])
+      inputs = _local_inputs + _flag_inputs
+      deps += _flag_deps
+
+      if (!defined(invoker.enforce_source_listing) ||
+          invoker.enforce_source_listing) {
+        # fail early when the user forgets to list sources
+        assert(defined(invoker.sources), "sources must be listed")
+        sources = invoker.sources
+      } else {
+        not_needed(invoker, [ "sources" ])
+
+        # This is a hack to workaround the fact that a GN `tool` invocation can't receive arbitrary input.
+        # Add a sentinel value so that enforcement is skipped.
+        sources = [ "//build/rust/__SKIP_ENFORCEMENT__.rs" ]
+
+        # Opting out of strict sources check requires that the package is present
+        # in a global allow-list.
+        deps += [ "//build/rust:disable_strict_sources_check_allowlist" ]
+      }
+
+      if (defined(invoker.link_args)) {
+        foreach(link_arg, invoker.link_args) {
+          rustflags += [ "-Clink-args=" + link_arg ]
+        }
+      }
+
+      # _pass_through and not_needed are to workaround https://crbug.com/gn/10
+      _pass_through = invoker.pass_through
+      assert(!defined(_pass_through.metadata))
+      not_needed([ "_pass_through" ])
+
+      # Pass through these variables unmodified.
+      forward_variables_from(invoker.pass_through, "*")
+
+      # The Fuchsia standard library has an implicit #[link] directive
+      # pointing to libfdio.so
+      if (is_fuchsia && (invoker.target_type == "executable" ||
+                         invoker.target_type == "shared_library" ||
+                         invoker.target_type == "loadable_module")) {
+        deps += [ "//src/lib/fdio/rust:fdio_for_rust_stdlib" ]
+      }
+
+      # Add the global lint defaults.
+      configs += [ "//build/config/rust/lints:clippy_warn_default" ]
+
+      # Add production-oriented lints to non-test code.
+      if (!(defined(testonly) && testonly)) {
+        configs += [ "//build/config/rust/lints:clippy_warn_production" ]
+      }
+      if (defined(visibility)) {
+        visibility += [ ":${_group_name}" ]
+      }
+
+      if (_should_define_rust_aux) {
+        forward_variables_from(invoker,
+                               [
+                                 "define_rustdoc_test_override",
+                                 "disable_clippy",
+                                 "disable_rustdoc",
+                                 "original_target_name",
+                                 "quiet_clippy",
+                                 "rust_crate_type",
+                                 "rustdoc_args",
+                                 "rustdoc_merge",
+                                 "rustdoc_out_dir",
+                                 "zip_rustdoc_to",
+                               ])
+
+        rust_auxiliary_name = _aux_target_name
+
+        # We already depend on the aux target here, in the group above.
+        # This keeps rustdoc and clippy out of the critical path for
+        # rustc_artifact targets, which are the ones that get built by default
+        # anyway.
+        no_rust_aux_build_config_dep = true
+
+        # rustdoc should not be data_dep'd for third party crates
+        include_rustdoc_first_party = true
+
+        # We should only generate clippy lints for first party crates,
+        # as lints for third party crates aren't actionable
+        enable_clippy_first_party = true
+      } else {
+        not_needed(invoker, [ "original_target_name" ])
+      }
     }
   }
 }
