@@ -137,6 +137,7 @@ fn example_cml_integration_test() {
             source: Some(Ref::Parent(ParentRef {})),
             source_name: Some("fuchsia.logger.LogSink".to_string()),
             target_path: Some("/svc/fuchsia.logger.LogSink".to_string()),
+            source_dictionary: Some("diagnostics".to_string()),
             availability: Some(Availability::Required),
             ..Default::default()
         }),
