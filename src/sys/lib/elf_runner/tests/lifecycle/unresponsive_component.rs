@@ -9,8 +9,8 @@ use {
     // fuchsia_component::server::ServiceFs,
     fuchsia_runtime::{self as fruntime, HandleInfo, HandleType},
     futures_util::stream::{StreamExt, TryStreamExt},
+    log::{error, info},
     std::{process, thread, time},
-    tracing::{error, info},
     zx::{self as zx},
 };
 

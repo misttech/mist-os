@@ -17,7 +17,6 @@ use futures::StreamExt;
 use sandbox::{Capability, Dict};
 use serve_processargs::NamespaceBuilder;
 use std::sync::Arc;
-use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
 
 /// Creates a component's namespace.
@@ -110,13 +109,15 @@ fn not_found_logging(component: &Arc<ComponentInstance>) -> UnboundedSender<Stri
             match component_for_logger.upgrade() {
                 Ok(target) => {
                     target
-                        .with_logger_as_default(|| {
-                            warn!(
+                        .log(
+                            log::Level::Warn,
+                            format!(
                                 "No capability available at path {} for component {}, \
-                                verify the component has the proper `use` declaration.",
+                             verify the component has the proper `use` declaration.",
                                 path, target.moniker
-                            );
-                        })
+                            ),
+                            &[],
+                        )
                         .await;
                 }
                 Err(_) => {}

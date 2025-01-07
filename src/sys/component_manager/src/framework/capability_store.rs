@@ -10,7 +10,7 @@ use cm_types::Name;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use lazy_static::lazy_static;
-use tracing::*;
+use log::*;
 
 lazy_static! {
     static ref CAPABILITY_NAME: Name =
@@ -27,7 +27,7 @@ impl InternalCapabilityProvider for CapabilityStoreCapabilityProvider {
         // These operations should all work, even if the component is not running.
         let serve_result = self.serve(server_end.into_stream()).await;
         if let Err(error) = serve_result {
-            warn!(%error, "CapabilityStore serve failed");
+            warn!(error:%; "CapabilityStore serve failed");
         }
     }
 }

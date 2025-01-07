@@ -26,39 +26,19 @@ impl ScopedLogger {
     }
 }
 
-impl tracing::Subscriber for ScopedLogger {
+impl log::Log for ScopedLogger {
     #[inline]
-    fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
         self.publisher.enabled(metadata)
     }
 
     #[inline]
-    fn new_span(&self, span: &tracing::span::Attributes<'_>) -> tracing::span::Id {
-        self.publisher.new_span(span)
+    fn log(&self, record: &log::Record<'_>) {
+        self.publisher.log(record);
     }
 
     #[inline]
-    fn record(&self, span: &tracing::span::Id, values: &tracing::span::Record<'_>) {
-        self.publisher.record(span, values)
-    }
-
-    #[inline]
-    fn record_follows_from(&self, span: &tracing::span::Id, follows: &tracing::span::Id) {
-        self.publisher.record_follows_from(span, follows)
-    }
-
-    #[inline]
-    fn event(&self, event: &tracing::Event<'_>) {
-        self.publisher.event(event)
-    }
-
-    #[inline]
-    fn enter(&self, span: &tracing::span::Id) {
-        self.publisher.enter(span)
-    }
-
-    #[inline]
-    fn exit(&self, span: &tracing::span::Id) {
-        self.publisher.exit(span)
+    fn flush(&self) {
+        self.publisher.flush();
     }
 }

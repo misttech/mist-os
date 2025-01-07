@@ -7,8 +7,8 @@ use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleOnEscrowRequest};
 use fuchsia_async as fasync;
 use fuchsia_runtime::{self as fruntime, HandleInfo, HandleType};
 
+use log::{error, info};
 use std::process;
-use tracing::{error, info};
 
 /// This component immediately escrows its outgoing directory and then exits.
 #[fuchsia::main]

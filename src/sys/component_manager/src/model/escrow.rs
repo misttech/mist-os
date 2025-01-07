@@ -221,7 +221,7 @@ impl ActorImpl {
                             match start_task.await {
                                 Ok(()) => {}
                                 Err(err) => {
-                                    tracing::warn!(
+                                    log::warn!(
                                         "the program of the component started, but the rest of the \
                                          start procedure (e.g. starting eager children) failed: \
                                          {err}"
@@ -240,7 +240,7 @@ impl ActorImpl {
                         // If the start action completes with an error, clear the escrow
                         // that was used to trigger the start action. Otherwise, we'll
                         // be continuously starting the component in a loop.
-                        tracing::warn!(
+                        log::warn!(
                             "the escrowed state of the component is readable but the component \
                              failed to start: {err}"
                         );

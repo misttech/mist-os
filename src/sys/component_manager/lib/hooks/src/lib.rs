@@ -9,12 +9,12 @@ use cm_types::{Name, Url};
 use errors::ModelError;
 use futures::channel::oneshot;
 use futures::lock::Mutex;
+use log::warn;
 use moniker::{ExtendedMoniker, Moniker};
 use sandbox::{Connector, Receiver, WeakInstanceToken};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex as StdMutex, Weak};
-use tracing::warn;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_diagnostics_types as fdiagnostics,
     fidl_fuchsia_io as fio,
@@ -435,7 +435,7 @@ impl Hooks {
         };
         for hook in strong_hooks {
             if let Err(err) = hook.on(event).await {
-                warn!(%err, %event, "Hook produced error for event");
+                warn!(err:%, event:%; "Hook produced error for event");
             }
         }
     }

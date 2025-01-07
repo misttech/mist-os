@@ -7,7 +7,7 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use futures::StreamExt;
-use tracing::info;
+use log::info;
 use {
     fidl_fuchsia_driver_test as fdt, fidl_test_structuredconfig_receiver as scr,
     fidl_test_structuredconfig_receiver_shim as scrs,

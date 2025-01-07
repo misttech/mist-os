@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_component::client;
-use tracing::*;
+use log::*;
 use zx::{Rights, Signals};
 use {fidl_componentmanager_test as ftest, fuchsia_async as fasync};
 

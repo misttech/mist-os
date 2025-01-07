@@ -23,7 +23,7 @@ rustc_binary("service-routing-branch-bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   source_root = "src/branch.rs"
@@ -58,8 +58,8 @@ rustc_test("service-routing-test-bin") {
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:tracing",
   ]
 
   source_root = "src/service_routing_test.rs"
@@ -82,7 +82,7 @@ rustc_test("filtered-service-routing-test-bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/sys/component_manager/tests/services/src/fidl:fuchsia.examples_rust",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   source_root = "src/filtered_service_routing_test.rs"
@@ -125,7 +125,7 @@ rustc_binary("multi_instance_echo_service_bin") {
     "//src/sys/component_manager/tests/services/src/fidl:fuchsia.examples_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   source_root = "src/multi_instance_echo_service.rs"

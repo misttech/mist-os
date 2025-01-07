@@ -9,11 +9,11 @@ use fuchsia_bootfs::{
 };
 use fuchsia_component::client;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use log::info;
 use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::info;
 use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo;

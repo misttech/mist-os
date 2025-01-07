@@ -20,12 +20,12 @@ use fuchsia_async as fasync;
 use futures::future::select_all;
 use futures::prelude::*;
 use futures::select;
+use log::*;
 use moniker::ChildName;
 use std::collections::{HashMap, HashSet};
 use std::pin::pin;
 use std::sync::Arc;
 use std::{fmt, iter};
-use tracing::*;
 
 /// Shuts down all component instances in this component (stops them and guarantees they will never
 /// be started again).

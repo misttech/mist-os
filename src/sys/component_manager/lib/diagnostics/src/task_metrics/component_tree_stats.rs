@@ -20,11 +20,11 @@ use futures::{FutureExt, StreamExt};
 use hooks::{Event, EventPayload, EventType, HasEventType, Hook, HooksRegistration};
 use injectable_time::{BootInstant, TimeSource};
 use lazy_static::lazy_static;
+use log::warn;
 use moniker::{ExtendedMoniker, Moniker};
 use std::collections::{BTreeMap, VecDeque};
 use std::fmt::Debug;
 use std::sync::{Arc, Weak};
-use tracing::warn;
 use zx::{self as zx, sys as zx_sys, HandleBased};
 
 macro_rules! maybe_return {

@@ -5,8 +5,8 @@
 use diagnostics_data::{ExtendedMoniker, Logs};
 use diagnostics_reader::ArchiveReader;
 use futures::stream::StreamExt;
+use log::info;
 use std::collections::HashMap;
-use tracing::info;
 
 #[fuchsia::main(logging_tags = ["archive-reader"])]
 async fn main() {

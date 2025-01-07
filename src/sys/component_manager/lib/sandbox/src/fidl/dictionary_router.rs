@@ -56,8 +56,8 @@ impl Router<Dict> {
                     responder.send(router::route_from_fidl(&self, payload).await)?;
                 }
                 fsandbox::DictionaryRouterRequest::_UnknownMethod { ordinal, .. } => {
-                    tracing::warn!(
-                        %ordinal, "Received unknown DictionaryRouter request"
+                    log::warn!(
+                        ordinal:%; "Received unknown DictionaryRouter request"
                     );
                 }
             }

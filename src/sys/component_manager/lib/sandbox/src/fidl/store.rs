@@ -8,10 +8,10 @@ use crate::{Capability, Connector, Dict, DirConnector, Message};
 use fidl::handle::Signals;
 use fidl::AsHandleRef;
 use futures::{FutureExt, TryStreamExt};
+use log::warn;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::{self, Arc, Weak};
-use tracing::warn;
 use {fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync};
 
 type Store = sync::Mutex<HashMap<u64, Capability>>;
@@ -277,7 +277,7 @@ async fn serve_dictionary_keys_iterator(
                 let _ = responder.send(&chunk);
             }
             fsandbox::DictionaryKeysIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown DictionaryKeysIterator request");
+                warn!(ordinal:%; "Unknown DictionaryKeysIterator request");
             }
         }
     }
@@ -327,7 +327,7 @@ async fn serve_dictionary_enumerate_iterator(
                 }
             }
             fsandbox::DictionaryEnumerateIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown DictionaryEnumerateIterator request");
+                warn!(ordinal:%; "Unknown DictionaryEnumerateIterator request");
             }
         }
     }
@@ -374,7 +374,7 @@ async fn serve_dictionary_drain_iterator(
                 }
             }
             fsandbox::DictionaryDrainIteratorRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "Unknown DictionaryDrainIterator request");
+                warn!(ordinal:%; "Unknown DictionaryDrainIterator request");
             }
         }
     }

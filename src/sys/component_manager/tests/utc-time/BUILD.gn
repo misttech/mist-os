@@ -41,7 +41,7 @@ rustc_binary("maintainer_bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/test_util",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "maintainer.rs" ]
@@ -59,7 +59,7 @@ rustc_binary("time_client_bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "time_client.rs" ]
@@ -80,7 +80,7 @@ rustc_test("integration_test_bin") {
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "integration_test.rs" ]

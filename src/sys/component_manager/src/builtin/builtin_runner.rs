@@ -6,17 +6,16 @@ use ::routing::capability_source::InternalCapability;
 use async_trait::async_trait;
 use cm_config::SecurityPolicy;
 use cm_types::Name;
-use cm_util::TaskGroup;
+use cm_util::{AbortHandle, AbortableScope, TaskGroup};
 use elf_runner::crash_info::CrashRecords;
 use elf_runner::process_launcher::NamespaceConnector;
 use fidl::endpoints;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, RequestStream, ServerEnd};
 use fidl_fuchsia_data::Dictionary;
 use fuchsia_runtime::UtcClock;
-
-use cm_util::{AbortHandle, AbortableScope};
 use futures::future::{BoxFuture, Shared};
 use futures::{Future, FutureExt, TryStreamExt};
+use log::{error, warn};
 use namespace::{Namespace, NamespaceError};
 use routing::capability_source::{BuiltinSource, CapabilitySource};
 use routing::policy::ScopedPolicyChecker;
@@ -24,7 +23,6 @@ use runner::component::{Controllable, Controller, StopInfo};
 use sandbox::{Capability, Dict, DirEntry, RemotableCapability};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{error, warn};
 use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
 use vfs::service::endpoint;
@@ -265,7 +263,7 @@ async fn wait_for_job_termination(job: zx::Job) -> StopInfo {
     fasync::OnSignals::new(&job.as_handle_ref(), zx::Signals::JOB_TERMINATED)
         .await
         .map(|_: fidl::Signals| ())
-        .unwrap_or_else(|error| warn!(%error, "error waiting for job termination"));
+        .unwrap_or_else(|error| warn!(error:%; "error waiting for job termination"));
 
     use fidl_fuchsia_component::Error;
     let exit_status = match job.info() {
@@ -275,11 +273,11 @@ async fn wait_for_job_termination(job: zx::Job) -> StopInfo {
             StopInfo::from_ok(None)
         }
         Ok(zx::JobInfo { return_code, .. }) => {
-            warn!(%return_code, "job terminated with abnormal return code");
+            warn!(return_code:%; "job terminated with abnormal return code");
             StopInfo::from_error(Error::InstanceDied, None)
         }
         Err(error) => {
-            warn!(%error, "Unable to query job info");
+            warn!(error:%; "Unable to query job info");
             StopInfo::from_error(Error::Internal, None)
         }
     };
@@ -312,7 +310,7 @@ impl BuiltinRunnerFactory for BuiltinRunner {
                             }
                         },
                         fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                            warn!(%ordinal, "Unknown ComponentRunner request");
+                            warn!(ordinal:%; "Unknown ComponentRunner request");
                         }
                     }
                 }
@@ -412,7 +410,7 @@ impl Controllable for BuiltinProgram {
                     .map(|_: fidl::Signals| ()) // Discard.
                     .unwrap_or_else(|err| {
                         warn!(
-                            %err,
+                            err:%;
                             "killing builtin component after failure waiting on lifecycle channel"
                         )
                     });
@@ -599,7 +597,7 @@ impl Inner {
                         .await;
                 }
                 fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(%ordinal, "Unknown ComponentRunner request");
+                    warn!(ordinal:%; "Unknown ComponentRunner request");
                 }
             }
         }

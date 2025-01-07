@@ -14,11 +14,11 @@ use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component as fcomponent;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
+use log::warn;
 use moniker::{ExtendedMoniker, Moniker};
 use routing::capability_source::InternalCapability;
 use routing::error::RoutingError;
 use routing::policy::PolicyError;
-use tracing::warn;
 use vfs::directory::entry::OpenRequest;
 
 use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
@@ -83,7 +83,7 @@ impl IntrospectorCapability {
                 method_type,
                 ..
             } => {
-                warn!(%ordinal, "Unknown {method_type:?} Introspector method");
+                warn!(ordinal:%; "Unknown {method_type:?} Introspector method");
                 Ok(())
             }
         }
@@ -96,7 +96,7 @@ impl InternalCapabilityProvider for IntrospectorCapability {
         let server_end = ServerEnd::<fcomponent::IntrospectorMarker>::new(server_end);
         let serve_result = self.serve(server_end.into_stream()).await;
         if let Err(error) = serve_result {
-            warn!(%error, "Error serving Introspector");
+            warn!(error:%; "Error serving Introspector");
         }
     }
 }

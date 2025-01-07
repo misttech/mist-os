@@ -34,7 +34,7 @@ rustc_binary("destruction_collection_realm_bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/sys/component_manager/tests/fidl:components_rust",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "collection_realm.rs" ]
@@ -54,7 +54,7 @@ rustc_binary("destroy_and_recreate_bin") {
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/sys/component_manager/tests/fidl:components_rust",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   sources = [ "destroy_and_recreate.rs" ]

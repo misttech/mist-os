@@ -17,10 +17,10 @@ use errors::OpenExposedDirError;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use futures::prelude::*;
 use lazy_static::lazy_static;
+use log::{debug, error, warn};
 use moniker::{ChildName, Moniker};
 use std::cmp;
 use std::sync::{Arc, Weak};
-use tracing::{debug, error, warn};
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
@@ -57,7 +57,7 @@ impl InternalCapabilityProvider for RealmCapabilityProvider {
         let serve_result = self.serve(weak, server_end.into_stream()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.
-            warn!(%error, "serve failed");
+            warn!(error:%; "serve failed");
         }
     }
 }
@@ -104,7 +104,7 @@ impl RealmCapabilityProvider {
                 // If the error was PEER_CLOSED then we don't need to log it as a client can
                 // disconnect while we are processing its request.
                 Err(error) if !error.is_closed() => {
-                    warn!(%method_name, %error, "Couldn't send Realm response");
+                    warn!(method_name:%, error:%; "Couldn't send Realm response");
                 }
                 _ => {}
             }
@@ -158,7 +158,7 @@ impl RealmCapabilityProvider {
         let component = weak.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
 
         cm_fidl_validator::validate_dynamic_child(&child_decl).map_err(|error| {
-            warn!(%error, "failed to create dynamic child. child decl is invalid");
+            warn!(error:%; "failed to create dynamic child. child decl is invalid");
             fcomponent::Error::InvalidArguments
         })?;
         let child_decl = child_decl.fidl_into_native();
@@ -188,7 +188,7 @@ impl RealmCapabilityProvider {
                 ));
             }
             None => {
-                debug!(?child, "open_controller() failed: instance not found");
+                debug!(child:?; "open_controller() failed: instance not found");
                 return Err(fcomponent::Error::InstanceNotFound);
             }
         }
@@ -233,7 +233,7 @@ impl RealmCapabilityProvider {
                     })?;
             }
             None => {
-                debug!(?child, "open_exposed_dir() failed: instance not found");
+                debug!(child:?; "open_exposed_dir() failed: instance not found");
                 return Err(fcomponent::Error::InstanceNotFound);
             }
         }
@@ -249,7 +249,7 @@ impl RealmCapabilityProvider {
         let child_moniker = ChildName::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
         component.remove_dynamic_child(&child_moniker).await.map_err(|error| {
-            debug!(%error, ?child, "remove_dynamic_child() failed");
+            debug!(error:%, child:?; "remove_dynamic_child() failed");
             error
         })?;
         Ok(())
@@ -261,7 +261,7 @@ impl RealmCapabilityProvider {
     ) -> Result<Option<Arc<ComponentInstance>>, fcomponent::Error> {
         let parent = parent.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
         let state = parent.lock_resolved_state().await.map_err(|error| {
-            debug!(%error, moniker=%parent.moniker, "failed to resolve instance");
+            debug!(error:%, moniker:% = parent.moniker; "failed to resolve instance");
             fcomponent::Error::InstanceCannotResolve
         })?;
         let child_moniker = ChildName::try_new(&child.name, child.collection.as_ref())
@@ -277,7 +277,7 @@ impl RealmCapabilityProvider {
     ) -> Result<(), fcomponent::Error> {
         let component = component.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
         let state = component.lock_resolved_state().await.map_err(|error| {
-            error!(%error, "failed to resolve InstanceState");
+            error!(error:%; "failed to resolve InstanceState");
             fcomponent::Error::Internal
         })?;
         let decl = state.decl();
@@ -313,7 +313,7 @@ impl RealmCapabilityProvider {
         fasync::Task::spawn(async move {
             if let Err(error) = Self::serve_child_iterator(children, stream, batch_size).await {
                 // TODO: Set an epitaph to indicate this was an unexpected error.
-                warn!(%error, "serve_child_iterator failed");
+                warn!(error:%; "serve_child_iterator failed");
             }
         })
         .detach();

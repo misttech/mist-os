@@ -5,7 +5,7 @@
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
 use futures::{StreamExt, TryStreamExt};
-use tracing::*;
+use log::*;
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fidl_test_components as ftest,
     fidl_fuchsia_io as fio, fuchsia_async as fasync,

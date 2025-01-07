@@ -62,8 +62,8 @@ impl Router<DirEntry> {
                     responder.send(router::route_from_fidl(&self, payload).await)?;
                 }
                 fsandbox::DirEntryRouterRequest::_UnknownMethod { ordinal, .. } => {
-                    tracing::warn!(
-                        %ordinal, "Received unknown DirEntryRouter request"
+                    log::warn!(
+                        ordinal:%; "Received unknown DirEntryRouter request"
                     );
                 }
             }

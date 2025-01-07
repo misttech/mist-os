@@ -28,7 +28,7 @@ rustc_test("reboot_on_terminate_test_bin") {
     "//src/sys/component_manager/tests/fidl:components_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   source_root = "src/integration_test.rs"
@@ -46,7 +46,7 @@ rustc_binary("reboot_on_terminate_success_bin") {
     "//src/lib/fuchsia-runtime",
     "//src/sys/component_manager/tests/fidl:components_rust",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   source_root = "src/reboot_on_terminate_success.rs"
@@ -68,7 +68,7 @@ rustc_binary("reboot_on_terminate_policy_bin") {
     "//src/sys/component_manager/tests/fidl:components_rust",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   source_root = "src/reboot_on_terminate_policy.rs"

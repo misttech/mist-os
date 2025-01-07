@@ -18,7 +18,7 @@ enum IncomingRequest {
 #[fuchsia::main(logging = false)]
 async fn main() -> Result<(), anyhow::Error> {
     let mut service_fs = ServiceFs::new_local();
-    tracing::info!("starting echo_server");
+    log::info!("starting echo_server");
 
     // Serve the Echo protocol
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Echo);
@@ -50,7 +50,7 @@ async fn handle_echo_request(mut stream: EchoRequestStream) {
         }
     };
 
-    tracing::info!("Setting default reply to {}", default_reply);
+    log::info!("Setting default reply to {}", default_reply);
 
     while let Some(event) = stream.try_next().await.expect("failed to serve echo service") {
         let EchoRequest::EchoString { value, responder } = event;
@@ -64,7 +64,7 @@ fn get_default_reply_from_file(filename: &str) -> Option<String> {
     match fs::read_to_string(filename) {
         Ok(content) => Some(content),
         Err(err) => {
-            tracing::info!("failed to read {} to string: {}", filename, err);
+            log::info!("failed to read {} to string: {}", filename, err);
             None
         }
     }

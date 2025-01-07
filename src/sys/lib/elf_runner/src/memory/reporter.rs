@@ -69,7 +69,7 @@ impl MemoryReporter {
                         control_handle,
                         ..
                     } => {
-                        tracing::error!("Invalid request to AttributionProvider: {ordinal}");
+                        log::error!("Invalid request to AttributionProvider: {ordinal}");
                         control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
                     }
                 }

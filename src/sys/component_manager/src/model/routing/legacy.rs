@@ -15,10 +15,10 @@ use cm_rust::{
 };
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
+use log::*;
 use router_error::Explain;
 use sandbox::{Capability, DirConnectable, DirConnector, DirEntry};
 use std::sync::Arc;
-use tracing::*;
 use vfs::directory::entry::{
     DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
 };

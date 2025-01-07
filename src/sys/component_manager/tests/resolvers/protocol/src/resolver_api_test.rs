@@ -13,9 +13,9 @@ use fuchsia_component::server;
 use fuchsia_component_test::{ChildOptions, LocalComponentHandles, RealmBuilder};
 use futures::channel::mpsc;
 use futures::prelude::*;
+use log::*;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
-use tracing::*;
 use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_resolution as fcresolution,
     fuchsia_async as fasync,

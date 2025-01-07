@@ -6,9 +6,9 @@ use crate::model::component::WeakComponentInstance;
 use crate::model::routing::{self};
 use ::routing::RouteRequest;
 use fidl_fuchsia_io as fio;
+use log::error;
 use router_error::Explain;
 use std::sync::Arc;
-use tracing::error;
 use vfs::directory::entry::{
     DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
 };

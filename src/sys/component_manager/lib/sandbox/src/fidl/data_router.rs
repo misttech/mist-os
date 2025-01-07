@@ -56,7 +56,7 @@ impl Router<Data> {
                     responder.send(router::route_from_fidl(&self, payload).await)?;
                 }
                 fsandbox::DataRouterRequest::_UnknownMethod { ordinal, .. } => {
-                    tracing::warn!(%ordinal, "Received unknown DataRouter request");
+                    log::warn!(ordinal:%; "Received unknown DataRouter request");
                 }
             }
         }

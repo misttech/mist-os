@@ -54,6 +54,7 @@ use {
         StreamExt,
     },
     hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+    log::warn,
     maplit::btreemap,
     moniker::{ChildName, ExtendedMoniker, Moniker},
     router_error::{DowncastErrorForTest, RouterError},
@@ -71,7 +72,6 @@ use {
         sync::{Arc, Weak},
         task::Poll,
     },
-    tracing::warn,
     vfs::{execution_scope::ExecutionScope, pseudo_directory, service},
     zx::{self as zx, AsHandleRef},
 };

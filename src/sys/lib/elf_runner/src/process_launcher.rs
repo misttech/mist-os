@@ -9,6 +9,7 @@ use fidl_connector::Connect;
 use fuchsia_runtime::{HandleInfo, HandleInfoError};
 use futures::prelude::*;
 use lazy_static::lazy_static;
+use log::warn;
 use process_builder::{
     BuiltProcess, NamespaceEntry, ProcessBuilder, ProcessBuilderError, StartupHandle,
 };
@@ -16,7 +17,6 @@ use std::ffi::CString;
 use std::fmt::Debug;
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::{error, info, warn};
 use zx::{self as zx, sys, AsHandleRef};
 use {fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 
@@ -262,24 +262,15 @@ fn log_launcher_error(err: &LauncherError, op: &str, job: Arc<zx::Job>, name: St
         .unwrap_or_else(|_| "<unknown>".to_string());
     let LogInfo { style, job_info, message } = describe_error(err, job.as_handle_ref().cast());
 
-    // Repeat ourselves slightly here because tracing does not support runtime levels in macros.
-    match style {
-        LogStyle::JobKilled => info!(
-            %op, process_name=%name, %job_koid, %job_info, error=%err,
-            "{}",
-            message,
-        ),
-        LogStyle::Warn => warn!(
-            %op, process_name=%name, %job_koid, %job_info, error=%err,
-            "{}",
-            message,
-        ),
-        LogStyle::Error => error!(
-            %op, process_name=%name, %job_koid, %job_info, error=%err,
-            "{}",
-            message,
-        ),
-    }
+    let level = match style {
+        LogStyle::JobKilled => log::Level::Info,
+        LogStyle::Warn => log::Level::Warn,
+        LogStyle::Error => log::Level::Error,
+    };
+    log::log!(level,
+        op:%, process_name:% = name, job_koid:%, job_info:%, error:% = err;
+        "{message}",
+    );
 }
 
 /// Describes the process launching error.
@@ -366,7 +357,7 @@ impl Connect for BuiltInConnector {
         fasync::Task::spawn(async move {
             let result = ProcessLauncher::serve(stream).await;
             if let Err(error) = result {
-                warn!(%error, "ProcessLauncher.serve failed");
+                warn!(error:%; "ProcessLauncher.serve failed");
             }
         })
         .detach();

@@ -12,12 +12,12 @@ use fidl::endpoints::Proxy;
 use futures::stream::Peekable;
 use futures::{stream, Stream, StreamExt};
 use hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType};
+use log::{error, warn};
 use measure_tape_for_events::Measurable;
 use moniker::{ExtendedMoniker, Moniker};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
-use tracing::{error, warn};
 use zx::sys::{ZX_CHANNEL_MAX_MSG_BYTES, ZX_CHANNEL_MAX_MSG_HANDLES};
 use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
@@ -224,7 +224,7 @@ impl EventFiller {
             *pending_event = Some(event);
             if self.events.len() == 0 {
                 error!(
-                    event_type = event_type.as_str(),
+                    event_type = event_type.as_str();
                     "Event exceeded the maximum channel size, dropping event"
                 );
             }
@@ -313,7 +313,7 @@ pub async fn serve_event_stream(
         match result {
             Ok(event_fidl_object) => Some(event_fidl_object),
             Err(error) => {
-                warn!(?error, "Failed to create event object");
+                warn!(error:?; "Failed to create event object");
                 None
             }
         }

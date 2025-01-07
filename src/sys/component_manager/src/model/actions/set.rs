@@ -137,7 +137,7 @@ impl ActionSet {
                     res
                 }
                 _ = timer => {
-                    tracing::warn!("action {:?} has been running for over 5 minutes on component {}", key, component.moniker);
+                    log::warn!("action {:?} has been running for over 5 minutes on component {}", key, component.moniker);
                     action_fut.await
                 }
             };

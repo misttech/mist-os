@@ -25,6 +25,7 @@ use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fidl::{endpoints, Vmo};
 use futures::channel::oneshot;
 use hooks::{EventPayload, RuntimeInfo};
+use log::warn;
 use moniker::Moniker;
 use router_error::RouterError;
 use routing::bedrock::request_metadata::runner_metadata;
@@ -33,7 +34,6 @@ use sandbox::{
 };
 use serve_processargs::NamespaceBuilder;
 use std::sync::Arc;
-use tracing::warn;
 use vfs::directory::entry::OpenRequest;
 use vfs::ToObjectRequest;
 use {
@@ -140,7 +140,7 @@ async fn do_start(
         .await
         .map_err(abort_error)?
         .map_err(|err| {
-            warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
+            warn!(moniker:% = component.moniker, err:%; "Failed to resolve runner.");
             err
         })?,
         None => None,
@@ -201,7 +201,7 @@ async fn do_start(
         match create_scoped_logger(logsink_decl.clone(), component, &program_input_dict).await {
             Ok(logger) => Some(logger),
             Err(err) => {
-                warn!(moniker = %component.moniker, %err, "Could not create logger for component. Logs will be attributed to component_manager");
+                warn!(moniker:% = component.moniker, err:%; "Could not create logger for component. Logs will be attributed to component_manager");
                 None
             }
         }

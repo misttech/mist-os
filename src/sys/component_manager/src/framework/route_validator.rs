@@ -21,12 +21,12 @@ use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use futures::future::join_all;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
+use log::warn;
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::{Explain, RouterError};
 use sandbox::{Capability, RouterResponse};
 use std::cmp::Ordering;
 use std::sync::{Arc, Weak};
-use tracing::warn;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_sys2 as fsys,
@@ -284,14 +284,14 @@ impl RouteValidatorCapabilityProvider {
                     fsys::RouteValidatorRequest::Validate { moniker, responder } => {
                         let result = Self::validate(&model, &self.scope_moniker, &moniker).await;
                         if let Err(e) = responder.send(result.as_deref().map_err(|e| *e)) {
-                            warn!(error = %e, "RouteValidator failed to send Validate response");
+                            warn!(error:% = e; "RouteValidator failed to send Validate response");
                         }
                     }
                     fsys::RouteValidatorRequest::Route { moniker, targets, responder } => {
                         let result =
                             Self::route(&model, &self.scope_moniker, &moniker, targets).await;
                         if let Err(e) = responder.send(result.as_deref().map_err(|e| *e)) {
-                            warn!(error = %e, "RouteValidator failed to send Route response");
+                            warn!(error:% = e; "RouteValidator failed to send Route response");
                         }
                     }
                 }
@@ -300,7 +300,7 @@ impl RouteValidatorCapabilityProvider {
         }
         .await;
         if let Err(e) = &res {
-            warn!(error = %e, "RouteValidator server failed");
+            warn!(error:% = e; "RouteValidator server failed");
         }
     }
 }

@@ -4,8 +4,8 @@
 
 use fidl::endpoints::{create_proxy, ServiceMarker};
 use fuchsia_component::client;
+use log::*;
 use std::collections::HashMap;
-use tracing::*;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_examples as fexamples, fidl_fuchsia_io as fio,

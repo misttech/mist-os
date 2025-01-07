@@ -8,7 +8,7 @@ use fuchsia_component_test::{
 };
 use futures::channel::mpsc;
 use futures::prelude::*;
-use tracing::*;
+use log::*;
 use {fidl_fidl_test_components as ftest, fuchsia_async as fasync};
 
 #[fuchsia::test]

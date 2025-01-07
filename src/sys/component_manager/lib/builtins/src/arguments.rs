@@ -11,11 +11,11 @@ use fuchsia_fs::node::OpenError;
 use fuchsia_zbi::{ZbiParser, ZbiResult, ZbiType};
 use futures::prelude::*;
 use lazy_static::lazy_static;
+use log::info;
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
 use std::env;
 use std::sync::Arc;
-use tracing::info;
 use zx_status::Status;
 use {fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio};
 
@@ -259,7 +259,7 @@ impl Arguments {
                         .map(|(k, v)| k.to_owned() + "=" + &v)
                         .collect();
                     if vec.len() > fboot::MAX_ARGS_VECTOR_LENGTH.into() {
-                        tracing::warn!(
+                        log::warn!(
                             "[Arguments] Collect results count {} exceeded maximum of {}",
                             vec.len(),
                             fboot::MAX_ARGS_VECTOR_LENGTH

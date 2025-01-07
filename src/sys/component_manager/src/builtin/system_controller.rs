@@ -10,10 +10,10 @@ use fidl_fuchsia_sys2::*;
 use fuchsia_async::{self as fasync};
 
 use futures::prelude::*;
+use log::*;
 use std::collections::VecDeque;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
-use tracing::*;
 
 const SHUTDOWN_WATCHDOG_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(15);
 
@@ -66,7 +66,7 @@ impl SystemController {
                     match responder.send() {
                         Ok(()) => {}
                         Err(e) => {
-                            warn!(%e, "Error sending response to shutdown requester. Shut down proceeding");
+                            warn!(e:%; "Error sending response to shutdown requester. Shut down proceeding");
                         }
                     }
                 }

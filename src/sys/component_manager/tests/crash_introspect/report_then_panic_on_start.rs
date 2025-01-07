@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_component::client as fclient;
-use tracing::*;
+use log::*;
 use zx::AsHandleRef;
 use {fidl_fuchsia_test as ftest, fuchsia_runtime as fruntime};
 

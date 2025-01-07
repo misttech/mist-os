@@ -11,9 +11,9 @@ use fuchsia_component::client;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route, ScopedInstance};
 use futures::channel::mpsc;
 use futures::{FutureExt, SinkExt, StreamExt};
+use log::*;
 use moniker::ChildName;
 use test_case::test_case;
-use tracing::*;
 use {
     fidl_fidl_test_components as ftest, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_examples as fecho, fidl_fuchsia_examples_services as fexamples,
@@ -361,7 +361,7 @@ async fn start_provider(branch: &ScopedInstance, child_moniker: &str) -> Result<
 
 /// Destroys a BankAccount provider component with the name `child_name`.
 async fn destroy_provider(branch: &ScopedInstance, child_moniker: &str) -> Result<(), Error> {
-    info!(%child_moniker, "destroying BankAccount provider");
+    info!(child_moniker:%; "destroying BankAccount provider");
 
     let lifecycle_controller_proxy =
         client::connect_to_protocol::<fsys2::LifecycleControllerMarker>()

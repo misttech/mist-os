@@ -6,7 +6,7 @@ use anyhow::{Context as _, Error};
 use fidl_fuchsia_examples::{EchoRequest, EchoRequestStream, EchoServiceRequest};
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use tracing::*;
+use log::*;
 
 async fn run_echo_server(
     mut stream: EchoRequestStream,

@@ -34,12 +34,12 @@ use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType, UtcClock};
 use futures::channel::oneshot;
 use futures::TryStreamExt;
+use log::warn;
 use moniker::Moniker;
 use runner::component::StopInfo;
 use runner::StartInfo;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::warn;
 use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
@@ -434,7 +434,7 @@ impl ElfRunner {
                 .on_timeout(MAX_WAIT_BREAK_ON_START, || Err(zx::Status::TIMED_OUT))
                 .await
                 .err()
-                .map(|error| warn!(%moniker, %error, "Failed to wait break_on_start"));
+                .map(|error| warn!(moniker:%, error:%; "Failed to wait break_on_start"));
         }
 
         // Launch the process.
@@ -562,7 +562,7 @@ impl ScopedElfRunner {
                         start(&runner, checker.clone(), start_info, controller).await;
                     }
                     fcrunner::ComponentRunnerRequest::_UnknownMethod { ordinal, .. } => {
-                        warn!(%ordinal, "Unknown ComponentRunner request");
+                        warn!(ordinal:%; "Unknown ComponentRunner request");
                     }
                 }
             }
@@ -637,7 +637,7 @@ async fn start(
             ..Default::default()
         })
         .map_err(|error| {
-            warn!(%error, "Failed to copy job for diagnostics");
+            warn!(error:%; "Failed to copy job for diagnostics");
             ()
         })
         .ok();
@@ -651,7 +651,7 @@ async fn start(
             fasync::OnSignals::new(&proc_copy.as_handle_ref(), zx::Signals::PROCESS_TERMINATED)
                 .await
                 .map(|_: fidl::Signals| ()) // Discard.
-                .unwrap_or_else(|error| warn!(%error, "error creating signal handler"));
+                .unwrap_or_else(|error| warn!(error:%; "error creating signal handler"));
             // Process exit code '0' is considered a clean return.
             // TODO(https://fxbug.dev/42134825) If we create an epitaph that indicates
             // intentional, non-zero exit, use that for all non-0 exit
@@ -668,14 +668,14 @@ async fn start(
                             Some(return_code),
                         ),
                         _ => {
-                            warn!(url=%resolved_url, %return_code,
+                            warn!(url:% = resolved_url, return_code:%;
                                 "process terminated with abnormal return code");
                             StopInfo::from_error(fcomp::Error::InstanceDied, Some(return_code))
                         }
                     }
                 }
                 Err(error) => {
-                    warn!(%error, "Unable to query process info");
+                    warn!(error:%; "Unable to query process info");
                     StopInfo::from_error(fcomp::Error::Internal, None)
                 }
             };
@@ -695,7 +695,7 @@ async fn start(
     fasync::Task::spawn(async move {
         if let Some(component_diagnostics) = component_diagnostics {
             control.send_on_publish_diagnostics(component_diagnostics).unwrap_or_else(
-                |error| warn!(url=%resolved_url, %error, "sending diagnostics failed"),
+                |error| warn!(url:% = resolved_url, error:%; "sending diagnostics failed"),
             );
         }
         runner::component::Controller::new(elf_component, server_stream, control)
@@ -1322,7 +1322,7 @@ mod tests {
             .try_next()
             .await
             .map(|_: Option<fcrunner::ComponentControllerEvent>| ()) // Discard.
-            .unwrap_or_else(|error| warn!(%error, "error reading from event stream"));
+            .unwrap_or_else(|error| warn!(error:%; "error reading from event stream"));
     }
 
     fn hello_world_startinfo_forward_stdout_to_log(

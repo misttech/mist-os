@@ -4,7 +4,7 @@
 
 use fidl_fidl_test_components as ftest;
 use fuchsia_component::client;
-use tracing::*;
+use log::*;
 
 #[fuchsia::main]
 async fn main() {

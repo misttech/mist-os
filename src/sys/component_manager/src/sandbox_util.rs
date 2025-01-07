@@ -18,11 +18,11 @@ use fidl::epitaph::ChannelEpitaphExt;
 use fidl::AsyncChannel;
 use futures::future::BoxFuture;
 use futures::FutureExt;
+use log::warn;
 use router_error::{Explain, RouterError};
 use sandbox::{Connectable, Connector, Message, Request, Routable, Router, RouterResponse};
 use std::fmt::Debug;
 use std::sync::Arc;
-use tracing::warn;
 use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
@@ -149,7 +149,7 @@ impl LaunchTaskOnReceive {
         let task_name = self.task_name.clone();
         self.task_group.spawn(async move {
             if let Err(error) = fut.await {
-                warn!(%error, "{} failed", task_name);
+                warn!(error:%; "{} failed", task_name);
             }
         });
     }
@@ -307,12 +307,14 @@ impl<T: Routable<Connector> + 'static> RoutableExt for T {
                                 // proper `report_routing_failure`, but that function requires a
                                 // legacy `RouteRequest` at the moment.
                                 target
-                                    .with_logger_as_default(|| {
-                                        warn!(
-                                        "Request was not available for target component `{}`: `{}`",
-                                        target.moniker, err
-                                    );
-                                    })
+                                    .log(
+                                        log::Level::Warn,
+                                        format!(
+                                            "Request was not available for target component `{}`: `{}`",
+                                            target.moniker, err
+                                        ),
+                                        &[]
+                                    )
                                     .await;
                                 return Err(err.as_zx_status());
                             }

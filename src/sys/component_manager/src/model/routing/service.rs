@@ -19,6 +19,7 @@ use futures::future::{join_all, BoxFuture};
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt;
 use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
+use log::{error, warn};
 use moniker::{ExtendedMoniker, Moniker};
 use router_error::Explain;
 use routing::capability_source::{
@@ -34,7 +35,6 @@ use routing::legacy_router::NoopVisitor;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Weak};
-use tracing::{error, warn};
 use vfs::directory::entry::{
     DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
 };
@@ -120,12 +120,14 @@ impl FilteredAggregateServiceDir {
                     Err(e) => {
                         if let (Ok(parent), Ok(target)) = (parent.upgrade(), target.upgrade()) {
                             target
-                                .with_logger_as_default(|| {
-                                    warn!(
-                                        parent=%parent.moniker, %e,
-                                        "Failed to route aggregate service instance",
-                                    );
-                                })
+                                .log(
+                                    log::Level::Warn,
+                                    "Failed to route aggregate service instance",
+                                    &[
+                                        &("parent", parent.moniker.to_string().as_str()),
+                                        &("e", format!("{e}").as_str()),
+                                    ],
+                                )
                                 .await;
                         }
                         return vec![];
@@ -413,9 +415,9 @@ impl AnonymizedAggregateServiceDir {
                     // Waits for the watcher to reach and idle event.
                     idle_receiver.await.map_err(|err| {
                         error!(
-                            component=%instance,
-                            service_name=%service_name,
-                            error=%err,
+                            component:% = instance,
+                            service_name:% = service_name,
+                            error:% = err;
                             "Failed to reach idle state on the service instance directory watcher.",
                         );
 
@@ -428,15 +430,16 @@ impl AnonymizedAggregateServiceDir {
             }
             Err(err) => {
                 parent
-                    .with_logger_as_default(|| {
-                        error!(
-                            component=%instance,
-                            service_name=%service_name,
-                            error=%err,
-                            "Failed to route service capability from component, skipping",
-                        );
-                    })
-                    .await
+                    .log(
+                        log::Level::Error,
+                        "Failed to route service capability from component, skipping",
+                        &[
+                            &("component", format!("{instance}").as_str()),
+                            &("service_name", service_name),
+                            &("error", format!("{err}").as_str()),
+                        ],
+                    )
+                    .await;
             }
         }
         Ok(())
@@ -457,8 +460,8 @@ impl AnonymizedAggregateServiceDir {
             // The CapabilitySource must be for a service capability.
             if source.type_name() != CapabilityTypeName::Service {
                 error!(
-                    component=%instance,
-                    service_name=%service_name,
+                    component:% = instance,
+                    service_name:% = service_name;
                     "The CapabilitySource has an invalid type: '{}'.", source.type_name()
                 );
                 return;
@@ -467,9 +470,9 @@ impl AnonymizedAggregateServiceDir {
             let result = self_clone.wait_for_service_directory(&instance, &source).await;
             if let Err(err) = result {
                 error!(
-                    component=%instance,
-                    service_name=%service_name,
-                    error=%err,
+                    component:% = instance,
+                    service_name:% = service_name,
+                    error:% = err;
                     "Failed to wait_for_service_directory.",
                 );
                 return;
@@ -485,9 +488,9 @@ impl AnonymizedAggregateServiceDir {
                 }
                 Err(err) => {
                     error!(
-                        component=%instance,
-                        service_name=%service_name,
-                        error=%err,
+                        component:% = instance,
+                        service_name:% = service_name,
+                        error:% = err;
                         "Failed to create_instance_watcher.",
                     );
                 }
@@ -530,9 +533,9 @@ impl AnonymizedAggregateServiceDir {
                     let watcher =
                         fuchsia_fs::directory::Watcher::new(&proxy).await.map_err(|err| {
                             error!(
-                                component=%instance,
-                                service_name=%self.route.service_name,
-                                error=%err,
+                                component:% = instance,
+                                service_name:% = self.route.service_name,
+                                error:% = err;
                                 "Failed to get the outgoing watcher for the path '{}'.",
                                 cur_path
                             );
@@ -607,9 +610,9 @@ impl AnonymizedAggregateServiceDir {
                         }
                         Err(StreamErrorType::StreamError(err)) => {
                             error!(
-                                component=%instance,
-                                service_name=%self.route.service_name,
-                                error=%err,
+                                component:% = instance,
+                                service_name:% = self.route.service_name,
+                                error:% = err;
                                 "Watcher in wait_for_service_directory ran into read error."
                             );
                         }
@@ -618,8 +621,8 @@ impl AnonymizedAggregateServiceDir {
                         }
                         Ok(()) => {
                             error!(
-                                component=%instance,
-                                service_name=%self.route.service_name,
+                                component:% = instance,
+                                service_name:% = self.route.service_name;
                                 "Watcher in wait_for_service_directory did not find the path piece before completing.",
                             );
                         }
@@ -669,9 +672,9 @@ impl AnonymizedAggregateServiceDir {
 
         fuchsia_fs::directory::Watcher::new(&proxy).await.map_err(|err| {
             error!(
-                component=%instance,
-                service_name=%self.route.service_name,
-                error=%err,
+                component:% = instance,
+                service_name:% = self.route.service_name,
+                error:% = err;
                 "Failed to create service instance directory watcher.",
             );
             ModelError::open_directory_error(target.moniker.clone(), instance.to_string())
@@ -741,9 +744,9 @@ impl AnonymizedAggregateServiceDir {
                         let result = inner.dir.add_node(&name, entry.clone());
                         if let Err(err) = result {
                             error!(
-                                component=%instance,
-                                service_name=%self.route.service_name,
-                                error=%err,
+                                component:% = instance,
+                                service_name:% = self.route.service_name,
+                                error:% = err;
                                 "Failed to add node to inner directory.",
                             );
                         }
@@ -762,9 +765,9 @@ impl AnonymizedAggregateServiceDir {
                                 let result = inner.dir.remove_node(&removed_entry.name);
                                 if let Err(err) = result {
                                     error!(
-                                        component=%instance,
-                                        service_name=%self.route.service_name,
-                                        error=%err,
+                                        component:% = instance,
+                                        service_name:% = self.route.service_name,
+                                        error:% = err;
                                         "Failed to remove node from inner directory.",
                                     );
                                 }
@@ -802,8 +805,8 @@ impl AnonymizedAggregateServiceDir {
             let fuchsia_fs::directory::WatcherStreamError::ChannelRead(status) = err;
             if status != zx::Status::PEER_CLOSED {
                 error!(
-                    component=%instance,
-                    service_name=%self.route.service_name,
+                    component:% = instance,
+                    service_name:% = self.route.service_name;
                     "Instance watcher stream closed with error {:?}.", status
                 );
             }
@@ -821,7 +824,7 @@ impl AnonymizedAggregateServiceDir {
             join_all(self.aggregate_capability_provider.list_instances().await?.iter().map(
                 |instance| async move {
                     self.add_entries_from_instance(&instance).await.map_err(|e| {
-                        error!(error=%e, instance=%instance, "error adding entries from instance");
+                        error!(error:% = e, instance:% = instance; "error adding entries from instance");
                         e
                     })
                 },
@@ -984,7 +987,7 @@ impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryE
         };
         let Ok(source_component) = source_component.upgrade() else {
             warn!(
-                moniker=%source_component.moniker,
+                moniker:% = source_component.moniker;
                 "source_component of aggregated service directory is gone"
             );
             return Err(zx::Status::NOT_FOUND);
@@ -996,14 +999,15 @@ impl<T: Send + Sync + 'static> DirectoryEntryAsync for ServiceInstanceDirectoryE
                 .map_err(|e| e.as_zx_status())?;
         if let Err(err) = cap_open_request.open().await {
             source_component
-                .with_logger_as_default(|| {
-                    error!(
-                        service_instance=%self.service_instance,
-                        source_instance=%source_component.moniker,
-                        error=%err,
-                        "Failed to open service instance from component",
-                    );
-                })
+                .log(
+                    log::Level::Error,
+                    "Failed to open service instance from component",
+                    &[
+                        &("service_instance", self.service_instance.as_str()),
+                        &("source_instance", format!("{}", source_component.moniker).as_str()),
+                        &("error", format!("{err}").as_str()),
+                    ],
+                )
                 .await;
             Err(err.as_zx_status())
         } else {

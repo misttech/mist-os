@@ -12,9 +12,9 @@ use crate::model::token::InstanceRegistry;
 use cm_config::RuntimeConfig;
 use cm_types::Url;
 use errors::ModelError;
+use log::warn;
 use routing::bedrock::structured_dict::ComponentInput;
 use std::sync::Arc;
-use tracing::warn;
 
 /// Parameters for initializing a component model, particularly the root of the component
 /// instance tree.

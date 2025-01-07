@@ -2,18 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::fmt::{Debug, Write};
+use std::fmt::Write;
 use std::os::fd::AsFd;
-use tracing::field::Field;
-use tracing::{Event, Level, Subscriber};
-use tracing_log::LogTracer;
-use tracing_subscriber::field::Visit;
-use tracing_subscriber::layer::Context;
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::{Layer, Registry};
+use std::sync::LazyLock;
 use zx::{self as zx, AsHandleRef, ObjectType};
 
-/// KernelLogger is a subscriber implementation for the tracing crate.
+static LOGGER: LazyLock<KernelLogger> = LazyLock::new(KernelLogger::new);
+
+/// KernelLogger is a subscriber implementation for the log crate.
 pub struct KernelLogger {
     debuglog: zx::DebugLog,
 }
@@ -26,37 +22,35 @@ impl KernelLogger {
         KernelLogger { debuglog: debuglog.into() }
     }
 
-    /// Initialize the global subscriber to use KernelLogger and installs a forwarder for
-    /// messages from the `log` crate.
+    /// Initialize the global logger to use KernelLogger.
     ///
     /// Registers a panic hook that prints the panic payload to the logger before running the
     /// default panic hook.
     pub fn init() {
-        let subscriber = Registry::default().with(Self::new());
-        tracing::subscriber::set_global_default(subscriber)
-            .expect("init() should only be called once");
-        LogTracer::init().expect("must be able to install log forwarder");
-
+        log::set_logger(&*LOGGER).expect("set logger must succeed");
+        log::set_max_level(log::LevelFilter::Info);
         let previous_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(move |info| {
-            tracing::error!("PANIC {}", info);
+            log::error!("PANIC {info}");
             previous_hook(info);
         }));
     }
 }
 
-impl<S: Subscriber> Layer<S> for KernelLogger {
-    fn on_event(&self, event: &Event<'_>, _cx: Context<'_, S>) {
-        // tracing levels run the opposite direction of fuchsia severity
-        let level = event.metadata().level();
-        if *level <= Level::INFO {
-            let mut visitor = StringVisitor("".to_string());
-            event.record(&mut visitor);
-            let mut msg_buffer = visitor.0;
+impl log::Log for KernelLogger {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        // log levels run the opposite direction of fuchsia severity
+        metadata.level() <= log::Level::Info
+    }
 
-            // msg always has a leading space
-            msg_buffer = msg_buffer.trim_start().to_string();
-            let msg_prefix = format!("[component_manager] {}: ", level);
+    fn log(&self, record: &log::Record<'_>) {
+        if self.enabled(record.metadata()) {
+            let msg_buffer = format!("{}", record.args());
+            let mut visitor = StringVisitor(msg_buffer);
+            let _ = record.key_values().visit(&mut visitor);
+            let msg_buffer = visitor.0;
+
+            let msg_prefix = format!("[component_manager] {}: ", record.level());
 
             // &str pointing to the remains of the message.
             let mut msg = msg_buffer.as_str();
@@ -98,45 +92,31 @@ impl<S: Subscriber> Layer<S> for KernelLogger {
             }
         }
     }
+
+    fn flush(&self) {}
 }
 
 struct StringVisitor(String);
 
-impl StringVisitor {
-    fn record_field(&mut self, field: &Field, value: std::fmt::Arguments<'_>) {
-        match field.name() {
-            "log.target" | "log.module_path" | "log.file" | "log.line" => {
-                // don't write these fields to the klog
-                return;
-            }
-            "message" => self.0.push(' '),
-            name => {
-                write!(self.0, " {name}=").expect("writing into strings does not fail");
-            }
-        }
-        write!(self.0, "{}", value).expect("writing into strings does not fail");
+impl log::kv::VisitSource<'_> for StringVisitor {
+    fn visit_pair(
+        &mut self,
+        key: log::kv::Key<'_>,
+        value: log::kv::Value<'_>,
+    ) -> Result<(), log::kv::Error> {
+        value.visit(StringValueVisitor { buf: &mut self.0, key: key.as_str() })
     }
 }
 
-impl Visit for StringVisitor {
-    fn record_debug(&mut self, field: &Field, value: &dyn Debug) {
-        self.record_field(field, format_args!("{value:?}"));
-    }
+struct StringValueVisitor<'a> {
+    buf: &'a mut String,
+    key: &'a str,
+}
 
-    fn record_str(&mut self, field: &Field, value: &str) {
-        self.record_field(field, format_args!("{value}"));
-    }
-
-    fn record_i64(&mut self, field: &Field, value: i64) {
-        self.record_field(field, format_args!("{value}"));
-    }
-
-    fn record_u64(&mut self, field: &Field, value: u64) {
-        self.record_field(field, format_args!("{value}"));
-    }
-
-    fn record_bool(&mut self, field: &Field, value: bool) {
-        self.record_field(field, format_args!("{value}"));
+impl log::kv::VisitValue<'_> for StringValueVisitor<'_> {
+    fn visit_any(&mut self, value: log::kv::Value<'_>) -> Result<(), log::kv::Error> {
+        write!(self.buf, " {}={}", self.key, value).expect("writing into strings does not fail");
+        Ok(())
     }
 }
 
@@ -146,9 +126,9 @@ mod tests {
     use anyhow::Context;
     use fidl_fuchsia_boot as fboot;
     use fuchsia_component::client::connect_channel_to_protocol;
+    use log::{error, info, warn};
     use rand::Rng;
     use std::panic;
-    use tracing::{error, info, warn};
     use zx::HandleBased;
 
     const MAX_INFO_LINE_LEN: usize =

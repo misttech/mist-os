@@ -10,9 +10,9 @@ use cm_types::Name;
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, ServerEnd};
 use futures::StreamExt;
 use lazy_static::lazy_static;
+use log::warn;
 use moniker::Moniker;
 use routing::capability_source::InternalCapability;
-use tracing::warn;
 use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_sys2 as fsys};
 
 use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
@@ -57,7 +57,7 @@ impl ConfigOverride {
                 }
             };
             if let Err(error) = result {
-                warn!(?error, "Could not respond to ConfigOverride request");
+                warn!(error:?; "Could not respond to ConfigOverride request");
                 break;
             }
         }

@@ -11,10 +11,10 @@ use fidl::endpoints::{self, DiscoverableProtocolMarker, ServerEnd};
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::prelude::*;
 use lazy_static::lazy_static;
+use log::warn;
 use namespace::NamespaceError;
 use sandbox::Capability;
 use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
-use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
@@ -36,7 +36,7 @@ impl InternalCapabilityProvider for NamespaceCapabilityProvider {
         let serve_result = self.serve(server_end.into_stream()).await;
         if let Err(error) = serve_result {
             // TODO: Set an epitaph to indicate this was an unexpected error.
-            warn!(%error, "serve failed");
+            warn!(error:%; "serve failed");
         }
     }
 }
@@ -64,7 +64,7 @@ impl NamespaceCapabilityProvider {
                 // If the error was PEER_CLOSED then we don't need to log it as a client can
                 // disconnect while we are processing its request.
                 Err(error) if !error.is_closed() => {
-                    warn!(%method_name, %error, "Couldn't send Namespace response");
+                    warn!(method_name:%, error:%; "Couldn't send Namespace response");
                 }
                 _ => {}
             }
@@ -83,7 +83,7 @@ impl NamespaceCapabilityProvider {
                 responder.send(res)?;
             }
             fcomponent::NamespaceRequest::_UnknownMethod { ordinal, .. } => {
-                warn!(%ordinal, "fuchsia.component/Namespace received unknown method");
+                warn!(ordinal:%; "fuchsia.component/Namespace received unknown method");
             }
         }
         Ok(())
