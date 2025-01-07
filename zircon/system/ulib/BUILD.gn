@@ -18,9 +18,6 @@ group("tests") {
   deps = [
     "abs_clock:tests",
     "affine:tests",
-    "async:tests",
-    "async-loop:tests",
-    "async-testing:tests",
     "bitmap:tests",
     "c:tests",
     "closure-queue:tests",
