@@ -284,14 +284,6 @@ if (current_toolchain == default_toolchain) {
     ]
   }
 
-  source_set("linuxboot.h") {
-    public = [ "linuxboot.h" ]
-    public_deps = [
-      # linuxboot.h has #include <lib/zircon-internal/e820.h>
-      "//zircon/system/ulib/zircon-internal:headers",
-    ]
-  }
-
   config("ikconfig.config") {
     visibility = [
       ":linuxboot",
@@ -412,6 +404,14 @@ hwreg_asm_header("phys32.h") {
     "LIB_ARCH_PRINTERS",
   ]
   deps = [ "//zircon/kernel/lib/arch" ]
+}
+
+source_set("linuxboot.h") {
+  public = [ "linuxboot.h" ]
+  public_deps = [
+    # linuxboot.h has #include <lib/zircon-internal/e820.h>
+    "//zircon/system/ulib/zircon-internal:headers",
+  ]
 }
 
 hwreg_asm_header("linuxboot-asm") {
