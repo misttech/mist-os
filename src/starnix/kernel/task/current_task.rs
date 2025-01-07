@@ -1407,7 +1407,7 @@ impl CurrentTask {
         let builder = Self::create_task(
             locked,
             kernel,
-            CString::new("[kthreadd]").unwrap(),
+            CString::new("kthreadd").unwrap(),
             fs,
             |locked, pid, process_group| {
                 let process = zx::Process::from(zx::Handle::invalid());

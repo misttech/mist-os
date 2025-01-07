@@ -164,11 +164,7 @@ where
         let Some(system_task) = system_task.upgrade() else {
             return error!(ESRCH);
         };
-        CurrentTask::create_kernel_thread(
-            locked,
-            &system_task,
-            CString::new("[kthreadd]").unwrap(),
-        )?
+        CurrentTask::create_kernel_thread(locked, &system_task, CString::new("kthreadd").unwrap())?
     };
     let result = f(locked, &current_task);
     current_task.release(locked);
