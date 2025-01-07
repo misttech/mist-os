@@ -116,26 +116,13 @@ void RelocateElfKernel(ElfImage& elf_kernel) {
   // call should be reframed into machinery that updates PhysHandoff as well.
   AddressSpace::PanicIfError(elf_kernel.MapInto(*gAddressSpace));
 
-  // For now we're loading an ELF kernel in physical address mode at an
-  // arbitrary load address, even though it's been relocated for its final
-  // virtual address.  The kernel's entry point is expected to be purely
-  // position independent long enough to switch to virtual addressing.
-  //
-  // NOTE: For real handoff with virtual addresses, this will need some inline
-  // asm to switch stacks and such. For interim hack kernels doing physical
-  // address mode handoff, they can either use the phys stack momentarily
-  // or have asm entry code that sets up its own stack.
-  elf_kernel.set_load_address(elf_kernel.physical_load_address());
   debugf("%s: Ready to hand off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
          gSymbolize->name(), elf_kernel.load_address(), elf_kernel.entry());
   if (gBootOptions->phys_verbose) {
     Allocation::GetPool().PrintMemoryRanges(gSymbolize->name());
   }
 
-  auto start_elf_kernel = [&elf_kernel](PhysHandoff* handoff) {
-    elf_kernel.Handoff<void(PhysHandoff*)>(handoff);
-  };
-  prep.DoHandoff(uart, kernel_storage.zbi().storage(), package, patch_info, start_elf_kernel);
+  prep.DoHandoff(elf_kernel, uart, kernel_storage.zbi().storage(), package, patch_info);
 }
 
 }  // namespace
