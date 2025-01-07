@@ -132,7 +132,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
@@ -240,7 +239,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Basic",
             "nullable": false,
@@ -272,7 +270,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Basic",
             "nullable": false,
@@ -288,7 +285,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Basic",
             "nullable": false,
@@ -320,7 +316,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Protocol_ErrorBasic_Result",
             "nullable": false,
@@ -337,7 +332,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Basic",
             "nullable": false,
@@ -352,7 +346,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -381,7 +374,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Basic",
             "nullable": false,
@@ -412,7 +404,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Compound",
             "nullable": false,
@@ -444,7 +435,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Compound",
             "nullable": false,
@@ -460,7 +450,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Compound",
             "nullable": false,
@@ -492,7 +481,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Protocol_ErrorCompound_Result",
             "nullable": false,
@@ -509,7 +497,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Compound",
             "nullable": false,
@@ -524,7 +511,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -553,7 +539,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Compound",
             "nullable": false,
@@ -584,7 +569,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayBasic",
             "nullable": false,
@@ -616,7 +600,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayBasic",
             "nullable": false,
@@ -632,7 +615,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayBasic",
             "nullable": false,
@@ -664,7 +646,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Protocol_ErrorArrayBasic_Result",
             "nullable": false,
@@ -681,7 +662,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayBasic",
             "nullable": false,
@@ -696,7 +676,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -725,7 +704,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayBasic",
             "nullable": false,
@@ -756,7 +734,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayCompound",
             "nullable": false,
@@ -788,7 +765,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayCompound",
             "nullable": false,
@@ -804,7 +780,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayCompound",
             "nullable": false,
@@ -836,7 +811,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Protocol_ErrorArrayCompound_Result",
             "nullable": false,
@@ -853,7 +827,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayCompound",
             "nullable": false,
@@ -868,7 +841,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -897,7 +869,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayCompound",
             "nullable": false,
@@ -928,7 +899,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorBasic",
             "nullable": false,
@@ -960,7 +930,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorBasic",
             "nullable": false,
@@ -976,7 +945,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorBasic",
             "nullable": false,
@@ -1008,7 +976,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Protocol_ErrorVectorBasic_Result",
             "nullable": false,
@@ -1025,7 +992,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorBasic",
             "nullable": false,
@@ -1040,7 +1006,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1069,7 +1034,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorBasic",
             "nullable": false,
@@ -1100,7 +1064,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorCompound",
             "nullable": false,
@@ -1132,7 +1095,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorCompound",
             "nullable": false,
@@ -1148,7 +1110,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorCompound",
             "nullable": false,
@@ -1180,7 +1141,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Protocol_ErrorVectorCompound_Result",
             "nullable": false,
@@ -1197,7 +1157,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorCompound",
             "nullable": false,
@@ -1212,7 +1171,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1241,7 +1199,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorCompound",
             "nullable": false,
@@ -1272,7 +1229,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorOptional",
             "nullable": false,
@@ -1304,7 +1260,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorOptional",
             "nullable": false,
@@ -1320,7 +1275,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorOptional",
             "nullable": false,
@@ -1352,7 +1306,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Protocol_ErrorVectorOptional_Result",
             "nullable": false,
@@ -1369,7 +1322,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorOptional",
             "nullable": false,
@@ -1384,7 +1336,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1413,7 +1364,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorOptional",
             "nullable": false,
@@ -1444,7 +1394,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayVectorNested",
             "nullable": false,
@@ -1476,7 +1425,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayVectorNested",
             "nullable": false,
@@ -1492,7 +1440,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayVectorNested",
             "nullable": false,
@@ -1524,7 +1471,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Protocol_ErrorArrayVectorNested_Result",
             "nullable": false,
@@ -1541,7 +1487,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayVectorNested",
             "nullable": false,
@@ -1556,7 +1501,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1585,7 +1529,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayVectorNested",
             "nullable": false,
@@ -1616,7 +1559,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Resource",
             "nullable": false,
@@ -1648,7 +1590,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Resource",
             "nullable": false,
@@ -1664,7 +1605,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Resource",
             "nullable": false,
@@ -1696,7 +1636,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Protocol_ErrorResource_Result",
             "nullable": false,
@@ -1713,7 +1652,6 @@
           "is_composed": false,
           "has_error": true,
           "maybe_response_success_type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Resource",
             "nullable": false,
@@ -1728,7 +1666,6 @@
             }
           },
           "maybe_response_err_type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -1757,7 +1694,6 @@
           "has_request": false,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Resource",
             "nullable": false,
@@ -1794,10 +1730,8 @@
       "members": [
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint8",
               "type_shape_v2": {
@@ -1836,10 +1770,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint16",
               "type_shape_v2": {
@@ -1878,10 +1810,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint32",
               "type_shape_v2": {
@@ -1920,10 +1850,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint64",
               "type_shape_v2": {
@@ -1962,10 +1890,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int8",
               "type_shape_v2": {
@@ -2004,10 +1930,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int16",
               "type_shape_v2": {
@@ -2046,10 +1970,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int32",
               "type_shape_v2": {
@@ -2088,10 +2010,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int64",
               "type_shape_v2": {
@@ -2130,10 +2050,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "float32",
               "type_shape_v2": {
@@ -2172,10 +2090,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "float64",
               "type_shape_v2": {
@@ -2214,10 +2130,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "string",
               "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
@@ -2256,10 +2170,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "string",
               "kind_v2": "string",
               "nullable": true,
               "type_shape_v2": {
@@ -2324,10 +2236,8 @@
       "members": [
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Bits",
               "nullable": false,
@@ -2367,10 +2277,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Enum",
               "nullable": false,
@@ -2410,10 +2318,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Struct",
               "nullable": false,
@@ -2453,10 +2359,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Table",
               "nullable": false,
@@ -2496,10 +2400,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Union",
               "nullable": false,
@@ -2539,10 +2441,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Struct",
               "nullable": true,
@@ -2582,10 +2482,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Union",
               "nullable": true,
@@ -2651,13 +2549,10 @@
       "members": [
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "array",
               "kind_v2": "array",
               "element_type": {
-                "kind": "primitive",
                 "kind_v2": "primitive",
                 "subtype": "uint8",
                 "type_shape_v2": {
@@ -2707,13 +2602,10 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "vector",
               "kind_v2": "vector",
               "element_type": {
-                "kind": "primitive",
                 "kind_v2": "primitive",
                 "subtype": "uint8",
                 "type_shape_v2": {
@@ -2763,13 +2655,10 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "array",
               "kind_v2": "array",
               "element_type": {
-                "kind": "primitive",
                 "kind_v2": "primitive",
                 "subtype": "uint8",
                 "type_shape_v2": {
@@ -2819,13 +2708,10 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "vector",
               "kind_v2": "vector",
               "element_type": {
-                "kind": "primitive",
                 "kind_v2": "primitive",
                 "subtype": "uint8",
                 "type_shape_v2": {
@@ -2901,7 +2787,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint8",
             "type_shape_v2": {
@@ -2929,7 +2814,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint16",
             "type_shape_v2": {
@@ -2957,7 +2841,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -2985,7 +2868,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint64",
             "type_shape_v2": {
@@ -3013,7 +2895,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int8",
             "type_shape_v2": {
@@ -3041,7 +2922,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int16",
             "type_shape_v2": {
@@ -3069,7 +2949,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -3097,7 +2976,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
@@ -3125,7 +3003,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "float32",
             "type_shape_v2": {
@@ -3153,7 +3030,6 @@
         },
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "float64",
             "type_shape_v2": {
@@ -3181,7 +3057,6 @@
         },
         {
           "type": {
-            "kind": "string",
             "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
@@ -3209,7 +3084,6 @@
         },
         {
           "type": {
-            "kind": "string",
             "kind_v2": "string",
             "nullable": true,
             "type_shape_v2": {
@@ -3263,7 +3137,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Bits",
             "nullable": false,
@@ -3292,7 +3165,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Enum",
             "nullable": false,
@@ -3321,7 +3193,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Struct",
             "nullable": false,
@@ -3350,7 +3221,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Table",
             "nullable": false,
@@ -3379,7 +3249,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Union",
             "nullable": false,
@@ -3408,7 +3277,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Struct",
             "nullable": true,
@@ -3437,7 +3305,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Union",
             "nullable": true,
@@ -3492,7 +3359,6 @@
       "members": [
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 0,
             "subtype": "handle",
@@ -3524,7 +3390,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
@@ -3556,13 +3421,11 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.typesinprotocols/Protocol",
             "nullable": false,
             "protocol_transport": "Channel",
-            "identifier": "test.typesinprotocols/Protocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -3588,13 +3451,11 @@
         },
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.typesinprotocols/Protocol",
             "nullable": false,
             "protocol_transport": "Channel",
-            "subtype": "test.typesinprotocols/Protocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -3620,7 +3481,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ResourceStruct",
             "nullable": false,
@@ -3649,7 +3509,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ResourceTable",
             "nullable": false,
@@ -3678,7 +3537,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ResourceUnion",
             "nullable": false,
@@ -3707,7 +3565,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 0,
             "subtype": "handle",
@@ -3739,7 +3596,6 @@
         },
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
@@ -3771,13 +3627,11 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.typesinprotocols/Protocol",
             "nullable": true,
             "protocol_transport": "Channel",
-            "identifier": "test.typesinprotocols/Protocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -3803,13 +3657,11 @@
         },
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.typesinprotocols/Protocol",
             "nullable": true,
             "protocol_transport": "Channel",
-            "subtype": "test.typesinprotocols/Protocol",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -3835,7 +3687,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ResourceStruct",
             "nullable": true,
@@ -3864,7 +3715,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ResourceUnion",
             "nullable": true,
@@ -3893,10 +3743,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "handle",
               "kind_v2": "handle",
               "obj_type": 0,
               "subtype": "handle",
@@ -3939,10 +3787,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "handle",
               "kind_v2": "handle",
               "obj_type": 3,
               "subtype": "vmo",
@@ -3985,16 +3831,13 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "endpoint",
               "role": "client",
               "protocol": "test.typesinprotocols/Protocol",
               "nullable": false,
               "protocol_transport": "Channel",
-              "identifier": "test.typesinprotocols/Protocol",
               "type_shape_v2": {
                 "inline_size": 4,
                 "alignment": 4,
@@ -4031,16 +3874,13 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "request",
               "kind_v2": "endpoint",
               "role": "server",
               "protocol": "test.typesinprotocols/Protocol",
               "nullable": false,
               "protocol_transport": "Channel",
-              "subtype": "test.typesinprotocols/Protocol",
               "type_shape_v2": {
                 "inline_size": 4,
                 "alignment": 4,
@@ -4077,10 +3917,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/ResourceStruct",
               "nullable": false,
@@ -4120,10 +3958,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/ResourceTable",
               "nullable": false,
@@ -4163,10 +3999,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/ResourceUnion",
               "nullable": false,
@@ -4206,10 +4040,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "handle",
               "kind_v2": "handle",
               "obj_type": 0,
               "subtype": "handle",
@@ -4252,10 +4084,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "handle",
               "kind_v2": "handle",
               "obj_type": 3,
               "subtype": "vmo",
@@ -4298,16 +4128,13 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "endpoint",
               "role": "client",
               "protocol": "test.typesinprotocols/Protocol",
               "nullable": false,
               "protocol_transport": "Channel",
-              "identifier": "test.typesinprotocols/Protocol",
               "type_shape_v2": {
                 "inline_size": 4,
                 "alignment": 4,
@@ -4344,16 +4171,13 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "request",
               "kind_v2": "endpoint",
               "role": "server",
               "protocol": "test.typesinprotocols/Protocol",
               "nullable": false,
               "protocol_transport": "Channel",
-              "subtype": "test.typesinprotocols/Protocol",
               "type_shape_v2": {
                 "inline_size": 4,
                 "alignment": 4,
@@ -4390,10 +4214,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/ResourceStruct",
               "nullable": false,
@@ -4433,10 +4255,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/ResourceTable",
               "nullable": false,
@@ -4476,10 +4296,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/ResourceUnion",
               "nullable": false,
@@ -4595,10 +4413,8 @@
       "members": [
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint8",
               "type_shape_v2": {
@@ -4637,10 +4453,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint16",
               "type_shape_v2": {
@@ -4679,10 +4493,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint32",
               "type_shape_v2": {
@@ -4721,10 +4533,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint64",
               "type_shape_v2": {
@@ -4763,10 +4573,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int8",
               "type_shape_v2": {
@@ -4805,10 +4613,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int16",
               "type_shape_v2": {
@@ -4847,10 +4653,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int32",
               "type_shape_v2": {
@@ -4889,10 +4693,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "int64",
               "type_shape_v2": {
@@ -4931,10 +4733,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "float32",
               "type_shape_v2": {
@@ -4973,10 +4773,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "float64",
               "type_shape_v2": {
@@ -5015,10 +4813,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "string",
               "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
@@ -5057,10 +4853,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "string",
               "kind_v2": "string",
               "nullable": true,
               "type_shape_v2": {
@@ -5125,10 +4919,8 @@
       "members": [
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Bits",
               "nullable": false,
@@ -5168,10 +4960,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Enum",
               "nullable": false,
@@ -5211,10 +5001,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Struct",
               "nullable": false,
@@ -5254,10 +5042,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Table",
               "nullable": false,
@@ -5297,10 +5083,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Union",
               "nullable": false,
@@ -5340,10 +5124,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Struct",
               "nullable": true,
@@ -5383,10 +5165,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Union",
               "nullable": true,
@@ -5452,10 +5232,8 @@
       "members": [
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint8",
               "type_shape_v2": {
@@ -5494,10 +5272,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "string",
               "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
@@ -5536,10 +5312,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Struct",
               "nullable": false,
@@ -5612,10 +5386,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "identifier",
               "kind_v2": "identifier",
               "identifier": "test.typesinprotocols/Struct",
               "nullable": true,
@@ -5740,7 +5512,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayBasic",
             "nullable": false,
@@ -5766,7 +5537,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -5820,7 +5590,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayCompound",
             "nullable": false,
@@ -5846,7 +5615,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -5900,7 +5668,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/ArrayVectorNested",
             "nullable": false,
@@ -5926,7 +5693,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -5980,7 +5746,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Basic",
             "nullable": false,
@@ -6006,7 +5771,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -6060,7 +5824,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Compound",
             "nullable": false,
@@ -6086,7 +5849,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -6140,7 +5902,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/Resource",
             "nullable": false,
@@ -6166,7 +5927,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -6220,7 +5980,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorBasic",
             "nullable": false,
@@ -6246,7 +6005,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -6300,7 +6058,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorCompound",
             "nullable": false,
@@ -6326,7 +6083,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -6380,7 +6136,6 @@
           "ordinal": 1,
           "name": "response",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.typesinprotocols/VectorOptional",
             "nullable": false,
@@ -6406,7 +6161,6 @@
           "ordinal": 2,
           "name": "err",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -6458,7 +6212,6 @@
           "ordinal": 1,
           "name": "b",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
@@ -6510,7 +6263,6 @@
           "ordinal": 1,
           "name": "b",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {

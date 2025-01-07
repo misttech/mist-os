@@ -88,7 +88,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.inheritance/SuperFooRequest",
             "nullable": false,
@@ -104,7 +103,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.inheritance/SuperFooResponse",
             "nullable": false,
@@ -149,7 +147,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.inheritance/SuperFooRequest",
             "nullable": false,
@@ -165,7 +162,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.inheritance/SuperFooResponse",
             "nullable": false,
@@ -204,7 +200,6 @@
       "members": [
         {
           "type": {
-            "kind": "string",
             "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
@@ -260,7 +255,6 @@
       "members": [
         {
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {

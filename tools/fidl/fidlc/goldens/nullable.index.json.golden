@@ -626,7 +626,7 @@
             "end_offset": 472
           },
           "type": {
-            "kind": "identifier"
+            "kind": "endpoint"
           }
         }
       ]
@@ -652,7 +652,7 @@
             "end_offset": 574
           },
           "type": {
-            "kind": "request"
+            "kind": "endpoint"
           }
         }
       ]

@@ -103,7 +103,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.dependent/MyBits",
         "nullable": false,
@@ -167,7 +166,6 @@
         }
       ],
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint8",
         "type_shape_v2": {
@@ -197,7 +195,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "identifier",
         "kind_v2": "identifier",
         "identifier": "test.dependent/MyEnum",
         "nullable": false,
@@ -261,7 +258,6 @@
         }
       ],
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint8",
         "type_shape_v2": {

@@ -44,7 +44,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleRequest",
             "nullable": false,
@@ -60,7 +59,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/ProtocolRequestStrictResponseFlexibleResponse",
             "nullable": false,
@@ -91,7 +89,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictRequest",
             "nullable": false,
@@ -107,7 +104,6 @@
           },
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/ProtocolRequestFlexibleResponseStrictResponse",
             "nullable": false,
@@ -146,7 +142,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/FlexibleFoo",
             "nullable": false,
@@ -203,7 +198,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/StrictFoo",
             "nullable": false,
@@ -260,7 +254,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/StrictFoo",
             "nullable": false,
@@ -317,7 +310,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.requestflexibleenvelope/FlexibleFoo",
             "nullable": false,
@@ -378,7 +370,6 @@
           "ordinal": 1,
           "name": "s",
           "type": {
-            "kind": "string",
             "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
@@ -403,7 +394,6 @@
           "ordinal": 2,
           "name": "i",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -455,7 +445,6 @@
           "ordinal": 1,
           "name": "s",
           "type": {
-            "kind": "string",
             "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
@@ -480,7 +469,6 @@
           "ordinal": 2,
           "name": "i",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {

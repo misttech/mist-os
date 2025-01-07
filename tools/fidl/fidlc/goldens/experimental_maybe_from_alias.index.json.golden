@@ -207,7 +207,7 @@
             "end_offset": 782
           },
           "type": {
-            "kind": "request"
+            "kind": "endpoint"
           }
         },
         {

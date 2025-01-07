@@ -35,10 +35,8 @@
       "members": [
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint8",
               "type_shape_v2": {
@@ -77,13 +75,10 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "vector",
               "kind_v2": "vector",
               "element_type": {
-                "kind": "primitive",
                 "kind_v2": "primitive",
                 "subtype": "bool",
                 "type_shape_v2": {

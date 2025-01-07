@@ -36,7 +36,6 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.overlay/Overlay",
             "nullable": false,
@@ -91,7 +90,6 @@
       "members": [
         {
           "type": {
-            "kind": "string",
             "kind_v2": "string",
             "maybe_element_count": 16,
             "nullable": false,
@@ -146,10 +144,8 @@
       "members": [
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "string",
               "kind_v2": "string",
               "maybe_element_count": 16,
               "nullable": false,
@@ -222,7 +218,6 @@
           "ordinal": 1,
           "name": "Primitive",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int32",
             "type_shape_v2": {
@@ -247,7 +242,6 @@
           "ordinal": 2,
           "name": "StringNeedsConstructor",
           "type": {
-            "kind": "string",
             "kind_v2": "string",
             "nullable": false,
             "type_shape_v2": {
@@ -272,10 +266,8 @@
           "ordinal": 3,
           "name": "VectorStringAlsoNeedsConstructor",
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "string",
               "kind_v2": "string",
               "nullable": false,
               "type_shape_v2": {
@@ -349,7 +341,6 @@
           "ordinal": 1,
           "name": "x",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "int64",
             "type_shape_v2": {
@@ -386,7 +377,6 @@
           "ordinal": 2,
           "name": "y",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "float64",
             "type_shape_v2": {
@@ -449,7 +439,6 @@
           "ordinal": 1,
           "name": "pizza",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.overlay/Pizza",
             "nullable": false,
@@ -475,7 +464,6 @@
           "ordinal": 2,
           "name": "pasta",
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.overlay/Pasta",
             "nullable": false,
@@ -527,7 +515,6 @@
           "ordinal": 1,
           "name": "first",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {
@@ -552,7 +539,6 @@
           "ordinal": 2,
           "name": "second",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "uint32",
             "type_shape_v2": {

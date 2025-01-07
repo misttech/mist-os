@@ -85,7 +85,6 @@
       },
       "deprecated": false,
       "type": {
-        "kind": "primitive",
         "kind_v2": "primitive",
         "subtype": "uint32",
         "type_shape_v2": {
@@ -109,7 +108,6 @@
           },
           "deprecated": false,
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.handlesintypes/obj_type",
             "nullable": false,
@@ -170,7 +168,6 @@
       "members": [
         {
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
@@ -202,10 +199,8 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "handle",
               "kind_v2": "handle",
               "obj_type": 3,
               "subtype": "vmo",
@@ -248,10 +243,8 @@
         },
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "handle",
               "kind_v2": "handle",
               "obj_type": 3,
               "subtype": "vmo",
@@ -294,13 +287,10 @@
         },
         {
           "type": {
-            "kind": "vector",
             "kind_v2": "vector",
             "element_type": {
-              "kind": "array",
               "kind_v2": "array",
               "element_type": {
-                "kind": "handle",
                 "kind_v2": "handle",
                 "obj_type": 3,
                 "subtype": "vmo",
@@ -354,7 +344,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.handlesintypes/TableWithHandle",
             "nullable": false,
@@ -383,7 +372,6 @@
         },
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.handlesintypes/UnionWithHandle",
             "nullable": false,
@@ -467,7 +455,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",
@@ -584,7 +571,6 @@
           "ordinal": 1,
           "name": "h",
           "type": {
-            "kind": "handle",
             "kind_v2": "handle",
             "obj_type": 3,
             "subtype": "vmo",

@@ -58,7 +58,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolrequest/ParentGetChildResponse",
             "nullable": false,
@@ -90,7 +89,6 @@
           "has_request": true,
           "has_response": true,
           "maybe_response_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolrequest/ParentGetChildRequestResponse",
             "nullable": false,
@@ -121,7 +119,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolrequest/ParentTakeChildRequest",
             "nullable": false,
@@ -153,7 +150,6 @@
           "deprecated": false,
           "has_request": true,
           "maybe_request_payload": {
-            "kind": "identifier",
             "kind_v2": "identifier",
             "identifier": "test.protocolrequest/ParentTakeChildRequestRequest",
             "nullable": false,
@@ -193,13 +189,11 @@
       "members": [
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.protocolrequest/Child",
             "nullable": false,
             "protocol_transport": "Channel",
-            "subtype": "test.protocolrequest/Child",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -253,13 +247,11 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.protocolrequest/Child",
             "nullable": false,
             "protocol_transport": "Channel",
-            "identifier": "test.protocolrequest/Child",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -313,13 +305,11 @@
       "members": [
         {
           "type": {
-            "kind": "identifier",
             "kind_v2": "endpoint",
             "role": "client",
             "protocol": "test.protocolrequest/Child",
             "nullable": false,
             "protocol_transport": "Channel",
-            "identifier": "test.protocolrequest/Child",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -373,13 +363,11 @@
       "members": [
         {
           "type": {
-            "kind": "request",
             "kind_v2": "endpoint",
             "role": "server",
             "protocol": "test.protocolrequest/Child",
             "nullable": false,
             "protocol_transport": "Channel",
-            "subtype": "test.protocolrequest/Child",
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,

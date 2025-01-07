@@ -35,10 +35,8 @@
       "members": [
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint32",
               "type_shape_v2": {
@@ -103,10 +101,8 @@
       "members": [
         {
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint32",
               "type_shape_v2": {
@@ -175,10 +171,8 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint32",
               "type_shape_v2": {
@@ -240,10 +234,8 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint32",
               "type_shape_v2": {
@@ -308,10 +300,8 @@
           "ordinal": 1,
           "name": "a",
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint32",
               "type_shape_v2": {
@@ -374,10 +364,8 @@
           "ordinal": 1,
           "name": "a",
           "type": {
-            "kind": "array",
             "kind_v2": "array",
             "element_type": {
-              "kind": "primitive",
               "kind_v2": "primitive",
               "subtype": "uint32",
               "type_shape_v2": {

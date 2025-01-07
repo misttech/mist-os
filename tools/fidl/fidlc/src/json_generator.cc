@@ -138,9 +138,7 @@ void JSONGenerator::Generate(const Constant& value) {
 
 void JSONGenerator::Generate(const Type* value) {
   GenerateObject([&]() {
-    // TODO(https://fxbug.dev/42149402): Delete KindV1.
-    GenerateObjectMember("kind", NameTypeKind(value), Position::kFirst);
-    GenerateObjectMember("kind_v2", NameTypeKindV2(value));
+    GenerateObjectMember("kind_v2", NameTypeKind(value), Position::kFirst);
 
     switch (value->kind) {
       case Type::Kind::kBox: {
@@ -205,17 +203,6 @@ void JSONGenerator::Generate(const Type* value) {
         GenerateObjectMember("nullable", type->nullability);
         GenerateObjectMember("protocol_transport", type->protocol_transport);
 
-        // TODO(https://fxbug.dev/42149402): This is for compatibility with
-        // backends that use "identifier" and "request" kinds to represent
-        // endpoints. Delete this once they've been updated.
-        switch (type->end) {
-          case TransportSide::kClient:
-            GenerateObjectMember("identifier", type->protocol_decl->name);
-            break;
-          case TransportSide::kServer:
-            GenerateObjectMember("subtype", type->protocol_decl->name);
-            break;
-        }
         break;
       }
       case Type::Kind::kZxExperimentalPointer: {
@@ -498,9 +485,7 @@ void JSONGenerator::GenerateParameterizedType(TypeKind parent_type_kind, const T
   GenerateObjectPunctuation(position);
   EmitObjectKey(key);
   GenerateObject([&]() {
-    // TODO(https://fxbug.dev/42149402): Delete KindV1.
-    GenerateObjectMember("kind", NameTypeKind(type), Position::kFirst);
-    GenerateObjectMember("kind_v2", NameTypeKind(type));
+    GenerateObjectMember("kind_v2", NameTypeKind(type), Position::kFirst);
 
     switch (type->kind) {
       case Type::Kind::kArray: {

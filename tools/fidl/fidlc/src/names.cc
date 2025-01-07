@@ -87,7 +87,6 @@ std::string NameRawLiteralKind(RawLiteral::Kind kind) {
   }
 }
 
-// TODO(https://fxbug.dev/42149402): Delete KindV1.
 std::string NameTypeKind(const Type* type) {
   switch (type->kind) {
     case Type::Kind::kArray:
@@ -103,12 +102,8 @@ std::string NameTypeKind(const Type* type) {
       return "string";
     case Type::Kind::kHandle:
       return "handle";
-    case Type::Kind::kTransportSide: {
-      // TODO(https://fxbug.dev/42149402): transition the JSON and other backends to using
-      // client/server end
-      auto channel_end = static_cast<const TransportSideType*>(type);
-      return (channel_end->end == TransportSide::kClient) ? "identifier" : "request";
-    }
+    case Type::Kind::kTransportSide:
+      return "endpoint";
     case Type::Kind::kPrimitive:
       return "primitive";
     case Type::Kind::kInternal:
@@ -120,13 +115,6 @@ std::string NameTypeKind(const Type* type) {
     case Type::Kind::kUntypedNumeric:
       ZX_PANIC("should not have untyped numeric here");
   }
-}
-
-std::string NameTypeKindV2(const Type* type) {
-  if (type->kind == Type::Kind::kTransportSide) {
-    return "endpoint";
-  }
-  return NameTypeKind(type);
 }
 
 std::string NameConstantKind(Constant::Kind kind) {

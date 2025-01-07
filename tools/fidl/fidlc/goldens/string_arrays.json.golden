@@ -36,7 +36,6 @@
       "members": [
         {
           "type": {
-            "kind": "string_array",
             "kind_v2": "string_array",
             "element_count": 100,
             "type_shape_v2": {
@@ -90,7 +89,6 @@
       "members": [
         {
           "type": {
-            "kind": "string_array",
             "kind_v2": "string_array",
             "element_count": 2,
             "type_shape_v2": {
@@ -148,7 +146,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "string_array",
             "kind_v2": "string_array",
             "element_count": 100,
             "type_shape_v2": {
@@ -199,7 +196,6 @@
         {
           "ordinal": 1,
           "type": {
-            "kind": "string_array",
             "kind_v2": "string_array",
             "element_count": 2,
             "type_shape_v2": {
@@ -253,7 +249,6 @@
           "ordinal": 1,
           "name": "a",
           "type": {
-            "kind": "string_array",
             "kind_v2": "string_array",
             "element_count": 100,
             "type_shape_v2": {
@@ -305,7 +300,6 @@
           "ordinal": 1,
           "name": "a",
           "type": {
-            "kind": "string_array",
             "kind_v2": "string_array",
             "element_count": 2,
             "type_shape_v2": {

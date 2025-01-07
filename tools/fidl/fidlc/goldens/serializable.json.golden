@@ -128,7 +128,6 @@
           "ordinal": 1,
           "name": "unused",
           "type": {
-            "kind": "primitive",
             "kind_v2": "primitive",
             "subtype": "bool",
             "type_shape_v2": {
