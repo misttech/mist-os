@@ -114,7 +114,7 @@ impl HistoryStatsAccessor {
             .map_or(zx::BootDuration::ZERO, |inner| inner.lock().shadow.history_duration())
     }
     pub fn at_capacity(&self) -> bool {
-        self.0.upgrade().map_or(false, |inner| inner.lock().shadow.at_capacity())
+        self.0.upgrade().is_some_and(|inner| inner.lock().shadow.at_capacity())
     }
 }
 

@@ -151,8 +151,8 @@ impl LogFilterCriteria {
     /// message, moniker, or component URL.
     fn matches_filter_string(filter_string: &str, message: &str, log: &LogsData) -> bool {
         message.contains(filter_string)
-            || log.file_path().map_or(false, |s| s.contains(filter_string))
-            || log.metadata.component_url.as_ref().map_or(false, |s| s.contains(filter_string))
+            || log.file_path().is_some_and(|s| s.contains(filter_string))
+            || log.metadata.component_url.as_ref().is_some_and(|s| s.contains(filter_string))
             || log.moniker.to_string().contains(filter_string)
     }
 

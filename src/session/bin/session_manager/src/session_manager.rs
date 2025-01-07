@@ -541,7 +541,7 @@ impl SessionManager {
     async fn handle_handoff_take_request(
         &mut self,
     ) -> Result<ClientEnd<fbroker::LeaseControlMarker>, fpower::HandoffError> {
-        self.state.take_power_lease().await.map_err(Into::into)
+        self.state.take_power_lease().await
     }
 }
 

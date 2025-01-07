@@ -274,10 +274,7 @@ fn match_linear_histogram<Key>(
     // of int and uint members.
     match (floor, step, counts) {
         (FieldValue::Double(floor), FieldValue::Double(step), counts) => {
-            let counts = match parse_f64_list(counts) {
-                None => return None,
-                Some(counts) => counts,
-            };
+            let counts = parse_f64_list(counts)?;
             Some(FieldValue::LinearDoubleHistogram(LinearHistogram {
                 floor: *floor,
                 step: *step,
@@ -336,10 +333,7 @@ fn match_exponential_histogram<Key>(
             FieldValue::Double(step_multiplier),
             counts,
         ) => {
-            let counts = match parse_f64_list(counts) {
-                None => return None,
-                Some(counts) => counts,
-            };
+            let counts = parse_f64_list(counts)?;
             Some(FieldValue::ExponentialDoubleHistogram(ExponentialHistogram {
                 floor: *floor,
                 initial_step: *initial_step,

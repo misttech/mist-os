@@ -363,10 +363,7 @@ impl<'a, Key> Iterator for DiagnosticsHierarchyIterator<'a, Key> {
                 None => {
                     // If we don't have a node we are currently working with, then go to the next
                     // node in our stack.
-                    let WorkStackEntry { node, key } = match self.work_stack.pop() {
-                        None => return None,
-                        Some(entry) => entry,
-                    };
+                    let WorkStackEntry { node, key } = self.work_stack.pop()?;
 
                     // Push to the stack all children of the new node.
                     for child in node.children.iter() {

@@ -240,6 +240,8 @@ impl Symbolizer for FakeSymbolizerForTest {
 mod test {
     use super::*;
     use async_channel::bounded;
+
+    #[allow(clippy::literal_string_with_formatting_args)]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_fake_symbolizer() {
         let args = vec!["arg".to_string(), "arg2".to_string()];

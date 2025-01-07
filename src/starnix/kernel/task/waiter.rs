@@ -76,6 +76,7 @@ pub enum EventHandler {
 }
 
 impl EventHandler {
+    #[allow(unpredictable_function_pointer_comparisons)]
     pub fn add_mapping(&mut self, f: fn(FdEvents) -> FdEvents) {
         let Some(prev) = (match self {
             Self::None => None,
