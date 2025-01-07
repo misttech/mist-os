@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <fidl/fuchsia.driver.host/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
+#include <fidl/fuchsia.driver.token/cpp/fidl.h>
 #include <fidl/fuchsia.ldsvc/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -42,6 +43,7 @@ namespace driver_manager {
 
 class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>,
                      public fidl::WireServer<fuchsia_driver_index::DriverNotifier>,
+                     public fidl::Server<fuchsia_driver_token::NodeBusTopology>,
                      public BindManagerBridge,
                      public CompositeManagerBridge,
                      public NodeManager,
@@ -73,6 +75,13 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_driver_framework::CompositeNodeManager> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // fidl::WireServer<fuchsia_driver_token::NodeBusTopology>
+  void Get(GetRequest& request, GetCompleter::Sync& completer) override;
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_driver_token::NodeBusTopology> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   // CompositeManagerBridge interface
@@ -109,7 +118,6 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   }
 
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
-  void PublishCompositeNodeManager(component::OutgoingDirectory& outgoing);
   zx::result<> StartRootDriver(std::string_view url);
 
   // Goes through the orphan list and attempts the bind them again. Sends nodes that are still
@@ -185,8 +193,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   uint64_t next_driver_host_id_ = 0;
   fidl::WireClient<fuchsia_driver_index::DriverIndex> driver_index_;
   LoaderServiceFactory loader_service_factory_;
-  fidl::ServerBindingGroup<fuchsia_component_runner::ComponentRunner> runner_bindings_;
   fidl::ServerBindingGroup<fuchsia_driver_framework::CompositeNodeManager> manager_bindings_;
+  fidl::ServerBindingGroup<fuchsia_driver_token::NodeBusTopology> bus_topo_bindings_;
   fidl::ServerBindingGroup<fuchsia_driver_index::DriverNotifier> driver_notifier_bindings_;
   async_dispatcher_t* const dispatcher_;
   std::shared_ptr<Node> root_node_;

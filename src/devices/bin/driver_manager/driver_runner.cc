@@ -322,6 +322,53 @@ void DriverRunner::handle_unknown_method(
        method_type.c_str(), metadata.method_ordinal);
 }
 
+void DriverRunner::Get(GetRequest& request, GetCompleter::Sync& completer) {
+  zx_info_handle_basic_t info;
+  zx_status_t status =
+      request.token().get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  if (status != ZX_OK) {
+    completer.Reply(zx::error(status));
+    return;
+  }
+  const Node* node = nullptr;
+  PerformBFS(root_node_,
+             [&node, token_koid = info.koid](const std::shared_ptr<driver_manager::Node>& current) {
+               if (node != nullptr) {
+                 // Already found it.
+                 return false;
+               }
+               std::optional current_koid = current->token_koid();
+               if (current_koid && current_koid.value() == token_koid) {
+                 node = current.get();
+                 return false;
+               }
+               return true;
+             });
+  if (node == nullptr) {
+    completer.Reply(zx::error(ZX_ERR_NOT_FOUND));
+    return;
+  }
+
+  completer.Reply(zx::ok(node->GetBusTopology()));
+}
+
+void DriverRunner::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_driver_token::NodeBusTopology> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  std::string method_type;
+  switch (metadata.unknown_method_type) {
+    case fidl::UnknownMethodType::kOneWay:
+      method_type = "one-way";
+      break;
+    case fidl::UnknownMethodType::kTwoWay:
+      method_type = "two-way";
+      break;
+  };
+
+  LOGF(WARNING, "NodeBusTopology received unknown %s method. Ordinal: %lu", method_type.c_str(),
+       metadata.method_ordinal);
+}
+
 void DriverRunner::AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec group,
                                         AddToIndexCallback callback) {
   driver_index_->AddCompositeNodeSpec(group).Then(
@@ -382,6 +429,16 @@ void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing
 
   result = outgoing.AddUnmanagedProtocol<fdf::CompositeNodeManager>(
       manager_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+  ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
+
+  result = outgoing.AddUnmanagedProtocol<fuchsia_driver_token::NodeBusTopology>(
+      bus_topo_bindings_.CreateHandler(this, dispatcher_, [](fidl::UnbindInfo info) {
+        if (info.is_user_initiated() || info.is_peer_closed()) {
+          return;
+        }
+        LOGF(WARNING, "Unexpected closure of NodeBusTopology: %s",
+             info.FormatDescription().c_str());
+      }));
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 }
 

@@ -121,6 +121,9 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
     device_info.offer_list(node_offers);
   }
 
+  std::vector topo_path = node->GetBusTopology();
+  device_info.bus_topology(fidl::ToWire(allocator, topo_path));
+
   return zx::ok(device_info.Build());
 }
 
