@@ -46,6 +46,7 @@ fuchsia_fidl_hlcpp_library(
     library = ":{{name}}",
     deps = [
         "{{parent_sdk}}//pkg/fidl_cpp",
+        "{{parent_sdk}}//pkg/fidl_cpp_hlcpp_conversion",
         {{cc_deps}}
     ],
     target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
