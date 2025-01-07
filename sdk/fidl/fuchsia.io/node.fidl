@@ -315,7 +315,11 @@ open protocol Node {
         object server_end:Node;
     });
 
-    @available(added=NEXT, deprecated=HEAD, note="Use fuchsia.unknown/Cloneable.Clone2 instead.")
+    /// DEPRECATED - Use `fuchsia.unknown/Cloneable.Clone` instead.
+    // TODO(https://fxbug.dev/324081103): Mark this as removed=NEXT once we ship API level 26.
+    // We can't remove a method at the same API level it was added, and although this is only
+    // a semantic rename with the same ordinal, it still counts as "adding" a new method.
+    @available(added=NEXT, removed=HEAD)
     @selector("fuchsia.io1/Node.Clone")
     flexible DeprecatedClone(resource struct {
         flags OpenFlags;
