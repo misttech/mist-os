@@ -34,7 +34,7 @@ sdk_host_tool = rule(
     sdk_host_tool(name = "ffx")
     ```
     """,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     executable = True,
     attrs = {
         "_sdk_runfiles": attr.label(

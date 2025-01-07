@@ -41,7 +41,7 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
 ) = fuchsia_task_rule(
     implementation = _fuchsia_task_publish_impl,
     doc = """A workflow task that publishes multiple fuchsia packages.""",
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "packages": attr.label_list(
             doc = "The packages to publish.",

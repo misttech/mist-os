@@ -596,7 +596,7 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
     doc = "Builds a fuchsia package.",
     implementation = _build_fuchsia_package_impl,
     cfg = fuchsia_transition,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION + ["@bazel_tools//tools/cpp:toolchain_type"],
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION, "@bazel_tools//tools/cpp:toolchain_type"],
     attrs = {
         "package_name": attr.string(
             doc = "The name of the package",

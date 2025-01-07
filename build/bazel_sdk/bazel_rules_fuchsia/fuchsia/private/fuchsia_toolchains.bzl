@@ -38,20 +38,15 @@ def get_fuchsia_sdk_toolchain(ctx):
     Returns:
         The fuchsia sdk tool chain.
     """
-    sdk = (
-        ctx.toolchains["@rules_fuchsia//fuchsia/toolchains:sdk"] or
-        ctx.toolchains["@fuchsia_sdk//fuchsia/toolchains:sdk"]
-    )
+    sdk = ctx.toolchains["@rules_fuchsia//fuchsia/toolchains:sdk"]
+
     if not sdk:
         fail("No fuchsia toolchain registered. Please call register_fuchsia_sdk_toolchain in your WORKSPACE file.")
     return sdk
 
 # These toolchain definitions should be used in conjunction with get_fuchsia_sdk_toolchain
 # when working with fuchsia toolchains.
-FUCHSIA_TOOLCHAIN_DEFINITION = [
-    config_common.toolchain_type("@rules_fuchsia//fuchsia/toolchains:sdk", mandatory = False),
-    config_common.toolchain_type("@fuchsia_sdk//fuchsia/toolchains:sdk", mandatory = False),
-]
+FUCHSIA_TOOLCHAIN_DEFINITION = "@rules_fuchsia//fuchsia/toolchains:sdk"
 
 def register_fuchsia_sdk_toolchain(
         name = "fuchsia_sdk_toolchain_decl",

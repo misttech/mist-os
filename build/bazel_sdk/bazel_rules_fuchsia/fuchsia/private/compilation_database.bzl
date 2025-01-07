@@ -216,7 +216,7 @@ def _compilation_db_rule_impl(ctx):
 
 _clangd_compilation_database = rule(
     implementation = _compilation_db_rule_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "output_base": attr.string(
             default = "__OUTPUT_BASE__",

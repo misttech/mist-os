@@ -329,7 +329,7 @@ _fuchsia_cc_test_manifest = rule(
     Detects whether gtest is included as a dependency. If it is, the cml file
     will use gtest_runner. Otherwise it will use the elf_test_runner.
     """,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "test_binary_name": attr.string(
             doc = "The test binary's name.",

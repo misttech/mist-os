@@ -59,7 +59,7 @@ _cvf = rule(
       (This is a translation of the cvf template defined in
       //tools/configc/build/config.gni.)
     """,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     implementation = _cvf_impl,
     attrs = {
         "cm_label": attr.label(
@@ -108,7 +108,7 @@ _fidl_config_client_lib_source = rule(
       //tools/configc/build/config.gni.)
     """,
     implementation = _fidl_config_client_lib_source_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "cm_label": attr.label(
             doc = """Target that generates the compiled manifest,
@@ -161,7 +161,7 @@ _cpp_config_client_lib_source = rule(
       //tools/configc/build/config.gni.)
     """,
     implementation = _cpp_config_client_lib_source_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "cm_label": attr.label(
             doc = """Target that generates the compiled manifest,

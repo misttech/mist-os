@@ -172,7 +172,7 @@ fuchsia_package_checker_test = rule(
     doc = """Validate the generated package.""",
     test = True,
     implementation = _fuchsia_package_checker_test_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "package_under_test": attr.label(
             doc = "Built Package.",

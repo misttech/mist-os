@@ -34,7 +34,7 @@ def _fuchsia_task_register_debug_symbols_impl(ctx, make_shell_task):
     fuchsia_task_register_debug_symbols,
 ) = shell_task_rule(
     doc = """Registers debug symbols with ffx.""",
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     implementation = _fuchsia_task_register_debug_symbols_impl,
     attrs = {
         "_tool": attr.label(

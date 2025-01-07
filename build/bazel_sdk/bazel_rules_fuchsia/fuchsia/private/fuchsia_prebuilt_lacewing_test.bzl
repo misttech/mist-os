@@ -37,7 +37,8 @@ def _fuchsia_prebuilt_lacewing_test_impl(ctx):
 fuchsia_prebuilt_lacewing_test = rule(
     doc = "Defines a prebuilt lacewing test.",
     implementation = _fuchsia_prebuilt_lacewing_test_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION + [
+    toolchains = [
+        FUCHSIA_TOOLCHAIN_DEFINITION,
         "@rules_python//python:toolchain_type",
     ],
     attrs = {

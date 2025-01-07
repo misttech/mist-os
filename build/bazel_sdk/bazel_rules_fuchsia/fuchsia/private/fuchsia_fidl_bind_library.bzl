@@ -42,7 +42,7 @@ def _bindlibgen_impl(ctx):
 # Runs bindc to produce the bind library file.
 _bindlibgen = rule(
     implementation = _bindlibgen_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "library": attr.label(
             doc = "The FIDL library to generate bind library for",

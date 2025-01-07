@@ -135,7 +135,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
 fuchsia_board_input_bundle = rule(
     doc = """Generates a board input bundle.""",
     implementation = _fuchsia_board_input_bundle_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "base_driver_packages": attr.label_list(
             doc = "Base-driver packages to include in board.",

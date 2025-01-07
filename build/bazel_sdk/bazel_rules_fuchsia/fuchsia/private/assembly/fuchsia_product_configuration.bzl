@@ -177,7 +177,7 @@ def _fuchsia_prebuilt_product_configuration_impl(ctx):
 _fuchsia_prebuilt_product_configuration = rule(
     doc = "Use a prebuilt product configuration directory for hybrid assembly.",
     implementation = _fuchsia_prebuilt_product_configuration_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "product_config": attr.label(
             doc = "The product assembly input artifacts directory containing the product config.",
@@ -198,7 +198,7 @@ _fuchsia_prebuilt_product_configuration = rule(
 _fuchsia_product_configuration = rule(
     doc = """Generates a product configuration file.""",
     implementation = _fuchsia_product_configuration_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "product_config": attr.string(
             doc = "Raw json config. Used as a base template for the config.",

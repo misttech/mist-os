@@ -304,7 +304,11 @@ fuchsia_sdk_repository(
     use_rules_fuchsia = True,
 )
 
-register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+# buildifier: disable=load-on-top
+load("@rules_fuchsia//fuchsia:deps.bzl", "register_fuchsia_sdk_toolchain")
+
+# Register the fuchsia toolchain for the fuchsia SDK
+register_fuchsia_sdk_toolchain()
 
 register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
 

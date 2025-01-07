@@ -35,7 +35,7 @@ def _fuchsia_work_on_runner_impl(ctx):
 
 fuchsia_work_on_runner = rule(
     implementation = _fuchsia_work_on_runner_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     executable = True,
     attrs = {
         "_runner_tool": attr.label(

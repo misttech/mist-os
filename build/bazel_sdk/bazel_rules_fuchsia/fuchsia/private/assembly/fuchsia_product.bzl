@@ -179,7 +179,7 @@ def _fuchsia_product_assembly_impl(ctx):
 _fuchsia_product_assembly = rule(
     doc = """Declares a target to product a fully-configured list of artifacts that make up a product.""",
     implementation = _fuchsia_product_assembly_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     provides = [FuchsiaProductAssemblyInfo],
     attrs = {
         "product_config": attr.label(
@@ -278,7 +278,7 @@ def _fuchsia_product_create_system_impl(ctx):
 _fuchsia_product_create_system = rule(
     doc = """Declares a target to generate the images for a Fuchsia product.""",
     implementation = _fuchsia_product_create_system_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     provides = [FuchsiaProductImageInfo],
     attrs = {
         "product_assembly": attr.label(

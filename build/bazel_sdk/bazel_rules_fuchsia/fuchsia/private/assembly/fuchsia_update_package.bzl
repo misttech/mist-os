@@ -82,7 +82,7 @@ def _fuchsia_update_package_impl(ctx):
 fuchsia_update_package = rule(
     doc = """Declares a Fuchsia update package.""",
     implementation = _fuchsia_update_package_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     provides = [FuchsiaUpdatePackageInfo],
     attrs = {
         "main": attr.label(

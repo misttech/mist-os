@@ -97,7 +97,7 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
     fuchsia_task_run_component,
 ) = fuchsia_task_rule(
     implementation = _fuchsia_task_run_component_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "repository": attr.string(
             doc = "The repository that has the published package.",

@@ -170,7 +170,7 @@ def _unpack_prebuilt_package_impl(ctx):
 _unpack_prebuilt_package = rule(
     doc = """Provides access to a fuchsia package from a prebuilt package archive (.far).""",
     implementation = _unpack_prebuilt_package_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "archive": attr.label(
             doc = "The fuchsia archive (typically a .far file).",
@@ -246,7 +246,7 @@ def _pack_prebuilt_package_impl(ctx):
 _pack_prebuilt_package = rule(
     doc = """Provides access to a fuchsia package from a package manifest.""",
     implementation = _pack_prebuilt_package_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "manifest": attr.label(
             doc = "The package's manifest file",

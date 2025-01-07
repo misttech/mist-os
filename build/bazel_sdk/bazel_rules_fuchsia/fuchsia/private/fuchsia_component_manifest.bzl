@@ -175,7 +175,7 @@ src file and included in the includes attribute.
 ```
 """,
     implementation = _fuchsia_component_manifest_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "src": attr.label(
             doc = "The source manifest to compile",
@@ -224,7 +224,7 @@ ensure_compiled_component_manifest = rule(
     fuchsia_component macros to ensure that the target that is passed in as the
     manifest gets compiled.
     """,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "dep": attr.label(
             doc = "The dependency to check. This should either be a plain cml file or a fuchsia_component_manifest target.",

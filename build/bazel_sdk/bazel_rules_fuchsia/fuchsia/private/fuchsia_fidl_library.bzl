@@ -63,7 +63,7 @@ def _fidl_impl(context):
 
 _fidl_library = rule(
     implementation = _fidl_impl,
-    toolchains = FUCHSIA_TOOLCHAIN_DEFINITION,
+    toolchains = [FUCHSIA_TOOLCHAIN_DEFINITION],
     attrs = {
         "library": attr.string(
             doc = "The name of the FIDL library",

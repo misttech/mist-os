@@ -122,12 +122,6 @@ fuchsia_toolchain_info(
     zbi_manifest = "//tools:{{HOST_CPU}}/zbi-meta.json",
 )
 
-toolchain(
-    name = "fuchsia_toolchain_sdk",
-    toolchain = ":fuchsia_toolchain_info",
-    toolchain_type = "@{{rules_fuchsia}}//fuchsia/toolchains:sdk",
-)
-
 # The following rules expose the sdk tools that are put in the fuchsia_toolchain
 # so uses can run them directly. These targets can be invoked by calling
 # `bazel run @{{rules_fuchsia}}//:<tool_name> -- args`
