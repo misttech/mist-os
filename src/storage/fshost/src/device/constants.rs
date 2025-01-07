@@ -6,10 +6,6 @@
 pub const BLOBFS_PARTITION_LABEL: &str = "blobfs";
 pub const DATA_PARTITION_LABEL: &str = "data";
 pub const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
-pub const FVM_PARTITION_LABEL: &str = "fvm";
-pub const FUCHSIA_FVM_PARTITION_LABEL: &str = "fuchsia-fvm";
-pub const FTL_PARTITION_LABEL: &str = "ftl";
-pub const SUPER_PARTITION_LABEL: &str = "super";
 
 // -- Fxfs volume labels --
 pub const BLOB_VOLUME_LABEL: &str = "blob";

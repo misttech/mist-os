@@ -3,18 +3,16 @@
 // found in the LICENSE file.
 
 use crate::device::constants::{
-    BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FTL_PARTITION_LABEL,
-    FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
-    LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH, SUPER_PARTITION_LABEL,
+    BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FVM_DRIVER_PATH,
+    GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
 };
 use crate::device::{Device, DeviceTag};
 use crate::environment::Environment;
 use anyhow::{bail, Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_block::Flag as BlockFlag;
+use fs_management::format::constants::ALL_FVM_LABELS;
 use fs_management::format::DiskFormat;
-use std::collections::HashSet;
-use std::sync::LazyLock;
 
 #[async_trait]
 pub trait Matcher: Send {
@@ -232,7 +230,7 @@ impl Matcher for FxblobMatcher {
                 // any of them, this isn't the right partition.
                 // TODO(https://fxbug.dev/344018917): Use another mechanism to keep
                 // track of partition labels.
-                if !DATA_PARTITION_LABELS.contains(&label) {
+                if !ALL_FVM_LABELS.contains(&label) {
                     return false;
                 }
             }
@@ -288,11 +286,7 @@ impl Matcher for FvmComponentMatcher {
                 // any of them, this isn't the right partition.
                 // TODO(https://fxbug.dev/344018917): Use another mechanism to keep
                 // track of partition labels.
-                if !(label == FVM_PARTITION_LABEL
-                    || label == FUCHSIA_FVM_PARTITION_LABEL
-                    || label == FTL_PARTITION_LABEL
-                    || label == SUPER_PARTITION_LABEL)
-                {
+                if !ALL_FVM_LABELS.contains(&label) {
                     log::info!("Label {label} doesn't match");
                     return false;
                 }
@@ -529,7 +523,7 @@ impl Matcher for FxblobOnRecoveryMatcher {
             // any of them, this isn't the right partition.
             // TODO(https://fxbug.dev/344018917): Use another mechanism to keep
             // track of partition labels.
-            Ok(label) if DATA_PARTITION_LABELS.contains(&label) => true,
+            Ok(label) if ALL_FVM_LABELS.contains(&label) => true,
             _ => false,
         }
     }
@@ -544,19 +538,13 @@ impl Matcher for FxblobOnRecoveryMatcher {
     }
 }
 
-static DATA_PARTITION_LABELS: LazyLock<HashSet<&str>> = LazyLock::new(|| {
-    [FVM_PARTITION_LABEL, FUCHSIA_FVM_PARTITION_LABEL, FTL_PARTITION_LABEL, SUPER_PARTITION_LABEL]
-        .into()
-});
-
 #[cfg(test)]
 mod tests {
     use super::{Device, DiskFormat, Environment, Matchers};
     use crate::config::default_config;
     use crate::device::constants::{
-        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FTL_PARTITION_LABEL,
-        FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
-        LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH, SUPER_PARTITION_LABEL,
+        BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, FVM_DRIVER_PATH,
+        GPT_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
     };
     use crate::device::{DeviceTag, RegisteredDevices};
     use crate::environment::{Filesystem, FilesystemQueue};
@@ -566,6 +554,10 @@ mod tests {
     use fidl_fuchsia_hardware_block::{BlockInfo, BlockProxy, Flag};
     use fidl_fuchsia_hardware_block_volume::VolumeProxy;
     use fs_management::filesystem::BlockConnector;
+    use fs_management::format::constants::{
+        FTL_PARTITION_LABEL, FUCHSIA_FVM_PARTITION_LABEL, FVM_PARTITION_LABEL,
+        SUPER_PARTITION_LABEL,
+    };
     use std::sync::{Arc, Mutex};
 
     #[derive(Clone)]

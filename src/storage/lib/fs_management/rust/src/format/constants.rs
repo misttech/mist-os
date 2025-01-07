@@ -39,3 +39,14 @@ pub const BLOBFS_PARTITION_LABEL: &str = "blobfs";
 pub const DATA_PARTITION_LABEL: &str = "data";
 
 pub const LEGACY_DATA_PARTITION_LABEL: &str = "minfs";
+
+pub const FVM_PARTITION_LABEL: &str = "fvm";
+
+pub const FUCHSIA_FVM_PARTITION_LABEL: &str = "fuchsia-fvm";
+
+pub const FTL_PARTITION_LABEL: &str = "ftl";
+
+pub const SUPER_PARTITION_LABEL: &str = "super";
+
+pub const ALL_FVM_LABELS: [&str; 4] =
+    [FVM_PARTITION_LABEL, FUCHSIA_FVM_PARTITION_LABEL, FTL_PARTITION_LABEL, SUPER_PARTITION_LABEL];
