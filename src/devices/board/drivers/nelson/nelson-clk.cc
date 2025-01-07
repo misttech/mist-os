@@ -34,23 +34,6 @@ static const std::vector<fpbus::Mmio> clk_mmios{
     }},
 };
 
-// TODO(b/373903133): Remove once no longer referenced.
-constexpr clock_id_t kClockIds[] = {
-    {sm1_clk::CLK_RESET},  // PLACEHOLDER.
-
-    // For audio driver.
-    {sm1_clk::CLK_HIFI_PLL},
-    {sm1_clk::CLK_SYS_PLL_DIV16},
-    {sm1_clk::CLK_SYS_CPU_CLK_DIV16},
-
-    // For video decoder
-    {sm1_clk::CLK_DOS_GCLK_VDEC},
-    {sm1_clk::CLK_DOS},
-
-    // For GPU
-    {sm1_clk::CLK_GP0_PLL},
-};
-
 zx_status_t Nelson::ClkInit() {
   fuchsia_hardware_clockimpl::wire::InitMetadata clock_init_metadata;
   clock_init_metadata.steps =
@@ -97,13 +80,6 @@ zx_status_t Nelson::ClkInit() {
           .data = encoded_clock_ids_metadata.value(),
       }},
 #endif
-      // TODO(b/373903133): Remove once no longer referenced.
-      {{
-          .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kClockIds),
-              reinterpret_cast<const uint8_t*>(&kClockIds) + sizeof(kClockIds)),
-      }},
       // TODO(b/373903133): Remove once no longer referenced.
       {{
           .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),

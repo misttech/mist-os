@@ -5,8 +5,10 @@
 #include "clock.h"
 
 #include <fidl/fuchsia.hardware.clock/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.clockimpl/cpp/fidl.h>
 #include <lib/async-default/include/lib/async/default.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/stdcompat/span.h>
 
@@ -126,9 +128,14 @@ class Environment : public fdf_testing::Environment {
       return zx::error(status);
     }
 
-    status = device_server_.AddMetadata(DEVICE_METADATA_CLOCK_IDS, nullptr, 0);
-    if (status != ZX_OK) {
-      return zx::error(status);
+    if (zx::result result = clock_ids_metadata_server_.SetMetadata({{.clock_ids{}}});
+        result.is_error()) {
+      return result.take_error();
+    }
+    if (zx::result result = clock_ids_metadata_server_.Serve(
+            to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+        result.is_error()) {
+      return result.take_error();
     }
 
     return zx::make_result(
@@ -149,6 +156,8 @@ class Environment : public fdf_testing::Environment {
   FakeClockImpl clock_impl_;
   compat::DeviceServer device_server_;
   std::vector<uint8_t> encoded_clock_init_metadata_;
+  fdf_metadata::MetadataServer<fuchsia_hardware_clockimpl::ClockIdsMetadata>
+      clock_ids_metadata_server_;
 };
 
 class ClockTestConfig {

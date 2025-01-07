@@ -458,6 +458,7 @@ library_headers("ddk-deprecated-mmio-headers") {
 # library.
 library_headers("ddk_metadata_only") {
   headers = [ "lib/ddk/metadata.h" ]
+  public_deps = [ "//sdk/lib/zbi-format" ]
 }
 
 # Exports the metadata.h file to the SDK to support the transition

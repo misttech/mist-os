@@ -4,12 +4,11 @@
 
 #include "clock.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
+#include <fidl/fuchsia.hardware.clockimpl/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 #include <lib/fdf/dispatcher.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -18,7 +17,6 @@
 
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
-#include <ddk/metadata/clock.h>
 #include <fbl/alloc_checker.h>
 
 void ClockDevice::Enable(EnableCompleter::Sync& completer) {
@@ -274,19 +272,22 @@ zx::result<> ClockDriver::Start() {
 }
 
 zx_status_t ClockDriver::CreateClockDevices() {
-  // TODO(b/373903133): Retrieve clock ID's via FIDL once available.
-  zx::result clock_ids =
-      compat::GetMetadataArray<clock_id_t>(incoming(), DEVICE_METADATA_CLOCK_IDS);
-  if (clock_ids.is_error()) {
-    FDF_LOG(ERROR, "Failed to get clock ID's: %s", clock_ids.status_string());
-    return clock_ids.status_value();
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  zx::result clock_ids_metadata =
+      fdf_metadata::GetMetadata<fuchsia_hardware_clockimpl::ClockIdsMetadata>(incoming());
+  if (clock_ids_metadata.is_error()) {
+    FDF_LOG(ERROR, "Failed to get clock IDs: %s", clock_ids_metadata.status_string());
+    return clock_ids_metadata.status_value();
   }
 
-  for (auto clock : *clock_ids) {
+  const auto& clock_ids = clock_ids_metadata.value().clock_ids();
+  if (!clock_ids.has_value()) {
+    return ZX_OK;
+  }
+  for (auto clock_id : clock_ids.value()) {
     // ClockDevice must be dynamically allocated because it has a ServerBindingGroup and compat
     // server property which cannot be moved.
-    auto clock_device = std::make_unique<ClockDevice>(clock.clock_id);
-
+    auto clock_device = std::make_unique<ClockDevice>(clock_id);
     zx_status_t status = clock_device->Init(
         incoming(), outgoing(), node_name(),
         [this](std::string_view child_node_name,
@@ -309,6 +310,10 @@ zx_status_t ClockDriver::CreateClockDevices() {
   }
 
   return ZX_OK;
+#else
+  static_assert(false,
+                "Cannot create clock devices: Clock IDs not available at given Fuchsia API level");
+#endif
 }
 
 zx_status_t ClockDriver::ConfigureClocks(

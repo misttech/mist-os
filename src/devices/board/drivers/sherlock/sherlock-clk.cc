@@ -34,23 +34,6 @@ static const std::vector<fpbus::Mmio> clk_mmios{
     }},
 };
 
-// TODO(b/373903133): Remove once no longer referenced.
-static const clock_id_t kClockIds[] = {
-    // For Camera Sensor.
-    {g12b_clk::G12B_CLK_CAM_INCK_24M},
-    // For cpu driver.
-    {g12b_clk::G12B_CLK_SYS_PLL_DIV16},
-    {g12b_clk::G12B_CLK_SYS_CPU_CLK_DIV16},
-    {g12b_clk::G12B_CLK_SYS_PLLB_DIV16},
-    {g12b_clk::G12B_CLK_SYS_CPUB_CLK_DIV16},
-    {g12b_clk::CLK_SYS_CPU_BIG_CLK},
-    {g12b_clk::CLK_SYS_CPU_LITTLE_CLK},
-    // For video decoder/encoder
-    {g12b_clk::G12B_CLK_DOS_GCLK_VDEC},
-    {g12b_clk::G12B_CLK_DOS_GCLK_HCODEC},
-    {g12b_clk::G12B_CLK_DOS},
-};
-
 zx_status_t Sherlock::ClkInit() {
   fuchsia_hardware_clockimpl::wire::InitMetadata clock_init_metadata;
   clock_init_metadata.steps =
@@ -99,13 +82,6 @@ zx_status_t Sherlock::ClkInit() {
           .data = encoded_clock_ids_metadata.value(),
       }},
 #endif
-      // TODO(b/373903133): Remove once no longer referenced.
-      {{
-          .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&kClockIds),
-              reinterpret_cast<const uint8_t*>(&kClockIds) + sizeof(kClockIds)),
-      }},
       // TODO(b/373903133): Remove once no longer referenced.
       {{
           .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),
