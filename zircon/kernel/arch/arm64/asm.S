@@ -81,9 +81,8 @@ FUNCTION(arm64_elX_to_el1)
     brk #0
 
 .Lconfigure_el2:
-    // Set the init vector table for EL2.
-    adr_global x9, arm64_el2_init_table
-    msr vbar_el2, x9
+    // Clear the init vector table for EL2.
+    msr vbar_el2, xzr
 
     // Set EL1 to 64-bit, ensuring also that E2H is clear, as the assumed
     // layouts of CNTHCTL_EL2 and CPTR_EL2 depend on that. Also, ensure
