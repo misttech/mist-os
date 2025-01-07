@@ -52,44 +52,46 @@ bool TestThread::Start() {
   return true;
 }
 
-bool TestThread::Wait() { return Wait(false /* expect_failure */, false /* expect_crash */, 0); }
+bool TestThread::Wait() { return Wait(ExpectStatus::Success, std::nullopt); }
 
-bool TestThread::WaitForFailure() {
-  return Wait(true /* expect_failure */, false /* expect_crash */, 0);
-}
+bool TestThread::WaitForFailure() { return Wait(ExpectStatus::Failure, std::nullopt); }
 
 bool TestThread::WaitForCrash(uintptr_t crash_addr, zx_status_t error_status) {
-  return Wait(false /* expect_failure */, true /* expect_crash */, crash_addr, error_status);
+  return Wait(ExpectStatus::Crash, {{crash_addr, error_status}});
 }
 
-bool TestThread::Wait(bool expect_failure, bool expect_crash, uintptr_t crash_addr,
-                      zx_status_t error_status) {
+bool TestThread::WaitForAnyCrash() { return Wait(ExpectStatus::Crash, std::nullopt); }
+
+bool TestThread::Wait(ExpectStatus expect,
+                      std::optional<std::pair<uintptr_t, zx_status_t>> crash_info) {
   zx_signals_t signals;
   ZX_ASSERT(exception_channel_.wait_one(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED,
                                         zx::time::infinite(), &signals) == ZX_OK);
 
   if (signals & ZX_CHANNEL_PEER_CLOSED) {
     // Thread has terminated.
-    return !expect_crash && success_ != expect_failure;
+    return (success_ && expect == ExpectStatus::Success) ||
+           (!success_ && expect == ExpectStatus::Failure);
   } else if (signals & ZX_CHANNEL_READABLE) {
     zx_exception_report_t report;
     ZX_ASSERT(zx_object_get_info(zx_thread_.get(), ZX_INFO_THREAD_EXCEPTION_REPORT, &report,
                                  sizeof(report), NULL, NULL) == ZX_OK);
-    bool res = expect_crash && report.header.type == ZX_EXCP_FATAL_PAGE_FAULT;
+    bool res = expect == ExpectStatus::Crash && report.header.type == ZX_EXCP_FATAL_PAGE_FAULT;
+    uintptr_t actual_crash_addr = 0;
     if (res) {
 #if defined(__x86_64__)
-      uintptr_t actual_crash_addr = report.context.arch.u.x86_64.cr2;
+      actual_crash_addr = report.context.arch.u.x86_64.cr2;
 #elif defined(__aarch64__)
-      uintptr_t actual_crash_addr = report.context.arch.u.arm_64.far;
+      actual_crash_addr = report.context.arch.u.arm_64.far;
 #elif defined(__riscv)
-      uintptr_t actual_crash_addr = report.context.arch.u.riscv_64.tval;
+      actual_crash_addr = report.context.arch.u.riscv_64.tval;
 #else
 #error Unsupported architecture
 #endif
-      res &= crash_addr == actual_crash_addr;
     }
-    if (res) {
-      res &= error_status == static_cast<zx_status_t>(report.context.synth_code);
+    if (auto info = crash_info) {
+      res &= info->first == actual_crash_addr;
+      res &= info->second == static_cast<zx_status_t>(report.context.synth_code);
     }
 
     if (!res) {

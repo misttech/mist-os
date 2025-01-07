@@ -33,6 +33,8 @@ class TestThread {
   // Block until the test thread crashes due to an access to |crash_addr|. The exception report's
   // |synth_code| field should be set to |error_status|.
   bool WaitForCrash(uintptr_t crash_addr, zx_status_t error_status);
+  // Block until the test thread crashes for any reason.
+  bool WaitForAnyCrash();
   // Block until the test thread is blocked against a pager.
   // NOTE: It is only valid to call this in an environment where there is no interference from an
   // external pager. More specifically, if the test is meant to be run as a component, the caller
@@ -55,8 +57,12 @@ class TestThread {
   void Run();
 
  private:
-  bool Wait(bool expect_failure, bool expect_crash, uintptr_t crash_addr,
-            zx_status_t error_status = ZX_OK);
+  enum class ExpectStatus {
+    Success,
+    Failure,
+    Crash,
+  };
+  bool Wait(ExpectStatus expect, std::optional<std::pair<uintptr_t, zx_status_t>> crash_info);
   void PrintDebugInfo(const zx_exception_report_t& report);
 
   const fit::function<bool()> fn_;
