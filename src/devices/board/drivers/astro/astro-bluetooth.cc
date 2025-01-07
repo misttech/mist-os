@@ -109,11 +109,6 @@ zx_status_t Astro::BluetoothInit() {
   }
 
   const std::vector<fpbus::Metadata> bt_uart_metadata{
-      // TODO(b/385364946): Remove once no longer retrieved.
-      {{
-          .id = std::to_string(DEVICE_METADATA_SERIAL_PORT_INFO),
-          .data = *encoded,
-      }},
       {{
           .id = fuchsia_hardware_serial::wire::SerialPortInfo::kSerializableName,
           .data = *std::move(encoded),

@@ -36,10 +36,6 @@ static_assert(DEVICE_METADATA_PARTITION_MAP == ZBI_TYPE_DRV_PARTITION_MAP, "");
 #define DEVICE_METADATA_SERIAL_NUMBER 0x4e4c5253  // SRLN
 static_assert(DEVICE_METADATA_SERIAL_NUMBER == ZBI_TYPE_SERIAL_NUMBER, "");
 
-// Serial port info
-// type: fuchsia.hardware.serial.SerialPortInfo
-#define DEVICE_METADATA_SERIAL_PORT_INFO 0x4D524553  // SERM
-
 // Platform board private data (for board driver)
 // type: ???
 #define DEVICE_METADATA_BOARD_PRIVATE 0x524F426D  // mBOR

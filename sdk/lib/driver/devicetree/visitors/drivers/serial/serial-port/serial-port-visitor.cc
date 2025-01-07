@@ -63,23 +63,15 @@ zx::result<> SerialPortVisitor::ParseSerialPort(fdf_devicetree::Node& node,
     return zx::error(encoded.error_value().status());
   }
 
-  // TODO(b/385364946): Remove once no longer retrieved.
-  fuchsia_hardware_platform_bus::Metadata metadata = {{
-      .id = std::to_string(DEVICE_METADATA_SERIAL_PORT_INFO),
-      .data = *encoded,
-  }};
-
   FDF_LOG(DEBUG, "Added serial port metadata (class=%d, vid=%d, pid=%d) to node '%s'",
           serial_port_info.serial_class(), serial_port_info.serial_vid(),
           serial_port_info.serial_pid(), node.name().c_str());
 
-  node.AddMetadata(metadata);
-
-  fuchsia_hardware_platform_bus::Metadata metadata2 = {{
+  fuchsia_hardware_platform_bus::Metadata metadata = {{
       .id = fuchsia_hardware_serial::SerialPortInfo::kSerializableName,
       .data = *std::move(encoded),
   }};
-  node.AddMetadata(metadata2);
+  node.AddMetadata(metadata);
 
   return zx::ok();
 }
