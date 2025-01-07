@@ -179,6 +179,10 @@ typedef struct device_add_args {
   // Optional client channel end for a fuchsia.io.Directory hosting fidl services specified in
   // either |fidl_service_offers| or |runtime_service_offers|.
   zx_handle_t outgoing_dir_channel;
+
+  // Pointer to a fuchsia_driver_framework::BusInfo struct.
+  // The exactly type is not encoded to keep this file C friendly.
+  const void* bus_info;
 } device_add_args_t;
 
 typedef struct device_init_reply_args {

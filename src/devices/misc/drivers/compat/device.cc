@@ -390,6 +390,10 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   device->properties_ = CreateProperties(arena_, *logger_, zx_args);
   device->device_flags_ = zx_args->flags;
 
+  if (zx_args->bus_info != nullptr) {
+    device->bus_info_ = *reinterpret_cast<const fdf::BusInfo*>(zx_args->bus_info);
+  }
+
   if (out) {
     *out = device->ZxDevice();
   }
@@ -449,6 +453,10 @@ zx_status_t Device::CreateNode() {
           .symbols(fidl::VectorView<fdf::wire::NodeSymbol>::FromExternal(symbols))
           .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(properties_))
           .offers2(fidl::VectorView<fdf::wire::Offer>::FromExternal(offers.data(), offers.size()));
+
+  if (bus_info_) {
+    args_builder.bus_info(fidl::ToWire(arena, bus_info_.value()));
+  }
 
   // Create NodeController, so we can control the device.
   auto controller_ends = fidl::CreateEndpoints<fdf::NodeController>();

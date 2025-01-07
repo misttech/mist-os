@@ -58,6 +58,9 @@ source_set("ddktl") {
       # <ddktl/device.h> has #include <lib/fidl_driver/cpp/transport.h>
       "//sdk/lib/fidl_driver:fidl_driver_transport",
 
+      # <ddktl/device.h> has #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+      "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+
       # <ddktl/metadata_server.h> has #include <fidl/fuchsia.driver.metadata/cpp/fidl.h>
       "//sdk/fidl/fuchsia.driver.metadata:fuchsia.driver.metadata_cpp",
 

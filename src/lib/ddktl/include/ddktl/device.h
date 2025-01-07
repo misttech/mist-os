@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
 #define SRC_LIB_DDKTL_INCLUDE_DDKTL_DEVICE_H_
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -424,11 +425,17 @@ class DeviceAddArgs {
     args_.power_state_count = static_cast<uint8_t>(power_states.size());
     return *this;
   }
+  DeviceAddArgs& set_bus_info(std::unique_ptr<fuchsia_driver_framework::BusInfo> bus_info) {
+    bus_info_ = std::move(bus_info);
+    args_.bus_info = bus_info_.get();
+    return *this;
+  }
 
   const device_add_args_t& get() const { return args_; }
 
  private:
   MetadataList metadata_list_;
+  std::unique_ptr<fuchsia_driver_framework::BusInfo> bus_info_;
   device_add_args_t args_ = {};
 };
 
