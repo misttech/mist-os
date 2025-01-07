@@ -56,28 +56,85 @@ fn is_transient_handle(object: ObjectHandle) -> bool {
     !is_persistent_handle(object)
 }
 
-// A collection of object attributes.
-//
-// TODO(https://fxbug.dev/360942417): Implement me!
-#[derive(Clone, Copy)]
-struct AttributeSet {}
+// The "key" type that carries no information.
+#[derive(Clone)]
+struct NoKey {}
 
-impl AttributeSet {
-    fn new() -> AttributeSet {
-        Self {}
+// Represents supported key types, in principle parameterized by
+// tee_internal::Type.
+//
+// TODO(https://fxbug.dev/360942417): More entries and properly implement me!
+#[derive(Clone)]
+enum Key {
+    Data(NoKey),
+}
+
+impl Key {
+    fn get_type(&self) -> Type {
+        match self {
+            Self::Data(_) => Type::Data,
+        }
     }
 
-    fn get(&self, id: AttributeId) -> Option<Attribute> {
+    fn size(&self) -> u32 {
+        0
+    }
+
+    fn max_size(&self) -> u32 {
+        0
+    }
+
+    fn buffer_attribute(&self, _id: AttributeId) -> Option<&Vec<u8>> {
+        None
+    }
+
+    fn value_attribute(&self, _id: AttributeId) -> Option<&ValueFields> {
         None
     }
 }
 
-// TODO(https://fxbug.dev/360942417): Implement me!
+// The common object abstraction implemented by transient and persistent
+// storage objects.
+trait Object {
+    fn key(&self) -> &Key;
+
+    fn usage(&self) -> &Usage;
+    fn usage_mut(&mut self) -> &mut Usage;
+
+    fn flags(&self) -> &HandleFlags;
+
+    fn restrict_usage(&mut self, restriction: Usage) {
+        let usage = self.usage_mut();
+        *usage = usage.intersection(restriction)
+    }
+
+    fn get_info(&self, data_size: usize, data_position: usize) -> ObjectInfo {
+        let all_info_flags = HandleFlags::PERSISTENT
+            | HandleFlags::INITIALIZED
+            | HandleFlags::DATA_ACCESS_READ
+            | HandleFlags::DATA_ACCESS_WRITE
+            | HandleFlags::DATA_ACCESS_WRITE_META
+            | HandleFlags::DATA_SHARE_READ
+            | HandleFlags::DATA_SHARE_WRITE;
+        let flags = self.flags().intersection(all_info_flags);
+        let key_size = self.key().size();
+        let object_size = if key_size > 0 { key_size } else { data_size.try_into().unwrap() };
+        ObjectInfo {
+            object_type: self.key().get_type(),
+            max_object_size: self.key().max_size(),
+            object_size,
+            object_usage: *self.usage(),
+            data_position: data_position,
+            data_size: data_size,
+            handle_flags: flags,
+        }
+    }
+}
+
 struct PersistentObject {
-    type_: Type,
+    key: Key,
     usage: Usage,
     base_flags: HandleFlags,
-    attributes: AttributeSet,
     data: zx::Vmo,
     data_size: usize,
     id: Vec<u8>,
@@ -87,41 +144,24 @@ struct PersistentObject {
     handles: HashSet<ObjectHandle>,
 }
 
-impl PersistentObject {
-    fn size_bytes(&self) -> u32 {
-        // TODO(https://fxbug.dev/360942417): Implement me!
-        0
+impl Object for PersistentObject {
+    fn key(&self) -> &Key {
+        &self.key
     }
 
-    fn size_bits(&self) -> u32 {
-        self.size_bytes() * 8
+    fn usage(&self) -> &Usage {
+        &self.usage
+    }
+    fn usage_mut(&mut self) -> &mut Usage {
+        &mut self.usage
     }
 
-    fn get_info(&self, data_position: usize) -> ObjectInfo {
-        let all_data_flags = HandleFlags::DATA_ACCESS_READ
-            | HandleFlags::DATA_ACCESS_WRITE
-            | HandleFlags::DATA_ACCESS_WRITE_META
-            | HandleFlags::DATA_SHARE_READ
-            | HandleFlags::DATA_SHARE_WRITE;
-        let flags = self.base_flags.intersection(all_data_flags)
-            | HandleFlags::PERSISTENT
-            | HandleFlags::INITIALIZED;
-        let object_size = self.size_bits();
-        ObjectInfo {
-            object_type: self.type_,
-            max_object_size: object_size,
-            object_size,
-            object_usage: self.usage,
-            data_position: data_position,
-            data_size: self.data_size,
-            handle_flags: flags,
-        }
+    fn flags(&self) -> &HandleFlags {
+        &self.base_flags
     }
 }
 
 // A handle's view into a persistent object.
-//
-// TODO(https://fxbug.dev/360942417):Implement me!
 struct PersistentObjectView {
     object: Arc<Mutex<PersistentObject>>,
     flags: HandleFlags,
@@ -130,7 +170,8 @@ struct PersistentObjectView {
 
 impl PersistentObjectView {
     fn get_info(&self) -> ObjectInfo {
-        self.object.lock().get_info(self.data_position)
+        let obj = self.object.lock();
+        obj.get_info(obj.data_size, self.data_position)
     }
 
     // See read_object_data().
@@ -217,8 +258,6 @@ type PersistentHandleMap = HashMap<ObjectHandle, Mutex<PersistentObjectView>>;
 type PersistentEnumHandleMap = HashMap<ObjectEnumHandle, Mutex<EnumState>>;
 
 // A class abstraction implementing the persistent storage interface.
-//
-// TODO(https://fxbug.dev/360942417): Implement me!
 struct PersistentObjects {
     by_id: RwLock<PersistentIdMap>,
     by_handle: RwLock<PersistentHandleMap>,
@@ -240,11 +279,10 @@ impl PersistentObjects {
 
     fn create(
         &self,
-        id: &[u8],
-        type_: Type,
+        key: Key,
         usage: Usage,
         flags: HandleFlags,
-        attributes: AttributeSet,
+        id: &[u8],
         initial_data: &[u8],
     ) -> TeeResult<ObjectHandle> {
         assert!(id.len() <= OBJECT_ID_MAX_LEN);
@@ -255,11 +293,12 @@ impl PersistentObjects {
             data.write(initial_data, 0).unwrap();
         }
 
+        let flags = flags.union(HandleFlags::PERSISTENT | HandleFlags::INITIALIZED);
+
         let obj = PersistentObject {
-            type_,
+            key,
             usage,
             base_flags: flags,
-            attributes,
             data,
             data_size: initial_data.len(),
             id: Vec::from(id),
@@ -323,7 +362,7 @@ impl PersistentObjects {
             // to imagine what else an implementation could or should do in
             // this case.
             if obj.handles.is_empty() {
-                obj.base_flags = flags;
+                obj.base_flags = flags.union(HandleFlags::PERSISTENT | HandleFlags::INITIALIZED);
             } else {
                 let combined = flags.union(obj.base_flags);
                 let intersection = flags.intersection(obj.base_flags);
@@ -524,7 +563,7 @@ impl PersistentObjects {
                     let written = &mut id_buffer[..id.len()];
                     written.copy_from_slice(id);
                     state.id = Some(id.clone());
-                    Ok((obj.lock().get_info(0), written))
+                    Ok((obj.lock().get_info(/*data_size=*/ 0, /*data_position=*/ 0), written))
                 } else {
                     Err(Error::ItemNotFound)
                 }
@@ -590,10 +629,7 @@ pub fn restrict_object_usage(object: ObjectHandle, usage: Usage) {
         unimplemented!();
     }
 
-    persistent_objects().operate(object, |view| {
-        let mut obj = view.object.lock();
-        obj.usage = obj.usage.intersection(usage);
-    })
+    persistent_objects().operate(object, |view| view.object.lock().restrict_usage(usage))
 }
 
 /// Encapsulates an error of get_object_buffer_attribute(), which includes the
@@ -623,24 +659,28 @@ pub fn get_object_buffer_attribute<'a>(
 ) -> Result<&'a [u8], GetObjectBufferAttributeError> {
     assert!(!attribute_id.value());
 
-    const NOT_FOUND: GetObjectBufferAttributeError =
-        GetObjectBufferAttributeError { error: Error::ItemNotFound, actual_size: 0 };
+    let copy_from_key =
+        |key: &Key, buffer: &'a mut [u8]| -> Result<&'a [u8], GetObjectBufferAttributeError> {
+            if let Some(bytes) = key.buffer_attribute(attribute_id) {
+                if buffer.len() < bytes.len() {
+                    Err(GetObjectBufferAttributeError {
+                        error: Error::ShortBuffer,
+                        actual_size: bytes.len(),
+                    })
+                } else {
+                    let written = &mut buffer[..bytes.len()];
+                    written.copy_from_slice(bytes);
+                    Ok(written)
+                }
+            } else {
+                Err(GetObjectBufferAttributeError { error: Error::ItemNotFound, actual_size: 0 })
+            }
+        };
 
-    let attr = if is_transient_handle(object) {
+    if is_transient_handle(object) {
         unimplemented!();
     } else {
-        persistent_objects().operate(object, |view| {
-            view.object.lock().attributes.get(attribute_id).ok_or(NOT_FOUND)
-        })
-    }?;
-
-    let bytes = attr.as_memory_reference().as_slice();
-    if buffer.len() < bytes.len() {
-        Err(GetObjectBufferAttributeError { error: Error::ShortBuffer, actual_size: bytes.len() })
-    } else {
-        let written = &mut buffer[..bytes.len()];
-        written.copy_from_slice(bytes);
-        Ok(written)
+        persistent_objects().operate(object, |view| copy_from_key(&view.object.lock().key, buffer))
     }
 }
 
@@ -657,14 +697,19 @@ pub fn get_object_value_attribute(
 ) -> TeeResult<ValueFields> {
     assert!(!attribute_id.value());
 
-    let attr = if is_transient_handle(object) {
+    let copy_from_key = |key: &Key| {
+        if let Some(value) = key.value_attribute(attribute_id) {
+            Ok(value.clone())
+        } else {
+            Err(Error::ItemNotFound)
+        }
+    };
+
+    if is_transient_handle(object) {
         unimplemented!();
     } else {
-        persistent_objects().operate(object, |view| {
-            view.object.lock().attributes.get(attribute_id).ok_or(Error::ItemNotFound)
-        })
-    }?;
-    Ok(attr.as_value().clone())
+        persistent_objects().operate(object, |view| copy_from_key(&view.object.lock().key))
+    }
 }
 
 /// Closes the given object handle.
@@ -712,15 +757,6 @@ pub fn init_value_attribute(id: AttributeId, value: ValueFields) -> Attribute {
 
 pub fn copy_object_attributes(src: ObjectHandle, dest: ObjectHandle) -> TeeResult {
     assert!(is_transient_handle(dest));
-
-    let (_, _, _) = if is_transient_handle(src) {
-        unimplemented!()
-    } else {
-        persistent_objects().operate(src, |view| {
-            let obj = view.object.lock();
-            (obj.type_, obj.usage, obj.attributes)
-        })
-    };
     unimplemented!()
 }
 
@@ -778,17 +814,18 @@ pub fn create_persistent_object(
     }
 
     let objects = persistent_objects();
-    let (type_, usage, attrs) = if attribute_src.is_null() {
-        (Type::Data, Usage::default(), AttributeSet::new())
+    let (key, usage, base_flags) = if attribute_src.is_null() {
+        (Key::Data(NoKey {}), Usage::default(), HandleFlags::empty())
     } else if is_persistent_handle(attribute_src) {
         persistent_objects().operate(attribute_src, |view| {
             let obj = view.object.lock();
-            (obj.type_, obj.usage, obj.attributes)
+            (obj.key.clone(), obj.usage, obj.base_flags)
         })
     } else {
         unimplemented!();
     };
-    objects.create(id, type_, usage, flags, attrs, initial_data)
+    let flags = base_flags.union(flags);
+    objects.create(key, usage, flags, id, initial_data)
 }
 
 /// Closes the given handle to a persistent object and deletes the object.
