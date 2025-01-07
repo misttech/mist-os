@@ -6,7 +6,7 @@ use fuchsia_inspect::{Inspector, LazyNode};
 use futures::FutureExt;
 
 use inspect_runtime::PublishedInspectController;
-use tracing::debug;
+use log::debug;
 use {fuchsia_inspect as _, inspect_runtime as _};
 
 /// Hold the resource required to serve the inspect tree.

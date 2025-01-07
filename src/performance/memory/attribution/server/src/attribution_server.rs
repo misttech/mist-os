@@ -6,11 +6,11 @@ use fidl::endpoints::ControlHandle;
 use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_memory_attribution as fattribution;
 use fuchsia_sync::Mutex;
+use log::error;
 use measure_tape_for_attribution::Measurable;
 use std::collections::HashMap;
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::error;
 
 mod key {
     /// Identifier used for disambiguation;
@@ -161,7 +161,7 @@ impl AttributionServer {
         let mut locked_inner = inner.lock();
 
         if locked_inner.consumer.is_some() {
-            tracing::warn!("Multiple connection requests to AttributionProvider");
+            log::warn!("Multiple connection requests to AttributionProvider");
             // The shutdown of the observer will be done when the old [AttributionConsumer] is
             // dropped.
         }

@@ -40,7 +40,7 @@ rustc_binary("bin") {
     "//src/lib/trace/rust:trace",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 
   test_deps = [
@@ -69,8 +69,8 @@ rustc_library("traces") {
     "//src/lib/trace/rust:trace-provider",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
     "//third_party/rust_crates:tokio",
-    "//third_party/rust_crates:tracing",
   ]
 }
 
@@ -85,7 +85,7 @@ rustc_library("inspect_nodes") {
     "//src/lib/diagnostics/inspect/rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:log",
   ]
 }
 
@@ -109,10 +109,10 @@ rustc_staticlib("memory-monitor2-trace-rust-cpp-lib") {
   deps = [
     ":traces",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:tokio",
-    "//third_party/rust_crates:tracing-subscriber",
   ]
 
   public = [ "tests/traces/lib.h" ]

@@ -8,11 +8,11 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path
 use fuchsia_component::server::ServiceFs;
 use fuchsia_trace::duration;
 use futures::StreamExt;
+use log::{error, warn};
 use resources::Job;
 use snapshot::AttributionSnapshot;
 use std::sync::Arc;
 use traces::CATEGORY_MEMORY_CAPTURE;
-use tracing::{error, warn};
 
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_kernel as fkernel,
@@ -80,7 +80,7 @@ async fn main() -> Result<(), Error> {
                     if let Err(error) =
                         serve_client_stream(stream, &kernel_stats, attribution_client.clone()).await
                     {
-                        warn!(%error);
+                        warn!(error:%; "");
                     }
                 }
             }
@@ -110,7 +110,7 @@ async fn serve_client_stream(
                     provide_snapshot(&attribution_client, &root_job, &kernel_stats, snapshot).await
                 {
                     // Errors from `serve_snapshot` are all internal errors, not client-induced.
-                    error!(%err);
+                    error!(err:%; "");
                     control_handle.shutdown_with_epitaph(zx::Status::INTERNAL);
                 }
             }

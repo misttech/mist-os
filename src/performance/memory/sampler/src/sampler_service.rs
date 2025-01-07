@@ -107,7 +107,7 @@ async fn run_sampler_service(
     mut tx: mpsc::Sender<ProfileReport>,
 ) -> Result<(), Error> {
     let profile = process_sampler_requests(stream, &mut tx).await?;
-    tracing::debug!("Profiling for {} done, queuing final report", profile.get_process_name());
+    log::debug!("Profiling for {} done, queuing final report", profile.get_process_name());
     tx.send(profile).await?;
     Ok(())
 }
@@ -135,7 +135,7 @@ pub fn setup_sampler_service(
                     run_sampler_service(stream, tx.clone())
                 },
             )
-            .inspect_err(|e| tracing::error!("fuchsia.memory.sampler/Sampler protocol: {}", e)),
+            .inspect_err(|e| log::error!("fuchsia.memory.sampler/Sampler protocol: {}", e)),
     ))
 }
 

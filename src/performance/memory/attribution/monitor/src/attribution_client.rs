@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::common::{GlobalPrincipalIdentifier, GlobalPrincipalIdentifierFactory};
 use fuchsia_sync::Mutex;
-use tracing::error;
+use log::error;
 use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_memory_attribution as fattribution};
 
 /// An error of the attribution client.

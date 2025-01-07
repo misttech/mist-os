@@ -6,9 +6,9 @@ use anyhow::Context;
 use fidl_fuchsia_memory_heapdump_client::{self as fheapdump_client, CollectorError};
 use futures::lock::Mutex;
 use futures::StreamExt;
+use log::{info, warn};
 use std::collections::hash_map::{Entry, HashMap};
 use std::sync::Arc;
-use tracing::{info, warn};
 use zx::Koid;
 use {fidl_fuchsia_memory_heapdump_process as fheapdump_process, fuchsia_async as fasync};
 
@@ -90,7 +90,7 @@ impl Registry {
                             self.find_process_by_koid(&Koid::from_raw(koid)).await
                         }
                         Some(process_selector @ fheapdump_client::ProcessSelectorUnknown!()) => {
-                            warn!(ordinal = process_selector.ordinal(), "Unknown process selector");
+                            warn!(ordinal = process_selector.ordinal(); "Unknown process selector");
                             Err(CollectorError::ProcessSelectorUnsupported)
                         }
                         None => {
@@ -109,7 +109,7 @@ impl Registry {
                                         .context("streaming snapshot")
                                 }
                                 Err(error) => {
-                                    warn!(?error, "Error while taking live snapshot");
+                                    warn!(error:?; "Error while taking live snapshot");
                                     CollectorError::LiveSnapshotFailed
                                 }
                             },
@@ -133,7 +133,7 @@ impl Registry {
                             Ok(Box::new(|koid, _name| koid.raw_koid() == *desired_koid))
                         }
                         Some(process_selector @ fheapdump_client::ProcessSelectorUnknown!()) => {
-                            warn!(ordinal = process_selector.ordinal(), "Unknown process selector");
+                            warn!(ordinal = process_selector.ordinal(); "Unknown process selector");
                             Err(CollectorError::ProcessSelectorUnsupported)
                         }
                     };
@@ -159,7 +159,7 @@ impl Registry {
                                     responder.send(Err(error)).context("sending error")
                                 } else {
                                     warn!(
-                                        ?error,
+                                        error:?;
                                         "Could not report because the client never called GetNext"
                                     );
                                     Ok(())
@@ -187,7 +187,7 @@ impl Registry {
                     });
                 }
                 fheapdump_client::CollectorRequest::_UnknownMethod { ordinal, .. } => {
-                    warn!(ordinal, "Unknown CollectorRequest");
+                    warn!(ordinal; "Unknown CollectorRequest");
                 }
             }
         }
@@ -227,7 +227,7 @@ impl Registry {
 
     async fn serve_process(&self, process: Arc<dyn Process>) -> Result<(), anyhow::Error> {
         let process_koid = process.get_koid();
-        info!(koid = process_koid.raw_koid(), name = process.get_name(), "Process connected");
+        info!(koid = process_koid.raw_koid(), name = process.get_name(); "Process connected");
         match self.processes.lock().await.entry(process_koid) {
             Entry::Vacant(vacant_entry) => vacant_entry.insert(Arc::clone(&process)),
             Entry::Occupied(_) => {
@@ -238,7 +238,7 @@ impl Registry {
 
         let status = process.serve_until_exit().await;
 
-        info!(koid = process_koid.raw_koid(), name = process.get_name(), "Process disconnected");
+        info!(koid = process_koid.raw_koid(), name = process.get_name(); "Process disconnected");
         self.processes.lock().await.remove(&process_koid).expect("Koid should still be present");
 
         // Propagate error only after removing the entry from `processes`.
@@ -269,7 +269,7 @@ impl Registry {
 fn start_detached_task(fut: impl futures::Future<Output = anyhow::Result<()>> + 'static) {
     let worker_fn = async move {
         if let Err(error) = fut.await {
-            warn!(?error, "Error in detached task");
+            warn!(error:?; "Error in detached task");
         }
     };
     fasync::Task::local(worker_fn).detach();

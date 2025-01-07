@@ -1,9 +1,9 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use log::debug;
 use std::sync::OnceLock;
 use tokio::sync::watch::{self, Receiver, Sender};
-use tracing::debug;
 
 // Use a singleton so that `trace_provider_create_with_fdio` is used only once, and the
 // `c_callback` can interact with a `TraceObserver` instance.

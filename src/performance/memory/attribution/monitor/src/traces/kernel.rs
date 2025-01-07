@@ -5,8 +5,8 @@ use anyhow::Result;
 use fuchsia_async::{Interval, MonotonicDuration};
 use fuchsia_trace::{category_enabled, counter};
 use futures::StreamExt;
+use log::debug;
 use std::ffi::CStr;
-use tracing::debug;
 
 use crate::watcher::Watcher;
 const CATEGORY_MEMORY_KERNEL: &'static CStr = c"memory:kernel";
@@ -25,11 +25,7 @@ pub async fn serve_forever(
         let mut interval = Interval::new(MonotonicDuration::from_seconds(1));
         while category_enabled(CATEGORY_MEMORY_KERNEL) {
             if let Err(err) = publish_one_sample(&kernel_stats).await {
-                tracing::warn!(
-                    "Failed to trace on category {:?} : {:?}",
-                    CATEGORY_MEMORY_KERNEL,
-                    err
-                );
+                log::warn!("Failed to trace on category {:?} : {:?}", CATEGORY_MEMORY_KERNEL, err);
             }
             debug!("Wait for {} second(s)", delay_in_secs);
             interval.next().await;

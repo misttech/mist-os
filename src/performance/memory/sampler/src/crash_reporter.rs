@@ -123,7 +123,7 @@ pub fn setup_crash_reporter() -> (mpsc::Sender<ProfileReport>, Task<Result<(), E
             .try_for_each(|profiles| async move {
                 let crash_reporter = connect_to_protocol::<CrashReporterMarker>()?;
                 file_report(profiles, &crash_reporter)
-                    .inspect_err(|e| tracing::error!("Filing report: {}", e))
+                    .inspect_err(|e| log::error!("Filing report: {}", e))
                     .await
             })
     });
