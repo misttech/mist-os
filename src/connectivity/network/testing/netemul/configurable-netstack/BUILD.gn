@@ -35,18 +35,20 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_component("configurable-netstack") {
+fuchsia_component("netstack2") {
   testonly = true
-  manifest = "meta/configurable-netstack.cml"
+  component_name = "configurable-netstack-netstack2"
+  manifest = "meta/configurable-netstack-netstack2.cml"
   deps = [
     ":bin",
     "//src/connectivity/network/netstack:component-debug",
   ]
 }
 
-fuchsia_component("configurable-netstack-fast-udp") {
+fuchsia_component("netstack2-fast-udp") {
   testonly = true
-  manifest = "meta/configurable-netstack-fast-udp.cml"
+  component_name = "configurable-netstack-netstack2-fast-udp"
+  manifest = "meta/configurable-netstack-netstack2-fast-udp.cml"
   deps = [
     ":bin",
     "//src/connectivity/network/netstack:component-with-fast-udp-debug",
@@ -55,6 +57,16 @@ fuchsia_component("configurable-netstack-fast-udp") {
 
 fuchsia_component("configurable-netstack-netstack3") {
   testonly = true
+  manifest = "meta/configurable-netstack-netstack3.cml"
+  deps = [
+    ":bin",
+    "//src/connectivity/network/netstack3:component-debug",
+  ]
+}
+
+fuchsia_component("netstack3") {
+  testonly = true
+  component_name = "configurable-netstack-netstack3"
   manifest = "meta/configurable-netstack-netstack3.cml"
   deps = [
     ":bin",

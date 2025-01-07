@@ -50,7 +50,7 @@
         },
         {
             name: "fuchsia-netstack",
-            url: "#meta/configurable-netstack.cm",
+            url: "#meta/configurable-netstack-netstack2.cm",
         },
 
         // =================== weave node ===================
@@ -60,19 +60,19 @@
         },
         {
             name: "weave-netstack",
-            url: "#meta/configurable-netstack.cm",
+            url: "#meta/configurable-netstack-netstack2.cm",
         },
 
         // =================== wlan node ====================
         {
             name: "wlan-netstack",
-            url: "#meta/configurable-netstack.cm",
+            url: "#meta/configurable-netstack-netstack2.cm",
         },
 
         // =================== wpan node ====================
         {
             name: "wpan-netstack",
-            url: "#meta/configurable-netstack.cm",
+            url: "#meta/configurable-netstack-netstack2.cm",
         },
     ],
     use: [

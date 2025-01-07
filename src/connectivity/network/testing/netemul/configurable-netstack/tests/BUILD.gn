@@ -76,7 +76,7 @@ fuchsia_test_component("configurable-netstack-test") {
   deps = [
     ":client-component",
     ":server-component",
-    "//src/connectivity/network/testing/netemul/configurable-netstack",
+    "//src/connectivity/network/testing/netemul/configurable-netstack:netstack2",
     "//src/connectivity/network/testing/netemul/sync-manager",
   ]
 }

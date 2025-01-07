@@ -86,11 +86,11 @@
         },
         {
             name: "local-netstack",
-            url: "#meta/configurable-netstack.cm",
+            url: "#meta/configurable-netstack-netstack2.cm",
         },
         {
             name: "remote-netstack",
-            url: "#meta/configurable-netstack.cm",
+            url: "#meta/configurable-netstack-netstack2.cm",
         },
         {
             name: "sync-manager",

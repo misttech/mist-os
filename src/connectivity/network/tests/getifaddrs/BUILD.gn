@@ -26,7 +26,7 @@ common_deps = [ ":test-driver" ]
 
 fuchsia_test_component("ns3-tests") {
   manifest = "meta/netstack3.cml"
-  deps = common_deps + [ "//src/connectivity/network/testing/netemul/configurable-netstack:configurable-netstack-netstack3" ]
+  deps = common_deps + [ "//src/connectivity/network/testing/netemul/configurable-netstack:netstack3" ]
 }
 
 fuchsia_test_package("ns3-getifaddrs-test") {
@@ -42,9 +42,7 @@ all_test_targets = [
 if (target_cpu != "riscv64") {
   fuchsia_test_component("ns2-tests") {
     manifest = "meta/netstack2.cml"
-    deps =
-        common_deps +
-        [ "//src/connectivity/network/testing/netemul/configurable-netstack" ]
+    deps = common_deps + [ "//src/connectivity/network/testing/netemul/configurable-netstack:netstack2" ]
   }
 
   fuchsia_test_package("ns2-getifaddrs-test") {
