@@ -219,7 +219,6 @@ pub(crate) async fn serve_iterator(
                     server,
                 )?;
 
-                log::info!("Serving debug data file {}: {}", dir_path, file_name);
                 let (client, server) = zx::Socket::create_stream();
                 let t = fasync::Task::spawn(serve_file_over_socket(
                     file_name.clone(),
