@@ -3,17 +3,16 @@
 // found in the LICENSE file.
 
 use std::borrow::Cow;
-use std::sync::Weak;
+use std::sync::{Arc, Weak};
 
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{BytesFile, BytesFileOps, FsNodeOps};
-use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 
 use crate::cgroup::{Cgroup, CgroupOps};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum FreezerState {
     Frozen,
     Thawed,
@@ -35,40 +34,32 @@ impl Default for FreezerState {
 }
 
 pub struct FreezerFile {
-    state: Mutex<FreezerState>,
     cgroup: Weak<Cgroup>,
 }
 
 impl FreezerFile {
     pub fn new_node(cgroup: Weak<Cgroup>) -> impl FsNodeOps {
-        BytesFile::new_node(Self { state: Mutex::new(FreezerState::Thawed), cgroup })
+        BytesFile::new_node(Self { cgroup })
+    }
+
+    fn cgroup(&self) -> Result<Arc<Cgroup>, Errno> {
+        self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
     }
 }
 
 impl BytesFileOps for FreezerFile {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
         let state_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
-        let state = match state_str.trim() {
-            "1" => FreezerState::Frozen,
-            "0" => FreezerState::Thawed,
-            _ => return error!(EINVAL),
-        };
-        let cgroup = self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))?;
-        match state {
-            FreezerState::Frozen => {
-                cgroup.freeze()?;
-            }
-            FreezerState::Thawed => {
-                cgroup.thaw();
-            }
+        let cgroup = self.cgroup()?;
+        match state_str.trim() {
+            "1" => cgroup.freeze(),
+            "0" => Ok(cgroup.thaw()),
+            _ => error!(EINVAL),
         }
-        *self.state.lock() = state;
-
-        Ok(())
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let state_str = format!("{}\n", self.state.lock());
+        let state_str = format!("{}\n", self.cgroup()?.get_status().freezer_state);
         Ok(state_str.as_bytes().to_owned().into())
     }
 }

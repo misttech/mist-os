@@ -12,9 +12,9 @@ use starnix_core::task::{CurrentTask, Kernel, ProcessEntryRef, ThreadGroup, Wait
 use starnix_core::vfs::buffers::InputBuffer;
 use starnix_core::vfs::{
     fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_not_dir,
-    AppendLockGuard, BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource,
-    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    FsString, VecDirectory, VecDirectoryEntry,
+    AppendLockGuard, BytesFile, BytesFileOps, DirectoryEntryType, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
 };
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex};
@@ -25,6 +25,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, pid_t};
+use std::borrow::Cow;
 use std::collections::{btree_map, hash_map, BTreeMap, HashMap};
 use std::ops::Deref;
 use std::sync::{Arc, OnceLock, Weak};
@@ -34,6 +35,7 @@ use crate::freezer::{FreezerFile, FreezerState};
 const CONTROLLERS_FILE: &str = "cgroup.controllers";
 const PROCS_FILE: &str = "cgroup.procs";
 const FREEZE_FILE: &str = "cgroup.freeze";
+const EVENTS_FILE: &str = "cgroup.events";
 
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
@@ -279,6 +281,16 @@ impl Deref for CgroupChildren {
     }
 }
 
+/// Status of the cgroup, used for populating `cgroup.events` file.
+#[derive(Debug, Default)]
+pub struct CgroupStatus {
+    /// Whether the cgroup or any of its descendants have any processes.
+    pub populated: bool,
+
+    /// Freezer state of the cgroup.
+    pub freezer_state: FreezerState,
+}
+
 #[derive(Default)]
 struct CgroupState {
     /// Subgroups of this control group.
@@ -398,6 +410,14 @@ impl Cgroup {
                             FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
                         ),
                     ),
+                    (
+                        EVENTS_FILE.into(),
+                        fs.create_node(
+                            current_task,
+                            EventsFile::new_node(weak.clone() as Weak<Self>),
+                            FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                        ),
+                    ),
                 ]),
                 weak_self: weak.clone(),
             }
@@ -432,6 +452,16 @@ impl Cgroup {
         if !state.deleted {
             state.processes.remove(&pid);
         }
+    }
+
+    /// Gets the current status of the cgroup.
+    pub fn get_status(&self) -> CgroupStatus {
+        let mut state = self.state.lock();
+        if state.deleted {
+            return CgroupStatus::default();
+        }
+        state.update_processes();
+        CgroupStatus { populated: !state.processes.is_empty(), freezer_state: state.freezer_state }
     }
 }
 
@@ -757,5 +787,31 @@ impl FileOps for ControlGroupFile {
         self.cgroup()?.add_process(pid, thread_group)?;
 
         Ok(bytes.len())
+    }
+}
+
+pub struct EventsFile {
+    cgroup: Weak<Cgroup>,
+}
+impl EventsFile {
+    fn new_node(cgroup: Weak<Cgroup>) -> impl FsNodeOps {
+        BytesFile::new_node(Self { cgroup })
+    }
+
+    fn cgroup(&self) -> Result<Arc<Cgroup>, Errno> {
+        self.cgroup.upgrade().ok_or_else(|| errno!(ENODEV))
+    }
+}
+
+impl BytesFileOps for EventsFile {
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        track_stub!(
+            TODO("https://fxbug.dev/377755814"),
+            "cgroup.events does not check state of parent and children cgroup"
+        );
+        let status = self.cgroup()?.get_status();
+        let events_str =
+            format!("populated {}\nfrozen {}\n", status.populated as u8, status.freezer_state);
+        Ok(events_str.as_bytes().to_owned().into())
     }
 }
