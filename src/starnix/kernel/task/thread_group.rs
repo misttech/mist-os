@@ -1492,7 +1492,7 @@ impl ThreadGroupMutableState<Base = ThreadGroup> {
     pub fn get_ppid(&self) -> pid_t {
         match &self.parent {
             Some(parent) => parent.upgrade().leader,
-            None => self.leader(),
+            None => 0,
         }
     }
 
