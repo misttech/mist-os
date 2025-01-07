@@ -1527,6 +1527,31 @@ fn get_cached_sid_and_class(fs_node: &FsNode) -> Option<FsNodeSidAndClass> {
     .map(|sid| FsNodeSidAndClass { sid, class: state.class })
 }
 
+/// Encapsulates a temporary override of the SID with which file nodes will be created.
+/// Restores the previously used file creation SID when dropped.
+pub struct ScopedFsCreate<'a> {
+    task: &'a CurrentTask,
+    old_fscreate_sid: Option<SecurityId>,
+}
+
+/// TODO(https://fxbug.dev/364568931) - Remove `dead_code` allowance once this is used by production hooks.
+#[allow(dead_code)]
+pub(super) fn scoped_fs_create<'a>(
+    task: &'a CurrentTask,
+    fscreate_sid: SecurityId,
+) -> ScopedFsCreate<'a> {
+    let mut task_attrs = task.security_state.lock();
+    let old_fscreate_sid = std::mem::replace(&mut task_attrs.fscreate_sid, Some(fscreate_sid));
+    ScopedFsCreate { task, old_fscreate_sid }
+}
+
+impl Drop for ScopedFsCreate<'_> {
+    fn drop(&mut self) {
+        let mut task_attrs = self.task.security_state.lock();
+        task_attrs.fscreate_sid = self.old_fscreate_sid;
+    }
+}
+
 #[cfg(test)]
 /// Returns the SID with which the node is labeled, if any, for use by `FsNode` labeling tests.
 pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
@@ -1763,5 +1788,21 @@ mod tests {
 
             assert_eq!(BStr::new(b"/foo/bar"), get_fs_relative_path(&dir_entry));
         });
+    }
+
+    #[fuchsia::test]
+    async fn create_file_with_fscreate_sid() {
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |locked, current_task, security_server| {
+                let sid =
+                    security_server.security_context_to_sid(VALID_SECURITY_CONTEXT.into()).unwrap();
+                let scoped_fs_create = scoped_fs_create(current_task, sid);
+                let dir_entry = &testing::create_test_file(locked, current_task).entry;
+                std::mem::drop(scoped_fs_create);
+
+                let effective_sid = fs_node_effective_sid_and_class(&dir_entry.node).sid;
+                assert_eq!(sid, effective_sid);
+            },
+        );
     }
 }
