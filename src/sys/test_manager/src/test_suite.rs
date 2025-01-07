@@ -502,7 +502,7 @@ async fn run_single_suite_for_suite_runner(
             debug_data_sender,
             &diagnostics,
             &suite_realm,
-            false, // use_debug_agent
+            true, // Use DebugAgent
         )
         .await
         {
@@ -600,7 +600,7 @@ pub(crate) async fn run_single_suite(
             debug_data_sender,
             &diagnostics,
             &suite_realm,
-            false, // use_debug_agent
+            true, // Use DebugAgent
         )
         .await
         {
