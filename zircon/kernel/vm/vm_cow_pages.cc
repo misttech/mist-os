@@ -1011,6 +1011,12 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
     DEBUG_ASSERT(parent == this);  // `parent` must either be hidden already, or be `this` node.
     DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
 
+    // Invalidate everything, both the pages the clone will and will not be able to see. As hidden
+    // nodes are immutable, even for pages that the clone cannot see we want the parent_clone to
+    // move them back out before modifying them.
+    // Note: We could eagerly move these pages into the parent_clone instead.
+    RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite);
+
     parent_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
         hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size_, nullptr, nullptr));
     if (!ac.check()) {
@@ -1172,10 +1178,6 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
       return ZX_ERR_INVALID_ARGS;
     }
   }
-
-  // Invalidate everything the clone will be able to see. They're COW pages now,
-  // so any existing mappings can no longer directly write to the pages.
-  RangeChangeUpdateLocked(VmCowRange(offset, size), RangeChangeOp::RemoveWrite);
 
   switch (type) {
     case CloneType::Snapshot: {
