@@ -29,7 +29,7 @@ import("libc_headers.gni")
 # llvm-libc roll to complete.  Finally, the flag must be set back to false
 # along with rebuilding with `update_goldens=true` in `args.gn` to update the
 # API summary files for the SDK, for a change that go through API review.
-llvm_libc_soft_transition = false
+llvm_libc_soft_transition = true  # TODO(https://fxbug.dev/376333113)
 
 # This target is in an sdk.deps list in sysroot_entries, to ensure that the
 # llvm-libc-golden copies are up to date.  It does nothing during a soft
