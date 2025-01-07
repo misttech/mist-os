@@ -1888,8 +1888,8 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
     Guard<CriticalMutex> guard{lock()};
 
     uint64_t taken_len = 0;
-    zx_status_t status =
-        cow_pages_locked()->TakePagesLocked(offset, len, pages, &taken_len, &page_request);
+    zx_status_t status = cow_pages_locked()->TakePagesLocked(VmCowRange(offset, len), pages,
+                                                             &taken_len, &page_request);
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }
@@ -1930,8 +1930,8 @@ zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpli
     Guard<CriticalMutex> guard{lock()};
 
     uint64_t supply_len = 0;
-    zx_status_t status = cow_pages_locked()->SupplyPagesLocked(offset, len, pages, options,
-                                                               &supply_len, &page_request);
+    zx_status_t status = cow_pages_locked()->SupplyPagesLocked(VmCowRange(offset, len), pages,
+                                                               options, &supply_len, &page_request);
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }

@@ -73,6 +73,7 @@ struct VmCowRange {
   bool is_page_aligned() const { return IS_PAGE_ALIGNED(offset) && IS_PAGE_ALIGNED(len); }
 
   VmCowRange OffsetBy(uint64_t delta) const { return VmCowRange(offset + delta, len); }
+  VmCowRange WithLength(uint64_t new_length) const { return VmCowRange(offset, new_length); }
   bool IsBoundedBy(uint64_t max) const;
 };
 
@@ -231,8 +232,8 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // |taken_len| is always filled with the amount of |len| that has been processed to allow for
   // gradual progress of calls. Will always be equal to |len| if ZX_OK is returned.
-  zx_status_t TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
-                              uint64_t* taken_len, MultiPageRequest* page_request) TA_REQ(lock());
+  zx_status_t TakePagesLocked(VmCowRange range, VmPageSpliceList* pages, uint64_t* taken_len,
+                              MultiPageRequest* page_request) TA_REQ(lock());
 
   // See VmObject::SupplyPages
   //
@@ -241,13 +242,12 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // If ZX_OK is returned then |supplied_len| will always be equal to |len|. For any other error
   // code the value of |supplied_len| is undefined.
-  zx_status_t SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
-                                SupplyOptions options, uint64_t* supplied_len,
-                                MultiPageRequest* page_request) TA_REQ(lock());
+  zx_status_t SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pages, SupplyOptions options,
+                                uint64_t* supplied_len, MultiPageRequest* page_request)
+      TA_REQ(lock());
 
-  zx_status_t SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
-                          SupplyOptions options, uint64_t* supplied_len,
-                          MultiPageRequest* page_request) TA_EXCL(lock());
+  zx_status_t SupplyPages(VmCowRange range, VmPageSpliceList* pages, SupplyOptions options,
+                          uint64_t* supplied_len, MultiPageRequest* page_request) TA_EXCL(lock());
 
   // See VmObject::FailPageRequests
   zx_status_t FailPageRequestsLocked(VmCowRange range, zx_status_t error_status) TA_REQ(lock());
@@ -721,7 +721,7 @@ class VmCowPages final : public VmHierarchyBase,
   ~VmCowPages() override;
 
   // A private helper that takes pages if this VmCowPages has a parent.
-  zx_status_t TakePagesWithParentLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
+  zx_status_t TakePagesWithParentLocked(VmCowRange range, VmPageSpliceList* pages,
                                         uint64_t* taken_len, MultiPageRequest* page_request)
       TA_REQ(lock());
 
