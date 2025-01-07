@@ -10,7 +10,7 @@ load("//common:toolchains/clang/clang_utils.bzl", "process_clang_builtins_output
 load("//common:toolchains/clang/providers.bzl", "ClangInfo")
 load("//common:toolchains/clang/toolchain_utils.bzl", "define_clang_runtime_filegroups")
 
-def prepare_clang_repository(repo_ctx, clang_install_dir):
+def prepare_clang_repository(repo_ctx, clang_install_dir, needs_symlinks = True):
     """Prepare a repository directory for a clang toolchain creation.
 
     This function must be called from a repository rule, and creates a number
@@ -40,6 +40,7 @@ def prepare_clang_repository(repo_ctx, clang_install_dir):
       repo_ctx: A repository_ctx value.
       clang_install_dir: Path to the clang prebuilt toolchain installation,
           relative to the main project workspace.
+      needs_symlinks: Whether we need to symlink the content to an outside directory
     """
     workspace_dir = str(repo_ctx.workspace_root)
 
@@ -50,8 +51,11 @@ def prepare_clang_repository(repo_ctx, clang_install_dir):
     # Note that this is possible because our C++ toolchain configuration redefine
     # the "dependency_file" feature to use relative file paths.
     clang_install_path = repo_ctx.path(clang_install_dir) if paths.is_absolute(clang_install_dir) else repo_ctx.path(workspace_dir + "/" + clang_install_dir)
-    for f in clang_install_path.readdir():
-        repo_ctx.symlink(f, f.basename)
+
+    # We only need to symlink when the contents exist outside of the repository.
+    if needs_symlinks:
+        for f in clang_install_path.readdir():
+            repo_ctx.symlink(f, f.basename)
 
     # Extract the builtin include paths by running the executable once.
     # Only care about C++ include paths. The list for compiling C is actually
