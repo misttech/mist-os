@@ -78,41 +78,45 @@ pub enum VersionedImagePackagesManifest {
 /// A manifest describing the various images and firmware packages that should be fetched and
 /// written during a system update, as well as metadata about those images and where to find them.
 #[derive(Serialize, Debug, PartialEq, Eq, Clone)]
+#[allow(missing_docs)]
 pub struct ImagePackagesManifest {
     #[serde(rename = "partitions")]
-    assets: Vec<AssetMetadata>,
-    firmware: Vec<FirmwareMetadata>,
+    pub assets: Vec<AssetMetadata>,
+    pub firmware: Vec<FirmwareMetadata>,
 }
 
 /// Metadata describing a firmware image.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
+#[allow(missing_docs)]
 pub struct FirmwareMetadata {
     #[serde(rename = "type")]
-    type_: String,
-    size: u64,
+    pub type_: String,
+    pub size: u64,
     #[serde(rename = "hash")]
-    sha256: fuchsia_hash::Sha256,
-    url: AbsoluteComponentUrl,
+    pub sha256: fuchsia_hash::Sha256,
+    pub url: AbsoluteComponentUrl,
 }
 
 /// Metadata describing a Zbi or Vbmeta image, whether or not it is for recovery, and where to
 /// resolve it from.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
 #[serde(deny_unknown_fields)]
+#[allow(missing_docs)]
 pub struct AssetMetadata {
-    slot: Slot,
+    pub slot: Slot,
     #[serde(rename = "type")]
-    type_: AssetType,
-    size: u64,
+    pub type_: AssetType,
+    pub size: u64,
     #[serde(rename = "hash")]
-    sha256: fuchsia_hash::Sha256,
-    url: AbsoluteComponentUrl,
+    pub sha256: fuchsia_hash::Sha256,
+    pub url: AbsoluteComponentUrl,
 }
 
 /// Whether an asset should be written to recovery or the non-current partition.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[serde(rename_all = "lowercase")]
+#[allow(missing_docs)]
 pub enum Slot {
     /// Write the asset to the non-current partition (if ABR is supported, otherwise overwrite
     /// the current partition).
@@ -125,6 +129,7 @@ pub enum Slot {
 /// Image asset type.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy, Hash)]
 #[serde(rename_all = "lowercase")]
+#[allow(missing_docs)]
 pub enum AssetType {
     /// A Zircon Boot Image.
     Zbi,
