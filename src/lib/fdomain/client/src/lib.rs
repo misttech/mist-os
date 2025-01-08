@@ -351,7 +351,7 @@ impl ClientInner {
         let tx_id = self.next_tx_id;
 
         let header = TransactionHeader::new(tx_id, ordinal, fidl_message::DynamicFlags::FLEXIBLE);
-        let msg = fidl_message::encode_message(header, request)?;
+        let msg = fidl_message::encode_message(header, request).expect("Could not encode request!");
         self.next_tx_id += 1;
         assert!(
             self.transactions.insert(tx_id.try_into().unwrap(), responder).is_none(),
@@ -389,14 +389,32 @@ impl ClientInner {
             }
             let Poll::Ready(Some(result)) = self.transport.poll_next(ctx) else { return Ok(()) };
             let data = result?;
-            let (header, data) = fidl_message::decode_transaction_header(&data)?;
+            let (header, data) = match fidl_message::decode_transaction_header(&data) {
+                Ok(x) => x,
+                Err(e) => {
+                    self.transport = Transport::Error(InnerError::Protocol(e));
+                    continue;
+                }
+            };
 
             let Some(tx_id) = NonZeroU32::new(header.tx_id) else {
-                return self.process_event(header, data);
+                if let Err(e) = self.process_event(header, data) {
+                    self.transport = Transport::Error(e);
+                    continue;
+                } else {
+                    return Ok(());
+                }
             };
 
             let tx = self.transactions.remove(&tx_id).ok_or(::fidl::Error::InvalidResponseTxid)?;
-            if let ResponderStatus::WriteErrorOccurred(handle) = tx.handle(Ok((header, data)))? {
+            let responder_status = match tx.handle(Ok((header, data))) {
+                Ok(x) => x,
+                Err(e) => {
+                    self.transport = Transport::Error(InnerError::Protocol(e));
+                    continue;
+                }
+            };
+            if let ResponderStatus::WriteErrorOccurred(handle) = responder_status {
                 self.request(
                     ordinals::ACKNOWLEDGE_WRITE_ERROR,
                     proto::FDomainAcknowledgeWriteErrorRequest { handle },

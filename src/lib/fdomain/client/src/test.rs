@@ -22,11 +22,12 @@ impl std::fmt::Display for TestError {
     }
 }
 
-struct TestFDomain(FDomainCodec, Arc<Mutex<Option<TestError>>>);
+struct TestFDomain(FDomainCodec, Arc<Mutex<FaultInjectorState>>);
 
 impl TestFDomain {
     fn new_client() -> (Arc<Client>, FaultInjector) {
-        let fault_injector = FaultInjector(Arc::new(Mutex::new(None)));
+        let fault_injector =
+            FaultInjector(Arc::new(Mutex::new(FaultInjectorState::SendBadMessages(Vec::new()))));
         let (client, fut) = Client::new(TestFDomain(
             FDomainCodec::new(FDomain::new_empty()),
             Arc::clone(&fault_injector.0),
@@ -50,19 +51,43 @@ impl Stream for TestFDomain {
     type Item = Result<Box<[u8]>, std::io::Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if let Some(e) = self.1.lock().unwrap().clone() {
-            return Poll::Ready(Some(Err(std::io::Error::other(e))));
+        {
+            let mut faults = self.1.lock().unwrap();
+            match &mut *faults {
+                FaultInjectorState::Error(e) => {
+                    return Poll::Ready(Some(Err(std::io::Error::other(e.clone()))));
+                }
+
+                FaultInjectorState::SendBadMessages(f) => {
+                    if let Some(send) = f.pop() {
+                        return Poll::Ready(Some(Ok(send)));
+                    }
+                }
+            }
         }
 
         Pin::new(&mut self.0).poll_next(cx).map_err(std::io::Error::other)
     }
 }
 
-struct FaultInjector(Arc<Mutex<Option<TestError>>>);
+enum FaultInjectorState {
+    Error(TestError),
+    SendBadMessages(Vec<Box<[u8]>>),
+}
+
+struct FaultInjector(Arc<Mutex<FaultInjectorState>>);
 
 impl FaultInjector {
     fn inject(&self, e: TestError) {
-        *self.0.lock().unwrap() = Some(e)
+        *self.0.lock().unwrap() = FaultInjectorState::Error(e)
+    }
+
+    fn send_garbage(&self, g: impl AsRef<[u8]>) {
+        let mut f = self.0.lock().unwrap();
+        let FaultInjectorState::SendBadMessages(queue) = &mut *f else {
+            panic!("Injected failure then still tried to send garbage!");
+        };
+        queue.insert(0, Box::from(g.as_ref()));
     }
 }
 
@@ -252,4 +277,20 @@ async fn channel_async() {
     };
 
     futures::future::join(read_side, write_side).await;
+}
+
+// TODO: We can re-enable this test in a bit. An upcoming CL reworks a bunch of
+// our internals and then this starts working again.
+#[fuchsia::test]
+#[ignore]
+async fn bad_tx() {
+    let (client, fault_injector) = TestFDomain::new_client();
+
+    let (a, b) = client.create_channel().await.unwrap();
+    let test_str_a = b"Feral Cats Move In Mysterious Ways";
+    a.write(test_str_a, Vec::new()).await.unwrap();
+    fault_injector.send_garbage(b"*splot*");
+    let err = b.recv_msg().await.unwrap_err();
+    let err2 = b.recv_msg().await.unwrap_err();
+    assert_eq!(err.to_string(), err2.to_string());
 }
