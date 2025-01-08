@@ -355,7 +355,9 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
 
   struct TlbInvalidatePage_context {
     paddr_t target_root_ptable;
+    cpu_mask_t target_mask;
     paddr_t target_unified_ptable;
+    cpu_mask_t target_unified_mask;
     const PendingTlbInvalidation* pending;
     uint16_t pcid;
     uint16_t unified_pcid;
@@ -363,7 +365,9 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
   };
   TlbInvalidatePage_context task_context = {
       .target_root_ptable = root_ptable_phys,
+      .target_mask = 0,
       .target_unified_ptable = unified_ptable_phys,
+      .target_unified_mask = 0,
       .pending = pending,
       .pcid = pcid,
       .unified_pcid = unified_pcid,
@@ -391,9 +395,9 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
     // additional comments in next if block.
     // If this is a restricted aspace, then we also need to send IPIs to any core that is running
     // the associated unified aspace.
-    target_mask = aspace->active_cpus();
+    task_context.target_mask = aspace->active_cpus();
     if (unified_aspace) {
-      target_mask |= unified_aspace->active_cpus();
+      task_context.target_unified_mask = unified_aspace->active_cpus();
     }
 
     if (g_x86_feature_pcid_enabled) {
@@ -403,10 +407,10 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
       // Mark all cpus as being dirty that aren't in this mask. This will force a TLB flush on the
       // next context switch on that cpu. If this is a restricted aspace, then we need to mark the
       // PCID of the associated unified aspace as dirty as well.
-      aspace->MarkPcidDirtyCpus(~target_mask);
+      aspace->MarkPcidDirtyCpus(~task_context.target_mask);
       if (unified_aspace) {
         DEBUG_ASSERT(unified_pcid != MMU_X86_UNUSED_PCID);
-        unified_aspace->MarkPcidDirtyCpus(~target_mask);
+        unified_aspace->MarkPcidDirtyCpus(~task_context.target_unified_mask);
       }
 
       // At this point we have CPUs in our target_mask that we're going to IPI, and any CPUS not in
@@ -425,11 +429,12 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
       // Additionally, if this is a restricted aspace, we must also send an IPI to any core that
       // is running the associated unified aspace and came online between when we set the PCIDs to
       // be dirty and now.
-      target_mask |= aspace->active_cpus();
+      task_context.target_mask |= aspace->active_cpus();
       if (unified_aspace) {
-        target_mask |= unified_aspace->active_cpus();
+        task_context.target_unified_mask |= unified_aspace->active_cpus();
       }
     }
+    target_mask = task_context.target_mask | task_context.target_unified_mask;
   }
 
   /* Task used for invalidating a TLB entry on each CPU */
@@ -438,6 +443,7 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
     const TlbInvalidatePage_context* context = static_cast<TlbInvalidatePage_context*>(raw_context);
 
     const paddr_t current_root_ptable = arch::X86Cr3::Read().base();
+    const cpu_mask_t curr_cpu_bit = cpu_num_to_mask(arch_curr_cpu_num());
 
     kcounter_add(tlb_invalidations_received, 1);
 
@@ -463,14 +469,19 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
         x86_tlb_global_invalidate();
       } else {
         kcounter_add(tlb_invalidations_full_nonglobal_received, 1);
-        if (context->is_shared) {
-          // The shared region runs under many different PCIDs, so instead of tracking those PCIDs
-          // we just invalidate all of them.
+        if (context->is_shared || !g_x86_feature_pcid_enabled) {
+          // Run a nonglobal invalidation across all PCIDs if:
+          // * We are invalidating an entry from a shared aspace, which runs under many different
+          //   PCIDs.
+          // * PCIDs are disabled.
           x86_tlb_nonglobal_invalidate(MMU_X86_UNUSED_PCID);
         } else {
-          x86_tlb_nonglobal_invalidate(context->pcid);
-          // If there's an associated unified PCID, invalidate that PCID too.
-          if (context->unified_pcid != MMU_X86_UNUSED_PCID) {
+          if (curr_cpu_bit & context->target_mask) {
+            x86_tlb_nonglobal_invalidate(context->pcid);
+          }
+          if (curr_cpu_bit & context->target_unified_mask) {
+            DEBUG_ASSERT(context->unified_pcid != MMU_X86_UNUSED_PCID);
+            // If there's an associated unified PCID, invalidate that PCID too.
             x86_tlb_nonglobal_invalidate(context->unified_pcid);
           }
         }
@@ -496,26 +507,33 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
             invlpg(item.addr());
           } else {
             // This item does not contain a global page and has a valid PCID.
-            // Start by invalidating the target PCID.
-            if (context->target_root_ptable == current_root_ptable) {
-              // If the CPU we're running on is running the target aspace, then run an invlpg to
-              // flush the address from our TLB.
-              invlpg(item.addr());
-            } else {
-              // In this case, the target aspace is not actively running on this CPU, so use an
-              // invpcid instruction to flush the entry.
-              invpcid_va_pcid(item.addr(), context->pcid);
+            // Start by invalidating the target PCID if it is running (or has run) on this CPU.
+            if (curr_cpu_bit & context->target_mask) {
+              if (context->target_root_ptable == current_root_ptable) {
+                // If the CPU we're running on is running the target aspace, then run an invlpg to
+                // flush the address from our TLB.
+                invlpg(item.addr());
+              } else {
+                // In this case, the target aspace is not actively running on this CPU, but we know
+                // that the CPU ran this aspace in the past. Therefore, we have to flush this PCID
+                // using an invpcid.
+                invpcid_va_pcid(item.addr(), context->pcid);
+              }
             }
 
-            // Now, check if there is an associated unified aspace.
-            if (context->target_unified_ptable == current_root_ptable) {
-              // If the unified aspace is currently active on this CPU, then just run an invlpg to
-              // flush the entry.
-              invlpg(item.addr());
-            } else if (context->unified_pcid != MMU_X86_UNUSED_PCID) {
-              // In this case, a unified aspace exists (has a valid PCID) but is not currently
-              // active on this CPU, so use an invpcid instruction to flush the entry.
-              invpcid_va_pcid(item.addr(), context->unified_pcid);
+            // Now, check if there is an associated unified aspace and if it has run on this CPU.
+            if (curr_cpu_bit & context->target_unified_mask) {
+              if (context->target_unified_ptable == current_root_ptable) {
+                // If the unified aspace is currently active on this CPU, then just run an invlpg to
+                // flush the entry.
+                invlpg(item.addr());
+              } else {
+                DEBUG_ASSERT(context->unified_pcid != MMU_X86_UNUSED_PCID);
+                // In this case, a unified aspace exists but is not currently active on this CPU.
+                // However, we know that this CPU has ran the unified aspace in the past, so flush
+                // its PCID using an invpcid.
+                invpcid_va_pcid(item.addr(), context->unified_pcid);
+              }
             }
           }
           break;
