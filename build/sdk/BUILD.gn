@@ -137,7 +137,7 @@ _partner_idk_unstable_source_sets_list_testonly = [
 # All targets must be in the dependency tree of `//sdk/bazel_internal_only_libs`
 # or `//sdk/firmware`.
 # TODO(https://fxbug.dev/372986936): Eliminate all such uses and remove.
-_internal_source_sets_list_testonly = [
+_internal_source_sets_list = [
   # DO NOT ADD TO THIS LIST.
 
   # TODO(https://fxbug.dev/343059325): Promote devicetree to "partner".
@@ -213,8 +213,8 @@ assert(
         _partner_idk_unstable_source_sets_list,
     "An unstable source set appears in both normal and testonly lists. Remove it from one of the lists.")
 assert(
-    _all_partner_idk_source_sets + _internal_source_sets_list_testonly -
-        _internal_source_sets_list_testonly == _all_partner_idk_source_sets,
+    _all_partner_idk_source_sets + _internal_source_sets_list -
+        _internal_source_sets_list == _all_partner_idk_source_sets,
     "A source set appears in both partner and internal lists. If promoting an internal source set, remove it from the internal list.")
 
 # Ensure no testonly atoms are in the non-test lists.
@@ -254,7 +254,7 @@ group("partner_idk_unstable_source_sets_allowlist") {
                _partner_idk_unstable_source_sets_list_testonly
 }
 group("internal_source_sets_allowlist") {
-  visibility = _internal_source_sets_list_testonly
+  visibility = _internal_source_sets_list
 }
 
 # Contains all shared libraries distributed with the partner IDK. None are
