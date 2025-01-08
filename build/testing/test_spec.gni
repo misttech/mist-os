@@ -180,16 +180,6 @@ if (allowed_device_types == []) {
 #         element-wise subsets of the test platform entries defined in
 #         //build/testing/platforms.gni.
 #
-#       emu_dimensions (optional)
-#         [scope] Dimensions to configure emulator with. This only applies if
-#         dimensions specify an emulator device type.
-#         TODO(https://fxbug.dev/326129848): Remove once we've switched to
-#         using the virtual_device_spec instead.
-#         Valid dimensions are:
-#
-#           cores (optional)
-#             [int] The number of cores to configure the emulator with.
-#
 #       virtual_device_spec (optional)
 #         [scope] Info about the virtual device spec to run the emulator with.
 #         Valid specs can be found at //build/virtual-devices/BUILD.gn.

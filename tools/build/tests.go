@@ -112,11 +112,6 @@ type Environment struct {
 	// Dimensions gives the Swarming dimensions a test wishes to target.
 	Dimensions DimensionSet `json:"dimensions"`
 
-	// EmuDimensions gives the dimensions to configure the emulator with if targeting an emulator.
-	// TODO(https://fxbug.dev/326129848): Remove once we've switched to using the VirtualDeviceSpec
-	// instead.
-	EmuDimensions map[string]any `json:"emu_dimensions,omitempty"`
-
 	// VirtualDeviceSpec specifies the virtual device spec to use if targeting an emulator.
 	VirtualDeviceSpec VirtualDeviceSpecInfo `json:"virtual_device_spec,omitempty"`
 
