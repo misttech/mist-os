@@ -1,0 +1,10 @@
+{
+  "version": "1",
+  "content": {
+    "files": {
+      "meta/fake_build_info.cm": {
+        "hash": "1a8242b86064877ae623443147d03087a2d223fa6f8be1ac92599c921bc5cd7e"
+      }
+    }
+  }
+}
