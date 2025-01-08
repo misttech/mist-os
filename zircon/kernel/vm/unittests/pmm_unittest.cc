@@ -69,6 +69,26 @@ class ManagedPmmNode {
 
   PmmNode& node() { return node_; }
 
+  zx_status_t AllocLoanedPages(size_t count, list_node_t* list) {
+    list_node alloc_list = LIST_INITIAL_VALUE(alloc_list);
+    for (size_t i = 0; i < count; i++) {
+      zx::result<vm_page_t*> result = node_.AllocLoanedPage();
+      if (result.is_error()) {
+        if (!list_is_empty(&alloc_list)) {
+          node_.FreeLoanedList(&alloc_list);
+        }
+        return result.status_value();
+      }
+      list_add_tail(&alloc_list, &(*result)->queue_node);
+    }
+    if (list_is_empty(list)) {
+      list_move(&alloc_list, list);
+    } else {
+      list_splice_after(&alloc_list, list_peek_tail(list));
+    }
+    return ZX_OK;
+  }
+
  private:
   PmmNode node_;
   Event event_;
@@ -197,7 +217,7 @@ static bool pmm_node_loan_borrow_cancel_reclaim_end() {
   EXPECT_EQ(0u, node.node().CountLoanedNotFreePages());
 
   EXPECT_EQ(0u, list_length(&list));
-  status = node.node().AllocPages(kLoanCount, PMM_ALLOC_FLAG_LOANED, &list);
+  status = node.AllocLoanedPages(kLoanCount, &list);
   EXPECT_EQ(ZX_OK, status, "pmm_alloc_pages PMM_ALLOC_FLAG_LOANED");
   EXPECT_EQ(kLoanCount, list_length(&list));
 
@@ -225,7 +245,7 @@ static bool pmm_node_loan_borrow_cancel_reclaim_end() {
   EXPECT_EQ(kLoanCount, node.node().CountLoanCancelledPages());
   EXPECT_EQ(kLoanCount, node.node().CountLoanedNotFreePages());
 
-  node.node().FreeList(&list);
+  node.node().FreeLoanedList(&list);
 
   EXPECT_EQ(kLoanCount, node.node().CountLoanedPages());
   EXPECT_EQ(kNotLoanCount, node.node().CountFreePages());
@@ -235,8 +255,8 @@ static bool pmm_node_loan_borrow_cancel_reclaim_end() {
   EXPECT_EQ(kLoanCount, node.node().CountLoanedNotFreePages());
 
   EXPECT_EQ(0u, list_length(&list));
-  status = node.node().AllocPages(kNotLoanCount + 1, PMM_ALLOC_FLAG_LOANED, &list);
-  EXPECT_EQ(ZX_ERR_NO_MEMORY, status, "try to allocate a loan_cancelled page");
+  status = node.AllocLoanedPages(kNotLoanCount + 1, &list);
+  EXPECT_EQ(ZX_ERR_NO_RESOURCES, status, "try to allocate a loan_cancelled page");
 
   EXPECT_EQ(0u, list_length(&list));
   status = node.node().AllocPages(kNotLoanCount, PMM_ALLOC_FLAG_ANY, &list);
@@ -364,7 +384,7 @@ static bool pmm_node_loan_delete_lender() {
   node.node().BeginLoan(&list);
 
   EXPECT_EQ(0u, list_length(&list));
-  status = node.node().AllocPages(kLoanCount, PMM_ALLOC_FLAG_LOANED, &list);
+  status = node.AllocLoanedPages(kLoanCount, &list);
   EXPECT_EQ(ZX_OK, status, "allocate kLoanCount pages");
   EXPECT_EQ(kLoanCount, list_length(&list));
 

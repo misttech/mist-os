@@ -35,11 +35,6 @@ struct Range;
 // is low. The caller should not infer anything about memory state if it is told to wait, as the PMM
 // may tell it to wait for any reason.
 #define PMM_ALLOC_FLAG_CAN_WAIT (1 << 1)
-// The default (flag not set) is to not allocate a loaned page, so that we don't end up with loaned
-// pages allocated for arbitrary purposes that prevent us from getting the loaned page back quickly.
-// This flag switches to requiring a loaned page, and will fail if a loaned page isn't available,
-// even if there are other free pages available.
-#define PMM_ALLOC_FLAG_LOANED (1 << 2)
 
 // per numa node collection of pmm arenas and worker threads
 class PmmNode {
@@ -66,8 +61,21 @@ class PmmNode {
   zx_status_t AllocContiguous(size_t count, uint alloc_flags, uint8_t alignment_log2, paddr_t* pa,
                               list_node* list);
   void FreePage(vm_page* page);
-  // The list can be a combination of loaned and non-loaned pages.
   void FreeList(list_node* list);
+
+  // Allocates a single page from the loaned pages list. The allocated page will always have
+  // is_loaned() being true, and must be returned by either FreeLoanedPage or FreeLoanedList. If
+  // there are not loaned pages available ZX_ERR_UNAVAILABLE is returned, as an absence of loaned
+  // pages does not constitute an out of memory scenario.
+  zx::result<vm_page_t*> AllocLoanedPage();
+
+  // Frees a single page that was allocated by AllocLoanedPage. It is an error to attempt to free a
+  // non loaned page.
+  void FreeLoanedPage(vm_page* page);
+
+  // Frees multiple pages that were allocated by AllocLoanedPage. It is an error to attempt to free
+  // any non loaned pages.
+  void FreeLoanedList(list_node* list);
 
   void UnwirePage(vm_page* page);
 

@@ -176,6 +176,13 @@ class BatchPQRemove {
     DEBUG_ASSERT(page);
     ASSERT(page->object.pin_count == 0);
     DEBUG_ASSERT(count_ < kMaxPages);
+    if (count_ != 0 && page->is_loaned() != is_loaned_) {
+      Flush();
+    }
+    if (count_ == 0) {
+      is_loaned_ = page->is_loaned();
+    }
+
     pages_[count_] = page;
     count_++;
     if (count_ == kMaxPages) {
@@ -201,8 +208,14 @@ class BatchPQRemove {
   // original list so that you can do operations on the list.
   void Flush() {
     if (count_ > 0) {
-      pmm_page_queues()->RemoveArrayIntoList(pages_, count_, freed_list_);
-      freed_count_ += count_;
+      if (is_loaned_) {
+        list_node_t loaned_freed_list = LIST_INITIAL_VALUE(loaned_freed_list);
+        pmm_page_queues()->RemoveArrayIntoList(pages_, count_, &loaned_freed_list);
+        Pmm::Node().FreeLoanedList(&loaned_freed_list);
+      } else {
+        pmm_page_queues()->RemoveArrayIntoList(pages_, count_, freed_list_);
+        freed_count_ += count_;
+      }
       count_ = 0;
     }
   }
@@ -231,6 +244,7 @@ class BatchPQRemove {
   size_t freed_count_ = 0;
   vm_page_t* pages_[kMaxPages];
   list_node_t* freed_list_ = nullptr;
+  bool is_loaned_ = false;
 };
 
 // Helper class for collecting pages to perform batched calls of |ChangeObjectOffset| on the page
@@ -340,16 +354,31 @@ zx_status_t VmCowPages::AllocPage(vm_page_t** page, AnonymousPageRequest* reques
 }
 
 zx_status_t VmCowPages::AllocLoanedPage(vm_page_t** page) {
-  uint32_t pmm_alloc_flags = pmm_alloc_flags_;
-  // Loaned page allocations will always precisely succeed or fail and the CAN_WAIT flag cannot be
-  // combined and so we remove it if it exists.
-  pmm_alloc_flags &= ~PMM_ALLOC_FLAG_CAN_WAIT;
-  pmm_alloc_flags |= PMM_ALLOC_FLAG_LOANED;
-  zx_status_t status = pmm_alloc_page(pmm_alloc_flags, page);
-  if (status == ZX_OK) {
+  DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
+  zx::result<vm_page_t*> result = Pmm::Node().AllocLoanedPage();
+  if (result.is_ok()) {
+    *page = *result;
     InitializeVmPage(*page);
   }
-  return status;
+  return result.status_value();
+}
+
+void VmCowPages::RemoveAndFreePageLocked(vm_page_t* page, bool freeing_owned_page) {
+  pmm_page_queues()->Remove(page);
+  if (page->is_loaned()) {
+    Pmm::Node().FreeLoanedPage(page);
+  } else {
+    FreePageLocked(page, freeing_owned_page);
+  }
+}
+
+void VmCowPages::RemovePageToListLocked(vm_page_t* page, list_node_t* free_list) {
+  pmm_page_queues()->Remove(page);
+  if (page->is_loaned()) {
+    Pmm::Node().FreeLoanedPage(page);
+  } else {
+    list_add_tail(free_list, &page->queue_node);
+  }
 }
 
 zx_status_t VmCowPages::CacheAllocPage(uint alloc_flags, vm_page_t** p, paddr_t* pa) {
@@ -440,7 +469,6 @@ VmCowPages::VmCowPages(const fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr,
       page_source_(ktl::move(page_source)),
       discardable_tracker_(ktl::move(discardable_tracker)) {
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
-  DEBUG_ASSERT(!(pmm_alloc_flags & PMM_ALLOC_FLAG_LOANED));
 }
 
 void VmCowPages::TransitionToAliveLocked() {
@@ -752,10 +780,7 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
 
     // Free the old page.
     vm_page_t* released_page = old_page.ReleasePage();
-    pmm_page_queues()->Remove(released_page);
-
-    DEBUG_ASSERT(!list_in_list(&released_page->queue_node));
-    FreePageLocked(released_page, /*freeing_owned_page=*/true);
+    RemoveAndFreePageLocked(released_page, /*freeing_owned_page=*/true);
 
     reclamation_event_count_++;
     IncrementHierarchyGenerationCountLocked();
@@ -2298,10 +2323,6 @@ bool VmCowPages::LookupCursor::TargetZeroContentSupplyDirty(bool writing) const 
 zx::result<VmCowPages::LookupCursor::RequireResult>
 VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, DirtyState dirty_state,
                                                          AnonymousPageRequest* page_request) {
-  // The general pmm_alloc_flags_ are not allowed to contain the LOANED option, and this is relied
-  // upon below to assume the page allocated cannot be loaned.
-  DEBUG_ASSERT(!(target_->pmm_alloc_flags_ & PMM_ALLOC_FLAG_LOANED));
-
   vm_page_t* out_page = nullptr;
   zx_status_t status =
       target_->AllocateCopyPage(source->paddr(), alloc_list_, page_request, &out_page);
@@ -3190,9 +3211,7 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
         DEBUG_ASSERT(state.start == state.end);
         vm_page_t* page = page_list_.ReplacePageWithZeroInterval(state.start, required_state);
         DEBUG_ASSERT(page->object.pin_count == 0);
-        pmm_page_queues()->Remove(page);
-        DEBUG_ASSERT(!list_in_list(&page->queue_node));
-        list_add_tail(freed_list, &page->queue_node);
+        RemovePageToListLocked(page, freed_list);
       } else if (state.overwrite_interval) {
         uint64_t old_start = state.start;
         uint64_t old_end = state.end;
@@ -5799,9 +5818,8 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* pa
   // to release any now empty intermediate nodes.
   vm_page_t* p = page_list_.RemoveContent(offset).ReleasePage();
   DEBUG_ASSERT(p == page);
-  pmm_page_queues()->Remove(page);
   const bool loaned = page->is_loaned();
-  FreePageLocked(page, true);
+  RemoveAndFreePageLocked(page, true);
 
   reclamation_event_count_++;
   IncrementHierarchyGenerationCountLocked();
@@ -6153,8 +6171,7 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   }
 
   SwapPageLocked(offset, old_page, new_page);
-  pmm_page_queues()->Remove(old_page);
-  FreePageLocked(old_page, /*freeing_owned_page=*/true);
+  RemoveAndFreePageLocked(old_page, /*freeing_owned_page=*/true);
   if (after_page) {
     *after_page = new_page;
   }

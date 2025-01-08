@@ -34,6 +34,11 @@
 
 #include "vm_priv.h"
 
+// Although the public interfaces claim that loaned pages must be allocated and freed using their
+// dedicated methods, the implementation presently uses common code and this internal flag for the
+// alloc_flags is used to achieve this.
+#define PMM_ALLOC_FLAG_LOANED (1 << 2)
+
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
 // The number of PMM allocation calls that have failed.
@@ -286,6 +291,14 @@ void PmmNode::AllocPageHelperLocked(vm_page_t* page) {
   // acquisition that removes the page from the free list, as both being the free list, or being
   // in the ALLOC state, indicate ownership by the PmmNode.
   page->set_state(vm_page_state::ALLOC);
+}
+
+zx::result<vm_page_t*> PmmNode::AllocLoanedPage() {
+  zx::result<vm_page_t*> result = AllocPage(PMM_ALLOC_FLAG_LOANED);
+  if (result.status_value() == ZX_ERR_NO_MEMORY) {
+    return zx::error{ZX_ERR_NO_RESOURCES};
+  }
+  return result;
 }
 
 zx::result<vm_page_t*> PmmNode::AllocPage(uint alloc_flags) {
@@ -688,6 +701,11 @@ void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {
   AsanPoisonPage(page, kAsanPmmFreeMagic);
 }
 
+void PmmNode::FreeLoanedPage(vm_page_t* page) {
+  DEBUG_ASSERT(page->is_loaned());
+  return FreePage(page);
+}
+
 void PmmNode::FreePage(vm_page* page) {
   AutoPreemptDisabler preempt_disable;
   const bool fill = IsFreeFillEnabledRacy();
@@ -772,6 +790,8 @@ void PmmNode::FreeListLocked(list_node* list, bool already_filled) {
   IncrementFreeCountLocked(count);
   IncrementFreeLoanedCountLocked(loaned_count);
 }
+
+void PmmNode::FreeLoanedList(list_node* list) { return FreeList(list); }
 
 void PmmNode::FreeList(list_node* list) {
   AutoPreemptDisabler preempt_disable;
