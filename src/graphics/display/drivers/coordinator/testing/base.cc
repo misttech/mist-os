@@ -25,7 +25,7 @@
 namespace display_coordinator {
 
 void TestBase::SetUp() {
-  loop_.StartThread("display::TestBase::loop_", &loop_thrd_);
+  loop_.StartThread("display::TestBase::loop_");
 
   zx::result<std::unique_ptr<display::FakeSysmemDeviceHierarchy>> create_sysmem_provider_result =
       display::FakeSysmemDeviceHierarchy::Create();

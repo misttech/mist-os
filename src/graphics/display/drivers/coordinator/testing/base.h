@@ -6,13 +6,12 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_TESTING_BASE_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fit/function.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/time.h>
-#include <threads.h>
 
 #include <memory>
 
@@ -48,7 +47,6 @@ class TestBase : public testing::Test {
 
  private:
   async::Loop loop_;
-  thrd_t loop_thrd_ = 0;
 
   std::unique_ptr<display::FakeDisplayStack> tree_;
 };

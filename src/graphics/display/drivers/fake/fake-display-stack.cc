@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/fake/fake-display-stack.h"
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/fdio/directory.h>
 #include <zircon/assert.h>

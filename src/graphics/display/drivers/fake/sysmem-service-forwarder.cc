@@ -6,8 +6,7 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async/cpp/task.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/syslog/cpp/macros.h>
@@ -43,16 +42,6 @@ zx::result<> SysmemServiceForwarder::Initialize() {
   component_incoming_root_ = std::move(incoming_service_root_result).value();
 
   return zx::ok();
-}
-
-zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> SysmemServiceForwarder::ConnectAllocator() {
-  auto [client_end, server_end] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
-  zx::result<> connect_result =
-      component::ConnectAt(component_incoming_root_, std::move(server_end));
-  if (connect_result.is_error()) {
-    return connect_result.take_error();
-  }
-  return zx::ok(std::move(client_end));
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>>

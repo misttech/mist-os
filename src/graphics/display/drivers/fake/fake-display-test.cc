@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/fpromise/result.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -358,8 +358,8 @@ TEST_F(FakeDisplayRealSysmemTest, ImportBufferCollection) {
                                                            token.TakeChannel()));
 
   // `driver_buffer_collection_id` must be unused.
-  zx::result<fidl::Endpoints<fuchsia_sysmem::BufferCollectionToken>> another_token_endpoints =
-      fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result<fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>> another_token_endpoints =
+      fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_OK(another_token_endpoints);
   EXPECT_EQ(display()->DisplayEngineImportBufferCollection(
                 kBanjoValidBufferCollectionId, another_token_endpoints->client.TakeChannel()),

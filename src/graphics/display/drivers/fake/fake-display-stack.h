@@ -6,8 +6,6 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_STACK_H_
 
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
@@ -18,6 +16,7 @@
 #include <lib/sync/cpp/completion.h>
 
 #include <memory>
+#include <optional>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
