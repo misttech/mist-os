@@ -81,9 +81,19 @@ load("@rules_python//python:repositories.bzl", "py_repositories")
 
 py_repositories()
 
+# @rules_proto is the deprecated set of rules to generate protobuf-related
+# actions. @com_google_protobuf should be used instead, but many other
+# repositories still depend on it implicitly.
 local_repository(
     name = "rules_proto",
     path = "third_party/bazel_rules_proto",
+)
+
+# @com_google_protobuf is the new set of rules for protobuf actions.
+# This is now required by pigweed.
+local_repository(
+    name = "com_google_protobuf",
+    path = "third_party/protobuf",
 )
 
 local_repository(
