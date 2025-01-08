@@ -7,6 +7,7 @@
 
 #include "src/ui/lib/escher/forward_declarations.h"
 #include "src/ui/lib/escher/util/hash_cache.h"
+#include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/lib/escher/vk/impl/framebuffer.h"
 
 namespace escher {
@@ -33,7 +34,10 @@ class FramebufferAllocator {
   const impl::FramebufferPtr& ObtainFramebuffer(const RenderPassInfo& info,
                                                 bool allow_render_pass_creation);
 
-  void BeginFrame() { framebuffer_cache_.BeginFrame(); }
+  void BeginFrame() {
+    TRACE_DURATION("gfx", "escher::impl::FramebufferAllocator::BeginFrame");
+    framebuffer_cache_.BeginFrame();
+  }
   void Clear() { framebuffer_cache_.Clear(); }
 
   size_t size() const { return framebuffer_cache_.size(); }

@@ -259,7 +259,7 @@ ShaderProgramPtr Escher::GetProgramImpl(const std::string shader_paths[EnumCount
 
 FramePtr Escher::NewFrame(const char* trace_literal, uint64_t frame_number, bool enable_gpu_logging,
                           escher::CommandBuffer::Type requested_type, bool use_protected_memory) {
-  TRACE_DURATION("gfx", "escher::Escher::NewFrame ");
+  TRACE_DURATION("gfx", "escher::Escher::NewFrame");
 
   // Check the type before cycling the framebuffer/descriptor-set allocators.
   // Without these checks it is possible to write into a Vulkan resource before
