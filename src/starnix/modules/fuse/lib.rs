@@ -551,10 +551,11 @@ impl FuseNode {
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
+        reason: CheckAccessReason,
         info: &RwLock<FsNodeInfo>,
     ) -> Result<(), Errno> {
         let info = self.refresh_expired_node_attributes(locked, current_task, info)?;
-        node.default_check_access_impl(current_task, access, info)
+        node.default_check_access_impl(current_task, access, reason, info)
     }
 
     fn refresh_expired_node_attributes<'a>(
@@ -1144,6 +1145,7 @@ impl FsNodeOps for FuseNode {
                 node,
                 current_task,
                 access,
+                reason,
                 info,
             );
         }
@@ -1167,7 +1169,8 @@ impl FsNodeOps for FuseNode {
                     error!(EINVAL)
                 }
             }
-            CheckAccessReason::InternalPermissionChecks => {
+            CheckAccessReason::ChangeTimestamps { .. }
+            | CheckAccessReason::InternalPermissionChecks => {
                 // Per FUSE's mount options, the kernel does not check file access
                 // permissions unless the default permissions mount option is set.
                 //

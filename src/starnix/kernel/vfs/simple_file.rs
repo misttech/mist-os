@@ -63,14 +63,14 @@ where
         current_task: &CurrentTask,
         access: Access,
         info: &RwLock<FsNodeInfo>,
-        _reason: CheckAccessReason,
+        reason: CheckAccessReason,
     ) -> Result<(), Errno> {
         if self.capabilities != Capabilities::empty()
             && current_task.creds().has_capability(self.capabilities)
         {
             Ok(())
         } else {
-            node.default_check_access_impl(current_task, access, info.read())
+            node.default_check_access_impl(current_task, access, reason, info.read())
         }
     }
 

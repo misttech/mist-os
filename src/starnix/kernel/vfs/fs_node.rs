@@ -566,6 +566,7 @@ pub enum CheckAccessReason {
     Access,
     Chdir,
     Chroot,
+    ChangeTimestamps { now: bool },
     InternalPermissionChecks,
 }
 
@@ -578,9 +579,9 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         current_task: &CurrentTask,
         access: Access,
         info: &RwLock<FsNodeInfo>,
-        _reason: CheckAccessReason,
+        reason: CheckAccessReason,
     ) -> Result<(), Errno> {
-        node.default_check_access_impl(current_task, access, info.read())
+        node.default_check_access_impl(current_task, access, reason, info.read())
     }
 
     /// Build the [`DirEntryOps`] for a new [`DirEntry`] that will be associated
@@ -1967,10 +1968,25 @@ impl FsNode {
         &self,
         current_task: &CurrentTask,
         access: Access,
+        reason: CheckAccessReason,
         info: RwLockReadGuard<'_, FsNodeInfo>,
     ) -> Result<(), Errno> {
         let (node_uid, node_gid, mode) = (info.uid, info.gid, info.mode);
         std::mem::drop(info);
+        if let CheckAccessReason::ChangeTimestamps { now } = reason {
+            // To set the timestamps to the current time the caller must either have write access to
+            // the file, be the file owner, or hold the CAP_DAC_OVERRIDE or CAP_FOWNER capability.
+            // To set the timestamps to other values the caller must either be the file owner or hold
+            // the CAP_FOWNER capability.
+            let creds = current_task.creds();
+            let has_owner_priviledge = creds.fsuid == node_uid || creds.has_capability(CAP_FOWNER);
+            if has_owner_priviledge {
+                return Ok(());
+            }
+            if !now {
+                return error!(EPERM);
+            }
+        }
         current_task.creds().check_access(access, node_uid, node_gid, mode)
     }
 
@@ -2537,27 +2553,14 @@ impl FsNode {
         // If the filesystem is read-only, this always fail.
         mount.check_readonly_filesystem()?;
 
-        // To set the timestamps to the current time the caller must either have write access to
-        // the file, be the file owner, or hold the CAP_DAC_OVERRIDE or CAP_FOWNER capability.
-        // To set the timestamps to other values the caller must either be the file owner or hold
-        // the CAP_FOWNER capability.
-        let creds = current_task.creds();
-        let has_owner_priviledge =
-            creds.fsuid == self.info().uid || creds.has_capability(CAP_FOWNER);
-        let set_current_time = matches!((atime, mtime), (TimeUpdateType::Now, TimeUpdateType::Now));
-        if !has_owner_priviledge {
-            if set_current_time {
-                self.check_access(
-                    locked,
-                    current_task,
-                    mount,
-                    Access::WRITE,
-                    CheckAccessReason::InternalPermissionChecks,
-                )?
-            } else {
-                return error!(EPERM);
-            }
-        }
+        let now = matches!((atime, mtime), (TimeUpdateType::Now, TimeUpdateType::Now));
+        self.check_access(
+            locked,
+            current_task,
+            mount,
+            Access::WRITE,
+            CheckAccessReason::ChangeTimestamps { now },
+        )?;
 
         if !matches!((atime, mtime), (TimeUpdateType::Omit, TimeUpdateType::Omit)) {
             // This function is called by `utimes(..)` which will update the access and
