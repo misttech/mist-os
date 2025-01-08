@@ -209,9 +209,10 @@ class BatchPQRemove {
   void Flush() {
     if (count_ > 0) {
       if (is_loaned_) {
-        list_node_t loaned_freed_list = LIST_INITIAL_VALUE(loaned_freed_list);
-        pmm_page_queues()->RemoveArrayIntoList(pages_, count_, &loaned_freed_list);
-        Pmm::Node().FreeLoanedList(&loaned_freed_list);
+        Pmm::Node().FreeLoanedArray(
+            pages_, count_, [](vm_page_t** pages, size_t count, list_node_t* free_list) {
+              pmm_page_queues()->RemoveArrayIntoList(pages, count, free_list);
+            });
       } else {
         pmm_page_queues()->RemoveArrayIntoList(pages_, count_, freed_list_);
         freed_count_ += count_;
@@ -353,30 +354,29 @@ zx_status_t VmCowPages::AllocPage(vm_page_t** page, AnonymousPageRequest* reques
   return status;
 }
 
-zx_status_t VmCowPages::AllocLoanedPage(vm_page_t** page) {
+template <typename F>
+zx::result<vm_page_t*> VmCowPages::AllocLoanedPage(F allocated) {
   DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
-  zx::result<vm_page_t*> result = Pmm::Node().AllocLoanedPage();
-  if (result.is_ok()) {
-    *page = *result;
-    InitializeVmPage(*page);
-  }
-  return result.status_value();
+  return Pmm::Node().AllocLoanedPage([allocated](vm_page_t* page) {
+    InitializeVmPage(page);
+    allocated(page);
+  });
 }
 
 void VmCowPages::RemoveAndFreePageLocked(vm_page_t* page, bool freeing_owned_page) {
-  pmm_page_queues()->Remove(page);
   if (page->is_loaned()) {
-    Pmm::Node().FreeLoanedPage(page);
+    Pmm::Node().FreeLoanedPage(page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); });
   } else {
+    pmm_page_queues()->Remove(page);
     FreePageLocked(page, freeing_owned_page);
   }
 }
 
 void VmCowPages::RemovePageToListLocked(vm_page_t* page, list_node_t* free_list) {
-  pmm_page_queues()->Remove(page);
   if (page->is_loaned()) {
-    Pmm::Node().FreeLoanedPage(page);
+    Pmm::Node().FreeLoanedPage(page, [](vm_page_t* page) { pmm_page_queues()->Remove(page); });
   } else {
+    pmm_page_queues()->Remove(page);
     list_add_tail(free_list, &page->queue_node);
   }
 }
@@ -4820,17 +4820,17 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
       // Try to replace src_page with a loaned page.  We allocate the loaned page one page at a time
       // to avoid failing the allocation due to asking for more loaned pages than there are free
       // loaned pages.
-      vm_page_t* new_page = nullptr;
-      zx_status_t alloc_status = AllocLoanedPage(&new_page);
-      // If we got a loaned page, replace the page in src_page, else just continue with src_page
-      // unmodified since pmm has no more loaned free pages or
-      // !is_borrowing_in_supplypages_enabled().
-      if (alloc_status == ZX_OK) {
-        CopyPageForReplacementLocked(new_page, src_page.Page());
+      auto result =
+          AllocLoanedPage([this, &src_page, &page_transaction, &old_page](vm_page_t* page) {
+            AssertHeld(lock_ref());
+            CopyPageMetadataForReplacementLocked(page, src_page.Page());
+            old_page = CompleteAddPageLocked(*page_transaction, VmPageOrMarker::Page(page),
+                                             /*do_range_update=*/false);
+          });
+      if (result.is_ok()) {
+        CopyPageContentsForReplacementLocked(*result, src_page.Page());
         vm_page_t* free_page = src_page.ReleasePage();
         list_add_tail(&freed_list, &free_page->queue_node);
-        old_page = CompleteAddPageLocked(*page_transaction, VmPageOrMarker::Page(new_page),
-                                         /*do_range_update=*/false);
       } else {
         old_page = CompleteAddPageLocked(*page_transaction, ktl::move(src_page),
                                          /*do_range_update=*/false);
@@ -6025,7 +6025,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
   return ReclaimCounts{};
 }
 
-void VmCowPages::SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page) {
+void VmCowPages::SwapPageInListLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page) {
   DEBUG_ASSERT(!old_page->object.pin_count);
   DEBUG_ASSERT(new_page->state() == vm_page_state::OBJECT);
 
@@ -6037,7 +6037,7 @@ void VmCowPages::SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t*
   DEBUG_ASSERT(p);
   DEBUG_ASSERT(p->IsPage());
 
-  CopyPageForReplacementLocked(new_page, old_page);
+  CopyPageMetadataForReplacementLocked(new_page, old_page);
 
   // Add replacement page in place of old page.
   __UNINITIALIZED auto result = BeginAddPageWithSlotLocked(offset, p, CanOverwriteContent::NonZero);
@@ -6162,15 +6162,25 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
     if (is_page_dirty_tracked(old_page) && !is_page_clean(old_page)) {
       return ZX_ERR_BAD_STATE;
     }
-    status = AllocLoanedPage(&new_page);
+    auto result = AllocLoanedPage([this, offset, old_page](vm_page_t* page) {
+      AssertHeld(lock_ref());
+      SwapPageInListLocked(offset, old_page, page);
+    });
+    status = result.status_value();
+    if (result.is_ok()) {
+      new_page = *result;
+    }
   } else {
     status = AllocPage(&new_page, page_request);
+    if (status == ZX_OK) {
+      SwapPageInListLocked(offset, old_page, new_page);
+    }
   }
   if (status != ZX_OK) {
     return status;
   }
+  CopyPageContentsForReplacementLocked(new_page, old_page);
 
-  SwapPageLocked(offset, old_page, new_page);
   RemoveAndFreePageLocked(old_page, /*freeing_owned_page=*/true);
   if (after_page) {
     *after_page = new_page;
@@ -6740,7 +6750,7 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardableLocked(vm_page_t* page, uint6
   return DiscardPagesLocked();
 }
 
-void VmCowPages::CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) {
+void VmCowPages::CopyPageContentsForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) {
   DEBUG_ASSERT(!src_page->object.pin_count);
   void* src = paddr_to_physmap(src_page->paddr());
   DEBUG_ASSERT(src);
@@ -6753,6 +6763,9 @@ void VmCowPages::CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* sr
       arch_clean_invalidate_cache_range((vaddr_t)dst, PAGE_SIZE);
     }
   }
+}
+
+void VmCowPages::CopyPageMetadataForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) {
   dst_page->object.share_count = src_page->object.share_count;
   dst_page->object.always_need = src_page->object.always_need;
   DEBUG_ASSERT(!dst_page->object.always_need || (!dst_page->is_loaned() && !src_page->is_loaned()));

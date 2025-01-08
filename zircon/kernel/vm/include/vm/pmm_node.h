@@ -67,15 +67,24 @@ class PmmNode {
   // is_loaned() being true, and must be returned by either FreeLoanedPage or FreeLoanedList. If
   // there are not loaned pages available ZX_ERR_UNAVAILABLE is returned, as an absence of loaned
   // pages does not constitute an out of memory scenario.
-  zx::result<vm_page_t*> AllocLoanedPage();
+  // The provided callback must transition the page into a state such that it has a valid backlink,
+  // i.e. it is in the OBJECT state with an owner set, prior to returning.
+  // During the execution of the callback the page contents must *not* be modified.
+  zx::result<vm_page_t*> AllocLoanedPage(fit::inline_function<void(vm_page_t*), 32> allocated);
 
   // Frees a single page that was allocated by AllocLoanedPage. It is an error to attempt to free a
-  // non loaned page.
-  void FreeLoanedPage(vm_page* page);
+  // non loaned page. When this method is called the |page| must have a valid backlink (i.e. be in
+  // the OBJECT state with an owner set). This backlink should be removed by the |release_page|
+  // callback, which is invoked under the loaned pages lock, prior to transition the page into the
+  // FREE_LOANED state.
+  void FreeLoanedPage(vm_page_t* page, fit::inline_function<void(vm_page_t*)> release_page);
 
   // Frees multiple pages that were allocated by AllocLoanedPage. It is an error to attempt to free
-  // any non loaned pages.
-  void FreeLoanedList(list_node* list);
+  // any non loaned pages. When this method is called all pages in the array must have a valid
+  // backlink (i.e. be in the OBJECT state with an owner set), and the |release_list| method must
+  // remove the backlink from all pages, and place them in the provided list in the same order.
+  void FreeLoanedArray(vm_page_t** pages, size_t count,
+                       fit::inline_function<void(vm_page_t**, size_t, list_node_t*)> release_list);
 
   void UnwirePage(vm_page* page);
 
@@ -202,7 +211,9 @@ class PmmNode {
   void FreePageHelperLocked(vm_page* page, bool already_filled) TA_REQ(lock_);
   void FreeLoanedPageHelperLocked(vm_page* page, bool already_filled) TA_REQ(loaned_list_lock_);
   void FreeListLocked(list_node* list, bool already_filled) TA_REQ(lock_);
-  void FreeLoanedListLocked(list_node* list, bool already_filled) TA_REQ(loaned_list_lock_);
+  template <typename F>
+  void FreeLoanedListLocked(list_node* list, bool already_filled, F validator)
+      TA_REQ(loaned_list_lock_);
 
   void SignalFreeMemoryChangeLocked() TA_REQ(lock_);
   void TripFreePagesLevelLocked() TA_REQ(lock_);

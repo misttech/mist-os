@@ -927,9 +927,9 @@ class VmCowPages final : public VmHierarchyBase,
   static void CacheFree(list_node_t* list);
   static void CacheFree(vm_page_t* p);
 
-  // Helper for allocating a loaned page from the pmm with the correct allocation flags. Does not
-  // take a LazyPageRequest as loaned allocations cannot wait.
-  zx_status_t AllocLoanedPage(vm_page_t** page);
+  // Helper for allocating and initializing a loaned page.
+  template <typename F>
+  zx::result<vm_page_t*> AllocLoanedPage(F allocated);
 
   // Helper for allocating a page for this VMO. The allocated page is not yet initialized, and
   // InitializeVmPage must be called on it prior to use. Callers most likely want AllocPage instead,
@@ -1305,10 +1305,12 @@ class VmCowPages final : public VmHierarchyBase,
     return page_source_ && page_source_->properties().is_handling_free;
   }
 
-  // Swap an old page for a new page.  The old page must be at offset.  The new page must be in
-  // ALLOC state.  On return, the old_page is owned by the caller.  Typically the caller will
-  // remove the old_page from pmm_page_queues() and free the old_page.
-  void SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page) TA_REQ(lock());
+  // Swap an old page for a new page in the page list. The old page must be at offset. The new page
+  // must be in ALLOC state. On return, the old_page is owned by the caller. Typically the caller
+  // will remove the old_page from pmm_page_queues() and free the old_page. The contents of new page
+  // is not modified, and the caller is responsible for filling in the contents.
+  void SwapPageInListLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page)
+      TA_REQ(lock());
 
   // If page is still at offset, replace it with a different page.  If with_loaned is true, replace
   // with a loaned page.  If with_loaned is false, replace with a non-loaned page and a page_request
@@ -1317,7 +1319,20 @@ class VmCowPages final : public VmHierarchyBase,
                                 vm_page_t** after_page, AnonymousPageRequest* page_request)
       TA_REQ(lock());
 
-  void CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) TA_REQ(lock());
+  // Copies the metadata information (dirty state, split bit information etc) from src_page to
+  // dst_page in preparation for replacing src with dst. This copies the metadata information only
+  // and not the contents, that must be done using the |CopyPageContentsForReplacementLocked|
+  // method. This is split into two steps to allow the copying of the metadata and installation into
+  // the page queues to be done under the pmm loaned pages lock, and then the copying of the page
+  // contents to be done after with the loaned pages lock dropped.
+  void CopyPageMetadataForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page)
+      TA_REQ(lock());
+
+  // Copies the page contents from src_page->dst_page to complete the replacement process. Typical
+  // usage would have |CopyPageMetadatForReplacementLocked| already be performed, but this method
+  // does not require it.
+  void CopyPageContentsForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page)
+      TA_REQ(lock());
 
   // Internal helper for performing reclamation via eviction on pager backed VMOs.
   // Assumes that the page is owned by this VMO at the specified offset.
