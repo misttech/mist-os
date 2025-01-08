@@ -19,8 +19,10 @@
 #include <zircon/status.h>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
-#include <numeric>
+#include <utility>
 #include <vector>
 
 #include <bind/fuchsia/goldfish/platform/sysmem/heap/cpp/bind.h>
@@ -360,99 +362,88 @@ void DisplayEngine::DisplayEngineReleaseImage(uint64_t image_handle) {
 }
 
 config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
-    const display_config_t* display_configs, size_t display_count,
+    const display_config_t* display_config_ptr,
     layer_composition_operations_t* out_layer_composition_operations_list,
     size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
+  ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
+  const display_config_t& display_config = *display_config_ptr;
+
   if (out_layer_composition_operations_actual != nullptr) {
     *out_layer_composition_operations_actual = 0;
   }
 
-  if (display_count == 0) {
+  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_config.layer_count);
+  if (out_layer_composition_operations_actual != nullptr) {
+    *out_layer_composition_operations_actual = display_config.layer_count;
+  }
+  cpp20::span<layer_composition_operations_t> layer_composition_operations(
+      out_layer_composition_operations_list, display_config.layer_count);
+
+  const display::DisplayId display_id = display::ToDisplayId(display_config.display_id);
+  if (display_config.layer_count == 0) {
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  int total_layer_count = std::accumulate(
-      display_configs, display_configs + display_count, 0,
-      [](int total, const display_config_t& config) { return total += config.layer_count; });
-  ZX_DEBUG_ASSERT(layer_composition_operations_count >= static_cast<size_t>(total_layer_count));
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = total_layer_count;
-  }
-  cpp20::span<layer_composition_operations_t> layer_composition_operations(
-      out_layer_composition_operations_list, total_layer_count);
-
   config_check_result_t check_result = CONFIG_CHECK_RESULT_OK;
-  int layer_composition_operations_offset = 0;
-  for (unsigned i = 0; i < display_count; i++) {
-    const size_t layer_count = display_configs[i].layer_count;
-    cpp20::span<layer_composition_operations_t> current_display_layer_composition_operations =
-        layer_composition_operations.subspan(layer_composition_operations_offset, layer_count);
-    layer_composition_operations_offset += layer_count;
+  ZX_DEBUG_ASSERT(display_id == kPrimaryDisplayId);
 
-    const display::DisplayId display_id = display::ToDisplayId(display_configs[i].display_id);
-    if (layer_count > 0) {
-      ZX_DEBUG_ASSERT(display_id == kPrimaryDisplayId);
+  if (display_config.cc_flags != 0) {
+    // Color Correction is not supported, but we will pretend we do.
+    // TODO(https://fxbug.dev/42111684): Returning error will cause blank screen if scenic
+    // requests color correction. For now, lets pretend we support it, until a proper fix is
+    // done (either from scenic or from core display)
+    FDF_LOG(WARNING, "%s: Color Correction not support. No error reported", __func__);
+  }
 
-      if (display_configs[i].cc_flags != 0) {
-        // Color Correction is not supported, but we will pretend we do.
-        // TODO(https://fxbug.dev/42111684): Returning error will cause blank screen if scenic
-        // requests color correction. For now, lets pretend we support it, until a proper fix is
-        // done (either from scenic or from core display)
-        FDF_LOG(WARNING, "%s: Color Correction not support. No error reported", __func__);
-      }
-
-      const layer_t& layer0 = display_configs[i].layer_list[0];
-      if (layer0.image_source.width == 0 || layer0.image_source.height == 0) {
-        // Solid color fill layers are not yet supported.
-        current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
-      } else {
-        // Scaling is allowed if destination frame match display and
-        // source frame match image.
-        const rect_u_t display_area = {
-            .x = 0,
-            .y = 0,
-            .width = static_cast<uint32_t>(primary_display_device_.width_px),
-            .height = static_cast<uint32_t>(primary_display_device_.height_px),
-        };
-        const rect_u_t image_area = {
-            .x = 0,
-            .y = 0,
-            .width = layer0.image_metadata.dimensions.width,
-            .height = layer0.image_metadata.dimensions.height,
-        };
-        if (memcmp(&layer0.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
-          // TODO(https://fxbug.dev/42111727): Need to provide proper flag to indicate driver only
-          // accepts full screen dest frame.
-          current_display_layer_composition_operations[0] |=
-              LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
-          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-        }
-        if (memcmp(&layer0.image_source, &image_area, sizeof(rect_u_t)) != 0) {
-          current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
-          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-        }
-
-        if (layer0.alpha_mode != ALPHA_DISABLE) {
-          // Alpha is not supported.
-          current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_ALPHA;
-          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-        }
-
-        if (layer0.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
-          // Transformation is not supported.
-          current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
-          check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-        }
-      }
-      // If there is more than one layer, the rest need to be merged into the base layer.
-      if (layer_count > 1) {
-        current_display_layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-        for (unsigned j = 1; j < layer_count; j++) {
-          current_display_layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
-        }
-        check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
-      }
+  const layer_t& layer0 = display_config.layer_list[0];
+  if (layer0.image_source.width == 0 || layer0.image_source.height == 0) {
+    // Solid color fill layers are not yet supported.
+    layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
+  } else {
+    // Scaling is allowed if destination frame match display and
+    // source frame match image.
+    const rect_u_t display_area = {
+        .x = 0,
+        .y = 0,
+        .width = static_cast<uint32_t>(primary_display_device_.width_px),
+        .height = static_cast<uint32_t>(primary_display_device_.height_px),
+    };
+    const rect_u_t image_area = {
+        .x = 0,
+        .y = 0,
+        .width = layer0.image_metadata.dimensions.width,
+        .height = layer0.image_metadata.dimensions.height,
+    };
+    if (memcmp(&layer0.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
+      // TODO(https://fxbug.dev/42111727): Need to provide proper flag to indicate driver only
+      // accepts full screen dest frame.
+      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
+      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
+    if (memcmp(&layer0.image_source, &image_area, sizeof(rect_u_t)) != 0) {
+      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
+      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+
+    if (layer0.alpha_mode != ALPHA_DISABLE) {
+      // Alpha is not supported.
+      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_ALPHA;
+      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+
+    if (layer0.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
+      // Transformation is not supported.
+      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
+      check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
+    }
+  }
+  // If there is more than one layer, the rest need to be merged into the base layer.
+  if (display_config.layer_count > 1) {
+    layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
+    for (size_t j = 1; j < display_config.layer_count; ++j) {
+      layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
+    }
+    check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 
   return check_result;
@@ -554,20 +545,18 @@ zx_status_t DisplayEngine::PresentPrimaryDisplayConfig(const DisplayConfig& disp
   return ZX_OK;
 }
 
-void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* display_configs,
-                                                    size_t display_count,
+void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* display_config_ptr,
                                                     const config_stamp_t* banjo_config_stamp) {
+  ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
+  const display_config_t& display_config = *display_config_ptr;
+
   ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
   display::DriverImageId driver_image_id = display::kInvalidDriverImageId;
 
-  cpp20::span<const display_config_t> display_configs_span(display_configs, display_count);
-  for (const display_config& display_config : display_configs_span) {
-    if (display::ToDisplayId(display_config.display_id) == kPrimaryDisplayId) {
-      if (display_config.layer_count) {
-        driver_image_id = display::ToDriverImageId(display_config.layer_list[0].image_handle);
-      }
-      break;
+  if (display::ToDisplayId(display_config.display_id) == kPrimaryDisplayId) {
+    if (display_config.layer_count) {
+      driver_image_id = display::ToDriverImageId(display_config.layer_list[0].image_handle);
     }
   }
 
@@ -714,6 +703,44 @@ zx_status_t DisplayEngine::DisplayEngineSetBufferCollectionConstraints(
   }
 
   return ZX_OK;
+}
+
+config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t out_layer_composition_operations_size, size_t* out_layer_composition_operations_actual) {
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs_count == 0) {
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  if (banjo_display_configs_count > 1) {
+    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
+    return CONFIG_CHECK_RESULT_TOO_MANY;
+  }
+
+  return DisplayEngineCheckConfiguration(
+      banjo_display_configs_array, out_layer_composition_operations_list,
+      out_layer_composition_operations_size, out_layer_composition_operations_actual);
+}
+
+void DisplayEngine::DisplayEngineApplyConfiguration(
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+    const config_stamp_t* banjo_config_stamp) {
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs_count == 0) {
+    return;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  ZX_DEBUG_ASSERT_MSG(banjo_display_configs_count == 1,
+                      "Display coordinator applied rejected multi-display config");
+  DisplayEngineApplyConfiguration(banjo_display_configs_array, banjo_config_stamp);
 }
 
 zx_status_t DisplayEngine::SetupPrimaryDisplay() {

@@ -106,7 +106,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigMultiLayer) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
+      &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(actual_result_size, kMaxLayerCount);
   EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_MERGE_BASE,
@@ -133,7 +133,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColor) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
+      &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
   EXPECT_EQ(1u, actual_result_size);
   EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_USE_IMAGE,
@@ -155,7 +155,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerPrimary) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
+      &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
   EXPECT_EQ(1u, actual_result_size);
   EXPECT_EQ(0u, results_[0]);
@@ -180,7 +180,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerDestFrame) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
+      &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(1u, actual_result_size);
   EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE, results_[0]);
@@ -205,7 +205,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerSrcFrame) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
+      &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(1u, actual_result_size);
   EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_SRC_FRAME, results_[0]);
@@ -225,7 +225,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerAlpha) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
+      &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(1u, actual_result_size);
   EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_ALPHA, results_[0]);
@@ -245,7 +245,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerTransform) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
+      &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(1u, actual_result_size);
   EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_TRANSFORM, results_[0]);
@@ -265,7 +265,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigLayerColorCoversion) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
+      &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_OK, res);
   EXPECT_EQ(1u, actual_result_size);
   // TODO(payamm): For now, driver will pretend it supports color conversion.
@@ -295,7 +295,7 @@ TEST_F(GoldfishDisplayEngineTest, CheckConfigAllFeatures) {
 
   size_t actual_result_size = 0;
   config_check_result_t res = display_engine_->DisplayEngineCheckConfiguration(
-      &config_, /*display_count=*/1, results_.data(), results_.size(), &actual_result_size);
+      &config_, results_.data(), results_.size(), &actual_result_size);
   EXPECT_EQ(CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG, res);
   EXPECT_EQ(1u, actual_result_size);
   // TODO(https://fxbug.dev/42080897): Driver will pretend it supports color conversion
