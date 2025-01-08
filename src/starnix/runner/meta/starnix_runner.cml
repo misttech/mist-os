@@ -85,6 +85,7 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
+                "fuchsia.time.alarms.Wake",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
@@ -119,11 +120,6 @@
         },
         {
             directory: "boot-kernel",
-            from: "parent",
-            to: [ "#kernels" ],
-        },
-        {
-            directory: "dev-hrtimer",
             from: "parent",
             to: [ "#kernels" ],
         },

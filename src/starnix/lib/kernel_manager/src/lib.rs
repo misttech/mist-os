@@ -11,7 +11,7 @@ use fuchsia_component::client as fclient;
 use fuchsia_sync::Mutex;
 use futures::{FutureExt, TryStreamExt};
 use kernels::Kernels;
-use log::warn;
+use log::{debug, warn};
 use rand::Rng;
 use std::cell::RefCell;
 use std::future::Future;
@@ -500,6 +500,7 @@ async fn start_proxy(
         // should signal `proxy.resume_event`, since those are the only messages that should
         // wake the container if it's suspended.
         fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-forwarding-messages", "name" => proxy.name.as_str());
+        let name = proxy.name.as_str();
         let result = match finished_wait {
             WaitReturn::Container => forward_message(
                 &signals,
@@ -508,6 +509,7 @@ async fn start_proxy(
                 None,
                 &mut bounce_bytes.borrow_mut(),
                 &mut bounce_handles.borrow_mut(),
+                name,
             ),
             WaitReturn::Remote => forward_message(
                 &signals,
@@ -516,16 +518,19 @@ async fn start_proxy(
                 Some(&proxy.resume_event),
                 &mut bounce_bytes.borrow_mut(),
                 &mut bounce_handles.borrow_mut(),
+                name,
             ),
         };
 
         if result.is_err() {
             log::warn!(
-                "Proxy failed to forward message {} kernel",
+                "Proxy failed to forward message {} kernel: {}; {:?}",
                 match finished_wait {
                     WaitReturn::Container => "from",
                     WaitReturn::Remote => "to",
-                }
+                },
+                name,
+                result,
             );
             break 'outer;
         }
@@ -548,8 +553,10 @@ fn forward_message(
     event: Option<&zx::EventPair>,
     bytes: &mut [MaybeUninit<u8>; zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize],
     handles: &mut [MaybeUninit<zx::Handle>; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize],
+    name: &str,
 ) -> Result<(), Error> {
     if signals.contains(zx::Signals::CHANNEL_READABLE) {
+        debug!("runner_proxy: {}: 1: entry, event={:?}", name, event);
         let (actual_bytes, actual_handles) = match read_channel.read_uninit(bytes, handles) {
             zx::ChannelReadResult::Ok(r) => r,
             _ => return Err(anyhow!("Failed to read from channel")),
@@ -560,11 +567,13 @@ fn forward_message(
             // the kernel.
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, RUNNER_SIGNAL);
             event.signal_handle(clear_mask, set_mask)?;
+            debug!("runner_proxy: {}: 4: K=0, R=1", name);
         }
 
         write_channel.write(actual_bytes, actual_handles)?;
 
         if let Some(event) = event {
+            debug!("{}: 5: wait for K=1", name);
             // Wait for the kernel endpoint to signal that the event has been handled, and
             // that it is now safe to suspend the container again.
             match event.wait_handle(
@@ -581,11 +590,14 @@ fn forward_message(
                     return Err(anyhow!("Failed to wait on signal from kernel"));
                 }
             };
-
+            debug!("runner_proxy: {} 6: K=1, R=0", name);
             // Clear the kernel signal for this message before continuing.
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, zx::Signals::NONE);
             event.signal_handle(clear_mask, set_mask)?;
+
+            debug!("runner_proxy: {}: 7: K=0, R=0", name);
         }
+        debug!("runner_proxy: {}: 9: loop done: event={:?}", name, event);
     }
     if signals.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
         Err(anyhow!("Proxy peer was closed"))

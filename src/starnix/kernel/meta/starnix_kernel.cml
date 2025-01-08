@@ -47,12 +47,6 @@
             path: "/boot/kernel",
         },
         {
-            directory: "dev-hrtimer",
-            rights: [ "r*" ],
-            path: "/dev/class/hrtimer",
-            availability: "optional",
-        },
-        {
             directory: "dev-gpu",
             rights: [ "r*" ],
             path: "/dev/class/gpu",
@@ -70,6 +64,11 @@
             rights: [ "r*" ],
             path: "/container_config",
             availability: "optional",
+        },
+        {
+            // Hardware-agnostic wake alarms support
+            protocol: [ "fuchsia.time.alarms.Wake" ],
+            from: "parent",
         },
         {
             protocol: [
