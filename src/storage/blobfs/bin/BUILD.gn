@@ -52,6 +52,7 @@ fuchsia_component("component") {
     ":blobfs-component-config-values",
     "//src/storage/blobfs:decompressor-sandbox",
   ]
+  visibility += [ "//src/security/tests/pkg_test/tests:*" ]
 }
 
 # Prefer this over the previous target for tests because it includes the required fs_management
