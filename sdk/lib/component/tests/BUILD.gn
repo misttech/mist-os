@@ -63,6 +63,7 @@ cc_test_executable("incoming_integration_test_bin") {
   deps = [
     ":fidl.service.test_hlcpp",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/tests:fidl.service.test_cpp",
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/sys/cpp",

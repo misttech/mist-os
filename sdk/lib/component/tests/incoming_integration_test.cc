@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/service/test/cpp/fidl_test_base.h>
+#include <fidl/fidl.service.test/cpp/fidl.h>
+#include <fidl/fidl.service.test/cpp/wire_test_base.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fidl/cpp/string.h>
@@ -22,33 +23,51 @@ namespace {
 
 using namespace component_testing;
 
-class LocalEchoServer : public fidl::service::test::testing::Echo_TestBase,
-                        public LocalComponentImpl {
+class LocalEchoServer : public fidl::testing::WireTestBase<::fidl_service_test::Echo>,
+                        public LocalCppComponent {
  public:
   explicit LocalEchoServer(async_dispatcher_t* dispatcher, bool* called)
       : dispatcher_(dispatcher), called_(called) {}
 
   void OnStart() override {
-    ASSERT_EQ(outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)), ZX_OK);
-    sys::ServiceHandler handler;
-    fidl::service::test::EchoService::Handler echo_server(&handler);
-    ASSERT_EQ(echo_server.add_foo(bindings_.GetHandler(this, dispatcher_)), ZX_OK);
-    ASSERT_EQ(outgoing()->AddService<fidl::service::test::EchoService>(std::move(handler)), ZX_OK);
+    ASSERT_EQ(outgoing()
+                  ->AddUnmanagedProtocol<fidl_service_test::Echo>(
+                      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure))
+                  .status_value(),
+              ZX_OK);
+    {
+      auto result = outgoing()->AddService<fidl_service_test::EchoService>(
+          fidl_service_test::EchoService::InstanceHandler({
+              .foo = bindings_.CreateHandler(this, dispatcher_,
+                                            std::mem_fn(&LocalEchoServer::OnFidlClosed)),
+              .bar = bindings_.CreateHandler(this, dispatcher_,
+                                            std::mem_fn(&LocalEchoServer::OnFidlClosed)),
+          }));
+      ASSERT_EQ(result.status_value(), ZX_OK);
+    }
   }
 
-  void EchoString(::fidl::StringPtr value, EchoStringCallback callback) override {
-    callback(std::move(value));
+  void OnFidlClosed(fidl::UnbindInfo info) {
+    if (info.is_user_initiated() || info.is_peer_closed()) {
+      return;
+    }
+    FX_LOGS(ERROR) << "LocalEchoServer server error: " << info;
+  }
+
+  void EchoString(EchoStringRequestView request, EchoStringCompleter::Sync& completer) override {
     *called_ = true;
+    completer.Reply(request->value);
   }
 
   bool WasCalled() const { return *called_; }
 
-  void NotImplemented_(const std::string& name) override {}
+  virtual void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+  }
 
  private:
   async_dispatcher_t* dispatcher_;
   bool* called_;
-  fidl::BindingSet<fidl::service::test::Echo> bindings_;
+  fidl::ServerBindingGroup<fidl_service_test::Echo> bindings_;
 };
 
 class IncomingTest : public gtest::RealLoopFixture {};
@@ -63,7 +82,7 @@ TEST_F(IncomingTest, ConnectsToProtocolInNamespace) {
     return std::make_unique<LocalEchoServer>(dispatcher, called_ptr);
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{fidl::service::test::Echo::Name_}},
+      .capabilities = {Protocol{fidl::DiscoverableProtocolName<fidl_service_test::Echo>}},
       .source = ChildRef{"echo_server"},
       .targets = {ChildRef{"echo_client"}},
   });
@@ -88,7 +107,7 @@ TEST_F(IncomingTest, ConnectsToServiceInNamespace) {
     return std::make_unique<LocalEchoServer>(dispatcher, called_ptr);
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Service{fidl::service::test::EchoService::Name}},
+      .capabilities = {Service{fidl_service_test::EchoService::Name}},
       .source = ChildRef{"echo_server"},
       .targets = {ChildRef{"echo_client"}},
   });
