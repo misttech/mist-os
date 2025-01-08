@@ -33,6 +33,20 @@ static const std::vector<fpbus::Mmio> clk_mmios{
     }},
 };
 
+// TODO(b/373903133): Remove once no longer referenced.
+constexpr clock_id_t kClockIds[] = {
+    // For CPU device.
+    {g12a_clk::CLK_SYS_PLL_DIV16},
+    {g12a_clk::CLK_SYS_CPU_CLK_DIV16},
+    {g12a_clk::CLK_SYS_CPU_CLK},
+    // For video decoder
+    {g12a_clk::CLK_DOS_GCLK_VDEC},
+    {g12a_clk::CLK_DOS},
+
+    // For GPU
+    {g12a_clk::CLK_GP0_PLL},
+};
+
 zx_status_t Astro::ClkInit() {
   fuchsia_hardware_clockimpl::wire::InitMetadata clock_init_metadata;
   clock_init_metadata.steps =
@@ -77,6 +91,13 @@ zx_status_t Astro::ClkInit() {
           .data = encoded_clock_ids_metadata.value(),
       }},
 #endif
+      // TODO(b/373903133): Remove once no longer referenced.
+      {{
+          .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&kClockIds),
+              reinterpret_cast<const uint8_t*>(&kClockIds) + sizeof(kClockIds)),
+      }},
       // TODO(b/373903133): Remove once no longer referenced.
       {{
           .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),

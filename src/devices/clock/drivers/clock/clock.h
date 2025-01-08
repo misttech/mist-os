@@ -7,9 +7,12 @@
 
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.clockimpl/cpp/driver/wire.h>
+#include <lib/ddk/platform-defs.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
-#include <lib/driver/metadata/cpp/metadata.h>
+
+#include <ddk/metadata/clock.h>
+#include <ddktl/device.h>
 
 class ClockDevice : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
  public:

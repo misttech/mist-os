@@ -174,10 +174,13 @@ zx_status_t AmlClock::PopulateRegisterBlocks(uint32_t device_id, fdf::PDev& pdev
 zx::result<> AmlClock::Start() {
   // Initialize compat server.
   {
-    // TODO(b/373903133): Don't forward DEVICE_METADATA_CLOCK_INIT once it is no longer used.
-    zx::result<> result =
-        compat_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
-                                  compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_INIT}));
+    // TODO(b/373903133): Don't forward clock ID's using the legacy method once it is no longer
+    // used.
+    // TODO(b/373903133): Don't forward clock init metadat using the legacy method once it is no
+    // longer used.
+    zx::result<> result = compat_server_.Initialize(
+        incoming(), outgoing(), node_name(), kChildNodeName,
+        compat::ForwardMetadata::Some({DEVICE_METADATA_CLOCK_IDS, DEVICE_METADATA_CLOCK_INIT}));
     if (result.is_error()) {
       FDF_LOG(ERROR, "Failed to initialize compat server: %s", result.status_string());
       return result.take_error();
