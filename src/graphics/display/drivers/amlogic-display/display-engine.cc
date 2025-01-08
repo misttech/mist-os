@@ -435,12 +435,17 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     const display_config_t* display_configs, size_t display_count,
     layer_composition_operations_t* out_layer_composition_operations_list,
     size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
+  if (display_count == 0) {
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  if (display_count > 1) {
+    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
+    return CONFIG_CHECK_RESULT_TOO_MANY;
+  }
+
   if (out_layer_composition_operations_actual != nullptr) {
     *out_layer_composition_operations_actual = 0;
-  }
-  if (display_count != 1) {
-    ZX_DEBUG_ASSERT(display_count == 0);
-    return CONFIG_CHECK_RESULT_OK;
   }
 
   fbl::AutoLock lock(&display_mutex_);
@@ -540,13 +545,18 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
 void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* display_configs,
                                                     size_t display_count,
                                                     const config_stamp_t* banjo_config_stamp) {
+  if (display_count == 0) {
+    return;
+  }
+  ZX_DEBUG_ASSERT_MSG(display_count == 1,
+                      "Display coordinator applied rejected multi-display config");
+
   ZX_DEBUG_ASSERT(display_configs);
   ZX_DEBUG_ASSERT(banjo_config_stamp);
   const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
 
   fbl::AutoLock lock(&display_mutex_);
-
-  if (display_count == 1 && display_configs[0].layer_count) {
+  if (display_configs[0].layer_count != 0) {
     if (!IgnoreDisplayMode()) {
       // Perform Vout modeset iff there's a new display mode.
       //
@@ -585,18 +595,6 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
         }
       }
       video_input_unit_->DisableLayer(config_stamp);
-    }
-  }
-
-  // If bootloader does not enable any of the display hardware, no vsync will be generated.
-  // This fakes a vsync to let clients know we are ready until we actually initialize hardware
-  if (!fully_initialized()) {
-    if (engine_listener_.is_valid()) {
-      if (display_count == 0 || display_configs[0].layer_count == 0) {
-        const config_stamp_t banjo_config_stamp_out = display::ToBanjoConfigStamp(config_stamp);
-        engine_listener_.OnDisplayVsync(display::ToBanjoDisplayId(display_id_),
-                                        zx_clock_get_monotonic(), &banjo_config_stamp_out);
-      }
     }
   }
 }
