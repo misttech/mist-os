@@ -16,7 +16,7 @@ use fuchsia_runtime::UtcInstant;
 use futures::future::BoxFuture;
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{Locked, Unlocked};
-use starnix_types::convert::{FromFidl as _, IntoFidl as _};
+use starnix_types::convert::IntoFidl as _;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{AccessCheck, FileMode};
@@ -686,21 +686,21 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         Ok(seek_result as u64)
     }
 
-    fn update_flags(&self, flags: fio::OpenFlags) -> zx::Status {
-        let flags = OpenFlags::from_fidl(flags);
-
-        // `fcntl(F_SETFL)` also supports setting `O_NOATIME`, but it's allowed
-        // only when the calling process has the same EUID as the UID of the
-        // file. We don't know caller's EUID here, so we cannot check if
-        // O_NOATIME should be allowed. It's not a problem here because
-        // `fidl::fuchsia::io::OpenFlags` doesn't have an equivalent of
-        // `O_NOATIME`.
-        assert!(!flags.contains(OpenFlags::NOATIME));
-
-        let settable_flags = OpenFlags::APPEND | OpenFlags::DIRECT | OpenFlags::NONBLOCK;
-        self.file.update_file_flags(flags, settable_flags);
-
-        zx::Status::OK
+    fn set_flags(&self, flags: fio::Flags) -> Result<(), zx::Status> {
+        // Called on the connection via `fcntl(FSETFL, ...)`. fuchsia.io only supports `O_APPEND`
+        // right now, and does not have equivalents for the following flags:
+        //  - `O_ASYNC`
+        //  - `O_DIRECT`
+        //  - `O_NOATIME` (only allowed if caller's EUID is same as the file's UID)
+        //  - `O_NONBLOCK`
+        const SETTABLE_FLAGS_MASK: OpenFlags = OpenFlags::APPEND;
+        let flags = if flags.contains(fio::Flags::FILE_APPEND) {
+            OpenFlags::APPEND
+        } else {
+            OpenFlags::empty()
+        };
+        self.file.update_file_flags(flags, SETTABLE_FLAGS_MASK);
+        Ok(())
     }
 }
 

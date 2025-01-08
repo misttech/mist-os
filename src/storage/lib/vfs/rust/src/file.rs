@@ -296,8 +296,7 @@ pub trait RawFileIoConnection: Send + Sync {
     ) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Notifies the `IoOpHandler` that the flags of the connection have changed.
-    /// TODO(https://fxbug.dev/376509077): Migrate this to fio::Flags.
-    fn update_flags(&self, flags: fio::OpenFlags) -> Status;
+    fn set_flags(&self, flags: fio::Flags) -> Result<(), Status>;
 }
 
 pub trait FileLike: Node {

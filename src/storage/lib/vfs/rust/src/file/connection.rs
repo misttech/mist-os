@@ -100,7 +100,7 @@ trait IoOpHandler: Send + Sync + Sized + 'static {
     ) -> impl Future<Output = Result<u64, Status>> + Send;
 
     /// Notifies the `IoOpHandler` that the flags of the connection have changed.
-    fn update_flags(&mut self, flags: fio::OpenFlags) -> Status;
+    fn set_flags(&mut self, flags: fio::Flags) -> Result<(), Status>;
 
     /// Duplicates the stream backing this connection if this connection is backed by a stream.
     /// Returns `None` if the connection is not backed by a stream.
@@ -237,9 +237,9 @@ impl<T: 'static + File + FileIo> IoOpHandler for FidlIoConnection<T> {
         }
     }
 
-    fn update_flags(&mut self, flags: fio::OpenFlags) -> Status {
-        self.is_append = flags.intersects(fio::OpenFlags::APPEND);
-        Status::OK
+    fn set_flags(&mut self, flags: fio::Flags) -> Result<(), Status> {
+        self.is_append = flags.intersects(fio::Flags::FILE_APPEND);
+        Ok(())
     }
 
     #[cfg(target_os = "fuchsia")]
@@ -309,8 +309,8 @@ impl<T: 'static + File + RawFileIoConnection> IoOpHandler for RawIoConnection<T>
         self.file.seek(offset, origin).await
     }
 
-    fn update_flags(&mut self, flags: fio::OpenFlags) -> Status {
-        self.file.update_flags(flags)
+    fn set_flags(&mut self, flags: fio::Flags) -> Result<(), Status> {
+        self.file.set_flags(flags)
     }
 
     #[cfg(target_os = "fuchsia")]
@@ -456,12 +456,9 @@ mod stream_io {
             self.stream.seek(position)
         }
 
-        fn update_flags(&mut self, flags: fio::OpenFlags) -> Status {
-            let append_mode = flags.contains(fio::OpenFlags::APPEND) as u8;
-            match self.stream.set_mode_append(&append_mode) {
-                Ok(()) => Status::OK,
-                Err(status) => status,
-            }
+        fn set_flags(&mut self, flags: fio::Flags) -> Result<(), Status> {
+            let append_mode = if flags.contains(fio::Flags::FILE_APPEND) { 1 } else { 0 };
+            self.stream.set_mode_append(&append_mode)
         }
 
         fn duplicate_stream(&self) -> Result<Option<zx::Stream>, Status> {
@@ -791,8 +788,11 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::SetFlags { flags, responder } => {
                 trace::duration!(c"storage", c"File::SetFlags");
-                self.options.is_append = flags.contains(fio::OpenFlags::APPEND);
-                responder.send(self.file.update_flags(self.options.to_io1()).into_raw())?;
+                // The only supported flag is APPEND.
+                let is_append = flags.contains(fio::OpenFlags::APPEND);
+                self.options.is_append = is_append;
+                let flags = if is_append { fio::Flags::FILE_APPEND } else { fio::Flags::empty() };
+                responder.send(Status::from_result(self.file.set_flags(flags)).into_raw())?;
             }
             #[cfg(target_os = "fuchsia")]
             fio::FileRequest::GetBackingMemory { flags, responder } => {
