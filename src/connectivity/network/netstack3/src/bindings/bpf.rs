@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use ebpf::{
-    BpfValue, DataWidth, EbpfInstruction, EbpfProgram, EbpfRunContext, PacketAccessor, SKF_AD_OFF,
-    SKF_AD_PROTOCOL, SKF_LL_OFF, SKF_NET_OFF,
+    link_program, BpfValue, DataWidth, EbpfInstruction, EbpfProgram, EbpfRunContext,
+    PacketAccessor, VerifiedEbpfProgram, SKF_AD_OFF, SKF_AD_PROTOCOL, SKF_LL_OFF, SKF_NET_OFF,
 };
 use fidl_fuchsia_posix_socket_packet as fppacket;
 use netstack3_core::device_socket::Frame;
+use std::collections::HashMap;
 use zerocopy::FromBytes;
 
 struct IpPacketForBpf<'a> {
@@ -126,7 +127,9 @@ impl SocketFilterProgram {
         // This is safe because fuchsia.posix.socket.packet is routed only to Starnix,
         // but that may change in the future. We need a better mechanism for permissions & BPF
         // verification.
-        let program = EbpfProgram::<()>::from_verified_code(code);
+        let program = VerifiedEbpfProgram::from_verified_code(code);
+        let program = link_program(&program, &[], &[], HashMap::new())
+            .expect("Failed to link SocketFilter program");
 
         Self { program }
     }

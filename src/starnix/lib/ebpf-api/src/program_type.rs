@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use ebpf::{
-    new_bpf_type_identifier, CallingContext, EbpfError, FieldDescriptor, FieldType,
-    FunctionSignature, MapSchema, MemoryId, MemoryParameterSize, StructDescriptor, Type,
+    CallingContext, EbpfError, FieldDescriptor, FieldType, FunctionSignature, MapSchema, MemoryId,
+    MemoryParameterSize, StructDescriptor, Type,
 };
 use linux_uapi::{
     __sk_buff, bpf_func_id_BPF_FUNC_csum_update, bpf_func_id_BPF_FUNC_get_current_uid_gid,
@@ -482,13 +482,13 @@ fn ptr_to_mem_type<T: IntoBytes>(id: MemoryId) -> Type {
     Type::PtrToMemory { id, offset: 0, buffer_size: std::mem::size_of::<T>() as u64 }
 }
 
-static RING_BUFFER_RESERVATION: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static RING_BUFFER_RESERVATION: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 
-pub static SK_BUF_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+pub static SK_BUF_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
     let cb_offset = std::mem::offset_of!(__sk_buff, cb);
     let hash_offset = std::mem::offset_of!(__sk_buff, hash);
-    let data_id = new_bpf_type_identifier();
+    let data_id = MemoryId::new();
 
     ptr_to_struct_type(
         SK_BUF_ID.clone(),
@@ -509,9 +509,9 @@ static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
 });
 static SK_BUF_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![SK_BUF_TYPE.clone()]);
 
-pub static XDP_MD_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+pub static XDP_MD_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static XDP_MD_TYPE: LazyLock<Type> = LazyLock::new(|| {
-    let data_id = new_bpf_type_identifier();
+    let data_id = MemoryId::new();
 
     ptr_to_struct_type(
         XDP_MD_ID.clone(),
@@ -528,23 +528,23 @@ static XDP_MD_TYPE: LazyLock<Type> = LazyLock::new(|| {
 });
 static XDP_MD_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![XDP_MD_TYPE.clone()]);
 
-static BPF_USER_PT_REGS_T_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_USER_PT_REGS_T_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_USER_PT_REGS_T_ARGS: LazyLock<Vec<Type>> =
     LazyLock::new(|| vec![ptr_to_mem_type::<bpf_user_pt_regs_t>(BPF_USER_PT_REGS_T_ID.clone())]);
 
-static BPF_SOCK_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_SOCK_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_SOCK_ARGS: LazyLock<Vec<Type>> =
     LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sock>(BPF_SOCK_ID.clone())]);
 
-static BPF_SOCKOPT_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_SOCKOPT_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_SOCKOPT_ARGS: LazyLock<Vec<Type>> =
     LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sockopt>(BPF_SOCKOPT_ID.clone())]);
 
-static BPF_SOCK_ADDR_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_SOCK_ADDR_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_SOCK_ADDR_ARGS: LazyLock<Vec<Type>> =
     LazyLock::new(|| vec![ptr_to_mem_type::<bpf_sock_addr>(BPF_SOCK_ADDR_ID.clone())]);
 
-static BPF_FUSE_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_FUSE_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         BPF_FUSE_ID.clone(),
@@ -553,7 +553,7 @@ static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
                 offset: (std::mem::offset_of!(fuse_bpf_args, out_args)
                     + std::mem::offset_of!(fuse_bpf_arg, value)),
                 field_type: FieldType::PtrToMemory {
-                    id: new_bpf_type_identifier(),
+                    id: MemoryId::new(),
                     buffer_size: std::mem::size_of::<fuse_entry_out>(),
                     is_32_bit: false,
                 },
@@ -563,7 +563,7 @@ static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
                     + std::mem::size_of::<fuse_bpf_arg>()
                     + std::mem::offset_of!(fuse_bpf_arg, value)),
                 field_type: FieldType::PtrToMemory {
-                    id: new_bpf_type_identifier(),
+                    id: MemoryId::new(),
                     buffer_size: std::mem::size_of::<fuse_entry_bpf_out>(),
                     is_32_bit: false,
                 },
@@ -593,7 +593,7 @@ struct TraceEvent {
     args: [u64; 16],
 }
 
-static BPF_TRACEPOINT_ID: LazyLock<MemoryId> = LazyLock::new(new_bpf_type_identifier);
+static BPF_TRACEPOINT_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static BPF_TRACEPOINT_ARGS: LazyLock<Vec<Type>> =
     LazyLock::new(|| vec![ptr_to_mem_type::<TraceEvent>(BPF_TRACEPOINT_ID.clone())]);
 

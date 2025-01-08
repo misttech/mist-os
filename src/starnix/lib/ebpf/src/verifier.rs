@@ -46,7 +46,20 @@ impl From<u64> for MemoryId {
     }
 }
 
+/// A counter that allows to generate new ids for parameters. The namespace is the same as for id
+/// generated for types while verifying an ebpf program, but it is started a u64::MAX / 2 and so is
+/// guaranteed to never collide because the number of instruction of an ebpf program are bounded.
+static BPF_TYPE_IDENTIFIER_COUNTER: std::sync::atomic::AtomicU64 =
+    std::sync::atomic::AtomicU64::new(u64::MAX / 2);
+
 impl MemoryId {
+    pub fn new() -> MemoryId {
+        Self {
+            id: BPF_TYPE_IDENTIFIER_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+            parent: None,
+        }
+    }
+
     /// Build a new id such that `other` is prepended to the chain of parent of `self`.
     fn prepended(&self, other: MemoryId) -> Self {
         match &self.parent {
@@ -689,6 +702,20 @@ pub struct VerifiedEbpfProgram {
     pub(crate) code: Vec<EbpfInstruction>,
     pub(crate) struct_access_instructions: Vec<StructAccess>,
     pub(crate) maps: Vec<MapSchema>,
+}
+
+impl VerifiedEbpfProgram {
+    // Convert the program to raw code. Can be used only when the program doesn't access any
+    // structs and maps.
+    pub fn to_code(self) -> Vec<EbpfInstruction> {
+        assert!(self.struct_access_instructions.is_empty());
+        assert!(self.maps.is_empty());
+        self.code
+    }
+
+    pub fn from_verified_code(code: Vec<EbpfInstruction>) -> Self {
+        Self { code, struct_access_instructions: vec![], maps: vec![] }
+    }
 }
 
 /// Verify the given code depending on the type of the parameters and the registered external

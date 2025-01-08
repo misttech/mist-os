@@ -5,15 +5,14 @@
 #[cfg(test)]
 pub mod test {
     use crate::{
-        link_program, new_bpf_type_identifier, verify_program, BpfValue, CallingContext, DataWidth,
-        EbpfHelperImpl, EmptyPacketAccessor, FunctionSignature, MemoryParameterSize,
-        NullVerifierLogger, PacketAccessor, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND,
-        BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT,
-        BPF_FETCH, BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT,
-        BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD,
-        BPF_LDX, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH,
-        BPF_SRC_IMM, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG,
-        BPF_XOR,
+        link_program, verify_program, BpfValue, CallingContext, DataWidth, EbpfHelperImpl,
+        EmptyPacketAccessor, FunctionSignature, MemoryId, MemoryParameterSize, NullVerifierLogger,
+        PacketAccessor, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC,
+        BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
+        BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32,
+        BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH,
+        BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG,
+        BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
     };
     use linux_uapi::bpf_insn;
     use pest::iterators::Pair;
@@ -879,8 +878,7 @@ pub mod test {
         match test_case.memory.as_ref() {
             Some(memory) => {
                 let buffer_size = memory.len() as u64;
-                let packet =
-                    Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size };
+                let packet = Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size };
                 args = vec![packet.clone(), Type::from(buffer_size)];
                 packet_type = Some(packet)
             }
@@ -890,7 +888,7 @@ pub mod test {
             }
         };
 
-        let malloc_id = new_bpf_type_identifier();
+        let malloc_id = MemoryId::new();
         let mut helpers = HashMap::<u32, FunctionSignature>::new();
         let mut helper_impls = HashMap::<u32, EbpfHelperImpl<()>>::new();
         let mut add_helper = |id, signature, impl_| {

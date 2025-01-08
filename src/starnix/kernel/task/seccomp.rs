@@ -12,7 +12,10 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FdFlags, FdNumber, FileObject, FileOps,
 };
 use bstr::ByteSlice;
-use ebpf::{bpf_addressing_mode, bpf_class, DirectPacketAccessor, EbpfProgram, EbpfRunContext};
+use ebpf::{
+    bpf_addressing_mode, bpf_class, convert_and_verify_cbpf, link_program, DirectPacketAccessor,
+    EbpfProgram, EbpfRunContext,
+};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
@@ -102,18 +105,19 @@ impl SeccompFilter {
             }
         }
 
-        match EbpfProgram::<()>::from_cbpf(code) {
-            Ok(program) => Ok(SeccompFilter {
-                program,
-                unique_id: maybe_unique_id,
-                cookie: AtomicU64Counter::new(0),
-                log: should_log,
-            }),
-            Err(errmsg) => {
+        let program = convert_and_verify_cbpf(code)
+            .and_then(|program| link_program(&program, &[], &[], HashMap::new()))
+            .map_err(|errmsg| {
                 log_warn!("{}", errmsg);
-                error!(EINVAL)
-            }
-        }
+                errno!(EINVAL)
+            })?;
+
+        Ok(SeccompFilter {
+            program,
+            unique_id: maybe_unique_id,
+            cookie: AtomicU64Counter::new(0),
+            log: should_log,
+        })
     }
 
     pub fn run(&self, data: &mut seccomp_data) -> u32 {

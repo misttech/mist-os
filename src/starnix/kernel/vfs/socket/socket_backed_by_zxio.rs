@@ -20,7 +20,7 @@ use starnix_uapi::{
     uapi, ucred, AF_PACKET, BPF_MAXINSNS, MSG_DONTWAIT, MSG_WAITALL, SO_ATTACH_FILTER,
 };
 
-use ebpf::EbpfProgram;
+use ebpf::convert_and_verify_cbpf;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use static_assertions::const_assert_eq;
 use std::sync::{Arc, OnceLock};
@@ -220,14 +220,14 @@ impl ZxioBackedSocket {
             return error!(ENOTSUP);
         }
 
-        let program = EbpfProgram::<()>::from_cbpf(&code).map_err(|_| errno!(EINVAL))?;
+        let program = convert_and_verify_cbpf(&code).map_err(|_| errno!(EINVAL))?;
 
         // TODO(https://fxbug.dev/377332291) Use `zxio_borrow()` to avoid cloning the handle.
         let packet_socket = fidl::endpoints::ClientEnd::<fposix_socket_packet::SocketMarker>::new(
             self.zxio.clone_handle().map_err(|_| errno!(EIO))?.into(),
         )
         .into_sync_proxy();
-        let code = program.code();
+        let code = program.to_code();
         let code = unsafe { std::slice::from_raw_parts(code.as_ptr() as *const u64, code.len()) };
         let result = packet_socket.attach_bpf_filter_unsafe(code, zx::MonotonicInstant::INFINITE);
         result.map_err(|_: fidl::Error| errno!(EIO))?.map_err(|e| {

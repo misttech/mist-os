@@ -2,30 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::converter::cbpf_to_ebpf;
 use crate::executor::execute;
-use crate::verifier::{
-    verify_program, CallingContext, NullVerifierLogger, Type, VerifiedEbpfProgram,
-};
+use crate::verifier::VerifiedEbpfProgram;
 use crate::{
     DataWidth, EbpfError, EbpfInstruction, MapSchema, MemoryId, StructAccess, BPF_CALL, BPF_DW,
     BPF_JMP, BPF_LDDW, BPF_PSEUDO_MAP_IDX, BPF_SIZE_MASK,
 };
 use derivative::Derivative;
-use linux_uapi::sock_filter;
 use std::collections::HashMap;
 use std::fmt::Formatter;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
-
-/// A counter that allows to generate new ids for parameters. The namespace is the same as for id
-/// generated for types while verifying an ebpf program, but it is started a u64::MAX / 2 and so is
-/// guaranteed to never collide because the number of instruction of an ebpf program are bounded.
-static BPF_TYPE_IDENTIFIER_COUNTER: std::sync::atomic::AtomicU64 =
-    std::sync::atomic::AtomicU64::new(u64::MAX / 2);
-
-pub fn new_bpf_type_identifier() -> MemoryId {
-    BPF_TYPE_IDENTIFIER_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed).into()
-}
 
 pub trait EbpfRunContext {
     type Context<'a>;
@@ -423,46 +409,18 @@ impl<C: EbpfRunContext> EbpfProgram<C> {
     }
 }
 
-impl EbpfProgram<()> {
-    pub fn from_verified_code(code: Vec<EbpfInstruction>) -> Self {
-        Self { code, helpers: Default::default() }
-    }
-
-    pub fn code(&self) -> &[EbpfInstruction] {
-        &self.code[..]
-    }
-
-    /// This method instantiates an EbpfProgram given a cbpf original.
-    pub fn from_cbpf(bpf_code: &[sock_filter]) -> Result<Self, EbpfError> {
-        // Pointer to the packet (e.g. `__sk_buff`). `buffer_size` is set to 0 because the
-        // packet is supposed to be access only through the `PacketAccessor` which validates
-        // the offset in runtime.
-        let packet_type =
-            Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size: 0 };
-        let context = CallingContext {
-            args: vec![
-                packet_type.clone(),
-                // Packet size (see `BPF_LEN` in cBPF). This may be different from the size of the
-                // value pointed by the first argument.
-                Type::ScalarValueParameter,
-            ],
-            packet_type: Some(packet_type),
-            ..Default::default()
-        };
-        let verified_program =
-            verify_program(cbpf_to_ebpf(bpf_code)?, context, &mut NullVerifierLogger)?;
-        link_program(&verified_program, &[], &[], HashMap::new())
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::api::*;
     use crate::conformance::test::parse_asm;
-    use crate::{FieldDescriptor, FieldMapping, FieldType, NullVerifierLogger, StructDescriptor};
+    use crate::{
+        convert_and_verify_cbpf, verify_program, CallingContext, FieldDescriptor, FieldMapping,
+        FieldType, NullVerifierLogger, StructDescriptor, Type,
+    };
     use linux_uapi::{
-        seccomp_data, AUDIT_ARCH_AARCH64, AUDIT_ARCH_X86_64, SECCOMP_RET_ALLOW, SECCOMP_RET_TRAP,
+        seccomp_data, sock_filter, AUDIT_ARCH_AARCH64, AUDIT_ARCH_X86_64, SECCOMP_RET_ALLOW,
+        SECCOMP_RET_TRAP,
     };
     use std::sync::{Arc, LazyLock};
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
@@ -487,6 +445,11 @@ mod test {
     const BPF_RET_A: u16 = (BPF_RET | BPF_A) as u16;
     const BPF_ST_REG: u16 = BPF_ST as u16;
     const BPF_MISC_TAX: u16 = (BPF_MISC | BPF_TAX) as u16;
+
+    fn verify_and_link_cbpf(code: &[CbpfInstruction]) -> Result<EbpfProgram<()>, EbpfError> {
+        let program = convert_and_verify_cbpf(code)?;
+        link_program(&program, &[], &[], HashMap::new())
+    }
 
     fn with_prg_assert_result(
         prg: &EbpfProgram<()>,
@@ -534,7 +497,7 @@ mod test {
             sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW },
         ];
 
-        let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
+        let prg = verify_and_link_cbpf(&test_prg).expect("Error parsing program");
 
         with_prg_assert_result(
             &prg,
@@ -608,7 +571,7 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
+            let prg = verify_and_link_cbpf(&test_prg).expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,
@@ -634,7 +597,7 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
+            let prg = verify_and_link_cbpf(&test_prg).expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,
@@ -657,7 +620,7 @@ mod test {
             sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
         ];
 
-        let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
+        let prg = verify_and_link_cbpf(&test_prg).expect("Error parsing program");
 
         for i in [0x00, 0x01, 0x07, 0x15, 0xff].iter() {
             with_prg_assert_result(
@@ -705,11 +668,11 @@ mod test {
         }
     }
 
-    static ARG_MEMORY_ID: LazyLock<MemoryId> = LazyLock::new(|| new_bpf_type_identifier());
+    static ARG_MEMORY_ID: LazyLock<MemoryId> = LazyLock::new(|| MemoryId::new());
 
     impl ProgramArgument {
         fn get_type() -> Type {
-            let array_id = new_bpf_type_identifier();
+            let array_id = MemoryId::new();
 
             let descriptor = Arc::new(StructDescriptor {
                 fields: vec![
@@ -740,7 +703,7 @@ mod test {
 
         // Returns type def for a program that takes `ProgramArgument32`, but remaps access to `ProgramArgument`.
         fn get_type_32bit() -> Type {
-            let array_id = new_bpf_type_identifier();
+            let array_id = MemoryId::new();
 
             let descriptor = Arc::new(StructDescriptor {
                 fields: vec![
@@ -981,8 +944,8 @@ mod test {
         exit
         "#;
         let args = vec![
-            Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size: 16 },
-            Type::PtrToMemory { id: new_bpf_type_identifier(), offset: 0, buffer_size: 16 },
+            Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 16 },
+            Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 16 },
         ];
         let verify_result = verify_program(
             parse_asm(program),

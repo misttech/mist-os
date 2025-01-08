@@ -11,6 +11,9 @@ use linux_uapi::{
 };
 use std::collections::HashMap;
 
+use crate::verifier::{
+    verify_program, CallingContext, MemoryId, NullVerifierLogger, Type, VerifiedEbpfProgram,
+};
 use crate::visitor::Register;
 use crate::EbpfError;
 use crate::EbpfError::*;
@@ -86,7 +89,7 @@ fn new_bpf_insn(code: u32, dst: Register, src: Register, offset: i16, imm: i32) 
 /// The bpf_code parameter is kept as an array for easy transfer
 /// via FFI.  This currently only allows the subset of BPF permitted
 /// by seccomp(2).
-pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
+fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
     // There are only two BPF registers, A and X. There are 10
     // EBPF registers, numbered 0-9.  We map between the two as
     // follows:
@@ -359,6 +362,27 @@ pub(crate) fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, Eb
     assert!(to_be_patched.is_empty());
 
     Ok(ebpf_code)
+}
+
+/// This method instantiates an EbpfProgram given a cbpf original.
+pub fn convert_and_verify_cbpf(bpf_code: &[sock_filter]) -> Result<VerifiedEbpfProgram, EbpfError> {
+    // Pointer to the packet (e.g. `__sk_buff`). `buffer_size` is set to 0 because the
+    // packet is supposed to be access only through the `PacketAccessor` which validates
+    // the offset in runtime.
+    let packet_type = Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 0 };
+    let context = CallingContext {
+        maps: vec![],
+        helpers: HashMap::new(),
+        args: vec![
+            packet_type.clone(),
+            // Packet size (see `BPF_LEN` in cBPF). This may be different from the size of the
+            // value pointed by the first argument.
+            Type::ScalarValueParameter,
+        ],
+        packet_type: Some(packet_type),
+    };
+    let ebpf_code = cbpf_to_ebpf(bpf_code)?;
+    verify_program(ebpf_code, context, &mut NullVerifierLogger)
 }
 
 #[cfg(test)]
