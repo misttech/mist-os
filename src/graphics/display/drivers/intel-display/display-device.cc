@@ -48,7 +48,9 @@ DisplayDevice::DisplayDevice(Controller* controller, display::DisplayId id, DdiI
       id_(id),
       ddi_id_(ddi_id),
       ddi_reference_(std::move(ddi_reference)),
-      type_(type) {}
+      type_(type) {
+  ZX_DEBUG_ASSERT(controller != nullptr);
+}
 
 DisplayDevice::~DisplayDevice() {
   if (pipe_) {

@@ -137,8 +137,7 @@ class DisplayDevice {
  private:
   bool CheckNeedsModeset(const display::DisplayTiming& mode);
 
-  // Borrowed reference to Controller instance
-  Controller* controller_;
+  Controller* const controller_;
 
   display::DisplayId id_;
   DdiId ddi_id_;
