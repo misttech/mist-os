@@ -319,14 +319,11 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   std::optional<PchEngine> pch_engine_;
   std::unique_ptr<Power> power_;
 
-  // References to displays. References are owned by devmgr, but will always
-  // be valid while they are in this vector.
-  fbl::Vector<std::unique_ptr<DisplayDevice>> display_devices_ __TA_GUARDED(display_lock_);
-  // Display ID can't be kInvalidDisplayId.
-  display::DisplayId next_id_ __TA_GUARDED(display_lock_) = display::DisplayId{1};
-  fbl::Mutex display_lock_;
-
   std::unique_ptr<DdiManager> ddi_manager_;
+
+  // Must outlive `display_devices_`.
+  //
+  // The `DisplayDevice` destructor calls into the `PipeManager`.
   std::unique_ptr<PipeManager> pipe_manager_;
 
   PowerWellRef cd_clk_power_well_;
@@ -337,6 +334,13 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   cpp20::span<const DdiId> ddis_;
   fbl::Vector<GMBusI2c> gmbus_i2cs_;
   fbl::Vector<DpAux> dp_auxs_;
+
+  // References to displays. References are owned by devmgr, but will always
+  // be valid while they are in this vector.
+  fbl::Vector<std::unique_ptr<DisplayDevice>> display_devices_ __TA_GUARDED(display_lock_);
+  // Display ID can't be kInvalidDisplayId.
+  display::DisplayId next_id_ __TA_GUARDED(display_lock_) = display::DisplayId{1};
+  fbl::Mutex display_lock_;
 
   // Plane buffer allocation. If no alloc, start == end == registers::PlaneBufCfg::kBufferCount.
   buffer_allocation_t plane_buffers_[PipeIds<registers::Platform::kKabyLake>().size()]
