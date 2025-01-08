@@ -14,7 +14,7 @@ use starnix_core::vfs::{
     fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_not_dir,
     AppendLockGuard, BytesFile, BytesFileOps, DirectoryEntryType, DynamicFile, DynamicFileBuf,
     DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
+    FsNodeOps, FsStr, FsString, PathBuilder, VecDirectory, VecDirectoryEntry,
 };
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex};
@@ -39,6 +39,12 @@ const EVENTS_FILE: &str = "cgroup.events";
 
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
+    /// Name of the cgroup.
+    fn name(&self) -> &FsStr;
+
+    /// Parent cgroup. Root cgroup should return `Ok(None)`.
+    fn parent(&self) -> Result<Option<Arc<dyn CgroupOps>>, Errno>;
+
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
     fn add_process(&self, pid: pid_t, thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno>;
 
@@ -148,6 +154,14 @@ impl CgroupRoot {
 }
 
 impl CgroupOps for CgroupRoot {
+    fn name(&self) -> &FsStr {
+        "".into()
+    }
+
+    fn parent(&self) -> Result<Option<Arc<dyn CgroupOps>>, Errno> {
+        Ok(None)
+    }
+
     fn add_process(&self, pid: pid_t, _thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno> {
         let mut pid_table = self.pid_table.lock();
         match pid_table.entry(pid) {
@@ -172,7 +186,10 @@ impl CgroupOps for CgroupRoot {
         name: &FsStr,
     ) -> Result<CgroupHandle, Errno> {
         let mut children = self.children.lock();
-        children.insert_child(name.into(), Cgroup::new(current_task, fs, &self.weak_self))
+        children.insert_child(
+            name.into(),
+            Cgroup::new(current_task, fs, name, &self.weak_self, self.weak_self.clone()),
+        )
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
@@ -356,6 +373,12 @@ impl CgroupState {
 pub struct Cgroup {
     root: Weak<CgroupRoot>,
 
+    /// Name of the cgroup.
+    name: FsString,
+
+    /// Weak reference of its parent cgroup.
+    parent: Weak<dyn CgroupOps>,
+
     /// Internal state of the Cgroup.
     state: Mutex<CgroupState>,
 
@@ -369,16 +392,32 @@ pub struct Cgroup {
 }
 pub type CgroupHandle = Arc<Cgroup>;
 
+/// Returns the path from the root to this `cgroup`.
+#[allow(dead_code)]
+pub fn path_from_root(cgroup: Arc<dyn CgroupOps>) -> Result<FsString, Errno> {
+    let mut path = PathBuilder::new();
+    let mut current = cgroup.clone();
+    while let Some(p) = current.parent()? {
+        path.prepend_element(current.name());
+        current = p.clone();
+    }
+    Ok(path.build_absolute())
+}
+
 impl Cgroup {
     pub fn new(
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
+        name: &FsStr,
         root: &Weak<CgroupRoot>,
+        parent: Weak<dyn CgroupOps>,
     ) -> CgroupHandle {
         Arc::new_cyclic(|weak| {
             let weak_ops = weak.clone() as Weak<dyn CgroupOps>;
             Self {
                 root: root.clone(),
+                name: name.to_owned(),
+                parent,
                 state: Default::default(),
                 directory_node: fs.create_node(
                     current_task,
@@ -466,6 +505,14 @@ impl Cgroup {
 }
 
 impl CgroupOps for Cgroup {
+    fn name(&self) -> &FsStr {
+        self.name.as_ref()
+    }
+
+    fn parent(&self) -> Result<Option<Arc<dyn CgroupOps>>, Errno> {
+        Ok(Some(self.parent.upgrade().ok_or_else(|| errno!(ENODEV))?))
+    }
+
     fn add_process(&self, pid: pid_t, thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno> {
         let root = self.root()?;
         let mut pid_table = root.pid_table.lock();
@@ -505,7 +552,10 @@ impl CgroupOps for Cgroup {
         if state.deleted {
             return error!(ENOENT);
         }
-        state.children.insert_child(name.into(), Cgroup::new(current_task, fs, &self.root))
+        state.children.insert_child(
+            name.into(),
+            Cgroup::new(current_task, fs, name, &self.root, self.weak_self.clone()),
+        )
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
@@ -813,5 +863,34 @@ impl BytesFileOps for EventsFile {
         let events_str =
             format!("populated {}\nfrozen {}\n", status.populated as u8, status.freezer_state);
         Ok(events_str.as_bytes().to_owned().into())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::CgroupV2Fs;
+
+    use super::*;
+    use starnix_core::testing::create_kernel_task_and_unlocked;
+    use starnix_core::vfs::fs_registry::FsRegistry;
+
+    #[::fuchsia::test]
+    async fn cgroup_path_from_root() {
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let registry = kernel.expando.get::<FsRegistry>();
+        registry.register(b"cgroup2".into(), CgroupV2Fs::new_fs);
+        let fs = current_task
+            .create_filesystem(&mut locked, b"cgroup2".into(), Default::default())
+            .expect("");
+        let root = fs.downcast_ops::<CgroupV2Fs>().expect("").root.clone();
+
+        let test_cgroup = root.new_child(&current_task, &fs, "test".into()).expect("");
+        let child_cgroup = test_cgroup.new_child(&current_task, &fs, "child".into()).expect("");
+
+        assert_eq!(path_from_root(test_cgroup), Ok("/test".into()));
+        assert_eq!(path_from_root(child_cgroup), Ok("/test/child".into()));
+
+        // Test with root cgroup
+        assert_eq!(path_from_root(root), Ok("/".into()));
     }
 }

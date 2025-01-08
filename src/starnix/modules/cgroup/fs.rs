@@ -53,9 +53,8 @@ impl FileSystemOps for CgroupV1Fs {
 }
 
 pub struct CgroupV2Fs {
-    #[allow(dead_code)]
     // `root` is not accessed, but is needed to keep the cgroup hierarchy alive.
-    root: Arc<CgroupRoot>,
+    pub root: Arc<CgroupRoot>,
 }
 
 impl CgroupV2Fs {
