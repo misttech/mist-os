@@ -61,13 +61,13 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
         #
         # The steps measured are:
         # 1. sysfs suspend start -> Starnix kernel suspend start
-        # 2. Starnix kernel suspend start -> SAG suspend start
-        # 3. SAG suspend start -> AML suspend driver start
-        # 4. AML suspend driver start -> CPU idle start
+        # 2. sysfs suspend start -> SAG suspend start
+        # 3. sysfs suspend start -> AML suspend driver start
+        # 4. sysfs suspend start -> CPU idle start
         # 5. CPU idle end -> AML suspend driver end
-        # 6. AML suspend driver end -> SAG suspend end
-        # 7. SAG suspend end -> Starnix kernel resume end
-        # 8. Starnix kernel resume end -> sysfs suspend end
+        # 6. CPU idle end -> SAG suspend end
+        # 7. CPU idle end -> Starnix kernel resume end
+        # 8. CPU idle end -> sysfs suspend end
         sysfs_events = filter_sysfs_suspend_events(model)
         suspend_cnt = 0
         suspend_resume_steps_sum = [trace_time.TimeDelta(0)] * 8
@@ -127,7 +127,7 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
             result.extend(
                 [
                     trace_metrics.TestCaseResult(
-                        label="Suspend:sysfs->starnix_kernel",
+                        label="Suspend.sysfs_to_starnix_kernel",
                         unit=trace_metrics.Unit.nanoseconds,
                         values=[
                             suspend_resume_steps_sum[0].to_nanoseconds()
@@ -135,7 +135,7 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
                         ],
                     ),
                     trace_metrics.TestCaseResult(
-                        label="Suspend:starnix_kernel->SAG",
+                        label="Suspend.sysfs_to_sag",
                         unit=trace_metrics.Unit.nanoseconds,
                         values=[
                             suspend_resume_steps_sum[1].to_nanoseconds()
@@ -143,7 +143,7 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
                         ],
                     ),
                     trace_metrics.TestCaseResult(
-                        label="Suspend:SAG->suspend_driver",
+                        label="Suspend.sysfs_to_suspend_driver",
                         unit=trace_metrics.Unit.nanoseconds,
                         values=[
                             suspend_resume_steps_sum[2].to_nanoseconds()
@@ -151,7 +151,7 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
                         ],
                     ),
                     trace_metrics.TestCaseResult(
-                        label="Suspend:suspend_driver->CPU_idle",
+                        label="Suspend.sysfs_to_cpu_idle",
                         unit=trace_metrics.Unit.nanoseconds,
                         values=[
                             suspend_resume_steps_sum[3].to_nanoseconds()
@@ -159,7 +159,7 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
                         ],
                     ),
                     trace_metrics.TestCaseResult(
-                        label="Resume:CPU_idle->suspend_driver",
+                        label="Resume.cpu_idle_to_suspend_driver",
                         unit=trace_metrics.Unit.nanoseconds,
                         values=[
                             suspend_resume_steps_sum[4].to_nanoseconds()
@@ -167,7 +167,7 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
                         ],
                     ),
                     trace_metrics.TestCaseResult(
-                        label="Resume:suspend_driver->SAG",
+                        label="Resume.cpu_idle_to_sag",
                         unit=trace_metrics.Unit.nanoseconds,
                         values=[
                             suspend_resume_steps_sum[5].to_nanoseconds()
@@ -175,7 +175,7 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
                         ],
                     ),
                     trace_metrics.TestCaseResult(
-                        label="Resume:SAG->starnix_kernel",
+                        label="Resume.cpu_idle_to_starnix_kernel",
                         unit=trace_metrics.Unit.nanoseconds,
                         values=[
                             suspend_resume_steps_sum[6].to_nanoseconds()
@@ -183,7 +183,7 @@ class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
                         ],
                     ),
                     trace_metrics.TestCaseResult(
-                        label="Resume:starnix_kernel->sysfs",
+                        label="Resume.cpu_idle_to_sysfs",
                         unit=trace_metrics.Unit.nanoseconds,
                         values=[
                             suspend_resume_steps_sum[7].to_nanoseconds()
@@ -254,13 +254,13 @@ def get_time_steps(
         A list of TimeDelta objects representing the time steps between the
         following events:
             - sysfs suspend start -> Starnix kernel suspend start
-            - Starnix kernel suspend start -> SAG suspend start
-            - SAG suspend start -> AML driver suspend start
-            - AML driver suspend start -> CPU idle start
+            - sysfs suspend start -> SAG suspend start
+            - sysfs suspend start -> AML driver suspend start
+            - sysfs suspend start -> CPU idle start
             - CPU idle end -> AML driver suspend end
-            - AML driver suspend end -> SAG suspend end
-            - SAG suspend end -> Starnix kernel resume end
-            - Starnix kernel resume end -> sysfs suspend end
+            - CPU idle end -> SAG suspend end
+            - CPU idle end -> Starnix kernel resume end
+            - CPU idle end -> sysfs suspend end
 
         Returns None if any of the required events are not found or if their
         timing information is incomplete.
@@ -336,13 +336,13 @@ def get_time_steps(
 
     return [
         starnix_kernel_suspend_start - sysfs_event.start,
-        sag_suspend_start - starnix_kernel_suspend_start,
-        aml_suspend_start - sag_suspend_start,
-        cpu_idle_start - aml_suspend_start,
+        sag_suspend_start - sysfs_event.start,
+        aml_suspend_start - sysfs_event.start,
+        cpu_idle_start - sysfs_event.start,
         aml_suspend_end - cpu_idle_end,
-        sag_suspend_end - aml_suspend_end,
-        starnix_kernel_resume_end - sag_suspend_end,
-        unwrap(sysfs_event.end_time()) - starnix_kernel_resume_end,
+        sag_suspend_end - cpu_idle_end,
+        starnix_kernel_resume_end - cpu_idle_end,
+        unwrap(sysfs_event.end_time()) - cpu_idle_end,
     ]
 
 
