@@ -255,6 +255,8 @@ network_unified_binary_regular_and_gub_components("component") {
   component_name = "netstack3"
   gub_deps = [ ":bin" ]
   visibility = [
+    ":*",
+
     # Only available to top level network for bubbling up into assembly. Use the
     # test components everywhere else.
     "//src/connectivity/network:*",

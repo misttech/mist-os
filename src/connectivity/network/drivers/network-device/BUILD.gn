@@ -42,7 +42,14 @@ fuchsia_cc_driver("network-device-driver") {
 }
 
 fuchsia_driver_component("network-device") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/connectivity/ethernet/drivers/asix-88179:*",
+    "//src/connectivity/ethernet/drivers/usb-cdc-ecm:*",
+    "//src/connectivity/network:drivers",
+    "//src/connectivity/network/drivers:drivers",
+    "//src/connectivity/wlan/tests/helpers/realm-factory:*",
+  ]
   component_name = "network-device"
   deps = [ ":network-device-driver" ]
   info = "meta/network-device-info.json"
