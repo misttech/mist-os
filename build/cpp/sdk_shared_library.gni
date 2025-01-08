@@ -32,7 +32,7 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     Not allowed when `no_headers` is true.
 #
 #   symbols_api (required)
-#     Path to the ifs file containing the public symbols of this library.
+#     Path to the golden ifs file for the public symbols of this library.
 #     This file is used to ensure modifications to the library's ABI are
 #     explicitly acknowledged.
 #
@@ -160,7 +160,7 @@ template("sdk_shared_library") {
 
   assert(
       defined(invoker.symbols_api),
-      "Must define path to an ifs file. See comment in //build/cpp/verify_public_symbols.gni")
+      "Must define path to the golden ifs file. See comment in //build/cpp/verify_public_symbols.gni")
 
   output_name = target_name
   if (defined(invoker.output_name)) {
@@ -349,23 +349,44 @@ template("sdk_shared_library") {
       ":${main_target_name}(${shlib_toolchain_no_default_variant_redirect})"
   shared_out_dir = get_label_info(shared_lib_target, "root_out_dir")
   lib_name = "lib${output_name}.so"
+  ifs_file_name = "lib${output_name}.ifs"
+  generated_ifs_file = "${shared_out_dir}/${ifs_file_name}"
+  ifs_golden_file = invoker.symbols_api
+
+  # For legacy reasons, the file name in the IDK is different.
+  packaged_ifs_file_name = get_path_info(ifs_golden_file, "file")
+  packaged_ifs_file = "${file_base}/${packaged_ifs_file_name}"
+
+  # TODO(https://fxbug.dev/342032854): Generate the .ifs file path in the
+  # template and Eliminate `symbols_api` because the name can be known as
+  # asserted below.
+  assert(packaged_ifs_file_name == "${output_name}.ifs")
+
   link_lib = "${sdk_prebuilt_base_for_target_api_level}/lib/${lib_name}"
   dist_lib = "${sdk_prebuilt_base_for_target_api_level}/dist/${lib_name}"
-  sdk_files =
-      sdk_header_files + [
-        {
-          source = "${shared_out_dir}/link_stub/${lib_name}"
-          dest = link_lib
-        },
-        {
-          source = "${shared_out_dir}/${lib_name}"
-          dest = dist_lib
-        },
-        {
-          source = get_path_info(invoker.symbols_api, "abspath")
-          dest = "${file_base}/" + get_path_info(invoker.symbols_api, "file")
-        },
-      ]
+  sdk_files = sdk_header_files + [
+                {
+                  source = "${shared_out_dir}/link_stub/${lib_name}"
+                  dest = link_lib
+                },
+                {
+                  source = "${shared_out_dir}/${lib_name}"
+                  dest = dist_lib
+                },
+                {
+                  # `generated_ifs_file` contains text, including undefined
+                  # symbols, that should not be exposed. In addition, the Target
+                  # and other such text can vary by architecture and would cause
+                  # errors when assemblying the IDK. `verify_public_symbols()`
+                  # removes such text, so we must use its output for the IDK.
+                  # `verify_public_symbols_target_name` verifies the golden file
+                  # against a stripped version of `generated_ifs_file`, so we
+                  # can use the golden file here. (Ideally, we would use the
+                  # stripped file - see https://fxbug.dev/383416850.)
+                  source = get_path_info(ifs_golden_file, "abspath")
+                  dest = packaged_ifs_file
+                },
+              ]
 
   if (generate_plasa_artifacts) {
     _plasa_artifacts_target_name = "${main_target_name}_plasa"
@@ -432,7 +453,7 @@ template("sdk_shared_library") {
     ]
     args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
     args += [ "--headers" ] + sdk_metadata_headers
-    args += [ "--ifs" ] + [ get_path_info(invoker.symbols_api, "file") ]
+    args += [ "--ifs" ] + [ packaged_ifs_file_name ]
     if (current_build_target_api_level != "PLATFORM") {
       args += [
         "--api-level",
@@ -450,8 +471,8 @@ template("sdk_shared_library") {
   main_target_dir = get_label_info(":${main_target_name}", "dir")
   verify_public_symbols_target_name = "${target_name}_sdk_verify_public_symbols"
   verify_public_symbols(verify_public_symbols_target_name) {
-    current = "${shared_out_dir}/lib${output_name}.ifs"
-    reference = invoker.symbols_api
+    current = generated_ifs_file
+    reference = ifs_golden_file
     library_name = main_target_dir
 
     deps = [ shared_lib_target ]
