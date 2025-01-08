@@ -10,8 +10,7 @@ use hmac::Mac as _;
 use net_types::ip::{Ipv6Addr, Subnet};
 use rand::Rng;
 
-/// The length in bytes of the `secret_key` argument to
-/// [`generate_opaque_interface_identifier`].
+/// The length in bytes of the [`IidSecret`] secret key.
 const IID_SECRET_KEY_BYTES: usize = 32;
 
 /// A secret for generating [`OpaqueIid`]s.
@@ -48,8 +47,8 @@ impl OpaqueIid {
     /// Computes an opaque interface identifier (IID) using the algorithm in [RFC
     /// 7217 Section 5].
     ///
-    /// Each argument to `generate_opaque_interface_identifier` corresponds to an
-    /// argument from Section 5 of the RFC:
+    /// Each argument to this function corresponds to an argument from Section 5 of
+    /// the RFC:
     /// - `prefix` corresponds to the "Prefix" argument
     /// - `net_iface` corresponds to the "Net_Iface" argument
     /// - `net_id` corresponds to the "Network_ID" argument
@@ -62,8 +61,8 @@ impl OpaqueIid {
     /// properties as the original algorithm specified in the RFC without requiring
     /// that they keep state in the form of a DAD count.
     ///
-    /// For fixed inputs, the output of `generate_opaque_interface_identifier` is
-    /// guaranteed to be stable across versions this codebase.
+    /// For fixed inputs, the output of this function is guaranteed to be stable
+    /// across versions of this codebase.
     ///
     /// [RFC 7217 Section 5]: https://tools.ietf.org/html/rfc7217#section-5
     pub fn new<IF, ID>(
@@ -103,16 +102,16 @@ impl OpaqueIid {
         //
         // ALGORITHM
         //
-        // Our primary goal is to ensure that `generate_opaque_interface_identifier`
-        // implements a PRF. Our HMAC implements a PRF, and we just truncate its
-        // output to 128 bits and return it. [5] Thus, all we need to do is not
-        // somehow negate the HMAC's PRF property in constructing its input.
+        // Our primary goal is to ensure that `OpaqueIid` implements a PRF. Our HMAC
+        // implements a PRF, and we just truncate its output to 128 bits and return it.
+        // [5] Thus, all we need to do is not somehow negate the HMAC's PRF property in
+        // constructing its input.
         //
         // A trivial way to do this is to ensure that any two distinct inputs to
-        // `generate_opaque_interface_identifier` will result in a distinct byte
-        // sequence being fed to the HMAC. We do this by feeding each input to the
-        // HMAC one at a time and, for the variable-length inputs, prefixing them
-        // with a fixed-length binary representation of their length. [6]
+        // `OpaqueIid::new` will result in a distinct byte sequence being fed to the
+        // HMAC. We do this by feeding each input to the HMAC one at a time and, for the
+        // variable-length inputs, prefixing them with a fixed-length binary
+        // representation of their length. [6]
         //
         // [1] See [2]. There is some subtlety [3], however HMAC-SHA256 is used as a
         //     PRF in existing standards (e.g., [4]), and thus it is almost
@@ -140,9 +139,8 @@ impl OpaqueIid {
         //     version of f, is a PRF.
         // [6] This representation ensures that it is always possible to reverse the
         //     encoding and decompose the encoding into the separate arguments to
-        //     `generate_opaque_interface_identifier`. This implies that no two
-        //     sets of inputs to `generate_opaque_interface_identifier` will ever
-        //     produce the same encoding.
+        //     `OpaqueIid::new`. This implies that no two sets of inputs to
+        //     `OpaqueIid::new` will ever produce the same encoding.
         // [7] https://en.wikipedia.org/wiki/Random_oracle
 
         fn write_u64(hmac: &mut HmacSha256, u: u64) {
@@ -153,9 +151,9 @@ impl OpaqueIid {
             // Write `usize` values as `u64` so that we always write the same number
             // of bytes regardless of the platform.
             //
-            // This `unwrap` is guaranteed not to panic unless we a) run on a
-            // 128-bit platform and, b) call `generate_opaque_interface_identifier`
-            // on a byte slice which is larger than 2^64 bytes.
+            // This `unwrap` is guaranteed not to panic unless we a) run on a 128-bit
+            // platform and, b) call `OpaqueIid::new` on a byte slice which is larger than
+            // 2^64 bytes.
             write_u64(hmac, u.try_into().unwrap())
         }
 
@@ -197,8 +195,7 @@ impl OpaqueIid {
     }
 }
 
-/// Describes the value being used as the nonce for
-/// [`generate_opaque_interface_identifier`].
+/// Describes the value being used as the nonce for [`OpaqueIid`].
 ///
 /// See the function documentation for more info.
 #[derive(Copy, Clone, Debug)]
