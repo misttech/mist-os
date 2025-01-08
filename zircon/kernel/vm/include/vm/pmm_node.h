@@ -200,7 +200,9 @@ class PmmNode {
   void InitReservedRange(const memalloc::Range& range);
 
   void FreePageHelperLocked(vm_page* page, bool already_filled) TA_REQ(lock_);
+  void FreeLoanedPageHelperLocked(vm_page* page, bool already_filled) TA_REQ(loaned_list_lock_);
   void FreeListLocked(list_node* list, bool already_filled) TA_REQ(lock_);
+  void FreeLoanedListLocked(list_node* list, bool already_filled) TA_REQ(loaned_list_lock_);
 
   void SignalFreeMemoryChangeLocked() TA_REQ(lock_);
   void TripFreePagesLevelLocked() TA_REQ(lock_);
@@ -228,26 +230,26 @@ class PmmNode {
     }
   }
 
-  void IncrementFreeLoanedCountLocked(uint64_t amount) TA_REQ(lock_) {
+  void IncrementFreeLoanedCountLocked(uint64_t amount) TA_REQ(loaned_list_lock_) {
     free_loaned_count_.fetch_add(amount, ktl::memory_order_relaxed);
   }
-  void DecrementFreeLoanedCountLocked(uint64_t amount) TA_REQ(lock_) {
+  void DecrementFreeLoanedCountLocked(uint64_t amount) TA_REQ(loaned_list_lock_) {
     DEBUG_ASSERT(free_loaned_count_.load(ktl::memory_order_relaxed) >= amount);
     free_loaned_count_.fetch_sub(amount, ktl::memory_order_relaxed);
   }
 
-  void IncrementLoanedCountLocked(uint64_t amount) TA_REQ(lock_) {
+  void IncrementLoanedCountLocked(uint64_t amount) TA_REQ(loaned_list_lock_) {
     loaned_count_.fetch_add(amount, ktl::memory_order_relaxed);
   }
-  void DecrementLoanedCountLocked(uint64_t amount) TA_REQ(lock_) {
+  void DecrementLoanedCountLocked(uint64_t amount) TA_REQ(loaned_list_lock_) {
     DEBUG_ASSERT(loaned_count_.load(ktl::memory_order_relaxed) >= amount);
     loaned_count_.fetch_sub(amount, ktl::memory_order_relaxed);
   }
 
-  void IncrementLoanCancelledCountLocked(uint64_t amount) TA_REQ(lock_) {
+  void IncrementLoanCancelledCountLocked(uint64_t amount) TA_REQ(loaned_list_lock_) {
     loan_cancelled_count_.fetch_add(amount, ktl::memory_order_relaxed);
   }
-  void DecrementLoanCancelledCountLocked(uint64_t amount) TA_REQ(lock_) {
+  void DecrementLoanCancelledCountLocked(uint64_t amount) TA_REQ(loaned_list_lock_) {
     DEBUG_ASSERT(loan_cancelled_count_.load(ktl::memory_order_relaxed) >= amount);
     loan_cancelled_count_.fetch_sub(amount, ktl::memory_order_relaxed);
   }
@@ -255,9 +257,11 @@ class PmmNode {
   bool ShouldDelayAllocationLocked() TA_REQ(lock_);
 
   void AllocPageHelperLocked(vm_page_t* page) TA_REQ(lock_);
+  void AllocLoanedPageHelperLocked(vm_page_t* page) TA_REQ(loaned_list_lock_);
 
   template <typename F>
-  void ForPagesInPhysRangeLocked(paddr_t start, size_t count, F func) TA_REQ(lock_);
+  void ForPagesInPhysRangeLocked(paddr_t start, size_t count, F func) TA_REQ(lock_)
+      TA_REQ(loaned_list_lock_);
 
   // This method should be called when the PMM fails to allocate in a user-visible way and will
   // (optionally) trigger an asynchronous OOM response.
@@ -272,14 +276,15 @@ class PmmNode {
   // as logic in the system relies on the free_count_ not changing whilst the lock is held, but also
   // be an atomic so it can be correctly read without the lock.
   ktl::atomic<uint64_t> free_count_ TA_GUARDED(lock_) = 0;
-  ktl::atomic<uint64_t> free_loaned_count_ TA_GUARDED(lock_) = 0;
-  ktl::atomic<uint64_t> loaned_count_ TA_GUARDED(lock_) = 0;
-  ktl::atomic<uint64_t> loan_cancelled_count_ TA_GUARDED(lock_) = 0;
+  ktl::atomic<uint64_t> free_loaned_count_ TA_GUARDED(loaned_list_lock_) = 0;
+  ktl::atomic<uint64_t> loaned_count_ TA_GUARDED(loaned_list_lock_) = 0;
+  ktl::atomic<uint64_t> loan_cancelled_count_ TA_GUARDED(loaned_list_lock_) = 0;
 
   // Free pages where !loaned.
   list_node free_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_list_);
   // Free pages where loaned && !loan_cancelled.
-  list_node free_loaned_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_loaned_list_);
+  mutable DECLARE_MUTEX(PmmNode) loaned_list_lock_;
+  list_node free_loaned_list_ TA_GUARDED(loaned_list_lock_) = LIST_INITIAL_VALUE(free_loaned_list_);
 
   // The pages comprising the memory temporarily used during phys hand-off,
   // populated on Init(). It is the responsibility of EndHandoff() to free this
@@ -348,12 +353,12 @@ class PmmNode {
   // even without the lock held.
   // This is an atomic to allow for reading this outside of the lock, but modifications only happen
   // with the lock held.
-  ktl::atomic<bool> free_fill_enabled_ TA_GUARDED(lock_) = false;
+  ktl::atomic<bool> free_fill_enabled_ TA_GUARDED(lock_) TA_GUARDED(loaned_list_lock_) = false;
   // Indicates whether it is known that all pages in the free list have had a pattern filled into
   // them. This value can only transition from false->true, and never back to false again. Once this
   // value is set the action and armed state in checker_ may no longer be changed, and it becomes
   // safe to call AssertPattern even without the lock held.
-  bool all_free_pages_filled_ TA_GUARDED(lock_) = false;
+  bool all_free_pages_filled_ TA_GUARDED(loaned_list_lock_) TA_GUARDED(lock_) = false;
   PmmChecker checker_;
 
   // This method is racy as it allows us to read free_fill_enabled_ without holding the lock. If we
@@ -366,6 +371,21 @@ class PmmNode {
     // Read with acquire semantics to ensure that any modifications to checker_ are visible before
     // changes to free_fill_enabled_. See EnableFreePageFilling for where the release is performed.
     return free_fill_enabled_.load(ktl::memory_order_acquire);
+  }
+  // The free_fill_enabled_ and all_free_pages_filled_ members require both locks to modify, but can
+  // be safely read with either lock held. These methods provide a convenient way to do so with
+  // either of the locks held.
+  bool FreeFillEnabledLocked() const TA_REQ(lock_) TA_NO_THREAD_SAFETY_ANALYSIS {
+    return free_fill_enabled_;
+  }
+  bool FreeFillEnabledLoanedLocked() const TA_REQ(loaned_list_lock_) TA_NO_THREAD_SAFETY_ANALYSIS {
+    return free_fill_enabled_;
+  }
+  bool FreePagesFilledLocked() const TA_REQ(lock_) TA_NO_THREAD_SAFETY_ANALYSIS {
+    return all_free_pages_filled_;
+  }
+  bool FreePagesFilledLoanedLocked() const TA_REQ(loaned_list_lock_) TA_NO_THREAD_SAFETY_ANALYSIS {
+    return all_free_pages_filled_;
   }
 
   // The rng state for random waiting on allocations. This allows us to use rand_r, which requires

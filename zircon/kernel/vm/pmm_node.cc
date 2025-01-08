@@ -34,11 +34,6 @@
 
 #include "vm_priv.h"
 
-// Although the public interfaces claim that loaned pages must be allocated and freed using their
-// dedicated methods, the implementation presently uses common code and this internal flag for the
-// alloc_flags is used to achieve this.
-#define PMM_ALLOC_FLAG_LOANED (1 << 2)
-
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
 // The number of PMM allocation calls that have failed.
@@ -64,6 +59,20 @@ void AsanUnpoisonPage(vm_page_t* p) {
 #if __has_feature(address_sanitizer)
   asan_unpoison_shadow(reinterpret_cast<uintptr_t>(paddr_to_physmap(p->paddr())), PAGE_SIZE);
 #endif  // __has_feature(address_sanitizer)
+}
+
+void ReturnPagesToFreeList(list_node* target_list, list_node* to_free) {
+  if constexpr (!__has_feature(address_sanitizer)) {
+    // splice list at the head of free_list_; free_loaned_list_.
+    list_splice_after(to_free, target_list);
+  } else {
+    // If address sanitizer is enabled, put the pages at the tail to maximize reuse distance.
+    if (!list_is_empty(target_list)) {
+      list_splice_after(to_free, list_peek_tail(target_list));
+    } else {
+      list_splice_after(to_free, target_list);
+    }
+  }
 }
 
 }  // namespace
@@ -197,7 +206,9 @@ void PmmNode::AddFreePages(list_node* list) TA_NO_THREAD_SAFETY_ANALYSIS {
 }
 
 void PmmNode::FillFreePagesAndArm() {
-  Guard<Mutex> guard{&lock_};
+  // Require both locks so we can process both of the free lists and modify all_free_pages_filled_.
+  Guard<Mutex> loaned_guard{&loaned_list_lock_};
+  Guard<Mutex> free_guard{&lock_};
 
   if (!free_fill_enabled_) {
     return;
@@ -219,7 +230,10 @@ void PmmNode::FillFreePagesAndArm() {
 }
 
 void PmmNode::CheckAllFreePages() {
-  Guard<Mutex> guard{&lock_};
+  // Require both locks so we can process both of the free lists. This is an infrequent manual
+  // operation and does not need to be optimized to avoid holding both locks at once.
+  Guard<Mutex> loaned_guard{&loaned_list_lock_};
+  Guard<Mutex> free_guard{&lock_};
 
   if (!checker_.IsArmed()) {
     return;
@@ -243,7 +257,10 @@ void PmmNode::CheckAllFreePages() {
 
 #if __has_feature(address_sanitizer)
 void PmmNode::PoisonAllFreePages() {
-  Guard<Mutex> guard{&lock_};
+  // Require both locks so we can process both of the free lists. This is an infrequent manual
+  // operation and does not need to be optimized to avoid holding both locks at once.
+  Guard<Mutex> loaned_guard{&loaned_list_lock_};
+  Guard<Mutex> free_guard{&lock_};
 
   vm_page* page;
   list_for_every_entry (&free_list_, page, vm_page, queue_node) {
@@ -256,7 +273,9 @@ void PmmNode::PoisonAllFreePages() {
 #endif  // __has_feature(address_sanitizer)
 
 bool PmmNode::EnableFreePageFilling(size_t fill_size, CheckFailAction action) {
-  Guard<Mutex> guard{&lock_};
+  // Require both locks so we can manipulate free_fill_enabled_.
+  Guard<Mutex> loaned_guard{&loaned_list_lock_};
+  Guard<Mutex> free_guard{&lock_};
   if (free_fill_enabled_) {
     // Checker is already enabled.
     return false;
@@ -276,15 +295,8 @@ void PmmNode::AllocPageHelperLocked(vm_page_t* page) {
 
   AsanUnpoisonPage(page);
 
-  DEBUG_ASSERT(page->is_free() || page->is_free_loaned());
+  DEBUG_ASSERT(page->is_free() && !page->is_loaned());
   DEBUG_ASSERT(!page->object.is_stack_owned());
-
-  if (page->is_loaned()) {
-    page->object.set_stack_owner(&StackOwnedLoanedPagesInterval::current());
-    // We want the set_stack_owner() to be visible before set_state(), but we don't need to make
-    // set_state() a release just for the benefit of loaned pages, so we use this fence.
-    ktl::atomic_thread_fence(ktl::memory_order_release);
-  }
 
   // Here we transition the page from FREE->ALLOC, completing the transfer of ownership from the
   // PmmNode to the stack. This must be done under lock_, and more specifically the same lock_
@@ -293,12 +305,58 @@ void PmmNode::AllocPageHelperLocked(vm_page_t* page) {
   page->set_state(vm_page_state::ALLOC);
 }
 
+void PmmNode::AllocLoanedPageHelperLocked(vm_page_t* page) {
+  LTRACEF("allocating loaned page %p, pa %#" PRIxPTR ", prev state %s\n", page, page->paddr(),
+          page_state_to_string(page->state()));
+
+  AsanUnpoisonPage(page);
+
+  DEBUG_ASSERT(page->is_free_loaned() && page->is_loaned());
+  DEBUG_ASSERT(!page->object.is_stack_owned());
+
+  page->object.set_stack_owner(&StackOwnedLoanedPagesInterval::current());
+  // We want the set_stack_owner() to be visible before set_state(), but we don't need to make
+  // set_state() a release just for the benefit of loaned pages, so we use this fence.
+  ktl::atomic_thread_fence(ktl::memory_order_release);
+
+  // Here we transition the page from FREE_LOANED->ALLOC, completing the transfer of ownership from
+  // the PmmNode to the stack. This must be done under loaned_pages_lock_, and more specifically
+  // the same loaned_pages_lock_ acquisition that removes the page from the free list, as both being
+  // the free list, or being in the ALLOC state, indicate ownership by the PmmNode.
+  page->set_state(vm_page_state::ALLOC);
+}
+
 zx::result<vm_page_t*> PmmNode::AllocLoanedPage() {
-  zx::result<vm_page_t*> result = AllocPage(PMM_ALLOC_FLAG_LOANED);
-  if (result.status_value() == ZX_ERR_NO_MEMORY) {
-    return zx::error{ZX_ERR_NO_RESOURCES};
+  DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
+  AutoPreemptDisabler preempt_disable;
+
+  if (!pmm_physical_page_borrowing_config()->is_any_borrowing_enabled()) {
+    return zx::error(ZX_ERR_NO_RESOURCES);
   }
-  return result;
+
+  bool free_list_had_fill_pattern = false;
+  vm_page* page = nullptr;
+  {
+    Guard<Mutex> guard{&loaned_list_lock_};
+    free_list_had_fill_pattern = FreePagesFilledLoanedLocked();
+
+    page = list_remove_head_type(&free_loaned_list_, vm_page, queue_node);
+    if (!page) {
+      // Does not count as out of memory, so do not report an allocation failure, just tell the
+      // caller we are out of resources.
+      return zx::error(ZX_ERR_NO_RESOURCES);
+    }
+
+    AllocLoanedPageHelperLocked(page);
+
+    DecrementFreeLoanedCountLocked(1);
+  }
+
+  if (free_list_had_fill_pattern) {
+    checker_.AssertPattern(page);
+  }
+
+  return zx::ok(page);
 }
 
 zx::result<vm_page_t*> PmmNode::AllocPage(uint alloc_flags) {
@@ -310,40 +368,23 @@ zx::result<vm_page_t*> PmmNode::AllocPage(uint alloc_flags) {
   {
     AutoPreemptDisabler preempt_disable;
     Guard<Mutex> guard{&lock_};
-    free_list_had_fill_pattern = all_free_pages_filled_;
+    free_list_had_fill_pattern = FreePagesFilledLocked();
 
-    // The PMM_ALLOC_FLAG_LOANED flag is not compatible with PMM_ALLOC_FLAG_CAN_WAIT
-    DEBUG_ASSERT(
-        !((alloc_flags & PMM_ALLOC_FLAG_LOANED) && (alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT)));
-    const bool use_loaned_list = pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
-                                 (alloc_flags & PMM_ALLOC_FLAG_LOANED);
-    list_node* const which_list = use_loaned_list ? &free_loaned_list_ : &free_list_;
-
-    // Note that we do not care if the allocation is happening from the loaned list or not since if
-    // we are in the OOM state we still want to preference those loaned pages to allocations that
-    // cannot be delayed.
     if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && ShouldDelayAllocationLocked()) {
       pmm_alloc_delayed.Add(1);
       return zx::error(ZX_ERR_SHOULD_WAIT);
     }
 
-    page = list_remove_head_type(which_list, vm_page, queue_node);
+    page = list_remove_head_type(&free_list_, vm_page, queue_node);
     if (!page) {
-      if (!use_loaned_list) {
-        // Allocation failures from the regular free list are likely to become user-visible.
-        ReportAllocFailureLocked();
-      }
+      // Allocation failures from the regular free list are likely to become user-visible.
+      ReportAllocFailureLocked();
       return zx::error(ZX_ERR_NO_MEMORY);
     }
 
-    DEBUG_ASSERT(use_loaned_list || !page->is_loaned());
     AllocPageHelperLocked(page);
 
-    if (use_loaned_list) {
-      DecrementFreeLoanedCountLocked(1);
-    } else {
-      DecrementFreeCountLocked(1);
-    }
+    DecrementFreeCountLocked(1);
   }
 
   if (free_list_had_fill_pattern) {
@@ -376,56 +417,35 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
   // their pattern checked (based on the bool above) before being appended to |list| and returned to
   // the caller.
   list_node_t alloc_list = LIST_INITIAL_VALUE(alloc_list);
-
   {
     AutoPreemptDisabler preempt_disable;
     Guard<Mutex> guard{&lock_};
-    free_list_had_fill_pattern = all_free_pages_filled_;
+    free_list_had_fill_pattern = FreePagesFilledLocked();
 
-    // The PMM_ALLOC_FLAG_LOANED flag is not compatible with PMM_ALLOC_FLAG_CAN_WAIT
-    DEBUG_ASSERT(
-        !((alloc_flags & PMM_ALLOC_FLAG_LOANED) && (alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT)));
-    const bool use_loaned_list = pmm_physical_page_borrowing_config()->is_any_borrowing_enabled() &&
-                                 (alloc_flags & PMM_ALLOC_FLAG_LOANED);
+    uint64_t free_count = free_count_.load(ktl::memory_order_relaxed);
     // based on whether allocated loaned pages or not, setup which_list to point directly to the
     // appropriate free list to simplify later allocation code that operates on either list.
-    list_node* const which_list = use_loaned_list ? &free_loaned_list_ : &free_list_;
-    uint64_t free_count = use_loaned_list ? free_loaned_count_.load(ktl::memory_order_relaxed)
-                                          : free_count_.load(ktl::memory_order_relaxed);
 
     if (unlikely(count > free_count)) {
       if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && should_wait_ != ShouldWaitState::Never) {
         pmm_alloc_delayed.Add(1);
         return ZX_ERR_SHOULD_WAIT;
       }
-      if (!use_loaned_list) {
-        // Allocation failures from the regular free list are likely to become user-visible.
-        ReportAllocFailureLocked();
-      }
+      // Allocation failures from the regular free list are likely to become user-visible.
+      ReportAllocFailureLocked();
       return ZX_ERR_NO_MEMORY;
     }
 
-    // For simplicity of oom state detection we decrement the free count and then check for whether
-    // we should wait or not. The error case is unlikely, and hence not performance critical, so
-    // having to redundantly re-increment is not a big deal.
-    if (use_loaned_list) {
-      DecrementFreeLoanedCountLocked(count);
-    } else {
-      DecrementFreeCountLocked(count);
-    }
+    DecrementFreeCountLocked(count);
 
     if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && ShouldDelayAllocationLocked()) {
-      // Loaned allocations do not support waiting, so we never have to undo the loaned count.
-      DEBUG_ASSERT(!use_loaned_list);
       IncrementFreeCountLocked(count);
       pmm_alloc_delayed.Add(1);
       return ZX_ERR_SHOULD_WAIT;
     }
-
-    list_node_t* node = which_list;
+    list_node_t* node = &free_list_;
     while (count > 0) {
-      node = list_next(which_list, node);
-      DEBUG_ASSERT(use_loaned_list || !containerof(node, vm_page, queue_node)->is_loaned());
+      node = list_next(&free_list_, node);
       AllocPageHelperLocked(containerof(node, vm_page, queue_node));
       --count;
     }
@@ -434,8 +454,8 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
     // node, and place them in alloc_list. Due to how the listnode operations work, it's easier to
     // move the entire list into alloc_list, then split the pages that we are not allocating back
     // into which_list.
-    list_move(which_list, &alloc_list);
-    list_split_after(&alloc_list, node, which_list);
+    list_move(&free_list_, &alloc_list);
+    list_split_after(&alloc_list, node, &free_list_);
   }
 
   // Check the pages we are allocating before appending them into the user's allocation list. Do
@@ -480,7 +500,7 @@ zx_status_t PmmNode::AllocRange(paddr_t address, size_t count, list_node* list) 
   {
     AutoPreemptDisabler preempt_disable;
     Guard<Mutex> guard{&lock_};
-    free_list_had_fill_pattern = all_free_pages_filled_;
+    free_list_had_fill_pattern = FreePagesFilledLocked();
 
     // walk through the arenas, looking to see if the physical page belongs to it
     for (auto& a : active_arenas()) {
@@ -521,7 +541,7 @@ zx_status_t PmmNode::AllocRange(paddr_t address, size_t count, list_node* list) 
       // We were not able to allocate the entire run, free these pages. As we allocated these pages
       // under this lock acquisition, the fill status is whatever it was before, i.e. the status of
       // whether free pages have all been filled..
-      FreeListLocked(list, all_free_pages_filled_);
+      FreeListLocked(list, FreePagesFilledLocked());
       return ZX_ERR_NOT_FOUND;
     }
   }
@@ -548,7 +568,7 @@ zx_status_t PmmNode::AllocContiguous(const size_t count, uint alloc_flags, uint8
     alignment_log2 = PAGE_SIZE_SHIFT;
   }
 
-  DEBUG_ASSERT(!(alloc_flags & (PMM_ALLOC_FLAG_LOANED | PMM_ALLOC_FLAG_CAN_WAIT)));
+  DEBUG_ASSERT(!(alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT));
   // pa and list must be valid pointers
   DEBUG_ASSERT(pa);
   DEBUG_ASSERT(list);
@@ -662,11 +682,46 @@ void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {
   // list, since the page is findable via the arena, and so we must ensure to:
   // 1. Be performing set_state here under the lock_
   // 2. Place the page in the free list and cease referring to the page before ever dropping lock_
-  if (!page->is_loaned()) {
-    page->set_state(vm_page_state::FREE);
-  } else {
-    page->set_state(vm_page_state::FREE_LOANED);
+  page->set_state(vm_page_state::FREE);
+
+  // This page cannot be loaned, but could be stack owned due to interactions with DeleteLender.
+  // See comment in FreeLoanedPageHelperLocked about why it is okay to reference an 'object' field
+  // here even if not in the object state.
+  DEBUG_ASSERT(!page->is_loaned());
+  if (unlikely(page->object.is_stack_owned())) {
+    // Due to how DeleteLender works it could have transitioned a page that was stack owned, however
+    // it did not own the page and could not clear the stack owner, therefore we must check for and
+    // handle that case here. No fences are needed as the page is no longer loaned and so is not
+    // being searched for.
+    page->object.clear_stack_owner();
   }
+
+  // The caller may have called RacyFreeFillEnabled and potentially already filled a pattern,
+  // however if it raced with enabling of free filling we may still need to fill the pattern. This
+  // should be unlikely, and since free filling can never be turned back off there is no race in the
+  // other direction.
+  if (FreeFillEnabledLocked() && !already_filled) {
+    checker_.FillPattern(page);
+  }
+
+  AsanPoisonPage(page, kAsanPmmFreeMagic);
+}
+
+void PmmNode::FreeLoanedPageHelperLocked(vm_page* page, bool already_filled) {
+  LTRACEF("page %p state %zu paddr %#" PRIxPTR "\n", page, VmPageStateIndex(page->state()),
+          page->paddr());
+
+  DEBUG_ASSERT(!page->is_free());
+  DEBUG_ASSERT(page->state() != vm_page_state::OBJECT || page->object.pin_count == 0);
+
+  // mark it free. This makes the page owned the PmmNode and even though it may not be in any page
+  // list, since the page is findable via the arena we must ensure the following happens:
+  // 1. We hold loaned_list_lock_ preventing pages from transition to/from loaned
+  // 2. This page is loaned and hence will not be considered by an arena traversal that holds lock_
+  // 3. Perform set_state here under the loaned_list_lock_
+  // 4. Place the page in the loaned_free_list_ and cease referring to the page before ever dropping
+  // the loaned_list_lock_.
+  page->set_state(vm_page_state::FREE_LOANED);
 
   // Coming from OBJECT or ALLOC, this will only be true if the page was loaned (and may still be
   // loaned, but doesn't have to be currently loaned if the contiguous VMO the page was loaned from
@@ -675,17 +730,17 @@ void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {
   // Coming from a state other than OBJECT or ALLOC, this currently won't be true, but if it were
   // true in future, it would only be because a state other than OBJECT or ALLOC has a (future)
   // field overlapping, in which case we do want to clear the invalid stack owner pointer value.
-  // We'll be ok to clear this invalid stack owner after setting FREE previously (instead of
+  // We'll be ok to clear this invalid stack owner after setting FREE_LOANED previously (instead of
   // clearing before) because the stack owner is only read elsewhere for pages with an underlying
   // contiguous VMO owner (whether actually loaned at the time or not), and pages with an underlying
-  // contiguous VMO owner can only be in FREE, ALLOC, OBJECT states, which all have this field, so
-  // reading an invalid stack owner pointer elsewhere won't happen (there's a magic number canary
-  // just in case though).  We could instead clear out any invalid stack owner pointer before
-  // setting FREE above and have a shorter comment here, but there's no actual need for the extra
-  // "if", so we just let this "if" handle it (especially since this whole paragraph is a
+  // contiguous VMO owner can only be in FREE_LOANED, ALLOC, OBJECT states, which all have this
+  // field, so reading an invalid stack owner pointer elsewhere won't happen (there's a magic number
+  // canary just in case though).  We could instead clear out any invalid stack owner pointer before
+  // setting FREE_LOANED above and have a shorter comment here, but there's no actual need for the
+  // extra "if", so we just let this "if" handle it (especially since this whole paragraph is a
   // hypothetical future since there aren't any overlapping fields yet as of this comment).
   if (page->object.is_stack_owned()) {
-    // Make FREE visible before lack of stack owner.
+    // Make FREE_LOANED visible before lack of stack owner.
     ktl::atomic_thread_fence(ktl::memory_order_release);
     page->object.clear_stack_owner();
   }
@@ -694,7 +749,7 @@ void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {
   // however if it raced with enabling of free filling we may still need to fill the pattern. This
   // should be unlikely, and since free filling can never be turned back off there is no race in the
   // other direction. As we hold lock we can safely perform a relaxed read.
-  if (!already_filled && free_fill_enabled_.load(ktl::memory_order_relaxed)) {
+  if (!already_filled && FreeFillEnabledLoanedLocked()) {
     checker_.FillPattern(page);
   }
 
@@ -702,12 +757,37 @@ void PmmNode::FreePageHelperLocked(vm_page* page, bool already_filled) {
 }
 
 void PmmNode::FreeLoanedPage(vm_page_t* page) {
+  AutoPreemptDisabler preempt_disable;
   DEBUG_ASSERT(page->is_loaned());
-  return FreePage(page);
+  const bool fill = IsFreeFillEnabledRacy();
+  if (fill) {
+    checker_.FillPattern(page);
+  }
+  Guard<Mutex> guard{&loaned_list_lock_};
+
+  // pages freed individually shouldn't be in a queue
+  DEBUG_ASSERT(!list_in_list(&page->queue_node));
+
+  FreeLoanedPageHelperLocked(page, fill);
+
+  // Add the page to the free loaned list, unless loan_cancelled. The loan_cancelled pages
+  // don't go in any free queue because they shouldn't get re-used until reclaimed by their
+  // underlying contiguous VMO or until that underlying contiguous VMO is deleted.
+  if (page->is_loan_cancelled()) {
+    return;
+  }
+  IncrementFreeLoanedCountLocked(1);
+  if constexpr (!__has_feature(address_sanitizer)) {
+    list_add_head(&free_loaned_list_, &page->queue_node);
+  } else {
+    // If address sanitizer is enabled, put the page at the tail to maximize reuse distance.
+    list_add_tail(&free_loaned_list_, &page->queue_node);
+  }
 }
 
 void PmmNode::FreePage(vm_page* page) {
   AutoPreemptDisabler preempt_disable;
+  DEBUG_ASSERT(!page->is_loaned());
   const bool fill = IsFreeFillEnabledRacy();
   if (fill) {
     checker_.FillPattern(page);
@@ -719,79 +799,71 @@ void PmmNode::FreePage(vm_page* page) {
 
   FreePageHelperLocked(page, fill);
 
-  list_node* which_list = nullptr;
-  if (!page->is_loaned()) {
-    IncrementFreeCountLocked(1);
-    which_list = &free_list_;
-  } else if (!page->is_loan_cancelled()) {
-    IncrementFreeLoanedCountLocked(1);
-    which_list = &free_loaned_list_;
+  IncrementFreeCountLocked(1);
+  if constexpr (!__has_feature(address_sanitizer)) {
+    list_add_head(&free_list_, &page->queue_node);
+  } else {
+    // If address sanitizer is enabled, put the page at the tail to maximize reuse distance.
+    list_add_tail(&free_list_, &page->queue_node);
   }
+}
 
-  // Add the page to the appropriate free queue, unless loan_cancelled.  The loan_cancelled pages
-  // don't go in any free queue because they shouldn't get re-used until reclaimed by their
-  // underlying contiguous VMO or until that underlying contiguous VMO is deleted.
-  DEBUG_ASSERT(which_list || page->is_loan_cancelled());
-  if (which_list) {
-    if constexpr (!__has_feature(address_sanitizer)) {
-      list_add_head(which_list, &page->queue_node);
-    } else {
-      // If address sanitizer is enabled, put the page at the tail to maximize reuse distance.
-      list_add_tail(which_list, &page->queue_node);
+void PmmNode::FreeLoanedListLocked(list_node* list, bool already_filled) {
+  DEBUG_ASSERT(list);
+
+  uint64_t count = 0;
+  {  // scope page
+    vm_page* page;
+    vm_page* temp;
+    list_for_every_entry_safe (list, page, temp, vm_page_t, queue_node) {
+      DEBUG_ASSERT(page->is_loaned());
+      FreeLoanedPageHelperLocked(page, already_filled);
+      if (page->is_loan_cancelled()) {
+        // Loaned cancelled pages do not go back on the free list.
+        list_delete(&page->queue_node);
+      } else {
+        count++;
+      }
     }
-  }
+  }  // end scope page
+
+  ReturnPagesToFreeList(&free_loaned_list_, list);
+
+  IncrementFreeLoanedCountLocked(count);
 }
 
 void PmmNode::FreeListLocked(list_node* list, bool already_filled) {
   DEBUG_ASSERT(list);
 
-  // process list backwards so the head is as hot as possible
   uint64_t count = 0;
-  uint64_t loaned_count = 0;
-  list_node freed_loaned_list = LIST_INITIAL_VALUE(freed_loaned_list);
   {  // scope page
-    vm_page* page = list_peek_tail_type(list, vm_page_t, queue_node);
-    while (page) {
+    vm_page* page;
+    vm_page* temp;
+    list_for_every_entry_safe (list, page, temp, vm_page_t, queue_node) {
+      DEBUG_ASSERT(!page->is_loaned());
       FreePageHelperLocked(page, already_filled);
-      vm_page_t* next_page = list_prev_type(list, &page->queue_node, vm_page_t, queue_node);
-      if (page->is_loaned()) {
-        // Remove from |list| and possibly put on freed_loaned_list instead, to route to the correct
-        // free list, or no free list if loan_cancelled.
-        list_delete(&page->queue_node);
-        if (!page->is_loan_cancelled()) {
-          list_add_head(&freed_loaned_list, &page->queue_node);
-          ++loaned_count;
-        }
-      } else {
-        count++;
-      }
-      page = next_page;
+      count++;
     }
   }  // end scope page
 
-  if constexpr (!__has_feature(address_sanitizer)) {
-    // splice list at the head of free_list_; free_loaned_list_.
-    list_splice_after(list, &free_list_);
-    list_splice_after(&freed_loaned_list, &free_loaned_list_);
-  } else {
-    // If address sanitizer is enabled, put the pages at the tail to maximize reuse distance.
-    if (!list_is_empty(&free_list_)) {
-      list_splice_after(list, list_peek_tail(&free_list_));
-    } else {
-      list_splice_after(list, &free_list_);
-    }
-    if (!list_is_empty(&free_loaned_list_)) {
-      list_splice_after(&freed_loaned_list, list_peek_tail(&free_loaned_list_));
-    } else {
-      list_splice_after(&freed_loaned_list, &free_loaned_list_);
-    }
-  }
+  ReturnPagesToFreeList(&free_list_, list);
 
   IncrementFreeCountLocked(count);
-  IncrementFreeLoanedCountLocked(loaned_count);
 }
 
-void PmmNode::FreeLoanedList(list_node* list) { return FreeList(list); }
+void PmmNode::FreeLoanedList(list_node* list) {
+  AutoPreemptDisabler preempt_disable;
+  const bool fill = IsFreeFillEnabledRacy();
+  if (fill) {
+    vm_page* page;
+    list_for_every_entry (list, page, vm_page, queue_node) {
+      checker_.FillPattern(page);
+    }
+  }
+  Guard<Mutex> guard{&loaned_list_lock_};
+
+  FreeLoanedListLocked(list, fill);
+}
 
 void PmmNode::FreeList(list_node* list) {
   AutoPreemptDisabler preempt_disable;
@@ -843,7 +915,9 @@ uint64_t PmmNode::CountLoanedFreePages() const TA_NO_THREAD_SAFETY_ANALYSIS {
 
 uint64_t PmmNode::CountLoanedNotFreePages() const TA_NO_THREAD_SAFETY_ANALYSIS {
   AutoPreemptDisabler preempt_disable;
-  Guard<Mutex> guard{&lock_};
+  // Require both locks to examine both counts.
+  Guard<Mutex> loaned_guard{&loaned_list_lock_};
+  Guard<Mutex> free_guard{&lock_};
   return loaned_count_.load(ktl::memory_order_relaxed) -
          free_loaned_count_.load(ktl::memory_order_relaxed);
 }
@@ -946,7 +1020,7 @@ void PmmNode::BeginLoan(list_node* page_list) {
       checker_.FillPattern(page);
     }
   }
-  Guard<Mutex> guard{&lock_};
+  Guard<Mutex> guard{&loaned_list_lock_};
 
   uint64_t loaned_count = 0;
   vm_page* page;
@@ -962,12 +1036,14 @@ void PmmNode::BeginLoan(list_node* page_list) {
   // Callers of BeginLoan() generally won't want the pages loaned to them; the intent is to loan to
   // the rest of the system, so go ahead and free also.  Some callers will basically choose between
   // pmm_begin_loan() and pmm_free().
-  FreeListLocked(page_list, fill);
+  FreeLoanedListLocked(page_list, fill);
 }
 
 void PmmNode::CancelLoan(paddr_t address, size_t count) {
   AutoPreemptDisabler preempt_disable;
-  Guard<Mutex> guard{&lock_};
+  // Require both locks in order to iterate the arenas and manipulate the loaned list.
+  Guard<Mutex> loaned_guard{&loaned_list_lock_};
+  Guard<Mutex> arena_guard{&lock_};
   DEBUG_ASSERT(IS_PAGE_ALIGNED(address));
   paddr_t end = address + count * PAGE_SIZE;
   DEBUG_ASSERT(address <= end);
@@ -1006,8 +1082,10 @@ void PmmNode::EndLoan(paddr_t address, size_t count, list_node* page_list) {
 
   {
     AutoPreemptDisabler preempt_disable;
-    Guard<Mutex> guard{&lock_};
-    free_list_had_fill_pattern = all_free_pages_filled_;
+    // Require both locks in order to manipulate loaned pages and the regular free list.
+    Guard<Mutex> loaned_guard{&loaned_list_lock_};
+    Guard<Mutex> free_guard{&lock_};
+    free_list_had_fill_pattern = FreePagesFilledLoanedLocked();
     DEBUG_ASSERT(IS_PAGE_ALIGNED(address));
     paddr_t end = address + count * PAGE_SIZE;
     DEBUG_ASSERT(address <= end);
@@ -1033,6 +1111,13 @@ void PmmNode::EndLoan(paddr_t address, size_t count, list_node* page_list) {
                                 page->clear_is_loan_cancelled();
                                 ++loan_ended_count;
 
+                                // Change the state to regular FREE. When this page was made
+                                // FREE_LOANED all of the pmm checker filling and asan work was
+                                // done, so we are safe to just change the state without using a
+                                // helper. As we are immediately going to allocate it again we do
+                                // not bother incrementing and then decrementing the free count.
+                                page->set_state(vm_page_state::FREE);
+
                                 AllocPageHelperLocked(page);
                                 list_add_tail(page_list, &page->queue_node);
                               });
@@ -1051,7 +1136,9 @@ void PmmNode::EndLoan(paddr_t address, size_t count, list_node* page_list) {
 
 void PmmNode::DeleteLender(paddr_t address, size_t count) {
   AutoPreemptDisabler preempt_disable;
-  Guard<Mutex> guard{&lock_};
+  // Require both locks as we are moving pages from the loaned list into the regular free list.
+  Guard<Mutex> loaned_guard{&loaned_list_lock_};
+  Guard<Mutex> free_guard{&lock_};
   DEBUG_ASSERT(IS_PAGE_ALIGNED(address));
   paddr_t end = address + count * PAGE_SIZE;
   DEBUG_ASSERT(address <= end);
@@ -1090,6 +1177,12 @@ void PmmNode::DeleteLender(paddr_t address, size_t count) {
                                   list_add_tail(&free_list_, &page->queue_node);
                                 }
                                 added_free_count++;
+                              } else {
+                                // The page could presently be being stack owned as we are removing
+                                // its loaned status. Since we have no ownership of the page we
+                                // cannot safely clear the stack owner without racing with someone
+                                // else. Therefore we must leave any stack ownership for the regular
+                                // free path to cleanup.
                               }
                               page->clear_is_loan_cancelled();
                               page->clear_is_loaned();

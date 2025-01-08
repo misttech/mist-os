@@ -395,8 +395,8 @@ struct vm_page {
     return !!(ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&loaned_state_priv)) &
               kLoanedStateIsLoanCancelled);
   }
-  // Manipulation of 'loaned' should only be done by the PmmNode under its lock whilst it is the
-  // owner of the page.
+  // Manipulation of 'loaned' should only be done by the PmmNode under the loaned pages lock whilst
+  // it is the owner of the page.
   void set_is_loaned() {
     ktl::atomic_ref<uint8_t>(loaned_state_priv).fetch_or(kLoanedStateIsLoaned);
   }
