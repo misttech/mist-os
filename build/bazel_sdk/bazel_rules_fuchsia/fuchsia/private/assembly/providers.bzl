@@ -38,6 +38,7 @@ FuchsiaBoardInputBundleInfo = provider(
     fields = {
         "config": "The config file located in the root directory containing Board Input Bundle.",
         "files": "All files belong to Board Input Bundles",
+        "build_id_dirs": "Directories containing the debug symbols",
     },
 )
 
@@ -46,6 +47,7 @@ FuchsiaBoardConfigInfo = provider(
     fields = {
         "files": "A list of files consisting the board config.",
         "config": "The path to JSON board configuration file.",
+        "build_id_dirs": "Directories containing the debug symbols",
     },
 )
 

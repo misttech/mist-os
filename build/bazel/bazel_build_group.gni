@@ -121,6 +121,8 @@ template("bazel_build_group") {
             bazel_dir = output.bazel_dir
             ninja_dir = "${_group_output_dir}/${output.ninja_dir}"
             tracked_files = output.tracked_files
+            copy_debug_symbols =
+                defined(output.copy_debug_symbols) && output.copy_debug_symbols
           },
         ]
       }

@@ -760,6 +760,7 @@ template("bazel_product_bundle") {
           bazel_dir = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
           ninja_dir = files.product_bundle_out_dir
           tracked_files = _product_bundle_tracked_files
+          copy_debug_symbols = true
         },
       ]
 

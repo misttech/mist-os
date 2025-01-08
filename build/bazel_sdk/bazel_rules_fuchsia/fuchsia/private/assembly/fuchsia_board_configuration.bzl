@@ -50,6 +50,8 @@ rm -rf \"$2\" && cp -fR \"$1/\" \"$2\";
     )
 
 def _fuchsia_board_configuration_impl(ctx):
+    build_id_dirs = []
+
     # TODO(https://fxbug.dev/349939865): Change the file name to
     # `board_configuration.json` and nest under `ctx.label.name`.
     board_config_file = ctx.actions.declare_file(ctx.label.name + "_board_config.json")
@@ -100,6 +102,7 @@ def _fuchsia_board_configuration_impl(ctx):
             board_config_relative_to_root + path,
         ]
         board_files.extend(bib[FuchsiaBoardInputBundleInfo].files)
+        build_id_dirs = bib[FuchsiaBoardInputBundleInfo].build_id_dirs
 
     if ctx.attr.devicetree:
         board_files.append(ctx.file.devicetree)
@@ -172,6 +175,10 @@ def _fuchsia_board_configuration_impl(ctx):
         FuchsiaBoardConfigInfo(
             config = board_config_dir.path + "/board_configuration.json",
             files = board_files,
+            build_id_dirs = build_id_dirs,
+        ),
+        OutputGroupInfo(
+            build_id_dirs = depset(transitive = build_id_dirs),
         ),
     ]
 
@@ -262,6 +269,7 @@ def _fuchsia_prebuilt_board_configuration_impl(ctx):
         FuchsiaBoardConfigInfo(
             files = ctx.files.files,
             config = board_configuration.path,
+            build_id_dirs = [],
         ),
     ]
 
@@ -344,12 +352,15 @@ def _fuchsia_hybrid_board_configuration_impl(ctx):
 
     all_outputs += bib_outputs
 
+    build_id_dirs = ctx.attr.board_configuration[FuchsiaBoardConfigInfo].build_id_dirs + ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].build_id_dirs
+
     return [
         DefaultInfo(
             files = depset(all_outputs),
         ),
         FuchsiaBoardConfigInfo(
             files = all_outputs,
+            build_id_dirs = build_id_dirs,
             config = output_board_config.path,
         ),
     ]
