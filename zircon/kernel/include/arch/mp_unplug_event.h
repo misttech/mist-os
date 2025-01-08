@@ -34,7 +34,7 @@ class MpUnplugEvent : protected Event {
     Event::Signal();
   }
 
-  zx_status_t WaitDeadline(zx_time_t deadline, Interruptible interruptible) {
+  zx_status_t WaitDeadline(zx_instant_mono_t deadline, Interruptible interruptible) {
     const zx_status_t ret = Event::WaitDeadline(deadline, interruptible);
 
     // Bouncing through the lock on our way out ensures that our signaler has
@@ -48,7 +48,7 @@ class MpUnplugEvent : protected Event {
   constexpr MpUnplugEvent(bool initial, Flags flags) : Event(initial, flags) {}
 
  private:
-  DECLARE_SPINLOCK(MpUnplugEvent) lock_{};
+  DECLARE_SPINLOCK(MpUnplugEvent) lock_ {};
 };
 
 class AutounsignalMpUnplugEvent : public MpUnplugEvent {

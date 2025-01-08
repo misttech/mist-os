@@ -40,7 +40,7 @@ class PreemptDisableTestAccess {
 
 // Test that PreemptDisable is set for timer callbacks and that, in this
 // context, preempts_pending will get set by some functions.
-static void timer_callback_func(Timer* timer, zx_time_t now, void* arg) {
+static void timer_callback_func(Timer* timer, zx_instant_mono_t now, void* arg) {
   Event* event = (Event*)arg;
 
   // The timer should run in interrupt context.
@@ -231,7 +231,7 @@ static bool test_interrupt_preserves_preempt_pending() {
 }
 
 // Timer callback used for testing.
-static void timer_set_preempt_pending(Timer* timer, zx_time_t now, void* arg) {
+static void timer_set_preempt_pending(Timer* timer, zx_instant_mono_t now, void* arg) {
   auto* timer_ran = reinterpret_cast<ktl::atomic<bool>*>(arg);
 
   Thread::Current::preemption_state().PreemptSetPending(cpu_num_to_mask(arch_curr_cpu_num()));
@@ -579,7 +579,7 @@ static bool test_evaluate_timeslice_extension() {
   // kEpsilonDuration and sleep for kEpsilonDuration.  The only requirement for
   // correctness is that this value is greater than zero.  We use the value 1 to
   // minimize test runtime.
-  static constexpr zx_duration_t kEpsilonDuration = 1;
+  static constexpr zx_duration_mono_t kEpsilonDuration = 1;
 
   // See that the timeslice extension expires.
   {

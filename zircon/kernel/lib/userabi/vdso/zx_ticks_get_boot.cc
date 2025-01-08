@@ -7,7 +7,7 @@
 #include "data-time-values.h"
 #include "private.h"
 
-__EXPORT zx_ticks_t _zx_ticks_get_boot(void) {
+__EXPORT zx_instant_boot_ticks_t _zx_ticks_get_boot(void) {
   return fasttime::internal::compute_boot_ticks<
       fasttime::internal::FasttimeVerificationMode::kSkip>(DATA_TIME_VALUES);
 }

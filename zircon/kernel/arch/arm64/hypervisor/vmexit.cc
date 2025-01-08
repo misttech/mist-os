@@ -82,9 +82,10 @@ zx::result<> handle_wfi_wfe_instruction(uint32_t iss, GuestState* guest_state,
     return zx::ok();
   }
 
-  zx_time_t deadline = ZX_TIME_INFINITE;
+  zx_instant_mono_t deadline = ZX_TIME_INFINITE;
   if (timer_enabled(guest_state)) {
-    zx_ticks_t guest_ticks_deadline = convert_raw_ticks_to_mono_ticks(guest_state->cntv_cval_el0);
+    zx_instant_mono_ticks_t guest_ticks_deadline =
+        convert_raw_ticks_to_mono_ticks(guest_state->cntv_cval_el0);
     if (current_ticks() >= guest_ticks_deadline) {
       return zx::ok();
     }

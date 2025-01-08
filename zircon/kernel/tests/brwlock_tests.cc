@@ -94,8 +94,8 @@ class BrwLockTest {
       t->Resume();
     }
 
-    zx_time_t start = current_time();
-    zx_duration_t duration = ZX_MSEC(300);
+    zx_instant_mono_t start = current_time();
+    zx_duration_mono_t duration = ZX_MSEC(300);
     while (current_time() < start + duration) {
       uint32_t local_state = test.state_.load(ktl::memory_order_relaxed);
       uint32_t num_readers = local_state & 0xffff;

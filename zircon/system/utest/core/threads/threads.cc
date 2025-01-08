@@ -41,7 +41,7 @@ static const char kThreadName[] = "test-thread";
 // transition states. Wait this amount of time. Generally the thread won't
 // take very long so this is a compromise between polling too frequently and
 // waiting too long.
-constexpr zx_duration_t THREAD_BLOCKED_WAIT_DURATION = ZX_MSEC(1);
+constexpr zx_duration_mono_t THREAD_BLOCKED_WAIT_DURATION = ZX_MSEC(1);
 
 static void get_koid(zx_handle_t handle, zx_koid_t* koid) {
   zx_info_handle_basic_t info;
@@ -604,7 +604,7 @@ TEST_F(Threads, ResumeSuspended) {
 }
 
 TEST_F(Threads, SuspendSleeping) {
-  const zx_time_t sleep_deadline = zx_deadline_after(ZX_MSEC(100));
+  const zx_instant_mono_t sleep_deadline = zx_deadline_after(ZX_MSEC(100));
   zxr_thread_t thread;
 
   zx_handle_t thread_h;
@@ -644,7 +644,7 @@ TEST_F(Threads, SuspendSleeping) {
   // Wait for the sleep to finish
   ASSERT_EQ(zx_object_wait_one(thread_h, ZX_THREAD_TERMINATED, ZX_TIME_INFINITE, NULL), ZX_OK);
 
-  const zx_time_t now = zx_clock_get_monotonic();
+  const zx_instant_mono_t now = zx_clock_get_monotonic();
   ASSERT_GE(now, sleep_deadline, "thread did not sleep long enough");
 
   ASSERT_EQ(zx_handle_close(thread_h), ZX_OK);
@@ -1016,7 +1016,7 @@ TEST_F(Threads, ExitViaException) {
   ASSERT_OK(zxr_thread_destroy(&thread));
 }
 
-static void port_wait_for_signal(zx_handle_t port, zx_handle_t thread, zx_time_t deadline,
+static void port_wait_for_signal(zx_handle_t port, zx_handle_t thread, zx_instant_mono_t deadline,
                                  zx_signals_t mask, zx_port_packet_t* packet) {
   ASSERT_EQ(zx_object_wait_async(thread, port, 0u, mask, 0), ZX_OK);
   ASSERT_EQ(zx_port_wait(port, deadline, packet), ZX_OK);
@@ -2044,8 +2044,8 @@ TEST_F(Threads, DebugRegistersDr6CorrectAfterBreakpointRemoval) {
 }
 #endif
 
-// This is a regression test for https://fxbug.dev/42109443. Verify that upon entry to the kernel via fault on
-// hardware that lacks SMAP, a subsequent usercopy does not panic.
+// This is a regression test for https://fxbug.dev/42109443. Verify that upon entry to the kernel
+// via fault on hardware that lacks SMAP, a subsequent usercopy does not panic.
 TEST_F(Threads, X86AcFlagUserCopy) {
 #if defined(__x86_64__)
   zx::process process;

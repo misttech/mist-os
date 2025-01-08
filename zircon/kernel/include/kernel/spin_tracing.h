@@ -38,7 +38,7 @@ template <bool TraceInstrumented = false>
 class Tracer {
  public:
   constexpr Tracer() = default;
-  constexpr explicit Tracer(zx_ticks_t) {}
+  constexpr explicit Tracer(zx_instant_mono_ticks_t) {}
   constexpr void Finish(FinishType, EncodedLockId,
                         SpinTracingTimestamp<false> = SpinTracingTimestamp<false>{}) const {}
 };
@@ -47,7 +47,7 @@ template <>
 class Tracer<true> {
  public:
   Tracer() = default;
-  explicit constexpr Tracer(zx_ticks_t ticks) : start_{static_cast<uint64_t>(ticks)} {}
+  explicit constexpr Tracer(zx_instant_mono_ticks_t ticks) : start_{static_cast<uint64_t>(ticks)} {}
 
   void Finish(FinishType finish_type, EncodedLockId elid,
               SpinTracingTimestamp<true> end_time = SpinTracingTimestamp<true>{}) const {

@@ -48,7 +48,7 @@ static unsigned get_num_cpus_online() {
 }
 
 static zx_status_t wait_for_cpu_offline(cpu_num_t i) {
-  zx_time_t print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+  zx_instant_mono_t print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
   while (true) {
     zx::result<power_cpu_state> res = platform_get_cpu_state(i);
     if (res.is_error()) {
@@ -70,7 +70,7 @@ static zx_status_t wait_for_cpu_offline(cpu_num_t i) {
 }
 
 static void wait_for_cpu_active(cpu_num_t i) {
-  zx_time_t print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+  zx_instant_mono_t print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
   while (true) {
     if (Scheduler::PeekIsActive(i)) {
       return;

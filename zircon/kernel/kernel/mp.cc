@@ -283,7 +283,7 @@ zx_status_t mp_hotplug_cpu_mask(cpu_mask_t cpu_mask) {
 }
 
 // Unplug a single CPU.  Must be called while holding the hotplug lock
-static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t deadline) {
+static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_instant_mono_t deadline) {
   percpu& percpu_to_unplug = percpu::Get(cpu_id);
 
   // Wait for |percpu_to_unplug| to complete any in-progress DPCs and terminate its DPC thread.
@@ -319,7 +319,7 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t 
 //
 // This should be called in a thread context.
 //
-zx_status_t mp_unplug_cpu_mask(cpu_mask_t cpu_mask, zx_time_t deadline) {
+zx_status_t mp_unplug_cpu_mask(cpu_mask_t cpu_mask, zx_instant_mono_t deadline) {
   DEBUG_ASSERT(!arch_ints_disabled());
   Guard<Mutex> lock(&mp.hotplug_lock);
 
@@ -424,7 +424,7 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
   // keep going.  Things are bad, and we want to take notice in CI/CQ
   // environments, but not bad enough to panic the system and send it into a
   // boot-loop.
-  constexpr zx_duration_t kCpuStartupTimeout = ZX_SEC(30);
+  constexpr zx_duration_mono_t kCpuStartupTimeout = ZX_SEC(30);
   zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::after(kCpuStartupTimeout));
   if (status != ZX_OK) {
     const auto online_mask = mp_get_online_mask();

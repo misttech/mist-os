@@ -135,7 +135,7 @@ static void* cond_thread3(void* arg) {
 // infinity to allow other tests to complete should this hang, and big
 // enough to allow most plausible delays in scheduling.
 static bool poll_waked_threads(int expected_count) {
-  zx_time_t start = zx_clock_get_monotonic();
+  zx_instant_mono_t start = zx_clock_get_monotonic();
   for (int tries = 0; tries < (ZX_SEC(10) / ZX_MSEC(1)); ++tries) {
     zx_nanosleep(start + ZX_MSEC(tries));
     if (thread_waked.load() == expected_count) {

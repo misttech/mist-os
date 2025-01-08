@@ -414,7 +414,7 @@ class ProcessDispatcher final
   uintptr_t vdso_code_address_ = 0;
 
   // The time at which the process was started.
-  zx_time_t start_time_ = 0;
+  zx_instant_mono_t start_time_ = 0;
 
   // Hold accumulated stats for threads who have exited.
   TaskRuntimeStats accumulated_stats_ TA_GUARDED(get_lock());

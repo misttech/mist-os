@@ -252,7 +252,7 @@ class FairProfile : public Profile {
 
 class DeadlineProfile : public Profile {
  public:
-  static fbl::RefPtr<Profile> Create(zx_duration_t capacity, zx_duration_t deadline) {
+  static fbl::RefPtr<Profile> Create(zx_duration_mono_t capacity, zx_duration_mono_t deadline) {
     fbl::AllocChecker ac;
     DeadlineProfile* profile =
         new (&ac) DeadlineProfile(SchedDuration{capacity}, SchedDuration{deadline});
@@ -599,7 +599,7 @@ bool TestThread::Reset(bool explicit_kill) {
       // that they otherwise would.  By timing out quickly and printing an
       // warning, we can hopefully make it easier for a developer to figure out
       // what's going on in the case where the second join hangs forever.
-      constexpr zx_duration_t timeout = ZX_MSEC(500);
+      constexpr zx_duration_mono_t timeout = ZX_MSEC(500);
       ASSERT(thread_ != nullptr);
       int ret_code;
       const Deadline join_deadline = Deadline::after(timeout);
@@ -647,9 +647,9 @@ template <TestThread::Condition condition>
 bool TestThread::WaitFor() {
   BEGIN_TEST;
 
-  constexpr zx_duration_t timeout = ZX_SEC(10);
-  constexpr zx_duration_t poll_interval = ZX_USEC(100);
-  zx_time_t deadline = current_time() + timeout;
+  constexpr zx_duration_mono_t timeout = ZX_SEC(10);
+  constexpr zx_duration_mono_t poll_interval = ZX_USEC(100);
+  zx_instant_mono_t deadline = current_time() + timeout;
 
   while (true) {
     if constexpr (condition == Condition::BLOCKED) {
@@ -669,7 +669,7 @@ bool TestThread::WaitFor() {
       }
     }
 
-    zx_time_t now = current_time();
+    zx_instant_mono_t now = current_time();
     ASSERT_LT(now, deadline);
     Thread::Current::SleepRelative(poll_interval);
   }
@@ -1274,7 +1274,7 @@ bool pi_test_multi_waiter() {
         blocking_queue.ReleaseOneThread();
 
         TestThread* new_owner = nullptr;
-        zx_time_t deadline = current_time() + ZX_SEC(10);
+        zx_instant_mono_t deadline = current_time() + ZX_SEC(10);
         while (current_time() < deadline) {
           for (auto& w : waiters) {
             // If the waiter's is_waiting flag is set, but the thread has

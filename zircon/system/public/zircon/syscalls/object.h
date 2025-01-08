@@ -169,7 +169,7 @@ typedef struct zx_info_process {
 
     // The monotonic time at which `zx_process_start()` was called, only valid
     // if the |ZX_INFO_PROCESS_FLAG_STARTED| flag is set.
-    zx_time_t start_time;
+    zx_instant_mono_t start_time;
 
     // Bitwise OR of ZX_INFO_PROCESS_FLAG_* values.
     zx_info_process_flags_t flags;
@@ -262,7 +262,7 @@ typedef struct zx_info_thread {
 
 typedef struct zx_info_thread_stats {
     // Total accumulated running time of the thread.
-    zx_duration_t total_runtime;
+    zx_duration_mono_t total_runtime;
 
     // CPU number that this thread was last scheduled on, or ZX_INFO_INVALID_CPU
     // if the thread has never been scheduled on a CPU. By the time this call
@@ -785,7 +785,7 @@ typedef struct zx_info_task_runtime {
     // exited).
     // * Jobs include the runtime for all of their processes (including processes that previously
     // exited).
-    zx_duration_t cpu_time;
+    zx_duration_mono_t cpu_time;
 
     // The total amount of time this task and its children were queued to run.
     // * Threads include only their own queue time.
@@ -793,7 +793,7 @@ typedef struct zx_info_task_runtime {
     // previously exited).
     // * Jobs include the queue time for all of their processes (including processes that previously
     // exited).
-    zx_duration_t queue_time;
+    zx_duration_mono_t queue_time;
 
     // The total amount of time this task and its children spent handling page faults.
     // * Threads include only their own page fault handling time.
@@ -801,7 +801,7 @@ typedef struct zx_info_task_runtime {
     // previously exited).
     // * Jobs include the page fault time for all of their processes (including processes that
     // previously exited).
-    zx_duration_t page_fault_time;
+    zx_duration_mono_t page_fault_time;
 
     // The total amount of time this task and its children spent waiting on contended kernel locks.
     // * Threads include only their own wait time.
@@ -809,12 +809,12 @@ typedef struct zx_info_task_runtime {
     // previously exited).
     // * Jobs include the wait time for all of their processes (including processes that
     // previously exited).
-    zx_duration_t lock_contention_time;
+    zx_duration_mono_t lock_contention_time;
 } zx_info_task_runtime_t;
 
 typedef struct zx_info_task_runtime_v1 {
-    zx_duration_t cpu_time;
-    zx_duration_t queue_time;
+    zx_duration_mono_t cpu_time;
+    zx_duration_mono_t queue_time;
 } zx_info_task_runtime_v1_t;
 
 
@@ -824,7 +824,7 @@ typedef struct zx_info_cpu_stats {
     uint32_t cpu_number;
     uint32_t flags;
 
-    zx_duration_t idle_time;
+    zx_duration_mono_t idle_time;
 
     // kernel scheduler counters
     uint64_t reschedules;
@@ -989,12 +989,12 @@ typedef struct zx_info_kmem_stats_compression {
     // Total amount of CPU time spent on compression across all threads.
     // Compression may happen in parallel and so this can be larger than
     // wall clock time.
-    zx_duration_t compression_time;
+    zx_duration_mono_t compression_time;
 
     // Total amount of time decompression has spent on a CPU across all threads.
     // Decompression may happen in parallel and so this can increase faster than
     // wall clock time.
-    zx_duration_t decompression_time;
+    zx_duration_mono_t decompression_time;
 
     // Total number of times compression has been done on a page, regardless of
     // whether the compressed result was ultimately retained.

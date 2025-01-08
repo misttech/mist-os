@@ -130,8 +130,8 @@ struct TestStage {
 // during the stage.  When results are printed, they are normalized to show the
 // number of actions/second the CPU managed to execute.
 struct StageResults {
-  zx_ticks_t start{0};
-  zx_ticks_t end{0};
+  zx_instant_mono_ticks_t start{0};
+  zx_instant_mono_ticks_t end{0};
   size_t count{0};
 };
 
@@ -289,7 +289,7 @@ class BenchmarkState {
   int RunContext(CpuContext& ctx);
 
  private:
-  static inline constexpr zx_duration_t kMeasurementTime = ZX_SEC(1);
+  static inline constexpr zx_duration_mono_t kMeasurementTime = ZX_SEC(1);
 
   bool WaitForGate(size_t gate_id) {
     while (!shutdown_now_.load() && (stage_gate_.load() < gate_id)) {
@@ -314,7 +314,7 @@ class BenchmarkState {
   ktl::atomic<size_t> stage_gate_{0};
   ktl::atomic<size_t> ready_to_start_count_{0};
   ktl::atomic<size_t> finished_count_{0};
-  ktl::atomic<zx_ticks_t> ticks_deadline_{0};
+  ktl::atomic<zx_instant_mono_ticks_t> ticks_deadline_{0};
 };
 
 int BenchmarkState::Run() {
@@ -394,8 +394,9 @@ int BenchmarkState::Run() {
       DEBUG_ASSERT(kStages.size() == ctx.results.size());
 
       const StageResults& result = ctx.results[stage];
-      const zx_ticks_t ticks_duration = result.end - result.start;
-      const zx_time_t time_duration = timer_get_ticks_to_time_ratio().Scale(ticks_duration);
+      const zx_duration_mono_ticks_t ticks_duration = result.end - result.start;
+      const zx_duration_mono_t time_duration =
+          timer_get_ticks_to_time_ratio().Scale(ticks_duration);
       if ((time_duration > 0) && (time_duration <= ktl::numeric_limits<uint32_t>::max())) {
         printf(" %12ld |",
                affine::Ratio{ZX_SEC(1), static_cast<uint32_t>(time_duration)}.Scale(result.count));
@@ -444,7 +445,8 @@ int BenchmarkState::RunContext(CpuContext& ctx) {
             arch::Yield();
           }
 
-          zx_ticks_t ticks = timer_get_ticks_to_time_ratio().Inverse().Scale(kMeasurementTime);
+          zx_duration_mono_ticks_t ticks =
+              timer_get_ticks_to_time_ratio().Inverse().Scale(kMeasurementTime);
           ticks_deadline_.store(current_ticks() + ticks);
           ready_to_start_count_.fetch_add(1);
         } else {
@@ -458,9 +460,9 @@ int BenchmarkState::RunContext(CpuContext& ctx) {
         // make it through the measurement action before we hit the deadline, then
         // record the start/end times, as well as the count.
         size_t count = 0;
-        zx_ticks_t end = 0;
-        zx_ticks_t deadline = ticks_deadline_.load();
-        zx_ticks_t start = current_ticks();
+        zx_instant_mono_ticks_t end = 0;
+        zx_duration_mono_ticks_t deadline = ticks_deadline_.load();
+        zx_instant_mono_ticks_t start = current_ticks();
 
         do {
           action(0xc235754ef00c463d, 0x9ba8562ddc0932cf);

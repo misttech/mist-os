@@ -39,13 +39,13 @@ TEST(VmoTests, vmo_cache_map_test) {
       buf[i] = 0;
 
     // write to it
-    zx_time_t wt = zx_clock_get_monotonic();
+    zx_instant_mono_t wt = zx_clock_get_monotonic();
     for (size_t i = 0; i < size / 4; i++)
       buf[i] = 0;
     wt = zx_clock_get_monotonic() - wt;
 
     // read from it
-    zx_time_t rt = zx_clock_get_monotonic();
+    zx_instant_mono_t rt = zx_clock_get_monotonic();
     for (size_t i = 0; i < size / 4; i++) [[maybe_unused]]
       uint32_t hole = buf[i];
     rt = zx_clock_get_monotonic() - rt;
@@ -125,12 +125,12 @@ TEST(VmoTests, DISABLED_vmo_unmap_coherency) {
   thrd_t t;
   thrd_create(&t, worker, &args);
 
-  const zx_time_t max_duration = ZX_SEC(30);
-  const zx_time_t max_wait = ZX_SEC(1);
-  zx_time_t start = zx_clock_get_monotonic();
+  const zx_duration_mono_t max_duration = ZX_SEC(30);
+  const zx_duration_mono_t max_wait = ZX_SEC(1);
+  zx_instant_mono_t start = zx_clock_get_monotonic();
   for (;;) {
     // wait for it to loop at least once
-    zx_time_t t = zx_clock_get_monotonic();
+    zx_instant_mono_t t = zx_clock_get_monotonic();
     size_t last_count = args.count.load();
     while (args.count.load() <= last_count) {
       if (zx_clock_get_monotonic() - t > max_wait) {

@@ -13,8 +13,8 @@ namespace sched {
 
 // Fixed-point wrappers for cleaner time arithmetic when dealing with other
 // fixed-point quantities.
-using Duration = ffl::Fixed<zx_duration_t, 0>;
-using Time = ffl::Fixed<zx_time_t, 0>;
+using Duration = ffl::Fixed<zx_duration_mono_t, 0>;
+using Time = ffl::Fixed<zx_instant_mono_t, 0>;
 
 }  // namespace sched
 

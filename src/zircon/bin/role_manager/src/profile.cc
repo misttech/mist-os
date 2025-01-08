@@ -59,9 +59,9 @@ void ProfileProvider::GetDeadlineProfile(GetDeadlineProfileRequestView request,
       .flags = ZX_PROFILE_INFO_FLAG_DEADLINE,
       .deadline_params =
           zx_sched_deadline_params_t{
-              .capacity = static_cast<zx_duration_t>(request->capacity),
-              .relative_deadline = static_cast<zx_duration_t>(request->deadline),
-              .period = static_cast<zx_duration_t>(request->period),
+              .capacity = static_cast<zx_duration_mono_t>(request->capacity),
+              .relative_deadline = static_cast<zx_duration_mono_t>(request->deadline),
+              .period = static_cast<zx_duration_mono_t>(request->period),
           },
   };
 

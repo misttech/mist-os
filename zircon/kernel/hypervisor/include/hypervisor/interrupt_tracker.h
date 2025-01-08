@@ -129,7 +129,7 @@ class InterruptTracker {
   void Cancel() { event_.Signal(ZX_ERR_INTERNAL_INTR_RETRY); }
 
   // Waits for an interrupt.
-  zx::result<> Wait(zx_time_t deadline, StateInvalidator* invalidator = nullptr) {
+  zx::result<> Wait(zx_instant_mono_t deadline, StateInvalidator* invalidator = nullptr) {
     if (invalidator != nullptr) {
       invalidator->Invalidate();
     }

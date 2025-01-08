@@ -21,14 +21,14 @@ __BEGIN_CDECLS
 //
 typedef struct zx_sched_deadline_params {
   // The worst case execution time of the deadline work per interarrival period.
-  zx_duration_t capacity;
+  zx_duration_mono_t capacity;
 
   // The worst case finish time of the deadline work, relative to the beginning
   // of the current interarrival period.
-  zx_duration_t relative_deadline;
+  zx_duration_mono_t relative_deadline;
 
   // The worst case interarrival period of the deadline work.
-  zx_duration_t period;
+  zx_duration_mono_t period;
 } zx_sched_deadline_params_t;
 
 __END_CDECLS

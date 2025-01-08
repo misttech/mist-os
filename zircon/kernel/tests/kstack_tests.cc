@@ -25,7 +25,7 @@ bool kstack_interrupt_depth_test() {
   // This gives us a window for interrupts to occur; any that do will have to make do with half
   // the stack consumed.
   int i = 0;
-  zx_time_t now = current_time();
+  zx_instant_mono_t now = current_time();
   while (current_time() < now + ZX_MSEC(100)) {
     buffer[i++ % kSize] = buffer[0];  // Touch the buffer to ensure it is not optimized out
     arch::Yield();
@@ -43,7 +43,7 @@ __attribute__((no_sanitize("safe-stack"))) bool kstack_interrupt_depth_test_no_s
   // Spin for a bit while we have a large, active buffer on the kernel stack.
   // Just like the above test, though with safe-stack disabled.
   int i = 0;
-  zx_time_t now = current_time();
+  zx_instant_mono_t now = current_time();
   while (current_time() < now + ZX_MSEC(100)) {
     buffer[i++ % kSize] = buffer[0];  // Touch the buffer to ensure it is not optimized out
     arch::Yield();

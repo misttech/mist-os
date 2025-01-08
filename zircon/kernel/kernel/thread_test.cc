@@ -43,7 +43,7 @@ namespace {
 // to avoid pegging the CPU.
 template <typename F>
 void wait_for_cond(F cond) {
-  zx_duration_t wait_duration = ZX_USEC(1);
+  zx_duration_mono_t wait_duration = ZX_USEC(1);
   while (!cond()) {
     Thread::Current::SleepRelative(wait_duration);
     // Increase wait_duration time by ~10%.
@@ -685,9 +685,9 @@ bool set_migrate_fn_stress_test() {
 
       while (!state->should_stop.load(ktl::memory_order_relaxed)) {
         // Spin or sleep for 100us.
-        const zx_duration_t delay = ZX_USEC(100);
+        const zx_duration_mono_t delay = ZX_USEC(100);
         if (rand() & 1) {
-          const zx_time_t spin_end = zx_time_add_duration(current_time(), delay);
+          const zx_instant_mono_t spin_end = zx_time_add_duration(current_time(), delay);
           while (current_time() < spin_end) {
           }
         } else {
@@ -896,7 +896,7 @@ struct TaskRuntimeStatsTests {
   static bool thread_runtime_test() {
     BEGIN_TEST;
 
-    const zx_ticks_t kCpuTicks = 10, kQueueTicks = 20;
+    const zx_duration_mono_ticks_t kCpuTicks = 10, kQueueTicks = 20;
     TaskRuntimeStats trs;
     ThreadRuntimeStats stats;
     ThreadRuntimeStats::ReadResult read_res = stats.Read();
@@ -913,8 +913,8 @@ struct TaskRuntimeStatsTests {
     EXPECT_EQ(0, trs.page_fault_ticks);
     EXPECT_EQ(0, trs.lock_contention_ticks);
 
-    auto DelayTicks = [](zx_ticks_t ticks) {
-      zx_ticks_t deadline = current_ticks() + kCpuTicks;
+    auto DelayTicks = [](zx_duration_mono_ticks_t ticks) {
+      zx_instant_mono_ticks_t deadline = current_ticks() + kCpuTicks;
       do {
         arch::Yield();
       } while (current_ticks() < deadline);
@@ -956,7 +956,7 @@ struct TaskRuntimeStatsTests {
     // has to be at least the compensated queue time before we switched to
     // running.  The accumulated CPU time should still be zero, since we have
     // never been in the running state, then switched out.
-    const zx_ticks_t queue_ticks_lower_bound = trs.queue_ticks;
+    const zx_duration_mono_ticks_t queue_ticks_lower_bound = trs.queue_ticks;
 
     read_res = stats.Read();
     EXPECT_EQ(thread_state::THREAD_RUNNING, sched_stats.current_state);
@@ -974,8 +974,8 @@ struct TaskRuntimeStatsTests {
     EXPECT_EQ(0, trs.lock_contention_ticks);
 
     // Add other times.
-    const zx_ticks_t kPageFaultTicks = 30;
-    const zx_ticks_t kLockContentionTicks = 40;
+    const zx_duration_mono_ticks_t kPageFaultTicks = 30;
+    const zx_duration_mono_ticks_t kLockContentionTicks = 40;
     const TaskRuntimeStats prev_trs = trs;
 
     stats.AddPageFaultTicks(kPageFaultTicks);

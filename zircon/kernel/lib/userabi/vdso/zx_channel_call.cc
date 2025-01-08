@@ -4,7 +4,8 @@
 
 #include "private.h"
 
-__EXPORT zx_status_t _zx_channel_call(zx_handle_t handle, uint32_t options, zx_time_t deadline,
+__EXPORT zx_status_t _zx_channel_call(zx_handle_t handle, uint32_t options,
+                                      zx_instant_mono_t deadline,
                                       const zx_channel_call_args_t* args, uint32_t* actual_bytes,
                                       uint32_t* actual_handles) {
   zx_status_t status = SYSCALL_zx_channel_call_noretry(handle, options, deadline, args,
@@ -17,7 +18,8 @@ __EXPORT zx_status_t _zx_channel_call(zx_handle_t handle, uint32_t options, zx_t
 
 VDSO_INTERFACE_FUNCTION(zx_channel_call);
 
-__EXPORT zx_status_t _zx_channel_call_etc(zx_handle_t handle, uint32_t options, zx_time_t deadline,
+__EXPORT zx_status_t _zx_channel_call_etc(zx_handle_t handle, uint32_t options,
+                                          zx_instant_mono_t deadline,
                                           zx_channel_call_etc_args_t* args, uint32_t* actual_bytes,
                                           uint32_t* actual_handles) {
   zx_status_t status = SYSCALL_zx_channel_call_etc_noretry(handle, options, deadline, args,

@@ -37,7 +37,7 @@ constexpr auto kThreadRegister = &zx_thread_state_general_regs_t::tp;
 constexpr auto kThreadRegister = &zx_thread_state_general_regs_t::fs_base;
 #endif
 
-const zx_time_t kTimeoutNs = ZX_MSEC(250);
+const zx_duration_mono_t kTimeoutNs = ZX_MSEC(250);
 
 TEST(ProcessTest, LongNameSucceeds) {
   // Creating a process with a super long name should succeed.
@@ -359,13 +359,13 @@ TEST(ProcessTest, InfoReflectsProcessState) {
     EXPECT_EQ(info.return_code, 0, "return code is zero");
   }
 
-  const zx_time_t before_start = zx_clock_get_monotonic();
+  const zx_instant_mono_t before_start = zx_clock_get_monotonic();
 
   zx_handle_t minip_chn;
   // Start the process and make (relatively) certain it's alive.
   ASSERT_OK(start_mini_process_etc(proc, thread, vmar, event, true, &minip_chn));
 
-  const zx_time_t after_start = zx_clock_get_monotonic();
+  const zx_instant_mono_t after_start = zx_clock_get_monotonic();
 
   zx_signals_t signals;
   ASSERT_EQ(zx_object_wait_one(proc, ZX_TASK_TERMINATED, zx_deadline_after(kTimeoutNs), &signals),
@@ -444,7 +444,7 @@ class TestProcess {
   // If |expected| is ZX_ERR_TIMED_OUT this waits for a finite amount of time,
   // otherwise it waits forever.
   bool WaitForThreadSignal(int index, zx_signals_t signal, zx_status_t expected) {
-    zx_time_t timeout = ZX_TIME_INFINITE;
+    zx_instant_mono_t timeout = ZX_TIME_INFINITE;
     if (expected == ZX_ERR_TIMED_OUT)
       timeout = zx_deadline_after(kTimeoutNs);
 
@@ -756,7 +756,7 @@ TEST(ProcessTest, GetInfoRuntimeV1) {
 // A stress test designed to create a race where one thread is creating a process while another
 // thread is killing its parent job.
 TEST(ProcessTest, CreateAndKillJobRaceStress) {
-  constexpr zx_duration_t kTestDuration = ZX_SEC(1);
+  constexpr zx_duration_mono_t kTestDuration = ZX_SEC(1);
   srand(4);
 
   struct args_t {

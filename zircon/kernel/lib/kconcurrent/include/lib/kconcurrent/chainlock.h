@@ -38,8 +38,8 @@ using ::concurrent::chainlock_transaction_token;
 //   static void SetActive(ChainLockTransaction*);
 //   static void ChainLockTransaction* Active();
 //   static Token AllocateReservedToken();
-//   static zx_ticks_t GetCurrentTicks();
-//   static void OnFinalized(zx_time_t, concurrent::CallsiteInfo);
+//   static zx_instant_mono_ticks_t GetCurrentTicks();
+//   static void OnFinalized(zx_instant_mono_t, concurrent::CallsiteInfo);
 //   template <StateOptions> struct StateSaver;
 //
 // The above are declared in this file and defined in lib/kconcurrent/chainlock_transaction.h to
@@ -113,13 +113,13 @@ class ChainLockTransaction
   static Token AllocateReservedToken();
 
   // Gets the current monotonic ticks.
-  static zx_ticks_t GetCurrentTicks();
+  static zx_instant_mono_ticks_t GetCurrentTicks();
 
   // Emits a trace event for the given contention information.
-  static void OnFinalized(zx_time_t contention_start_ticks,
+  static void OnFinalized(zx_instant_mono_t contention_start_ticks,
                           ::concurrent::CallsiteInfo callsite_info);
 
-  static void UpdateContentionCounters(zx_ticks_t contention_ticks);
+  static void UpdateContentionCounters(zx_duration_mono_ticks_t contention_ticks);
 
   uint64_t conflict_id_{0};
 };

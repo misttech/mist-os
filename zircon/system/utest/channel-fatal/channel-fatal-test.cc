@@ -38,9 +38,9 @@ const char* process_bin;
 // but this is the simplest), and then add the offset of the internal
 // SYSCALL_zx_channel_call_noretry function we want to call.
 #include "vdso-code.h"
-zx_status_t zx_channel_call_noretry(zx_handle_t handle, uint32_t options, zx_time_t deadline,
-                                    const zx_channel_call_args_t* args, uint32_t* actual_bytes,
-                                    uint32_t* actual_handles) {
+zx_status_t zx_channel_call_noretry(zx_handle_t handle, uint32_t options,
+                                    zx_instant_mono_t deadline, const zx_channel_call_args_t* args,
+                                    uint32_t* actual_bytes, uint32_t* actual_handles) {
   uintptr_t vdso_base = (uintptr_t)&zx_handle_close - VDSO_SYSCALL_zx_handle_close;
   uintptr_t fnptr = vdso_base + VDSO_SYSCALL_zx_channel_call_noretry;
   return (*(__typeof(zx_channel_call_noretry)*)fnptr)(handle, options, deadline, args, actual_bytes,

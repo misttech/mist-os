@@ -43,7 +43,7 @@ zx_ticks_t riscv_sbi_current_ticks() { return riscv64_csr_read(RISCV64_CSR_TIME)
 zx_status_t riscv_sbi_set_oneshot_timer(zx_ticks_t deadline) {
   DEBUG_ASSERT(arch_ints_disabled());
 
-  deadline = ktl::max<zx_time_t>(deadline, 0);
+  deadline = ktl::max<zx_ticks_t>(deadline, 0);
 
   LTRACEF("cpu %u: deadline %#" PRIx64 "\n", arch_curr_cpu_num(), deadline);
 

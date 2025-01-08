@@ -46,8 +46,9 @@ class LoopLimiter {
   // Construct a limiter with a relative timeout.
   //
   // If |duration| is <= 0 |Exceeded| will always return false.
-  static LoopLimiter<ItersPerGetTicks> WithDuration(zx_duration_t duration) {
-    const zx_ticks_t relative_ticks = timer_get_ticks_to_time_ratio().Inverse().Scale(duration);
+  static LoopLimiter<ItersPerGetTicks> WithDuration(zx_duration_mono_t duration) {
+    const zx_duration_mono_ticks_t relative_ticks =
+        timer_get_ticks_to_time_ratio().Inverse().Scale(duration);
     return LoopLimiter<ItersPerGetTicks>(relative_ticks);
   }
 
@@ -56,29 +57,29 @@ class LoopLimiter {
   // Call once per loop iteration.
   bool Exceeded() {
     if constexpr (ItersPerGetTicks <= 1) {
-      const zx_ticks_t now = current_ticks();
+      const zx_instant_mono_ticks_t now = current_ticks();
       return now >= deadline_ticks_;
     }
 
     ++iter_since_;
     if (iter_since_ >= ItersPerGetTicks) {
       iter_since_ = 0;
-      const zx_ticks_t now = current_ticks();
+      const zx_instant_mono_ticks_t now = current_ticks();
       return now >= deadline_ticks_;
     }
     return false;
   }
 
  private:
-  explicit LoopLimiter(zx_ticks_t relative_ticks) {
+  explicit LoopLimiter(zx_duration_mono_ticks_t relative_ticks) {
     if (relative_ticks > 0) {
-      const zx_ticks_t now = current_ticks();
+      const zx_instant_mono_ticks_t now = current_ticks();
       deadline_ticks_ = zx_ticks_add_ticks(now, relative_ticks);
     }
   }
 
   // Absolute deadline measured in monotonic clock ticks.
-  zx_ticks_t deadline_ticks_{};
+  zx_instant_mono_ticks_t deadline_ticks_{};
   // Number of iterations since the last call to |current_ticks|.
   uint64_t iter_since_{};
 };

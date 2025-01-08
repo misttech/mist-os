@@ -1197,7 +1197,7 @@ class Scheduler {
     Scheduler& scheduler() { return *request_dpc_.arg<Scheduler>(); }
     cpu_num_t cpu() { return scheduler().this_cpu(); }
 
-    static void TimerHandler(Timer* timer, zx_time_t now, void* arg);
+    static void TimerHandler(Timer* timer, zx_instant_mono_t now, void* arg);
     static void DpcHandler(Dpc* dpc);
 
     power_management::PowerState power_state_;

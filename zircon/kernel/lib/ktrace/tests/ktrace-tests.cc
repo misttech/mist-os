@@ -823,8 +823,8 @@ class TestKTraceState : public ::internal::KTraceState {
     END_TEST;
   }
 
-  zx_time_t last_static_name_report_time_{0};
-  zx_time_t last_thread_name_report_time_{0};
+  zx_instant_mono_t last_static_name_report_time_{0};
+  zx_instant_mono_t last_thread_name_report_time_{0};
   uint32_t static_name_report_count_{0};
   uint32_t thread_name_report_count_{0};
 

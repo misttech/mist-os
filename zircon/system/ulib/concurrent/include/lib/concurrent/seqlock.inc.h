@@ -24,13 +24,13 @@ SeqLock<Osal, kSyncOpt>::BeginReadTransaction() {
 
 template <typename Osal, SyncOpt kSyncOpt>
 bool SeqLock<Osal, kSyncOpt>::TryBeginReadTransaction(ReadTransactionToken& out_token,
-                                                      zx_duration_t timeout) {
+                                                      zx_duration_mono_t timeout) {
   return TryBeginReadTransactionDeadline(out_token, Osal::GetClockMonotonic() + timeout);
 }
 
 template <typename Osal, SyncOpt kSyncOpt>
 bool SeqLock<Osal, kSyncOpt>::TryBeginReadTransactionDeadline(ReadTransactionToken& out_token,
-                                                              zx_time_t deadline) {
+                                                              zx_instant_mono_t deadline) {
   while (((out_token.seq_num_ = seq_num_.load(std::memory_order_acquire)) & 0x1) != 0) {
     if (Osal::GetClockMonotonic() >= deadline) {
       return false;
@@ -81,12 +81,12 @@ void SeqLock<Osal, kSyncOpt>::Acquire() {
 }
 
 template <typename Osal, SyncOpt kSyncOpt>
-bool SeqLock<Osal, kSyncOpt>::TryAcquire(zx_duration_t timeout) {
+bool SeqLock<Osal, kSyncOpt>::TryAcquire(zx_duration_mono_t timeout) {
   return TryAcquireDeadline(Osal::GetClockMonotonic() + timeout);
 }
 
 template <typename Osal, SyncOpt kSyncOpt>
-bool SeqLock<Osal, kSyncOpt>::TryAcquireDeadline(zx_time_t deadline) {
+bool SeqLock<Osal, kSyncOpt>::TryAcquireDeadline(zx_instant_mono_t deadline) {
   while (true) {
     SequenceNumber expected;
 

@@ -649,7 +649,7 @@ TEST(FutexTest, WaitExitRace) {
 
     std::thread t2(wait_then_exit);
 
-    const zx_time_t deadline = zx_deadline_after(ZX_USEC(100));
+    const zx_instant_mono_t deadline = zx_deadline_after(ZX_USEC(100));
     const zx_handle_t new_futex_owner = thrd_get_zx_handle(t2.native_handle());
 
     ready.store(true);

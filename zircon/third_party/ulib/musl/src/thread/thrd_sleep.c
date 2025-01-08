@@ -5,7 +5,7 @@
 #include "time_conversion.h"
 
 int thrd_sleep(const struct timespec* req, struct timespec* rem) {
-  zx_time_t deadline = ZX_TIME_INFINITE;
+  zx_instant_mono_t deadline = ZX_TIME_INFINITE;
   int ret = __timespec_to_deadline(req, CLOCK_REALTIME, &deadline);
   if (ret) {
     // According to the API, failures not due to signals should return a

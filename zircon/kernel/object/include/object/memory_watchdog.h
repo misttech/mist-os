@@ -40,7 +40,7 @@ class MemoryWatchdog {
 
  private:
   // The callback provided to the |eviction_trigger_| timer.
-  static void EvictionTriggerCallback(Timer* timer, zx_time_t now, void* arg);
+  static void EvictionTriggerCallback(Timer* timer, zx_instant_mono_t now, void* arg);
   void EvictionTrigger();
 
   void WorkerThread() __NO_RETURN;
@@ -50,7 +50,7 @@ class MemoryWatchdog {
 
   // Called by the WorkerThread to determine if a kernel event needs to be signaled corresponding to
   // pressure change to level |idx|.
-  inline bool IsSignalDue(PressureLevel idx, zx_time_t time_now) const;
+  inline bool IsSignalDue(PressureLevel idx, zx_instant_mono_t time_now) const;
 
   // Called by the WorkerThread to determine if kernel eviction (asynchronous) needs to be triggered
   // in response to pressure change to level |idx|.
@@ -78,10 +78,10 @@ class MemoryWatchdog {
   uint64_t watermark_debounce_ = 0;
 
   // Used to delay signaling memory level transitions in the case of rapid changes.
-  zx_time_t hysteresis_seconds_ = ZX_SEC(10);
+  zx_duration_mono_t hysteresis_seconds_ = ZX_SEC(10);
 
   // Tracks last time the memory state was evaluated (and signaled if required).
-  zx_time_t prev_mem_state_eval_time_ = ZX_TIME_INFINITE_PAST;
+  zx_instant_mono_t prev_mem_state_eval_time_ = ZX_TIME_INFINITE_PAST;
 
   // The highest pressure level we trigger eviction at, OOM being the lowest pressure level (0).
   PressureLevel max_eviction_level_ = PressureLevel::kCritical;

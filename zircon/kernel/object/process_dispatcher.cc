@@ -602,7 +602,7 @@ void ProcessDispatcher::GetInfo(zx_info_process_t* info) const {
   canary_.Assert();
 
   State state;
-  zx_time_t start_time;
+  zx_instant_mono_t start_time;
   int64_t return_code;
   zx_info_process_flags_t flags = 0u;
   // retcode_ depends on the state: make sure they're consistent.

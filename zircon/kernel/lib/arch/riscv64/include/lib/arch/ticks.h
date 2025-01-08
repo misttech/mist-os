@@ -17,7 +17,7 @@ namespace arch {
 
 // This is the C++ type that the `rdtime` instruction delivers.
 // Higher-level kernel code knows how to translate this into the Zircon
-// monotonic clock's zx_ticks_t.
+// monotonic clock's zx_instant_mono_ticks_t.
 struct EarlyTicks {
   uint64_t time;
 

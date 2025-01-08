@@ -14,7 +14,7 @@
 
 class ContentionTimer {
  public:
-  ContentionTimer(Thread* current_thread, zx_ticks_t start_ticks)
+  ContentionTimer(Thread* current_thread, zx_instant_mono_ticks_t start_ticks)
       : current_thread_(current_thread), start_ticks_(start_ticks) {}
 
   ContentionTimer(const ContentionTimer&) = delete;
@@ -31,12 +31,12 @@ class ContentionTimer {
 
  private:
   Thread* const current_thread_;
-  const zx_ticks_t start_ticks_;
+  const zx_instant_mono_ticks_t start_ticks_;
 };
 
 class PageFaultTimer {
  public:
-  PageFaultTimer(Thread* current_thread, zx_ticks_t start_ticks)
+  PageFaultTimer(Thread* current_thread, zx_instant_mono_ticks_t start_ticks)
       : current_thread_(current_thread), start_ticks_(start_ticks) {}
 
   PageFaultTimer(const PageFaultTimer&) = delete;
@@ -53,7 +53,7 @@ class PageFaultTimer {
 
  private:
   Thread* const current_thread_;
-  const zx_ticks_t start_ticks_;
+  const zx_instant_mono_ticks_t start_ticks_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_TASK_RUNTIME_TIMERS_H_

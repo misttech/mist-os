@@ -16,7 +16,7 @@ __BEGIN_CDECLS
 // that prevent it from being optimal. For example, the |mutex_t| interface
 // supports recursion, which adds a branch to |mutex_init| to check that the
 // client has not asked for recursion, and |mutex_timedlock| operates in
-// |struct timespec| rather than |zx_time_t|.
+// |struct timespec| rather than |zx_instant_mono_t|.
 //
 // |sync_mutex| resolves these issues.
 typedef struct __TA_CAPABILITY("mutex") sync_mutex {
@@ -54,7 +54,7 @@ void sync_mutex_lock_with_waiter(sync_mutex_t* mutex) __TA_ACQUIRE(mutex);
 //
 // Returns |ZX_OK| if the lock is acquired, and |ZX_ERR_TIMED_OUT| if the
 // deadline passes.
-zx_status_t sync_mutex_timedlock(sync_mutex_t* mutex, zx_time_t deadline);
+zx_status_t sync_mutex_timedlock(sync_mutex_t* mutex, zx_instant_mono_t deadline);
 
 // Attempts to lock the mutex without blocking.
 //

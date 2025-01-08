@@ -252,7 +252,7 @@ void RamMappableCrashlog::UpdateUptimeLocked() {
         Deadline::after(kDefaultUpdateInterval, {kDefaultUpdateInterval / 2, TIMER_SLACK_CENTER});
     uptime_updater_timer_.Set(
         next_update_time,
-        [](Timer*, zx_time_t now, void* arg) {
+        [](Timer*, zx_instant_mono_t now, void* arg) {
           auto thiz = reinterpret_cast<RamMappableCrashlog*>(arg);
           Guard<SpinLock, IrqSave> guard{&thiz->uptime_updater_lock_};
           thiz->UpdateUptimeLocked();

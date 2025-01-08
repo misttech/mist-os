@@ -53,7 +53,8 @@ class TimerSlack {
 // Deadline specifies when a timer or event should occur.
 //
 // This class encapsulates the point in time at which a timer/event should occur ("when") and how
-// much the timer/event is allowed to deviate from that point in time ("slack").
+// much the timer/event is allowed to deviate from that point in time ("slack"). The point in time
+// can be on the boot or monotonic clock.
 class Deadline {
  public:
   constexpr Deadline(zx_time_t when, TimerSlack slack) : when_(when), slack_(slack) {}

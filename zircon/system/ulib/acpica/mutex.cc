@@ -111,7 +111,7 @@ ACPI_STATUS AcpiOsAcquireMutex(ACPI_MUTEX Handle, UINT16 Timeout)
 
     sync_mutex_lock(Handle);
   } else {
-    zx_time_t deadline = zx_deadline_after(ZX_MSEC(Timeout));
+    zx_instant_mono_t deadline = zx_deadline_after(ZX_MSEC(Timeout));
 
     if (acpi_spinlocks_held == 0) {
       int ret;

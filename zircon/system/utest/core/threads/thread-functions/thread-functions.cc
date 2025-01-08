@@ -48,7 +48,7 @@ bool buffers_equal(const uint8_t* a, const uint8_t* b, size_t size) {
 
 void threads_test_sleep_fn(void* arg) {
   // Note: You shouldn't use C standard library functions from this thread.
-  zx_time_t time = (zx_time_t)arg;
+  zx_instant_mono_t time = (zx_instant_mono_t)arg;
   zx_nanosleep(time);
 }
 

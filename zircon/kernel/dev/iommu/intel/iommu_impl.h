@@ -98,7 +98,7 @@ class IommuImpl final : public Iommu {
   void InvalidateIotlbGlobalLocked() TA_REQ(lock_);
 
   zx_status_t SetRootTablePointerLocked(paddr_t pa) TA_REQ(lock_);
-  zx_status_t SetTranslationEnableLocked(bool enabled, zx_time_t deadline) TA_REQ(lock_);
+  zx_status_t SetTranslationEnableLocked(bool enabled, zx_instant_mono_t deadline) TA_REQ(lock_);
   zx_status_t ConfigureFaultEventInterruptLocked() TA_REQ(lock_);
 
   // Process Reserved Memory Mapping Regions and set them up as pass-through.
@@ -115,7 +115,7 @@ class IommuImpl final : public Iommu {
   template <class RegType>
   zx_status_t WaitForValueLocked(RegType* reg,
                                  typename RegType::ValueType (RegType::*getter)() const,
-                                 typename RegType::ValueType value, zx_time_t deadline)
+                                 typename RegType::ValueType value, zx_instant_mono_t deadline)
       TA_REQ(lock_);
 
   volatile ds::RootTable* root_table() const TA_REQ(lock_) {

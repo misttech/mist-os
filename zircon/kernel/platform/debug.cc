@@ -125,13 +125,13 @@ constexpr size_t kRxQueueSize = 1024;
 // When Polling is enabled, this will fire the polling callback for draining UART's RX Queue.
 Timer gUartPollTimer;
 
-constexpr zx_duration_t kPollingPeriod = ZX_MSEC(10);
+constexpr zx_duration_mono_t kPollingPeriod = ZX_MSEC(10);
 constexpr TimerSlack kPollingSlack = {ZX_MSEC(10), TIMER_SLACK_CENTER};
 
 // Callback used by |gUartPollTimer| when deadline is met. See |Timer| interface for more
 // information.
 template <bool DrainUart>
-void UartPoll(Timer* uart_timer, zx_time_t now, void* arg) {
+void UartPoll(Timer* uart_timer, zx_instant_mono_t now, void* arg) {
   uart_timer->Set(Deadline(zx_time_add_duration(now, kPollingPeriod), kPollingSlack),
                   &UartPoll<true>, nullptr);
   if constexpr (DrainUart) {

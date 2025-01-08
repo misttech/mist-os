@@ -468,7 +468,8 @@ static bool PerfTestMode(const char* test_suite, int argc, char** argv) {
   if (args.enable_tracing) {
     trace_provider_start();
   }
-  zx_duration_t duration = static_cast<zx_duration_t>(ZX_SEC(1) * args.startup_delay_seconds);
+  zx_duration_mono_t duration =
+      static_cast<zx_duration_mono_t>(ZX_SEC(1) * args.startup_delay_seconds);
   zx_nanosleep(zx_deadline_after(duration));
 #endif
 

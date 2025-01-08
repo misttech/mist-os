@@ -90,7 +90,7 @@ TEST(SeqLock, ReadTimeouts) {
   // assume zx_clock_get_monotonic is our proper time reference.  Otherwise, we
   // use a deadline which is almost certainly in the past.  The operation should
   // still fail, it just will not end up spinning at all.
-  zx_time_t now{0};
+  zx_instant_mono_t now{0};
 #if defined(__Fuchsia__)
   now = zx_clock_get_monotonic();
 #endif
@@ -138,7 +138,7 @@ TEST(SeqLock, ContestedWrite) {
     ASSERT_TRUE(false);
   }
 
-  zx_time_t now{0};
+  zx_instant_mono_t now{0};
 #if defined(__Fuchsia__)
   now = zx_clock_get_monotonic();
 #endif

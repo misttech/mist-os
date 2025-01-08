@@ -1314,7 +1314,7 @@ TEST(KernelClocksTestCase, TrivialRateUpdates) {
     constexpr std::array TEST_RATES = {0, 1, -1, 20, -20};
     for (int32_t rate_adj : TEST_RATES) {
       zx_clock_details_v1_t last_details, curr_details;
-      zx_ticks_t before_update_ticks, after_update_ticks;
+      zx_instant_mono_ticks_t before_update_ticks, after_update_ticks;
 
       zx::clock::update_args args;
       args.set_rate_adjust(rate_adj);

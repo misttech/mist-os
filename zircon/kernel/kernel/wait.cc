@@ -85,7 +85,7 @@ static inline void WqTraceDepth(const WaitQueueCollection* collection, uint32_t 
 
 // Wait queues are building blocks that other locking primitives use to handle
 // blocking threads.
-void WaitQueue::TimeoutHandler(Timer* timer, zx_time_t now, void* arg) {
+void WaitQueue::TimeoutHandler(Timer* timer, zx_instant_mono_t now, void* arg) {
   Thread& thread = *(static_cast<Thread*>(arg));
   thread.canary().Assert();
 
@@ -188,7 +188,7 @@ SchedDuration WaitQueueCollection::MinInheritableRelativeDeadline() const {
   return min_deadline;
 }
 
-Thread* WaitQueueCollection::Peek(zx_time_t signed_now) {
+Thread* WaitQueueCollection::Peek(zx_instant_mono_t signed_now) {
   // Find the "best" thread in the queue to run at time |now|.  See the comments
   // in thread.h, immediately above the definition of WaitQueueCollection for
   // details of how the data structure and this algorithm work.
@@ -274,7 +274,7 @@ void WaitQueueCollection::Insert(Thread* thread) {
     // current_time() of the system would need to be greater than 2^63
     // nanoseconds minus one year, or about 291 years, before this can happen.
     constexpr SchedWeight kMinPosWeight{ffl::FromRatio<int64_t>(1, SchedWeight::Format::Power)};
-    constexpr SchedDuration OneYear{SchedMs(zx_duration_t(1) * 86400 * 365245)};
+    constexpr SchedDuration OneYear{SchedMs(zx_duration_mono_t(1) * 86400 * 365245)};
     static_assert(OneYear >= (Scheduler::kDefaultTargetLatency / kMinPosWeight),
                   "SchedWeight resolution is too fine");
 
@@ -738,7 +738,7 @@ void WaitQueue::UpdateBlockedThreadEffectiveProfile(Thread& t) {
 }
 
 ktl::optional<BrwLockOps::LockForWakeResult> BrwLockOps::LockForWake(WaitQueue& queue,
-                                                                     zx_time_t now) {
+                                                                     zx_instant_mono_t now) {
   DEBUG_ASSERT_MAGIC_AND_NOT_OWQ(&queue);
   LockForWakeResult result;
   Thread* t;

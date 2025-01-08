@@ -29,19 +29,19 @@ static zx_time_t ticks_to_ns(zx_ticks_t ticks) {
 }
 
 // spin the cpu a bit to make sure the frequency is cranked to the top
-static void spin(zx_time_t nanosecs) {
-  zx_ticks_t target_ticks = ns_to_ticks(nanosecs);
-  zx_ticks_t t = zx_ticks_get();
+static void spin(zx_duration_mono_t nanosecs) {
+  zx_duration_mono_ticks_t target_ticks = ns_to_ticks(nanosecs);
+  zx_instant_mono_ticks_t t = zx_ticks_get();
 
   while (zx_ticks_get() - t < target_ticks)
     ;
 }
 
 template <typename T>
-inline zx_time_t time_it(T func) {
+inline zx_duration_mono_t time_it(T func) {
   spin(ZX_MSEC(10));
 
-  zx_ticks_t ticks = zx_ticks_get();
+  zx_instant_mono_ticks_t ticks = zx_ticks_get();
   func();
   ticks = zx_ticks_get() - ticks;
 
@@ -50,7 +50,7 @@ inline zx_time_t time_it(T func) {
 
 int vmo_run_benchmark() {
   const size_t kPageSize = zx_system_get_page_size();
-  zx_time_t t;
+  zx_duration_mono_t t;
   // zx_handle_t vmo;
 
   printf("starting VMO benchmark\n");

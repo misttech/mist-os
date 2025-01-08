@@ -174,7 +174,7 @@ TEST(RegisterStateTest, SegmentSelectorsZeroedOnContextSwitch) {
   // this thread will be interrupted by an interrupt, which would also clear
   // the segment selector registers. Keep the sleep duration short to reduce
   // the chance of that happening.
-  zx_duration_t duration = ZX_MSEC(1);
+  zx_duration_mono_t duration = ZX_MSEC(1);
   zx_status_t status = ZX_OK;
   while (get_ds() == 1 && duration < ZX_SEC(10)) {
     status = zx_nanosleep(zx_deadline_after(duration));

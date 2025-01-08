@@ -7,7 +7,7 @@
 #include "data-time-values.h"
 #include "private.h"
 
-__EXPORT zx_ticks_t _zx_ticks_get(void) {
+__EXPORT zx_instant_mono_ticks_t _zx_ticks_get(void) {
   return fasttime::internal::compute_monotonic_ticks<
       fasttime::internal::FasttimeVerificationMode::kSkip>(DATA_TIME_VALUES);
 }

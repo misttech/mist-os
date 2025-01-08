@@ -182,7 +182,7 @@ class TA_SCOPED_CAP AnnotatedAutoEagerReschedDisabler {
 // preemption is requested or the object is destroyed, whichever comes first.
 class AutoExpiringPreemptDisabler {
  public:
-  explicit AutoExpiringPreemptDisabler(zx_duration_t max_deferral_duration)
+  explicit AutoExpiringPreemptDisabler(zx_duration_mono_t max_deferral_duration)
       : should_clear_(
             Thread::Current::preemption_state().SetTimesliceExtension(max_deferral_duration)) {}
 

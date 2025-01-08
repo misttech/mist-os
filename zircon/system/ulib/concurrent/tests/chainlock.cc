@@ -36,7 +36,7 @@ class ChainLockTransaction
                                                 TracingEnabled> {
  public:
   static ChainLockTransaction* Active() { return active_transaction_; }
-  static zx_ticks_t GetCurrentTicks() {
+  static zx_instant_mono_ticks_t GetCurrentTicks() {
     return std::chrono::steady_clock::now().time_since_epoch().count();
   }
   static void Yield() {}
@@ -60,7 +60,9 @@ class ChainLockTransaction
 
   ~ChainLockTransaction() __TA_RELEASE(chainlock_transaction_token) = default;
 
-  static zx_ticks_t last_contention_start_ticks() { return last_contention_start_ticks_; }
+  static zx_instant_mono_ticks_t last_contention_start_ticks() {
+    return last_contention_start_ticks_;
+  }
   static CallsiteInfo last_callsite_info() { return last_callsite_info_; }
 
  private:
@@ -97,7 +99,7 @@ class ChainLockTransaction
     return ReservedToken(reserved_index);
   }
 
-  static void OnFinalized(zx_time_t contention_start_ticks, CallsiteInfo callsite_info) {
+  static void OnFinalized(zx_instant_mono_t contention_start_ticks, CallsiteInfo callsite_info) {
     last_contention_start_ticks_ = contention_start_ticks;
     last_callsite_info_ = callsite_info;
   }
@@ -126,7 +128,7 @@ class ChainLockTransaction
     void Relax(ChainLockTransaction&) { std::this_thread::yield(); }
   };
 
-  inline static thread_local zx_time_t last_contention_start_ticks_{0};
+  inline static thread_local zx_instant_mono_t last_contention_start_ticks_{0};
   inline static thread_local CallsiteInfo last_callsite_info_;
 
   inline static std::atomic<size_t> reserved_token_allocator_{0};

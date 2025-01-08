@@ -47,7 +47,7 @@ class ChannelDispatcher final
 
   // Perform a transacted Write + Read. |owner| is the handle table koid of the process attempting
   // to write to the channel, or ZX_KOID_INVALID if kernel is doing it.
-  zx_status_t Call(zx_koid_t owner, MessagePacketPtr msg, zx_time_t deadline,
+  zx_status_t Call(zx_koid_t owner, MessagePacketPtr msg, zx_instant_mono_t deadline,
                    MessagePacketPtr* reply);
 
   // Performs the wait-then-read half of Call.  This is meant for retrying

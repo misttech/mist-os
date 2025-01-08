@@ -73,7 +73,7 @@ constexpr SchedWeight kReciprocalMinWeight = 1 / kMinWeight;
 
 // Utility operator to make expressions more succinct that update thread times
 // and durations of basic types using the fixed-point counterparts.
-constexpr zx_time_t& operator+=(zx_time_t& value, SchedDuration delta) {
+constexpr zx_instant_mono_t& operator+=(zx_instant_mono_t& value, SchedDuration delta) {
   value += delta.raw_value();
   return value;
 }
@@ -155,7 +155,7 @@ constexpr T PeakDecayDelta(T value, T sample, Alpha alpha, Beta beta) {
 // |now| is the time that was latched when the CPU entered the scheduler.
 //
 // Must be called with interrupts disabled.
-void PreemptReset(cpu_num_t current_cpu, zx_time_t now, zx_time_t deadline) {
+void PreemptReset(cpu_num_t current_cpu, zx_instant_mono_t now, zx_instant_mono_t deadline) {
   // Setting a preemption time that's prior to the point at which the CPU
   // entered the scheduler indicates at worst a bug, or at best a wasted
   // reschedule.
@@ -212,7 +212,7 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
   // arg1[30..30] : 1 == idle thread, 0 == normal thread
   //
   if constexpr (SCHEDULER_QUEUE_TRACING_ENABLED) {
-    const zx_time_t now = current_time();  // TODO(johngro): plumb this in from above
+    const zx_instant_mono_t now = current_time();  // TODO(johngro): plumb this in from above
     const bool fair = IsFairThread(thread);
     const bool eligible = fair || (thread->scheduler_state().start_time_ <= now);
     const size_t cnt = fair_run_queue_.size() + deadline_run_queue_.size() +
@@ -3006,7 +3006,7 @@ bool Scheduler::PowerLevelControl::RequestPowerLevel(uint8_t power_level) {
   return !had_pending_request && pending_update_request_.has_value();
 }
 
-void Scheduler::PowerLevelControl::TimerHandler(Timer* timer, zx_time_t now, void* arg) {
+void Scheduler::PowerLevelControl::TimerHandler(Timer* timer, zx_instant_mono_t now, void* arg) {
   // Only queue the DPC if the timer handler is running on the expected CPU. If the timer handler
   // is running on a different CPU, the CPU it services went offline while the timer was pending
   // and its power level requests are no longer relevant.

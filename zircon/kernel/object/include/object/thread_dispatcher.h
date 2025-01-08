@@ -235,10 +235,10 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
   void UpdateRuntimeStats(thread_state new_state);
 
   // Update time spent handling page faults. This is called by the VM during page fault handling.
-  void AddPageFaultTicks(zx_ticks_t ticks);
+  void AddPageFaultTicks(zx_duration_mono_ticks_t ticks);
 
   // Update time spent contended on locks. This is called by lock implementations.
-  void AddLockContentionTicks(zx_ticks_t ticks);
+  void AddLockContentionTicks(zx_duration_mono_ticks_t ticks);
 
   class CoreThreadObservation {
    public:

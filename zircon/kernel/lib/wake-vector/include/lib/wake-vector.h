@@ -200,7 +200,7 @@ class WakeEvent {
   class PendingState {
    public:
     constexpr PendingState() = default;
-    constexpr PendingState(bool pending, zx_ticks_t last_triggered_boot_ticks)
+    constexpr PendingState(bool pending, zx_instant_boot_ticks_t last_triggered_boot_ticks)
         : value_{PendingField(pending) | TicksField(last_triggered_boot_ticks)} {}
 
     PendingState(const PendingState&) = default;
@@ -208,8 +208,8 @@ class WakeEvent {
 
     constexpr bool pending() const { return value_ & kPendingBit; }
 
-    constexpr zx_ticks_t last_triggered_boot_ticks() const {
-      return static_cast<zx_ticks_t>(value_ & kTicksMask);
+    constexpr zx_instant_boot_ticks_t last_triggered_boot_ticks() const {
+      return static_cast<zx_instant_boot_ticks_t>(value_ & kTicksMask);
     }
 
     zx_instant_boot_t last_triggered_boot_time() const;

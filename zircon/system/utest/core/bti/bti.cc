@@ -395,10 +395,10 @@ TEST(Bti, DecommitRace) {
   // 100 iterations are run.
   const int max_iterations = 20000;
   const int min_iterations = 100;
-  const zx_ticks_t max_elapsed_ticks = 10 * zx::ticks::per_second().get();
+  const zx_duration_mono_ticks_t max_elapsed_ticks = 10 * zx::ticks::per_second().get();
   const zx::ticks start = zx::ticks::now();
 
-  zx_ticks_t elapsed_ticks = 0;
+  zx_duration_mono_ticks_t elapsed_ticks = 0;
   int iterations = 0;
   while (elapsed_ticks < max_elapsed_ticks && iterations < max_iterations) {
     zx::pmt pmt;

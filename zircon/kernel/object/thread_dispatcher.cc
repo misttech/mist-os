@@ -628,12 +628,12 @@ void ThreadDispatcher::UpdateRuntimeStats(thread_state new_state) {
   runtime_stats_.Update(new_state, ThreadRuntimeStats::NoIrqSave);
 }
 
-void ThreadDispatcher::AddPageFaultTicks(zx_ticks_t ticks) {
+void ThreadDispatcher::AddPageFaultTicks(zx_duration_mono_ticks_t ticks) {
   canary_.Assert();
   runtime_stats_.AddPageFaultTicks(ticks);
 }
 
-void ThreadDispatcher::AddLockContentionTicks(zx_ticks_t ticks) {
+void ThreadDispatcher::AddLockContentionTicks(zx_duration_mono_ticks_t ticks) {
   canary_.Assert();
   runtime_stats_.AddLockContentionTicks(ticks);
 }

@@ -34,7 +34,7 @@
 
 #include <ktl/enforce.h>
 
-static void timer_diag_cb(Timer* timer, zx_time_t now, void* arg) {
+static void timer_diag_cb(Timer* timer, zx_instant_mono_t now, void* arg) {
   Event* event = (Event*)arg;
   event->Signal();
 }
@@ -75,14 +75,14 @@ static void timer_diag_all_cpus(void) {
   }
 }
 
-static void timer_diag_cb2(Timer* timer, zx_time_t now, void* arg) {
+static void timer_diag_cb2(Timer* timer, zx_instant_mono_t now, void* arg) {
   auto timer_count = static_cast<ktl::atomic<size_t>*>(arg);
   timer_count->fetch_add(1);
   Thread::Current::preemption_state().PreemptSetPending();
 }
 
-static void timer_diag_coalescing(TimerSlack slack, const zx_time_t* deadline,
-                                  const zx_duration_t* expected_adj, size_t count) {
+static void timer_diag_coalescing(TimerSlack slack, const zx_instant_mono_t* deadline,
+                                  const zx_duration_mono_t* expected_adj, size_t count) {
   printf("testing coalsecing mode %u\n", slack.mode());
 
   ktl::atomic<size_t> timer_count(0);
@@ -118,11 +118,11 @@ static void timer_diag_coalescing(TimerSlack slack, const zx_time_t* deadline,
 }
 
 static void timer_diag_coalescing_center(void) {
-  zx_time_t when = current_time() + ZX_MSEC(1);
-  zx_duration_t off = ZX_USEC(10);
+  zx_instant_mono_t when = current_time() + ZX_MSEC(1);
+  zx_duration_mono_t off = ZX_USEC(10);
   TimerSlack slack = {2u * off, TIMER_SLACK_CENTER};
 
-  const zx_time_t deadline[] = {
+  const zx_instant_mono_t deadline[] = {
       when + (6u * off),  // non-coalesced, adjustment = 0
       when,               // non-coalesced, adjustment = 0
       when - off,         // coalesced with [1], adjustment = 10u
@@ -133,18 +133,18 @@ static void timer_diag_coalescing_center(void) {
       when - (3u * off),  // non-coalesced, same as [3], adjustment = 0
   };
 
-  const zx_duration_t expected_adj[ktl::size(deadline)] = {
+  const zx_duration_mono_t expected_adj[ktl::size(deadline)] = {
       0, 0, ZX_USEC(10), 0, -ZX_USEC(10), 0, ZX_USEC(10), 0};
 
   timer_diag_coalescing(slack, deadline, expected_adj, ktl::size(deadline));
 }
 
 static void timer_diag_coalescing_late(void) {
-  zx_time_t when = current_time() + ZX_MSEC(1);
-  zx_duration_t off = ZX_USEC(10);
+  zx_instant_mono_t when = current_time() + ZX_MSEC(1);
+  zx_duration_mono_t off = ZX_USEC(10);
   TimerSlack slack = {3u * off, TIMER_SLACK_LATE};
 
-  const zx_time_t deadline[] = {
+  const zx_instant_mono_t deadline[] = {
       when + off,         // non-coalesced, adjustment = 0
       when + (2u * off),  // non-coalesced, adjustment = 0
       when - off,         // coalesced with [0], adjustment = 20u
@@ -154,17 +154,18 @@ static void timer_diag_coalescing_late(void) {
       when - (4u * off),  // coalesced with [3], adjustment = 10u
   };
 
-  const zx_duration_t expected_adj[ktl::size(deadline)] = {0, 0, ZX_USEC(20), 0, 0, 0, ZX_USEC(10)};
+  const zx_duration_mono_t expected_adj[ktl::size(deadline)] = {0, 0, ZX_USEC(20), 0,
+                                                                0, 0, ZX_USEC(10)};
 
   timer_diag_coalescing(slack, deadline, expected_adj, ktl::size(deadline));
 }
 
 static void timer_diag_coalescing_early(void) {
-  zx_time_t when = current_time() + ZX_MSEC(1);
-  zx_duration_t off = ZX_USEC(10);
+  zx_instant_mono_t when = current_time() + ZX_MSEC(1);
+  zx_duration_mono_t off = ZX_USEC(10);
   TimerSlack slack = {3u * off, TIMER_SLACK_EARLY};
 
-  const zx_time_t deadline[] = {
+  const zx_instant_mono_t deadline[] = {
       when,               // non-coalesced, adjustment = 0
       when + (2u * off),  // coalesced with [0], adjustment = -20u
       when - off,         // non-coalesced, adjustment = 0
@@ -174,8 +175,8 @@ static void timer_diag_coalescing_early(void) {
       when - (2u * off),  // coalesced with [3], adjustment = -10u
   };
 
-  const zx_duration_t expected_adj[ktl::size(deadline)] = {0, -ZX_USEC(20), 0,           0,
-                                                           0, -ZX_USEC(10), -ZX_USEC(10)};
+  const zx_duration_mono_t expected_adj[ktl::size(deadline)] = {0, -ZX_USEC(20), 0,           0,
+                                                                0, -ZX_USEC(10), -ZX_USEC(10)};
 
   timer_diag_coalescing(slack, deadline, expected_adj, ktl::size(deadline));
 }
@@ -210,13 +211,13 @@ struct timer_stress_args {
   ktl::atomic<uint64_t> num_fired;
 };
 
-static void timer_stress_cb(Timer* t, zx_time_t now, void* void_arg) {
+static void timer_stress_cb(Timer* t, zx_instant_mono_t now, void* void_arg) {
   timer_stress_args* args = reinterpret_cast<timer_stress_args*>(void_arg);
   args->num_fired++;
 }
 
 // Returns a random duration between 0 and max (inclusive).
-static zx_duration_t rand_duration(zx_duration_t max) {
+static zx_duration_mono_t rand_duration(zx_duration_mono_t max) {
   return (zx_duration_mul_int64(max, rand())) / RAND_MAX;
 }
 
@@ -224,7 +225,7 @@ static int timer_stress_worker(void* void_arg) {
   timer_stress_args* args = reinterpret_cast<timer_stress_args*>(void_arg);
   while (!args->timer_stress_done.load()) {
     Timer t;
-    zx_duration_t timer_duration = rand_duration(ZX_MSEC(5));
+    zx_duration_mono_t timer_duration = rand_duration(ZX_MSEC(5));
 
     // Set a timer, then switch to a different CPU to ensure we race with it.
     {
@@ -305,7 +306,7 @@ struct timer_args {
   DECLARE_SPINLOCK_WITH_TYPE(timer_args, MonitoredSpinLock) lock;
 };
 
-static void timer_cb(Timer*, zx_time_t now, void* void_arg) {
+static void timer_cb(Timer*, zx_instant_mono_t now, void* void_arg) {
   timer_args* arg = reinterpret_cast<timer_args*>(void_arg);
   arg->timer_fired.store(1);
 }
@@ -335,7 +336,7 @@ static bool cancel_after_fired() {
   END_TEST;
 }
 
-static void timer_cancel_cb(Timer* t, zx_time_t now, void* void_arg) {
+static void timer_cancel_cb(Timer* t, zx_instant_mono_t now, void* void_arg) {
   timer_args* arg = reinterpret_cast<timer_args*>(void_arg);
   arg->result.store(t->Cancel());
   arg->timer_fired.store(1);
@@ -356,7 +357,7 @@ static bool cancel_from_callback() {
   END_TEST;
 }
 
-static void timer_set_cb(Timer* t, zx_time_t now, void* void_arg) {
+static void timer_set_cb(Timer* t, zx_instant_mono_t now, void* void_arg) {
   timer_args* arg = reinterpret_cast<timer_args*>(void_arg);
   if (arg->remaining.fetch_sub(1) >= 1) {
     const Deadline deadline = Deadline::after(ZX_USEC(10));
@@ -381,7 +382,7 @@ static bool set_from_callback() {
   END_TEST;
 }
 
-static void timer_trylock_cb(Timer* t, zx_time_t now, void* void_arg) {
+static void timer_trylock_cb(Timer* t, zx_instant_mono_t now, void* void_arg) {
   timer_args* arg = reinterpret_cast<timer_args*>(void_arg);
   arg->timer_fired.store(1);
   while (arg->wait.load()) {
@@ -517,7 +518,7 @@ static bool print_timer_queues() {
   memset(buffer.get(), 'X', kBufferSize);
 
   for (size_t i = 0; i < kNumTimers; ++i) {
-    timers[i].Set(Deadline::infinite(), [](Timer*, zx_time_t, void*) {}, nullptr);
+    timers[i].Set(Deadline::infinite(), [](Timer*, zx_instant_mono_t, void*) {}, nullptr);
   }
   auto cleanup = fit::defer([&]() {
     for (size_t i = 0; i < kNumTimers; ++i) {
@@ -565,11 +566,11 @@ static bool deadline_after() {
   // our call to Deadline::after, we _can_ bound the range it might exist in.
   // Test for this as well.
   for (const auto& slack : kSlackModes) {
-    constexpr zx_duration_t kTimeout = ZX_MSEC(10);
-    zx_time_t before = zx_time_add_duration(current_time(), kTimeout);
+    constexpr zx_duration_mono_t kTimeout = ZX_MSEC(10);
+    zx_instant_mono_t before = zx_time_add_duration(current_time(), kTimeout);
     Deadline deadline =
         slack.has_value() ? Deadline::after(kTimeout, slack.value()) : Deadline::after(kTimeout);
-    zx_time_t after = zx_time_add_duration(current_time(), kTimeout);
+    zx_instant_mono_t after = zx_time_add_duration(current_time(), kTimeout);
     ASSERT_LE(before, deadline.when());
     ASSERT_GE(after, deadline.when());
 

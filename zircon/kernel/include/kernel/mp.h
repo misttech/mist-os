@@ -52,7 +52,7 @@ void mp_unplug_current_cpu();
 
 // Unplug the cpu specified by |mask|, waiting, up to |deadline| for its "shutdown" thread to
 // complete.
-zx_status_t mp_unplug_cpu_mask(cpu_mask_t mask, zx_time_t deadline);
+zx_status_t mp_unplug_cpu_mask(cpu_mask_t mask, zx_instant_mono_t deadline);
 
 static inline zx_status_t mp_hotplug_cpu(cpu_num_t cpu) {
   return mp_hotplug_cpu_mask(cpu_num_to_mask(cpu));

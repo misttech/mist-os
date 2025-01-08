@@ -40,7 +40,7 @@
 // Usage:
 //
 //     trace_vthread_id_t vthread_id = 444;
-//     zx_ticks_t curr_ticks = zx_ticks_get();
+//     zx_instant_mono_ticks_t curr_ticks = zx_ticks_get();
 //     TRACE_VTHREAD_DURATION_BEGIN("category", "name", "vthread", vthread_id,
 //                                  curr_ticks, "x", TA_INT32(42));
 //
@@ -71,7 +71,7 @@
 // Usage:
 //
 //     trace_vthread_id_t vthread_id = 444;
-//     zx_ticks_t curr_ticks = zx_ticks_get();
+//     zx_instant_mono_ticks_t curr_ticks = zx_ticks_get();
 //     TRACE_VTHREAD_DURATION_END("category", "name", "vthread", vthread_id,
 //                                curr_ticks, "x", TA_INT32(42));
 //
@@ -113,7 +113,7 @@
 //
 //     trace_vthread_id_t vthread_id = 444;
 //     trace_flow_id_t flow_id = 555;
-//     zx_ticks_t curr_ticks = zx_ticks_get();
+//     zx_instant_mono_ticks_t curr_ticks = zx_ticks_get();
 //     TRACE_VTHREAD_FLOW_BEGIN("category", "name", "vthread", vthread_id,
 //                              flow_id, curr_ticks, "x", TA_INT32(42));
 //
@@ -153,7 +153,7 @@
 //
 //     trace_vthread_id_t vthread_id = 444;
 //     trace_flow_id_t flow_id = 555;
-//     zx_ticks_t curr_ticks = zx_ticks_get();
+//     zx_instant_mono_ticks_t curr_ticks = zx_ticks_get();
 //     TRACE_VTHREAD_FLOW_STEP("category", "name", "vthread", vthread_id,
 //                             flow_id, curr_ticks, "x", TA_INT32(42));
 //
@@ -193,7 +193,7 @@
 //
 //     trace_vthread_id_t vthread_id = 444;
 //     trace_flow_id_t flow_id = 555;
-//     zx_ticks_t curr_ticks = zx_ticks_get();
+//     zx_instant_mono_ticks_t curr_ticks = zx_ticks_get();
 //     TRACE_VTHREAD_FLOW_END("category", "name", "vthread", vthread_id,
 //                            flow_id, curr_ticks, "x", TA_INT32(42));
 //
@@ -228,7 +228,7 @@
 //
 //     trace_vthread_id_t vthread_id = 444;
 //     trace_counter_id_t counter_id = 555;
-//     zx_ticks_t curr_ticks = zx_ticks_get();
+//     zx_instant_mono_ticks_t curr_ticks = zx_ticks_get();
 //     TRACE_VTHREAD_COUNTER("category", "name", "vthread", vthread_id,
 //                           counter_id, curr_ticks, "x", TA_INT32(42));
 //

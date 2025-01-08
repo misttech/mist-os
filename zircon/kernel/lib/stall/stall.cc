@@ -10,7 +10,7 @@
 #include <kernel/percpu.h>
 #include <lk/init.h>
 
-static constexpr zx_duration_t kSampleInterval = ZX_MSEC(10);
+static constexpr zx_duration_mono_t kSampleInterval = ZX_MSEC(10);
 
 StallAggregator StallAggregator::singleton_;
 
@@ -47,8 +47,8 @@ StallAccumulator::Stats StallAccumulator::Flush() {
 }
 
 void StallAccumulator::Consolidate() {
-  zx_time_t now = current_time();
-  zx_duration_t time_delta = now - last_consolidate_time_;
+  zx_instant_mono_t now = current_time();
+  zx_duration_mono_t time_delta = now - last_consolidate_time_;
 
   if (num_contributors_stalling_ > 0) {
     accumulated_stats_.total_time_stall_some += time_delta;
@@ -167,7 +167,7 @@ void StallAggregator::IteratePerCpuStats(PerCpuStatsCallback callback) {
 void StallAggregator::StartSamplingThread(uint level) {
   auto worker_thread = [](void *) {
     StallAggregator *aggregator = GetStallAggregator();
-    zx_time_t deadline = current_time();
+    zx_instant_mono_t deadline = current_time();
 
     for (;;) {
       aggregator->SampleOnce();

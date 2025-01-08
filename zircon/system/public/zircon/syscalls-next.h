@@ -106,7 +106,7 @@ typedef struct zx_restricted_exception {
 
 // Configuration struct for periodically sampling a thread
 typedef struct zx_sampler_config {
-  zx_duration_t period;
+  zx_duration_mono_t period;
   size_t buffer_size;
   uint64_t iobuffer_discipline;
 } zx_sampler_config_t;
@@ -152,7 +152,7 @@ typedef struct {
 // Represents a transition between processor power levels.
 typedef struct {
   // The expected latency of the transition.
-  zx_duration_t latency;
+  zx_duration_mono_t latency;
 
   // The expected energy expended by the transition in nanojoules.
   uint64_t energy_nj;

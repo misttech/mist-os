@@ -5,7 +5,7 @@
 #include "time_conversion.h"
 
 int mtx_timedlock(mtx_t* restrict m, const struct timespec* restrict ts) {
-  zx_time_t deadline = ZX_TIME_INFINITE;
+  zx_instant_mono_t deadline = ZX_TIME_INFINITE;
   while (true) {
     int ret = __timespec_to_deadline(ts, CLOCK_REALTIME, &deadline);
     if (ret)

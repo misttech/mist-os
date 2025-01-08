@@ -60,7 +60,7 @@ class StallAccumulator {
   size_t num_contributors_stalling_ TA_GUARDED(lock_) = 0;
 
   // Timestamp of the last Consolidate() call.
-  zx_ticks_t last_consolidate_time_ TA_GUARDED(lock_) = 0;
+  zx_instant_mono_ticks_t last_consolidate_time_ TA_GUARDED(lock_) = 0;
 
   // Accumulated totals at the time of the last update.
   Stats accumulated_stats_ TA_GUARDED(lock_);

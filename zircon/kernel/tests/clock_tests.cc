@@ -21,7 +21,7 @@
 
 int clock_tests(int, const cmd_args*, uint32_t) {
   uint64_t c;
-  zx_time_t t2;
+  zx_instant_mono_t t2;
 
   Thread::Current::SleepRelative(ZX_MSEC(100));
   c = arch::Cycles();
@@ -32,8 +32,8 @@ int clock_tests(int, const cmd_args*, uint32_t) {
   printf("making sure time never goes backwards\n");
   {
     printf("testing current_time()\n");
-    zx_time_t start = current_time();
-    zx_time_t last = start;
+    zx_instant_mono_t start = current_time();
+    zx_instant_mono_t last = start;
     for (;;) {
       t2 = current_time();
       // printf("%llu %llu\n", last, t2);
@@ -66,7 +66,7 @@ int clock_tests(int, const cmd_args*, uint32_t) {
 
     for (int i = 0; i < 3; i++) {
       uint64_t cycles = arch::Cycles();
-      zx_time_t start = current_time();
+      zx_instant_mono_t start = current_time();
       while ((current_time() - start) < ZX_SEC(1))
         ;
       cycles = arch::Cycles() - cycles;

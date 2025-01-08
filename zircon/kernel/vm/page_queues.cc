@@ -194,8 +194,8 @@ PageQueues::~PageQueues() {
   }
 }
 
-void PageQueues::StartThreads(zx_duration_t min_mru_rotate_time,
-                              zx_duration_t max_mru_rotate_time) {
+void PageQueues::StartThreads(zx_duration_mono_t min_mru_rotate_time,
+                              zx_duration_mono_t max_mru_rotate_time) {
   // Clamp the max rotate to the minimum.
   max_mru_rotate_time = ktl::max(min_mru_rotate_time, max_mru_rotate_time);
   // Prevent a rotation rate that is too small.
@@ -317,7 +317,7 @@ bool PageQueues::IsActiveRatioTriggeringAging() const {
   return active_count.active * active_ratio_multiplier_ > active_count.inactive;
 }
 
-ktl::variant<PageQueues::AgeReason, zx_time_t> PageQueues::ConsumeAgeReason() {
+ktl::variant<PageQueues::AgeReason, zx_instant_mono_t> PageQueues::ConsumeAgeReason() {
   AutoPreemptDisabler apd;
   Guard<SpinLock, IrqSave> guard{&lock_};
   auto reason = GetAgeReasonLocked();
@@ -359,12 +359,12 @@ void PageQueues::SynchronizeWithAging() {
   }
 }
 
-ktl::variant<PageQueues::AgeReason, zx_time_t> PageQueues::GetAgeReasonLocked() const {
-  const zx_time_t current = current_time();
+ktl::variant<PageQueues::AgeReason, zx_instant_mono_t> PageQueues::GetAgeReasonLocked() const {
+  const zx_instant_mono_t current = current_time();
   // Check if there is an active ratio that wants us to age.
   if (active_ratio_triggered_) {
     // Need to have passed the min time though.
-    const zx_time_t min_timeout =
+    const zx_instant_mono_t min_timeout =
         zx_time_add_duration(last_age_time_.load(ktl::memory_order_relaxed), min_mru_rotate_time_);
     if (current < min_timeout) {
       return min_timeout;
@@ -374,7 +374,7 @@ ktl::variant<PageQueues::AgeReason, zx_time_t> PageQueues::GetAgeReasonLocked() 
   }
 
   // Exceeding the maximum time forces aging.
-  const zx_time_t max_timeout =
+  const zx_instant_mono_t max_timeout =
       zx_time_add_duration(last_age_time_.load(ktl::memory_order_relaxed), max_mru_rotate_time_);
   if (max_timeout <= current) {
     return AgeReason::Timeout;
@@ -475,7 +475,7 @@ void PageQueues::Dump() {
   size_t inactive_count;
   size_t failed_reclaim;
   size_t dirty;
-  zx_time_t last_age_time;
+  zx_instant_mono_t last_age_time;
   AgeReason last_age_reason;
   ActiveInactiveCounts activeinactive;
   {
@@ -523,7 +523,7 @@ void PageQueues::Dump() {
     }
     buf_len += write_len;
   }
-  zx_time_t current = current_time();
+  zx_instant_mono_t current = current_time();
   timespec age_time = zx_timespec_from_duration(zx_time_sub_time(current, last_age_time));
   printf("pq: MRU generation is %" PRIu64
          " set %ld.%lds ago due to \"%s\", LRU generation is %" PRIu64 "\n",
@@ -565,7 +565,8 @@ void PageQueues::MruThread() {
     }
     // Check if there is an age reason waiting for us, consuming if there is, or if we need to wait.
     auto reason_or_timeout = ConsumeAgeReason();
-    if (const zx_time_t* age_deadline = ktl::get_if<zx_time_t>(&reason_or_timeout)) {
+    if (const zx_instant_mono_t* age_deadline =
+            ktl::get_if<zx_instant_mono_t>(&reason_or_timeout)) {
       // Wait for this time, ensuring we wake up if the active ratio should change.
       zx_status_t result = aging_active_ratio_event_.WaitDeadline(*age_deadline, Interruptible::No);
       // Check if shutdown has been requested, we need this extra check even though it is part of

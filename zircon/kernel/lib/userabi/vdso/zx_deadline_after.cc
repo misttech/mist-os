@@ -24,18 +24,20 @@
 //
 // See comments in zx_clock_monotonic.cc for additional details.
 //
-__EXPORT zx_time_t _zx_deadline_after(zx_duration_t nanoseconds) {
-  zx_time_t now = VDSO_zx_clock_get_monotonic();
+__EXPORT zx_instant_mono_t _zx_deadline_after(zx_duration_mono_t nanoseconds) {
+  zx_instant_mono_t now = VDSO_zx_clock_get_monotonic();
   return zx_time_add_duration(now, nanoseconds);
 }
 
-VDSO_KERNEL_EXPORT zx_time_t CODE_deadline_after_via_kernel_mono(zx_duration_t nanoseconds) {
-  zx_time_t now = SYSCALL_zx_clock_get_monotonic_via_kernel();
+VDSO_KERNEL_EXPORT zx_instant_mono_t
+CODE_deadline_after_via_kernel_mono(zx_duration_mono_t nanoseconds) {
+  zx_instant_mono_t now = SYSCALL_zx_clock_get_monotonic_via_kernel();
   return zx_time_add_duration(now, nanoseconds);
 }
 
-VDSO_KERNEL_EXPORT zx_time_t CODE_deadline_after_via_kernel_ticks(zx_duration_t nanoseconds) {
-  zx_time_t now = CODE_clock_get_monotonic_via_kernel_ticks();
+VDSO_KERNEL_EXPORT zx_instant_mono_t
+CODE_deadline_after_via_kernel_ticks(zx_duration_mono_t nanoseconds) {
+  zx_instant_mono_t now = CODE_clock_get_monotonic_via_kernel_ticks();
   return zx_time_add_duration(now, nanoseconds);
 }
 

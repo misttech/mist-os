@@ -39,7 +39,7 @@ enum class Action : uint8_t {
 };
 
 Time ConsumeTime(FuzzedDataProvider& provider) {
-  return Time{provider.ConsumeIntegral<zx_time_t>()};
+  return Time{provider.ConsumeIntegral<zx_instant_mono_t>()};
 }
 
 FlexibleWeight ConsumeFlexibleWeight(FuzzedDataProvider& provider, FlexibleWeight min) {
@@ -50,7 +50,8 @@ FlexibleWeight ConsumeFlexibleWeight(FuzzedDataProvider& provider, FlexibleWeigh
 Duration ConsumeDuration(FuzzedDataProvider& provider, Duration min, Duration max) {
   ZX_ASSERT(min >= 0);
   ZX_ASSERT(max >= min);
-  return Duration{provider.ConsumeIntegralInRange<zx_duration_t>(min.raw_value(), max.raw_value())};
+  return Duration{
+      provider.ConsumeIntegralInRange<zx_duration_mono_t>(min.raw_value(), max.raw_value())};
 }
 
 TestThread* AllocateNewThread(FuzzedDataProvider& provider,

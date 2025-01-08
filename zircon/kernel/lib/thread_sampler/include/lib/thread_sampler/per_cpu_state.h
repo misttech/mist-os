@@ -82,7 +82,7 @@ class PerCpuState {
  private:
   BufferWriter writer;
   Timer timer;
-  zx_duration_t period_{0};
+  zx_duration_mono_t period_{0};
 
   // Bit-wise AND with |write_state_| to read if there is a current write
   static constexpr uint64_t kPendingWrite = 1ul << 0;

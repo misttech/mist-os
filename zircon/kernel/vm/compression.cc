@@ -18,16 +18,16 @@
 
 namespace {
 
-// We always add zx_ticks_t to any data that we store, so ensure that the maximum size of the
-// compressed data combined with that would not require us to store more than a page.
+// We always add zx_instant_mono_ticks_t to any data that we store, so ensure that the maximum size
+// of the compressed data combined with that would not require us to store more than a page.
 constexpr size_t ensure_threshold(size_t threshold) {
-  if (threshold + sizeof(zx_ticks_t) > PAGE_SIZE) {
-    return PAGE_SIZE - sizeof(zx_ticks_t);
+  if (threshold + sizeof(zx_instant_mono_ticks_t) > PAGE_SIZE) {
+    return PAGE_SIZE - sizeof(zx_instant_mono_ticks_t);
   }
   return threshold;
 }
 
-constexpr size_t bucket_for_ticks(zx_ticks_t start, zx_ticks_t end) {
+constexpr size_t bucket_for_ticks(zx_instant_mono_ticks_t start, zx_instant_mono_ticks_t end) {
   // Turn the ticks range into seconds. As we want whole seconds we are happy to tolerate the
   // rounding behavior of integer division here.
   const uint64_t seconds = end > start ? (end - start) / ticks_per_second() : 0;
@@ -57,7 +57,7 @@ VmCompression::VmCompression(fbl::RefPtr<VmCompressedStorage> storage,
   ASSERT(storage_);
   ASSERT(strategy_);
   // Ensure we can steal space to store the compression timestamp.
-  ASSERT(compression_threshold_ + sizeof(zx_ticks_t) <= PAGE_SIZE);
+  ASSERT(compression_threshold_ + sizeof(zx_instant_mono_ticks_t) <= PAGE_SIZE);
 }
 
 VmCompression::~VmCompression() {
@@ -66,7 +66,8 @@ VmCompression::~VmCompression() {
   }
 }
 
-VmCompression::CompressResult VmCompression::Compress(const void* page_src, zx_ticks_t now) {
+VmCompression::CompressResult VmCompression::Compress(const void* page_src,
+                                                      zx_instant_mono_ticks_t now) {
   // Take the compression lock so we can use the buffer_page_.
   Guard<Mutex> guard{&compression_lock_};
 
@@ -82,10 +83,10 @@ VmCompression::CompressResult VmCompression::Compress(const void* page_src, zx_t
   compression_attempts_.fetch_add(1);
 
   // Compress into the buffer page, measuring the time taken to do so.
-  const zx_duration_t start_runtime = Thread::Current::Get()->Runtime();
+  const zx_duration_mono_t start_runtime = Thread::Current::Get()->Runtime();
   void* buffer_ptr = paddr_to_physmap(buffer_page_->paddr());
   auto result = strategy_->Compress(page_src, buffer_ptr, compression_threshold_);
-  const zx_duration_t end_runtime = Thread::Current::Get()->Runtime();
+  const zx_duration_mono_t end_runtime = Thread::Current::Get()->Runtime();
   if (likely(end_runtime > start_runtime)) {
     compression_time_.fetch_add(end_runtime - start_runtime);
   }
@@ -108,9 +109,10 @@ VmCompression::CompressResult VmCompression::Compress(const void* page_src, zx_t
 
   // Store the current ticks for tracking how long pages remain compressed. We had previously
   // validated in the constructor that we would always have space on the page.
-  const size_t storage_size = compressed_size + sizeof(zx_ticks_t);
+  const size_t storage_size = compressed_size + sizeof(zx_instant_mono_ticks_t);
   DEBUG_ASSERT(storage_size <= PAGE_SIZE);
-  *reinterpret_cast<zx_ticks_t*>(reinterpret_cast<uintptr_t>(buffer_ptr) + compressed_size) = now;
+  *reinterpret_cast<zx_instant_mono_ticks_t*>(reinterpret_cast<uintptr_t>(buffer_ptr) +
+                                              compressed_size) = now;
 
   // Store the data, it takes ownership of the buffer_page_ and might return ownership of a page.
   // Metadata associated with the page will be stored later, when the caller reaccquires the VMO
@@ -129,7 +131,7 @@ VmCompression::CompressResult VmCompression::Compress(const void* page_src, zx_t
 }
 
 void VmCompression::Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest,
-                               zx_ticks_t now) {
+                               zx_instant_mono_ticks_t now) {
   ScopedMemoryStall memory_stall;
 
   if (unlikely(IsTempReference(ref))) {
@@ -144,16 +146,16 @@ void VmCompression::Decompress(CompressedRef ref, void* page_dest, uint32_t* met
   *metadata_dest = metadata;
 
   // pull out the timestamp and determine how long this was compressed for.
-  DEBUG_ASSERT(len >= sizeof(zx_ticks_t));
-  const zx_ticks_t compressed_ticks =
-      *reinterpret_cast<zx_ticks_t*>(reinterpret_cast<uintptr_t>(src) + len - sizeof(zx_ticks_t));
+  DEBUG_ASSERT(len >= sizeof(zx_instant_mono_ticks_t));
+  const zx_instant_mono_ticks_t compressed_ticks = *reinterpret_cast<zx_instant_mono_ticks_t*>(
+      reinterpret_cast<uintptr_t>(src) + len - sizeof(zx_instant_mono_ticks_t));
   const size_t bucket = bucket_for_ticks(compressed_ticks, now);
   decompressions_within_log_seconds_[bucket].fetch_add(1);
 
   // Decompress the data, excluding our timestamp, and measure how long decompression takes.
-  const zx_duration_t start_runtime = Thread::Current::Get()->Runtime();
-  strategy_->Decompress(src, len - sizeof(zx_ticks_t), page_dest);
-  const zx_duration_t end_runtime = Thread::Current::Get()->Runtime();
+  const zx_duration_mono_t start_runtime = Thread::Current::Get()->Runtime();
+  strategy_->Decompress(src, len - sizeof(zx_instant_mono_ticks_t), page_dest);
+  const zx_duration_mono_t end_runtime = Thread::Current::Get()->Runtime();
   if (end_runtime > start_runtime) {
     decompression_time_.fetch_add(end_runtime - start_runtime);
   }

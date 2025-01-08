@@ -170,7 +170,7 @@ inline bool check_fasttime_version(const TimeValues& tvalues) {
 }
 
 template <FasttimeVerificationMode kVerificationMode = FasttimeVerificationMode::kNormal>
-inline zx_ticks_t compute_monotonic_ticks(const TimeValues& tvalues) {
+inline zx_instant_mono_ticks_t compute_monotonic_ticks(const TimeValues& tvalues) {
   if constexpr (kVerificationMode == FasttimeVerificationMode::kNormal) {
     if (!tvalues.usermode_can_access_ticks || tvalues.version != kFasttimeVersion) {
       return ZX_TIME_INFINITE_PAST;
@@ -185,8 +185,8 @@ inline zx_ticks_t compute_monotonic_ticks(const TimeValues& tvalues) {
 }
 
 template <FasttimeVerificationMode kVerificationMode = FasttimeVerificationMode::kNormal>
-inline zx_time_t compute_monotonic_time(const TimeValues& tvalues) {
-  const zx_ticks_t ticks = compute_monotonic_ticks<kVerificationMode>(tvalues);
+inline zx_instant_mono_t compute_monotonic_time(const TimeValues& tvalues) {
+  const zx_instant_mono_ticks_t ticks = compute_monotonic_ticks<kVerificationMode>(tvalues);
   if constexpr (kVerificationMode == FasttimeVerificationMode::kNormal) {
     if (ticks == ZX_TIME_INFINITE_PAST) {
       return ticks;
@@ -198,7 +198,7 @@ inline zx_time_t compute_monotonic_time(const TimeValues& tvalues) {
 }
 
 template <FasttimeVerificationMode kVerificationMode = FasttimeVerificationMode::kNormal>
-inline zx_ticks_t compute_boot_ticks(const TimeValues& tvalues) {
+inline zx_instant_boot_ticks_t compute_boot_ticks(const TimeValues& tvalues) {
   if constexpr (kVerificationMode == FasttimeVerificationMode::kNormal) {
     if (!tvalues.usermode_can_access_ticks || tvalues.version != kFasttimeVersion) {
       return ZX_TIME_INFINITE_PAST;
@@ -208,8 +208,8 @@ inline zx_ticks_t compute_boot_ticks(const TimeValues& tvalues) {
 }
 
 template <FasttimeVerificationMode kVerificationMode = FasttimeVerificationMode::kNormal>
-inline zx_time_t compute_boot_time(const TimeValues& tvalues) {
-  const zx_ticks_t ticks = compute_boot_ticks<kVerificationMode>(tvalues);
+inline zx_instant_boot_t compute_boot_time(const TimeValues& tvalues) {
+  const zx_instant_boot_ticks_t ticks = compute_boot_ticks<kVerificationMode>(tvalues);
   if constexpr (kVerificationMode == FasttimeVerificationMode::kNormal) {
     if (ticks == ZX_TIME_INFINITE_PAST) {
       return ticks;

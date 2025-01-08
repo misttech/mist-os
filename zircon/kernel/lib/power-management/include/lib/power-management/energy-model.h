@@ -201,7 +201,7 @@ class PowerLevelTransition {
         energy_cost_nj_(transition.energy_nj) {}
 
   // Latency for transitioning from a given level to another.
-  constexpr zx_duration_t latency() const { return latency_; }
+  constexpr zx_duration_mono_t latency() const { return latency_; }
 
   // Energy cost in nano joules(nj) for transition from a given level to another.
   constexpr uint64_t energy_cost_nj() const { return energy_cost_nj_; }
@@ -214,7 +214,7 @@ class PowerLevelTransition {
  private:
   // Time required for the transition to take effect. In some cases it may mean for the actual
   // voltage to stabilize.
-  zx_duration_t latency_ = ZX_TIME_INFINITE;
+  zx_duration_mono_t latency_ = ZX_TIME_INFINITE;
 
   // Amount of energy consumed to perform the transition.
   uint64_t energy_cost_nj_ = std::numeric_limits<uint64_t>::max();

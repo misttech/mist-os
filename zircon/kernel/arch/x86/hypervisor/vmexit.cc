@@ -617,7 +617,7 @@ void handle_rdmsr(const ExitInfo& exit_info, AutoVmcs& vmcs, GuestState& guest_s
   }
 }
 
-zx_time_t lvt_deadline(LocalApicState& local_apic_state) {
+zx_instant_mono_t lvt_deadline(LocalApicState& local_apic_state) {
   if ((local_apic_state.lvt_timer & LVT_TIMER_MODE_MASK) != LVT_TIMER_MODE_ONESHOT &&
       (local_apic_state.lvt_timer & LVT_TIMER_MODE_MASK) != LVT_TIMER_MODE_PERIODIC) {
     return 0;
@@ -631,9 +631,9 @@ zx_time_t lvt_deadline(LocalApicState& local_apic_state) {
   return zx_time_add_duration(current_time(), duration);
 }
 
-void update_timer(LocalApicState& local_apic_state, zx_time_t deadline);
+void update_timer(LocalApicState& local_apic_state, zx_instant_mono_t deadline);
 
-void deadline_callback(Timer* timer, zx_time_t now, void* arg) {
+void deadline_callback(Timer* timer, zx_instant_mono_t now, void* arg) {
   auto& local_apic_state = *static_cast<LocalApicState*>(arg);
   if (local_apic_state.lvt_timer & LVT_MASKED) {
     return;
@@ -645,7 +645,7 @@ void deadline_callback(Timer* timer, zx_time_t now, void* arg) {
   local_apic_state.interrupt_tracker.Interrupt(vector);
 }
 
-void update_timer(LocalApicState& local_apic_state, zx_time_t deadline) {
+void update_timer(LocalApicState& local_apic_state, zx_instant_mono_t deadline) {
   local_apic_state.timer.Cancel();
   if (deadline > 0) {
     local_apic_state.timer.SetOneshot(deadline, deadline_callback, &local_apic_state);
@@ -870,7 +870,7 @@ zx::result<> handle_wrmsr(const ExitInfo& exit_info, AutoVmcs& vmcs, const Guest
       }
       next_rip(exit_info, vmcs);
       int64_t tsc_deadline = static_cast<int64_t>(guest_state.EdxEax());
-      zx_time_t mono_deadline = convert_raw_tsc_timestamp_to_clock_monotonic(tsc_deadline);
+      zx_instant_mono_t mono_deadline = convert_raw_tsc_timestamp_to_clock_monotonic(tsc_deadline);
       update_timer(local_apic_state, mono_deadline);
       return zx::ok();
     }

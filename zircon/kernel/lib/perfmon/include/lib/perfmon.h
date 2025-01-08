@@ -108,7 +108,7 @@ static inline void arch_perfmon_write_header(perfmon::RecordHeader* hdr, perfmon
 
 static inline perfmon::RecordHeader* arch_perfmon_write_time_record(perfmon::RecordHeader* hdr,
                                                                     PmuEventId event,
-                                                                    zx_ticks_t time) {
+                                                                    zx_instant_mono_ticks_t time) {
   auto rec = reinterpret_cast<perfmon::TimeRecord*>(hdr);
   arch_perfmon_write_header(&rec->header, perfmon::kRecordTypeTime, event);
   rec->time = time;

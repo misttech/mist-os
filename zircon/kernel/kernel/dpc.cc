@@ -54,7 +54,7 @@ void Dpc::Invoke() {
 void DpcQueue::Enqueue(Dpc* dpc) { list_.push_back(dpc); }
 void DpcQueue::Signal() { event_.Signal(); }
 
-zx_status_t DpcQueue::Shutdown(zx_time_t deadline) {
+zx_status_t DpcQueue::Shutdown(zx_instant_mono_t deadline) {
   Thread* t;
   Event* event;
   {

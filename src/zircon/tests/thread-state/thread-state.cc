@@ -33,7 +33,7 @@ static char* program_path;
 // transition states. Wait this amount of time. Generally the thread won't
 // take very long so this is a compromise between polling too frequently and
 // waiting too long.
-constexpr zx_duration_t THREAD_BLOCKED_WAIT_DURATION = ZX_MSEC(1);
+constexpr zx_duration_mono_t THREAD_BLOCKED_WAIT_DURATION = ZX_MSEC(1);
 
 static const char test_child_name[] = "test-child";
 
@@ -53,7 +53,7 @@ const zx_port_packet_t port_test_packet = {
         },
 };
 
-const zx_time_t interrupt_signaled_timestamp = 12345;
+const zx_instant_boot_t interrupt_signaled_timestamp = 12345;
 
 enum MessageType : uint32_t {
   MSG_DONE,
@@ -309,7 +309,7 @@ static void do_msg_interrupt_test(zx_handle_t channel, const Message* msg) {
   }
 
   auto interrupt = msg->handles[0];
-  zx_time_t timestamp;
+  zx_instant_boot_t timestamp;
   auto status = zx_interrupt_wait(interrupt, &timestamp);
   zx_handle_close(interrupt);
   if (status != ZX_OK) {

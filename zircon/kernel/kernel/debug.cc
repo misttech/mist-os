@@ -160,7 +160,7 @@ namespace {
 
 RecurringCallback g_threadload_callback([]() {
   static struct cpu_stats old_stats[SMP_MAX_CPUS];
-  static zx_duration_t last_idle_time[SMP_MAX_CPUS]{0};
+  static zx_duration_mono_t last_idle_time[SMP_MAX_CPUS]{0};
 
   printf(
       "cpu    load"
@@ -175,7 +175,7 @@ RecurringCallback g_threadload_callback([]() {
 
     SingleChainLockGuard thread_guard{IrqSaveOption, idle_power_thread.get_lock(),
                                       CLT_TAG("g_threadload_callback")};
-    using optional_duration = ktl::optional<zx_duration_t>;
+    using optional_duration = ktl::optional<zx_duration_mono_t>;
     auto maybe_idle_time = Scheduler::RunInLockedScheduler(i, [&]() -> optional_duration {
       // dont display time for inactive cpus
       if (!Scheduler::PeekIsActive(i)) {
@@ -193,7 +193,7 @@ RecurringCallback g_threadload_callback([]() {
       if (Scheduler::PeekIsIdle(i)) {
         ChainLockTransaction::AssertActive();
         idle_power_thread.get_lock().AssertHeld();
-        zx_duration_t recent_idle_time = zx_time_sub_time(
+        zx_duration_mono_t recent_idle_time = zx_time_sub_time(
             current_time(), idle_power_thread.scheduler_state().last_started_running());
         return zx_duration_add_duration(stats.idle_time, recent_idle_time);
       } else {
@@ -205,11 +205,11 @@ RecurringCallback g_threadload_callback([]() {
       continue;
     }
 
-    const zx_duration_t idle_time = maybe_idle_time.value();
-    const zx_duration_t delta_time = zx_duration_sub_duration(idle_time, last_idle_time[i]);
-    const zx_duration_t busy_time =
+    const zx_duration_mono_t idle_time = maybe_idle_time.value();
+    const zx_duration_mono_t delta_time = zx_duration_sub_duration(idle_time, last_idle_time[i]);
+    const zx_duration_mono_t busy_time =
         (ZX_SEC(1) > delta_time) ? zx_duration_sub_duration(ZX_SEC(1), delta_time) : 0;
-    zx_duration_t busypercent = zx_duration_mul_int64(busy_time, 10000) / ZX_SEC(1);
+    zx_duration_mono_t busypercent = zx_duration_mul_int64(busy_time, 10000) / ZX_SEC(1);
 
     const uint64_t kNanosToMillis = 1'000'000u;
     const uint64_t kRoundNanosToMillis = 500'000u;
@@ -302,7 +302,7 @@ static int cmd_zmips(int argc, const cmd_args* argv, uint32_t flags) {
 
     const int max_samples = 10;
     const uint64_t max_loops = uint64_t{1} << 48;
-    const zx_duration_t target_duration_ns = ZX_SEC(1) / 20;
+    const zx_duration_mono_t target_duration_ns = ZX_SEC(1) / 20;
 
     for (int i = 0; i < max_samples; i++) {
       // Quickly find the number of loops it takes for the delay loop to run for at least the target
@@ -312,12 +312,12 @@ static int cmd_zmips(int argc, const cmd_args* argv, uint32_t flags) {
         // to provide suitable precision without disabling interrupts for too long to risk tripping
         // software/hardware watchdogs.
         InterruptDisableGuard interrupt_disable;
-        const zx_time_t start_ns = current_time();
+        const zx_instant_mono_t start_ns = current_time();
         delay(loops);
-        const zx_time_t stop_ns = current_time();
+        const zx_instant_mono_t stop_ns = current_time();
         interrupt_disable.Reenable();
 
-        const zx_duration_t duration_ns = zx_time_sub_time(stop_ns, start_ns);
+        const zx_duration_mono_t duration_ns = zx_time_sub_time(stop_ns, start_ns);
         if (duration_ns >= target_duration_ns) {
           printf("Calibrating CPU %u: %" PRIu64 " loops per %" PRId64 " ns\n", cpu_num, loops,
                  duration_ns);

@@ -8,7 +8,7 @@
 #include "private.h"
 
 // By default, zx_clock_get_boot will use libfasttime to compute the ticks value in user-mode.
-__EXPORT zx_time_t _zx_clock_get_boot(void) {
+__EXPORT zx_instant_boot_t _zx_clock_get_boot(void) {
   return fasttime::internal::compute_boot_time<fasttime::internal::FasttimeVerificationMode::kSkip>(
       DATA_TIME_VALUES);
 }
@@ -21,7 +21,7 @@ VDSO_INTERFACE_FUNCTION(zx_clock_get_boot);
 // zx_clock_get_boot instead.  It will perform the transformation from
 // ticks to clock boot in user mode (just like the default version), but it will
 // query its ticks from the via_kernel version of zx_ticks_get_boot.
-VDSO_KERNEL_EXPORT zx_time_t CODE_clock_get_boot_via_kernel_ticks(void) {
+VDSO_KERNEL_EXPORT zx_instant_boot_t CODE_clock_get_boot_via_kernel_ticks(void) {
   affine::Ratio ticks_to_time_ratio(DATA_TIME_VALUES.ticks_to_time_numerator,
                                     DATA_TIME_VALUES.ticks_to_time_denominator);
   return ticks_to_time_ratio.Scale(SYSCALL_zx_ticks_get_boot_via_kernel());

@@ -222,18 +222,20 @@ class UserPager {
 
   // Checks if there is a request for the range [page_offset, length). Will
   // wait until |deadline|.
-  bool WaitForPageRead(Vmo* vmo, uint64_t page_offset, uint64_t page_count, zx_time_t deadline);
-  bool WaitForPageDirty(Vmo* vmo, uint64_t page_offset, uint64_t page_count, zx_time_t deadline);
-  bool WaitForPageComplete(uint64_t key, zx_time_t deadline);
+  bool WaitForPageRead(Vmo* vmo, uint64_t page_offset, uint64_t page_count,
+                       zx_instant_mono_t deadline);
+  bool WaitForPageDirty(Vmo* vmo, uint64_t page_offset, uint64_t page_count,
+                        zx_instant_mono_t deadline);
+  bool WaitForPageComplete(uint64_t key, zx_instant_mono_t deadline);
 
   // Gets the first page read request. Blocks until |deadline|.
-  bool GetPageReadRequest(Vmo* vmo, zx_time_t deadline, uint64_t* page_offset,
+  bool GetPageReadRequest(Vmo* vmo, zx_instant_mono_t deadline, uint64_t* page_offset,
                           uint64_t* page_count);
   // Gets the first page dirty request. Blocks until |deadline|.
-  bool GetPageDirtyRequest(Vmo* vmo, zx_time_t deadline, uint64_t* page_offset,
+  bool GetPageDirtyRequest(Vmo* vmo, zx_instant_mono_t deadline, uint64_t* page_offset,
                            uint64_t* page_count);
   // Gets the first page request with |command|. Blocks until |deadline|.
-  bool GetPageRequest(Vmo* vmo, uint16_t command, zx_time_t deadline, uint64_t* page_offset,
+  bool GetPageRequest(Vmo* vmo, uint16_t command, zx_instant_mono_t deadline, uint64_t* page_offset,
                       uint64_t* page_count);
 
   // Starts a thread to handle any page faults. Faulted in pages are initialized with the default
@@ -250,11 +252,11 @@ class UserPager {
 
  private:
   bool WaitForPageRequest(uint16_t command, Vmo* vmo, uint64_t page_offset, uint64_t page_count,
-                          zx_time_t deadline);
+                          zx_instant_mono_t deadline);
   bool WaitForRequest(Vmo* vmo, uint64_t key, const zx_packet_page_request_t& request,
-                      zx_time_t deadline);
+                      zx_instant_mono_t deadline);
   bool WaitForRequest(Vmo* vmo, fit::function<bool(const zx_port_packet_t& packet)> cmp_fn,
-                      zx_time_t deadline);
+                      zx_instant_mono_t deadline);
   void PageFaultHandler();
   bool VerifyDirtyRangesHelper(Vmo* paged_vmo, zx_vmo_dirty_range_t* dirty_ranges_to_verify,
                                size_t num_dirty_ranges_to_verify, zx_vmo_dirty_range_t* ranges_buf,

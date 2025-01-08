@@ -105,7 +105,7 @@ void DLog::StartThreads() {
   }
 }
 
-zx_status_t DLog::Shutdown(zx_time_t deadline) {
+zx_status_t DLog::Shutdown(zx_instant_mono_t deadline) {
   dprintf(INFO, "Shutting down debuglog\n");
 
   // Are we the first to try to shutdown this instance?  Try to claim the honor.
@@ -617,7 +617,7 @@ void dlog_serial_write(ktl::string_view str) {
 
 void dlog_bluescreen_init() { DLOG->BluescreenInit(); }
 void dlog_panic_start() { DLOG->PanicStart(); }
-zx_status_t dlog_shutdown(zx_time_t deadline) { return DLOG->Shutdown(deadline); }
+zx_status_t dlog_shutdown(zx_instant_mono_t deadline) { return DLOG->Shutdown(deadline); }
 size_t dlog_render_to_crashlog(ktl::span<char> target) { return DLOG->RenderToCrashlog(target); }
 
 LK_INIT_HOOK(debuglog, [](uint level) { DLOG->StartThreads(); }, LK_INIT_LEVEL_PLATFORM)

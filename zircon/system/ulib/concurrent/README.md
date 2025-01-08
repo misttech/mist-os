@@ -593,10 +593,10 @@ process, `Try` versions of the `BeginReadTransaction` and the `Acquire` may be
 used along with a timeout to limit the amount of spinning which may eventually
 take place.
 
-+ `bool TryBeginReadTransaction(ReadTransactionToken& out_token, zx_duration_t timeout)`
-+ `bool TryBeginReadTransactionDeadline(ReadTransactionToken& out_token, zx_time_t deadline)`
-+ `bool TryAcquire(zx_duration_t timeout)`
-+ `bool TryAcquireDeadline(zx_time_t deadline)`
++ `bool TryBeginReadTransaction(ReadTransactionToken& out_token, zx_duration_mono_t timeout)`
++ `bool TryBeginReadTransactionDeadline(ReadTransactionToken& out_token, zx_instant_mono_t deadline)`
++ `bool TryAcquire(zx_duration_mono_t timeout)`
++ `bool TryAcquireDeadline(zx_instant_mono_t deadline)`
 
 Note that there is currently no lockdep::Guard adapter defined which works with
 timeouts/deadlines, so we will need to manually manage locking/unlocking and
@@ -611,7 +611,7 @@ and this is the technique used in the example below.
 For example:
 
 ```c++
-zx_status_t MyClass::UpdateWithTimeout(const Foo& foo, zx_duration_t timeout) {
+zx_status_t MyClass::UpdateWithTimeout(const Foo& foo, zx_duration_mono_t timeout) {
   if (!seq_lock_.lock().TryAcquire(timeout)) {
     return ZX_ERR_TIMED_OUT;
   }
@@ -620,13 +620,13 @@ zx_status_t MyClass::UpdateWithTimeout(const Foo& foo, zx_duration_t timeout) {
   return ZX_OK;
 }
 
-zx::result<Foo> MyClass::ObserveWithTimeout(zx_duration_t timeout) {
+zx::result<Foo> MyClass::ObserveWithTimeout(zx_duration_mono_t timeout) {
   // Instead of needing to say this to decalre our token:
   // decltype(seq_lock_)::LockType::ReadTransactionToken token;
   //
   // We can say this instead:
   SeqLockReadTransactionToken token{seq_lock_};
-  zx_time_t deadline = zx_deadline_after(timeout);
+  zx_instant_mono_t deadline = zx_deadline_after(timeout);
   Foo ret;
 
   do {

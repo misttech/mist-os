@@ -168,7 +168,7 @@ void sampler::ThreadSamplerDispatcher::StopLocked() TA_REQ(get_lock()) {
 
   // Some timers may not have not been able to be canceled, so we need to wait for any samples that
   // have already started to finish.
-  zx_time_t deadline = zx_time_add_duration(current_time(), ZX_SEC(30));
+  zx_instant_mono_t deadline = zx_time_add_duration(current_time(), ZX_SEC(30));
   for (const internal::PerCpuState& i : per_cpu_state_) {
     bool pending_timers;
     bool pending_writes;

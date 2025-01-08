@@ -423,8 +423,8 @@ class ChainLockTransaction : public ChainLockTransactionCommon {
     void SetCallsiteInfo(CallsiteInfo callsite_info) { callsite_info_ = callsite_info; }
 
    private:
-    static constexpr zx_ticks_t kInvalidTicks = 0;
-    zx_ticks_t contention_start_ticks_{kInvalidTicks};
+    static constexpr zx_instant_mono_ticks_t kInvalidTicks = 0;
+    zx_instant_mono_ticks_t contention_start_ticks_{kInvalidTicks};
     CallsiteInfo callsite_info_;
   };
   class TraceStorageDisabled {

@@ -69,7 +69,7 @@ class Event {
   // Wait until deadline
   // Interruptible arg allows it to return early with ZX_ERR_INTERNAL_INTR_KILLED if thread
   // is signaled for kill or with ZX_ERR_INTERNAL_INTR_RETRY if the thread is suspended.
-  zx_status_t WaitDeadline(zx_time_t deadline, Interruptible interruptible) {
+  zx_status_t WaitDeadline(zx_instant_mono_t deadline, Interruptible interruptible) {
     return WaitWorker(Deadline::no_slack(deadline), interruptible, 0);
   }
 

@@ -160,7 +160,7 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   using FailTag = VmCompressor::FailTag;
   using ZeroTag = VmCompressor::ZeroTag;
   using CompressResult = VmCompressor::CompressResult;
-  CompressResult Compress(const void* page_src, zx_ticks_t now);
+  CompressResult Compress(const void* page_src, zx_instant_mono_ticks_t now);
 
   // Wrapper that passes current_ticks() as |now|
   CompressResult Compress(const void* page_src) { return Compress(page_src, current_ticks()); }
@@ -174,7 +174,8 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   //
   // Note that the temporary reference may be passed into here, however the same locking
   // requirements as |MoveReference| must be observed.
-  void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest, zx_ticks_t now);
+  void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest,
+                  zx_instant_mono_ticks_t now);
 
   // Wrapper that passes current_ticks() as |now|
   void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest) {
@@ -256,8 +257,8 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   static constexpr size_t kNumLogBuckets = 8;
   struct Stats {
     VmCompressedStorage::MemoryUsage memory_usage;
-    zx_duration_t compression_time = 0;
-    zx_duration_t decompression_time = 0;
+    zx_duration_mono_t compression_time = 0;
+    zx_duration_mono_t decompression_time = 0;
     uint64_t total_page_compression_attempts = 0;
     uint64_t failed_page_compression_attempts = 0;
     uint64_t total_page_decompressions = 0;
@@ -301,8 +302,8 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   void FreeTempReference(CompressedRef ref);
 
   // Statistics
-  RelaxedAtomic<zx_duration_t> compression_time_ = 0;
-  RelaxedAtomic<zx_duration_t> decompression_time_ = 0;
+  RelaxedAtomic<zx_duration_mono_t> compression_time_ = 0;
+  RelaxedAtomic<zx_duration_mono_t> decompression_time_ = 0;
   RelaxedAtomic<uint64_t> compression_attempts_ = 0;
   RelaxedAtomic<uint64_t> compression_success_ = 0;
   RelaxedAtomic<uint64_t> compression_zero_page_ = 0;

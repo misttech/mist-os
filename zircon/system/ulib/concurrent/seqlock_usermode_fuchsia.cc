@@ -9,7 +9,7 @@ namespace concurrent {
 namespace internal {
 
 struct FuchsiaUserModeOsal {
-  static inline zx_time_t GetClockMonotonic() { return zx_clock_get_monotonic(); }
+  static inline zx_instant_mono_t GetClockMonotonic() { return zx_clock_get_monotonic(); }
   static inline void ArchYield() {}
 };
 

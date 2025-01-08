@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_TIME_CONVERSION_H_
+#define ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_TIME_CONVERSION_H_
 
 #define __NEED_struct_timespec
 
@@ -9,8 +10,8 @@
 
 #include "threads_impl.h"
 
-static inline zx_time_t __duration_timespec_to_deadline(const struct timespec timespec) {
-  zx_duration_t nanos = zx_duration_add_duration(
+static inline zx_instant_mono_t __duration_timespec_to_deadline(const struct timespec timespec) {
+  zx_duration_mono_t nanos = zx_duration_add_duration(
       zx_duration_mul_int64(1000000000ll, timespec.tv_sec), timespec.tv_nsec);
   return _zx_deadline_after(nanos);
 }
@@ -33,3 +34,5 @@ static inline int __timespec_to_deadline(const struct timespec* timespec, clocki
   *deadline = __duration_timespec_to_deadline(to);
   return 0;
 }
+
+#endif  // ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_TIME_CONVERSION_H_

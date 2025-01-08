@@ -16,7 +16,7 @@
 HaltToken HaltToken::g_instance;
 
 void platform_graceful_halt_helper(platform_halt_action action, zircon_crash_reason_t reason,
-                                   zx_time_t panic_deadline) {
+                                   zx_instant_mono_t panic_deadline) {
   if (!HaltToken::Get().Take()) {
     printf("platform_graceful_halt_helper: halt/reboot already in progress; sleeping forever\n");
     Thread::Current::Sleep(ZX_TIME_INFINITE);
@@ -45,7 +45,7 @@ void platform_graceful_halt_helper(platform_halt_action action, zircon_crash_rea
   panic("ERROR: failed to halt the platform\n");
 }
 
-zx_status_t platform_halt_secondary_cpus(zx_time_t deadline) {
+zx_status_t platform_halt_secondary_cpus(zx_instant_mono_t deadline) {
   // Ensure the current thread is pinned to the boot CPU.
   {
     Thread* current_thread = Thread::Current::Get();

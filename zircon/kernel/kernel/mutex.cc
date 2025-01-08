@@ -257,11 +257,11 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
   }
 
   // Remember the last call to current_ticks.
-  zx_ticks_t now_ticks = current_ticks();
+  zx_instant_mono_ticks_t now_ticks = current_ticks();
   spin_tracing::Tracer<kSchedulerLockSpinTracingEnabled> spin_tracer{now_ticks};
 
   const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
-  const zx_ticks_t spin_until_ticks =
+  const zx_instant_mono_ticks_t spin_until_ticks =
       affine::utils::ClampAdd(now_ticks, time_to_ticks.Scale(spin_max_duration));
   do {
     uintptr_t old_mutex_state = STATE_FREE;

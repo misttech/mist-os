@@ -54,7 +54,7 @@ inline ChainLockTransaction::Token ChainLockTransaction::AllocateReservedToken()
   return ReservedToken(arch_curr_cpu_num());
 }
 
-inline zx_ticks_t ChainLockTransaction::GetCurrentTicks() { return current_ticks(); }
+inline zx_instant_mono_ticks_t ChainLockTransaction::GetCurrentTicks() { return current_ticks(); }
 
 inline bool ChainLockTransaction::RecordBackoffOrRetry(Token observed_token,
                                                        ktl::atomic<Token>& lock_state,
@@ -114,7 +114,7 @@ inline void ChainLockTransaction::WaitForConflictResolution(percpu* percpu) {
   }
 }
 
-inline void ChainLockTransaction::OnFinalized(zx_ticks_t contention_start_ticks,
+inline void ChainLockTransaction::OnFinalized(zx_instant_mono_ticks_t contention_start_ticks,
                                               ::concurrent::CallsiteInfo callsite_info) {
   KTRACE_COMPLETE("kernel:sched", "lock_spin", contention_start_ticks,
                   ("lock_id", callsite_info.line_number), ("lock_class", *callsite_info.label),
@@ -235,7 +235,7 @@ class TA_SCOPED_CAP SingleChainLockGuard {
 };
 
 template <ChainLockTransaction::StateOptions option>
-SingleChainLockGuard(ChainLockTransaction::Option<option>, ChainLock&,
-                     ::concurrent::CallsiteInfo) -> SingleChainLockGuard<option>;
+SingleChainLockGuard(ChainLockTransaction::Option<option>, ChainLock&, ::concurrent::CallsiteInfo)
+    -> SingleChainLockGuard<option>;
 
 #endif  // ZIRCON_KERNEL_LIB_KCONCURRENT_INCLUDE_LIB_KCONCURRENT_CHAINLOCK_TRANSACTION_H_

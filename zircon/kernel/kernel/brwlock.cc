@@ -275,13 +275,13 @@ void BrwLock<PI>::ContendedReadAcquire() {
   LOCK_TRACE_DURATION("ContendedReadAcquire", ("name", class_name_ref()));
 
   // Remember the last call to current_ticks.
-  zx_ticks_t now_ticks = current_ticks();
+  zx_instant_mono_ticks_t now_ticks = current_ticks();
   Thread* const current_thread = Thread::Current::Get();
   ContentionTimer timer(current_thread, now_ticks);
 
   const zx_duration_t spin_max_duration = Mutex::SPIN_MAX_DURATION;
   const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
-  const zx_ticks_t spin_until_ticks =
+  const zx_instant_mono_ticks_t spin_until_ticks =
       affine::utils::ClampAdd(now_ticks, time_to_ticks.Scale(spin_max_duration));
 
   do {
@@ -411,13 +411,13 @@ void BrwLock<PI>::ContendedWriteAcquire() {
   LOCK_TRACE_DURATION("ContendedWriteAcquire", ("name", class_name_ref()));
 
   // Remember the last call to current_ticks.
-  zx_ticks_t now_ticks = current_ticks();
+  zx_instant_mono_ticks_t now_ticks = current_ticks();
   Thread* current_thread = Thread::Current::Get();
   ContentionTimer timer(current_thread, now_ticks);
 
   const zx_duration_t spin_max_duration = Mutex::SPIN_MAX_DURATION;
   const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
-  const zx_ticks_t spin_until_ticks =
+  const zx_instant_mono_ticks_t spin_until_ticks =
       affine::utils::ClampAdd(now_ticks, time_to_ticks.Scale(spin_max_duration));
 
   do {

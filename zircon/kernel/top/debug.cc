@@ -88,9 +88,9 @@ bool EndsWith(const char* str, char x) {
 }  // namespace
 
 void spin(uint32_t usecs) {
-  zx_time_t start = current_time();
+  zx_instant_mono_t start = current_time();
 
-  zx_duration_t nsecs = ZX_USEC(usecs);
+  zx_duration_mono_t nsecs = ZX_USEC(usecs);
   while (zx_time_sub_time(current_time(), start) < nsecs)
     ;
 }

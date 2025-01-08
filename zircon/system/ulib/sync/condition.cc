@@ -38,7 +38,7 @@ void sync_condition_wait(sync_condition_t* condition, sync_mutex_t* mutex) {
 }
 
 zx_status_t sync_condition_timedwait(sync_condition_t* condition, sync_mutex_t* mutex,
-                                     zx_time_t deadline) {
+                                     zx_instant_mono_t deadline) {
   return condition_impl_internal::timedwait(condition, mutex, deadline, nullptr);
 }
 

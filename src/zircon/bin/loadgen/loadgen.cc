@@ -96,8 +96,8 @@ int LoadGeneratorThread::Run() {
   // precision floating point math.
   while (!quit_) {
     double work_delay = MakeRandomDouble(min_work_msec(), max_work_msec());
-    zx_ticks_t work_deadline_ticks =
-        zx_ticks_get() + static_cast<zx_ticks_t>(work_delay * ticks_per_msec);
+    zx_instant_mono_ticks_t work_deadline_ticks =
+        zx_ticks_get() + static_cast<zx_duration_mono_ticks_t>(work_delay * ticks_per_msec);
 
     while (!quit_ && (zx_ticks_get() < work_deadline_ticks)) {
       accumulator_ = accumulator_ + MakeRandomDouble(kMinNum, kMaxNum);
@@ -113,12 +113,12 @@ int LoadGeneratorThread::Run() {
       break;
 
     double sleep_delay = MakeRandomDouble(min_sleep_msec(), max_sleep_msec());
-    zx_time_t sleep_deadline =
-        zx_deadline_after(static_cast<zx_duration_t>(sleep_delay * 1000000.0));
+    zx_instant_mono_t sleep_deadline =
+        zx_deadline_after(static_cast<zx_duration_mono_t>(sleep_delay * 1000000.0));
 
     do {
-      static constexpr zx_duration_t max_sleep = ZX_MSEC(10);
-      zx_time_t now = zx_clock_get_monotonic();
+      static constexpr zx_duration_mono_t max_sleep = ZX_MSEC(10);
+      zx_instant_mono_t now = zx_clock_get_monotonic();
 
       if (now >= sleep_deadline)
         break;

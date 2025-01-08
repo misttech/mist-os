@@ -43,12 +43,12 @@ bool TimeoutTest() {
   CpuContext context;
 
   // See that we timeout at or after the specified timeout duration.
-  const zx_duration_t timeout = ZX_USEC(200);
-  zx_duration_t delta;
+  const zx_duration_mono_t timeout = ZX_USEC(200);
+  zx_duration_mono_t delta;
   zx_status_t status;
   {
     InterruptDisableGuard irqd;
-    zx_time_t before = current_time();
+    zx_instant_mono_t before = current_time();
     status = exchange.RequestContext(0, timeout, context);
     delta = current_time() - before;
   }
@@ -172,7 +172,7 @@ bool NmiInterruptsTimerTest() {
   } args;
 
   Timer t;
-  Timer::Callback timer_cb = [](Timer*, zx_time_t, void* _args) {
+  Timer::Callback timer_cb = [](Timer*, zx_instant_mono_t, void* _args) {
     auto* args = reinterpret_cast<Args*>(_args);
     CpuContext context;
     args->status =

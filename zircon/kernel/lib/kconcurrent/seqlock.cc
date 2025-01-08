@@ -10,7 +10,7 @@
 namespace internal {
 
 struct FuchsiaKernelOsal {
-  static zx_time_t GetClockMonotonic() { return current_time(); }
+  static zx_instant_mono_t GetClockMonotonic() { return current_time(); }
   static void ArchYield() { arch::Yield(); }
 };
 

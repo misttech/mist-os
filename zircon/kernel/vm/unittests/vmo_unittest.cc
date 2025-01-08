@@ -696,7 +696,7 @@ static bool vmo_contiguous_decommit_test() {
   // so we can also have the loop below do a CommitRange() to reclaim before the borrowing VMO is
   // deleted.
   borrowed_seen = false;
-  zx_time_t complain_deadline = current_time() + ZX_SEC(5);
+  zx_instant_mono_t complain_deadline = current_time() + ZX_SEC(5);
   uint32_t loop_count = 0;
   while (!borrowed_seen || loop_count < 5) {
     // Not super small, in case we end up needing to do multiple iterations of the loop to see the
@@ -736,7 +736,7 @@ static bool vmo_contiguous_decommit_test() {
         // will eventually work through the free_loaned_list_, even if a large contiguous VMO was
         // decomitted at an inconvenient time.
       }
-      zx_time_t now = current_time();
+      zx_instant_mono_t now = current_time();
       if (now > complain_deadline) {
         dprintf(INFO, "!borrowed_seen is persisting longer than expected; still trying...\n");
         complain_deadline = now + ZX_SEC(5);
