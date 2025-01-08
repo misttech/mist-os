@@ -219,17 +219,17 @@ static bool parallel_alloc() {
 
   // Attempt to join one of the threads, letting it run for a bit. If the join succeeds this means
   // the fixture terminated, which indicates it encountered an error.
-  zx_status_t status = t1->Join(nullptr, current_time() + ZX_MSEC(500));
+  zx_status_t status = t1->Join(nullptr, current_mono_time() + ZX_MSEC(500));
   EXPECT_NE(status, ZX_OK);
   // Check that the other thread is still running as well.
-  status = t2->Join(nullptr, current_time());
+  status = t2->Join(nullptr, current_mono_time());
   EXPECT_NE(status, ZX_OK);
 
   // Cleanup.
   fixture.stop_requested.store(true, ktl::memory_order_relaxed);
-  status = t1->Join(nullptr, current_time() + ZX_SEC(5));
+  status = t1->Join(nullptr, current_mono_time() + ZX_SEC(5));
   EXPECT_EQ(status, ZX_OK);
-  status = t2->Join(nullptr, current_time() + ZX_SEC(5));
+  status = t2->Join(nullptr, current_mono_time() + ZX_SEC(5));
   EXPECT_EQ(status, ZX_OK);
 
   END_TEST;
@@ -254,7 +254,7 @@ static bool parallel_grow_memory() {
   t->Resume();
 
   // let the worker run for a bit to make sure its started.
-  zx_status_t status = t->Join(nullptr, current_time() + ZX_MSEC(10));
+  zx_status_t status = t->Join(nullptr, current_mono_time() + ZX_MSEC(10));
   EXPECT_NE(status, ZX_OK);
 
   // Allocate all the rest of the objects causing arena to have to grow.
@@ -264,12 +264,12 @@ static bool parallel_grow_memory() {
   }
 
   // Worker should still be running fine.
-  status = t->Join(nullptr, current_time() + ZX_MSEC(10));
+  status = t->Join(nullptr, current_mono_time() + ZX_MSEC(10));
   EXPECT_NE(status, ZX_OK);
 
   // Cleanup.
   fixture.stop_requested.store(true, ktl::memory_order_relaxed);
-  status = t->Join(nullptr, current_time() + ZX_SEC(5));
+  status = t->Join(nullptr, current_mono_time() + ZX_SEC(5));
   EXPECT_EQ(status, ZX_OK);
 
   for (int i = 0; i < count - 1; i++) {

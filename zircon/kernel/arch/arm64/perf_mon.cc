@@ -674,7 +674,7 @@ static void arm64_perfmon_write_last_records(PerfmonState* state,
   PerfmonCpuData* data = &state->cpu_data[cpu];
   perfmon::RecordHeader* next = data->buffer_next;
 
-  zx_instant_mono_ticks_t now = current_ticks();
+  zx_instant_mono_ticks_t now = current_mono_ticks();
   next = arch_perfmon_write_time_record(next, perfmon::kEventIdNone, now);
 
   // If the counter triggers interrupts then the PMI handler will
@@ -855,7 +855,7 @@ static bool pmi_interrupt_handler(const iframe_t* frame, PerfmonState* state) {
   cpu_num_t cpu = arch_curr_cpu_num();
   auto data = &state->cpu_data[cpu];
 
-  zx_instant_mono_ticks_t now = current_ticks();
+  zx_instant_mono_ticks_t now = current_mono_ticks();
   TRACEF("cpu %u: now %ld, sp %p\n", cpu, now, __GET_FRAME());
 
   // Rather than continually checking if we have enough space, just

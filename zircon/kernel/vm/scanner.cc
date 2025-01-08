@@ -120,9 +120,9 @@ int scanner_request_thread(void*) {
   bool disabled = false;
   bool pt_eviction_enabled = false;
   zx_instant_mono_t last_pt_evict = ZX_TIME_INFINITE_PAST;
-  zx_instant_mono_t next_zero_scan_deadline = calc_next_zero_scan_deadline(current_time());
+  zx_instant_mono_t next_zero_scan_deadline = calc_next_zero_scan_deadline(current_mono_time());
   zx_instant_mono_t next_harvest_deadline =
-      zx_time_add_duration(current_time(), accessed_scan_period);
+      zx_time_add_duration(current_mono_time(), accessed_scan_period);
   while (1) {
     if (disabled) {
       scanner_request_event.Wait(Deadline::infinite());
@@ -164,7 +164,7 @@ int scanner_request_thread(void*) {
       continue;
     }
 
-    zx_instant_mono_t current = current_time();
+    zx_instant_mono_t current = current_mono_time();
 
     if (current >= calc_next_pt_evict_deadline(last_pt_evict, pt_eviction_enabled) ||
         (op & kScannerOpReclaimAll)) {
@@ -210,7 +210,7 @@ int scanner_request_thread(void*) {
       pmm_evictor()->EvictFromExternalTarget(target);
       // To ensure any page table eviction that was set earlier actually occurs, force an accessed
       // scan to happen right now.
-      scanner_wait_for_accessed_scan(current_time(), true);
+      scanner_wait_for_accessed_scan(current_mono_time(), true);
     }
     if (op & kScannerOpDump) {
       op &= ~kScannerOpDump;
@@ -289,7 +289,7 @@ void scanner_wait_for_accessed_scan(zx_instant_mono_t update_time, bool clear_bi
                                                      : VmAspace::TerminalAction::UpdateAge);
     pmm_page_queues()->EndAccessScan();
   }
-  last_accessed_scan_complete = current_time();
+  last_accessed_scan_complete = current_mono_time();
   if (clear_bits) {
     last_harvest_accessed_scan_complete = last_accessed_scan_complete.load();
   }
@@ -473,7 +473,7 @@ static int cmd_scanner(int argc, const cmd_args* argv, uint32_t flags) {
   } else if (!strcmp(argv[1].str, "rotate_queue")) {
     pmm_page_queues()->RotateReclaimQueues();
   } else if (!strcmp(argv[1].str, "harvest_accessed")) {
-    scanner_wait_for_accessed_scan(current_time(), true);
+    scanner_wait_for_accessed_scan(current_mono_time(), true);
   } else if (!strcmp(argv[1].str, "reclaim")) {
     if (argc < 3) {
       goto usage;

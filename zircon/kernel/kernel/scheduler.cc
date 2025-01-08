@@ -212,7 +212,7 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
   // arg1[30..30] : 1 == idle thread, 0 == normal thread
   //
   if constexpr (SCHEDULER_QUEUE_TRACING_ENABLED) {
-    const zx_instant_mono_t now = current_time();  // TODO(johngro): plumb this in from above
+    const zx_instant_mono_t now = current_mono_time();  // TODO(johngro): plumb this in from above
     const bool fair = IsFairThread(thread);
     const bool eligible = fair || (thread->scheduler_state().start_time_ <= now);
     const size_t cnt = fair_run_queue_.size() + deadline_run_queue_.size() +

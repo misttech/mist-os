@@ -113,7 +113,7 @@ void timer_tick();
 bool platform_usermode_can_access_tick_registers();
 
 // Current monotonic time in nanoseconds.
-zx_instant_mono_t current_time();
+zx_instant_mono_t current_mono_time();
 
 // Current boot time in nanoseconds.
 zx_instant_boot_t current_boot_time();
@@ -231,7 +231,7 @@ inline zx_instant_boot_ticks_t timer_current_boot_ticks() {
 }
 
 // The current monotonic time in ticks.
-inline zx_instant_mono_ticks_t current_ticks() { return timer_current_mono_ticks(); }
+inline zx_instant_mono_ticks_t current_mono_ticks() { return timer_current_mono_ticks(); }
 
 // The current boot time in ticks.
 inline zx_instant_boot_ticks_t current_boot_ticks() { return timer_current_boot_ticks(); }
@@ -244,7 +244,7 @@ inline zx_instant_boot_ticks_t current_boot_ticks() { return timer_current_boot_
 //
 // It is NOT safe to call timer_pause_monotonic and timer_unpause_monotonic concurrently.
 inline void timer_pause_monotonic() {
-  const zx_instant_mono_ticks_t paused_ticks = current_ticks();
+  const zx_instant_mono_ticks_t paused_ticks = current_mono_ticks();
   DEBUG_ASSERT(paused_ticks > 0);
   internal::mono_ticks_modifier.store(paused_ticks, ktl::memory_order_relaxed);
 }

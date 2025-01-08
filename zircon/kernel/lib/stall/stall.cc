@@ -47,7 +47,7 @@ StallAccumulator::Stats StallAccumulator::Flush() {
 }
 
 void StallAccumulator::Consolidate() {
-  zx_instant_mono_t now = current_time();
+  zx_instant_mono_t now = current_mono_time();
   zx_duration_mono_t time_delta = now - last_consolidate_time_;
 
   if (num_contributors_stalling_ > 0) {
@@ -167,7 +167,7 @@ void StallAggregator::IteratePerCpuStats(PerCpuStatsCallback callback) {
 void StallAggregator::StartSamplingThread(uint level) {
   auto worker_thread = [](void *) {
     StallAggregator *aggregator = GetStallAggregator();
-    zx_instant_mono_t deadline = current_time();
+    zx_instant_mono_t deadline = current_mono_time();
 
     for (;;) {
       aggregator->SampleOnce();

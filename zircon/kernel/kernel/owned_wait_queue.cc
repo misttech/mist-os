@@ -703,7 +703,7 @@ ktl::optional<Thread::UnblockList> OwnedWaitQueue::LockForWakeOperationLocked(
 
   // Lock as many threads as we can, moving them out of our wait collection
   // and onto a temporary unblock list as we go.
-  const zx_instant_mono_t now = current_time();
+  const zx_instant_mono_t now = current_mono_time();
   ktl::optional<Thread::UnblockList> maybe_unblock_list =
       LockAndMakeWaiterListLocked(now, max_wake, wake_hooks);
 
@@ -736,7 +736,7 @@ bool OwnedWaitQueue::LockForRequeueOperationOrBackoff(
   RequeueLockingDetails res;
   {
     ktl::optional<WakeRequeueThreadDetails> maybe_threads = LockAndMakeWakeRequeueThreadListsLocked(
-        current_time(), max_wake, wake_hooks, max_requeue, requeue_hooks);
+        current_mono_time(), max_wake, wake_hooks, max_requeue, requeue_hooks);
 
     if (!maybe_threads.has_value()) {
       get_lock().Release();

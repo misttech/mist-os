@@ -429,7 +429,7 @@ bool test_nmi_spam() {
   const Deadline deadline = Deadline::after(kDuration);
   do {
     apic_send_mask_ipi(X86_INT_NMI, Scheduler::PeekActiveMask(), DELIVERY_MODE_NMI);
-  } while (current_time() < deadline.when());
+  } while (current_mono_time() < deadline.when());
 
   END_TEST;
 }

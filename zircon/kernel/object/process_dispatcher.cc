@@ -461,7 +461,7 @@ zx_status_t ProcessDispatcher::AddInitializedThread(ThreadDispatcher* t, bool en
 
   if (initial_thread) {
     DEBUG_ASSERT_MSG(start_time_ == 0, "start_time_ %ld", start_time_);
-    start_time_ = current_time();
+    start_time_ = current_mono_time();
     SetStateLocked(State::RUNNING);
   }
 

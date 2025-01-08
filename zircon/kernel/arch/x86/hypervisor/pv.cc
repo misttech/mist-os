@@ -115,7 +115,7 @@ void pv_clock_update_system_time(PvClockState* pv_clock, hypervisor::GuestPhysic
   ktl::atomic_thread_fence(ktl::memory_order_seq_cst);
   system_time->tsc_mul = tsc_mul;
   system_time->tsc_shift = tsc_shift;
-  system_time->system_time = current_time();
+  system_time->system_time = current_mono_time();
   system_time->tsc_timestamp = _rdtsc();
   system_time->flags = pv_clock->is_stable ? kKvmSystemTimeStable : 0;
   ktl::atomic_thread_fence(ktl::memory_order_seq_cst);

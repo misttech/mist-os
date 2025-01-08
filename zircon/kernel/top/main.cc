@@ -166,7 +166,7 @@ void lk_main(paddr_t handoff_paddr) {
 }
 
 static int bootstrap2(void*) {
-  timeline_threading.Set(current_ticks());
+  timeline_threading.Set(current_mono_ticks());
 
   dprintf(SPEW, "top of bootstrap2()\n");
 
@@ -200,7 +200,7 @@ static int bootstrap2(void*) {
   dprintf(SPEW, "moving to last init level\n");
   lk_primary_cpu_init_level(LK_INIT_LEVEL_USER, LK_INIT_LEVEL_LAST);
 
-  timeline_init.Set(current_ticks());
+  timeline_init.Set(current_mono_ticks());
   return 0;
 }
 

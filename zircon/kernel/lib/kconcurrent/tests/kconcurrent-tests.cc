@@ -293,8 +293,8 @@ struct Test {
 
       // Wait for a bit longer, then verify that the thread is still attempting to
       // enter the guard.
-      zx_instant_mono_t deadline = current_time() + ZX_MSEC(500);
-      while (deadline > current_time()) {
+      zx_instant_mono_t deadline = current_mono_time() + ZX_MSEC(500);
+      while (deadline > current_mono_time()) {
         arch::Yield();
       }
       EXPECT_EQ(State::EnteringGuard, params.state.load());

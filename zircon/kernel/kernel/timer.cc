@@ -86,7 +86,7 @@ void timer_set_ticks_to_time_ratio(const affine::Ratio& ticks_to_time) {
 
 const affine::Ratio& timer_get_ticks_to_time_ratio(void) { return gTicksToTime; }
 
-zx_instant_mono_t current_time(void) { return gTicksToTime.Scale(current_ticks()); }
+zx_instant_mono_t current_mono_time(void) { return gTicksToTime.Scale(current_mono_ticks()); }
 
 zx_instant_boot_t current_boot_time(void) { return gTicksToTime.Scale(current_boot_ticks()); }
 
@@ -462,7 +462,7 @@ void timer_tick() {
 }
 
 void TimerQueue::Tick(cpu_num_t cpu) {
-  zx_instant_mono_t now = current_time();
+  zx_instant_mono_t now = current_mono_time();
   zx_instant_boot_t boot_now = current_boot_time();
   LTRACEF("cpu %u now %" PRIi64 ", sp %p\n", cpu, now, __GET_FRAME());
 
@@ -642,7 +642,7 @@ void TimerQueue::PrintTimerQueues(char* buf, size_t len) {
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
     if (mp_is_cpu_online(i)) {
       fprintf(&buffer, "cpu %u:\n", i);
-      PrintTimerList(current_time(), percpu::Get(i).timer_queue.monotonic_timer_list_, buffer);
+      PrintTimerList(current_mono_time(), percpu::Get(i).timer_queue.monotonic_timer_list_, buffer);
       fprintf(&buffer, "boot timers:\n");
       PrintTimerList(current_boot_time(), percpu::Get(i).timer_queue.boot_timer_list_, buffer);
     }

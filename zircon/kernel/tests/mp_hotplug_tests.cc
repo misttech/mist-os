@@ -48,7 +48,7 @@ static unsigned get_num_cpus_online() {
 }
 
 static zx_status_t wait_for_cpu_offline(cpu_num_t i) {
-  zx_instant_mono_t print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+  zx_instant_mono_t print_time = zx_time_add_duration(current_mono_time(), ZX_SEC(5));
   while (true) {
     zx::result<power_cpu_state> res = platform_get_cpu_state(i);
     if (res.is_error()) {
@@ -61,8 +61,8 @@ static zx_status_t wait_for_cpu_offline(cpu_num_t i) {
     } else if (res.value() == power_cpu_state::OFF || res.value() == power_cpu_state::STOPPED) {
       return ZX_OK;
     }
-    if (current_time() > print_time) {
-      print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+    if (current_mono_time() > print_time) {
+      print_time = zx_time_add_duration(current_mono_time(), ZX_SEC(5));
       printf("Still waiting for CPU %u to go offline, waiting 5 more seconds\n", i);
     }
     Thread::Current::SleepRelative(ZX_USEC(200));
@@ -70,13 +70,13 @@ static zx_status_t wait_for_cpu_offline(cpu_num_t i) {
 }
 
 static void wait_for_cpu_active(cpu_num_t i) {
-  zx_instant_mono_t print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+  zx_instant_mono_t print_time = zx_time_add_duration(current_mono_time(), ZX_SEC(5));
   while (true) {
     if (Scheduler::PeekIsActive(i)) {
       return;
     }
-    if (current_time() > print_time) {
-      print_time = zx_time_add_duration(current_time(), ZX_SEC(5));
+    if (current_mono_time() > print_time) {
+      print_time = zx_time_add_duration(current_mono_time(), ZX_SEC(5));
       printf("Still waiting for CPU %u to become active, waiting 5 more seconds\n", i);
     }
     Thread::Current::SleepRelative(ZX_USEC(200));

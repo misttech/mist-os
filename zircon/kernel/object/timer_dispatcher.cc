@@ -92,7 +92,8 @@ zx_status_t TimerDispatcher::Set(zx_time_t deadline, zx_duration_t slack_amount)
 
   // If the timer is already due, then we can set the signal immediately without
   // starting the timer.
-  const zx_time_t now = (clock_id_ == ZX_CLOCK_MONOTONIC ? current_time() : current_boot_time());
+  const zx_time_t now =
+      (clock_id_ == ZX_CLOCK_MONOTONIC ? current_mono_time() : current_boot_time());
   if ((deadline == 0u) || (deadline <= now)) {
     UpdateStateLocked(0u, ZX_TIMER_SIGNALED);
     return ZX_OK;

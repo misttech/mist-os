@@ -230,7 +230,7 @@ ktl::optional<ResourceOwnership> BrwLock<PI>::TryWake() {
     // Try to lock the set of threads we need to wake.  Either the next writer,
     // or the next contiguous span of readers.
     ktl::optional<BrwLockOps::LockForWakeResult> lock_result =
-        BrwLockOps::LockForWake(wait_, current_time());
+        BrwLockOps::LockForWake(wait_, current_mono_time());
 
     // If we failed to lock, backoff and try again.
     if (!lock_result.has_value()) {
@@ -275,7 +275,7 @@ void BrwLock<PI>::ContendedReadAcquire() {
   LOCK_TRACE_DURATION("ContendedReadAcquire", ("name", class_name_ref()));
 
   // Remember the last call to current_ticks.
-  zx_instant_mono_ticks_t now_ticks = current_ticks();
+  zx_instant_mono_ticks_t now_ticks = current_mono_ticks();
   Thread* const current_thread = Thread::Current::Get();
   ContentionTimer timer(current_thread, now_ticks);
 
@@ -301,7 +301,7 @@ void BrwLock<PI>::ContendedReadAcquire() {
 
     // Give the arch a chance to relax the CPU.
     arch::Yield();
-    now_ticks = current_ticks();
+    now_ticks = current_mono_ticks();
   } while (now_ticks < spin_until_ticks);
 
   // Enter our wait queue's lock and figure out what to do next.  We don't really know what we need
@@ -411,7 +411,7 @@ void BrwLock<PI>::ContendedWriteAcquire() {
   LOCK_TRACE_DURATION("ContendedWriteAcquire", ("name", class_name_ref()));
 
   // Remember the last call to current_ticks.
-  zx_instant_mono_ticks_t now_ticks = current_ticks();
+  zx_instant_mono_ticks_t now_ticks = current_mono_ticks();
   Thread* current_thread = Thread::Current::Get();
   ContentionTimer timer(current_thread, now_ticks);
 
@@ -436,7 +436,7 @@ void BrwLock<PI>::ContendedWriteAcquire() {
 
     // Give the arch a chance to relax the CPU.
     arch::Yield();
-    now_ticks = current_ticks();
+    now_ticks = current_mono_ticks();
   } while (now_ticks < spin_until_ticks);
 
   // Enter our wait queue's lock and figure out what to do next.  We don't really know what we need
@@ -626,7 +626,7 @@ template <BrwLockEnablePi PI>
 void BrwLock<PI>::ContendedReadUpgrade() {
   LOCK_TRACE_DURATION("ContendedReadUpgrade", ("name", class_name_ref()));
   Thread* const current_thread = Thread::Current::Get();
-  ContentionTimer timer(current_thread, current_ticks());
+  ContentionTimer timer(current_thread, current_mono_ticks());
 
   auto TryBlock = [&]() TA_REQ(chainlock_transaction_token) TA_REL(wait_.get_lock()) -> bool {
     ktl::optional<BlockOpLockDetails<PI>> maybe_lock_details = LockForBlock();

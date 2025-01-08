@@ -28,7 +28,7 @@ template <zx_duration_mono_t Duration>
 class EventLimiter {
  public:
   bool Ready() {
-    zx_instant_mono_t now = current_time();
+    zx_instant_mono_t now = current_mono_time();
 
     // If we have recently taken action, we don't need to do it again.
     zx_instant_mono_t last_event = last_event_.load(ktl::memory_order_relaxed);

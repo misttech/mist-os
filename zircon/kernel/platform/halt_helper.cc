@@ -23,7 +23,7 @@ void platform_graceful_halt_helper(platform_halt_action action, zircon_crash_rea
   }
 
   printf("platform_graceful_halt_helper: action=%d reason=%u panic_deadline=%ld current_time=%ld\n",
-         action, static_cast<uint32_t>(reason), panic_deadline, current_time());
+         action, static_cast<uint32_t>(reason), panic_deadline, current_mono_time());
 
   // Migrate to the boot CPU before shutting down the secondary CPUs.  Note that
   // this action also hard-pins our thread to the boot CPU, so we don't need to

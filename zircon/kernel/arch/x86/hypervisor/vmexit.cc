@@ -628,7 +628,7 @@ zx_instant_mono_t lvt_deadline(LocalApicState& local_apic_state) {
   int64_t duration_tsc_ticks =
       static_cast<int64_t>(local_apic_state.lvt_initial_count << divisor_shift);
   zx_duration_t duration = convert_raw_tsc_duration_to_nanoseconds(duration_tsc_ticks);
-  return zx_time_add_duration(current_time(), duration);
+  return zx_time_add_duration(current_mono_time(), duration);
 }
 
 void update_timer(LocalApicState& local_apic_state, zx_instant_mono_t deadline);

@@ -333,7 +333,7 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
 
     if (!show_mem) {
       printf("pmm free: issue the same command to stop.\n");
-      zx_instant_mono_t deadline = zx_time_add_duration(current_time(), ZX_SEC(1));
+      zx_instant_mono_t deadline = zx_time_add_duration(current_mono_time(), ZX_SEC(1));
       const TimerSlack slack{ZX_MSEC(20), TIMER_SLACK_CENTER};
       const Deadline slackDeadline(deadline, slack);
       dump_free_mem_timer.Set(slackDeadline, &pmm_dump_timer, nullptr);

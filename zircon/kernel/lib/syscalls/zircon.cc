@@ -59,7 +59,7 @@ zx_status_t sys_nanosleep(zx_instant_mono_t deadline) {
     return ZX_OK;
   }
 
-  const zx_instant_mono_t now = current_time();
+  const zx_instant_mono_t now = current_mono_time();
   const auto up = ProcessDispatcher::GetCurrent();
   const Deadline slackDeadline(deadline, up->GetTimerSlackPolicy());
 
@@ -72,7 +72,7 @@ zx_status_t sys_nanosleep(zx_instant_mono_t deadline) {
 
 zx_instant_mono_t sys_clock_get_monotonic_via_kernel() {
   kcounter_add(syscalls_zx_clock_get_monotonic, 1);
-  return current_time();
+  return current_mono_time();
 }
 
 zx_instant_boot_t sys_clock_get_boot_via_kernel() {
@@ -82,7 +82,7 @@ zx_instant_boot_t sys_clock_get_boot_via_kernel() {
 
 zx_instant_mono_ticks_t sys_ticks_get_via_kernel() {
   kcounter_add(syscalls_zx_ticks_get, 1);
-  return current_ticks();
+  return current_mono_ticks();
 }
 
 zx_instant_boot_ticks_t sys_ticks_get_boot_via_kernel() {

@@ -125,7 +125,7 @@ void HandleOnOomReboot() {
   // we have a full debuglog buffer of 128KB, at 115200 bps, with 8-N-1, it will take roughly
   // 11.4 seconds to drain the buffer.  The timeout should be long enough to allow a full DLOG
   // buffer to be drained.
-  zx_instant_mono_t deadline = current_time() + ZX_SEC(20);
+  zx_instant_mono_t deadline = current_mono_time() + ZX_SEC(20);
   status = dlog_shutdown(deadline);
   if (status != ZX_OK) {
     // If `dlog_shutdown` failed, there's not much we can do besides print an error (which
@@ -243,7 +243,7 @@ void MemoryWatchdog::WorkerThread() {
       mem_event_idx_ = PressureLevel::kOutOfMemory;
     }
 
-    auto time_now = current_time();
+    auto time_now = current_mono_time();
 
     if (IsSignalDue(mem_event_idx_, time_now)) {
       CountPressureEvent(mem_event_idx_);

@@ -17,7 +17,7 @@
 //
 // https://static.docs.arm.com/epm086451/120/Cortex-A73_MPCore_Software_Developers_Errata_Notice.pdf
 //
-// Right now, this means that we need a special version of current_ticks() in
+// Right now, this means that we need a special version of current_mono_ticks() in
 // the kernel, and to inject a special version of zx_ticks_get in the VDSO if
 // our clients are not going to make a syscall in order to read the tick
 // counter.

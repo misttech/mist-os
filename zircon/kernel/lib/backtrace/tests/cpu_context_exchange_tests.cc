@@ -48,9 +48,9 @@ bool TimeoutTest() {
   zx_status_t status;
   {
     InterruptDisableGuard irqd;
-    zx_instant_mono_t before = current_time();
+    zx_instant_mono_t before = current_mono_time();
     status = exchange.RequestContext(0, timeout, context);
-    delta = current_time() - before;
+    delta = current_mono_time() - before;
   }
   EXPECT_EQ(ZX_ERR_TIMED_OUT, status);
   EXPECT_GE(delta, timeout);

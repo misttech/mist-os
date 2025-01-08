@@ -411,6 +411,6 @@ void userboot_init() {
                          /* ensure_initial_thread= */ true);
   ASSERT(status == ZX_OK);
 
-  timeline_userboot.Set(current_ticks());
-  init_time.Add(current_time() / 1000000LL);
+  timeline_userboot.Set(current_mono_ticks());
+  init_time.Add(current_mono_time() / 1000000LL);
 }

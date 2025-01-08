@@ -819,7 +819,7 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
           const bool is_idle = Scheduler::PeekIsIdle(i);
           if (is_idle) {
             zx_duration_mono_t recent_idle = zx_time_sub_time(
-                current_time(), idle_power_thread.scheduler_state().last_started_running());
+                current_mono_time(), idle_power_thread.scheduler_state().last_started_running());
             idle_time = zx_duration_add_duration(idle_time, recent_idle);
           }
           stats.idle_time = idle_time;

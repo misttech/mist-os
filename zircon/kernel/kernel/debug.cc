@@ -143,7 +143,7 @@ static int cmd_threadstats(int argc, const cmd_args* argv, uint32_t flags) {
     printf("thread stats (cpu %u):\n", i);
     printf("\ttotal idle time: %" PRIi64 "\n", percpu.stats.idle_time);
     printf("\ttotal busy time: %" PRIi64 "\n",
-           zx_time_sub_duration(current_time(), percpu.stats.idle_time));
+           zx_time_sub_duration(current_mono_time(), percpu.stats.idle_time));
     printf("\treschedules: %lu\n", percpu.stats.reschedules);
     printf("\treschedule_ipis: %lu\n", percpu.stats.reschedule_ipis);
     printf("\tcontext_switches: %lu\n", percpu.stats.context_switches);
@@ -194,7 +194,7 @@ RecurringCallback g_threadload_callback([]() {
         ChainLockTransaction::AssertActive();
         idle_power_thread.get_lock().AssertHeld();
         zx_duration_mono_t recent_idle_time = zx_time_sub_time(
-            current_time(), idle_power_thread.scheduler_state().last_started_running());
+            current_mono_time(), idle_power_thread.scheduler_state().last_started_running());
         return zx_duration_add_duration(stats.idle_time, recent_idle_time);
       } else {
         return stats.idle_time;
@@ -312,9 +312,9 @@ static int cmd_zmips(int argc, const cmd_args* argv, uint32_t flags) {
         // to provide suitable precision without disabling interrupts for too long to risk tripping
         // software/hardware watchdogs.
         InterruptDisableGuard interrupt_disable;
-        const zx_instant_mono_t start_ns = current_time();
+        const zx_instant_mono_t start_ns = current_mono_time();
         delay(loops);
-        const zx_instant_mono_t stop_ns = current_time();
+        const zx_instant_mono_t stop_ns = current_mono_time();
         interrupt_disable.Reenable();
 
         const zx_duration_mono_t duration_ns = zx_time_sub_time(stop_ns, start_ns);

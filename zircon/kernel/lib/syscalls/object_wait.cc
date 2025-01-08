@@ -91,7 +91,7 @@ zx_status_t sys_object_wait_many(user_inout_ptr<zx_wait_item_t> user_items, size
   const Deadline slackDeadline(deadline, up->GetTimerSlackPolicy());
 
   if (!count) {
-    const zx_instant_mono_t now = current_time();
+    const zx_instant_mono_t now = current_mono_time();
     {
       ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::WAIT_MANY);
       zx_status_t result = Thread::Current::SleepEtc(slackDeadline, Interruptible::Yes, now);

@@ -217,7 +217,7 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
     // Check for polling mode.
     if (!uart_irq || gBootOptions->debug_uart_poll) {
       // Start the polling without performing any drain.
-      UartPoll</*DrainUart=*/false>(&gUartPollTimer, current_time(), nullptr);
+      UartPoll</*DrainUart=*/false>(&gUartPollTimer, current_mono_time(), nullptr);
       printf("UART: POLLING mode enabled.\n");
       polling_mode = true;
       return;

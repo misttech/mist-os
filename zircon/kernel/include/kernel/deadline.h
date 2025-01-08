@@ -63,7 +63,7 @@ class Deadline {
 
   // Construct a deadline using relative duration measured from now.
   static Deadline after(zx_duration_t after, TimerSlack slack = TimerSlack::none()) {
-    return Deadline(zx_time_add_duration(current_time(), after), slack);
+    return Deadline(zx_time_add_duration(current_mono_time(), after), slack);
   }
 
   // A deadline that will never be reached.

@@ -857,7 +857,7 @@ static int cmd_boot_test_success(int argc, const cmd_args* argv, uint32_t flags)
 
 static int cmd_graceful_shutdown(int argc, const cmd_args* argv, uint32_t flags) {
   printf("*** Performing graceful shutdown from kernel shell... ***\n");
-  const zx_instant_mono_t dlog_deadline = current_time() + ZX_SEC(10);
+  const zx_instant_mono_t dlog_deadline = current_mono_time() + ZX_SEC(10);
   dlog_shutdown(dlog_deadline);
   // Does not return.
   platform_halt(HALT_ACTION_SHUTDOWN, ZirconCrashReason::NoCrash);

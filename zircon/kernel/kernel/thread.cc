@@ -1748,18 +1748,18 @@ zx_status_t Thread::Current::SleepEtc(const Deadline& deadline, Interruptible in
 }
 
 zx_status_t Thread::Current::Sleep(zx_instant_mono_t deadline) {
-  const zx_instant_mono_t now = current_time();
+  const zx_instant_mono_t now = current_mono_time();
   return SleepEtc(Deadline::no_slack(deadline), Interruptible::No, now);
 }
 
 zx_status_t Thread::Current::SleepRelative(zx_duration_mono_t delay) {
-  const zx_instant_mono_t now = current_time();
+  const zx_instant_mono_t now = current_mono_time();
   const Deadline deadline = Deadline::no_slack(zx_time_add_duration(now, delay));
   return SleepEtc(deadline, Interruptible::No, now);
 }
 
 zx_status_t Thread::Current::SleepInterruptible(zx_instant_mono_t deadline) {
-  const zx_instant_mono_t now = current_time();
+  const zx_instant_mono_t now = current_mono_time();
   const TimerSlack slack(sleep_slack(deadline, now), TIMER_SLACK_LATE);
   const Deadline slackDeadline(deadline, slack);
   return SleepEtc(slackDeadline, Interruptible::Yes, now);
@@ -1777,7 +1777,7 @@ zx_duration_mono_t Thread::Runtime() const {
   zx_duration_mono_t runtime = scheduler_state_.runtime_ns();
   if (state() == THREAD_RUNNING) {
     zx_duration_mono_t recent =
-        zx_time_sub_time(current_time(), scheduler_state_.last_started_running());
+        zx_time_sub_time(current_mono_time(), scheduler_state_.last_started_running());
     runtime = zx_duration_add_duration(runtime, recent);
   }
 
@@ -2117,7 +2117,7 @@ void ThreadDumper::DumpLocked(const Thread* t, bool full_dump) {
   zx_duration_mono_t runtime = t->scheduler_state().runtime_ns();
   if (t->state() == THREAD_RUNNING) {
     zx_duration_mono_t recent =
-        zx_time_sub_time(current_time(), t->scheduler_state().last_started_running());
+        zx_time_sub_time(current_mono_time(), t->scheduler_state().last_started_running());
     runtime = zx_duration_add_duration(runtime, recent);
   }
 

@@ -54,7 +54,9 @@ inline ChainLockTransaction::Token ChainLockTransaction::AllocateReservedToken()
   return ReservedToken(arch_curr_cpu_num());
 }
 
-inline zx_instant_mono_ticks_t ChainLockTransaction::GetCurrentTicks() { return current_ticks(); }
+inline zx_instant_mono_ticks_t ChainLockTransaction::GetCurrentTicks() {
+  return current_mono_ticks();
+}
 
 inline bool ChainLockTransaction::RecordBackoffOrRetry(Token observed_token,
                                                        ktl::atomic<Token>& lock_state,
@@ -120,7 +122,7 @@ inline void ChainLockTransaction::OnFinalized(zx_instant_mono_ticks_t contention
                   ("lock_id", callsite_info.line_number), ("lock_class", *callsite_info.label),
                   ("lock_type", "ChainLockTransaction"_intern),
                   ("backoff_count", Active()->backoff_count()));
-  UpdateContentionCounters(current_ticks() - contention_start_ticks);
+  UpdateContentionCounters(current_mono_ticks() - contention_start_ticks);
 }
 
 template <>

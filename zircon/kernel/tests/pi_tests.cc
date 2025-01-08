@@ -649,7 +649,7 @@ bool TestThread::WaitFor() {
 
   constexpr zx_duration_mono_t timeout = ZX_SEC(10);
   constexpr zx_duration_mono_t poll_interval = ZX_USEC(100);
-  zx_instant_mono_t deadline = current_time() + timeout;
+  zx_instant_mono_t deadline = current_mono_time() + timeout;
 
   while (true) {
     if constexpr (condition == Condition::BLOCKED) {
@@ -669,7 +669,7 @@ bool TestThread::WaitFor() {
       }
     }
 
-    zx_instant_mono_t now = current_time();
+    zx_instant_mono_t now = current_mono_time();
     ASSERT_LT(now, deadline);
     Thread::Current::SleepRelative(poll_interval);
   }
@@ -1274,8 +1274,8 @@ bool pi_test_multi_waiter() {
         blocking_queue.ReleaseOneThread();
 
         TestThread* new_owner = nullptr;
-        zx_instant_mono_t deadline = current_time() + ZX_SEC(10);
-        while (current_time() < deadline) {
+        zx_instant_mono_t deadline = current_mono_time() + ZX_SEC(10);
+        while (current_mono_time() < deadline) {
           for (auto& w : waiters) {
             // If the waiter's is_waiting flag is set, but the thread has
             // reached the WAITING_FOR_SHUTDOWN state, then we know that

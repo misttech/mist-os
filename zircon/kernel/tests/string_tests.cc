@@ -137,11 +137,11 @@ static zx_duration_mono_t bench_memcpy_routine(void* memcpy_routine(void*, const
   int i;
   zx_instant_mono_t t0;
 
-  t0 = current_time();
+  t0 = current_mono_time();
   for (i = 0; i < ITERATIONS; i++) {
     memcpy_routine(g_dst + dstalign, g_src + srcalign, BUFFER_SIZE);
   }
-  return current_time() - t0;
+  return current_mono_time() - t0;
 }
 
 static void bench_memcpy(void) {
@@ -233,11 +233,11 @@ static zx_duration_mono_t bench_memset_routine(void* memset_routine(void*, int, 
   int i;
   zx_instant_mono_t t0;
 
-  t0 = current_time();
+  t0 = current_mono_time();
   for (i = 0; i < ITERATIONS; i++) {
     memset_routine(g_dst + dstalign, 0, len);
   }
-  return current_time() - t0;
+  return current_mono_time() - t0;
 }
 
 static void bench_memset(void) {

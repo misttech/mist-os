@@ -30,7 +30,7 @@
 // |current_ticks| is called.  For example:
 //
 //   // Make sure we spend no more than 30,000 nanoseconds in the loop, but
-//   // don't call current_ticks() more than once every 1,000 loop iterations.
+//   // don't call current_mono_ticks() more than once every 1,000 loop iterations.
 //   auto limiter = LoopLimiter<1000>::WithDuration(30000);
 //   while (!limiter.Exceeded()) {
 //     ...
@@ -57,14 +57,14 @@ class LoopLimiter {
   // Call once per loop iteration.
   bool Exceeded() {
     if constexpr (ItersPerGetTicks <= 1) {
-      const zx_instant_mono_ticks_t now = current_ticks();
+      const zx_instant_mono_ticks_t now = current_mono_ticks();
       return now >= deadline_ticks_;
     }
 
     ++iter_since_;
     if (iter_since_ >= ItersPerGetTicks) {
       iter_since_ = 0;
-      const zx_instant_mono_ticks_t now = current_ticks();
+      const zx_instant_mono_ticks_t now = current_mono_ticks();
       return now >= deadline_ticks_;
     }
     return false;
@@ -73,7 +73,7 @@ class LoopLimiter {
  private:
   explicit LoopLimiter(zx_duration_mono_ticks_t relative_ticks) {
     if (relative_ticks > 0) {
-      const zx_instant_mono_ticks_t now = current_ticks();
+      const zx_instant_mono_ticks_t now = current_mono_ticks();
       deadline_ticks_ = zx_ticks_add_ticks(now, relative_ticks);
     }
   }

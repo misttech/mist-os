@@ -25,7 +25,7 @@ class ContentionTimer {
   ~ContentionTimer() {
     ThreadDispatcher* user_thread = current_thread_->user_thread();
     if (likely(user_thread)) {
-      user_thread->AddLockContentionTicks(current_ticks() - start_ticks_);
+      user_thread->AddLockContentionTicks(current_mono_ticks() - start_ticks_);
     }
   }
 
@@ -47,7 +47,7 @@ class PageFaultTimer {
   ~PageFaultTimer() {
     ThreadDispatcher* user_thread = current_thread_->user_thread();
     if (likely(user_thread)) {
-      user_thread->AddPageFaultTicks(current_ticks() - start_ticks_);
+      user_thread->AddPageFaultTicks(current_mono_ticks() - start_ticks_);
     }
   }
 

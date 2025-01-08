@@ -209,7 +209,7 @@ class CriticalSectionLockupChecker {
   // (reboot).
   //
   // These values are expressed in units of ticks rather than nanoseconds because it is faster to
-  // read the platform timer's tick count than to get current_time().
+  // read the platform timer's tick count than to get current_mono_time().
   //
   // These variables are atomic because, although set early during lockup detector initialization,
   // their values may change to facilitate testing (see |lockup_set_cs_threshold_ticks|).  Use
@@ -392,7 +392,7 @@ Deadline DeadlineWithJitterAfter(zx_duration_t duration, uint32_t percent) {
 //    critical section of code, such as an SMC call).
 //
 void DoHeartbeatAndCheckPeerCpus(Timer* timer, zx_time_t now_mono, void* arg) {
-  const zx_ticks_t now_ticks = current_ticks();
+  const zx_ticks_t now_ticks = current_mono_ticks();
   const cpu_num_t current_cpu = arch_curr_cpu_num();
 
   // Record that we are still alive.
@@ -473,7 +473,7 @@ void start_heartbeats() {
   // To be safe, make sure we have a recent last heartbeat before activating.
   LockupDetectorState& state = gLockupDetectorPerCpuState[arch_curr_cpu_num()];
   auto& hb_state = state.heartbeat;
-  const zx_time_t now = current_time();
+  const zx_time_t now = current_mono_time();
   hb_state.last_heartbeat.store(now);
   hb_state.active.store(true);
 
@@ -557,7 +557,7 @@ void lockup_timed_begin(const char* name) {
     // sees the latest value.
     cs_state.name.store(name, ktl::memory_order_relaxed);
     if (CriticalSectionLockupChecker::IsEnabled()) {
-      const zx_ticks_t now = current_ticks();
+      const zx_ticks_t now = current_mono_ticks();
       // Use release semantics to ensure that if an observer sees this store to |begin_ticks|,
       // they will also see the stores that preceded it.
       cs_state.begin_ticks.store(now, ktl::memory_order_release);
@@ -569,7 +569,7 @@ void lockup_timed_end() {
   LockupDetectorState& state = gLockupDetectorPerCpuState[arch_curr_cpu_num()];
   lockup_internal::CallIfOuterAndLeave(state, [](LockupDetectorState& state) {
     // Is this a new worst for us?
-    const zx_ticks_t now_ticks = current_ticks();
+    const zx_ticks_t now_ticks = current_mono_ticks();
     auto& cs_state = state.critical_section;
     const zx_ticks_t begin = cs_state.begin_ticks.load(ktl::memory_order_relaxed);
     zx_ticks_t delta = zx_time_sub_time(now_ticks, begin);
@@ -617,7 +617,7 @@ void lockup_status() {
       const auto& cs_state = gLockupDetectorPerCpuState[i].critical_section;
       const zx_ticks_t begin_ticks = cs_state.begin_ticks.load(ktl::memory_order_acquire);
       const char* name = cs_state.name.load(ktl::memory_order_relaxed);
-      const zx_ticks_t now = current_ticks();
+      const zx_ticks_t now = current_mono_ticks();
       const int64_t worst_case_usec =
           TicksToDuration(cs_state.worst_case_ticks.load(ktl::memory_order_relaxed)) / ZX_USEC(1);
       if (begin_ticks == 0) {
@@ -646,7 +646,7 @@ void lockup_status() {
       continue;
     }
     const zx_time_t last_heartbeat = hb_state.last_heartbeat.load();
-    const zx_duration_t age = zx_time_sub_time(current_time(), last_heartbeat);
+    const zx_duration_t age = zx_time_sub_time(current_mono_time(), last_heartbeat);
     const zx_duration_t max_gap = hb_state.max_gap.load();
     printf("CPU-%u last heartbeat at %" PRId64 " ms, age is %" PRId64 " ms, max gap is %" PRId64
            " ms\n",
@@ -669,8 +669,8 @@ void lockup_trigger_spinlock(cpu_num_t cpu, zx_duration_t duration) {
     // Acquire a spinlock and hold it for |duration|.
     DECLARE_SINGLETON_SPINLOCK_WITH_TYPE(lockup_test_lock, MonitoredSpinLock);
     Guard<MonitoredSpinLock, IrqSave> guard{lockup_test_lock::Get(), SOURCE_TAG};
-    const zx_time_t deadline = zx_time_add_duration(current_time(), duration);
-    while (current_time() < deadline) {
+    const zx_time_t deadline = zx_time_add_duration(current_mono_time(), duration);
+    while (current_mono_time() < deadline) {
       arch::Yield();
     }
     return 0;
@@ -683,8 +683,8 @@ void lockup_trigger_critical_section(cpu_num_t cpu, zx_duration_t duration) {
     const zx_duration_t duration = *reinterpret_cast<zx_duration_t*>(arg);
     AutoPreemptDisabler preempt_disable;
     LOCKUP_TIMED_BEGIN("trigger-tool");
-    const zx_time_t deadline = zx_time_add_duration(current_time(), duration);
-    while (current_time() < deadline) {
+    const zx_time_t deadline = zx_time_add_duration(current_mono_time(), duration);
+    while (current_mono_time() < deadline) {
       arch::Yield();
     }
     LOCKUP_TIMED_END();

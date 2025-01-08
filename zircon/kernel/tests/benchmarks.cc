@@ -66,12 +66,12 @@ class InactiveCpuGuard {
 __NO_INLINE static void bench_cycles_per_second() {
   {
     InactiveCpuGuard inactive_cpu_guard;
-    const zx_instant_mono_ticks_t before_ticks = current_ticks();
+    const zx_instant_mono_ticks_t before_ticks = current_mono_ticks();
     const uint64_t before_cycles = arch::Cycles();
     for (size_t i = 0; i < 100000000; i++) {
       __asm__ volatile("");
     }
-    const zx_instant_mono_ticks_t after_ticks = current_ticks();
+    const zx_instant_mono_ticks_t after_ticks = current_mono_ticks();
     const uint64_t after_cycles = arch::Cycles();
     const zx_duration_mono_t delta_time =
         timer_get_ticks_to_time_ratio().Scale(after_ticks - before_ticks);

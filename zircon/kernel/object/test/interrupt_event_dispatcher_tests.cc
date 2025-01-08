@@ -72,7 +72,7 @@ static bool TestConcurrentIntEventDispatcherTeardown() {
   // Signal the thread by setting bits in the high byte.
   state.fetch_or(0xff00, ktl::memory_order_seq_cst);
   // Shutdown the test.
-  zx_status_t status = int_thread->Join(nullptr, current_time() + ZX_SEC(5));
+  zx_status_t status = int_thread->Join(nullptr, current_mono_time() + ZX_SEC(5));
   EXPECT_EQ(status, ZX_OK);
 #endif
 

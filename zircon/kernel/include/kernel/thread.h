@@ -909,7 +909,8 @@ class PreemptionState {
       state_.fetch_and(~kTimesliceExtensionFlagsMask);
       return (old_state & ~kTimesliceExtensionFlagsMask) == 0;
     }
-    const zx_instant_mono_t deadline = zx_time_add_duration(current_time(), extension_duration);
+    const zx_instant_mono_t deadline =
+        zx_time_add_duration(current_mono_time(), extension_duration);
     timeslice_extension_deadline_.store(deadline);
     // See comment at |timeslice_extension_deadline_| for why the signal fence
     // is needed.
@@ -963,7 +964,7 @@ class PreemptionState {
     //
     // See comment at |timeslice_extension_deadline_| for why the signal fence is needed.
     ktl::atomic_signal_fence(ktl::memory_order_acquire);
-    if (current_time() >= timeslice_extension_deadline_.load()) {
+    if (current_mono_time() >= timeslice_extension_deadline_.load()) {
       state_.fetch_and(~kTimesliceExtensionFlagsMask);
       return true;
     }

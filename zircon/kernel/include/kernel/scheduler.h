@@ -523,7 +523,7 @@ class Scheduler {
   };
 
   // Returns the current system time as a SchedTime value.
-  static SchedTime CurrentTime() { return SchedTime{current_time()}; }
+  static SchedTime CurrentTime() { return SchedTime{current_mono_time()}; }
 
   // Returns the Scheduler instance for the current CPU.
   static Scheduler* Get();

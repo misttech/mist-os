@@ -259,7 +259,7 @@ class ThreadBaseProfileChangedOp
     } else {
       DEBUG_ASSERT(target_new_ep.IsDeadline());
       // TODO(johngro): use the `now` time latched at the start of ThreadBaseProfileChanged instead?
-      GetStartTime(target_) = SchedTime{current_time()} + target_new_ep.deadline.deadline_ns;
+      GetStartTime(target_) = SchedTime{current_mono_time()} + target_new_ep.deadline.deadline_ns;
       GetFinishTime(target_) = GetStartTime(target_) + target_new_ep.deadline.deadline_ns;
     }
     GetTimeSliceNs(target_) = SchedDuration{0};

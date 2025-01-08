@@ -67,7 +67,7 @@ void DiscardableVmoTracker::UpdateDiscardableStateLocked(DiscardableState state)
       DEBUG_ASSERT(lock_count_ == 1);
 
       // Update the last unlock timestamp.
-      last_unlock_timestamp_ = current_time();
+      last_unlock_timestamp_ = current_mono_time();
 
       // Move to reclaim candidates list.
       MoveToReclaimCandidatesListLocked();

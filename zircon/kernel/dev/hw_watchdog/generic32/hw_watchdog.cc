@@ -111,7 +111,7 @@ class GenericWatchdog32 {
     // _actually_ pet the dog, but if we use it to schedule our next timer
     // deadline, we might end up scheduling our timers in the past, causing our
     // core to get stuck in its timer handler.
-    zx_time_t now = current_time();
+    zx_time_t now = current_mono_time();
     if (!is_petting_suppressed_) {
       last_pet_time_ = now;
       TakeAction(cfg_.pet_action);

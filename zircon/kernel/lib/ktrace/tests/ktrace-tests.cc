@@ -724,12 +724,12 @@ class TestKTraceState : public ::internal::KTraceState {
   }
 
   void ReportStaticNames() override {
-    last_static_name_report_time_ = current_time();
+    last_static_name_report_time_ = current_mono_time();
     ++static_name_report_count_;
   }
 
   void ReportThreadProcessNames() override {
-    last_thread_name_report_time_ = current_time();
+    last_thread_name_report_time_ = current_mono_time();
     ++thread_name_report_count_;
   }
 

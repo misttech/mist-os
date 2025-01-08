@@ -176,13 +176,13 @@ int IdlePowerThread::Run(void* arg) {
       // WARNING: Be careful not to do anything that could pend a preemption after the check above,
       // with the exception of the internal implementation of ArchIdlePowerThread::EnterIdleState.
 
-      const zx_instant_mono_t idle_start_time = current_time();
+      const zx_instant_mono_t idle_start_time = current_mono_time();
 
       // TODO(eieio): Use scheduler and timer states to determine latency requirements.
       const zx_duration_mono_t max_latency = 0;
       ArchIdlePowerThread::EnterIdleState(max_latency);
 
-      const zx_instant_mono_t idle_finish_time = current_time();
+      const zx_instant_mono_t idle_finish_time = current_mono_time();
 
       this_idle_power_thread.processor_idle_time_ns_ += idle_finish_time - idle_start_time;
 

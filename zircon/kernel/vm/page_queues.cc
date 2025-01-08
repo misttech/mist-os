@@ -360,7 +360,7 @@ void PageQueues::SynchronizeWithAging() {
 }
 
 ktl::variant<PageQueues::AgeReason, zx_instant_mono_t> PageQueues::GetAgeReasonLocked() const {
-  const zx_instant_mono_t current = current_time();
+  const zx_instant_mono_t current = current_mono_time();
   // Check if there is an active ratio that wants us to age.
   if (active_ratio_triggered_) {
     // Need to have passed the min time though.
@@ -523,7 +523,7 @@ void PageQueues::Dump() {
     }
     buf_len += write_len;
   }
-  zx_instant_mono_t current = current_time();
+  zx_instant_mono_t current = current_mono_time();
   timespec age_time = zx_timespec_from_duration(zx_time_sub_time(current, last_age_time));
   printf("pq: MRU generation is %" PRIu64
          " set %ld.%lds ago due to \"%s\", LRU generation is %" PRIu64 "\n",
@@ -543,7 +543,7 @@ void PageQueues::Dump() {
 // a full scan may happen inline in that method call, and get attributed directly to this thread.
 void PageQueues::MruThread() {
   // Pretend that aging happens during startup to simplify the rest of the loop logic.
-  last_age_time_ = current_time();
+  last_age_time_ = current_mono_time();
   unsigned int iterations_since_last_age = 0;
   while (!shutdown_threads_.load(ktl::memory_order_relaxed)) {
     // Normally we should retry the loop at most once (i.e. pass this line of code twice) if an
@@ -724,7 +724,7 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
     DeferPendingSignals dps{*this};
     Guard<SpinLock, IrqSave> guard{&lock_};
     mru_gen_.fetch_add(1, ktl::memory_order_relaxed);
-    last_age_time_ = current_time();
+    last_age_time_ = current_mono_time();
     last_age_reason_ = reason;
     // Update the active/inactive counts. We could be a bit smarter here since we know exactly which
     // active bucket might have changed, but this will work.

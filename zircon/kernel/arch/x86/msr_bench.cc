@@ -447,7 +447,7 @@ int BenchmarkState::RunContext(CpuContext& ctx) {
 
           zx_duration_mono_ticks_t ticks =
               timer_get_ticks_to_time_ratio().Inverse().Scale(kMeasurementTime);
-          ticks_deadline_.store(current_ticks() + ticks);
+          ticks_deadline_.store(current_mono_ticks() + ticks);
           ready_to_start_count_.fetch_add(1);
         } else {
           ready_to_start_count_.fetch_add(1);
@@ -462,12 +462,12 @@ int BenchmarkState::RunContext(CpuContext& ctx) {
         size_t count = 0;
         zx_instant_mono_ticks_t end = 0;
         zx_duration_mono_ticks_t deadline = ticks_deadline_.load();
-        zx_instant_mono_ticks_t start = current_ticks();
+        zx_instant_mono_ticks_t start = current_mono_ticks();
 
         do {
           action(0xc235754ef00c463d, 0x9ba8562ddc0932cf);
           ++count;
-        } while ((end = current_ticks()) < deadline);
+        } while ((end = current_mono_ticks()) < deadline);
 
         // Record our results;
         ctx.results[stage].start = start;

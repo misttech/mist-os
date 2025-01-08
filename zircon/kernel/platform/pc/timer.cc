@@ -77,7 +77,7 @@ KCOUNTER(platform_timer_cancel_counter, "platform.timer.cancel")
 // sent from the scheduler.
 
 enum clock_source {
-  // Used before wall_clock is selected. current_ticks() returns 0.
+  // Used before wall_clock is selected. current_mono_ticks() returns 0.
   CLOCK_UNSELECTED = 0,
 
   CLOCK_TSC,
@@ -274,7 +274,7 @@ zx_instant_mono_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts) {
     // and use the average of those two values to create the ticks half of the
     // correspondence pair.
     uint64_t before_tsc = current_ticks_rdtsc();
-    zx_instant_mono_t now_mono = current_time();
+    zx_instant_mono_t now_mono = current_mono_time();
     uint64_t after_tsc = current_ticks_rdtsc();
     uint64_t now_tsc = (before_tsc >> 1) + (after_tsc >> 1) + (before_tsc & after_tsc & 1);
     int64_t time_till_tsc_timestamp = zx_time_sub_time(ts, now_tsc);

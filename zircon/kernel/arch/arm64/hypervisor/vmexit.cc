@@ -86,7 +86,7 @@ zx::result<> handle_wfi_wfe_instruction(uint32_t iss, GuestState* guest_state,
   if (timer_enabled(guest_state)) {
     zx_instant_mono_ticks_t guest_ticks_deadline =
         convert_raw_ticks_to_mono_ticks(guest_state->cntv_cval_el0);
-    if (current_ticks() >= guest_ticks_deadline) {
+    if (current_mono_ticks() >= guest_ticks_deadline) {
       return zx::ok();
     }
     deadline = timer_get_ticks_to_time_ratio().Scale(guest_ticks_deadline);
@@ -480,7 +480,7 @@ DataAbort::DataAbort(uint32_t iss) {
 void timer_maybe_interrupt(GuestState* guest_state, GichState* gich_state) {
   if (timer_enabled(guest_state)) {
     zx_ticks_t guest_ticks_deadline = convert_raw_ticks_to_mono_ticks(guest_state->cntv_cval_el0);
-    if (current_ticks() >= guest_ticks_deadline) {
+    if (current_mono_ticks() >= guest_ticks_deadline) {
       gich_state->Track(kTimerVector);
     }
   }

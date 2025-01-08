@@ -162,8 +162,8 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   using CompressResult = VmCompressor::CompressResult;
   CompressResult Compress(const void* page_src, zx_instant_mono_ticks_t now);
 
-  // Wrapper that passes current_ticks() as |now|
-  CompressResult Compress(const void* page_src) { return Compress(page_src, current_ticks()); }
+  // Wrapper that passes current_mono_ticks() as |now|
+  CompressResult Compress(const void* page_src) { return Compress(page_src, current_mono_ticks()); }
 
   // Decompresses and frees the provided reference into |page_dest| and |metadata_dest|. This cannot
   // fail and always produces PAGE_SIZE worth of data. After calling this the reference is no longer
@@ -177,9 +177,9 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest,
                   zx_instant_mono_ticks_t now);
 
-  // Wrapper that passes current_ticks() as |now|
+  // Wrapper that passes current_mono_ticks() as |now|
   void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest) {
-    Decompress(ref, page_dest, metadata_dest, current_ticks());
+    Decompress(ref, page_dest, metadata_dest, current_mono_ticks());
   }
 
   // Free the compressed reference without decompressing it.

@@ -45,8 +45,8 @@ class TestThreadSampler : public sampler::ThreadSamplerDispatcher {
 
     constexpr fxt::StringRef<fxt::RefType::kId> empty_string{0};
     const fxt::ThreadRef current_thread{pid, tid};
-    fxt::WriteLargeBlobRecordWithMetadata(&cpu_state, current_ticks(), empty_string, empty_string,
-                                          current_thread, bt,
+    fxt::WriteLargeBlobRecordWithMetadata(&cpu_state, current_mono_ticks(), empty_string,
+                                          empty_string, current_thread, bt,
                                           sizeof(uint64_t) * kMaxUserBacktraceSize);
   }
 
@@ -96,7 +96,7 @@ class TestThreadSampler : public sampler::ThreadSamplerDispatcher {
 
       ASSERT_TRUE(test_state->StartImpl().is_ok());
 
-      zx_instant_mono_ticks_t before = current_ticks();
+      zx_instant_mono_ticks_t before = current_mono_ticks();
       //  Write some fake samples to each buffer on each cpu
       mp_sync_exec(
           MP_IPI_TARGET_ALL, 0,
@@ -106,7 +106,7 @@ class TestThreadSampler : public sampler::ThreadSamplerDispatcher {
                                               nullptr);
           },
           test_state.get());
-      zx_instant_mono_ticks_t after = current_ticks();
+      zx_instant_mono_ticks_t after = current_mono_ticks();
       ASSERT_TRUE(test_state->StopImpl().is_ok());
 
       // We should now be able to read the records

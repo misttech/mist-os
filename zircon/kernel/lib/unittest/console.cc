@@ -95,7 +95,7 @@ bool run_unittest(const unittest_testcase_registration_t* testcase) {
   unittest_printf("%s : Running %zu test%s...\n", testcase->name, testcase->test_cnt,
                   testcase->test_cnt == 1 ? "" : "s");
 
-  zx_instant_mono_t testcase_start = current_time();
+  zx_instant_mono_t testcase_start = current_mono_time();
 
   for (unsigned long j = 0; j < g_repeat; j++) {
     for (size_t i = 0; i < testcase->test_cnt; ++i) {
@@ -106,9 +106,9 @@ bool run_unittest(const unittest_testcase_registration_t* testcase) {
       const cpu_mask_t online_mask_before = mp_get_online_mask();
       const cpu_mask_t active_mask_before = Scheduler::PeekActiveMask();
 
-      const zx_instant_mono_t test_start = current_time();
+      const zx_instant_mono_t test_start = current_mono_time();
       bool good = (test->fn ? test->fn() : false);
-      const zx_duration_mono_t test_runtime = current_time() - test_start;
+      const zx_duration_mono_t test_runtime = current_mono_time() - test_start;
 
       // Make sure that this test didn't change the online or active state of any CPUs.
       const cpu_mask_t online_mask_after = mp_get_online_mask();
@@ -137,7 +137,7 @@ bool run_unittest(const unittest_testcase_registration_t* testcase) {
     }
   }
 
-  zx_duration_mono_t testcase_runtime = current_time() - testcase_start;
+  zx_duration_mono_t testcase_runtime = current_mono_time() - testcase_start;
 
   unittest_printf("%s : %sll tests passed (%zu/%zu) in %" PRIi64 " nSec\n", testcase->name,
                   passed != testcase->test_cnt ? "Not a" : "A", passed, testcase->test_cnt,

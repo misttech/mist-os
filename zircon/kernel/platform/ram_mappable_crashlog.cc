@@ -55,7 +55,7 @@ void RamMappableCrashlog::Finalize(zircon_crash_reason_t reason, size_t amt) {
   // The RAM crashlog library will gracefully handle a nullptr or 0 length here;
   // no need to explicitly check that they are valid.
   ram_crashlog_stow(crashlog_buffer_.data(), crashlog_buffer_.size(), render_target_.data(),
-                    static_cast<uint32_t>(amt), reason, current_time());
+                    static_cast<uint32_t>(amt), reason, current_mono_time());
 }
 
 size_t RamMappableCrashlog::Recover(FILE* tgt) {
@@ -246,7 +246,7 @@ void RamMappableCrashlog::UpdateUptimeLocked() {
     constexpr zx_duration_t kDefaultUpdateInterval = ZX_SEC(1);
 
     ram_crashlog_stow(crashlog_buffer_.data(), crashlog_buffer_.size(), nullptr, 0,
-                      ZirconCrashReason::Unknown, current_time());
+                      ZirconCrashReason::Unknown, current_mono_time());
 
     Deadline next_update_time =
         Deadline::after(kDefaultUpdateInterval, {kDefaultUpdateInterval / 2, TIMER_SLACK_CENTER});

@@ -50,7 +50,7 @@ void watchdog_hw_set_enabled(bool enabled) {
   platform_watchdog_set_enabled(enabled);
   if (enabled) {
     timer_set_oneshot(&hw_watchdog_timer,
-                      zx_time_add_duration(current_time(), hw_watchdog_pet_timeout),
+                      zx_time_add_duration(current_mono_time(), hw_watchdog_pet_timeout),
                       hw_watchdog_timer_callback, NULL);
   } else {
     timer_cancel(&hw_watchdog_timer);

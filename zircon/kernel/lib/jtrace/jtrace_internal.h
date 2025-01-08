@@ -206,7 +206,7 @@ class JTrace {
         Thread::Current::preemption_state().PreemptDisable();
       }
 
-      entry.ts_ticks = current_ticks();
+      entry.ts_ticks = current_mono_ticks();
       if (entry.ts_ticks == 0) {
         entry.ts_ticks = kZeroReplacement;
       }
@@ -251,16 +251,16 @@ class JTrace {
 
     const affine::Ratio ticks_to_time_ratio = timer_get_ticks_to_time_ratio();
     const zx_ticks_t deadline =
-        zx_ticks_add_ticks(current_ticks(), ticks_to_time_ratio.Inverse().Scale(timeout));
+        zx_ticks_add_ticks(current_mono_ticks(), ticks_to_time_ratio.Inverse().Scale(timeout));
     while ((trace_ops_in_flight_.load(ktl::memory_order_acquire) > 0) &&
-           (current_ticks() < deadline)) {
+           (current_mono_ticks() < deadline)) {
       // just spin while we wait.
       arch::Yield();
     }
 
     // Print a warning if we never saw the in flight op-count hit zero, then go
     // ahead and dump the current buffer.
-    if (current_ticks() >= deadline) {
+    if (current_mono_ticks() >= deadline) {
       hooks_.PrintWarning(
           "Warning: ops in flight was never observed at zero while waiting to dump the current "
           "trace buffer.  Some trace records might be corrupt.\n");

@@ -108,7 +108,7 @@ static void timer_diag_coalescing(TimerSlack slack, const zx_instant_mono_t* dea
 
   // Wait for the timers to fire.
   while (timer_count.load() != count) {
-    Thread::Current::Sleep(current_time() + ZX_MSEC(5));
+    Thread::Current::Sleep(current_mono_time() + ZX_MSEC(5));
   }
 
   // Cancel all the timers prior to going out of scope
@@ -118,7 +118,7 @@ static void timer_diag_coalescing(TimerSlack slack, const zx_instant_mono_t* dea
 }
 
 static void timer_diag_coalescing_center(void) {
-  zx_instant_mono_t when = current_time() + ZX_MSEC(1);
+  zx_instant_mono_t when = current_mono_time() + ZX_MSEC(1);
   zx_duration_mono_t off = ZX_USEC(10);
   TimerSlack slack = {2u * off, TIMER_SLACK_CENTER};
 
@@ -140,7 +140,7 @@ static void timer_diag_coalescing_center(void) {
 }
 
 static void timer_diag_coalescing_late(void) {
-  zx_instant_mono_t when = current_time() + ZX_MSEC(1);
+  zx_instant_mono_t when = current_mono_time() + ZX_MSEC(1);
   zx_duration_mono_t off = ZX_USEC(10);
   TimerSlack slack = {3u * off, TIMER_SLACK_LATE};
 
@@ -161,7 +161,7 @@ static void timer_diag_coalescing_late(void) {
 }
 
 static void timer_diag_coalescing_early(void) {
-  zx_instant_mono_t when = current_time() + ZX_MSEC(1);
+  zx_instant_mono_t when = current_mono_time() + ZX_MSEC(1);
   zx_duration_mono_t off = ZX_USEC(10);
   TimerSlack slack = {3u * off, TIMER_SLACK_EARLY};
 
@@ -187,7 +187,7 @@ static void timer_far_deadline(void) {
 
   const Deadline deadline = Deadline::no_slack(ZX_TIME_INFINITE - 5);
   timer.Set(deadline, timer_diag_cb, &event);
-  zx_status_t st = event.WaitDeadline(current_time() + ZX_MSEC(100), Interruptible::No);
+  zx_status_t st = event.WaitDeadline(current_mono_time() + ZX_MSEC(100), Interruptible::No);
   if (st != ZX_ERR_TIMED_OUT) {
     printf("error: unexpected timer fired!\n");
   } else {
@@ -328,7 +328,7 @@ static bool cancel_after_fired() {
   BEGIN_TEST;
   timer_args arg{};
   Timer t;
-  const Deadline deadline = Deadline::no_slack(current_time());
+  const Deadline deadline = Deadline::no_slack(current_mono_time());
   t.Set(deadline, timer_cb, &arg);
   while (!arg.timer_fired.load()) {
   }
@@ -348,7 +348,7 @@ static bool cancel_from_callback() {
   timer_args arg{};
   arg.result = 1;
   Timer t;
-  const Deadline deadline = Deadline::no_slack(current_time());
+  const Deadline deadline = Deadline::no_slack(current_mono_time());
   t.Set(deadline, timer_cancel_cb, &arg);
   while (!arg.timer_fired.load()) {
   }
@@ -371,7 +371,7 @@ static bool set_from_callback() {
   timer_args arg{};
   arg.remaining = 5;
   Timer t;
-  const Deadline deadline = Deadline::no_slack(current_time());
+  const Deadline deadline = Deadline::no_slack(current_mono_time());
   t.Set(deadline, timer_set_cb, &arg);
   while (arg.remaining.load() > 0) {
   }
@@ -567,10 +567,10 @@ static bool deadline_after() {
   // Test for this as well.
   for (const auto& slack : kSlackModes) {
     constexpr zx_duration_mono_t kTimeout = ZX_MSEC(10);
-    zx_instant_mono_t before = zx_time_add_duration(current_time(), kTimeout);
+    zx_instant_mono_t before = zx_time_add_duration(current_mono_time(), kTimeout);
     Deadline deadline =
         slack.has_value() ? Deadline::after(kTimeout, slack.value()) : Deadline::after(kTimeout);
-    zx_instant_mono_t after = zx_time_add_duration(current_time(), kTimeout);
+    zx_instant_mono_t after = zx_time_add_duration(current_mono_time(), kTimeout);
     ASSERT_LE(before, deadline.when());
     ASSERT_GE(after, deadline.when());
 

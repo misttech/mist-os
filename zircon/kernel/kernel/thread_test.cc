@@ -687,8 +687,8 @@ bool set_migrate_fn_stress_test() {
         // Spin or sleep for 100us.
         const zx_duration_mono_t delay = ZX_USEC(100);
         if (rand() & 1) {
-          const zx_instant_mono_t spin_end = zx_time_add_duration(current_time(), delay);
-          while (current_time() < spin_end) {
+          const zx_instant_mono_t spin_end = zx_time_add_duration(current_mono_time(), delay);
+          while (current_mono_time() < spin_end) {
           }
         } else {
           Thread::Current::SleepRelative(delay);
@@ -914,15 +914,15 @@ struct TaskRuntimeStatsTests {
     EXPECT_EQ(0, trs.lock_contention_ticks);
 
     auto DelayTicks = [](zx_duration_mono_ticks_t ticks) {
-      zx_instant_mono_ticks_t deadline = current_ticks() + kCpuTicks;
+      zx_instant_mono_ticks_t deadline = current_mono_ticks() + kCpuTicks;
       do {
         arch::Yield();
-      } while (current_ticks() < deadline);
+      } while (current_mono_ticks() < deadline);
     };
 
     // Test that runtime is calculated as a function of the stats and the current time spent queued.
     // When the state is set to THREAD_READY, TotalRuntime calculates queue_ticks as:
-    //   runtime.queue_ticks + (current_ticks() - state_change_ticks)
+    //   runtime.queue_ticks + (current_mono_ticks() - state_change_ticks)
     //
     stats.Update(thread_state::THREAD_READY, ThreadRuntimeStats::IrqSave);
 
@@ -947,7 +947,7 @@ struct TaskRuntimeStatsTests {
     // current time spent running. When the state is set to THREAD_RUNNING,
     // TotalRuntime calculates cpu_ticks as:
     //
-    // runtime.cpu_ticks + (current_ticks() - state_change_ticks)
+    // runtime.cpu_ticks + (current_mono_ticks() - state_change_ticks)
     //
     // Start by changing state to running.
     stats.Update(thread_state::THREAD_RUNNING, ThreadRuntimeStats::IrqSave);

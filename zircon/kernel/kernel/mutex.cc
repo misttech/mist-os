@@ -257,7 +257,7 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
   }
 
   // Remember the last call to current_ticks.
-  zx_instant_mono_ticks_t now_ticks = current_ticks();
+  zx_instant_mono_ticks_t now_ticks = current_mono_ticks();
   spin_tracing::Tracer<kSchedulerLockSpinTracingEnabled> spin_tracer{now_ticks};
 
   const affine::Ratio time_to_ticks = timer_get_ticks_to_time_ratio().Inverse();
@@ -317,7 +317,7 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
 
     // Give the arch a chance to relax the CPU.
     arch::Yield();
-    now_ticks = current_ticks();
+    now_ticks = current_mono_ticks();
   } while (now_ticks < spin_until_ticks);
 
   // Capture the end-of-spin timestamp for our spin tracer, but do not finish
