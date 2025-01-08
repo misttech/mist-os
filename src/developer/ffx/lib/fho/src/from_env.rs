@@ -833,7 +833,7 @@ impl TryFromEnv for fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy 
                         let message = format!("Failed connecting to remote control proxy: {ffx_e}");
                         Err(e).user_message(message)
                     } else {
-                        Err(e).user_message("Failed to create remote control proxy")
+                        Err(e).user_message("Failed to create remote control proxy. Please check the connection to the target;`ffx doctor -v` may help diagnose the issue.")
                     }
                 }
             },
@@ -853,7 +853,7 @@ impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
                         let message = format!("Failed connecting to remote control proxy: {ffx_e}");
                         Err(e).user_message(message)
                     } else {
-                        Err(e).user_message("Failed to create remote control proxy")
+                        Err(e).user_message("Failed to create remote control proxy. Please check the connection to the target;`ffx doctor -v` may help diagnose the issue.")
                     }
                 }
             },
