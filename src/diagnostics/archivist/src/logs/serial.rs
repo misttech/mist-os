@@ -8,13 +8,13 @@ use diagnostics_data::{Data, Logs};
 use fidl_fuchsia_diagnostics::{Selector, StreamMode};
 use fuchsia_trace as ftrace;
 use futures::StreamExt;
+use log::warn;
 use selectors::FastError;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::io::{self, Write};
 use std::sync::Arc;
-use tracing::warn;
 
 const MAX_SERIAL_WRITE_SIZE: usize = 256;
 
@@ -41,7 +41,7 @@ impl SerialConfig {
                         ..Selector::default()
                     }),
                     Err(err) => {
-                        warn!(%selector, ?err, "Failed to parse component selector");
+                        warn!(selector:%, err:?; "Failed to parse component selector");
                         None
                     }
                 }
@@ -80,8 +80,8 @@ impl Write for SerialSink {
             if buffer.len() > MAX_SERIAL_WRITE_SIZE && !ALREADY_LOGGED.swap(true, Ordering::Relaxed)
             {
                 let size = buffer.len();
-                tracing::error!(
-                    size,
+                log::error!(
+                    size;
                     "Skipping write to serial due to internal error. Exceeded max buffer size."
                 );
                 return Ok(buffer.len());

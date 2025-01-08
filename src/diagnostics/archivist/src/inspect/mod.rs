@@ -13,9 +13,9 @@ use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
 use fuchsia_inspect::reader::PartialNodeHierarchy;
 use fuchsia_trace as ftrace;
 use futures::prelude::*;
+use log::error;
 use selectors::SelectorExt;
 use std::sync::Arc;
-use tracing::error;
 
 pub mod collector;
 pub mod container;
@@ -276,7 +276,7 @@ impl ReaderServer {
                     .collect::<Result<Vec<_>, _>>()
                     .unwrap_or_else(|err| {
                         error!(
-                            moniker = ?pumped_inspect_data.identity.moniker, ?err,
+                            moniker:? = pumped_inspect_data.identity.moniker, err:?;
                             "Failed to evaluate client selectors",
                         );
                         Vec::new()
@@ -288,7 +288,7 @@ impl ReaderServer {
                     match matching_selectors.try_into() {
                         Ok(hierarchy_matcher) => Some(hierarchy_matcher),
                         Err(e) => {
-                            error!(?e, "Failed to create hierarchy matcher");
+                            error!(e:?; "Failed to create hierarchy matcher");
                             None
                         }
                     }

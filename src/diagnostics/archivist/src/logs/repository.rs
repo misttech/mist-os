@@ -10,7 +10,6 @@ use crate::logs::debuglog::{DebugLog, DebugLogBridge, KERNEL_IDENTITY};
 use crate::logs::multiplex::{Multiplexer, MultiplexerHandleAction};
 use crate::logs::shared_buffer::SharedBuffer;
 use crate::logs::stats::LogStreamStats;
-use crate::severity_filter::KlogSeverityFilter;
 use anyhow::format_err;
 use diagnostics_data::{LogsData, Severity};
 use fidl_fuchsia_diagnostics::{
@@ -23,13 +22,13 @@ use fuchsia_url::boot_url::BootUrl;
 use fuchsia_url::AbsoluteComponentUrl;
 use futures::channel::mpsc;
 use futures::prelude::*;
+use log::{debug, error, LevelFilter};
 use moniker::{ExtendedMoniker, Moniker};
 use selectors::SelectorExt;
 use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, LazyLock, Weak};
-use tracing::{debug, error};
 use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace};
 
 // LINT.IfChange
@@ -149,7 +148,7 @@ impl LogsRepository {
             let mut messages = match kernel_logger.existing_logs() {
                 Ok(messages) => messages,
                 Err(e) => {
-                    error!(%e, "failed to read from kernel log, important logs may be missing");
+                    error!(e:%; "failed to read from kernel log, important logs may be missing");
                     return;
                 }
             };
@@ -166,7 +165,7 @@ impl LogsRepository {
                 })
                 .await;
             if let Err(e) = res {
-                error!(%e, "failed to drain kernel log, important logs may be missing");
+                error!(e:%; "failed to drain kernel log, important logs may be missing");
             }
         });
     }
@@ -280,7 +279,7 @@ impl EventConsumer for LogsRepository {
                 component,
                 request_stream,
             }) => {
-                debug!(identity = %component, "LogSink requested.");
+                debug!(identity:% = component; "LogSink requested.");
                 let container = self.get_log_container(component);
                 container.handle_log_sink(request_stream, self.scope_handle.clone());
             }
@@ -393,29 +392,30 @@ impl LogsRepositoryState {
         selectors: &[LogInterestSelector],
         clear_interest: bool,
     ) {
-        tracing::dispatcher::get_default(|dispatcher| {
-            let Some(publisher) = dispatcher.downcast_ref::<KlogSeverityFilter>() else {
-                return;
-            };
-            let lowest_selector = selectors
-                .iter()
-                .filter(|selector| {
-                    ARCHIVIST_MONIKER
-                        .matches_component_selector(&selector.selector)
-                        .unwrap_or(false)
-                })
-                .min_by_key(|selector| {
-                    selector.interest.min_severity.unwrap_or(FidlSeverity::Info)
-                });
-            if let Some(selector) = lowest_selector {
-                if clear_interest {
-                    publisher.set_severity(FidlSeverity::Info);
-                } else {
-                    publisher
-                        .set_severity(selector.interest.min_severity.unwrap_or(FidlSeverity::Info));
-                }
+        let lowest_selector = selectors
+            .iter()
+            .filter(|selector| {
+                ARCHIVIST_MONIKER.matches_component_selector(&selector.selector).unwrap_or(false)
+            })
+            .min_by_key(|selector| selector.interest.min_severity.unwrap_or(FidlSeverity::Info));
+        if let Some(selector) = lowest_selector {
+            if clear_interest {
+                log::set_max_level(LevelFilter::Info);
+            } else {
+                log::set_max_level(
+                    match selector.interest.min_severity.unwrap_or(FidlSeverity::Info) {
+                        FidlSeverity::Trace => LevelFilter::Trace,
+                        FidlSeverity::Debug => LevelFilter::Debug,
+                        FidlSeverity::Info => LevelFilter::Info,
+                        FidlSeverity::Warn => LevelFilter::Warn,
+                        FidlSeverity::Error => LevelFilter::Error,
+                        // Log has no "Fatal" level, so set it to Error
+                        // instead.
+                        FidlSeverity::Fatal => LevelFilter::Error,
+                    },
+                );
             }
-        });
+        }
     }
 
     fn update_logs_interest(&mut self, connection_id: usize, selectors: Vec<LogInterestSelector>) {

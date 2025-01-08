@@ -13,12 +13,12 @@ use fuchsia_async as fasync;
 use fuchsia_async::condition::{Condition, WakerEntry};
 use fuchsia_sync::Mutex;
 use futures::Stream;
+use log::debug;
 use pin_project::{pin_project, pinned_drop};
 use std::ops::{Deref, DerefMut, Range};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tracing::debug;
 use zerocopy::FromBytes;
 use zx::AsHandleRef as _;
 
@@ -512,7 +512,7 @@ impl ContainerInfo {
                 .prev = prev;
         }
         sockets.free(socket_id.0);
-        debug!(%self.identity, "Socket closed.");
+        debug!(identity:% = self.identity; "Socket closed.");
     }
 }
 

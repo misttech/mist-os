@@ -7,7 +7,7 @@ use anyhow::Error;
 use fcomponent::EventStreamProxy;
 use fidl_fuchsia_component as fcomponent;
 use fuchsia_component::client::connect_to_protocol_at_path;
-use tracing::warn;
+use log::warn;
 
 pub struct EventSource {
     dispatcher: Dispatcher,
@@ -40,7 +40,7 @@ impl EventSource {
                         }
                     }
                     Err(err) => {
-                        warn!(?err, "Failed to interpret event");
+                        warn!(err:?; "Failed to interpret event");
                     }
                 }
             }

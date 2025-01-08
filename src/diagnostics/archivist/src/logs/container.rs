@@ -20,13 +20,13 @@ use futures::future::{Fuse, FusedFuture};
 use futures::prelude::*;
 use futures::select;
 use futures::stream::StreamExt;
+use log::{debug, error, warn};
 use selectors::SelectorExt;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::pin::pin;
 use std::sync::Arc;
 use std::task::Poll;
-use tracing::{debug, error, warn};
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 pub type OnInactive = Box<dyn Fn(&LogsArtifactsContainer) + Send + Sync>;
@@ -240,7 +240,7 @@ impl LogsArtifactsContainer {
         scope: fasync::ScopeHandle,
     ) {
         let mut previous_interest_sent = None;
-        debug!(%self.identity, "Draining LogSink channel.");
+        debug!(identity:% = self.identity; "Draining LogSink channel.");
 
         let mut hanging_gets = Vec::new();
         let mut interest_changed = pin!(Fuse::terminated());
@@ -266,7 +266,7 @@ impl LogsArtifactsContainer {
                             // it below.
                             hanging_gets.push(responder);
                         }
-                        Err(e) => error!(%self.identity, %e, "error handling log sink"),
+                        Err(e) => error!(identity:% = self.identity, e:%; "error handling log sink"),
                     }
                 }
                 _ = interest_changed => {}
@@ -299,7 +299,7 @@ impl LogsArtifactsContainer {
             }
         }
 
-        debug!(%self.identity, "LogSink channel closed.");
+        debug!(identity:% = self.identity; "LogSink channel closed.");
         self.state.lock().num_active_channels -= 1;
         self.check_inactive();
     }
@@ -310,18 +310,18 @@ impl LogsArtifactsContainer {
     where
         E: Encoding + Unpin,
     {
-        debug!(%self.identity, "Draining messages from a socket.");
+        debug!(identity:% = self.identity; "Draining messages from a socket.");
         loop {
             match log_stream.next().await {
                 Some(Ok(message)) => self.ingest_message(message),
                 Some(Err(err)) => {
-                    warn!(source = %self.identity, %err, "closing socket");
+                    warn!(source:% = self.identity, err:%; "closing socket");
                     break;
                 }
                 None => break,
             }
         }
-        debug!(%self.identity, "Socket closed.");
+        debug!(identity:% = self.identity; "Socket closed.");
         self.state.lock().num_active_legacy_sockets -= 1;
         self.check_inactive();
     }

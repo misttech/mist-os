@@ -6,8 +6,8 @@ use crate::logs::error::LogsError;
 use crate::logs::repository::LogsRepository;
 use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker};
 use futures::StreamExt;
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 use {fidl_fuchsia_diagnostics as fdiagnostics, fuchsia_async as fasync};
 
 pub struct LogSettingsServer {

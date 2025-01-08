@@ -9,12 +9,12 @@ use fidl_fuchsia_diagnostics::{
 use fuchsia_sync::Mutex;
 
 use futures::prelude::*;
+use log::{error, warn};
 use serde::Serialize;
 use std::io::{BufWriter, Result as IoResult, Write};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tracing::{error, warn};
 
 pub type FormattedStream =
     Pin<Box<dyn Stream<Item = Vec<Result<FormattedContent, AccessorError>>> + Send>>;
@@ -320,7 +320,7 @@ where
         if writer_tail > *this.max_packet_size {
             error!(
                 actual = writer_tail,
-                max = *this.max_packet_size,
+                max = *this.max_packet_size;
                 "returned a string longer than maximum specified",
             )
         }

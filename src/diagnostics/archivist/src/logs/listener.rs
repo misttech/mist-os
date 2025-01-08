@@ -8,11 +8,11 @@ use fidl_fuchsia_logger::{
     LogFilterOptions, LogListenerSafeMarker, LogListenerSafeProxy, LogMessage,
 };
 use futures::prelude::*;
+use log::{debug, error, trace};
 use logmessage_measure_tape::Measurable as _;
 use std::sync::Arc;
 use std::task::Poll;
 use thiserror::Error;
-use tracing::{debug, error, trace};
 
 mod filter;
 
@@ -181,7 +181,7 @@ impl Listener {
             if e.is_closed() {
                 self.status = Status::Stale;
             } else {
-                error!(?e, "Error calling listener");
+                error!(e:?; "Error calling listener");
             }
         }
     }

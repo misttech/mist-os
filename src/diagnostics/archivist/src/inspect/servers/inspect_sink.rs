@@ -10,8 +10,8 @@ use crate::inspect::repository::InspectRepository;
 use anyhow::Error;
 use fidl::endpoints::{ControlHandle, Responder};
 use futures::StreamExt;
+use log::warn;
 use std::sync::Arc;
-use tracing::warn;
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
 pub struct InspectSinkServer {
@@ -56,7 +56,7 @@ impl InspectSinkServer {
                     payload: finspect::InspectSinkPublishRequest { tree: None, name, .. },
                     control_handle,
                 } => {
-                    warn!(name, %component, "InspectSink/Publish without a tree");
+                    warn!(name:?, component:%; "InspectSink/Publish without a tree");
                     control_handle.shutdown();
                 }
                 finspect::InspectSinkRequest::Escrow {
@@ -83,9 +83,9 @@ impl InspectSinkServer {
                     payload: finspect::InspectSinkEscrowRequest { vmo, token, .. },
                 } => {
                     warn!(
-                        %component,
+                        component:%,
                         has_vmo = vmo.is_some(),
-                        has_token = token.is_some(),
+                        has_token = token.is_some();
                         "Attempted to escrow inspect without required data"
                     );
                     control_handle.shutdown();
@@ -105,7 +105,7 @@ impl InspectSinkServer {
                     responder,
                     payload: finspect::InspectSinkFetchEscrowRequest { token: None, .. },
                 } => {
-                    warn!(%component, "Attempted to fetch escrowed inspect with invalid data");
+                    warn!(component:%; "Attempted to fetch escrowed inspect with invalid data");
                     responder.control_handle().shutdown();
                 }
                 finspect::InspectSinkRequest::_UnknownMethod {
@@ -114,7 +114,7 @@ impl InspectSinkServer {
                     method_type,
                     ..
                 } => {
-                    warn!(ordinal, ?method_type, "Received unknown request for InspectSink");
+                    warn!(ordinal, method_type:?; "Received unknown request for InspectSink");
                     // Close the connection if we receive an unknown interaction.
                     control_handle.shutdown();
                 }
