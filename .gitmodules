@@ -723,3 +723,18 @@
 	url = https://fuchsia.googlesource.com/third_party/spirv-tools
 	name = third_party/spirv-tools
 	ignore = all
+[submodule "third_party/android/platform/frameworks/native"]
+	path = third_party/android/platform/frameworks/native
+	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/frameworks/native
+	name = third_party/android.googlesource.com/platform/frameworks/native
+	ignore = all
+[submodule "third_party/android/platform/system/logging"]
+	path = third_party/android/platform/system/logging
+	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/system/logging
+	name = third_party/android.googlesource.com/platform/system/logging
+	ignore = all
+[submodule "third_party/android/platform/system/tools/aidl"]
+	path = third_party/android/platform/system/tools/aidl
+	url = https://fuchsia.googlesource.com/third_party/android/platform/system/tools/aidl
+	name = third_party/android/platform/system/tools/aidl
+	ignore = all
