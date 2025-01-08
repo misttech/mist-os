@@ -1,0 +1,25 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.ui.display.singleton;
+
+using zx;
+
+/// Controls the power state of the default display device.
+@available(added=HEAD)
+@discoverable
+open protocol DisplayPower {
+    /// Set the power state of the default connected display device to `power_on`.
+    ///
+    /// When successfull, the connected display is turned on or off. Once the
+    /// display device is turned off, [`fuchsia.hardware.display/Coordinator`]
+    /// clients will not receive `OnVsync` events anymore until the display device is
+    /// turned on again.
+    ///
+    /// Fails with ZX_ERR_NOT_SUPPORTED if the connected display fails to turn on/off.
+    ///
+    /// All display devices are turned on by default.
+    strict SetDisplayPower(struct {
+        power_on bool;
+    }) -> () error zx.Status;
+};
