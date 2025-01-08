@@ -30,23 +30,22 @@ struct pair_hash {
 
 std::optional<zx_koid_t> GetViewRefKoid(
     const flatland::TransformHandle& handle,
-    const std::unordered_map<flatland::TransformHandle,
-                             std::shared_ptr<const fuchsia::ui::views::ViewRef>>& view_ref_map) {
+    const flatland::GlobalTopologyData::ViewRefMap& view_ref_map) {
   const auto kv = view_ref_map.find(handle);
-  if (kv == view_ref_map.end() || kv->second == nullptr) {
+  if (kv == view_ref_map.end() || std::get<0>(kv->second) == nullptr) {
     return std::nullopt;
   }
 
-  return utils::ExtractKoid(*kv->second);
+  return std::get<1>(kv->second);
 }
 
-std::optional<size_t> GetViewRefIndex(
-    zx_koid_t view_ref_koid, const std::vector<flatland::TransformHandle>& transforms,
-    const std::unordered_map<flatland::TransformHandle,
-                             std::shared_ptr<const fuchsia::ui::views::ViewRef>>& view_refs) {
+std::optional<size_t> GetViewRefIndex(zx_koid_t view_ref_koid,
+                                      const std::vector<flatland::TransformHandle>& transforms,
+                                      const flatland::GlobalTopologyData::ViewRefMap& view_refs) {
   TRACE_DURATION("gfx", "flatland::HitTest[GetViewRefIndex]");
-  for (const auto& [transform, view_ref] : view_refs) {
-    if (view_ref != nullptr && view_ref_koid == utils::ExtractKoid(*view_ref)) {
+  for (const auto& [transform, value] : view_refs) {
+    const auto& [view_ref, koid] = value;
+    if (view_ref != nullptr && view_ref_koid == koid) {
       // Found |view_ref_koid|, now calculate the index of its root transform in |transforms|.
       for (size_t start = 0; start < transforms.size(); ++start) {
         if (transforms[start] == transform) {
@@ -179,8 +178,8 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
 
     // Skip anonymous views.
     if (const auto local_root = view_refs.find(root_transform);
-        local_root != view_refs.end() && local_root->second != nullptr) {
-      const auto& view_ref = *local_root->second;
+        local_root != view_refs.end() && std::get<0>(local_root->second) != nullptr) {
+      const auto& [_, view_ref_koid] = local_root->second;
       // Skip views without hit regions.
       if (const auto hit_region_vec = hit_regions.find(transform);
           hit_region_vec != hit_regions.end()) {
@@ -199,7 +198,7 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
           // point is in both.
           if (HitRegionContainsPoint(region, x, y) &&
               utils::RectFContainsPoint(clip_region, x, y)) {
-            hits.push_back(utils::ExtractKoid(view_ref));
+            hits.push_back(view_ref_koid);
             break;
           }
         }
@@ -226,7 +225,7 @@ bool HasAnonymousAncestor(const size_t index, const size_t root_index,
     // anonymous view.
     const auto parent_transform_handle = topology_vector[parent_index];
     const auto it = view_refs.find(parent_transform_handle);
-    if (it != view_refs.end() && it->second == nullptr) {
+    if (it != view_refs.end() && std::get<0>(it->second) == nullptr) {
       return true;
     }
 
@@ -317,7 +316,7 @@ ViewTreeData ComputeViewTree(
       continue;
     }
 
-    const auto& view_ref = view_ref_it->second;
+    const auto& [view_ref, view_ref_koid] = view_ref_it->second;
     // Anonymous views can be skipped.
     if (view_ref == nullptr) {
       continue;
@@ -334,7 +333,6 @@ ViewTreeData ComputeViewTree(
       debug_name = debug_it->second;
     }
 
-    const zx_koid_t view_ref_koid = utils::ExtractKoid(*view_ref);
     const zx_koid_t parent_koid =
         FindParentView(i, view_ref_koid, root, topology_vector, parent_indices, view_refs);
     const view_tree::BoundingBox bounding_box = ComputeBoundingBox(
@@ -402,7 +400,11 @@ GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
   // currently attached to the scene or not.
   for (const auto& [_, uber_struct] : uber_structs) {
     if (!uber_struct->local_topology.empty()) {
-      view_refs.emplace(uber_struct->local_topology[0].handle, uber_struct->view_ref);
+      zx_koid_t view_ref_koid = uber_struct->view_ref == nullptr
+                                    ? ZX_KOID_INVALID
+                                    : utils::ExtractKoid(*uber_struct->view_ref);
+      view_refs.emplace(uber_struct->local_topology[0].handle,
+                        std::make_tuple(uber_struct->view_ref, view_ref_koid));
     }
   }
 
@@ -596,11 +598,11 @@ view_tree::SubtreeSnapshot GlobalTopologyData::GenerateViewTreeSnapshot(
   view_tree = std::move(view_tree_temp);
 
   // Unconnected_views = all non-anonymous views (those with ViewRefs) not in the ViewTree.
-  for (const auto& [_, view_ref] : data.view_refs) {
+  for (const auto& [_, value] : data.view_refs) {
+    auto& [view_ref, view_ref_koid] = value;
     if (view_ref != nullptr) {
-      const zx_koid_t koid = utils::ExtractKoid(*view_ref);
-      if (!view_tree.contains(koid)) {
-        unconnected_views.emplace(koid);
+      if (!view_tree.contains(view_ref_koid)) {
+        unconnected_views.emplace(view_ref_koid);
       }
     }
   }

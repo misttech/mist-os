@@ -75,8 +75,8 @@ struct GlobalTopologyData {
   std::unordered_set<TransformHandle> live_handles;
 
   // ViewRef for each root TransformHandle. nullptr for anonymous Views.
-  using ViewRefMap =
-      std::unordered_map<TransformHandle, std::shared_ptr<const fuchsia::ui::views::ViewRef>>;
+  using ViewRefMapValue = std::tuple<std::shared_ptr<const fuchsia::ui::views::ViewRef>, zx_koid_t>;
+  using ViewRefMap = std::unordered_map<TransformHandle, ViewRefMapValue>;
   ViewRefMap view_refs;
 
   // Map of TransformHandle to its local root TransformHandle. Needed for hit testing.
