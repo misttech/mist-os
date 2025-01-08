@@ -38,6 +38,7 @@ rustc_library("api_impl") {
   edition = "2021"
   sources = [
     "src/binding_stubs.rs",
+    "src/context.rs",
     "src/lib.rs",
     "src/mem.rs",
     "src/props.rs",

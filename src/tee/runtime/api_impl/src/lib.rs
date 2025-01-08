@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod binding_stubs;
+pub mod context;
 pub mod mem;
 pub mod props;
 pub mod storage;

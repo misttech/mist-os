@@ -9,7 +9,7 @@ use crate::params::ParamAdapter;
 use crate::ta_loader::TAInterface;
 use anyhow::Error;
 use fidl_fuchsia_tee::{OpResult, Parameter, ReturnOrigin};
-use tee_internal::{to_tee_result, SessionContext};
+use tee_internal::{binding, Result as TeeResult, SessionContext};
 
 // Reserve 0 as the canonically invalid session ID.
 //
@@ -23,6 +23,34 @@ pub struct TrustedApp<T: TAInterface> {
     interface: T,
     sessions: BTreeMap<u32, SessionContext>,
     next_session_id: u32,
+}
+
+// This helper handles setting up the context for calling in to a TA entry point and cleaning up
+// after the call. This includes translating the FIDL type definitions into their in-memory
+// representations and back as well as saving and restoring contextual information.
+fn invoke_ta_entry_point<F, R>(
+    entry_point: F,
+    parameter_set: Vec<Parameter>,
+) -> Result<(TeeResult<R>, OpResult), Error>
+where
+    F: FnOnce(tee_internal::ParamTypes, &mut [tee_internal::Param; 4]) -> TeeResult<R>,
+{
+    let (tee_result, return_params) = {
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(parameter_set)?;
+        let tee_result = entry_point(param_types, adapter.tee_params_mut());
+        (tee_result, adapter.export_to_fidl()?)
+    };
+    let return_code = match tee_result {
+        Ok(_) => binding::TEE_SUCCESS,
+        Err(error) => error as binding::TEE_Result,
+    };
+    let op_result = OpResult {
+        return_code: Some(return_code as u64),
+        return_origin: Some(ReturnOrigin::TrustedApplication),
+        parameter_set: Some(return_params),
+        ..Default::default()
+    };
+    Ok((tee_result, op_result))
 }
 
 impl<T: TAInterface> TrustedApp<T> {
@@ -45,22 +73,17 @@ impl<T: TAInterface> TrustedApp<T> {
         &mut self,
         parameter_set: Vec<Parameter>,
     ) -> Result<(u32, OpResult), Error> {
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(parameter_set)?;
-        let (session_id, return_code) =
-            match self.interface.open_session(param_types, adapter.tee_params_mut()) {
-                Ok(session_context) => {
-                    let session_id = self.allocate_session_id();
-                    let _ = self.sessions.insert(session_id, session_context);
-                    (session_id, 0)
-                }
-                Err(error) => (INVALID_SESSION_ID, error as u64),
-            };
-        let return_params = adapter.export_to_fidl()?;
-        let op_result = OpResult {
-            return_code: Some(return_code),
-            return_origin: Some(ReturnOrigin::TrustedApplication),
-            parameter_set: Some(return_params),
-            ..Default::default()
+        let (tee_result, op_result) = invoke_ta_entry_point(
+            |param_types, params| self.interface.open_session(param_types, params),
+            parameter_set,
+        )?;
+        let session_id = match tee_result {
+            Ok(session_context) => {
+                let session_id = self.allocate_session_id();
+                let _ = self.sessions.insert(session_id, session_context);
+                session_id
+            }
+            Err(_) => INVALID_SESSION_ID,
         };
         Ok((session_id, op_result))
     }
@@ -85,20 +108,12 @@ impl<T: TAInterface> TrustedApp<T> {
             Some(session_context) => session_context,
             None => anyhow::bail!("Invalid session id"),
         };
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(parameter_set)?;
-        let ta_result = self.interface.invoke_command(
-            *session_context,
-            command,
-            param_types,
-            adapter.tee_params_mut(),
-        );
-        let return_params = adapter.export_to_fidl()?;
-        let op_result = OpResult {
-            return_code: Some(to_tee_result(ta_result) as u64),
-            return_origin: Some(ReturnOrigin::TrustedApplication),
-            parameter_set: Some(return_params),
-            ..Default::default()
-        };
+        let (_, op_result) = invoke_ta_entry_point(
+            |param_types, params| {
+                self.interface.invoke_command(*session_context, command, param_types, params)
+            },
+            parameter_set,
+        )?;
         Ok(op_result)
     }
 
