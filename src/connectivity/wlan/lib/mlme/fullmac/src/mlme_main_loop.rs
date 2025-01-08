@@ -86,7 +86,12 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
                 driver_event_sink,
             )
             .await;
-            ifc_server_stop_sender.send(()).unwrap();
+            info!("WlanFullmacImplIfc server stopped");
+
+            // This signals that the fullmac_ifc_server_task exited before the main loop. It's fine
+            // if the main loop exits and drops the receiver before this task exits, so we ignore
+            // the result of this send.
+            let _ = ifc_server_stop_sender.send(());
         });
 
         loop {
