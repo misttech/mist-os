@@ -145,7 +145,6 @@ rustc_library("lib") {
     "src/pipeline/privacy_pipeline.rs",
     "src/severity_filter.rs",
     "src/testing.rs",
-    "src/utils.rs",
   ]
 }
 

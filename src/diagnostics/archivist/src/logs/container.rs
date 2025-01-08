@@ -9,26 +9,23 @@ use crate::logs::shared_buffer::{self, ContainerBuffer, LazyItem};
 use crate::logs::socket::{Encoding, LogMessageSocket};
 use crate::logs::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
-use crate::utils::AutoCall;
 use derivative::Derivative;
 use diagnostics_data::{BuilderArgs, Data, LogError, Logs, LogsData, LogsDataBuilder};
 use fidl_fuchsia_diagnostics::{
     Interest as FidlInterest, LogInterestSelector, Severity as FidlSeverity, StreamMode,
 };
-use fidl_fuchsia_logger::{
-    InterestChangeError, LogSinkRequest, LogSinkRequestStream,
-    LogSinkWaitForInterestChangeResponder,
-};
-use fuchsia_async::Task;
-use fuchsia_sync::Mutex;
-use futures::channel::oneshot;
+use fidl_fuchsia_logger::{LogSinkRequest, LogSinkRequestStream};
+use fuchsia_async::condition::Condition;
+use futures::future::{Fuse, FusedFuture};
 use futures::prelude::*;
+use futures::select;
 use futures::stream::StreamExt;
 use selectors::SelectorExt;
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
-use std::sync::atomic::AtomicUsize;
+use std::pin::pin;
 use std::sync::Arc;
+use std::task::Poll;
 use tracing::{debug, error, warn};
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
@@ -48,30 +45,14 @@ pub struct LogsArtifactsContainer {
     buffer: ContainerBuffer,
 
     /// Mutable state for the container.
-    state: Arc<Mutex<ContainerState>>,
-
-    /// Current object ID used in place of a memory address
-    /// used to uniquely identify an object in a BTreeMap.
-    next_hanging_get_id: AtomicUsize,
-
-    /// Mechanism for a test to retrieve the internal hanging get state.
-    hanging_get_test_state: Arc<Mutex<TestState>>,
+    #[derivative(Debug = "ignore")]
+    state: Arc<Condition<ContainerState>>,
 
     /// A callback which is called when the container is inactive i.e. has no channels, sockets or
     /// stored logs.
     #[derivative(Debug = "ignore")]
     on_inactive: Option<OnInactive>,
 }
-
-#[derive(PartialEq, Debug)]
-enum TestState {
-    /// Blocked -- waiting for interest change
-    Blocked,
-    /// No FIDL request received yet
-    NoRequest,
-}
-
-type InterestSender = oneshot::Sender<Result<FidlInterest, InterestChangeError>>;
 
 #[derive(Debug)]
 struct ContainerState {
@@ -84,9 +65,6 @@ struct ContainerState {
 
     /// Current interest for this component.
     interests: BTreeMap<Interest, usize>,
-
-    /// Hanging gets
-    hanging_gets: BTreeMap<usize, Arc<Mutex<Option<InterestSender>>>>,
 
     is_initializing: bool,
 }
@@ -128,16 +106,13 @@ impl LogsArtifactsContainer {
         let new = Self {
             identity,
             buffer,
-            state: Arc::new(Mutex::new(ContainerState {
+            state: Arc::new(Condition::new(ContainerState {
                 num_active_channels: 0,
                 num_active_legacy_sockets: 0,
                 interests,
-                hanging_gets: BTreeMap::new(),
                 is_initializing: true,
             })),
             stats,
-            next_hanging_get_id: AtomicUsize::new(0),
-            hanging_get_test_state: Arc::new(Mutex::new(TestState::NoRequest)),
             on_inactive,
         };
 
@@ -145,10 +120,6 @@ impl LogsArtifactsContainer {
         new.update_interest(interest_selectors, &[]);
 
         new
-    }
-
-    fn fetch_add_hanging_get_id(&self) -> usize {
-        self.next_hanging_get_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     }
 
     fn create_raw_cursor(
@@ -268,125 +239,69 @@ impl LogsArtifactsContainer {
         mut stream: LogSinkRequestStream,
         scope: fasync::ScopeHandle,
     ) {
-        let hanging_get_sender = Arc::new(Mutex::new(None));
-
-        let mut interest_listener = None;
-        let previous_interest_sent = Arc::new(Mutex::new(None));
+        let mut previous_interest_sent = None;
         debug!(%self.identity, "Draining LogSink channel.");
 
-        while let Some(next) = stream.next().await {
-            match next {
-                Ok(LogSinkRequest::Connect { socket, .. }) => {
-                    // TODO(https://fxbug.dev/378977533): Add support for ingesting
-                    // the legacy log format directly to the shared buffer.
-                    let socket = fasync::Socket::from_socket(socket);
-                    let log_stream = LogMessageSocket::new(socket, Arc::clone(&self.stats));
-                    self.state.lock().num_active_legacy_sockets += 1;
-                    scope.spawn(Arc::clone(&self).drain_messages(log_stream));
-                }
-                Ok(LogSinkRequest::ConnectStructured { socket, .. }) => {
-                    self.buffer.add_socket(socket);
-                }
-                Ok(LogSinkRequest::WaitForInterestChange { responder }) => {
-                    // Check if we sent latest data to the client
-                    let min_interest;
-                    let needs_interest_broadcast;
-                    {
-                        let state = self.state.lock();
-                        let previous_interest = previous_interest_sent.lock();
-                        needs_interest_broadcast = {
-                            if let Some(prev) = &*previous_interest {
-                                *prev != state.min_interest()
-                            } else {
-                                true
-                            }
-                        };
-                        min_interest = state.min_interest();
+        let mut hanging_gets = Vec::new();
+        let mut interest_changed = pin!(Fuse::terminated());
+
+        loop {
+            select! {
+                next = stream.next() => {
+                    let Some(next) = next else { break };
+                    match next {
+                        Ok(LogSinkRequest::Connect { socket, .. }) => {
+                            // TODO(https://fxbug.dev/378977533): Add support for ingesting
+                            // the legacy log format directly to the shared buffer.
+                            let socket = fasync::Socket::from_socket(socket);
+                            let log_stream = LogMessageSocket::new(socket, Arc::clone(&self.stats));
+                            self.state.lock().num_active_legacy_sockets += 1;
+                            scope.spawn(Arc::clone(&self).drain_messages(log_stream));
+                        }
+                        Ok(LogSinkRequest::ConnectStructured { socket, .. }) => {
+                            self.buffer.add_socket(socket);
+                        }
+                        Ok(LogSinkRequest::WaitForInterestChange { responder }) => {
+                            // If the interest has changed since we last reported it, we'll report
+                            // it below.
+                            hanging_gets.push(responder);
+                        }
+                        Err(e) => error!(%self.identity, %e, "error handling log sink"),
                     }
-                    if needs_interest_broadcast {
-                        // Send interest if not yet received
+                }
+                _ = interest_changed => {}
+            }
+
+            if !hanging_gets.is_empty() {
+                let min_interest = self.state.lock().min_interest();
+                if Some(&min_interest) != previous_interest_sent.as_ref() {
+                    // Send updates to all outstanding hanging gets.
+                    for responder in hanging_gets.drain(..) {
                         let _ = responder.send(Ok(&min_interest));
-                        let mut previous_interest = previous_interest_sent.lock();
-                        *previous_interest = Some(min_interest);
-                    } else {
-                        // Wait for broadcast event asynchronously
-                        self.wait_for_interest_change_async(
-                            Arc::clone(&previous_interest_sent),
-                            &mut interest_listener,
-                            responder,
-                            Arc::clone(&hanging_get_sender),
-                        )
-                        .await;
                     }
+                    interest_changed.set(Fuse::terminated());
+                    previous_interest_sent = Some(min_interest);
+                } else if interest_changed.is_terminated() {
+                    // Set ourselves up to be woken when the interest changes.
+                    let previous_interest_sent = previous_interest_sent.clone();
+                    interest_changed.set(
+                        self.state
+                            .when(move |state| {
+                                if previous_interest_sent != Some(state.min_interest()) {
+                                    Poll::Ready(())
+                                } else {
+                                    Poll::Pending
+                                }
+                            })
+                            .fuse(),
+                    );
                 }
-                Err(e) => error!(%self.identity, %e, "error handling log sink"),
             }
         }
+
         debug!(%self.identity, "LogSink channel closed.");
         self.state.lock().num_active_channels -= 1;
         self.check_inactive();
-    }
-
-    async fn wait_for_interest_change_async(
-        self: &Arc<Self>,
-        previous_interest_sent: Arc<Mutex<Option<FidlInterest>>>,
-        interest_listener: &mut Option<Task<()>>,
-        responder: LogSinkWaitForInterestChangeResponder,
-        sender: Arc<Mutex<Option<InterestSender>>>,
-    ) {
-        let (tx, rx) = oneshot::channel();
-        {
-            let mut locked_sender = sender.lock();
-            if let Some(value) = locked_sender.take() {
-                // Error to call API twice without waiting for first return
-                let _ = value.send(Err(InterestChangeError::CalledTwice));
-            }
-            *locked_sender = Some(tx);
-        }
-        if let Some(listener) = interest_listener.take() {
-            listener.await;
-        }
-
-        let mut state = self.state.lock();
-        let id = self.fetch_add_hanging_get_id();
-        {
-            state.hanging_gets.insert(id, Arc::clone(&sender));
-        }
-        let unlocked_state = Arc::clone(&self.state);
-        let prev_interest_clone = Arc::clone(&previous_interest_sent);
-        let get_clone = Arc::clone(&self.hanging_get_test_state);
-        *interest_listener = Some(Task::spawn(async move {
-            // Block started
-            if cfg!(test) {
-                let mut get_state = get_clone.lock();
-                *get_state = TestState::Blocked;
-            }
-            let _ac = AutoCall::new(|| {
-                Task::spawn(async move {
-                    let mut state = unlocked_state.lock();
-                    state.hanging_gets.remove(&id);
-                })
-                .detach();
-            });
-            let res = rx.await;
-            if let Ok(value) = res {
-                match value {
-                    Ok(value) => {
-                        let _ = responder.send(Ok(&value));
-                        let mut write_lock = prev_interest_clone.lock();
-                        *write_lock = Some(value);
-                    }
-                    Err(error) => {
-                        let _ = responder.send(Err(error));
-                    }
-                }
-            }
-            // No longer blocked
-            if cfg!(test) {
-                let mut get_state = get_clone.lock();
-                *get_state = TestState::NoRequest;
-            }
-        }));
     }
 
     /// Drain a `LogMessageSocket` which wraps a socket from a component
@@ -452,34 +367,22 @@ impl LogsArtifactsContainer {
         // It does derive PartialEq though. All these branches will send an interest update if the
         // minimum interest changes after performing the required actions.
         if new_interest == FidlInterest::default() && remove_interest != FidlInterest::default() {
-            // Undo the previous interest. There's no new interest to add.
-            state.maybe_send_updates(
-                |state| {
-                    state.erase(&remove_interest);
-                },
-                &self.identity,
-            );
+            state.erase(&remove_interest);
         } else if new_interest != FidlInterest::default()
             && remove_interest == FidlInterest::default()
         {
-            // Apply the new interest. There's no previous interest to remove.
-            state.maybe_send_updates(
-                |state| {
-                    state.push_interest(new_interest);
-                },
-                &self.identity,
-            );
+            state.push_interest(new_interest);
         } else if new_interest != FidlInterest::default()
             && remove_interest != FidlInterest::default()
         {
-            // Remove the previous interest and insert the new one.
-            state.maybe_send_updates(
-                |state| {
-                    state.erase(&remove_interest);
-                    state.push_interest(new_interest);
-                },
-                &self.identity,
-            );
+            state.erase(&remove_interest);
+            state.push_interest(new_interest);
+        } else {
+            return;
+        }
+
+        for waker in state.drain_wakers() {
+            waker.wake();
         }
     }
 
@@ -494,12 +397,11 @@ impl LogsArtifactsContainer {
                 .matches_component_selector(&selector.selector)
                 .unwrap_or_default()
             {
-                self.state.lock().maybe_send_updates(
-                    |state| {
-                        state.erase(&selector.interest);
-                    },
-                    &self.identity,
-                );
+                let mut state = self.state.lock();
+                state.erase(&selector.interest);
+                for waker in state.drain_wakers() {
+                    waker.wake();
+                }
                 return;
             }
         }
@@ -550,28 +452,6 @@ fn maybe_add_rolled_out_error(rolled_out_messages: &mut u64, mut msg: Data<Logs>
 }
 
 impl ContainerState {
-    /// Executes the given callback on the state. If the minimum interest before executing the given
-    /// actions and after isn't the same, then the new interest is sent to the registered listeners.
-    fn maybe_send_updates<F>(&mut self, action: F, identity: &ComponentIdentity)
-    where
-        F: FnOnce(&mut ContainerState),
-    {
-        let prev_min_interest = self.min_interest();
-        action(self);
-        let new_min_interest = self.min_interest();
-        if prev_min_interest == FidlInterest::default()
-            || compare_fidl_interest(&new_min_interest, &prev_min_interest) != Ordering::Equal
-        {
-            debug!(%identity, ?new_min_interest, "Updating interest.");
-            for value in self.hanging_gets.values_mut() {
-                let locked = value.lock().take();
-                if let Some(value) = locked {
-                    let _ = value.send(Ok(new_min_interest.clone()));
-                }
-            }
-        }
-    }
-
     /// Pushes the given `interest` to the set.
     fn push_interest(&mut self, interest: FidlInterest) {
         if interest != FidlInterest::default() {
@@ -626,12 +506,7 @@ impl Eq for Interest {}
 
 impl Ord for Interest {
     fn cmp(&self, other: &Self) -> Ordering {
-        match (self.min_severity, other.min_severity) {
-            (Some(_), None) => Ordering::Greater,
-            (None, Some(_)) => Ordering::Less,
-            (None, None) => Ordering::Equal,
-            (Some(a), Some(b)) => a.cmp(&b),
-        }
+        self.min_severity.cmp(&other.min_severity)
     }
 }
 
@@ -641,23 +516,13 @@ impl PartialOrd for Interest {
     }
 }
 
-/// Compares the minimum severity of two interests.
-fn compare_fidl_interest(a: &FidlInterest, b: &FidlInterest) -> Ordering {
-    match (a.min_severity, b.min_severity) {
-        (Some(_), None) => Ordering::Greater,
-        (None, Some(_)) => Ordering::Less,
-        (None, None) => Ordering::Equal,
-        (Some(a), Some(b)) => a.cmp(&b),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::logs::shared_buffer::SharedBuffer;
     use fidl_fuchsia_diagnostics::{ComponentSelector, Severity, StringSelector};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
-    use fuchsia_async::MonotonicDuration;
+    use fuchsia_async::{Task, TestExecutor};
     use fuchsia_inspect as inspect;
     use fuchsia_inspect_derive::WithInspect;
     use moniker::ExtendedMoniker;
@@ -690,63 +555,29 @@ mod tests {
         (container, proxy)
     }
 
-    #[fuchsia::test]
+    #[fuchsia::test(allow_stalls = false)]
     async fn update_interest() {
         // Sync path test (initial interest)
         let scope = fasync::Scope::new();
         let (container, log_sink) = initialize_container(None, scope.to_handle());
+
         // Get initial interest
         let initial_interest = log_sink.wait_for_interest_change().await.unwrap().unwrap();
-        {
-            let test_state = container.hanging_get_test_state.lock();
-            assert_eq!(*test_state, TestState::NoRequest);
-        }
+
         // Async (blocking) path test.
         assert_eq!(initial_interest.min_severity, None);
         let log_sink_clone = log_sink.clone();
-        let interest_future =
+        let mut interest_future =
             Task::spawn(async move { log_sink_clone.wait_for_interest_change().await });
-        // Wait for the background task to get blocked to test the blocking case
-        loop {
-            fuchsia_async::Timer::new(MonotonicDuration::from_millis(200)).await;
-            {
-                let test_state = container.hanging_get_test_state.lock();
-                if *test_state == TestState::Blocked {
-                    break;
-                }
-            }
-        }
+
+        // The call should be blocked.
+        assert!(TestExecutor::poll_until_stalled(&mut interest_future).await.is_pending());
+
         // We should see this interest update. This should unblock the hanging get.
         container.update_interest([interest(&["foo", "bar"], Some(Severity::Info))].iter(), &[]);
 
         // Verify we see the last interest we set.
         assert_eq!(interest_future.await.unwrap().unwrap().min_severity, Some(Severity::Info));
-
-        // Issuing another hanging get should error out the first one
-        let log_sink_clone = log_sink.clone();
-        let interest_future =
-            Task::spawn(async move { log_sink_clone.wait_for_interest_change().await });
-        // Since spawn is async we need to wait for first future to block before starting second
-        // Fuchsia Rust provides no ordering guarantees with respect to async tasks
-        loop {
-            fuchsia_async::Timer::new(MonotonicDuration::from_millis(200)).await;
-            {
-                let test_state = container.hanging_get_test_state.lock();
-                if *test_state == TestState::Blocked {
-                    break;
-                }
-            }
-        }
-        let _interest_future_2 =
-            Task::spawn(async move { log_sink.wait_for_interest_change().await });
-        match interest_future.await {
-            Ok(Err(InterestChangeError::CalledTwice)) => {
-                // pass test
-            }
-            _ => {
-                panic!("Invoking a second interest listener on a channel should cancel the first one with an error.");
-            }
-        }
     }
 
     #[fuchsia::test]
