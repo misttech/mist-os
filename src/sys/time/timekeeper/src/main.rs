@@ -6,7 +6,6 @@
 
 //! `timekeeper` is responsible for external time synchronization in Fuchsia.
 
-mod alarms;
 mod clock_manager;
 mod diagnostics;
 mod enums;
@@ -16,6 +15,8 @@ mod rtc;
 mod rtc_testing;
 mod time_source;
 mod time_source_manager;
+
+use alarms;
 
 use crate::clock_manager::ClockManager;
 use crate::diagnostics::{
@@ -311,7 +312,7 @@ async fn main() -> Result<()> {
             .map_err(|e| {
                 // This may not be a bug, if access to wake alarms is not used.
                 // Make this a warning, but attempted connections will be errors.
-                warn!("could not connect to fuchsia.time.alarms/Wake: {}", &e);
+                warn!("could not connect to hrtimer: {}", &e);
                 e
             })
             .map(|proxy| Rc::new(alarms::Loop::new(proxy))),

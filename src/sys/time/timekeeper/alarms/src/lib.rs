@@ -44,17 +44,22 @@ use {
     fidl_fuchsia_hardware_hrtimer as ffhh, fidl_fuchsia_time_alarms as fta, fuchsia_async as fasync,
 };
 
-static I64_MAX_AS_U64: std::sync::LazyLock<u64> =
-    std::sync::LazyLock::new(|| i64::MAX.try_into().expect("infallible"));
-static I32_MAX_AS_U64: std::sync::LazyLock<u64> =
-    std::sync::LazyLock::new(|| i32::MAX.try_into().expect("infallible"));
+static I64_MAX_AS_U64: LazyLock<u64> = LazyLock::new(|| i64::MAX.try_into().expect("infallible"));
+static I32_MAX_AS_U64: LazyLock<u64> = LazyLock::new(|| i32::MAX.try_into().expect("infallible"));
 
 /// The largest value of timer "ticks" that is still considered useful.
-static MAX_USEFUL_TICKS: std::sync::LazyLock<u64> = std::sync::LazyLock::new(|| *I32_MAX_AS_U64);
+static MAX_USEFUL_TICKS: LazyLock<u64> = LazyLock::new(|| *I32_MAX_AS_U64);
 
 /// The hrtimer ID used for scheduling wake alarms.  This ID is reused from
 /// Starnix, and should eventually no longer be critical.
 const MAIN_TIMER_ID: usize = 6;
+
+/// TODO(b/383062441): remove this special casing once Starnix hrtimer is fully
+/// migrated to multiplexed timer.
+/// A special-cased Starnix timer ID, used to allow cross-connection setup
+/// for Starnix only.
+const TEMPORARY_STARNIX_TIMER_ID: &str = "starnix-hrtimer";
+static TEMPORARY_STARNIX_CID: LazyLock<zx::Event> = LazyLock::new(|| zx::Event::create());
 
 // This may be already handled by something, but I don't want new deps.
 const USEC_IN_NANOS: i64 = 1000;
@@ -264,11 +269,34 @@ pub async fn serve(timer_loop: Rc<Loop>, requests: fta::WakeRequestStream) {
     .detach();
 }
 
+// Inject a constant KOID as connection ID (cid) if the singular alarm ID corresponds to a Starnix
+// alarm.
+// TODO(b/383062441): remove this special casing.
+fn compute_cid(cid: zx::Koid, alarm_id: &str) -> zx::Koid {
+    if alarm_id == TEMPORARY_STARNIX_TIMER_ID {
+        // Temporarily, the Starnix timer is a singleton and always gets the
+        // same CID.
+        TEMPORARY_STARNIX_CID.as_handle_ref().get_koid().expect("infallible")
+    } else {
+        cid
+    }
+}
+
+async fn handle_cancel(alarm_id: String, cid: zx::Koid, cmd: &mut mpsc::Sender<Cmd>) {
+    let done = zx::Event::create();
+    let cid = compute_cid(cid, &alarm_id);
+    let timer_id = TimerId { alarm_id: alarm_id.clone(), cid };
+    if let Err(e) = cmd.send(Cmd::StopById { timer_id, done: clone_handle(&done) }).await {
+        warn!("handle_request: error while trying to cancel: {}: {:?}", alarm_id, e);
+    }
+    wait_signaled(&done).await;
+}
+
 /// Processes a single Wake API request from a single client.
 /// This function is expected to return quickly.
 ///
 /// # Args
-/// - `id`: the unique identifier of the connection producing these requests.
+/// - `cid`: the unique identifier of the connection producing these requests.
 /// - `cmd`: the outbound queue of commands to deliver to the timer manager.
 /// - `request`: a single inbound Wake FIDL API request.
 async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta::WakeRequest) {
@@ -284,6 +312,7 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
             // use take() to replace the struct with None so it does not need to leave
             // a Default in its place.
             let responder = Rc::new(RefCell::new(Some(responder)));
+            let cid = compute_cid(cid, &alarm_id);
 
             // Alarm is not scheduled yet!
             debug!(
@@ -313,12 +342,19 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
             }
         }
         fta::WakeRequest::Cancel { alarm_id, .. } => {
-            let done = zx::Event::create();
-            let timer_id = TimerId { alarm_id: alarm_id.clone(), cid };
-            if let Err(e) = cmd.send(Cmd::StopById { timer_id, done: clone_handle(&done) }).await {
-                warn!("handle_request: error while trying to cancel: {}: {:?}", alarm_id, e);
-            }
-            wait_signaled(&done).await;
+            // TODO: b/383062441 - make this into an async task so that we wait
+            // less to schedule the next alarm.
+            handle_cancel(alarm_id, cid, &mut cmd).await;
+        }
+        // Similar to above, but wait for the cancel to complete.
+        fta::WakeRequest::CancelSync { alarm_id, responder, .. } => {
+            handle_cancel(alarm_id, cid, &mut cmd).await;
+            responder.send(Ok(())).expect("infallible");
+        }
+        fta::WakeRequest::GetProperties { responder, .. } => {
+            let response =
+                fta::WakeGetPropertiesResponse { is_supported: Some(true), ..Default::default() };
+            responder.send(&response).expect("send success");
         }
         fta::WakeRequest::_UnknownMethod { .. } => {}
     };
@@ -1201,7 +1237,6 @@ async fn schedule_hrtimer(
     let hrtimer_task = fasync::Task::local(async move {
         debug!("hrtimer_task: waiting for hrtimer driver response");
         let response = start_and_wait_fut.await;
-        debug!("hrtimer: got response: {:?}", response);
         match response {
             Err(e) => {
                 debug!("hrtimer_task: hrtimer FIDL error: {:?}", e);
@@ -1218,6 +1253,7 @@ async fn schedule_hrtimer(
                 // BAD: no way to keep alive.
             }
             Ok(Ok(keep_alive)) => {
+                debug!("hrtimer: got alarm response: {:?}", keep_alive);
                 // May trigger sooner than the deadline.
                 command_send
                     .start_send(Cmd::Alarm { expired_deadline: deadline, keep_alive })

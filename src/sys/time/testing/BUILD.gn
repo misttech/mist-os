@@ -13,6 +13,7 @@ group("testing") {
     ":timekeeper_integration",
     "example",
     "realm-proxy",
+    "wake-alarms",
   ]
 }
 
@@ -95,4 +96,15 @@ fuchsia_structured_config_values("config-values-integration") {
   testonly = true
   cm_label = ":timekeeper_for_integration"
   values_source = "config/values.json5"
+}
+
+# A Timekeeper package that includes structured configuration values.
+fuchsia_package("timekeeper-with-config") {
+  testonly = true
+  package_name = "timekeeper_for_integration"
+  validate_structured_config = true
+  deps = [
+    ":config-values-integration",
+    ":timekeeper_for_integration",
+  ]
 }

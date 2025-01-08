@@ -20,5 +20,5 @@
     serve_test_protocols: true,
     has_real_time_clock: true,
     utc_start_at_startup_when_invalid_rtc: false,
-    serve_fuchsia_time_alarms: false,
+    serve_fuchsia_time_alarms: true,
 }

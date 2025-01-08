@@ -10,12 +10,16 @@ group("timekeeper") {
   deps = [
     ":service",
     ":tests",
+    "alarms",
   ]
 }
 
 group("tests") {
   testonly = true
-  deps = [ ":timekeeper-tests" ]
+  deps = [
+    ":timekeeper-tests",
+    "alarms:tests",
+  ]
 }
 
 timekeeper_deps = [
@@ -23,7 +27,6 @@ timekeeper_deps = [
   ":timekeeper-config",
   "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
   "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
-  "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_rust",
   "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
@@ -50,6 +53,7 @@ timekeeper_deps = [
   "//src/sys/time/lib/inspect-writable",
   "//src/sys/time/lib/time-util",
   "//src/sys/time/lib/time_metrics_registry",
+  "//src/sys/time/timekeeper/alarms",
   "//third_party/cobalt/src/lib/client/rust:cobalt-client",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:async-trait",
@@ -57,14 +61,12 @@ timekeeper_deps = [
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:lazy_static",
   "//third_party/rust_crates:log",
-  "//third_party/rust_crates:scopeguard",
   "//third_party/rust_crates:serde",
   "//third_party/rust_crates:serde_json",
   "//third_party/rust_crates:thiserror",
 ]
 
 timekeeper_sources = [
-  "src/alarms/mod.rs",
   "src/clock_manager.rs",
   "src/diagnostics/cobalt.rs",
   "src/diagnostics/composite.rs",
