@@ -80,7 +80,6 @@ fuchsia_package(
 # Tests
 fuchsia_cc_test(
     name = "aml-i2c-test-bin",
-    size = "small",
     srcs = [
         "aml-i2c.cc",
         "aml-i2c.h",

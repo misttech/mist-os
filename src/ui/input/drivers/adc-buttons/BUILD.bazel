@@ -87,7 +87,6 @@ fuchsia_package(
 
 fuchsia_cc_test(
     name = "adc-buttons-test-bin",
-    size = "small",
     srcs = ["adc-buttons-test.cc"] + _common_sources,
     deps = [
         "//sdk/lib/driver/compat/cpp",

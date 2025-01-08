@@ -54,33 +54,30 @@ unit test components:
 * `fuchsia_cc_test()`: Compiles the C++ source code into a test binary. When
   added to a package, this rule also generates a minimal component manifest that
   references the test binary and requires no additional capabilities.
-* `fuchsia_test_package()`: Generates a Fuchsia package containing one or more
-  test components and their dependencies.
+* `fuchsia_unittest_package()`: Generates a Fuchsia package containing one or
+  more auto-generated unit-test components and their dependencies.
 
 Below is an example `BUILD.bazel` snippet for including unit tests:
 
 ```bazel
 load(
     "fuchsia_cc_test",
-    "fuchsia_select",
-    "fuchsia_test_package",
+    "fuchsia_unittest_package",
 )
 
 fuchsia_cc_test(
     name = "hello_world_test",
     srcs = ["hello_world_test.cc"],
-    deps = fuchsia_select({
-      "@platforms//os:fuchsia": [
-        "@fuchsia_sdk//pkg/fdio",
-        "@fuchsia_sdk//pkg/syslog",
-      ],
-    }),
+    deps = [
+      "@fuchsia_sdk//pkg/fdio",
+      "@fuchsia_sdk//pkg/syslog",
+    ],
 )
 
-fuchsia_test_package(
+fuchsia_unittest_package(
     name = "unit_test_pkg",
     visibility = ["//visibility:public"],
-    deps = [
+    unit_tests = [
       ":hello_world_test",
     ],
 )

@@ -32,18 +32,6 @@ build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 # Bzlmod is not supported yet.
 common --enable_bzlmod=false
 
-# This flag is required to avoid conflicts at analysis time when
-# testonly fuchsia_cc_test() targets depend on non-testonly
-# cc_library() ones.
-#
-# For example, without the target at
-# //fuchsia/packaging/fuchsia_package/cc_component:cc_test
-# will be instantiated in two different build configurations that
-# write their output to the same location, resulting in a conflict!
-cquery --experimental_retain_test_configuration_across_testonly
-aquery --experimental_retain_test_configuration_across_testonly
-build --experimental_retain_test_configuration_across_testonly
-
 build --flag_alias=override_fuchsia_api_level=@fuchsia_sdk//fuchsia:fuchsia_api_level
 build --flag_alias=default_fuchsia_api_level=@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level
 

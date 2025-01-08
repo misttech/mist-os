@@ -413,10 +413,15 @@ fuchsia_component(
 )
 
 # Note: the test package contains a fuchsia_cc_test()
-# that depends on a non-testonly cc_library() to demontrate
-# the issue that requires adding
-# --experimental_retain_test_configuration_across_testonly
-# to every project .bazelrc :-(
+# that depends on a non-testonly cc_library() to ensure that builds correctly.
+# Historically `fuchsia_cc_test` used `cc_test` and other `test = True`
+# targets under the hood, requiring the
+# --experimental_retain_test_configuration_across_testonly flag to be added to
+# each project's .bazelrc as the build configuration would otherwise diverge
+# between the analysis graph and aspect build graphs.
+# However, now that `fuchsia_cc_test` uses `cc_binary` under the hood, the flag
+# is no longer needed, but we keep this test in place to ensure this type of
+# interaction will keep building correctly in the future.
 make_file(
     name = "cc_lib_src",
     content = "int what() { return 42; } \n",

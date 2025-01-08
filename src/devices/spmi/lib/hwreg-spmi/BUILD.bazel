@@ -27,7 +27,6 @@ cc_library(
 
 fuchsia_cc_test(
     name = "spmi-hwreg-test-bin",
-    size = "small",
     srcs = [
         "spmi-hwreg-test.cc",
     ],

@@ -18,7 +18,7 @@ load(
     "FuchsiaPackageResourcesInfo",
     "FuchsiaUnstrippedBinaryInfo",
 )
-load(":utils.bzl", "find_cc_toolchain", "forward_providers", "rule_variants")
+load(":utils.bzl", "find_cc_toolchain", "forward_providers")
 
 KNOWN_PROVIDERS = [
     CcInfo,
@@ -83,7 +83,7 @@ def _fuchsia_cc_impl(ctx):
     return forward_providers(
         ctx,
         ctx.attr.native_target,
-        rename_executable = ctx.attr._variant != "test" and ctx.attr.bin_name,
+        rename_executable = ctx.attr.bin_name,
         *KNOWN_PROVIDERS
     ) + [
         ctx.attr.clang_debug_symbols[FuchsiaDebugSymbolInfo],
@@ -94,10 +94,7 @@ def _fuchsia_cc_impl(ctx):
         ),
     ]
 
-# TODO(https://fxbug.dev/382278475): Remove `_fuchsia_cc_test` once
-# fuchsia_cc_test uses `cc_binary` under the hood.
-fuchsia_cc, _fuchsia_cc_test = rule_variants(
-    variants = (None, "test"),
+fuchsia_cc = rule(
     implementation = _fuchsia_cc_impl,
     toolchains = ["@bazel_tools//tools/cpp:toolchain_type"],
     doc = """Attaches fuchsia-specific metadata to native cc_* targets.
@@ -213,6 +210,8 @@ def fuchsia_cc_binary(
         **cc_binary_kwargs: Arguments to forward to `cc_binary`.
     """
 
+    # TODO(https://fxbug.dev/385351779): Switch to the version from `@rules_cc`
+    # once the `@rules_cc` dependency in-tree is version-bumped.
     native.cc_binary(
         name = "%s.binary" % name,
         tags = tags + ["manual"],
@@ -259,16 +258,18 @@ def fuchsia_cc_test(
         tags = tags + ["manual"],
         deps = deps,
         features = features,
+        visibility = visibility,
         **cc_test_kwargs
     )
 
-    _fuchsia_cc_test(
+    fuchsia_cc(
         name = name,
         bin_name = name,
         native_target = "%s.binary" % name,
         deps = deps,
         data = data_for_features(features),
         tags = tags,
+        testonly = True,
         visibility = visibility,
     )
 

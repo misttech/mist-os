@@ -95,7 +95,6 @@ fuchsia_package(
 # Tests
 fuchsia_cc_test(
     name = "aml-g12-composite-test-bin",
-    size = "small",
     srcs = [
         "aml-tdm-config-device.cc",
         "aml-tdm-config-device.h",

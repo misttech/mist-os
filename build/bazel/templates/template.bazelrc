@@ -28,13 +28,6 @@ build --experimental_output_directory_naming_scheme=diff_against_baseline
 cquery --experimental_output_directory_naming_scheme=diff_against_baseline
 aquery --experimental_output_directory_naming_scheme=diff_against_baseline
 
-# Disable the injection of magic TestTrimmingTransition at analysis time
-# which does not happen when aspects are visiting the configured graph,
-# creating conflicts.
-build --experimental_retain_test_configuration_across_testonly
-cquery --experimental_retain_test_configuration_across_testonly
-aquery --experimental_retain_test_configuration_across_testonly
-
 # Setup the default platform.
 # We need to set them for cqueries and aqueries as well as build (and
 # everything else that inherits from it). Alas, setting them in `common`

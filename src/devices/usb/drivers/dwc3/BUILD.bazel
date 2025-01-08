@@ -96,7 +96,6 @@ fuchsia_package(
 # Tests
 fuchsia_cc_test(
     name = "dwc3-test-bin",
-    size = "small",
     srcs = [
         "dwc3-test.cc",
     ],

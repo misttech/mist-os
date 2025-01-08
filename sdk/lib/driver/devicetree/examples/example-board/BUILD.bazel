@@ -78,7 +78,6 @@ fuchsia_package_resource(
 
 fuchsia_cc_test(
     name = "example-board-test-bin",
-    size = "small",
     srcs = [
         "integration-test.cc",
     ],

@@ -34,7 +34,6 @@ load(
     "fuchsia_cpu_from_ctx",
     "label_name",
     "make_resource_struct",
-    "rule_variants",
     "stub_executable",
 )
 
@@ -211,7 +210,7 @@ def _fuchsia_test_package(
         target_compatible_with = target_compatible_with,
     )
 
-    _build_fuchsia_package_test(
+    _build_fuchsia_package(
         name = "%s_fuchsia_package" % name,
         test_components = _test_component_mapping.values(),
         components = _components,
@@ -226,6 +225,7 @@ def _fuchsia_test_package(
         platform = platform,
         target_compatible_with = target_compatible_with,
         tags = tags + ["manual"],
+        testonly = True,
         **kwargs
     )
 
@@ -591,8 +591,7 @@ def _build_fuchsia_package_impl(ctx):
         ),
     ]
 
-_build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
-    variants = (None, "test"),
+_build_fuchsia_package = rule(
     doc = "Builds a fuchsia package.",
     implementation = _build_fuchsia_package_impl,
     cfg = fuchsia_transition,

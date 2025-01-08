@@ -80,7 +80,6 @@ fuchsia_package(
 # Tests
 fuchsia_cc_test(
     name = "vim3-clk-test-bin",
-    size = "small",
     srcs = [
         "aml-fclk.h",
         "aml-fclk-rates.cc",

@@ -11,7 +11,7 @@ load(
     "FuchsiaComponentManifestInfo",
     "FuchsiaPackageResourcesInfo",
 )
-load(":utils.bzl", "label_name", "make_resource_struct", "rule_variants")
+load(":utils.bzl", "label_name", "make_resource_struct")
 
 def _manifest_target(name, manifest_in, tags, testonly):
     target_name = name + "_ensure_compiled_manifest"
@@ -57,7 +57,6 @@ def fuchsia_component(
         moniker = moniker,
         deps = deps,
         tags = tags,
-        is_driver = False,
         **kwargs
     )
 
@@ -75,12 +74,13 @@ def fuchsia_test_component(*, name, manifest, deps = [], tags = ["manual"], **kw
     """
     manifest_target = _manifest_target(name, manifest, tags, testonly = True)
 
-    _fuchsia_component_test(
+    _fuchsia_component(
         name = name,
         compiled_manifest = manifest_target,
         deps = deps,
         tags = tags,
-        is_driver = False,
+        is_test = True,
+        testonly = True,
         **kwargs
     )
 
@@ -154,15 +154,14 @@ def _fuchsia_component_impl(ctx):
         manifest = manifest,
         resources = resources,
         is_driver = ctx.attr.is_driver,
-        is_test = ctx.attr._variant == "test",
+        is_test = ctx.attr.is_test,
         moniker = ctx.attr.moniker.format(COMPONENT_NAME = component_name),
         run_tag = label_name(str(ctx.label)),
     ) + [
         collect_debug_symbols(ctx.attr.deps),
     ]
 
-_fuchsia_component, _fuchsia_component_test = rule_variants(
-    variants = (None, "test"),
+_fuchsia_component = rule(
     doc = """Creates a Fuchsia component which can be added to a package
 
 This rule will take a component manifest and compile it into a form that
@@ -198,6 +197,10 @@ number of dependencies which will be included in the final package.
         ),
         "is_driver": attr.bool(
             doc = "True if this is a driver component",
+            default = False,
+        ),
+        "is_test": attr.bool(
+            doc = "True if this is a test component",
             default = False,
         ),
     },

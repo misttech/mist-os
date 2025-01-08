@@ -52,7 +52,6 @@ fuchsia_package(
 
 fuchsia_cc_test(
     name = "hello_test",
-    size = "small",
     srcs = ["hello_test.cc"],
     visibility = ["//visibility:public"],
     deps = [

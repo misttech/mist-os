@@ -97,7 +97,6 @@ fuchsia_package(
 # Tests
 fuchsia_cc_test(
     name = "aml-usb-phy-test-bin",
-    size = "small",
     srcs = [
         "aml-usb-phy.cc",
         "aml-usb-phy.h",
