@@ -60,9 +60,14 @@ group("tests") {
   ]
 }
 
-fuchsia_package_with_single_component("regulatory_region") {
+fuchsia_component("regulatory_region_component") {
   deps = [ ":bin" ]
+  component_name = "regulatory_region"
   manifest = "meta/regulatory_region.cml"
+}
+
+fuchsia_package("regulatory_region") {
+  deps = [ ":regulatory_region_component" ]
 }
 
 fuchsia_unittest_component("regulatory-region-test") {
