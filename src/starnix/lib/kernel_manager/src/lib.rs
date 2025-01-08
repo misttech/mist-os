@@ -335,12 +335,14 @@ async fn suspend_container(
 
     kernels.acquire_wake_lease(&container_job).await?;
 
+    log::info!("Signalling wake watchers.");
     let watchers = suspend_context.wake_watchers.lock();
     for event in watchers.iter() {
         let (clear_mask, set_mask) = (ASLEEP_SIGNAL, AWAKE_SIGNAL);
         event.signal_peer(clear_mask, set_mask)?;
     }
 
+    log::info!("Returning from SuspendContainer.");
     Ok(Ok(fstarnixrunner::ManagerSuspendContainerResponse {
         suspend_time: Some((zx::BootInstant::get() - suspend_start).into_nanos()),
         ..Default::default()
