@@ -29,7 +29,11 @@ fuchsia_cc_driver("testcontroller_driver-driver") {
 }
 
 fuchsia_driver_component("testcontroller_driver") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/connectivity/wlan:drivers",
+    "//src/connectivity/wlan/tests/drivers-only/fullmac-tests:*",
+  ]
   component_name = "testcontroller_driver"
   deps = [ ":testcontroller_driver-driver" ]
   info = "meta/testcontroller_driver-info.json"
