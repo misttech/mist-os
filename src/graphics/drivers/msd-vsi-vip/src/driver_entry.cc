@@ -49,6 +49,10 @@ zx::result<> NpuDevice::MagmaStart() {
     DMESSAGE("Failed to create MagmaDriver");
     return zx::error(ZX_ERR_INTERNAL);
   }
+#if MAGMA_TEST_DRIVER
+  DLOG("running magma indriver test");
+  set_unit_test_status(magma_indriver_test(&parent_));
+#endif
 
   set_magma_system_device(msd::MagmaSystemDevice::Create(
       magma_driver(),
