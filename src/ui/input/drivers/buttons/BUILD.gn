@@ -34,7 +34,10 @@ fuchsia_component_manifest("buttons-manifest") {
 
 fuchsia_driver_component("buttons") {
   cm_label = ":buttons-manifest"
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/ui/input:drivers",
+  ]
   deps = [ ":buttons-driver" ]
   info = "meta/buttons-info.json"
 }
