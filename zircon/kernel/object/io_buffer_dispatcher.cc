@@ -352,8 +352,10 @@ zx::result<fbl::RefPtr<VmObject>> IoBufferDispatcher::CreateMappableVmoForRegion
       // peer_mapped_regions_.
       Guard<CriticalMutex> guard{get_lock()};
       const fbl::RefPtr<IoBufferDispatcher>& p = peer();
-      AssertHeld(*p->get_lock());
-      p->peer_mapped_regions_++;
+      if (p) {
+        AssertHeld(*p->get_lock());
+        p->peer_mapped_regions_++;
+      }
     }
   }
   child_reference->set_user_id(vmo->user_id());

@@ -930,4 +930,24 @@ TEST(Iob, IdAllocatorMediatedErrors) {
                                   bytes.size(), nullptr, 0));
 }
 
+TEST(Iob, MapWhenPeerClosed) {
+  zx::iob ep0, ep1;
+  zx_iob_region_t config{
+      .type = ZX_IOB_REGION_TYPE_PRIVATE,
+      .access = kIoBufferEpRwMap,
+      .size = ZX_PAGE_SIZE,
+      .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
+      .private_region =
+          {
+              .options = 0,
+          },
+  };
+  ASSERT_OK(zx::iob::create(0, &config, 1, &ep0, &ep1));
+  ep1.reset();
+
+  zx::result<MappingHelper> region =
+      MappingHelper::Create(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, ep0, 0, 0, ZX_PAGE_SIZE);
+  EXPECT_OK(region.status_value());
+}
+
 }  // namespace
