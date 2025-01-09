@@ -81,48 +81,48 @@ class State final {
 
   // Create a new |IntProperty| in the Inspect VMO. The returned value releases
   // the property when destroyed.
-  IntProperty CreateIntProperty(BorrowedStringValue name, BlockIndex parent, int64_t value);
+  IntProperty CreateIntProperty(std::string_view name, BlockIndex parent, int64_t value);
 
   // Create a new |UintProperty| in the Inspect VMO. The returned value releases
   // the property when destroyed.
-  UintProperty CreateUintProperty(BorrowedStringValue name, BlockIndex parent, uint64_t value);
+  UintProperty CreateUintProperty(std::string_view name, BlockIndex parent, uint64_t value);
 
   // Create a new |DoubleProperty| in the Inspect VMO. The returned value releases
   // the property when destroyed.
-  DoubleProperty CreateDoubleProperty(BorrowedStringValue name, BlockIndex parent, double value);
+  DoubleProperty CreateDoubleProperty(std::string_view name, BlockIndex parent, double value);
 
   // Create a new |BoolProperty| in the Inspect VMO. The returned value releases
   // the property when destroyed.
-  BoolProperty CreateBoolProperty(BorrowedStringValue name, BlockIndex parent, bool value);
+  BoolProperty CreateBoolProperty(std::string_view name, BlockIndex parent, bool value);
 
   // Create a new |IntArray| in the Inspect VMO. The returned value releases
   // the array when destroyed.
-  IntArray CreateIntArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+  IntArray CreateIntArray(std::string_view name, BlockIndex parent, size_t slots,
                           ArrayBlockFormat format);
 
   // Create a new |StringArray| in the Inspect VMO. The returned value releases
   // the array when destroyed.
-  StringArray CreateStringArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+  StringArray CreateStringArray(std::string_view name, BlockIndex parent, size_t slots,
                                 ArrayBlockFormat format);
 
   // Create a new |UintArray| in the Inspect VMO. The returned value releases
   // the array when destroyed.
-  UintArray CreateUintArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+  UintArray CreateUintArray(std::string_view name, BlockIndex parent, size_t slots,
                             ArrayBlockFormat format);
 
   // Create a new |DoubleArray| in the Inspect VMO. The returned value releases
   // the array when destroyed.
-  DoubleArray CreateDoubleArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+  DoubleArray CreateDoubleArray(std::string_view name, BlockIndex parent, size_t slots,
                                 ArrayBlockFormat format);
 
   // Create a new |StringProperty| in the Inspect VMO. The returned value releases
   // the property when destroyed.
-  StringProperty CreateStringProperty(BorrowedStringValue name, BlockIndex parent,
+  StringProperty CreateStringProperty(std::string_view name, BlockIndex parent,
                                       const std::string& value);
 
   // Create a new |ByteVectorProperty| in the Inspect VMO. The returned value releases
   // the property when destroyed.
-  ByteVectorProperty CreateByteVectorProperty(BorrowedStringValue name, BlockIndex parent,
+  ByteVectorProperty CreateByteVectorProperty(std::string_view name, BlockIndex parent,
                                               cpp20::span<const uint8_t> value);
 
   // Create a new [Link] in the Inspect VMO. The returned node releases the link when destroyed.
@@ -130,16 +130,16 @@ class State final {
   // A Link is a low-level reference to a new Inspector linked off of the one managed by this
   // state. A Link alone is not sufficient to populate the linked tree, see CreateLazyNode and
   // CreateLazyValues.
-  Link CreateLink(BorrowedStringValue name, BlockIndex parent, BorrowedStringValue content,
+  Link CreateLink(std::string_view name, BlockIndex parent, std::string_view content,
                   LinkBlockDisposition disposition);
 
   // Create a new |Node| in the Inspect VMO. Nodes are refcounted such that values nested under the
   // node remain valid until all such values values are destroyed.
-  Node CreateNode(BorrowedStringValue name, BlockIndex parent);
+  Node CreateNode(std::string_view name, BlockIndex parent);
 
   // Create and allocate, if necessary, a StringReference block. The reference count will be 1
   // if the block is new, and incremented if it already existed.
-  zx_status_t CreateAndIncrementStringReference(BorrowedStringValue value, BlockIndex* out);
+  zx_status_t CreateAndIncrementStringReference(std::string_view value, BlockIndex* out);
 
   // Create a special root |Node| in the Inspect VMO. This node is not backed by any storage,
   // rather it allows clients to use the |Node| interface to add properties and children directly
@@ -148,12 +148,11 @@ class State final {
 
   // Create a new |LazyNode| with a new named |Link| that calls the given callback with child
   // disposition.
-  LazyNode CreateLazyNode(BorrowedStringValue name, BlockIndex parent, LazyNodeCallbackFn callback);
+  LazyNode CreateLazyNode(std::string_view name, BlockIndex parent, LazyNodeCallbackFn callback);
 
   // Create a new |LazyNode| with a new named |Link| that calls the given callback with inline
   // disposition.
-  LazyNode CreateLazyValues(BorrowedStringValue name, BlockIndex parent,
-                            LazyNodeCallbackFn callback);
+  LazyNode CreateLazyValues(std::string_view name, BlockIndex parent, LazyNodeCallbackFn callback);
   // Setters for various property types
   void SetIntProperty(IntProperty* property, int64_t value);
   void SetUintProperty(UintProperty* property, uint64_t value);
@@ -162,7 +161,7 @@ class State final {
   void SetIntArray(IntArray* array, size_t index, int64_t value);
   void SetUintArray(UintArray* array, size_t index, uint64_t value);
   void SetDoubleArray(DoubleArray* array, size_t index, double value);
-  void SetStringArray(StringArray* array, size_t index, BorrowedStringValue value);
+  void SetStringArray(StringArray* array, size_t index, std::string_view value);
   void SetStringProperty(StringProperty* property, const std::string& value);
   void SetByteVectorProperty(ByteVectorProperty* property, cpp20::span<const uint8_t> value);
 
@@ -279,12 +278,12 @@ class State final {
       __TA_REQUIRES(mutex_);
 
   // Helper method for creating a new VALUE block type.
-  zx_status_t InnerCreateValue(BorrowedStringValue name, BlockType type, BlockIndex parent_index,
+  zx_status_t InnerCreateValue(std::string_view name, BlockType type, BlockIndex parent_index,
                                BlockIndex* out_name, BlockIndex* out_value,
                                size_t min_size_required = kMinOrderSize) __TA_REQUIRES(mutex_);
 
   // Helper method to create a new LINK block that calls a callback when followed.
-  LazyNode InnerCreateLazyLink(BorrowedStringValue name, BlockIndex parent,
+  LazyNode InnerCreateLazyLink(std::string_view name, BlockIndex parent,
                                LazyNodeCallbackFn callback, LinkBlockDisposition disposition);
 
   // Returns true if the block is an extent, false otherwise.
@@ -300,17 +299,17 @@ class State final {
   void InnerFreeExtentChain(BlockIndex extent_index) __TA_REQUIRES(mutex_);
 
   // Helper to create a new name block with the given name.
-  zx_status_t InnerCreateAndIncrementStringReference(BorrowedStringValue name, BlockIndex* out)
-      __TA_REQUIRES(mutex_);
+  zx_status_t InnerCreateAndIncrementStringReference(std::string_view name, BlockIndex* out,
+                                                     bool should_cache) __TA_REQUIRES(mutex_);
 
   // Helper function to create an array with the given name, number of slots, and format.
   template <typename WrapperType, BlockType BlockTypeValue>
-  WrapperType InnerCreateArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+  WrapperType InnerCreateArray(std::string_view name, BlockIndex parent, size_t slots,
                                ArrayBlockFormat format);
 
   // Helper function to create a property with a byte format.
   template <typename WrapperType, typename ValueType>
-  WrapperType InnerCreateProperty(BorrowedStringValue name, BlockIndex parent, const char* value,
+  WrapperType InnerCreateProperty(std::string_view name, BlockIndex parent, const char* value,
                                   size_t length, PropertyBlockFormat format);
 
   template <typename WrapperType>
@@ -335,16 +334,16 @@ class State final {
   void InnerFreeArray(WrapperType* value);
 
   // Helper function to generate a unique name for a link.
-  std::string UniqueLinkName(cpp17::string_view prefix);
+  std::string UniqueLinkName(std::string_view prefix);
 
   // Create a new |StringReference| in the Inspect VMO, or get the existing index.
   // If the StringReference is new, it will have a reference count of 0. If it already
   // existed, the reference count will not be incremented.
-  zx_status_t InnerCreateStringReference(BorrowedStringValue value, BlockIndex* out)
+  zx_status_t InnerCreateStringReference(std::string_view value, BlockIndex* out, bool should_cache)
       __TA_REQUIRES(mutex_);
 
-  zx_status_t InnerDoStringReferenceAllocations(cpp17::string_view data, BlockIndex* out)
-      __TA_REQUIRES(mutex_);
+  zx_status_t InnerDoStringReferenceAllocations(std::string_view data, BlockIndex* out,
+                                                bool should_cache) __TA_REQUIRES(mutex_);
 
   // Free the block pointed to by |index| if and only if it has a reference count of 0.
   // Attempting to free a reference that has a non-zero reference count is not an error,
@@ -356,7 +355,7 @@ class State final {
   void InnerReadExtents(BlockIndex head_extent, size_t remaining_length,
                         std::vector<uint8_t>* buf) const __TA_REQUIRES(mutex_);
 
-  zx_status_t WriteStringReferencePayload(Block* block, cpp17::string_view data)
+  zx_status_t WriteStringReferencePayload(Block* block, std::string_view data)
       __TA_REQUIRES(mutex_);
 
   friend cpp17::optional<std::string> TesterLoadStringReference(const State& state,
@@ -398,46 +397,11 @@ class State final {
   uint32_t transaction_count_ FIT_GUARDED(mutex_);
   std::unique_ptr<AutoGenerationIncrement> transaction_gen_ FIT_GUARDED(mutex_);
 
-  // Map StringReference.ID to an index in the VMO and vice-versa.
-  class {
-   public:
-    void Insert(BlockIndex index, uint64_t id) {
-      state_id_to_block_index_.insert({id, index});
-      block_index_to_state_id_.insert({index, id});
-    }
-
-    cpp17::optional<BlockIndex> GetBlockIndex(uint64_t id) {
-      const auto index = state_id_to_block_index_.find(id);
-      if (index == std::cend(state_id_to_block_index_)) {
-        return {};
-      }
-      return index->second;
-    }
-
-    cpp17::optional<uint64_t> GetStateId(BlockIndex index) {
-      const auto state_id = block_index_to_state_id_.find(index);
-      if (state_id == std::cend(block_index_to_state_id_)) {
-        return {};
-      }
-
-      return state_id->second;
-    }
-
-    void EraseByIndex(BlockIndex index) {
-      const auto id = GetStateId(index);
-      if (!id.has_value()) {
-        return;
-      }
-
-      state_id_to_block_index_.erase(*id);
-      block_index_to_state_id_.erase(index);
-    }
-
-   private:
-    std::unordered_map<uint64_t, BlockIndex> state_id_to_block_index_;
-    std::unordered_map<BlockIndex, uint64_t> block_index_to_state_id_;
-
-  } string_reference_ids_;
+  // Map the interned strings held in this State to their block indexes
+  //
+  // std::less<> is specified to make this have a "transparent comparator," which allows using
+  // std::string_view as the input to std::map::find without allocating temporary std::strings
+  std::map<std::string, BlockIndex, std::less<>> string_reference_ids_;
 };
 
 }  // namespace internal

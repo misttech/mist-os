@@ -135,15 +135,15 @@ void internal::NumericProperty<double>::Subtract(double value) {
 }
 
 template <>
-internal::ArrayValue<BorrowedStringValue>::~ArrayValue<BorrowedStringValue>() {
+internal::ArrayValue<std::string_view>::~ArrayValue<std::string_view>() {
   if (state_) {
     state_->FreeStringArray(this);
   }
 }
 
 template <>
-internal::ArrayValue<BorrowedStringValue>& internal::ArrayValue<BorrowedStringValue>::operator=(
-    internal::ArrayValue<BorrowedStringValue>&& other) noexcept {
+internal::ArrayValue<std::string_view>& internal::ArrayValue<std::string_view>::operator=(
+    internal::ArrayValue<std::string_view>&& other) noexcept {
   if (state_) {
     state_->FreeStringArray(this);
   }
@@ -154,7 +154,7 @@ internal::ArrayValue<BorrowedStringValue>& internal::ArrayValue<BorrowedStringVa
 }
 
 template <>
-void internal::ArrayValue<BorrowedStringValue>::Set(size_t index, BorrowedStringValue value) {
+void internal::ArrayValue<std::string_view>::Set(size_t index, std::string_view value) {
   if (state_) {
     state_->SetStringArray(this, index, value);
   }
@@ -350,108 +350,107 @@ Node& Node::operator=(Node&& other) noexcept {
   return *this;
 }
 
-Node Node::CreateChild(BorrowedStringValue name) {
+Node Node::CreateChild(std::string_view name) {
   if (state_) {
     return state_->CreateNode(name, value_index_);
   }
   return Node();
 }
 
-void Node::RecordChild(BorrowedStringValue name, RecordChildCallbackFn callback) {
+void Node::RecordChild(std::string_view name, RecordChildCallbackFn callback) {
   auto node = CreateChild(name);
   callback(node);
   value_list_.emplace(std::move(node));
 }
 
-IntProperty Node::CreateInt(BorrowedStringValue name, int64_t value) {
+IntProperty Node::CreateInt(std::string_view name, int64_t value) {
   if (state_) {
     return state_->CreateIntProperty(name, value_index_, value);
   }
   return IntProperty();
 }
 
-void Node::RecordInt(BorrowedStringValue name, int64_t value) {
+void Node::RecordInt(std::string_view name, int64_t value) {
   value_list_.emplace(CreateInt(name, value));
 }
 
-UintProperty Node::CreateUint(BorrowedStringValue name, uint64_t value) {
+UintProperty Node::CreateUint(std::string_view name, uint64_t value) {
   if (state_) {
     return state_->CreateUintProperty(name, value_index_, value);
   }
   return UintProperty();
 }
 
-void Node::RecordUint(BorrowedStringValue name, uint64_t value) {
+void Node::RecordUint(std::string_view name, uint64_t value) {
   value_list_.emplace(CreateUint(name, value));
 }
 
-DoubleProperty Node::CreateDouble(BorrowedStringValue name, double value) {
+DoubleProperty Node::CreateDouble(std::string_view name, double value) {
   if (state_) {
     return state_->CreateDoubleProperty(name, value_index_, value);
   }
   return DoubleProperty();
 }
 
-void Node::RecordDouble(BorrowedStringValue name, double value) {
+void Node::RecordDouble(std::string_view name, double value) {
   value_list_.emplace(CreateDouble(name, value));
 }
 
-BoolProperty Node::CreateBool(BorrowedStringValue name, bool value) {
+BoolProperty Node::CreateBool(std::string_view name, bool value) {
   if (state_) {
     return state_->CreateBoolProperty(name, value_index_, value);
   }
   return BoolProperty();
 }
 
-void Node::RecordBool(BorrowedStringValue name, bool value) {
+void Node::RecordBool(std::string_view name, bool value) {
   value_list_.emplace(CreateBool(name, value));
 }
 
-StringProperty Node::CreateString(BorrowedStringValue name, const std::string& value) {
+StringProperty Node::CreateString(std::string_view name, const std::string& value) {
   if (state_) {
     return state_->CreateStringProperty(name, value_index_, value);
   }
   return StringProperty();
 }
 
-void Node::RecordString(BorrowedStringValue name, const std::string& value) {
+void Node::RecordString(std::string_view name, const std::string& value) {
   value_list_.emplace(CreateString(name, value));
 }
 
-ByteVectorProperty Node::CreateByteVector(BorrowedStringValue name,
-                                          cpp20::span<const uint8_t> value) {
+ByteVectorProperty Node::CreateByteVector(std::string_view name, cpp20::span<const uint8_t> value) {
   if (state_) {
     return state_->CreateByteVectorProperty(name, value_index_, value);
   }
   return ByteVectorProperty();
 }
 
-void Node::RecordByteVector(BorrowedStringValue name, cpp20::span<const uint8_t> value) {
+void Node::RecordByteVector(std::string_view name, cpp20::span<const uint8_t> value) {
   value_list_.emplace(CreateByteVector(name, value));
 }
 
-IntArray Node::CreateIntArray(BorrowedStringValue name, size_t slots) {
+IntArray Node::CreateIntArray(std::string_view name, size_t slots) {
   if (state_) {
     return state_->CreateIntArray(name, value_index_, slots, ArrayBlockFormat::kDefault);
   }
   return IntArray();
 }
 
-UintArray Node::CreateUintArray(BorrowedStringValue name, size_t slots) {
+UintArray Node::CreateUintArray(std::string_view name, size_t slots) {
   if (state_) {
     return state_->CreateUintArray(name, value_index_, slots, ArrayBlockFormat::kDefault);
   }
   return UintArray();
 }
 
-DoubleArray Node::CreateDoubleArray(BorrowedStringValue name, size_t slots) {
+DoubleArray Node::CreateDoubleArray(std::string_view name, size_t slots) {
   if (state_) {
     return state_->CreateDoubleArray(name, value_index_, slots, ArrayBlockFormat::kDefault);
   }
   return DoubleArray();
 }
 
-StringArray Node::CreateStringArray(BorrowedStringValue name, size_t slots) {
+StringArray Node::CreateStringArray(std::string_view name, size_t slots) {
   if (state_) {
     return state_->CreateStringArray(name, value_index_, slots, ArrayBlockFormat::kDefault);
   }
@@ -464,7 +463,7 @@ const size_t kExtraSlotsForLinearHistogram = 4;
 const size_t kExtraSlotsForExponentialHistogram = 5;
 }  // namespace
 
-LinearIntHistogram Node::CreateLinearIntHistogram(BorrowedStringValue name, int64_t floor,
+LinearIntHistogram Node::CreateLinearIntHistogram(std::string_view name, int64_t floor,
                                                   int64_t step_size, size_t buckets) {
   if (state_) {
     const size_t slots = buckets + kExtraSlotsForLinearHistogram;
@@ -475,7 +474,7 @@ LinearIntHistogram Node::CreateLinearIntHistogram(BorrowedStringValue name, int6
   return LinearIntHistogram();
 }
 
-LinearUintHistogram Node::CreateLinearUintHistogram(BorrowedStringValue name, uint64_t floor,
+LinearUintHistogram Node::CreateLinearUintHistogram(std::string_view name, uint64_t floor,
                                                     uint64_t step_size, size_t buckets) {
   if (state_) {
     const size_t slots = buckets + kExtraSlotsForLinearHistogram;
@@ -486,7 +485,7 @@ LinearUintHistogram Node::CreateLinearUintHistogram(BorrowedStringValue name, ui
   return LinearUintHistogram();
 }
 
-LinearDoubleHistogram Node::CreateLinearDoubleHistogram(BorrowedStringValue name, double floor,
+LinearDoubleHistogram Node::CreateLinearDoubleHistogram(std::string_view name, double floor,
                                                         double step_size, size_t buckets) {
   if (state_) {
     const size_t slots = buckets + kExtraSlotsForLinearHistogram;
@@ -497,7 +496,7 @@ LinearDoubleHistogram Node::CreateLinearDoubleHistogram(BorrowedStringValue name
   return LinearDoubleHistogram();
 }
 
-ExponentialIntHistogram Node::CreateExponentialIntHistogram(BorrowedStringValue name, int64_t floor,
+ExponentialIntHistogram Node::CreateExponentialIntHistogram(std::string_view name, int64_t floor,
                                                             int64_t initial_step,
                                                             int64_t step_multiplier,
                                                             size_t buckets) {
@@ -510,8 +509,8 @@ ExponentialIntHistogram Node::CreateExponentialIntHistogram(BorrowedStringValue 
   return ExponentialIntHistogram();
 }
 
-ExponentialUintHistogram Node::CreateExponentialUintHistogram(BorrowedStringValue name,
-                                                              uint64_t floor, uint64_t initial_step,
+ExponentialUintHistogram Node::CreateExponentialUintHistogram(std::string_view name, uint64_t floor,
+                                                              uint64_t initial_step,
                                                               uint64_t step_multiplier,
                                                               size_t buckets) {
   if (state_) {
@@ -523,7 +522,7 @@ ExponentialUintHistogram Node::CreateExponentialUintHistogram(BorrowedStringValu
   return ExponentialUintHistogram();
 }
 
-ExponentialDoubleHistogram Node::CreateExponentialDoubleHistogram(BorrowedStringValue name,
+ExponentialDoubleHistogram Node::CreateExponentialDoubleHistogram(std::string_view name,
                                                                   double floor, double initial_step,
                                                                   double step_multiplier,
                                                                   size_t buckets) {
@@ -544,26 +543,26 @@ std::string Node::UniqueName(const std::string& prefix) {
   return "";
 }
 
-LazyNode Node::CreateLazyNode(BorrowedStringValue name, LazyNodeCallbackFn callback) {
+LazyNode Node::CreateLazyNode(std::string_view name, LazyNodeCallbackFn callback) {
   if (state_) {
     return state_->CreateLazyNode(name, value_index_, std::move(callback));
   }
   return LazyNode();
 }
 
-void Node::RecordLazyNode(BorrowedStringValue name, LazyNodeCallbackFn callback) {
+void Node::RecordLazyNode(std::string_view name, LazyNodeCallbackFn callback) {
   auto node = CreateLazyNode(name, std::move(callback));
   value_list_.emplace(std::move(node));
 }
 
-LazyNode Node::CreateLazyValues(BorrowedStringValue name, LazyNodeCallbackFn callback) {
+LazyNode Node::CreateLazyValues(std::string_view name, LazyNodeCallbackFn callback) {
   if (state_) {
     return state_->CreateLazyValues(name, value_index_, std::move(callback));
   }
   return LazyNode();
 }
 
-void Node::RecordLazyValues(BorrowedStringValue name, LazyNodeCallbackFn callback) {
+void Node::RecordLazyValues(std::string_view name, LazyNodeCallbackFn callback) {
   auto node = CreateLazyValues(name, std::move(callback));
   value_list_.emplace(std::move(node));
 }

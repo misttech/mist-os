@@ -37,39 +37,34 @@ TEST_F(InspectorWarningTest, FailedDevice) {
   EXPECT_EQ(hierarchy.node().properties().size(), 3u);
   // Eventually we should test these Device detection failure modes as well.
   EXPECT_EQ(hierarchy.node()
-                .get_property<UintPropertyValue>(std::string(kDetectionConnectionErrors.Data()))
+                .get_property<UintPropertyValue>(std::string(kDetectionConnectionErrors))
                 ->value(),
             0u);
+  EXPECT_EQ(
+      hierarchy.node().get_property<UintPropertyValue>(std::string(kDetectionOtherErrors))->value(),
+      0u);
   EXPECT_EQ(hierarchy.node()
-                .get_property<UintPropertyValue>(std::string(kDetectionOtherErrors.Data()))
-                ->value(),
-            0u);
-  EXPECT_EQ(hierarchy.node()
-                .get_property<UintPropertyValue>(std::string(kDetectionUnsupportedDevices.Data()))
+                .get_property<UintPropertyValue>(std::string(kDetectionUnsupportedDevices))
                 ->value(),
             0u);
 
   auto devices_node =
       std::find_if(hierarchy.children().begin(), hierarchy.children().end(),
-                   [](const inspect::Hierarchy& h) { return h.name() == kDevices.Data(); });
+                   [](const inspect::Hierarchy& h) { return h.name() == kDevices; });
   ASSERT_NE(devices_node, hierarchy.children().end());
   ASSERT_TRUE(devices_node->node().properties().empty());
   ASSERT_EQ(devices_node->children().size(), 1u);
 
   auto device_node = devices_node->children().cbegin();
   EXPECT_GT(device_node->node().properties().size(), 4u);
-  EXPECT_GT(
-      device_node->node().get_property<IntPropertyValue>(std::string(kAddedAt.Data()))->value(),
-      before_added.get());
-  EXPECT_GT(
-      device_node->node().get_property<IntPropertyValue>(std::string(kFailedAt.Data()))->value(),
-      before_added.get());
-  EXPECT_FALSE(
-      device_node->node().get_property<BoolPropertyValue>(std::string(kHealthy.Data()))->value());
-  EXPECT_EQ(device_node->node()
-                .get_property<StringPropertyValue>(std::string(kDeviceType.Data()))
-                ->value(),
-            "CODEC");
+  EXPECT_GT(device_node->node().get_property<IntPropertyValue>(std::string(kAddedAt))->value(),
+            before_added.get());
+  EXPECT_GT(device_node->node().get_property<IntPropertyValue>(std::string(kFailedAt))->value(),
+            before_added.get());
+  EXPECT_FALSE(device_node->node().get_property<BoolPropertyValue>(std::string(kHealthy))->value());
+  EXPECT_EQ(
+      device_node->node().get_property<StringPropertyValue>(std::string(kDeviceType))->value(),
+      "CODEC");
   EXPECT_TRUE(device_node->children().empty());
 }
 
@@ -91,35 +86,31 @@ TEST_F(InspectorWarningTest, FailedThenRemovedDevice) {
   ASSERT_EQ(hierarchy.name(), "root");
   EXPECT_EQ(hierarchy.node().properties().size(), 3u);
   EXPECT_EQ(hierarchy.node()
-                .get_property<UintPropertyValue>(std::string(kDetectionConnectionErrors.Data()))
+                .get_property<UintPropertyValue>(std::string(kDetectionConnectionErrors))
                 ->value(),
             0u);
+  EXPECT_EQ(
+      hierarchy.node().get_property<UintPropertyValue>(std::string(kDetectionOtherErrors))->value(),
+      0u);
   EXPECT_EQ(hierarchy.node()
-                .get_property<UintPropertyValue>(std::string(kDetectionOtherErrors.Data()))
-                ->value(),
-            0u);
-  EXPECT_EQ(hierarchy.node()
-                .get_property<UintPropertyValue>(std::string(kDetectionUnsupportedDevices.Data()))
+                .get_property<UintPropertyValue>(std::string(kDetectionUnsupportedDevices))
                 ->value(),
             0u);
 
   auto devices_node =
       std::find_if(hierarchy.children().begin(), hierarchy.children().end(),
-                   [](const inspect::Hierarchy& h) { return h.name() == kDevices.Data(); });
+                   [](const inspect::Hierarchy& h) { return h.name() == kDevices; });
   ASSERT_NE(devices_node, hierarchy.children().end());
   ASSERT_TRUE(devices_node->node().properties().empty());
   ASSERT_EQ(devices_node->children().size(), 1u);
 
   auto device_node = devices_node->children().cbegin();
   EXPECT_GT(device_node->node().properties().size(), 4u);
-  EXPECT_LT(
-      device_node->node().get_property<IntPropertyValue>(std::string(kFailedAt.Data()))->value(),
-      before_removed.get());
-  EXPECT_GT(
-      device_node->node().get_property<IntPropertyValue>(std::string(kRemovedAt.Data()))->value(),
-      before_removed.get());
-  EXPECT_FALSE(
-      device_node->node().get_property<BoolPropertyValue>(std::string(kHealthy.Data()))->value());
+  EXPECT_LT(device_node->node().get_property<IntPropertyValue>(std::string(kFailedAt))->value(),
+            before_removed.get());
+  EXPECT_GT(device_node->node().get_property<IntPropertyValue>(std::string(kRemovedAt))->value(),
+            before_removed.get());
+  EXPECT_FALSE(device_node->node().get_property<BoolPropertyValue>(std::string(kHealthy))->value());
   EXPECT_TRUE(device_node->children().empty());
 }
 

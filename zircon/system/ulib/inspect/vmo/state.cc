@@ -114,7 +114,7 @@ State::State(std::unique_ptr<Heap> heap, BlockIndex header)
       transaction_count_(0) {}
 
 template <typename WrapperType, BlockType BlockTypeValue>
-WrapperType State::InnerCreateArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+WrapperType State::InnerCreateArray(std::string_view name, BlockIndex parent, size_t slots,
                                     ArrayBlockFormat format) {
   const auto size_of_payload_type = SizeForArrayPayload(BlockTypeValue);
   if (!size_of_payload_type.has_value()) {
@@ -332,7 +332,7 @@ bool State::CopyBytes(std::vector<uint8_t>* out) const {
   return true;
 }
 
-IntProperty State::CreateIntProperty(BorrowedStringValue name, BlockIndex parent, int64_t value) {
+IntProperty State::CreateIntProperty(std::string_view name, BlockIndex parent, int64_t value) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
 
@@ -349,8 +349,7 @@ IntProperty State::CreateIntProperty(BorrowedStringValue name, BlockIndex parent
   return IntProperty(weak_self_ptr_.lock(), name_index, value_index);
 }
 
-UintProperty State::CreateUintProperty(BorrowedStringValue name, BlockIndex parent,
-                                       uint64_t value) {
+UintProperty State::CreateUintProperty(std::string_view name, BlockIndex parent, uint64_t value) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
 
@@ -367,8 +366,7 @@ UintProperty State::CreateUintProperty(BorrowedStringValue name, BlockIndex pare
   return UintProperty(weak_self_ptr_.lock(), name_index, value_index);
 }
 
-DoubleProperty State::CreateDoubleProperty(BorrowedStringValue name, BlockIndex parent,
-                                           double value) {
+DoubleProperty State::CreateDoubleProperty(std::string_view name, BlockIndex parent, double value) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
 
@@ -385,7 +383,7 @@ DoubleProperty State::CreateDoubleProperty(BorrowedStringValue name, BlockIndex 
   return DoubleProperty(weak_self_ptr_.lock(), name_index, value_index);
 }
 
-BoolProperty State::CreateBoolProperty(BorrowedStringValue name, BlockIndex parent, bool value) {
+BoolProperty State::CreateBoolProperty(std::string_view name, BlockIndex parent, bool value) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
 
@@ -401,30 +399,29 @@ BoolProperty State::CreateBoolProperty(BorrowedStringValue name, BlockIndex pare
   return BoolProperty(weak_self_ptr_.lock(), name_index, value_index);
 }
 
-IntArray State::CreateIntArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+IntArray State::CreateIntArray(std::string_view name, BlockIndex parent, size_t slots,
                                ArrayBlockFormat format) {
   return InnerCreateArray<IntArray, BlockType::kIntValue>(name, parent, slots, format);
 }
 
-UintArray State::CreateUintArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+UintArray State::CreateUintArray(std::string_view name, BlockIndex parent, size_t slots,
                                  ArrayBlockFormat format) {
   return InnerCreateArray<UintArray, BlockType::kUintValue>(name, parent, slots, format);
 }
 
-DoubleArray State::CreateDoubleArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+DoubleArray State::CreateDoubleArray(std::string_view name, BlockIndex parent, size_t slots,
                                      ArrayBlockFormat format) {
   return InnerCreateArray<DoubleArray, BlockType::kDoubleValue>(name, parent, slots, format);
 }
 
-StringArray State::CreateStringArray(BorrowedStringValue name, BlockIndex parent, size_t slots,
+StringArray State::CreateStringArray(std::string_view name, BlockIndex parent, size_t slots,
                                      ArrayBlockFormat format) {
   return InnerCreateArray<StringArray, BlockType::kStringReference>(name, parent, slots, format);
 }
 
 template <typename WrapperType, typename ValueType>
-WrapperType State::InnerCreateProperty(BorrowedStringValue name, BlockIndex parent,
-                                       const char* value, size_t length,
-                                       PropertyBlockFormat format) {
+WrapperType State::InnerCreateProperty(std::string_view name, BlockIndex parent, const char* value,
+                                       size_t length, PropertyBlockFormat format) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
 
@@ -451,20 +448,20 @@ WrapperType State::InnerCreateProperty(BorrowedStringValue name, BlockIndex pare
   return WrapperType(weak_self_ptr_.lock(), name_index, value_index);
 }
 
-StringProperty State::CreateStringProperty(BorrowedStringValue name, BlockIndex parent,
+StringProperty State::CreateStringProperty(std::string_view name, BlockIndex parent,
                                            const std::string& value) {
   return InnerCreateProperty<StringProperty, std::string>(
       name, parent, value.data(), value.length(), PropertyBlockFormat::kUtf8);
 }
 
-ByteVectorProperty State::CreateByteVectorProperty(BorrowedStringValue name, BlockIndex parent,
+ByteVectorProperty State::CreateByteVectorProperty(std::string_view name, BlockIndex parent,
                                                    cpp20::span<const uint8_t> value) {
   return InnerCreateProperty<ByteVectorProperty, cpp20::span<const uint8_t>>(
       name, parent, reinterpret_cast<const char*>(value.data()), value.size(),
       PropertyBlockFormat::kBinary);
 }
 
-Link State::CreateLink(BorrowedStringValue name, BlockIndex parent, BorrowedStringValue content,
+Link State::CreateLink(std::string_view name, BlockIndex parent, std::string_view content,
                        LinkBlockDisposition disposition) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
@@ -476,7 +473,8 @@ Link State::CreateLink(BorrowedStringValue name, BlockIndex parent, BorrowedStri
     return Link();
   }
 
-  status = InnerCreateAndIncrementStringReference(content, &content_index);
+  // `content` is always unique (passed through UniqueLinkName), so caching is unneeded
+  status = InnerCreateAndIncrementStringReference(content, &content_index, false);
   if (status != ZX_OK) {
     DecrementParentRefcount(value_index);
     InnerReleaseStringReference(name_index);
@@ -497,18 +495,9 @@ Node State::CreateRootNode() {
   return Node(weak_self_ptr_.lock(), 0, 0);
 }
 
-LazyNode State::InnerCreateLazyLink(BorrowedStringValue name, BlockIndex parent,
+LazyNode State::InnerCreateLazyLink(std::string_view name, BlockIndex parent,
                                     LazyNodeCallbackFn callback, LinkBlockDisposition disposition) {
-  cpp17::string_view data;
-  switch (name.index()) {
-    case internal::isStringReference:
-      data = cpp17::get<internal::isStringReference>(name).Data();
-      break;
-    case internal::isStringLiteral:
-      data = cpp17::get<internal::isStringLiteral>(name);
-      break;
-  }
-  std::string content = UniqueLinkName(data);
+  std::string content = UniqueLinkName(name);
   auto link = CreateLink(name, parent, content, disposition);
 
   {
@@ -520,17 +509,17 @@ LazyNode State::InnerCreateLazyLink(BorrowedStringValue name, BlockIndex parent,
   }
 }
 
-LazyNode State::CreateLazyNode(BorrowedStringValue name, BlockIndex parent,
+LazyNode State::CreateLazyNode(std::string_view name, BlockIndex parent,
                                LazyNodeCallbackFn callback) {
   return InnerCreateLazyLink(name, parent, std::move(callback), LinkBlockDisposition::kChild);
 }
 
-LazyNode State::CreateLazyValues(BorrowedStringValue name, BlockIndex parent,
+LazyNode State::CreateLazyValues(std::string_view name, BlockIndex parent,
                                  LazyNodeCallbackFn callback) {
   return InnerCreateLazyLink(name, parent, std::move(callback), LinkBlockDisposition::kInline);
 }
 
-Node State::CreateNode(BorrowedStringValue name, BlockIndex parent) {
+Node State::CreateNode(std::string_view name, BlockIndex parent) {
   std::lock_guard<std::mutex> lock(mutex_);
   std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
 
@@ -602,7 +591,7 @@ void State::SetDoubleArray(DoubleArray* array, size_t index, double value) {
   InnerSetArray<double, DoubleArray, BlockType::kDoubleValue>(array, index, value);
 }
 
-void State::SetStringArray(StringArray* array, size_t index, BorrowedStringValue value) {
+void State::SetStringArray(StringArray* array, size_t index, std::string_view value) {
   BlockIndex value_index;
   CreateAndIncrementStringReference(value, &value_index);
   InnerSetArray<BlockIndex, StringArray, BlockType::kStringReference>(array, index, value_index);
@@ -998,7 +987,12 @@ void State::InnerMaybeFreeStringReference(BlockIndex index, Block* block) {
   // If a reference ID is used again, it will just be re-allocated to the VMO.
   // Additionally, though the index might not have been mapped to a state ID,
   // failing to erase isn't an error.
-  string_reference_ids_.EraseByIndex(index);
+  for (auto it = std::begin(string_reference_ids_); it != std::cend(string_reference_ids_); it++) {
+    if (it->second == index) {
+      string_reference_ids_.erase(it);
+      break;
+    }
+  }
 
   const auto first_extent_index =
       StringReferenceBlockFields::NextExtentIndex::Get<BlockIndex>(block->header);
@@ -1069,9 +1063,9 @@ fpromise::promise<Inspector> State::CallLinkCallback(const std::string& name) {
   return holder.call();
 }
 
-zx_status_t State::InnerCreateValue(BorrowedStringValue name, BlockType type,
-                                    BlockIndex parent_index, BlockIndex* out_name,
-                                    BlockIndex* out_value, size_t min_size_required) {
+zx_status_t State::InnerCreateValue(std::string_view name, BlockType type, BlockIndex parent_index,
+                                    BlockIndex* out_name, BlockIndex* out_value,
+                                    size_t min_size_required) {
   BlockIndex value_index, name_index;
   zx_status_t status;
   status = heap_->Allocate(min_size_required, &value_index);
@@ -1079,7 +1073,7 @@ zx_status_t State::InnerCreateValue(BorrowedStringValue name, BlockType type,
     return status;
   }
 
-  status = InnerCreateAndIncrementStringReference(name, &name_index);
+  status = InnerCreateAndIncrementStringReference(name, &name_index, true);
   if (status != ZX_OK) {
     heap_->Free(value_index);
     return status;
@@ -1172,46 +1166,31 @@ std::pair<BlockIndex, zx_status_t> State::InnerCreateExtentChain(const char* val
   return {first_extent_index, ZX_OK};
 }
 
-std::string State::UniqueLinkName(cpp17::string_view prefix) {
+std::string State::UniqueLinkName(std::string_view prefix) {
   return std::string(prefix.data(), prefix.size()) + "-" +
          std::to_string(next_unique_link_number_.fetch_add(1, std::memory_order_relaxed));
 }
 
-zx_status_t State::CreateAndIncrementStringReference(BorrowedStringValue value, BlockIndex* out) {
+zx_status_t State::CreateAndIncrementStringReference(std::string_view value, BlockIndex* out) {
   std::lock_guard<std::mutex> lock(mutex_);
   // Since InnerCreateStringReferenceWithCount might not actually allocate, a potential
   // optimzation here is to only conditionally increment the generation count.
   std::unique_ptr<AutoGenerationIncrement> gen = MaybeIncrementGeneration();
-  return InnerCreateAndIncrementStringReference(value, out);
+  return InnerCreateAndIncrementStringReference(value, out, true);
 }
 
-zx_status_t State::InnerCreateStringReference(BorrowedStringValue value, BlockIndex* const out) {
-  zx_status_t status;
-  cpp17::optional<BlockIndex> maybe_block_index;
+zx_status_t State::InnerCreateStringReference(std::string_view value, BlockIndex* const out,
+                                              bool should_cache) {
+  zx_status_t status = ZX_OK;
 
-  switch (value.index()) {
-    case internal::isStringReference:
-      maybe_block_index =
-          string_reference_ids_.GetBlockIndex(cpp17::get<internal::isStringReference>(value).ID());
-      if (maybe_block_index.has_value()) {
-        *out = maybe_block_index.value();
-        return ZX_OK;
-      }
-
-      status = InnerDoStringReferenceAllocations(
-          cpp17::get<internal::isStringReference>(value).Data(), out);
-      if (status != ZX_OK) {
-        return status;
-      }
-
-      string_reference_ids_.Insert(*out, cpp17::get<internal::isStringReference>(value).ID());
-      break;
-
-    case internal::isStringLiteral:
-      return InnerDoStringReferenceAllocations(cpp17::get<internal::isStringLiteral>(value), out);
+  const auto maybe_block_index = string_reference_ids_.find(value);
+  if (maybe_block_index == std::cend(string_reference_ids_)) {
+    status = InnerDoStringReferenceAllocations(value, out, should_cache);
+  } else {
+    *out = maybe_block_index->second;
   }
 
-  return ZX_OK;
+  return status;
 }
 
 namespace {
@@ -1222,12 +1201,16 @@ constexpr size_t GetOrderForSizeOfStringReference(const size_t data_size) {
 }
 }  // namespace
 
-zx_status_t State::InnerDoStringReferenceAllocations(cpp17::string_view data,
-                                                     BlockIndex* const out) {
+zx_status_t State::InnerDoStringReferenceAllocations(std::string_view data, BlockIndex* const out,
+                                                     bool should_cache) {
   const auto order_for_size = GetOrderForSizeOfStringReference(data.size());
   auto status = heap_->Allocate(order_for_size, out);
   if (status != ZX_OK) {
     return status;
+  }
+
+  if (should_cache) {
+    string_reference_ids_[std::string(data.data(), data.size())] = *out;
   }
 
   auto* block = heap_->GetBlock(*out);
@@ -1240,7 +1223,7 @@ zx_status_t State::InnerDoStringReferenceAllocations(cpp17::string_view data,
   return WriteStringReferencePayload(block, data);
 }
 
-zx_status_t State::WriteStringReferencePayload(Block* const block, cpp17::string_view data) {
+zx_status_t State::WriteStringReferencePayload(Block* const block, std::string_view data) {
   // write the inline-portion first:
   auto inline_length =
       std::min(data.size(), PayloadCapacity(GetOrder(block)) -
@@ -1267,9 +1250,9 @@ zx_status_t State::WriteStringReferencePayload(Block* const block, cpp17::string
   return ZX_OK;
 }
 
-zx_status_t State::InnerCreateAndIncrementStringReference(BorrowedStringValue name,
-                                                          BlockIndex* out) {
-  const auto status = InnerCreateStringReference(name, out);
+zx_status_t State::InnerCreateAndIncrementStringReference(std::string_view name, BlockIndex* out,
+                                                          bool should_cache) {
+  const auto status = InnerCreateStringReference(name, out, should_cache);
   if (status != ZX_OK) {
     return status;
   }
