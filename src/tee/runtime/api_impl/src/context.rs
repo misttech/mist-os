@@ -4,11 +4,13 @@
 
 use std::cell::RefCell;
 
+use crate::props::Properties;
+
 // Context stores information about the current state of the TA runtime during a
 // call into the TA. API entry points are expected to retrieve the current context
 // and provide the relevant portions to implementation entry points.
 pub struct Context {
-    // TODO: Add fields.
+    pub properties: Properties,
 }
 
 // The TA entry points are FFI calls that are expected to call back into the
@@ -38,7 +40,7 @@ where
 
 impl Context {
     pub fn new() -> Self {
-        Self {}
+        Self { properties: Properties::new() }
     }
 
     pub fn cleanup_after_call(&mut self) {

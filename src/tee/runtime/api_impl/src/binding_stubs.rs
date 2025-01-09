@@ -11,7 +11,7 @@
 #![allow(unused_variables)]
 
 use crate::props::is_propset_pseudo_handle;
-use crate::{mem, props, storage, time};
+use crate::{context, mem, storage, time};
 use num_traits::FromPrimitive;
 use tee_internal::binding::{
     TEE_Attribute, TEE_BigInt, TEE_BigIntFMM, TEE_BigIntFMMContext, TEE_Identity,
@@ -343,22 +343,23 @@ extern "C" fn TEE_GetPropertyAsString(
         // is the responsibility of the caller (e.g. out-of-bounds or freed memory pointers).
         let initial_buf_len = unsafe { *valueBufferLen };
         let mut buf = slice_from_raw_parts_mut(valueBuffer, initial_buf_len);
-
-        let (len, result) = match props::get_property_as_string(handle, name, &mut buf) {
-            Ok(written) => {
-                // written.len() does not include the NUL terminator byte, so cases where we
-                // write the exact buffer length are captured by `<` rather than `<=`.
-                debug_assert!(written.len() < initial_buf_len);
-                (written.len(), Ok(()))
-            }
-            Err(err) => {
-                if err.error == Error::ShortBuffer {
-                    (err.actual_length, Err(err.error))
-                } else {
-                    (err.written.len(), Err(err.error))
+        let (len, result) = context::with_current(|context| {
+            match context.properties.get_property_as_string(handle, name, &mut buf) {
+                Ok(written) => {
+                    // written.len() does not include the NUL terminator byte, so cases where we
+                    // write the exact buffer length are captured by `<` rather than `<=`.
+                    debug_assert!(written.len() < initial_buf_len);
+                    (written.len(), Ok(()))
+                }
+                Err(err) => {
+                    if err.error == Error::ShortBuffer {
+                        (err.actual_length, Err(err.error))
+                    } else {
+                        (err.written.len(), Err(err.error))
+                    }
                 }
             }
-        };
+        });
 
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
@@ -387,7 +388,8 @@ extern "C" fn TEE_GetPropertyAsBool(
         } else {
             ""
         };
-        let val = props::get_property_as_bool(handle, name)?;
+        let val =
+            context::with_current(|context| context.properties.get_property_as_bool(handle, name))?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -413,7 +415,8 @@ extern "C" fn TEE_GetPropertyAsU32(
         } else {
             ""
         };
-        let val = props::get_property_as_u32(handle, name)?;
+        let val =
+            context::with_current(|context| context.properties.get_property_as_u32(handle, name))?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -439,7 +442,8 @@ extern "C" fn TEE_GetPropertyAsU64(
         } else {
             ""
         };
-        let val = props::get_property_as_u64(handle, name)?;
+        let val =
+            context::with_current(|context| context.properties.get_property_as_u64(handle, name))?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -471,20 +475,22 @@ extern "C" fn TEE_GetPropertyAsBinaryBlock(
         let initial_buf_len = unsafe { *valueBufferLen };
         let mut buf = slice_from_raw_parts_mut(valueBuffer as *mut u8, initial_buf_len);
 
-        let (len, result) = match props::get_property_as_binary_block(handle, name, &mut buf) {
-            Ok(bytes_written) => {
-                debug_assert!(bytes_written.len() <= initial_buf_len);
-                (bytes_written.len(), Ok(()))
+        let (len, result) = context::with_current(|context| {
+            match context.properties.get_property_as_binary_block(handle, name, &mut buf) {
+                Ok(bytes_written) => {
+                    debug_assert!(bytes_written.len() <= initial_buf_len);
+                    (bytes_written.len(), Ok(()))
+                }
+                Err(err) => {
+                    let len = match err.error {
+                        Error::ShortBuffer => err.actual_length,
+                        Error::BadFormat => 0,
+                        _ => err.written.len(),
+                    };
+                    (len, Err(err.error))
+                }
             }
-            Err(err) => {
-                let len = match err.error {
-                    Error::ShortBuffer => err.actual_length,
-                    Error::BadFormat => 0,
-                    _ => err.written.len(),
-                };
-                (len, Err(err.error))
-            }
-        };
+        });
 
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
@@ -512,7 +518,8 @@ extern "C" fn TEE_GetPropertyAsUUID(
         } else {
             ""
         };
-        let uuid = props::get_property_as_uuid(handle, name)?;
+        let uuid =
+            context::with_current(|context| context.properties.get_property_as_uuid(handle, name))?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -538,7 +545,9 @@ extern "C" fn TEE_GetPropertyAsIdentity(
         } else {
             ""
         };
-        let identity = props::get_property_as_identity(handle, name)?;
+        let identity = context::with_current(|context| {
+            context.properties.get_property_as_identity(handle, name)
+        })?;
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
         unsafe {
@@ -552,7 +561,8 @@ extern "C" fn TEE_GetPropertyAsIdentity(
 extern "C" fn TEE_AllocatePropertyEnumerator(enumerator: *mut TEE_PropSetHandle) -> TEE_Result {
     assert!(!enumerator.is_null());
     assert!(enumerator.is_aligned());
-    let handle = props::allocate_property_enumerator();
+    let handle =
+        context::with_current_mut(|context| context.properties.allocate_property_enumerator());
     // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
     // other validity concerns for `ptr::write()`.
     unsafe {
@@ -563,7 +573,9 @@ extern "C" fn TEE_AllocatePropertyEnumerator(enumerator: *mut TEE_PropSetHandle)
 
 #[no_mangle]
 extern "C" fn TEE_FreePropertyEnumerator(enumerator: TEE_PropSetHandle) {
-    props::free_property_enumerator(*PropSetHandle::from_binding(&enumerator));
+    context::with_current_mut(|context| {
+        context.properties.free_property_enumerator(*PropSetHandle::from_binding(&enumerator))
+    });
 }
 
 #[no_mangle]
@@ -571,15 +583,19 @@ extern "C" fn TEE_StartPropertyEnumerator(
     enumerator: TEE_PropSetHandle,
     propSet: TEE_PropSetHandle,
 ) {
-    props::start_property_enumerator(
-        *PropSetHandle::from_binding(&enumerator),
-        *PropSetHandle::from_binding(&propSet),
-    );
+    context::with_current_mut(|context| {
+        context.properties.start_property_enumerator(
+            *PropSetHandle::from_binding(&enumerator),
+            *PropSetHandle::from_binding(&propSet),
+        )
+    });
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetPropertyEnumerator(enumerator: TEE_PropSetHandle) {
-    props::reset_property_enumerator(*PropSetHandle::from_binding(&enumerator));
+    context::with_current_mut(|context| {
+        context.properties.reset_property_enumerator(*PropSetHandle::from_binding(&enumerator))
+    });
 }
 
 #[no_mangle]
@@ -601,21 +617,23 @@ extern "C" fn TEE_GetPropertyName(
         let initial_buf_len = unsafe { *nameBufferLen };
         let mut buf = slice_from_raw_parts_mut(nameBuffer, initial_buf_len);
 
-        let (len, result) = match props::get_property_name(handle, &mut buf) {
-            Ok(written) => {
-                // written.len() does not include the NUL terminator byte, so cases where we
-                // write the exact buffer length are captured by `<` rather than `<=`.
-                debug_assert!(written.len() < initial_buf_len);
-                (written.len(), Ok(()))
-            }
-            Err(err) => {
-                if err.error == Error::ShortBuffer {
-                    (err.actual_length, Err(err.error))
-                } else {
-                    (err.written.len(), Err(err.error))
+        let (len, result) = context::with_current(|context| {
+            match context.properties.get_property_name(handle, &mut buf) {
+                Ok(written) => {
+                    // written.len() does not include the NUL terminator byte, so cases where we
+                    // write the exact buffer length are captured by `<` rather than `<=`.
+                    debug_assert!(written.len() < initial_buf_len);
+                    (written.len(), Ok(()))
+                }
+                Err(err) => {
+                    if err.error == Error::ShortBuffer {
+                        (err.actual_length, Err(err.error))
+                    } else {
+                        (err.written.len(), Err(err.error))
+                    }
                 }
             }
-        };
+        });
 
         // SAFETY: Nullity and alignment are checked above. The caller is responsible for upholding
         // other validity concerns for `ptr::write()`.
@@ -631,7 +649,9 @@ extern "C" fn TEE_GetPropertyName(
 #[no_mangle]
 extern "C" fn TEE_GetNextProperty(enumerator: TEE_PropSetHandle) -> TEE_Result {
     to_tee_result((|| -> TeeResult {
-        props::get_next_property(*PropSetHandle::from_binding(&enumerator))
+        context::with_current_mut(|context| {
+            context.properties.get_next_property(*PropSetHandle::from_binding(&enumerator))
+        })
     })())
 }
 
