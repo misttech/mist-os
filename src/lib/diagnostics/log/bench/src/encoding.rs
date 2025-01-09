@@ -8,6 +8,7 @@ use diagnostics_log_encoding::encode::{
 };
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
+use log::kv::ToValue;
 use std::fmt;
 use std::io::Cursor;
 use std::time::Duration;
@@ -39,14 +40,14 @@ where
 fn bench_write_record_with_args(
     b: &mut criterion::Bencher,
     message: fmt::Arguments<'static>,
-    key_values: &[&(dyn log::kv::Source + Send + Sync)],
+    kvs: &[(&str, log::kv::Value<'_>)],
 ) {
-    let mut builder = log::Record::builder();
-    builder.level(log::Level::Info);
-    for key_value in key_values {
-        builder.key_values(key_value);
-    }
-    let record = builder.args(message).build();
+    let key_values = Some(kvs);
+    let record = log::Record::builder()
+        .level(log::Level::Info)
+        .key_values(&key_values)
+        .args(message)
+        .build();
 
     b.iter_batched_ref(
         encoder,
@@ -71,12 +72,12 @@ fn setup_write_record_benchmarks(bench: criterion::Benchmark) -> criterion::Benc
                 b,
                 format_args!("this is a log emitted from the benchmark"),
                 &[
-                    &("tag", "logbench"),
-                    &("boolean", true),
-                    &("float", 1234.5678),
-                    &("int", -123456),
-                    &("string", "foobarbaz"),
-                    &("uint", 123456)
+                    ("tag", "logbench".to_value()),
+                    ("boolean", true.to_value()),
+                    ("float", 1234.5678.to_value()),
+                    ("int", (-123456).to_value()),
+                    ("string", "foobarbaz".to_value()),
+                    ("uint", 123456.to_value())
                 ],
             );
         })
@@ -99,9 +100,9 @@ fn setup_write_record_benchmarks(bench: criterion::Benchmark) -> criterion::Benc
                 b,
                 format_args!("this is a log emitted from the benchmark"),
                 &[
-                    &("boolean", true),
-                    &("int", -123456),
-                    &("string", "foobarbaz"),
+                    ("boolean", true.to_value()),
+                    ("int", (-123456).to_value()),
+                    ("string", "foobarbaz".to_value()),
                 ],
             );
         })

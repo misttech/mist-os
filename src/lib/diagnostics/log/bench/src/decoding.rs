@@ -9,6 +9,7 @@ use diagnostics_log_encoding::parse::{parse_argument, parse_record};
 use diagnostics_log_encoding::{Argument, Value};
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
+use log::kv::ToValue;
 use std::fmt;
 use std::io::Cursor;
 use std::time::Duration;
@@ -32,14 +33,14 @@ const ENCODE_SIZE: usize = 4096;
 
 fn write(
     message: fmt::Arguments<'static>,
-    key_values: &[&(dyn log::kv::Source + Send + Sync)],
+    kvs: &[(&str, log::kv::Value<'_>)],
 ) -> Encoder<Cursor<[u8; ENCODE_SIZE]>> {
-    let mut builder = log::Record::builder();
-    builder.level(log::Level::Info);
-    for key_value in key_values {
-        builder.key_values(key_value);
-    }
-    let record = builder.args(message).build();
+    let key_values = Some(kvs);
+    let record = log::Record::builder()
+        .level(log::Level::Info)
+        .key_values(&key_values)
+        .args(message)
+        .build();
     let buffer = [0u8; ENCODE_SIZE];
     let mut encoder = Encoder::new(Cursor::new(buffer), EncoderOpts::default());
     assert_matches!(
@@ -62,12 +63,12 @@ fn setup_read_event_benchmarks(bench: criterion::Benchmark) -> criterion::Benchm
             let encoder = write(
                 format_args!("this is a log emitted from the benchmark"),
                 &[
-                    &("tag", "logbench"),
-                    &("boolean", true),
-                    &("float", 1234.5678),
-                    &("int", -123456),
-                    &("string", "foobarbaz"),
-                    &("uint", 123456),
+                    ("tag", "logbench".to_value()),
+                    ("boolean", true.to_value()),
+                    ("float", 1234.5678.to_value()),
+                    ("int", (-123456).to_value()),
+                    ("string", "foobarbaz".to_value()),
+                    ("uint", 123456.to_value()),
                 ],
             );
             b.iter(|| parse_record(encoder.inner().get_ref()).unwrap())
@@ -84,9 +85,9 @@ fn setup_read_event_benchmarks(bench: criterion::Benchmark) -> criterion::Benchm
             let encoder = write(
                 format_args!("this is a log emitted from the benchmark"),
                 &[
-                    &("boolean", true),
-                    &("int", 98765),
-                    &("string", "foobarbaz"),
+                    ("boolean", true.to_value()),
+                    ("int", 98765.to_value()),
+                    ("string", "foobarbaz".to_value()),
                 ],
             );
             b.iter(|| parse_record(encoder.inner().get_ref()).unwrap())
