@@ -18,7 +18,6 @@ use pin_project::pin_project;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::pin::pin;
-use std::sync::Arc;
 use std::task::Poll;
 
 use crate::directory::{open_directory_async, AsRefDirectory};
@@ -238,7 +237,7 @@ impl MemberOpener for ServiceInstanceDirectory {
 struct ServiceInstance<S> {
     /// The name of the service instance within the service directory
     name: String,
-    service: Arc<Service<S>>,
+    service: Service<S>,
 }
 
 impl<S: ServiceMarker> MemberOpener for ServiceInstance<S> {
@@ -254,6 +253,12 @@ impl<S: ServiceMarker> MemberOpener for ServiceInstance<S> {
 pub struct Service<S> {
     dir: fio::DirectoryProxy,
     _marker: S,
+}
+
+impl<S: Clone> Clone for Service<S> {
+    fn clone(&self) -> Self {
+        Self { dir: Clone::clone(&self.dir), _marker: self._marker.clone() }
+    }
 }
 
 /// Returns a new [`Service`] that waits for instances to appear in
@@ -335,7 +340,7 @@ impl<S: ServiceMarker> Service<S> {
     pub async fn watch(self) -> Result<ServiceInstanceStream<S>, Error> {
         let watcher = Watcher::new(&self.dir).await?;
         let finished = false;
-        Ok(ServiceInstanceStream { service: Arc::new(self), watcher, finished })
+        Ok(ServiceInstanceStream { service: self, watcher, finished })
     }
 
     /// Asynchronously returns the first service instance available within this service directory.
@@ -349,13 +354,12 @@ impl<S: ServiceMarker> Service<S> {
 
     /// Returns an list of all instances that are currently available.
     pub async fn enumerate(self) -> Result<Vec<S::Proxy>, Error> {
-        let this = Arc::new(self);
-        let instances: Vec<S::Proxy> = fuchsia_fs::directory::readdir(&this.dir)
+        let instances: Vec<S::Proxy> = fuchsia_fs::directory::readdir(&self.dir)
             .await?
             .into_iter()
             .map(|dirent| {
                 S::Proxy::from_member_opener(Box::new(ServiceInstance {
-                    service: this.clone(),
+                    service: self.clone(),
                     name: dirent.name,
                 }))
             })
@@ -370,11 +374,12 @@ impl<S: ServiceMarker> Service<S> {
 /// Normally, this stream will only terminate if the service directory being watched is removed, so
 /// the client must decide when it has found all the instances it's looking for.
 #[pin_project]
-pub struct ServiceInstanceStream<S> {
-    service: Arc<Service<S>>,
+pub struct ServiceInstanceStream<S: Clone> {
+    service: Service<S>,
     watcher: Watcher,
     finished: bool,
 }
+
 impl<S: ServiceMarker> Stream for ServiceInstanceStream<S> {
     type Item = Result<S::Proxy, Error>;
 
@@ -542,6 +547,7 @@ pub mod test_util {
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
+    use std::sync::Arc;
 
     use super::*;
     use fidl::endpoints::ServiceMarker as _;

@@ -275,7 +275,7 @@ pub trait Responder {
 
 /// A marker for a particular FIDL service.
 #[cfg(target_os = "fuchsia")]
-pub trait ServiceMarker: Sized + Send + Sync + 'static {
+pub trait ServiceMarker: Clone + Sized + Send + Sync + 'static {
     /// The type of the proxy object upon which calls are made to a remote FIDL service.
     type Proxy: ServiceProxy<Service = Self>;
 
