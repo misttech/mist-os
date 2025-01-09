@@ -56,7 +56,7 @@ impl Responder {
     ) -> fidl::Result<ResponderStatus> {
         match self {
             Responder::Namespace(sender) => {
-                Responder::dispatch_handle("namespace", ordinals::NAMESPACE, sender, result)
+                Responder::dispatch_handle("namespace", ordinals::GET_NAMESPACE, sender, result)
             }
             Responder::CreateChannel(sender) => Responder::dispatch_handle(
                 "create_channel",

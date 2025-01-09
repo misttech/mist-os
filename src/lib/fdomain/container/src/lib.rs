@@ -970,7 +970,7 @@ impl FDomain {
         }
     }
 
-    pub fn namespace(&mut self, request: proto::FDomainNamespaceRequest) -> Result<()> {
+    pub fn get_namespace(&mut self, request: proto::FDomainGetNamespaceRequest) -> Result<()> {
         match (self.namespace)() {
             Ok(endpoint) => self.alloc_client_handles(
                 [request.new_handle],

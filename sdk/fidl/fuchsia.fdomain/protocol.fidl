@@ -140,7 +140,7 @@ open protocol FDomain {
 
     // Adds a new channel handle to this namespace which points to a
     // fuchsia.io.Directory. Can be used to "bootstrap" the FDomain.
-    flexible Namespace(struct {
+    flexible GetNamespace(struct {
         new_handle NewHandleId;
     }) -> () error Error;
 
