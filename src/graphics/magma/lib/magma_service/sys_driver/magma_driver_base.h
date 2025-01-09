@@ -345,7 +345,7 @@ class MagmaTestDriverBase : public MagmaDriverBase<fuchsia_gpu_magma::TestDevice
   void set_unit_test_status(zx_status_t status) { unit_test_status_ = status; }
 
  private:
-  zx_status_t unit_test_status_ = ZX_OK;
+  zx_status_t unit_test_status_ = ZX_ERR_NOT_FOUND;
 };
 
 using MagmaProductionDriverBase = MagmaDriverBase<fuchsia_gpu_magma::CombinedDevice>;
