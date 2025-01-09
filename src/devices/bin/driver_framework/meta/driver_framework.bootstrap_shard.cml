@@ -11,9 +11,7 @@
         {
             name: "driver_index",
             url: "fuchsia-boot:///driver-index#meta/driver-index.cm",
-
-            // TODO(https://fxbug.dev/352624082): Use on_terminate: "reboot_on_error".
-            // on_terminate: "reboot",
+            on_terminate: "reboot",
         },
         {
             // Exists to augment capability graph with information about when #boot-drivers should
