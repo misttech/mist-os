@@ -1607,8 +1607,6 @@ declare_args() {
   #
   # Normally this is not set as a build argument, but it serves to
   # document the available set of variants.
-  # See also [`universal_variants`](#universal_variants).
-  # Only set this to remove all the default variants here.
   # To add more, set [`extra_variants`](#extra_variants) instead.
   #
   # Each element of the list is one variant, which is a scope defining:
@@ -1866,45 +1864,6 @@ declare_args() {
   # This is just added to [`known_variants`](#known_variants).
   extra_variants = []
 
-  # List of "universal" variants, in addition to
-  # [`known_variants`](#known_variants).  Normally this is not set as a
-  # build argument, but it serves to document the available set of
-  # variants.  These are treated just like
-  # [`known_variants`](#known_variants), but as well as being variants by
-  # themselves, these are also combined with each of
-  # [`known_variants`](#known_variants) to form additional variants,
-  # e.g. "asan-debug" or "ubsan-sancov-release".
-  universal_variants = []
-
-  # Only one of "debug" and "release" is really available as a universal
-  # variant in any given build (depending on the global setting of
-  # `is_debug`).  But this gets evaluated separately in every toolchain, so
-  # e.g. in the "release" toolchain the sense of `if (is_debug)` tests is
-  # inverted and this would list only "debug" as an available variant.  The
-  # selection logic in `variant_target()` can only work if the value of
-  # `universal_variants` it sees includes the current variant.
-  if (is_debug) {
-    universal_variants += [
-      {
-        name = "release"
-        configs = []
-        toolchain_args = {
-          is_debug = false
-        }
-      },
-    ]
-  } else {
-    universal_variants += [
-      {
-        name = "debug"
-        configs = []
-        toolchain_args = {
-          is_debug = true
-        }
-      },
-    ]
-  }
-
   # List of short names for commonly-used variant selectors.  Normally this
   # is not set as a build argument, but it serves to document the available
   # set of short-cut names for variant selectors.  Each element of this list
@@ -2035,35 +1994,6 @@ foreach(variant, known_variants + extra_variants) {
       ]
     },
   ]
-  foreach(universal_variant, universal_variants) {
-    _select_variant_shortcuts += [
-      {
-        name = "${variant}-${universal_variant.name}"
-        select_variant = []
-        select_variant = [
-          {
-            variant = name
-            host = false
-          },
-        ]
-      },
-    ]
-  }
-}
-foreach(variant, universal_variants) {
-  variant = variant.name
-  _select_variant_shortcuts += [
-    {
-      name = variant
-      select_variant = []
-      select_variant = [
-        {
-          variant = name
-          host = false
-        },
-      ]
-    },
-  ]
 }
 
 declare_args() {
@@ -2079,8 +2009,7 @@ declare_args() {
   # A string selector can match a name in
   # [`select_variant_shortcuts`](#select_variant_shortcuts).  If it's not a
   # specific shortcut listed there, then it can be the name of any variant
-  # described in [`known_variants`](#known_variants) and
-  # [`universal_variants`](#universal_variants) (and combinations thereof).
+  # described in [`known_variants`](#known_variants).
   # A `selector` that's a simple variant name selects for every binary
   # built in the target toolchain: `{ host=false variant=selector }`.
   #
@@ -2095,8 +2024,7 @@ declare_args() {
   #         [string or `false`] The variant that applies if this selector
   #         matches.  This can be `false` to choose no variant, or a string
   #         that names the variant.  See
-  #         [`known_variants`](#known_variants) and
-  #         [`universal_variants`](#universal_variants).
+  #         [`known_variants`](#known_variants).
   #
   # The rest below are matching criteria.  All are optional.
   # The selector matches if and only if all of its criteria match.
@@ -2273,9 +2201,9 @@ if (in_default_toolchain) {
   }
 
   # Expand the list of all variants, based on the values of known_variants,
-  # extra_variants, and universal_variants. Note that the items in the list
-  # are not in their full canonical format because they don't have a 'base'
-  # key, and the 'host_only' and 'target_only' keys are not expanded yet.
+  # and extra_variants. Note that the items in the list are not in their full
+  # canonical format because they don't have a 'base' key, and the 'host_only'
+  # and 'target_only' keys are not expanded yet.
   # Full expansion will happen in variant_toolchain_suite().
   all_toolchain_variants = []
   foreach(variant, [ false ] + known_variants + extra_variants) {
@@ -2322,43 +2250,6 @@ if (in_default_toolchain) {
         }
       },
     ]
-  }
-
-  # Now elaborate the list with all the universal variant combinations.
-  # Each universal variant becomes its own standalone variant when
-  # combined with the null variant.
-  foreach(variant, all_toolchain_variants) {
-    foreach(universal_variant, universal_variants) {
-      all_toolchain_variants += [
-        {
-          forward_variables_from(variant, "*", [ "toolchain_args" ])
-          toolchain_args = {
-            if (defined(variant.toolchain_args)) {
-              forward_variables_from(variant.toolchain_args, "*")
-            }
-            if (defined(universal_variant.toolchain_args)) {
-              forward_variables_from(universal_variant.toolchain_args, "*")
-            }
-          }
-          if (name == "") {
-            name = universal_variant.name
-          } else {
-            name += "-${universal_variant.name}"
-          }
-          suffix += "-${universal_variant.name}"
-          configs += universal_variant.configs
-          if (defined(universal_variant.remove_common_configs)) {
-            remove_common_configs += universal_variant.remove_common_configs
-          }
-          if (defined(universal_variant.remove_shared_configs)) {
-            remove_shared_configs += universal_variant.remove_shared_configs
-          }
-          if (defined(universal_variant.deps)) {
-            deps += universal_variant.deps
-          }
-        },
-      ]
-    }
   }
 
   # Insert a 'variant_tags' field in each selector item that corresponds to
