@@ -61,11 +61,27 @@ def validate_component_manifest(
     )
 
 
+def component_manifests_from_paths(paths: str) -> list[str]:
+    """Returns a list of component manifests from a comma separated list.
+
+    If a package does not contain a component this list of paths will be passed
+    in as an empty string which when split will return a single empty string.
+    If we pass this along to the validate call then cmc will complain.
+    """
+    if paths.strip() == "":
+        return []
+    else:
+        return paths.split(",")
+
+
 def main():
     args = get_parser().parse_args()
     cmc = args.cmc
     package_manifest = args.package_manifest_path
-    component_manifests = args.component_manifest_paths.split(",")
+
+    component_manifests = component_manifests_from_paths(
+        args.component_manifest_paths
+    )
 
     for component_manifest in component_manifests:
         validate_component_manifest(cmc, package_manifest, component_manifest)
