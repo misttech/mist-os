@@ -78,8 +78,9 @@ zx_status_t RestrictedState::ArchValidateStatePreRestrictedEntry(
 }
 
 void RestrictedState::ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& arch_state) {
-  // Save the thread local storage register from normal mode.
+  // Save the thread local storage register(s) from normal mode.
   arch_state.tpidr_el0 = __arm_rsr64("tpidr_el0");
+  arch_state.tpidrro_el0 = __arm_rsr64("tpidrro_el0");
 }
 
 [[noreturn]] void RestrictedState::ArchEnterRestricted(const zx_restricted_state_t& state) {
@@ -98,6 +99,12 @@ void RestrictedState::ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& arch
   // TODO(https://fxbug.dev/42076040): Eventually the TPIDR register should be
   // inside the iframe.
   __arm_wsr64("tpidr_el0", state.tpidr_el0);
+  // Mirror to tpidrro_el0 when supporting aarch32.
+  // This allows aarch32 userland to read TPIDRURO which is needed
+  // by some libc implementations.
+  if (state.cpsr & kArm32BitMode) {
+    __arm_wsr64("tpidrro_el0", state.tpidr_el0);
+  }
 
   // Load the new state and enter restricted mode.
   arch_enter_uspace(&iframe);
@@ -187,6 +194,7 @@ void RestrictedState::ArchSaveRestrictedIframeState(zx_restricted_state_t& state
   // TODO(https://fxbug.dev/42076040): Eventually the TPIDR register should be
   // inside the iframe.
   __arm_wsr64("tpidr_el0", arch_state.tpidr_el0);
+  __arm_wsr64("tpidrro_el0", arch_state.tpidrro_el0);
 
   // Set up a mostly empty iframe and return back to normal mode.
   iframe_t iframe{};
