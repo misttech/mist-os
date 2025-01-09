@@ -13,7 +13,7 @@ use fidl_fuchsia_developer_ffx::{self as ffx};
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
 use fuchsia_async::TimeoutExt;
 use futures::future::join_all;
-use futures::{FutureExt, StreamExt};
+use futures::{pin_mut, select, FutureExt, StreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
 use std::cell::RefCell;
@@ -122,22 +122,39 @@ trait QueryResolverT {
         env_context: &EnvironmentContext,
     ) -> Result<Resolution, FfxTargetError> {
         let query = TargetInfoQuery::from(target_spec.clone());
+        let mut handles;
 
+        let handles_fut = self.resolve_target_query(query.clone(), env_context).fuse();
+        // We want to query both the manual targets and the discoverable handles concurrently.
         if let TargetInfoQuery::NodenameOrSerial(ref s) = query {
-            match self.try_resolve_manual_target(s, env_context).await {
-                Err(e) => {
-                    tracing::debug!("Failed to resolve target {s} as manual target: {e:?}");
+            let manual_target_fut = self.try_resolve_manual_target(s, env_context).fuse();
+            pin_mut!(manual_target_fut);
+            pin_mut!(handles_fut);
+            loop {
+                select! {
+                    mtr = manual_target_fut => match mtr {
+                        Err(e) => {
+                            tracing::debug!("Failed to resolve target {s} as manual target: {e:?}");
+                            // Keep going, waiting for the discovery to complete
+                        }
+                        Ok(Some(res)) => return Ok(res), // We found a manual target, so we're done
+                        _ => (), // Keep going
+                    },
+                    handles_res = handles_fut => {
+                        // We got a response from discovery
+                        handles = handles_res.map_err(|_| FfxTargetError::OpenTargetError { err: ffx::OpenTargetError::FailedDiscovery, target: target_spec.clone()})?;
+                        break;
+                    },
                 }
-                Ok(Some(res)) => return Ok(res),
-                _ => (), // Keep going
             }
-        }
-        let mut handles = self.resolve_target_query(query, env_context).await.map_err(|_| {
-            FfxTargetError::OpenTargetError {
+        } else {
+            // If the query is not a nodename, we won't even bother with trying to resolve a manual
+            // target.
+            handles = handles_fut.await.map_err(|_| FfxTargetError::OpenTargetError {
                 err: ffx::OpenTargetError::FailedDiscovery,
                 target: target_spec.clone(),
-            }
-        })?;
+            })?;
+        };
         if handles.len() == 0 {
             return Err(FfxTargetError::OpenTargetError {
                 err: ffx::OpenTargetError::TargetNotFound,

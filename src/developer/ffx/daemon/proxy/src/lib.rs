@@ -250,7 +250,9 @@ impl Injector for Injection {
     async fn target_factory(&self) -> Result<TargetProxy> {
         let timeout_error = self.daemon_timeout_error();
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
-        timeout(proxy_timeout, self.target_factory_inner()).await.map_err(|_| {
+        // We pin this in order to avoid the compiler reporting "error: large
+        // future with a size of 16600 bytes".
+        Box::pin(timeout(proxy_timeout, self.target_factory_inner())).await.map_err(|_| {
             tracing::warn!("Timed out getting Target proxy for: {:?}", self.target_spec);
             timeout_error
         })?
