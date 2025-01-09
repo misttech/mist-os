@@ -66,7 +66,7 @@ async fn run_echo_launcher_server(
                 }
             };
             // Run the Echo server with the specified prefix
-            run_echo_server(server_end.into_stream()?, &echo_prefix).await
+            run_echo_server(server_end.into_stream(), &echo_prefix).await
         })
         .await
 }
@@ -75,7 +75,7 @@ async fn run_server(
     client: &Arc<Client>,
     server_end: fdomain_client::fidl::ServerEnd<echo::EchoLauncherMarker>,
 ) -> anyhow::Result<()> {
-    let stream = server_end.into_stream()?;
+    let stream = server_end.into_stream();
     let fut = run_echo_launcher_server(client, stream);
 
     println!("Running echo launcher server");
@@ -93,7 +93,7 @@ async fn test_clients_with_server(client: &Arc<Client>, server: Channel) -> anyh
         println!("Got echo from launcher proxy");
         // "Upgrade" the client end in the response into an Echo proxy, and
         // make an EchoString request on it
-        let proxy = client_end.into_proxy()?;
+        let proxy = client_end.into_proxy();
         proxy.echo_string("hello").map_ok(|val| println!("Got echo response {}", val)).await?;
         anyhow::Result::Ok(())
     };
@@ -151,9 +151,8 @@ async fn server_is_fidl_in_ns() {
     fuchsia_async::Task::spawn(fut).detach();
 
     let namespace = client.namespace().await.unwrap();
-    let namespace = fdomain_client::fidl::ClientEnd::<fio::DirectoryMarker>::new(namespace)
-        .into_proxy()
-        .unwrap();
+    let namespace =
+        fdomain_client::fidl::ClientEnd::<fio::DirectoryMarker>::new(namespace).into_proxy();
     let (echo_client, echo_server) = client.create_channel().await.unwrap();
     namespace
         .open3("echo", fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), echo_server)

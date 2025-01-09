@@ -469,8 +469,8 @@ impl<T: ProtocolMarker> ClientEnd<T> {
 
 impl<'c, T: ProtocolMarker> ClientEnd<T> {
     /// Convert the `ClientEnd` into a `Proxy` through which FIDL calls may be made.
-    pub fn into_proxy(self) -> Result<T::Proxy, crate::Error> {
-        Ok(T::Proxy::from_channel(self.inner))
+    pub fn into_proxy(self) -> T::Proxy {
+        T::Proxy::from_channel(self.inner)
     }
 }
 
@@ -516,24 +516,24 @@ impl<T: ProtocolMarker> ServerEnd<T> {
     }
 
     /// Create a stream of requests off of the channel.
-    pub fn into_stream(self) -> Result<T::RequestStream, crate::Error>
+    pub fn into_stream(self) -> T::RequestStream
     where
         T: ProtocolMarker,
     {
-        Ok(T::RequestStream::from_channel(self.inner))
+        T::RequestStream::from_channel(self.inner)
     }
 
     /// Create a stream of requests and an event-sending handle
     /// from the channel.
     pub fn into_stream_and_control_handle(
         self,
-    ) -> Result<(T::RequestStream, <T::RequestStream as RequestStream>::ControlHandle), crate::Error>
+    ) -> (T::RequestStream, <T::RequestStream as RequestStream>::ControlHandle)
     where
         T: ProtocolMarker,
     {
-        let stream = self.into_stream()?;
+        let stream = self.into_stream();
         let control_handle = stream.control_handle();
-        Ok((stream, control_handle))
+        (stream, control_handle)
     }
 }
 
