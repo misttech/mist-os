@@ -455,6 +455,7 @@ loadable_module://pkg/vulkan_layers
 package://packages/cmd-buf-benchmark-test
 package://packages/fake-build-info
 package://packages/heapdump-collector
+package://packages/intl_property_manager
 package://packages/magma_conformance_tests
 package://packages/realm_builder_server
 package://packages/vkcopy-test

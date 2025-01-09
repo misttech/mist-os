@@ -1,0 +1,13 @@
+{
+  "version": "1",
+  "content": {
+    "files": {
+      "meta/intl_property_manager.cm": {
+        "hash": "61507a401f0f2b28d7f79de90689a0c4d4fbe8a050622b3b8d13797c63f6d3e3"
+      },
+      "meta/intl_property_manager_without_flags.cm": {
+        "hash": "e5fc46925d0c33cd7441d11f918439400ed6d11c7b57b3a7386cff327f14a74c"
+      }
+    }
+  }
+}
