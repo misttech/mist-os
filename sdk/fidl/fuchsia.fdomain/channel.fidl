@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library fuchsia.fdomain;
 
+using zx;
+
 // Result from a channel write operation.
 type WriteChannelError = strict union {
     1: error Error;
@@ -11,8 +13,8 @@ type WriteChannelError = strict union {
 
 // Message received through a channel.
 type ChannelMessage = struct {
-    data vector<uint8>;
-    handles vector<HandleInfo>;
+    data vector<uint8>:zx.CHANNEL_MAX_MSG_BYTES;
+    handles vector<HandleInfo>:zx.CHANNEL_MAX_MSG_HANDLES;
 };
 
 // FDomain operations on Channels.
@@ -24,7 +26,11 @@ open protocol Channel {
     }) -> () error Error;
 
     // Read a message from a channel. This method will fail if the channel is currently being read
-    // asynchronously.
+    // using the streaming read functions.
+    //
+    // Note that this method is not like zx_channel_read in that it will not
+    // return `SHOULD_WAIT` but will instead delay returning until there is data
+    // to return.
     flexible ReadChannel(struct {
         handle Hid;
     }) -> (ChannelMessage) error Error;

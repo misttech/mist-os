@@ -19,7 +19,9 @@ type NewHid = struct {
     id uint32;
 };
 
-// A handle, and the rights that handle is known to possess.
+// A handle, and the rights that handle is known to possess. This is meant to be
+// a direct analogue to `zx_handle_info_t` as described in
+// https://fuchsia.dev/reference/syscalls/channel_read_etc
 type HandleInfo = struct {
     handle Hid;
     type zx.ObjType;
@@ -32,9 +34,8 @@ type AioStopped = struct {
 };
 
 type Error = flexible union {
-    // An error produced by interacting with the handle itself. Value should
-    // translate to a zx.Status.
-    1: target_error int32;
+    // An error produced by interacting with the handle itself.
+    1: target_error zx.Status;
 
     // An invalid handle ID was given.
     2: bad_hid struct {
@@ -90,7 +91,7 @@ type Error = flexible union {
     // safely without knowing what they were. The signals field should contain
     // only the signals that weren't understood.
     12: signals_unknown struct {
-        signals uint32;
+        signals zx.Signals;
     };
 
     // The flexible features of this protocol allowed the client to send us
@@ -166,24 +167,24 @@ open protocol FDomain {
     // Set or clear signals on a handle.
     flexible Signal(struct {
         handle Hid;
-        set uint32;
-        clear uint32;
+        set zx.Signals;
+        clear zx.Signals;
     }) -> () error Error;
 
     // Set or clear signals on a handle's peer.
     flexible SignalPeer(struct {
         handle Hid;
-        set uint32;
-        clear uint32;
+        set zx.Signals;
+        clear zx.Signals;
     }) -> () error Error;
 
     // Wait for signals from the given handle. Reply will be returned when one
     // of the given signals is asserted.
     flexible WaitForSignals(struct {
         handle Hid;
-        signals uint32;
+        signals zx.Signals;
     }) -> (struct {
-        signals uint32;
+        signals zx.Signals;
     }) error Error;
 
     // When a write error occurs, further write operations to that handle will
