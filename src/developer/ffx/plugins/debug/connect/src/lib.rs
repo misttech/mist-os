@@ -106,8 +106,7 @@ async fn connect_tool_impl(
         Some(debugger_debugger) => {
             let sdk = ffx_config::global_env_context()
                 .context("loading global environment context")?
-                .get_sdk()
-                .await?;
+                .get_sdk()?;
             if *sdk.get_version() != sdk::SdkVersion::InTree {
                 // OOT doesn't provide symbols for zxdb.
                 ffx_bail!("--debugger only works in-tree.");

@@ -204,6 +204,7 @@ pub const SDK_OVERRIDE_KEY_PREFIX: &str = "sdk.overrides";
 /// Returns the path to the tool with the given name by first
 /// checking for configured override with the key of `sdk.override.{name}`,
 /// and no override is found, sdk.get_host_tool() is called.
+#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
 pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
     // Check for configured override for the host tool.
     let override_key = format!("{SDK_OVERRIDE_KEY_PREFIX}.{name}");
@@ -222,12 +223,14 @@ pub async fn get_host_tool(sdk: &Sdk, name: &str) -> Result<PathBuf> {
     sdk.get_host_tool(name)
 }
 
+#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
 pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> Result<()> {
     let config = ctx.load()?.config_from_cache()?;
     let read_guard = config.read().map_err(|_| anyhow!("config read guard"))?;
     writeln!(writer, "{}", *read_guard).context("displaying config")
 }
 
+#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
 pub async fn get_log_dirs() -> Result<Vec<String>> {
     match query("log.dir").get() {
         Ok(log_dirs) => Ok(log_dirs),
@@ -447,7 +450,7 @@ mod test {
         put_file!(sdk_root, "../test_data/sdk", "meta/manifest.json");
         put_file!(sdk_root, "../test_data/sdk", "tools/x64/a_host_tool-meta.json");
 
-        let sdk = env.context.get_sdk().await.expect("test sdk");
+        let sdk = env.context.get_sdk().expect("test sdk");
 
         let result = get_host_tool(&sdk, "a_host_tool").await.expect("a_host_tool");
         assert_eq!(result, sdk_root.join("tools/x64/a-host-tool"));
@@ -476,7 +479,7 @@ mod test {
             .await
             .expect("setting override");
 
-        let sdk = env.context.get_sdk().await.expect("test sdk");
+        let sdk = env.context.get_sdk().expect("test sdk");
 
         let result = get_host_tool(&sdk, "a_host_tool").await.expect("a_host_tool");
         assert_eq!(result, override_path);
@@ -508,7 +511,7 @@ mod test {
             .await
             .expect("setting override");
 
-        let sdk = env.context.get_sdk().await.expect("test sdk");
+        let sdk = env.context.get_sdk().expect("test sdk");
 
         let result = get_host_tool(&sdk, "a_host_tool").await;
         assert_eq!(

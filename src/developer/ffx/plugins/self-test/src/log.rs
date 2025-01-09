@@ -53,8 +53,7 @@ pub mod include_log {
         let target = get_target_addr().await?;
         let sdk = ffx_config::global_env_context()
             .context("loading global environment context")?
-            .get_sdk()
-            .await?;
+            .get_sdk()?;
         let isolate = new_isolate("log-run-normal").await?;
         isolate.start_daemon().await?;
         // Test with proactive logging enabled

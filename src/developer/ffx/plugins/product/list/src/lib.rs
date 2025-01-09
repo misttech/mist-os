@@ -119,7 +119,7 @@ where
             None => return_user_error!("Branch value is not supported!"),
         },
         (None, None) => {
-            let sdk = context.get_sdk().await.context("getting sdk env context")?;
+            let sdk = context.get_sdk().context("getting sdk env context")?;
             match sdk.get_version() {
                 // For version of SDK, we trim the version to date section.
                 // e.g. if the version is 24.20241023.2.1, we will trim it

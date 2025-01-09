@@ -416,7 +416,7 @@ impl EnvironmentContext {
 
     /// Find the appropriate sdk root for this invocation of ffx, looking at configuration
     /// values and the current environment context to determine the correct place to find it.
-    pub async fn get_sdk_root(&self) -> Result<SdkRoot> {
+    pub fn get_sdk_root(&self) -> Result<SdkRoot> {
         // some in-tree tooling directly overrides sdk.root. But if that's not done, the 'root' is just the
         // build directory.
         // Out of tree, we will always want to pull the config from the normal config path, which
@@ -432,13 +432,13 @@ impl EnvironmentContext {
                     None => Ok(SdkRoot::Full(manifest)),
                 }
             }
-            (_, runtime_root) => self.sdk_from_config(runtime_root.as_deref()).await,
+            (_, runtime_root) => self.sdk_from_config(runtime_root.as_deref()),
         }
     }
 
     /// Load the sdk configured for this environment context
-    pub async fn get_sdk(&self) -> Result<Sdk> {
-        self.get_sdk_root().await?.get_sdk()
+    pub fn get_sdk(&self) -> Result<Sdk> {
+        self.get_sdk_root()?.get_sdk()
     }
 
     /// The environment variable we search for
@@ -452,7 +452,7 @@ impl EnvironmentContext {
     /// context's `ExecutableType` is MainFfx.
     /// - If neither of those are found, and an sdk is configured, search the
     /// sdk manifest for the ffx host-tool entry and use that.
-    pub async fn rerun_bin(&self) -> Result<PathBuf, anyhow::Error> {
+    pub fn rerun_bin(&self) -> Result<PathBuf, anyhow::Error> {
         if let Some(bin_from_env) = self.env_var(Self::FFX_BIN_ENV).ok() {
             return Ok(bin_from_env.into());
         }
@@ -461,7 +461,7 @@ impl EnvironmentContext {
             return Ok(self.self_path.clone());
         }
 
-        let sdk = self.get_sdk().await.with_context(|| {
+        let sdk = self.get_sdk().with_context(|| {
             ffx_error!("Unable to load SDK while searching for the 'main' ffx binary")
         })?;
         sdk.get_host_tool("ffx")
@@ -470,9 +470,9 @@ impl EnvironmentContext {
 
     /// Creates a command builder that starts with everything necessary to re-run ffx within the same context,
     /// without any subcommands.
-    pub async fn rerun_prefix(&self) -> Result<Command, anyhow::Error> {
+    pub fn rerun_prefix(&self) -> Result<Command, anyhow::Error> {
         // we may have been run by a wrapper script, so we want to make sure we're using the 'real' executable.
-        let mut ffx_path = self.rerun_bin().await?;
+        let mut ffx_path = self.rerun_bin()?;
         // if we daemonize, our path will change to /, so get the canonical path before that occurs.
         ffx_path = std::fs::canonicalize(ffx_path)?;
 
@@ -544,7 +544,7 @@ impl EnvironmentContext {
     }
 
     /// Gets the basic information about the sdk as configured, without diving deeper into the sdk's own configuration.
-    async fn sdk_from_config(&self, sdk_root: Option<&Path>) -> Result<SdkRoot> {
+    fn sdk_from_config(&self, sdk_root: Option<&Path>) -> Result<SdkRoot> {
         // All gets in this function should declare that they don't want the build directory searched, because
         // if there is a build directory it *is* generally the sdk.
         let manifest = match sdk_root {
@@ -697,7 +697,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_find_sdk_root_finds_root() {
+    fn test_find_sdk_root_finds_root() {
         let temp = tempdir().unwrap();
         let temp_path = std::fs::canonicalize(temp.path()).expect("canonical temp path");
 
@@ -713,7 +713,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_find_sdk_root_no_manifest() {
+    fn test_find_sdk_root_no_manifest() {
         let temp = tempdir().unwrap();
 
         let start_path = temp.path().to_path_buf().join("test1").join("test2");
@@ -730,7 +730,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_config_domain_context() {
+    fn test_config_domain_context() {
         let domain_root = domains_test_data_path().join("basic_example");
         let context = EnvironmentContext::config_domain_root(
             ExecutableKind::Test,
@@ -741,12 +741,12 @@ mod test {
         )
         .expect("config domain context");
 
-        check_config_domain_paths(&context, &domain_root).await;
+        check_config_domain_paths(&context, &domain_root);
         assert!(!context.is_isolated());
     }
 
     #[fuchsia::test]
-    async fn test_strict_context() {
+    fn test_strict_context() {
         // For the time being, these are all the values that default (built into the binary,
         // specifically) to being env variables. These must be overwritten to allow for allocating
         // of a strict env context.
@@ -784,7 +784,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_config_domain_context_isolated() {
+    fn test_config_domain_context_isolated() {
         let isolate_dir = tempdir().expect("tempdir");
         let domain_root = domains_test_data_path().join("basic_example");
         println!("check with explicit config domain path");
@@ -797,7 +797,7 @@ mod test {
         )
         .expect("isolated config domain context");
 
-        check_config_domain_paths(&context, &domain_root).await;
+        check_config_domain_paths(&context, &domain_root);
         check_isolated_paths(&context, &isolate_dir.path());
 
         println!("check with implied config domain path");
@@ -812,7 +812,7 @@ mod test {
         )
         .expect("Isolated context");
 
-        check_config_domain_paths(&context, &domain_root).await;
+        check_config_domain_paths(&context, &domain_root);
         check_isolated_paths(&context, &isolate_dir.path());
     }
 
@@ -833,14 +833,14 @@ mod test {
         check_isolated_paths(&context, &isolate_dir.path());
     }
 
-    async fn check_config_domain_paths(context: &EnvironmentContext, domain_root: &Utf8Path) {
+    fn check_config_domain_paths(context: &EnvironmentContext, domain_root: &Utf8Path) {
         let domain_root = domain_root.canonicalize().expect("canonicalized domain root");
         assert_eq!(context.build_dir().unwrap(), domain_root.join("bazel-out"));
         assert_eq!(
             context.get_build_config_file().unwrap(),
             domain_root.join(".fuchsia-build-config.json")
         );
-        assert_matches!(context.get_sdk_root().await.unwrap(), SdkRoot::Full(path) if path == domain_root.join("bazel-out/external/fuchsia_sdk"));
+        assert_matches!(context.get_sdk_root().unwrap(), SdkRoot::Full(path) if path == domain_root.join("bazel-out/external/fuchsia_sdk"));
     }
 
     fn check_isolated_paths(context: &EnvironmentContext, isolate_dir: &Path) {

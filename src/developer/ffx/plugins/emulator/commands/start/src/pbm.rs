@@ -53,7 +53,7 @@ pub(crate) async fn make_configs(
             .await.context("problem with convert_bundle_to_configs")?;
         // Set OVMF references for non riscv guests (at this time we have no efi support for riscv).
         if emu_config.device.cpu.architecture != CpuArchitecture::Riscv64 {
-            let sdk = ctx.get_sdk().await?;
+            let sdk = ctx.get_sdk()?;
             emu_config.guest.ovmf_code = ffx_config::get_host_tool(&sdk, OVMF_CODE).await
                 .map_err(|e| bug!("cannot locate ovmf code in SDK: {e}"))?;
 
@@ -114,6 +114,7 @@ pub(crate) async fn make_configs(
 
 /// Given an EmulatorConfiguration and a StartCommand, write the values from the
 /// StartCommand onto the EmulatorConfiguration, overriding any previous values.
+#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
 async fn apply_command_line_options(
     mut emu_config: EmulatorConfiguration,
     cmd: &StartCommand,

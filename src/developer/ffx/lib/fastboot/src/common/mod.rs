@@ -551,8 +551,7 @@ where
             } else {
                 let sdk = ffx_config::global_env_context()
                     .context("loading global environment context")?
-                    .get_sdk()
-                    .await?;
+                    .get_sdk()?;
                 let mut path = sdk.get_path_prefix().to_path_buf();
                 path.push("flash.json"); // Not actually used, placeholder value needed.
                 match sdk.get_version() {

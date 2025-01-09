@@ -42,8 +42,7 @@ use vbmeta::{HashDescriptor, Key, Salt, VBMeta};
 pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
     let sdk = ffx_config::global_env_context()
         .ok_or_else(|| bug!("loading global environment context"))?
-        .get_sdk()
-        .await?;
+        .get_sdk()?;
 
     // Attempts to get a host tool from the SDK manifest. If it fails, falls
     // back to attempting to derive the path to the host tool binary by simply checking

@@ -103,8 +103,7 @@ impl Symbolizer for LogSymbolizer {
         tx: Sender<String>,
         extra_args: Vec<String>,
     ) -> Result<()> {
-        let sdk =
-            global_env_context().context("Loading global environment context")?.get_sdk().await?;
+        let sdk = global_env_context().context("Loading global environment context")?.get_sdk()?;
         if let Err(e) = ensure_symbol_index_registered(&sdk) {
             log::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
         }

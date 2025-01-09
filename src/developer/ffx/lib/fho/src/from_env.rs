@@ -644,7 +644,7 @@ impl<T> Future for Deferred<T> {
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_config::Sdk {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.context.get_sdk().await.user_message("Could not load currently active SDK")
+        env.context.get_sdk().user_message("Could not load currently active SDK")
     }
 }
 
@@ -652,7 +652,7 @@ impl TryFromEnv for ffx_config::Sdk {
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_config::SdkRoot {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.context.get_sdk_root().await.user_message("Could not load currently active SDK")
+        env.context.get_sdk_root().user_message("Could not load currently active SDK")
     }
 }
 

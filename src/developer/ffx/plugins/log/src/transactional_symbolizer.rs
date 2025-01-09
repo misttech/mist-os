@@ -258,7 +258,7 @@ pub struct RealSymbolizerProcess {
 impl RealSymbolizerProcess {
     /// Constructs a new symbolizer.
     pub async fn new(enable_prettification: bool) -> Result<Self, LogError> {
-        let sdk = global_env_context().unwrap().get_sdk().await.map_err(|err| {
+        let sdk = global_env_context().unwrap().get_sdk().map_err(|err| {
             tracing::warn!(?err, "Failed to get SDK");
             LogError::SdkNotAvailable { msg: "not found" }
         })?;
@@ -686,7 +686,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn string_escape_test() {
+    fn string_escape_test() {
         // Escaped string
         let input = "TXN:0:start\nHello world!\n\n\nTest line 2\nRTXN:0:nothing\nTXN-COMMIT:0:COMMIT\nTXN:1:start";
         // Escaped view of string
@@ -714,7 +714,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn read_transacted_test() {
+    fn read_transacted_test() {
         let mut reader = TransactionReader::default();
         let stdout = "TXN:0:start\nHello world!\n\n\nTest line 2\nRTXN:0:nothing\nTXN-COMMIT:0:COMMIT\nTXN:1:start";
         let lines = stdout.lines();
@@ -941,7 +941,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn transaction_parser_test() {
+    fn transaction_parser_test() {
         // Invalid transaction
         assert_matches!(EscapedMessage::from("TXN:notaninteger:this is not valid").parse(), Err(_));
         // Valid transaction with ignored part. Messages should be on their own line,

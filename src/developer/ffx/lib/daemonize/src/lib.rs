@@ -13,13 +13,14 @@ use std::process::{Command, Stdio};
 ///  and package serving. The args are the command line arguments, not including ffx, and any
 /// `--config` or `--env` options. The ffx path and isolation root, if any, are taken from
 ///  the current invocation.
+#[allow(clippy::unused_async)] // TODO(https://fxbug.dev/386387845)
 pub async fn daemonize(
     args: &[String],
     log_basename: String,
     context: EnvironmentContext,
     keep_current_dir: bool,
 ) -> Result<()> {
-    let mut cmd = context.rerun_prefix().await?;
+    let mut cmd = context.rerun_prefix()?;
 
     let mut stdout = Stdio::null();
     let mut stderr = Stdio::null();

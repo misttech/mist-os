@@ -65,7 +65,7 @@ impl ToolRunner for ExternalSubTool {
         // we don't have to do signal management, but later versions of fho
         // will likely need to do more here.
         let exec_err = std::process::Command::new(&self.path)
-            .env(EnvironmentContext::FFX_BIN_ENV, self.context.rerun_bin().await?)
+            .env(EnvironmentContext::FFX_BIN_ENV, self.context.rerun_bin()?)
             .args(self.cmd_line.ffx_args_iter().chain(self.cmd_line.subcmd_iter()))
             .exec();
 
@@ -193,7 +193,7 @@ impl ToolSuite for ExternalSubToolSuite {
             let help_cmd = c
                 .env(
                     EnvironmentContext::FFX_BIN_ENV,
-                    self.context.rerun_bin().await.bug_context("rerun bin")?,
+                    self.context.rerun_bin().bug_context("rerun bin")?,
                 )
                 .args(cmdline.ffx_args_iter().chain(cmdline.subcmd_iter()));
 
@@ -215,7 +215,7 @@ impl ToolSuite for ExternalSubToolSuite {
 
     async fn command_list(&self) -> Vec<FfxToolInfo> {
         let mut tools: Vec<_> = self.workspace_tools.values().cloned().collect();
-        if let Ok(sdk) = self.context.get_sdk().await {
+        if let Ok(sdk) = self.context.get_sdk() {
             for ffx_tool in sdk.get_ffx_tools() {
                 SubToolLocation::from_path(
                     FfxToolSource::Sdk,
@@ -237,8 +237,7 @@ impl ToolSuite for ExternalSubToolSuite {
             return Ok(Some(Box::new(cmd)));
         }
         // then try the sdk
-        let sdk_cmd =
-            self.context.get_sdk().await.ok().and_then(|sdk| self.find_sdk_tool(&sdk, ffx_cmd));
+        let sdk_cmd = self.context.get_sdk().ok().and_then(|sdk| self.find_sdk_tool(&sdk, ffx_cmd));
         if let Some(cmd) = sdk_cmd {
             return Ok(Some(Box::new(cmd)));
         }

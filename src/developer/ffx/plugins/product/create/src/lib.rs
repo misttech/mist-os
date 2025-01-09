@@ -46,7 +46,7 @@ fho::embedded_plugin!(ProductCreateTool);
 impl FfxMain for ProductCreateTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        let sdk = self.ctx.get_sdk().await.context("getting sdk env context")?;
+        let sdk = self.ctx.get_sdk().context("getting sdk env context")?;
         let sdk_version = match sdk.get_version() {
             SdkVersion::Version(version) => version.to_string(),
             SdkVersion::InTree => in_tree_sdk_version(),

@@ -26,10 +26,7 @@ impl SdkToolProvider {
     /// found, parsed, or is invalid.
     pub fn try_new() -> Result<Self> {
         let ctx = global_env_context().context("loading global environment context")?;
-        Ok(Self {
-            sdk: block_on(ctx.get_sdk()).context("Reading the SDK")?,
-            log: ToolCommandLog::default(),
-        })
+        Ok(Self { sdk: ctx.get_sdk().context("Reading the SDK")?, log: ToolCommandLog::default() })
     }
 }
 
