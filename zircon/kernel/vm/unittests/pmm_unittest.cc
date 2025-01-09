@@ -1114,7 +1114,7 @@ static bool pq_rotate_queue() {
   const PageQueues::Counts counts_last = (PageQueues::Counts){
       .reclaim = {0, 0, 0, 0, 0, 0, 0, 1}, .pager_backed_dirty = 1, .wired = 1};
   const PageQueues::Counts counts_second_last = (PageQueues::Counts){
-      .reclaim = {0, 0, 1, 0, 0, 0, 0, 0}, .pager_backed_dirty = 1, .wired = 1};
+      .reclaim = {0, 0, 0, 0, 0, 0, 1, 0}, .pager_backed_dirty = 1, .wired = 1};
   PageQueues::Counts counts = pq.QueueCounts();
   EXPECT_TRUE(counts == counts_last || counts == counts_second_last);
 
