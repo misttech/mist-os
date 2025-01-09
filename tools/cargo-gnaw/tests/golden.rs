@@ -165,6 +165,11 @@ fn main() {
             options: Options { extra_args: vec!["--skip-root"], ..Default::default() },
         },
         TestCase {
+            manifest_path: vec!["licenses", "Cargo.toml"],
+            golden_expected_filename: vec!["licenses", "BUILD.gn"],
+            options: Default::default(),
+        },
+        TestCase {
             manifest_path: vec!["sdk_metadata", "Cargo.toml"],
             golden_expected_filename: vec!["sdk_metadata", "BUILD.gn"],
             options: Options {

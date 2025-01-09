@@ -83,8 +83,8 @@ type PackageName = String;
 type TargetName = String;
 type Version = String;
 
-/// Per-target metadata in the Cargo.toml for Rust crates that
-/// require extra information to in the BUILD.gn
+/// Per-target metadata in the Cargo.toml file for Rust crates that
+/// require extra information to go in the BUILD.gn file.
 #[derive(Default, Clone, Serialize, Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct TargetCfg {
@@ -104,6 +104,9 @@ pub struct TargetCfg {
 
     // Whether the package uses the Fuchsia license.
     uses_fuchsia_license: Option<bool>,
+
+    // Path to explicitly defined license(s).
+    license_files: Option<Vec<String>>,
 }
 
 /// Configuration for a single GN executable target to generate from a Cargo binary target.

@@ -452,8 +452,12 @@ require_feature_reviews = [
   "tokio",
 ]
 
+[gn.package.aead."0.5.2"]
+license_files = ["LICENSE-APACHE"]
+
 [gn.package.aes."0.8.4"]
 rustflags = [ "--cfg=aes_armv8" ]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.ahash."0.8.11".platform."cfg(any(target_arch = \"x86_64\", target_arch = \"aarch64\", target_arch = \"mips64\", target_arch = \"powerpc64\", target_arch = \"riscv64gc\", target_arch = \"s390x\"))"]
 rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
@@ -461,6 +465,10 @@ rustflags = [ "--cfg=feature=\\\"folded_multiply\\\"" ]
 [gn.package.anyhow."1.0.86"]
 # TODO(https://github.com/rust-lang/rust/pull/99301): uncomment when generic member access is stable
 #rustflags = ["--cfg=backtrace"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.arbitrary."1.0.3"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.ash."0.37.0+1.3.209"]
 rustflags = []
@@ -512,6 +520,9 @@ rustflags = ["--cfg=crc32fast_stdarchx86"]
 
 [gn.package.crossbeam-utils."0.8.14"]
 rustflags = []
+
+[gn.package.euclid."0.22.1"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.fancy-regex."0.8.0"]
 # TODO(https://fxbug.dev/112722): We're importing this explicitly for now, but eventually
@@ -569,6 +580,9 @@ rustflags = [ "--cfg=relaxed_coherence" ]
 [gn.package.getrandom."0.2.10"]
 env_vars = [ "CARGO_PKG_NAME=getrandom", "CARGO_PKG_VERSION=0.2.10", "CARGO_MANIFEST_DIR=${gn_source_root}/third_party/rust_crates/vendor/getrandom-0.2.10" ]
 rustflags = []
+
+[gn.package.group."0.12.1"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.handlebars."4.3.5"]
 # pest relies on this being set to find the grammar file
@@ -697,7 +711,6 @@ rustflags = [
 
 [gn.package.once_cell."1.20.2"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "once_cell_visibility" }
-
 [gn.package.parking_lot."0.12.0"]
 # Funnel usage of parking_lot through fuchsia_sync.
 visibility = ["//src/lib/fuchsia-sync", "//third_party/rust_crates:*"]
@@ -727,12 +740,51 @@ rustflags = ["--cfg=span_locations", "--cfg=wrap_proc_macro"]
 
 [gn.package.rand."0.6.5"]
 rustflags = ["--cfg=rustc_1_25","--cfg=rustc_1_26",  "--cfg=rustc_1_27",]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_chacha."0.3.1"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.rand_chacha."0.1.1"]
 rustflags = ["--cfg=rustc_1_26"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_core."0.3.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_core."0.4.2"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_core."0.6.3"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_hc."0.1.0"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_hc."0.3.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_isaac."0.1.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_jitter."0.1.3"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_os."0.1.2"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.rand_pcg."0.1.1"]
 rustflags = ["--cfg=rust_1_26"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_xorshift."0.1.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_xorshift."0.3.0"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.rand_xoshiro."0.1.0"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.rayon-core."1.12.1"]
 # Has build script but no config needed.
@@ -1016,9 +1068,36 @@ rustflags = [
   "--cfg=__unicase__core_and_alloc",
 ]
 
+[gn.package.unicode-bidi."0.3.4"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-normalization."0.1.19"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-segmentation."1.10.1"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-width."0.1.10"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-xid."0.1.0"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.unicode-xid."0.2.0"]
+license_files = ["LICENSE-APACHE"]
+
 [gn.package.url."1.7.2"]
 # FIXME(91750): Blocked on updating valico to 3.x.
 visibility = [":*", "//build/sdk/meta:*"]
+
+[gn.package.uuid."0.7.2"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.uuid."0.8.2"]
+license_files = ["LICENSE-APACHE"]
+
+[gn.package.uuid."1.1.2"]
+license_files = ["LICENSE-APACHE"]
 
 [gn.package.valico."2.4.2"]
 env_vars = ["OUT_DIR=../../../../compat/valico"]
