@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    AnyHandle, AsHandleRef, Channel, ChannelMessage, ChannelMessageStream, ChannelWriter, Error,
-    Handle, HandleInfo,
+    AnyHandle, AsHandleRef, Channel, ChannelMessageStream, ChannelWriter, Error, Handle,
+    HandleInfo, MessageBuf,
 };
 use fidl_fuchsia_fdomain as proto;
 use futures::{Stream, StreamExt, TryStream};
@@ -87,7 +87,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
     fn recv_etc_from(
         &self,
         ctx: &mut std::task::Context<'_>,
-        buf: &mut ChannelMessage,
+        buf: &mut MessageBuf,
     ) -> Poll<Result<(), Option<Error>>> {
         let Some(got) = std::task::ready!(self.0.lock().unwrap().poll_next_unpin(ctx)) else {
             return Poll::Ready(Err(Some(Error::ClientLost)));
@@ -140,7 +140,7 @@ impl ::fidl::encoding::ProxyChannelBox<FDomainResourceDialect> for FDomainProxyC
 pub struct FDomainResourceDialect;
 impl ::fidl::encoding::ResourceDialect for FDomainResourceDialect {
     type Handle = Handle;
-    type MessageBufEtc = ChannelMessage;
+    type MessageBufEtc = MessageBuf;
     type ProxyChannel = Channel;
 
     #[inline]
@@ -151,9 +151,9 @@ impl ::fidl::encoding::ResourceDialect for FDomainResourceDialect {
     }
 }
 
-impl ::fidl::encoding::MessageBufFor<FDomainResourceDialect> for ChannelMessage {
-    fn new() -> ChannelMessage {
-        ChannelMessage { bytes: Vec::new(), handles: Vec::new() }
+impl ::fidl::encoding::MessageBufFor<FDomainResourceDialect> for MessageBuf {
+    fn new() -> MessageBuf {
+        MessageBuf { bytes: Vec::new(), handles: Vec::new() }
     }
 
     fn split_mut(&mut self) -> (&mut Vec<u8>, &mut Vec<HandleInfo>) {

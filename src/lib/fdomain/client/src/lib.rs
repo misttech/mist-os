@@ -32,7 +32,7 @@ pub mod fidl;
 use responder::{Responder, ResponderStatus};
 
 pub use channel::{
-    AnyHandle, Channel, ChannelMessage, ChannelMessageStream, ChannelWriter, HandleInfo,
+    AnyHandle, Channel, ChannelMessageStream, ChannelWriter, HandleInfo, MessageBuf,
 };
 pub use event::Event;
 pub use event_pair::Eventpair as EventPair;

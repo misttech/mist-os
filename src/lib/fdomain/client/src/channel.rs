@@ -23,16 +23,16 @@ handle_type!(Channel CHANNEL peered);
 
 /// A message which has been read from a channel.
 #[derive(Debug)]
-pub struct ChannelMessage {
+pub struct MessageBuf {
     pub bytes: Vec<u8>,
     pub handles: Vec<HandleInfo>,
 }
 
-impl ChannelMessage {
-    /// Convert a proto ChannelMessage to a local ChannelMessage.
-    fn from_proto(client: &Arc<crate::Client>, message: proto::ChannelMessage) -> ChannelMessage {
+impl MessageBuf {
+    /// Convert a proto ChannelMessage to a MessageBuf.
+    fn from_proto(client: &Arc<crate::Client>, message: proto::ChannelMessage) -> MessageBuf {
         let proto::ChannelMessage { data, handles } = message;
-        ChannelMessage {
+        MessageBuf {
             bytes: data,
             handles: handles
                 .into_iter()
@@ -115,7 +115,7 @@ pub enum HandleOp<'h> {
 
 impl Channel {
     /// Reads a message from the channel.
-    pub fn recv_msg(&self) -> impl Future<Output = Result<ChannelMessage, Error>> {
+    pub fn recv_msg(&self) -> impl Future<Output = Result<MessageBuf, Error>> {
         let client = self.0.client();
         let handle = self.0.proto();
 
@@ -126,7 +126,7 @@ impl Channel {
                     proto::ChannelReadChannelRequest { handle },
                     Responder::ReadChannel,
                 )
-                .map(move |f| f.map(|message| ChannelMessage::from_proto(&client, message)))
+                .map(move |f| f.map(|message| MessageBuf::from_proto(&client, message)))
         });
 
         async move { result?.await }
@@ -302,12 +302,12 @@ impl ChannelMessageStream {
 }
 
 impl Stream for ChannelMessageStream {
-    type Item = Result<ChannelMessage, Error>;
+    type Item = Result<MessageBuf, Error>;
     fn poll_next(mut self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match ready!(Pin::new(&mut self.messages).poll_next(ctx)) {
             Some(Ok(c)) => {
                 if let Ok(client) = self.channel.0.client() {
-                    Poll::Ready(Some(Ok(ChannelMessage::from_proto(&client, c))))
+                    Poll::Ready(Some(Ok(MessageBuf::from_proto(&client, c))))
                 } else {
                     Poll::Ready(None)
                 }
