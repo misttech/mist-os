@@ -517,6 +517,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                         if new_range.end <= extent_key.range.start {
                             break;
                         }
+                        // Add any prefix we might need to allocate.
+                        if new_range.start < extent_key.range.start {
+                            to_allocate.push(new_range.start..extent_key.range.start);
+                            new_range.start = extent_key.range.start;
+                        }
                         let device_offset = match extent_value {
                             ExtentValue::None => {
                                 // If the extent value is None, it indicates a deleted extent. In
@@ -542,52 +547,15 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                         };
 
                         // Figure out how we have to break up the ranges.
-                        if extent_key.range.start <= new_range.start {
-                            // [ extent
-                            //    [ new
-                            // and
-                            // [ extent
-                            // [ new
-                            assert!(new_range.start < extent_key.range.end);
-                            let device_offset =
-                                device_offset + (new_range.start - extent_key.range.start);
-
-                            if extent_key.range.end < new_range.end {
-                                // [ extent ]
-                                //    [ new    ]
-                                to_switch
-                                    .push((new_range.start..extent_key.range.end, device_offset));
-                                new_range.start = extent_key.range.end;
-                            } else {
-                                // [ extent    ]
-                                //    [ new    ]
-                                // or
-                                // [ extent       ]
-                                //    [ new    ]
-                                to_switch.push((new_range.start..new_range.end, device_offset));
-                                new_range.start = new_range.end;
-                                break;
-                            }
+                        let device_offset =
+                            device_offset + (new_range.start - extent_key.range.start);
+                        if extent_key.range.end < new_range.end {
+                            to_switch.push((new_range.start..extent_key.range.end, device_offset));
+                            new_range.start = extent_key.range.end;
                         } else {
-                            //    [ extent
-                            // [ new          ]
-                            to_allocate.push(new_range.start..extent_key.range.start);
-                            if extent_key.range.end < new_range.end {
-                                //    [ extent ]
-                                // [ new          ]
-                                to_switch.push((extent_key.range.clone(), device_offset));
-                                new_range.start = extent_key.range.end;
-                            } else {
-                                //    [ extent    ]
-                                // [ new          ]
-                                // or
-                                //    [ extent       ]
-                                // [ new          ]
-                                to_switch
-                                    .push((extent_key.range.start..new_range.end, device_offset));
-                                new_range.start = new_range.end;
-                                break;
-                            }
+                            to_switch.push((new_range.start..new_range.end, device_offset));
+                            new_range.start = new_range.end;
+                            break;
                         }
                     }
                     // The records are sorted so if we find something that isn't an extent or
@@ -3733,8 +3701,89 @@ mod tests {
         }
     }
 
+    async fn get_modes(
+        obj: &DataObjectHandle<ObjectStore>,
+        mut search_range: Range<u64>,
+    ) -> Vec<(Range<u64>, ExtentMode)> {
+        let mut modes = Vec::new();
+        let store = obj.store();
+        let tree = store.tree();
+        let layer_set = tree.layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = merger
+            .query(Query::FullRange(&ObjectKey::attribute(
+                obj.object_id(),
+                0,
+                AttributeKey::Extent(ExtentKey::search_key_from_offset(search_range.start)),
+            )))
+            .await
+            .unwrap();
+        loop {
+            match iter.get() {
+                Some(ItemRef {
+                    key:
+                        ObjectKey {
+                            object_id,
+                            data:
+                                ObjectKeyData::Attribute(
+                                    attribute_id,
+                                    AttributeKey::Extent(ExtentKey { range }),
+                                ),
+                        },
+                    value: ObjectValue::Extent(ExtentValue::Some { mode, .. }),
+                    ..
+                }) if *object_id == obj.object_id() && *attribute_id == 0 => {
+                    if search_range.end <= range.start {
+                        break;
+                    }
+                    let found_range = std::cmp::max(search_range.start, range.start)
+                        ..std::cmp::min(search_range.end, range.end);
+                    search_range.start = found_range.end;
+                    modes.push((found_range, mode.clone()));
+                    if search_range.start == search_range.end {
+                        break;
+                    }
+                    iter.advance().await.unwrap();
+                }
+                x => panic!("looking for extent record, found this {:?}", x),
+            }
+        }
+        modes
+    }
+
+    async fn assert_all_overwrite(
+        obj: &DataObjectHandle<ObjectStore>,
+        mut search_range: Range<u64>,
+    ) {
+        let modes = get_modes(obj, search_range.clone()).await;
+        for mode in modes {
+            assert_eq!(
+                mode.0.start, search_range.start,
+                "missing mode in range {}..{}",
+                search_range.start, mode.0.start
+            );
+            match mode.1 {
+                ExtentMode::Overwrite | ExtentMode::OverwritePartial(_) => (),
+                m => panic!("mode at range {:?} was not overwrite, instead found {:?}", mode.0, m),
+            }
+            assert!(
+                mode.0.end <= search_range.end,
+                "mode ends beyond search range (bug in test) - search_range: {:?}, mode: {:?}",
+                search_range,
+                mode,
+            );
+            search_range.start = mode.0.end;
+        }
+        assert_eq!(
+            search_range.start, search_range.end,
+            "missing mode in range {:?}",
+            search_range
+        );
+    }
+
     #[fuchsia::test(threads = 10)]
     async fn test_multi_overwrite() {
+        #[derive(Debug)]
         struct Case {
             pre_writes: Vec<Range<usize>>,
             allocate_ranges: Vec<Range<u64>>,
@@ -3854,9 +3903,25 @@ mod tests {
                 allocate_ranges: vec![0..5],
                 overwrites: vec![vec![0..2, 2..5], vec![0..5]],
             },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![0..10, 4..6],
+                overwrites: Vec::new(),
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![3..8, 5..10],
+                overwrites: Vec::new(),
+            },
+            Case {
+                pre_writes: Vec::new(),
+                allocate_ranges: vec![5..10, 3..8],
+                overwrites: Vec::new(),
+            },
         ];
 
         for (i, case) in cases.into_iter().enumerate() {
+            log::info!("running case {} - {:?}", i, case);
             let (fs, object) = test_filesystem_and_empty_object().await;
             let block_size = fs.block_size();
             let file_size = block_size * 10;
@@ -3875,11 +3940,19 @@ mod tests {
                 );
             }
 
-            for allocate_range in case.allocate_ranges {
+            for allocate_range in &case.allocate_ranges {
                 object
                     .allocate(allocate_range.start * block_size..allocate_range.end * block_size)
                     .await
                     .unwrap();
+            }
+
+            for allocate_range in case.allocate_ranges {
+                assert_all_overwrite(
+                    &object,
+                    allocate_range.start * block_size..allocate_range.end * block_size,
+                )
+                .await;
             }
 
             for overwrite in case.overwrites {
@@ -3932,41 +4005,6 @@ mod tests {
         }
     }
 
-    async fn get_mode(obj: &DataObjectHandle<ObjectStore>) -> ExtentMode {
-        let store = obj.store();
-        let block_size = store.block_size();
-        let tree = store.tree();
-        let layer_set = tree.layer_set();
-        let mut merger = layer_set.merger();
-        let iter = merger
-            .query(Query::FullRange(&ObjectKey::attribute(
-                obj.object_id(),
-                0,
-                AttributeKey::Extent(ExtentKey::search_key_from_offset(0)),
-            )))
-            .await
-            .unwrap();
-        match iter.get() {
-            Some(ItemRef {
-                key:
-                    ObjectKey {
-                        object_id,
-                        data:
-                            ObjectKeyData::Attribute(
-                                attribute_id,
-                                AttributeKey::Extent(ExtentKey { range }),
-                            ),
-                    },
-                value: ObjectValue::Extent(ExtentValue::Some { mode, .. }),
-                ..
-            }) if *object_id == obj.object_id() && *attribute_id == 0 => {
-                assert_eq!(*range, 0..block_size * 10, "unexpected extent range");
-                mode.clone()
-            }
-            x => panic!("looking for extent record, found this {:?}", x),
-        }
-    }
-
     #[fuchsia::test(threads = 10)]
     async fn test_multi_overwrite_mode_updates() {
         let (fs, object) = test_filesystem_and_empty_object().await;
@@ -3977,7 +4015,10 @@ mod tests {
         let mut expected_bitmap = BitVec::from_elem(10, false);
 
         object.allocate(0..10 * block_size).await.unwrap();
-        assert_eq!(get_mode(&object).await, ExtentMode::OverwritePartial(expected_bitmap.clone()));
+        assert_eq!(
+            get_modes(&object, 0..10 * block_size).await,
+            vec![(0..10 * block_size, ExtentMode::OverwritePartial(expected_bitmap.clone()))]
+        );
 
         let mut write_buf = object.allocate_buffer(2 * block_size as usize).await;
         let data = (0..20).cycle().take(write_buf.len()).collect::<Vec<_>>();
@@ -3996,7 +4037,10 @@ mod tests {
 
         expected_bitmap.set(2, true);
         expected_bitmap.set(3, true);
-        assert_eq!(get_mode(&object).await, ExtentMode::OverwritePartial(expected_bitmap.clone()));
+        assert_eq!(
+            get_modes(&object, 0..10 * block_size).await,
+            vec![(0..10 * block_size, ExtentMode::OverwritePartial(expected_bitmap.clone()))]
+        );
 
         let mut write_buf = object.allocate_buffer(3 * block_size as usize).await;
         let data = (0..20).cycle().take(write_buf.len()).collect::<Vec<_>>();
@@ -4015,7 +4059,10 @@ mod tests {
 
         expected_bitmap.set(4, true);
         expected_bitmap.set(6, true);
-        assert_eq!(get_mode(&object).await, ExtentMode::OverwritePartial(expected_bitmap.clone()));
+        assert_eq!(
+            get_modes(&object, 0..10 * block_size).await,
+            vec![(0..10 * block_size, ExtentMode::OverwritePartial(expected_bitmap.clone()))]
+        );
 
         let mut write_buf = object.allocate_buffer(6 * block_size as usize).await;
         let data = (0..20).cycle().take(write_buf.len()).collect::<Vec<_>>();
@@ -4036,7 +4083,10 @@ mod tests {
             .unwrap();
         transaction.commit().await.unwrap();
 
-        assert_eq!(get_mode(&object).await, ExtentMode::Overwrite);
+        assert_eq!(
+            get_modes(&object, 0..10 * block_size).await,
+            vec![(0..10 * block_size, ExtentMode::Overwrite)]
+        );
 
         fs.close().await.expect("close failed");
     }
