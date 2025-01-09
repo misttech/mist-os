@@ -110,7 +110,9 @@ async fn try_get_target_info(
     spec: String,
     context: &EnvironmentContext,
 ) -> Result<(ffx::RemoteControlState, Option<String>, Option<String>), KnockError> {
-    let mut resolution = ffx_target::resolve_target_address(&Some(spec), context).await?;
+    let mut resolution = ffx_target::resolve_target_address(&Some(spec), context)
+        .await
+        .map_err(|e| KnockError::CriticalError(e.into()))?;
     let (rcs_state, pc, bc) = match resolution.identify(context).await {
         Ok(id_result) => (
             ffx::RemoteControlState::Up,

@@ -142,6 +142,9 @@ type OpenTargetError = strict enum {
     QUERY_AMBIGUOUS = 1;
     /// No targets were able to match the query after waiting.
     TARGET_NOT_FOUND = 2;
+    /// When resolving the target, the discovery of potentially matching
+    /// targets failed.
+    FAILED_DISCOVERY = 3;
 };
 
 type TargetConnectionError = strict enum {

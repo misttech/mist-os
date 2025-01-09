@@ -451,8 +451,16 @@ pub async fn knock_target_daemonless(
 ) -> Result<Option<CompatibilityInfo>, KnockError> {
     let knock_timeout = knock_timeout.unwrap_or(DEFAULT_RCS_KNOCK_TIMEOUT * 2);
     let res_future = async {
-        tracing::trace!("resolving target spec address from {target_spec:?}");
-        let res = resolve::resolve_target_address(target_spec, context).await?;
+        tracing::debug!("resolving target spec address from {target_spec:?}");
+        let res =
+            resolve::resolve_target_address(target_spec, context).await.map_err(|e| match e {
+                // When knocking, it's not critical if we have not yet found the target. The caller should just retry
+                FfxTargetError::OpenTargetError {
+                    err: ffx::OpenTargetError::TargetNotFound,
+                    ..
+                } => KnockError::NonCriticalError(e.into()),
+                _ => KnockError::CriticalError(e.into()),
+            })?;
         tracing::debug!("daemonless knock connecting to address {}", res.addr()?);
         let conn = match res.connection {
             Some(c) => c,

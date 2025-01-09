@@ -87,9 +87,10 @@ impl TryFromEnvContext for ffx_target::Resolution {
                 target_spec.as_ref().unwrap_or(&unspecified_target)
             };
             tracing::trace!("resolving target spec address from {}", target_spec_unwrapped);
-            let resolution = ffx_target::resolve_target_address(&target_spec, env)
-                .await
-                .map_err(|e| ffx_command_error::Error::User(crate::NonFatalError(e).into()))?;
+            let resolution =
+                ffx_target::resolve_target_address(&target_spec, env).await.map_err(|e| {
+                    ffx_command_error::Error::User(crate::NonFatalError(e.into()).into())
+                })?;
             Ok(resolution)
         })
     }

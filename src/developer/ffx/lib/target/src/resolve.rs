@@ -104,7 +104,7 @@ trait QueryResolverT {
         &self,
         target_spec: &Option<String>,
         ctx: &EnvironmentContext,
-    ) -> Result<Resolution> {
+    ) -> Result<Resolution, FfxTargetError> {
         let query = TargetInfoQuery::from(target_spec.clone());
         if let TargetInfoQuery::Addr(a) = query {
             return Ok(Resolution::from_addr(a));
@@ -120,9 +120,9 @@ trait QueryResolverT {
         &self,
         target_spec: &Option<String>,
         env_context: &EnvironmentContext,
-    ) -> Result<Resolution, anyhow::Error> {
-        let target_spec_info = target_spec.clone().unwrap_or_else(|| "<unspecified>".to_owned());
+    ) -> Result<Resolution, FfxTargetError> {
         let query = TargetInfoQuery::from(target_spec.clone());
+
         if let TargetInfoQuery::NodenameOrSerial(ref s) = query {
             match self.try_resolve_manual_target(s, env_context).await {
                 Err(e) => {
@@ -132,20 +132,26 @@ trait QueryResolverT {
                 _ => (), // Keep going
             }
         }
-        let mut handles = self.resolve_target_query(query, env_context).await?;
-        if handles.len() == 0 {
-            return Err(anyhow::anyhow!(
-                "unable to resolve address for target '{target_spec_info}'"
-            ));
-        }
-        if handles.len() > 1 {
-            return Err(FfxTargetError::DaemonError {
-                err: ffx::DaemonError::TargetAmbiguous,
+        let mut handles = self.resolve_target_query(query, env_context).await.map_err(|_| {
+            FfxTargetError::OpenTargetError {
+                err: ffx::OpenTargetError::FailedDiscovery,
                 target: target_spec.clone(),
             }
-            .into());
+        })?;
+        if handles.len() == 0 {
+            return Err(FfxTargetError::OpenTargetError {
+                err: ffx::OpenTargetError::TargetNotFound,
+                target: target_spec.clone(),
+            });
         }
-        Ok(Resolution::from_target_handle(handles.remove(0))?)
+        if handles.len() > 1 {
+            return Err(FfxTargetError::OpenTargetError {
+                err: ffx::OpenTargetError::QueryAmbiguous,
+                target: target_spec.clone(),
+            });
+        }
+        // Unwrap() is okay because we validate that we have at least one entry
+        Ok(Resolution::from_target_handle(handles.remove(0)).unwrap())
     }
 }
 
@@ -341,7 +347,7 @@ async fn resolve_target_query_with_sources(
 pub async fn resolve_target_address(
     target_spec: &Option<String>,
     ctx: &EnvironmentContext,
-) -> Result<Resolution> {
+) -> Result<Resolution, FfxTargetError> {
     QueryResolver::default().resolve_target_address(target_spec, ctx).await
 }
 struct QueryResolver {

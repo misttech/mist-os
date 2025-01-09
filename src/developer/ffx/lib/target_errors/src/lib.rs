@@ -37,6 +37,7 @@ pub enum FfxTargetError {
 
     #[cfg(not(target_os = "fuchsia"))]
     #[error("{}", match .err {
+            OpenTargetError::FailedDiscovery => format!("Could not resolve specification {} due to discovery failure", target_string(.target)),
             OpenTargetError::QueryAmbiguous => {
                 match target_string(.target) {
                     target if target == "\"unspecified\"" => format!("More than one device/emulator found. Use `ffx target list` to list known targets and choose a target with `ffx -t`."),
