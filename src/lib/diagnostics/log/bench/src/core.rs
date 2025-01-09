@@ -60,19 +60,19 @@ where
 // to log. They set up different cases: just a string, a string with arguments, the same string
 // but with the arguments formatted, etc. It'll measure the time it takes for the log to go
 // through the tracing mechanisms, our encoder and finally writing to the socket.
-fn setup_tracing_write_benchmarks(
+fn setup_log_write_benchmarks(
     name: &str,
     benchmark: Option<criterion::Benchmark>,
 ) -> criterion::Benchmark {
     let all_args_bench = move |b: &mut criterion::Bencher| {
         write_log_benchmark(b, || {
-            tracing::info!(
+            log::info!(
                 tag = "logbench",
                 boolean = true,
                 float = 1234.5678,
                 int = -123456,
                 string = "foobarbaz",
-                uint = 123456,
+                uint = 123456;
                 "this is a log emitted from the benchmark"
             );
         });
@@ -85,22 +85,22 @@ fn setup_tracing_write_benchmarks(
     bench
         .with_function(format!("Publisher/{}/NoArguments", name), move |b| {
             write_log_benchmark(b, || {
-                tracing::info!("this is a log emitted from the benchmark");
+                log::info!("this is a log emitted from the benchmark");
             });
         })
         .with_function(format!("Publisher/{}/MessageWithSomeArguments", name), move |b| {
             write_log_benchmark(b, || {
-                tracing::info!(
+                log::info!(
                     boolean = true,
                     int = -123456,
-                    string = "foobarbaz",
+                    string = "foobarbaz";
                     "this is a log emitted from the benchmark",
                 );
             });
         })
         .with_function(format!("Publisher/{}/MessageAsString", name), move |b| {
             write_log_benchmark(b, || {
-                tracing::info!(
+                log::info!(
                     "this is a log emitted from the benchmark boolean={} int={} string={}",
                     true,
                     -123456,
@@ -110,7 +110,7 @@ fn setup_tracing_write_benchmarks(
         })
 }
 
-fn setup_log_write_benchmarks(name: &str, bench: criterion::Benchmark) -> criterion::Benchmark {
+fn setup_old_log_write_benchmarks(name: &str, bench: criterion::Benchmark) -> criterion::Benchmark {
     bench
         .with_function(format!("Publisher/{}/NoArguments", name), move |b| {
             write_log_benchmark(b, || {
@@ -147,11 +147,12 @@ fn main() {
         .sample_size(10);
 
     let (_drain_logs, logger) = create_logger();
-    log::set_boxed_logger(Box::new(logger.clone())).expect("setp logger");
-    tracing::subscriber::set_global_default(logger).expect("setup subscriber");
+    log::set_boxed_logger(Box::new(logger)).expect("setp logger");
 
-    let mut bench = setup_tracing_write_benchmarks("Tracing", None);
-    bench = setup_log_write_benchmarks("Log", bench);
+    // TODO(https://fxbug.dev/344980783): keep the old benchmarks to see continuity, but then
+    // rename "Tracing" to "Log" and remove the old tracing benchmarks.
+    let mut bench = setup_log_write_benchmarks("Tracing", None);
+    bench = setup_old_log_write_benchmarks("Log", bench);
 
     c.bench("fuchsia.diagnostics_log_rust.core", bench);
 }

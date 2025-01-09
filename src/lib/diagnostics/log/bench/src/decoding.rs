@@ -3,17 +3,15 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use diagnostics_log::TracingEvent;
+use diagnostics_log::LogEvent;
 use diagnostics_log_encoding::encode::{Encoder, EncoderOpts, WriteEventParams};
 use diagnostics_log_encoding::parse::{parse_argument, parse_record};
 use diagnostics_log_encoding::{Argument, Value};
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
+use std::fmt;
 use std::io::Cursor;
 use std::time::Duration;
-use tracing::Event;
-use tracing_core::field;
-use tracing_subscriber::Registry;
 
 mod common;
 
@@ -32,19 +30,21 @@ fn bench_argument(
 
 const ENCODE_SIZE: usize = 4096;
 
-fn write<const N: usize>(
-    metadata: &'static tracing::Metadata<'static>,
-    fields: [field::Field; N],
-    values: [&(dyn field::Value); N],
+fn write(
+    message: fmt::Arguments<'static>,
+    key_values: &[&(dyn log::kv::Source + Send + Sync)],
 ) -> Encoder<Cursor<[u8; ENCODE_SIZE]>> {
-    let value_set_entries = common::make_value_set(&fields, &values);
-    let value_set = metadata.fields().value_set(&value_set_entries);
-    let event = Event::new(metadata, &value_set);
+    let mut builder = log::Record::builder();
+    builder.level(log::Level::Info);
+    for key_value in key_values {
+        builder.key_values(key_value);
+    }
+    let record = builder.args(message).build();
     let buffer = [0u8; ENCODE_SIZE];
     let mut encoder = Encoder::new(Cursor::new(buffer), EncoderOpts::default());
     assert_matches!(
         encoder.write_event(WriteEventParams {
-            event: TracingEvent::<Registry>::from_event(&event),
+            event: LogEvent::new(&record),
             tags: &["some-tag"],
             metatags: std::iter::empty(),
             pid: *common::PROCESS_ID,
@@ -59,45 +59,36 @@ fn write<const N: usize>(
 fn setup_read_event_benchmarks(bench: criterion::Benchmark) -> criterion::Benchmark {
     bench
         .with_function("Decoder/ReadEvent/AllArguments", |b| {
-            let (metadata, fields, values) = crate::common::make_event_metadata!(
-                message: "this is a log emitted from the benchmark",
-                tag: "logbench",
-                boolean: true,
-                float: 1234.5678,
-                int: -123456,
-                string: "foobarbaz",
-                uint: 123456
+            let encoder = write(
+                format_args!("this is a log emitted from the benchmark"),
+                &[
+                    &("tag", "logbench"),
+                    &("boolean", true),
+                    &("float", 1234.5678),
+                    &("int", -123456),
+                    &("string", "foobarbaz"),
+                    &("uint", 123456),
+                ],
             );
-            let encoder = write(metadata, fields, values);
             b.iter(|| parse_record(encoder.inner().get_ref()).unwrap())
         })
         .with_function("Decoder/ReadEvent/NoArguments", |b| {
-            let (metadata, fields, values) = common::make_event_metadata!(
-                message: "this is a log emitted from the benchmark"
-            );
-            let encoder = write(metadata, fields, values);
+            let encoder = write(format_args!("this is a log emitted from the benchmark"), &[]);
             b.iter(|| parse_record(encoder.inner().get_ref()).unwrap())
         })
         .with_function("Decoder/ReadEvent/MessageAsString", |b| {
-            let (metadata, fields, values) = common::make_event_metadata!(
-                message:
-                    // NOTE: the arguments here should match the bench below.
-                    concat!(
-                        "this is a log emitted from the benchmark boolean=true ",
-                        "int=98765 string=foobarbaz"
-                    )
-            );
-            let encoder = write(metadata, fields, values);
+            let encoder = write(format_args!("this is a log emitted from the benchmark boolean=true int=98765 string=foobarbaz"), &[]);
             b.iter(|| parse_record(encoder.inner().get_ref()).unwrap())
         })
         .with_function("Decoder/ReadEvent/MessageWithSomeArguments", |b| {
-            let (metadata, fields, values) = common::make_event_metadata!(
-                message: "this is a log emitted from the benchmark",
-                boolean: true,
-                int: 98765,
-                string: "foobarbaz"
+            let encoder = write(
+                format_args!("this is a log emitted from the benchmark"),
+                &[
+                    &("boolean", true),
+                    &("int", 98765),
+                    &("string", "foobarbaz"),
+                ],
             );
-            let encoder = write(metadata, fields, values);
             b.iter(|| parse_record(encoder.inner().get_ref()).unwrap())
         })
 }

@@ -329,13 +329,14 @@ impl EncodedSpanArguments {
     }
 }
 
-struct LogEvent<'a> {
+#[doc(hidden)]
+pub struct LogEvent<'a> {
     record: &'a log::Record<'a>,
     timestamp: zx::BootInstant,
 }
 
 impl<'a> LogEvent<'a> {
-    fn new(record: &'a log::Record<'a>) -> Self {
+    pub fn new(record: &'a log::Record<'a>) -> Self {
         Self { record, timestamp: zx::BootInstant::get() }
     }
 }

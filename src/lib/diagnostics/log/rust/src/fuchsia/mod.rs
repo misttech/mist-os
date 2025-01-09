@@ -29,7 +29,7 @@ use sink::{Sink, SinkConfig};
 pub use diagnostics_log_encoding::encode::TestRecord;
 pub use diagnostics_log_encoding::Metatag;
 pub use paste::paste;
-pub use sink::TracingEvent;
+pub use sink::{LogEvent, TracingEvent};
 
 #[cfg(test)]
 use std::{

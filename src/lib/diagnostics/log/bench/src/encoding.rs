@@ -2,17 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_log::TracingEvent;
+use diagnostics_log::LogEvent;
 use diagnostics_log_encoding::encode::{
     Encoder, EncoderOpts, WriteArgumentValue, WriteEventParams,
 };
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
+use std::fmt;
 use std::io::Cursor;
 use std::time::Duration;
-use tracing::{Event, Metadata};
-use tracing_core::field;
-use tracing_subscriber::Registry;
 
 mod common;
 
@@ -38,82 +36,74 @@ where
     }
 }
 
-// `tracing_core::field::private::ValidLen<'_>` is not implemented for `[(&tracing_core::Field,
-// std::option::Option<&dyn tracing::Value>); N]`
-// Therefore we cannot use const generics for doing this.
-macro_rules! impl_bench_write_event {
-    ($($n:tt),+) => {
-        $(
-            paste::paste! {
-                fn [< bench_write_event_with_ $n _args>](
-                    b: &mut criterion::Bencher,
-                    metadata: &'static Metadata<'static>,
-                    fields: [field::Field; $n],
-                    values: [&dyn field::Value; $n],
-                ) {
-                    let value_set_entries = common::make_value_set(&fields, &values);
-                    let value_set = metadata.fields().value_set(&value_set_entries);
-                    let event = Event::new(metadata, &value_set);
-                    b.iter_batched_ref(
-                        || encoder(),
-                        |encoder| encoder.write_event(
-                            WriteEventParams {
-                            event: TracingEvent::<Registry>::from_event(&event),
-                            tags: &["some-tag"],
-                            metatags: std::iter::empty(),
-                            pid: *common::PROCESS_ID,
-                            tid: *common::THREAD_ID,
-                            dropped: 1
-                        }),
-                        criterion::BatchSize::SmallInput,
-                    )
-                }
-            }
-        )+
+fn bench_write_record_with_args(
+    b: &mut criterion::Bencher,
+    message: fmt::Arguments<'static>,
+    key_values: &[&(dyn log::kv::Source + Send + Sync)],
+) {
+    let mut builder = log::Record::builder();
+    builder.level(log::Level::Info);
+    for key_value in key_values {
+        builder.key_values(key_value);
     }
+    let record = builder.args(message).build();
+
+    b.iter_batched_ref(
+        encoder,
+        |encoder| {
+            encoder.write_event(WriteEventParams {
+                event: LogEvent::new(&record),
+                tags: &["some-tag"],
+                metatags: std::iter::empty(),
+                pid: *common::PROCESS_ID,
+                tid: *common::THREAD_ID,
+                dropped: 1,
+            })
+        },
+        criterion::BatchSize::SmallInput,
+    )
 }
 
-impl_bench_write_event!(1, 4, 7);
-
-fn setup_write_event_benchmarks(bench: criterion::Benchmark) -> criterion::Benchmark {
+fn setup_write_record_benchmarks(bench: criterion::Benchmark) -> criterion::Benchmark {
     bench
         .with_function("Encoder/WriteEvent/AllArguments", |b| {
-            let (metadata, fields, values) = common::make_event_metadata!(
-                message: "this is a log emitted from the benchmark",
-                tag: "logbench",
-                boolean: true,
-                float: 1234.5678,
-                int: -123456,
-                string: "foobarbaz",
-                uint: 123456
+            bench_write_record_with_args(
+                b,
+                format_args!("this is a log emitted from the benchmark"),
+                &[
+                    &("tag", "logbench"),
+                    &("boolean", true),
+                    &("float", 1234.5678),
+                    &("int", -123456),
+                    &("string", "foobarbaz"),
+                    &("uint", 123456)
+                ],
             );
-            bench_write_event_with_7_args(b, metadata, fields, values);
         })
         .with_function("Encoder/WriteEvent/NoArguments", |b| {
-            let (metadata, fields, values) = common::make_event_metadata!(
-                message: "this is a log emitted from the benchmark"
+            bench_write_record_with_args(
+                b,
+                format_args!("this is a log emitted from the benchmark"),
+                &[],
             );
-            bench_write_event_with_1_args(b, metadata, fields, values);
         })
         .with_function("Encoder/WriteEvent/MessageAsString", |b| {
-            let (metadata, fields, values) = common::make_event_metadata!(
-                message:
-                    // NOTE: the arguments here should match the bench below.
-                    concat!(
-                        "this is a log emitted from the benchmark boolean=true ",
-                        "int=98765 string=foobarbaz"
-                    )
+            bench_write_record_with_args(
+                b,
+                format_args!("this is a log emitted from the benchmark boolean=true int=98765 string=foobarbaz"),
+                &[],
             );
-            bench_write_event_with_1_args(b, metadata, fields, values);
         })
         .with_function("Encoder/WriteEvent/MessageWithSomeArguments", |b| {
-            let (metadata, fields, values) = common::make_event_metadata!(
-                message: "this is a log emitted from the benchmark",
-                boolean: true,
-                int: 98765,
-                string: "foobarbaz"
+            bench_write_record_with_args(
+                b,
+                format_args!("this is a log emitted from the benchmark"),
+                &[
+                    &("boolean", true),
+                    &("int", -123456),
+                    &("string", "foobarbaz"),
+                ],
             );
-            bench_write_event_with_4_args(b, metadata, fields, values);
         })
 }
 
@@ -143,7 +133,7 @@ fn main() {
         )
     }
 
-    bench = setup_write_event_benchmarks(bench);
+    bench = setup_write_record_benchmarks(bench);
 
     c.bench("fuchsia.diagnostics_log_rust.encoding", bench);
 }
