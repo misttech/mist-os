@@ -33,7 +33,6 @@ const (
 	TestbedConfigEnvKey = "FUCHSIA_TESTBED_CONFIG"
 	// LINT.ThenChange(//src/testing/end_to_end/mobly_driver/api_infra.py)
 
-	FFXPathEnvKey            = "FUCHSIA_FFX_PATH"
-	FFXExperimentLevelEnvKey = "FUCHSIA_FFX_EXPERIMENT_LEVEL"
-	FFXConfigPathEnvKey      = "FUCHSIA_FFX_CONFIG_PATH"
+	FFXPathEnvKey       = "FUCHSIA_FFX_PATH"
+	FFXConfigPathEnvKey = "FUCHSIA_FFX_CONFIG_PATH"
 )

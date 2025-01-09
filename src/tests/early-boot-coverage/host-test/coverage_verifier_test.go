@@ -16,6 +16,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/debug/covargs/api/llvm"
@@ -177,15 +178,15 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 
 	// Create a new fuchsia tester that is responsible for executing the test.
 	// This should match what is currently used by the coverage builders. They
-	// currently use an FFXTester which defaults to the SSHTester if the ffx
-	// experiment level does not enable using `ffx test`. When updating the ffx
-	// experiment level on the coverage builders, the level should be updated
+	// currently use an FFXTester which defaults to the SSHTester if the enabled
+	// experiments do not include using `ffx test`. When updating the ffx
+	// experiments on the coverage builders, they should be updated
 	// here as well.
 	// TODO(https://fxbug.dev/42075455): Pass in the llvm-profdata tool when this
 	// gets changed to enable ffx test.
-	ffxExperimentLevel := 1
+	ffxExperiments := botanist.Experiments{}
 
-	ffxRunner, err := testrunner.NewFFXTester(runnerCtx, ffxInstance, sshRunner, outDir, ffxExperimentLevel, "")
+	ffxRunner, err := testrunner.NewFFXTester(runnerCtx, ffxInstance, sshRunner, outDir, ffxExperiments, "")
 	if err != nil {
 		t.Fatalf("Cannot create Ffx Tester. Reason: %s", err)
 	}

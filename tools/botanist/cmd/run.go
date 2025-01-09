@@ -93,7 +93,11 @@ type RunCommand struct {
 	// 1 or greater: ffx emu, ffx log
 	// 2 or greater: ffx test, ffx target snapshot, keeps ffx output dir for debugging
 	// 3: enables parallel test execution
+	// TODO(ihuh): Remove when we've switched to specifying experiments by name instead.
 	ffxExperimentLevel int
+
+	// Experiments to enable. Supported experiments can be found at //tools/botanist/common.go.
+	experiments flagmisc.StringsValue
 
 	// When true skips setting up the targets.
 	skipSetup bool
@@ -148,6 +152,7 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.ffxPath, "ffx", "", "Path to the ffx tool.")
 	f.StringVar(&r.downloadManifest, "download-manifest", "", "Path to a manifest containing all package server downloads")
 	f.IntVar(&r.ffxExperimentLevel, "ffx-experiment-level", 0, "The level of experimental features to enable. If -ffx is not set, this will have no effect.")
+	f.Var(&r.experiments, "experiment", fmt.Sprintf("The name of an experiment to enable. Supported experiments are: %v.", botanist.SupportedExperiments))
 	f.BoolVar(&r.skipSetup, "skip-setup", false, "if set, botanist will not set up a target.")
 	// Temporary flag to enable a soft transition to uploading test results from botanist rather than from the recipe.
 	f.BoolVar(&r.uploadToResultDB, "upload-to-resultdb", false, "if set, test results will be uploaded to ResultDB from testrunner.")
@@ -178,7 +183,7 @@ func (r *RunCommand) setupFFX(ctx context.Context) (*ffxutil.FFXInstance, func()
 		Settings: map[string]any{
 			"daemon.autostart":              false,
 			"discovery.mdns.enabled":        false,
-			"ffx.target-list.local-connect": r.ffxExperimentLevel >= 2,
+			"ffx.target-list.local-connect": true,
 		},
 	}
 	ffx, err := ffxutil.NewFFXInstance(ctx, r.ffxPath, "", []string{}, "", "", ffxOutputsDir, extraConfigs)
@@ -188,10 +193,8 @@ func (r *RunCommand) setupFFX(ctx context.Context) (*ffxutil.FFXInstance, func()
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "ffx")
 	defer flush()
 	ffx.SetStdoutStderr(stdout, stderr)
-	if r.ffxExperimentLevel > 0 {
-		if err := ffx.SetLogLevel(ctx, ffxutil.Debug); err != nil {
-			return ffx, cleanup, err
-		}
+	if err := ffx.SetLogLevel(ctx, ffxutil.Debug); err != nil {
+		return ffx, cleanup, err
 	}
 	if err := ffx.Run(ctx, "config", "env"); err != nil {
 		return ffx, cleanup, err
@@ -469,6 +472,14 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	// streamed from.
 	primaryTarget := fuchsiaTargets[0]
 
+	// TODO(ihuh): Remove when we've switched to passing in experiments by name.
+	if r.ffxExperimentLevel >= 2 {
+		r.experiments = append(r.experiments, string(botanist.UseFFXTest))
+	}
+	if r.ffxExperimentLevel == 3 {
+		r.experiments = append(r.experiments, string(botanist.UseFFXTestParallel))
+	}
+	experiments := botanist.GetExperiments(r.experiments)
 	for _, t := range fuchsiaTargets {
 		// Start serial servers for all targets. Will no-op for targets that
 		// already have serial servers.
@@ -479,7 +490,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		// config and daemon, but run commands against its own specified target. The target
 		// will be set after starting the target, so that we can resolve the IP address.
 		ffxForTarget := ffxutil.FFXWithTarget(ffx, "")
-		t.SetFFX(&targets.FFXInstance{ffxForTarget, r.ffxExperimentLevel}, ffx.Env())
+		t.SetFFX(&targets.FFXInstance{ffxForTarget, experiments}, ffx.Env())
 	}
 
 	eg, ctx := errgroup.WithContext(ctx)
@@ -653,7 +664,7 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.FuchsiaTarg
 	}
 	setEnviron(t.FFXEnv())
 	r.testrunnerOptions.FFX = t.GetFFX().FFXInstance
-	r.testrunnerOptions.FFXExperimentLevel = r.ffxExperimentLevel
+	r.testrunnerOptions.Experiments = botanist.GetExperiments(r.experiments)
 
 	if err := testrunner.SetupAndExecute(ctx, r.testrunnerOptions, testsPath); err != nil {
 		return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerOptions, r.timeout, err)

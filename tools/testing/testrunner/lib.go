@@ -70,10 +70,10 @@ type Options struct {
 	// The ffx instance to use.
 	FFX *ffxutil.FFXInstance
 
-	// The level of experimental ffx features to enable.
+	// The experiments to enable.
 	//
-	// See //tools/botanist/cmd/run.go for the mapping of features to levels.
-	FFXExperimentLevel int
+	// See //tools/botanist/cmd/run.go for supported experiments.
+	Experiments botanist.Experiments
 
 	// Whether to upload to upload test results to ResultDB from testrunner
 	// Bool enables soft transition from tefmocheck running in the recipe vs the processing happening in botanist.
@@ -173,7 +173,7 @@ var (
 var ffxInstance = func(
 	ctx context.Context,
 	ffxInstance *ffxutil.FFXInstance,
-	ffxExperimentalLevel int,
+	experiments botanist.Experiments,
 ) (FFXInstance, error) {
 	ffx, err := func() (FFXInstance, error) {
 		if ffxInstance == nil {
@@ -183,7 +183,7 @@ var ffxInstance = func(
 			// return false.
 			return nil, nil
 		}
-		if ffxExperimentalLevel == 3 {
+		if experiments.Contains(botanist.UseFFXTestParallel) {
 			if err := ffxInstance.ConfigSet(ctx, "test.enable_experimental_parallel_execution", "true"); err != nil {
 				return ffxInstance, err
 			}
@@ -217,7 +217,7 @@ func execute(
 	)
 
 	if !opts.UseSerial && sshKeyFile != "" {
-		ffx, err := ffxInstance(ctx, opts.FFX, opts.FFXExperimentLevel)
+		ffx, err := ffxInstance(ctx, opts.FFX, opts.Experiments)
 		if err != nil {
 			return err
 		}
@@ -227,7 +227,7 @@ func execute(
 			if err != nil {
 				return fmt.Errorf("failed to initialize fuchsia tester: %w", err)
 			}
-			ffxTester, err := NewFFXTester(ctx, ffx, t, outputs.OutDir, opts.FFXExperimentLevel, opts.LLVMProfdataPath)
+			ffxTester, err := NewFFXTester(ctx, ffx, t, outputs.OutDir, opts.Experiments, opts.LLVMProfdataPath)
 			if err != nil {
 				return fmt.Errorf("failed to initialize ffx tester: %w", err)
 			}

@@ -15,6 +15,33 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/streams"
 )
 
+// Experiments is a map containing a set of experiments to check for.
+type Experiments map[string]struct{}
+
+func GetExperiments(experiments []string) Experiments {
+	expMap := make(map[string]struct{})
+	for _, exp := range experiments {
+		expMap[exp] = struct{}{}
+	}
+	return expMap
+}
+
+func (e Experiments) Contains(experiment Experiment) bool {
+	_, ok := e[string(experiment)]
+	return ok
+}
+
+// Experiment represents a supported botanist experiment.
+type Experiment string
+
+const (
+	UseFFXTest             Experiment = "use_ffx_test"
+	UseFFXTestParallel     Experiment = "use_ffx_test_parallel"
+	UseFFXEmuProductBundle Experiment = "use_ffx_emu_product_bundle"
+)
+
+var SupportedExperiments = []Experiment{UseFFXTest, UseFFXTestParallel, UseFFXEmuProductBundle}
+
 // LockedWriter is a wrapper around a writer that locks around each write so
 // that multiple writes won't interleave with each other.
 type LockedWriter struct {

@@ -46,9 +46,8 @@ const (
 // determine how botanist uses ffx.
 type FFXInstance struct {
 	*ffxutil.FFXInstance
-	// ExperimentLevel specifies what level of experimental ffx features
-	// to enable.
-	ExperimentLevel int
+	// Experiments specify what experiments to enable.
+	Experiments botanist.Experiments
 }
 
 // Base represents a device used during testing.
@@ -126,8 +125,8 @@ type FuchsiaTarget interface {
 	// GetFFX returns the ffx instance associated with the target.
 	GetFFX() *FFXInstance
 
-	// UseFFXExperimental returns whether to enable an experimental ffx feature.
-	UseFFXExperimental(int) bool
+	// UseFFXExperiment returns whether to enable an experimental ffx feature.
+	UseFFXExperiment(botanist.Experiment) bool
 
 	// UseProductBundles returns whether this target can be provisioned using
 	// product bundles.
@@ -188,11 +187,10 @@ func (t *genericFuchsiaTarget) GetFFX() *FFXInstance {
 	return t.ffx
 }
 
-// UseFFXExperimental returns true if there is an FFXInstance associated with
-// this target and we're running with an experiment level >= the provided level.
+// UseFFXExperiment returns whether the provided experiment is enabled.
 // Use to enable experimental ffx features.
-func (t *genericFuchsiaTarget) UseFFXExperimental(level int) bool {
-	return t.ffx.ExperimentLevel >= level
+func (t *genericFuchsiaTarget) UseFFXExperiment(experiment botanist.Experiment) bool {
+	return t.ffx.Experiments.Contains(experiment)
 }
 
 // UseProductBundles returns whether this target can be provisioned using
@@ -437,14 +435,10 @@ func (t *genericFuchsiaTarget) AddPackageRepository(client *sshutil.Client, repo
 // blocks until the target is stopped.
 func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, repoURL, blobURL string) error {
 	var syslogger *syslog.Syslogger
-	if t.UseFFXExperimental(1) {
-		// The SSH client is no longer needed if using `ffx log`, so close it so
-		// it doesn't keep sending keepalives.
-		client.Close()
-		syslogger = syslog.NewFFXSyslogger(t.ffx.FFXInstance)
-	} else {
-		syslogger = syslog.NewSyslogger(client)
-	}
+	// The SSH client is no longer needed if using `ffx log`, so close it so
+	// it doesn't keep sending keepalives.
+	client.Close()
+	syslogger = syslog.NewFFXSyslogger(t.ffx.FFXInstance)
 
 	f, err := os.Create(filename)
 	if err != nil {
@@ -504,9 +498,7 @@ func (t *genericFuchsiaTarget) CaptureSyslog(client *sshutil.Client, filename, r
 				// The client is still connected, so continue.
 			}
 			t.AddPackageRepository(client, repoURL, blobURL)
-			if t.UseFFXExperimental(1) {
-				client.Close()
-			}
+			client.Close()
 		}
 	}
 	return nil

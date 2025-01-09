@@ -26,6 +26,7 @@ import (
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/debug/covargs"
@@ -555,8 +556,8 @@ type FFXInstance interface {
 
 // FFXTester uses ffx to run tests and other enabled features.
 type FFXTester struct {
-	ffx             FFXInstance
-	experimentLevel int
+	ffx         FFXInstance
+	experiments botanist.Experiments
 	// It will temporarily use an sshTester for functions where ffx has not been
 	// enabled to run yet.
 	// TODO(ihuh): Remove once all v1 tests are migrated to v2 and data sinks are
@@ -589,7 +590,7 @@ type ffxTestRun struct {
 }
 
 // NewFFXTester returns an FFXTester.
-func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localOutputDir string, experimentLevel int, llvmProfdata string) (*FFXTester, error) {
+func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localOutputDir string, experiments botanist.Experiments, llvmProfdata string) (*FFXTester, error) {
 	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
 		return ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
 	}, nil)
@@ -612,7 +613,7 @@ func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localO
 		ffx:               ffx,
 		sshTester:         sshTester,
 		localOutputDir:    localOutputDir,
-		experimentLevel:   experimentLevel,
+		experiments:       experiments,
 		testRuns:          make(map[string]ffxTestRun),
 		llvmProfdata:      llvmProfdata,
 		llvmVersion:       llvmVersion,
@@ -626,7 +627,7 @@ func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localO
 }
 
 func (t *FFXTester) EnabledForTesting() bool {
-	return t.experimentLevel >= 2
+	return t.experiments.Contains(botanist.UseFFXTest)
 }
 
 func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
@@ -671,7 +672,7 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 	defer t.ffx.SetStdoutStderr(origStdout, origStderr)
 
 	extraArgs := []string{"--filter-ansi"}
-	if t.experimentLevel == 3 {
+	if t.experiments.Contains(botanist.UseFFXTestParallel) {
 		extraArgs = append(extraArgs, "--experimental-parallel-execution", "8")
 	}
 	startTime := clock.Now(ctx)

@@ -20,6 +20,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
@@ -1047,7 +1048,7 @@ func TestExecute(t *testing.T) {
 				return fuchsiaTester, nil
 			}
 			ffx := &ffxutil.MockFFXInstance{}
-			ffxInstance = func(_ context.Context, _ *ffxutil.FFXInstance, _ int) (FFXInstance, error) {
+			ffxInstance = func(_ context.Context, _ *ffxutil.FFXInstance, _ botanist.Experiments) (FFXInstance, error) {
 				if c.useFFX {
 					return ffx, nil
 				}
@@ -1064,7 +1065,7 @@ func TestExecute(t *testing.T) {
 			testrunnerOpts := Options{SnapshotFile: "snapshot.zip"}
 			if c.useFFX {
 				// No need to set the FFX option since we will use the mock instance instead.
-				testrunnerOpts.FFXExperimentLevel = 2
+				testrunnerOpts.Experiments = botanist.Experiments{string(botanist.UseFFXTest): struct{}{}}
 				if _, err := ffx.WriteRunResult(build.TestList{}, filepath.Join(o.OutDir, "early-boot-profiles")); err != nil {
 					t.Errorf("failed to write early-boot profiles: %s", err)
 				}

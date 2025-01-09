@@ -21,6 +21,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
@@ -391,45 +392,44 @@ func (*fakeDataSinkCopier) Close() error {
 
 func TestFFXTester(t *testing.T) {
 	cases := []struct {
-		name            string
-		sshRunErrs      []error
-		expectedResult  runtests.TestResult
-		connErr         bool
-		experimentLevel int
-		output          string
+		name           string
+		sshRunErrs     []error
+		expectedResult runtests.TestResult
+		connErr        bool
+		experiments    []string
+		output         string
 	}{
 		{
-			name:            "run tests with ssh if low experiment level",
-			sshRunErrs:      []error{nil},
-			expectedResult:  runtests.TestSuccess,
-			experimentLevel: 1,
+			name:           "run tests with ssh",
+			sshRunErrs:     []error{nil},
+			expectedResult: runtests.TestSuccess,
 		},
 		{
-			name:            "run v2 tests with ffx",
-			expectedResult:  runtests.TestSuccess,
-			experimentLevel: 2,
+			name:           "run v2 tests with ffx",
+			expectedResult: runtests.TestSuccess,
+			experiments:    []string{"use_ffx_test", "use_ffx_test_parallel"},
 		},
 		{
-			name:            "ffx test fails",
-			expectedResult:  runtests.TestFailure,
-			experimentLevel: 2,
+			name:           "ffx test fails",
+			expectedResult: runtests.TestFailure,
+			experiments:    []string{"use_ffx_test"},
 		},
 		{
-			name:            "ffx test times out",
-			expectedResult:  runtests.TestAborted,
-			experimentLevel: 2,
+			name:           "ffx test times out",
+			expectedResult: runtests.TestAborted,
+			experiments:    []string{"use_ffx_test"},
 		},
 		{
-			name:            "ffx test skipped",
-			expectedResult:  runtests.TestSkipped,
-			experimentLevel: 2,
+			name:           "ffx test skipped",
+			expectedResult: runtests.TestSkipped,
+			experiments:    []string{"use_ffx_test"},
 		},
 		{
-			name:            "ffx test returns ssh connection failure",
-			expectedResult:  runtests.TestFailure,
-			connErr:         true,
-			experimentLevel: 2,
-			output:          sshutilconstants.ProcessTerminatedMsg + "\n" + ffxutilconstants.ClientChannelClosedMsg,
+			name:           "ffx test returns ssh connection failure",
+			expectedResult: runtests.TestFailure,
+			connErr:        true,
+			experiments:    []string{"use_ffx_test"},
+			output:         sshutilconstants.ProcessTerminatedMsg + "\n" + ffxutilconstants.ClientChannelClosedMsg,
 		},
 	}
 	for _, c := range cases {
@@ -456,7 +456,8 @@ func TestFFXTester(t *testing.T) {
 			}
 			ffx := &ffxutil.MockFFXInstance{TestOutcome: outcome, Output: c.output}
 			localOutputDir := t.TempDir()
-			tester, err := NewFFXTester(context.Background(), ffx, sshTester, localOutputDir, c.experimentLevel, "")
+			experiments := botanist.GetExperiments(c.experiments)
+			tester, err := NewFFXTester(context.Background(), ffx, sshTester, localOutputDir, experiments, "")
 			if err != nil {
 				t.Fatalf("NewFFXTester got unexpected error: %s", err)
 			}
@@ -487,7 +488,7 @@ func TestFFXTester(t *testing.T) {
 
 			if tester.EnabledForTesting() {
 				testArgs := []string{}
-				if c.experimentLevel == 3 {
+				if experiments.Contains(botanist.UseFFXTestParallel) {
 					testArgs = append(testArgs, "--experimental-parallel-execution", "8")
 				}
 				if !ffx.ContainsCmd("test", testArgs...) {

@@ -51,9 +51,6 @@ const (
 
 	// Minimum number of bytes of entropy bits required for the kernel's PRNG.
 	minEntropyBytes uint = 32 // 256 bits
-
-	// The experiment level at which to enable `ffx emu`.
-	ffxEmuExperimentLevel = 1
 )
 
 type Target string
@@ -408,65 +405,56 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 	cmdLine.SetCPUCount(t.config.CPU)
 	cmdLine.SetMemory(t.config.Memory)
 
-	var cmd *exec.Cmd
-	if t.UseFFXExperimental(ffxEmuExperimentLevel) {
-		ffxConfig, err := cmdLine.BuildFFXConfig()
-		if err != nil {
-			return err
-		}
+	ffxConfig, err := cmdLine.BuildFFXConfig()
+	if err != nil {
+		return err
+	}
 
-		ffxConfigFile := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_emu_config.json")
-		absFFXConfigFile, err := filepath.Abs(ffxConfigFile)
-		if err != nil {
-			return err
-		}
-		if err := jsonutil.WriteToFile(absFFXConfigFile, ffxConfig); err != nil {
-			return err
-		}
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
-		}
-		edk2Dir := filepath.Join(t.config.EDK2Dir, "qemu-"+string(t.config.Target))
-		var code string
-		switch t.config.Target {
-		case "x64":
-			code = filepath.Join(edk2Dir, "OVMF_CODE.fd")
-		case "arm64":
-			code = filepath.Join(edk2Dir, "QEMU_EFI.fd")
-		}
-		tools := ffxutil.EmuTools{
-			Emulator: absBin,
-			FVM:      t.config.FVMTool,
-			ZBI:      t.config.ZBITool,
-			UEFI:     code,
-		}
-		startArgs := ffxutil.EmuStartArgs{
-			Engine: strings.ToLower(os.Getenv("FUCHSIA_DEVICE_TYPE")),
-		}
-		if t.config.UseProductBundle {
-			startArgs.ProductBundle = filepath.Join(cwd, pbPath)
-			startArgs.KernelArgs = ffxConfig.KernelArgs
-			startArgs.Device = t.config.VirtualDeviceSpec
-			if t.config.KVM {
-				startArgs.Accel = "hyper"
-			} else {
-				startArgs.Accel = "none"
-			}
+	ffxConfigFile := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_emu_config.json")
+	absFFXConfigFile, err := filepath.Abs(ffxConfigFile)
+	if err != nil {
+		return err
+	}
+	if err := jsonutil.WriteToFile(absFFXConfigFile, ffxConfig); err != nil {
+		return err
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	edk2Dir := filepath.Join(t.config.EDK2Dir, "qemu-"+string(t.config.Target))
+	var code string
+	switch t.config.Target {
+	case "x64":
+		code = filepath.Join(edk2Dir, "OVMF_CODE.fd")
+	case "arm64":
+		code = filepath.Join(edk2Dir, "QEMU_EFI.fd")
+	}
+	tools := ffxutil.EmuTools{
+		Emulator: absBin,
+		FVM:      t.config.FVMTool,
+		ZBI:      t.config.ZBITool,
+		UEFI:     code,
+	}
+	startArgs := ffxutil.EmuStartArgs{
+		Engine: strings.ToLower(os.Getenv("FUCHSIA_DEVICE_TYPE")),
+	}
+	if t.config.UseProductBundle || t.UseFFXExperiment(botanist.UseFFXEmuProductBundle) {
+		startArgs.ProductBundle = filepath.Join(cwd, pbPath)
+		startArgs.KernelArgs = ffxConfig.KernelArgs
+		startArgs.Device = t.config.VirtualDeviceSpec
+		if t.config.KVM {
+			startArgs.Accel = "hyper"
 		} else {
-			startArgs.Config = absFFXConfigFile
-		}
-
-		cmd, err = t.ffx.EmuStartConsole(ctx, cwd, DefaultEmulatorNodename, tools, startArgs)
-		if err != nil {
-			return err
+			startArgs.Accel = "none"
 		}
 	} else {
-		invocation, err := cmdLine.BuildInvocation()
-		if err != nil {
-			return err
-		}
-		cmd = exec.Command(invocation[0], invocation[1:]...)
+		startArgs.Config = absFFXConfigFile
+	}
+
+	cmd, err := t.ffx.EmuStartConsole(ctx, cwd, DefaultEmulatorNodename, tools, startArgs)
+	if err != nil {
+		return err
 	}
 
 	cmd.Dir = workdir
@@ -542,14 +530,15 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 
 // Stop stops the emulator target.
 func (t *emulator) Stop() error {
-	if t.UseFFXExperimental(ffxEmuExperimentLevel) {
-		return t.ffx.EmuStop(context.Background())
+	var err error
+	if err = t.ffx.EmuStop(context.Background()); err != nil {
+		logger.Debugf(t.targetCtx, "failed to stop emulator: %s", err)
+		if t.process == nil {
+			return fmt.Errorf("%s target has not yet been started", t.binary)
+		}
+		logger.Debugf(t.targetCtx, "Sending SIGKILL to %d", t.process.Pid)
+		err = t.process.Kill()
 	}
-	if t.process == nil {
-		return fmt.Errorf("%s target has not yet been started", t.binary)
-	}
-	logger.Debugf(t.targetCtx, "Sending SIGKILL to %d", t.process.Pid)
-	err := t.process.Kill()
 	t.process = nil
 	t.genericFuchsiaTarget.Stop()
 	return err
