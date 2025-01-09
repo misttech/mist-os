@@ -46,9 +46,11 @@ class Vmo : public HasIo {
   }
 
   zx_status_t AttrGet(zxio_node_attributes_t* inout_attr) {
-    uint64_t content_size;
-    if (zx_status_t status =
-            vmo_.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size, sizeof(content_size));
+    uint64_t content_size = 0;
+    // Return VMO size as stream size the VMO doesn't have associated stream object.
+    if (zx_status_t status = stream_ ? vmo_.get_property(ZX_PROP_VMO_CONTENT_SIZE, &content_size,
+                                                         sizeof(content_size))
+                                     : vmo_.get_size(&content_size);
         status != ZX_OK) {
       return status;
     }
