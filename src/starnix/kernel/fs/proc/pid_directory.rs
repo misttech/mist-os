@@ -1206,6 +1206,9 @@ impl DynamicFileSource for StatusFile {
                 writeln!(sink, "VmExe:\t{} kB", mem_stats.vm_exe / 1024)?;
                 writeln!(sink, "VmSwap:\t{} kB", mem_stats.vm_swap / 1024)?;
             }
+            // Report seccomp filter status.
+            let seccomp = task.seccomp_filter_state.get() as u8;
+            writeln!(sink, "Seccomp:\t{}", seccomp)?;
         }
 
         // There should be at least on thread in Zombie processes.
