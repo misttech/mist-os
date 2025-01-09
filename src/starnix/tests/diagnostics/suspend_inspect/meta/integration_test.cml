@@ -41,10 +41,6 @@
             name: "fake-hrtimer",
             url: "fake-hrtimer#meta/fake-hrtimer.cm",
         },
-        {
-            name: "wake-alarms",
-            url: "wake-alarms#meta/default.cm",
-        },
     ],
     collections: [
         {
@@ -117,12 +113,6 @@
         {
             directory: "dev-hrtimer",
             from: "#fake-hrtimer",
-            to: [ "#wake-alarms" ],
-        },
-        {
-            // Support for hardware-agnostic wake alarms.
-            protocol: "fuchsia.time.alarms.Wake",
-            from: "#wake-alarms",
             to: [ "#kernel" ],
         },
         {

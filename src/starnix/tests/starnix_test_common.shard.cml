@@ -43,12 +43,6 @@
             name: "fake-hrtimer",
             url: "fake-hrtimer#meta/fake-hrtimer.cm",
         },
-        {
-            name: "timekeeper",
-
-            // This is the timekeeper subset of functionality used in this test.
-            url: "wake-alarms#meta/default.cm",
-        },
     ],
     capabilities: [
         { protocol: "fuchsia.test.Suite" },
@@ -145,11 +139,6 @@
             to: [ "#kernel" ],
         },
         {
-            protocol: [ "fuchsia.time.alarms.Wake" ],
-            from: "#timekeeper",
-            to: [ "#kernel" ],
-        },
-        {
             protocol: [ "fuchsia.net.tun.Control" ],
             from: "#network-tun",
             to: [ "#kernel" ],
@@ -167,7 +156,7 @@
         {
             directory: "dev-hrtimer",
             from: "#fake-hrtimer",
-            to: [ "#timekeeper" ],
+            to: [ "#kernel" ],
         },
     ],
     environments: [

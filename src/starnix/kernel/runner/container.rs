@@ -540,10 +540,7 @@ async fn create_container(
 
     kernel.syslog.init(&system_task).source_context("initializing syslog")?;
 
-    kernel
-        .hrtimer_manager
-        .init(system_task, None)
-        .source_context("initializing HrTimer manager")?;
+    kernel.hrtimer_manager.init(system_task).source_context("initializing HrTimer manager")?;
 
     if let Err(e) = kernel.suspend_resume_manager.init(&system_task) {
         log_warn!("Suspend/Resume manager initialization failed: ({e:?})");

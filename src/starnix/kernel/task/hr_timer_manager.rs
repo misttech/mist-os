@@ -11,7 +11,7 @@ use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
 use zx::{self as zx, AsHandleRef, HandleBased, HandleRef};
-use {fidl_fuchsia_time_alarms as fta, fuchsia_async as fasync};
+use {fidl_fuchsia_hardware_hrtimer as fhrtimer, fuchsia_async as fasync};
 
 use std::collections::BinaryHeap;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -23,65 +23,65 @@ use crate::power::{
 use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 
-/// TODO(b/383062441): remove this special casing once Starnix hrtimer is fully
-/// migrated to multiplexed timer.
-/// A special-cased Starnix timer ID, used to allow cross-connection setup
-/// for Starnix only.
-const TEMPORARY_STARNIX_TIMER_ID: &str = "starnix-hrtimer";
+const HRTIMER_DIRECTORY: &str = "/dev/class/hrtimer";
+const HRTIMER_DEFAULT_ID: u64 = 6;
 
 /// Max value for inspect event history.
 const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 128;
 
-// Used to inject a fake proxy in tests.
-fn get_wake_proxy_internal(mut wake_channel: Option<zx::Channel>) -> fta::WakeProxy {
-    wake_channel
-        .take()
-        .map(|c| fta::WakeProxy::new(fidl::AsyncChannel::from_channel(c)))
-        .unwrap_or_else(|| {
-            connect_to_wake_alarms_async().expect("connection to wake alarms async proxy")
-        })
+fn connect_to_hrtimer() -> Result<fhrtimer::DeviceSynchronousProxy, Errno> {
+    let mut dir = std::fs::read_dir(HRTIMER_DIRECTORY)
+        .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer directory: {e}")))?;
+    let entry = dir
+        .next()
+        .ok_or_else(|| errno!(EINVAL, format!("No entry in the hrtimer directory")))?
+        .map_err(|e| errno!(EINVAL, format!("Failed to find hrtimer device: {e}")))?;
+    let path = entry
+        .path()
+        .into_os_string()
+        .into_string()
+        .map_err(|e| errno!(EINVAL, format!("Failed to parse the device entry path: {e:?}")))?;
+
+    let (hrtimer, server_end) = fidl::endpoints::create_sync_proxy::<fhrtimer::DeviceMarker>();
+    fdio::service_connect(&path, server_end.into_channel())
+        .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer device: {e}")))?;
+
+    Ok(hrtimer)
 }
 
-// Synchronous connect to wake alarms serves as a connection test. If there is no usable connection
-// to the wake alarms API, or if wake alarms are not suported, the wake alarms functionality
-// will be disabled and wake alarms will never fire.
-fn connect_to_wake_alarms() -> Result<fta::WakeSynchronousProxy, Errno> {
-    log_debug!("connecting to SYNC wake alarms");
-    let wake_alarm_sync = fuchsia_component::client::connect_to_protocol_sync::<fta::WakeMarker>()
-        .map_err(|e| {
-            errno!(
-                EINVAL,
-                format!("Failed to connect to fuchsia.time.alarms/Wake synchronously: {e}")
-            )
-        })?;
+fn connect_to_hrtimer_async() -> Result<fhrtimer::DeviceProxy, Errno> {
+    let mut dir = std::fs::read_dir(HRTIMER_DIRECTORY)
+        .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer directory: {e}")))?;
+    let entry = dir
+        .next()
+        .ok_or_else(|| errno!(EINVAL, format!("No entry in the hrtimer directory")))?
+        .map_err(|e| errno!(EINVAL, format!("Failed to find hrtimer device: {e}")))?;
+    let path = entry
+        .path()
+        .into_os_string()
+        .into_string()
+        .map_err(|e| errno!(EINVAL, format!("Failed to parse the device entry path: {e:?}")))?;
 
-    // Try to connect to verify that the proxy is usable.
-    let maybe_supported = wake_alarm_sync
+    let (hrtimer, server_end) = fidl::endpoints::create_proxy::<fhrtimer::DeviceMarker>();
+    fdio::service_connect(&path, server_end.into_channel())
+        .map_err(|e| errno!(EINVAL, format!("Failed to open hrtimer device: {e}")))?;
+
+    Ok(hrtimer)
+}
+
+fn get_hrtimer_resolution_nsecs(device_proxy: &fhrtimer::DeviceSynchronousProxy) -> Option<i64> {
+    match device_proxy
         .get_properties(zx::MonotonicInstant::INFINITE)
-        .map_err(|e| {
-            log_warn!("Failed to connect to fuchsia.time.alarms/Wake synchronously, assuming the protocol is not available: {e}");
-            errno!(
-                EINVAL,
-                format!("Failed to connect to fuchsia.time.alarms/Wake synchronously: {e}")
-            )
-        })
-    .map(|r| r.is_supported)
-    ?;
-
-    match maybe_supported {
-        Some(true) => Ok(wake_alarm_sync),
-        other => Err(errno!(
-            EINVAL,
-            format!("Failed to connect to fuchsia.time.alarm/Wake synchronously: {:?}", other)
-        )),
+        .ok()?
+        .timers_properties?
+        .get(HRTIMER_DEFAULT_ID as usize)?
+        .supported_resolutions
+        .as_ref()?
+        .last()?
+    {
+        fhrtimer::Resolution::Duration(nsecs) => Some(*nsecs),
+        _ => None,
     }
-}
-
-// This function is swapped out for an injected proxy in tests.
-fn connect_to_wake_alarms_async() -> Result<fta::WakeProxy, Errno> {
-    log_debug!("connecting to ASYNC wake alarms");
-    fuchsia_component::client::connect_to_protocol::<fta::WakeMarker>()
-        .map_err(|e| errno!(EINVAL, format!("Failed to connect to fuchsia.time.alarms/Wake : {e}")))
 }
 
 #[derive(Debug)]
@@ -123,8 +123,6 @@ struct HrTimerManagerState {
     current_deadline: Option<zx::BootInstant>,
 
     /// The event that is registered with runner to allow the hrtimer to wake the kernel.
-    ///
-    /// A custom wake event is injected in unit tests in this mod.
     wake_event: Option<zx::EventPair>,
 
     /// Inspect node to record events in the timer heap
@@ -161,7 +159,7 @@ impl HrTimerManagerState {
 /// It uses a binary heap to keep track of the timers and their deadlines.
 /// The timer with the soonest deadline is always at the front of the heap.
 pub struct HrTimerManager {
-    device_proxy: Option<fta::WakeSynchronousProxy>,
+    device_proxy: Option<fhrtimer::DeviceSynchronousProxy>,
     state: Mutex<HrTimerManagerState>,
 
     /// The channel sender that notifies the worker thread that HrTimer driver needs to be
@@ -174,7 +172,7 @@ impl HrTimerManager {
     pub fn new(parent_node: &fuchsia_inspect::Node) -> HrTimerManagerHandle {
         let inspect_node = parent_node.create_child("hr_timer_manager");
         let new_manager = Arc::new(Self {
-            device_proxy: connect_to_wake_alarms().ok(),
+            device_proxy: connect_to_hrtimer().ok(),
             state: Mutex::new(HrTimerManagerState::new(&inspect_node)),
             start_next_sender: Default::default(),
         });
@@ -209,11 +207,7 @@ impl HrTimerManager {
         new_manager
     }
 
-    pub fn init(
-        self: &HrTimerManagerHandle,
-        system_task: &CurrentTask,
-        wake_channel_for_test: Option<zx::Channel>,
-    ) -> Result<(), Errno> {
+    pub fn init(self: &HrTimerManagerHandle, system_task: &CurrentTask) -> Result<(), Errno> {
         let (start_next_sender, start_next_receiver) = channel();
         self.start_next_sender.set(start_next_sender).map_err(|_| errno!(EEXIST))?;
 
@@ -221,31 +215,22 @@ impl HrTimerManager {
         // Spawn a worker thread to register the HrTimer driver event and listen incoming
         // `start_next` request
         system_task.kernel().kthreads.spawn(move |_, system_task| {
-            let Ok(_device_proxy) = self_ref.check_connection() else {
-                log_warn!("worker thread failed due to no connection to wake alarms manager");
+            let Ok(device_proxy) = self_ref.check_connection() else {
+                log_warn!("worker thread failed due to no connection to the driver");
                 return;
             };
+            let resolution_nsecs = get_hrtimer_resolution_nsecs(&device_proxy)
+                .expect("hrtimer resolution nsecs should not be empty");
 
             let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(self_ref.watch_new_hrtimer_loop(
                 &system_task,
                 &start_next_receiver,
-                wake_channel_for_test,
+                resolution_nsecs,
             ));
         });
 
         Ok(())
-    }
-
-    // If no events have been injected for tests, set `event` as wake event.
-    //
-    // Otherwise use the injected event. This approach *only* makes sense in the unit tests in this
-    // mod, as they do not exercise the async proxy.
-    fn inject_or_set_wake_event(self: &HrTimerManagerHandle, event: zx::EventPair) {
-        let mut guard = self.lock();
-        if guard.wake_event.is_none() {
-            guard.wake_event = Some(event);
-        }
     }
 
     /// Watch any new hrtimer being added to the front the heap.
@@ -253,20 +238,21 @@ impl HrTimerManager {
         self: &HrTimerManagerHandle,
         system_task: &CurrentTask,
         start_next_receiver: &Receiver<()>,
-        wake_channel_for_test: Option<zx::Channel>,
+        resolution_nsecs: i64,
     ) {
-        let wake_proxy = get_wake_proxy_internal(wake_channel_for_test);
+        let hrtimer_proxy =
+            connect_to_hrtimer_async().expect("connection of hrtimer device async proxy");
 
         let (device_channel, wake_event) = create_proxy_for_wake_events(
-            wake_proxy
+            hrtimer_proxy
                 .into_channel()
-                .expect("Failed to convert wake alarms proxy to channel")
+                .expect("Failed to convert hrtimer proxy to channel")
                 .into(),
-            "wake-alarms".to_string(),
+            "hrtimer".to_string(),
         );
-        self.inject_or_set_wake_event(wake_event);
+        self.lock().wake_event = Some(wake_event);
         let device_async_proxy =
-            fta::WakeProxy::new(fidl::AsyncChannel::from_channel(device_channel));
+            fhrtimer::DeviceProxy::new(fidl::AsyncChannel::from_channel(device_channel));
 
         while start_next_receiver
             .recv()
@@ -287,6 +273,10 @@ impl HrTimerManager {
             let wake_source = node.wake_source.clone();
             let hrtimer_ref = node.hr_timer.clone();
 
+            // If the deadline is in the past, set the `ticks` as 0 to trigger event right
+            // away.
+            let ticks = std::cmp::max(0, (new_deadline - zx::BootInstant::get()).into_nanos())
+                / resolution_nsecs;
             // Note: This fidl::QueryResponseFut is scheduled when created. To prevent suspend
             // before the next hrtimer is started, it needs to be created before
             // `reset_timer_event` is called.
@@ -295,10 +285,11 @@ impl HrTimerManager {
             let setup_event = zx::Event::create();
             let duplicate_event =
                 setup_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into();
-            let set_and_wait = device_async_proxy.set_and_wait(
-                new_deadline,
+            let start_and_wait = device_async_proxy.start_and_wait(
+                HRTIMER_DEFAULT_ID,
+                &fhrtimer::Resolution::Duration(resolution_nsecs),
+                ticks as u64,
                 duplicate_event,
-                &TEMPORARY_STARNIX_TIMER_ID,
             );
             // The hrtimer client is responsible for clearing the timer fired
             // signal, so we clear it here right before starting the next
@@ -306,7 +297,7 @@ impl HrTimerManager {
             guard.clear_wake_proxy_signal();
             drop(guard);
 
-            match set_and_wait.await {
+            match start_and_wait.await {
                 Ok(Ok(lease)) => {
                     let _ = hrtimer_ref
                         .event
@@ -348,7 +339,7 @@ impl HrTimerManager {
                     }
                 }
                 Ok(Err(e)) => match e {
-                    fta::WakeError::Dropped => {
+                    fhrtimer::DriverError::Canceled => {
                         let mut guard = self.lock();
                         if guard.timer_heap.is_empty() {
                             // Clear the timer event if there are no more timers to start.
@@ -359,12 +350,12 @@ impl HrTimerManager {
                         log_debug!(
                             "A new HrTimer with \
                                 an earlier deadline has been started. \
-                                This `SetAndWait` attempt is cancelled."
+                                This `StartAndWait` attempt is cancelled."
                         )
                     }
-                    _ => log_error!("Wake::SetAndWait driver error: {e:?}"),
+                    _ => log_error!("HrTimer::StartAndWait driver error: {e:?}"),
                 },
-                Err(e) => log_error!("Wake::SetAndWait fidl error: {e}"),
+                Err(e) => log_error!("HrTimer::StartAndWait fidl error: {e}"),
             }
         }
     }
@@ -374,10 +365,8 @@ impl HrTimerManager {
     }
 
     /// Make sure the proxy to HrTimer device is active.
-    fn check_connection(&self) -> Result<&fta::WakeSynchronousProxy, Errno> {
-        self.device_proxy
-            .as_ref()
-            .ok_or_else(|| errno!(EINVAL, "No connection to wake alarms manager"))
+    fn check_connection(&self) -> Result<&fhrtimer::DeviceSynchronousProxy, Errno> {
+        self.device_proxy.as_ref().ok_or_else(|| errno!(EINVAL, "No connection to HrTimer driver"))
     }
 
     #[cfg(test)]
@@ -442,7 +431,7 @@ impl HrTimerManager {
     ) -> Result<(), Errno> {
         guard.current_deadline = None;
         self.check_connection()?
-            .cancel_sync(TEMPORARY_STARNIX_TIMER_ID, zx::Instant::INFINITE)
+            .stop(HRTIMER_DEFAULT_ID, zx::Instant::INFINITE)
             .map_err(|e| errno!(EINVAL, format!("HrTimer::Stop fidl error: {e}")))?
             .map_err(|e| errno!(EINVAL, format!("HrTimer::Stop driver error: {e:?}")))?;
 
@@ -662,10 +651,8 @@ impl PartialOrd for HrTimerNode {
 mod tests {
     use crate::power::RUNNER_PROXY_EVENT_SIGNAL;
     use crate::testing::create_kernel_and_task;
-    use assert_matches::assert_matches;
     use futures::StreamExt;
-    use test_util::assert_gt;
-    use {fidl_fuchsia_time_alarms as fta, fuchsia_async as fasync};
+    use {fidl_fuchsia_hardware_hrtimer as fhrtimer, fuchsia_async as fasync};
 
     use super::*;
 
@@ -683,32 +670,10 @@ mod tests {
         }
     }
 
-    pub fn has_awake_signal(resume_event: &zx::EventPair) -> Result<zx::Signals, zx::Status> {
-        resume_event.wait_handle(RUNNER_PROXY_EVENT_SIGNAL, zx::MonotonicInstant::INFINITE_PAST)
-    }
-
-    fn serve_wake_proxy_task(mut stream: fta::WakeRequestStream) -> fasync::Task<()> {
-        fasync::Task::spawn(async move {
-            while let Some(Ok(event)) = stream.next().await {
-                match event {
-                    fta::WakeRequest::CancelSync { responder, .. } => {
-                        responder.send(Ok(())).expect("");
-                    }
-                    fta::WakeRequest::Cancel { .. } => {}
-                    fta::WakeRequest::GetProperties { responder, .. } => {
-                        let response = fta::WakeGetPropertiesResponse {
-                            is_supported: Some(true),
-                            ..Default::default()
-                        };
-                        responder.send(&response).expect("send success");
-                    }
-                    fta::WakeRequest::SetAndWait { responder, .. } => {
-                        responder.send(Err(fta::WakeError::Internal)).expect("");
-                    }
-                    fta::WakeRequest::_UnknownMethod { .. } => unreachable!(),
-                }
-            }
-        })
+    pub fn has_awake_signal(resume_event: &zx::EventPair) -> bool {
+        resume_event
+            .wait_handle(RUNNER_PROXY_EVENT_SIGNAL, zx::MonotonicInstant::INFINITE_PAST)
+            .is_ok()
     }
 
     /// Returns a mocked HrTimer::Device client sync proxy and its server running in a spawned
@@ -718,17 +683,55 @@ mod tests {
     /// Having a sync fidl call running on an async executor that is talking to something that
     /// needs to run on the same executor is troublesome. Mutithread should be set in these tests.
     /// It should never happen outside of test code.
-    fn mock_hrtimer_connection() -> fta::WakeSynchronousProxy {
-        let (sync_proxy, stream) =
-            fidl::endpoints::create_sync_proxy_and_stream::<fta::WakeMarker>();
-        serve_wake_proxy_task(stream).detach();
-        sync_proxy
-    }
+    fn mock_hrtimer_connection() -> fhrtimer::DeviceSynchronousProxy {
+        let (hrtimer, mut stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fhrtimer::DeviceMarker>();
+        let fut = async move {
+            while let Some(Ok(event)) = stream.next().await {
+                match event {
+                    fhrtimer::DeviceRequest::Start { responder, .. } => {
+                        responder.send(Ok(())).expect("");
+                    }
+                    fhrtimer::DeviceRequest::Stop { responder, .. } => {
+                        responder.send(Ok(())).expect("");
+                    }
+                    fhrtimer::DeviceRequest::GetTicksLeft { responder, .. } => {
+                        responder.send(Ok(1)).expect("");
+                    }
+                    fhrtimer::DeviceRequest::SetEvent { responder, .. } => {
+                        responder.send(Ok(())).expect("");
+                    }
+                    fhrtimer::DeviceRequest::StartAndWait { responder, .. } => {
+                        responder.send(Err(fhrtimer::DriverError::InternalError)).expect("");
+                    }
+                    fhrtimer::DeviceRequest::StartAndWait2 { responder, .. } => {
+                        responder.send(Err(fhrtimer::DriverError::InternalError)).expect("");
+                    }
+                    fhrtimer::DeviceRequest::GetProperties { responder, .. } => {
+                        let mut timer_properties: Vec<fhrtimer::TimerProperties> = vec![];
+                        for _ in 0..10 {
+                            timer_properties.push(fhrtimer::TimerProperties {
+                                supported_resolutions: Some(vec![fhrtimer::Resolution::Duration(
+                                    1000000,
+                                )]),
+                                ..Default::default()
+                            });
+                        }
+                        responder
+                            .send(fhrtimer::Properties {
+                                timers_properties: Some(timer_properties),
+                                ..Default::default()
+                            })
+                            .expect("");
+                    }
+                    fhrtimer::DeviceRequest::_UnknownMethod { .. } => todo!(),
+                }
+            }
+        };
 
-    fn mock_hrtimer_connection_async() -> fta::WakeProxy {
-        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fta::WakeMarker>();
-        serve_wake_proxy_task(stream).detach();
-        proxy
+        fasync::Task::spawn(fut).detach();
+
+        hrtimer
     }
 
     fn init_hr_timer_manager() -> (HrTimerManagerHandle, zx::EventPair) {
@@ -740,9 +743,7 @@ mod tests {
             state: Mutex::new(HrTimerManagerState::new_for_test(local_resume_event)),
             start_next_sender: Default::default(),
         });
-        let async_proxy = mock_hrtimer_connection_async();
-        let async_proxy_channel = async_proxy.into_channel().ok().map(|ac| ac.into_zx_channel());
-        manager.init(&current_task, async_proxy_channel).expect("");
+        manager.init(&current_task).expect("");
         (manager, resume_event)
     }
 
@@ -755,15 +756,9 @@ mod tests {
         let timer3 = HrTimer::new();
 
         // Add three timers into the heap.
-        assert_matches!(
-            hrtimer_manager.add_timer(None, &timer3, zx::BootInstant::from_nanos(3)),
-            Ok(_)
-        );
-        assert_matches!(
-            hrtimer_manager.add_timer(None, &timer2, zx::BootInstant::from_nanos(2)),
-            Ok(_)
-        );
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, soonest_deadline), Ok(_));
+        assert!(hrtimer_manager.add_timer(None, &timer3, zx::BootInstant::from_nanos(3)).is_ok());
+        assert!(hrtimer_manager.add_timer(None, &timer2, zx::BootInstant::from_nanos(2)).is_ok());
+        assert!(hrtimer_manager.add_timer(None, &timer1, soonest_deadline).is_ok());
 
         // Make sure the deadline of the current running timer is the soonest.
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == soonest_deadline));
@@ -775,13 +770,12 @@ mod tests {
 
         let timer1 = HrTimer::new();
         let sooner_deadline = zx::BootInstant::from_nanos(1);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, sooner_deadline), Ok(_));
+        assert!(hrtimer_manager.add_timer(None, &timer1, sooner_deadline).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == sooner_deadline));
 
         let later_deadline = zx::BootInstant::from_nanos(2);
-        assert_gt!(later_deadline, sooner_deadline);
-        assert_matches!(hrtimer_manager.add_timer(None, &timer1, later_deadline), Ok(_));
-        assert_matches!(hrtimer_manager.current_deadline(), Some(_));
+        assert!(later_deadline > sooner_deadline);
+        assert!(hrtimer_manager.add_timer(None, &timer1, later_deadline).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == later_deadline));
         // Make sure no duplicate timers.
         assert_eq!(hrtimer_manager.lock().timer_heap.len(), 1);
@@ -797,17 +791,14 @@ mod tests {
         let timer3 = HrTimer::new();
         let timer3_deadline = zx::BootInstant::from_nanos(3);
 
-        assert_matches!(hrtimer_manager.add_timer(None, &timer3, timer3_deadline), Ok(_));
-        assert_matches!(hrtimer_manager.add_timer(None, &timer2, timer2_deadline), Ok(_));
-        assert_matches!(
-            hrtimer_manager.add_timer(None, &timer1, zx::BootInstant::from_nanos(1)),
-            Ok(_)
-        );
+        assert!(hrtimer_manager.add_timer(None, &timer3, timer3_deadline).is_ok());
+        assert!(hrtimer_manager.add_timer(None, &timer2, timer2_deadline).is_ok());
+        assert!(hrtimer_manager.add_timer(None, &timer1, zx::BootInstant::from_nanos(1)).is_ok());
 
-        assert_matches!(hrtimer_manager.remove_timer(&timer1), Ok(_));
+        assert!(hrtimer_manager.remove_timer(&timer1).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == timer2_deadline));
 
-        assert_matches!(hrtimer_manager.remove_timer(&timer2), Ok(_));
+        assert!(hrtimer_manager.remove_timer(&timer2).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == timer3_deadline));
     }
 
@@ -815,12 +806,9 @@ mod tests {
     async fn hr_timer_manager_clear_heap() {
         let (hrtimer_manager, _) = init_hr_timer_manager();
         let timer = HrTimer::new();
-        assert_matches!(
-            hrtimer_manager.add_timer(None, &timer, zx::BootInstant::from_nanos(1)),
-            Ok(_)
-        );
-        assert_matches!(hrtimer_manager.remove_timer(&timer), Ok(_));
-        assert_matches!(hrtimer_manager.current_deadline(), None);
+        assert!(hrtimer_manager.add_timer(None, &timer, zx::BootInstant::from_nanos(1)).is_ok());
+        assert!(hrtimer_manager.remove_timer(&timer).is_ok());
+        assert!(hrtimer_manager.current_deadline().is_none());
     }
 
     #[fuchsia::test(threads = 2)]
@@ -831,9 +819,9 @@ mod tests {
         let sooner_deadline = zx::BootInstant::from_nanos(1);
         let later_deadline = zx::BootInstant::from_nanos(2);
 
-        assert_matches!(hrtimer_manager.add_timer(None, &timer, later_deadline), Ok(_));
+        assert!(hrtimer_manager.add_timer(None, &timer, later_deadline).is_ok());
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == later_deadline));
-        assert_matches!(hrtimer_manager.add_timer(None, &timer, sooner_deadline), Ok(_));
+        assert!(hrtimer_manager.add_timer(None, &timer, sooner_deadline).is_ok());
         // Make sure no duplicate timers.
         assert_eq!(hrtimer_manager.lock().timer_heap.len(), 1);
         assert!(hrtimer_manager.current_deadline().is_some_and(|d| d == sooner_deadline));
@@ -847,15 +835,15 @@ mod tests {
         let sooner_deadline = zx::BootInstant::from_nanos(1);
         let later_deadline = zx::BootInstant::from_nanos(2);
 
-        assert_matches!(hrtimer_manager.add_timer(None, &timer, later_deadline), Ok(_));
-        assert_matches!(has_awake_signal(&resume_event), Ok(_));
+        assert!(hrtimer_manager.add_timer(None, &timer, later_deadline).is_ok());
+        assert!(has_awake_signal(&resume_event));
 
         hrtimer_manager.lock().clear_wake_proxy_signal();
-        assert_matches!(has_awake_signal(&resume_event), Err(_));
+        assert!(!has_awake_signal(&resume_event));
 
         // Update the only timer.
-        assert_matches!(hrtimer_manager.add_timer(None, &timer, sooner_deadline), Ok(_));
-        assert_matches!(has_awake_signal(&resume_event), Ok(_));
+        assert!(hrtimer_manager.add_timer(None, &timer, sooner_deadline).is_ok());
+        assert!(has_awake_signal(&resume_event));
     }
 
     #[fuchsia::test]
