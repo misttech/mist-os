@@ -432,17 +432,11 @@ void DisplayEngine::DisplayEngineReleaseImage(uint64_t image_handle) {
 }
 
 config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
-    const display_config_t* display_configs, size_t display_count,
+    const display_config_t* display_config_ptr,
     layer_composition_operations_t* out_layer_composition_operations_list,
     size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
-  if (display_count == 0) {
-    return CONFIG_CHECK_RESULT_OK;
-  }
-
-  if (display_count > 1) {
-    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
-    return CONFIG_CHECK_RESULT_TOO_MANY;
-  }
+  ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
+  const display_config_t& display_config = *display_config_ptr;
 
   if (out_layer_composition_operations_actual != nullptr) {
     *out_layer_composition_operations_actual = 0;
@@ -451,11 +445,11 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   fbl::AutoLock lock(&display_mutex_);
 
   // no-op, just wait for the client to try a new config
-  if (!display_attached_ || display::ToDisplayId(display_configs[0].display_id) != display_id_) {
+  if (!display_attached_ || display::ToDisplayId(display_config.display_id) != display_id_) {
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0].mode);
+  display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.mode);
   if (!IgnoreDisplayMode()) {
     // `current_display_timing_` is already applied to the display so it's
     // guaranteed to be supported. We only perform the timing check if there
@@ -465,33 +459,33 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     }
   }
 
-  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_configs[0].layer_count);
+  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_config.layer_count);
   cpp20::span<layer_composition_operations_t> layer_composition_operations(
-      out_layer_composition_operations_list, display_configs[0].layer_count);
+      out_layer_composition_operations_list, display_config.layer_count);
   std::fill(layer_composition_operations.begin(), layer_composition_operations.end(), 0);
   if (out_layer_composition_operations_actual != nullptr) {
     *out_layer_composition_operations_actual = layer_composition_operations.size();
   }
 
   config_check_result_t check_result = [&] {
-    if (display_configs[0].layer_count > 1) {
+    if (display_config.layer_count > 1) {
       // We only support 1 layer
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
 
     // TODO(https://fxbug.dev/42080882): Move color conversion validation code to a common
     // library.
-    if (display_configs[0].cc_flags) {
+    if (display_config.cc_flags) {
       // Make sure cc values are correct
-      if (display_configs[0].cc_flags & COLOR_CONVERSION_PREOFFSET) {
-        for (float cc_preoffset : display_configs[0].cc_preoffsets) {
+      if (display_config.cc_flags & COLOR_CONVERSION_PREOFFSET) {
+        for (float cc_preoffset : display_config.cc_preoffsets) {
           if (cc_preoffset <= -1 || cc_preoffset >= 1) {
             return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
           }
         }
       }
-      if (display_configs[0].cc_flags & COLOR_CONVERSION_POSTOFFSET) {
-        for (float cc_postoffset : display_configs[0].cc_postoffsets) {
+      if (display_config.cc_flags & COLOR_CONVERSION_POSTOFFSET) {
+        for (float cc_postoffset : display_config.cc_postoffsets) {
           if (cc_postoffset <= -1 || cc_postoffset >= 1) {
             return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
           }
@@ -503,7 +497,7 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     const uint32_t height = display_timing.vertical_active_lines;
 
     // Make sure the layer configuration is supported.
-    const layer_t& layer = display_configs[0].layer_list[0];
+    const layer_t& layer = display_config.layer_list[0];
     // TODO(https://fxbug.dev/42080883) Instead of using memcmp() to compare the frame
     // with expected frames, we should use the common type in "api-types-cpp"
     // which supports comparison operators.
@@ -535,35 +529,31 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
 
   if (check_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG) {
     layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_MERGE_BASE;
-    for (unsigned i = 1; i < display_configs[0].layer_count; i++) {
+    for (size_t i = 1; i < display_config.layer_count; ++i) {
       layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE_SRC;
     }
   }
   return check_result;
 }
 
-void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* display_configs,
-                                                    size_t display_count,
+void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* display_config_ptr,
                                                     const config_stamp_t* banjo_config_stamp) {
-  if (display_count == 0) {
-    return;
-  }
-  ZX_DEBUG_ASSERT_MSG(display_count == 1,
-                      "Display coordinator applied rejected multi-display config");
+  ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
+  const display_config_t& display_config = *display_config_ptr;
 
-  ZX_DEBUG_ASSERT(display_configs);
-  ZX_DEBUG_ASSERT(banjo_config_stamp);
+  ZX_DEBUG_ASSERT(banjo_config_stamp != nullptr);
   const display::ConfigStamp config_stamp = display::ToConfigStamp(*banjo_config_stamp);
 
   fbl::AutoLock lock(&display_mutex_);
-  if (display_configs[0].layer_count != 0) {
+
+  if (display_config.layer_count) {
     if (!IgnoreDisplayMode()) {
       // Perform Vout modeset iff there's a new display mode.
       //
       // Setting up OSD may require Vout framebuffer information, which may be
       // changed on each ApplyConfiguration(), so we need to apply the
       // configuration to Vout first before initializing the display and OSD.
-      display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0].mode);
+      display::DisplayTiming display_timing = display::ToDisplayTiming(display_config.mode);
       if (IsNewDisplayTiming(display_timing)) {
         zx::result<> apply_config_result = vout_->ApplyConfiguration(display_timing);
         if (!apply_config_result.is_ok()) {
@@ -577,13 +567,13 @@ void DisplayEngine::DisplayEngineApplyConfiguration(const display_config_t* disp
     // The only way a checked configuration could now be invalid is if display was
     // unplugged. If that's the case, then the upper layers will give a new configuration
     // once they finish handling the unplug event. So just return.
-    if (!display_attached_ || display::ToDisplayId(display_configs[0].display_id) != display_id_) {
+    if (!display_attached_ || display::ToDisplayId(display_config.display_id) != display_id_) {
       return;
     }
 
     // Since Amlogic does not support plug'n play (fixed display), there is no way
     // a checked configuration could be invalid at this point.
-    video_input_unit_->FlipOnVsync(display_configs[0], config_stamp);
+    video_input_unit_->FlipOnVsync(display_config, config_stamp);
   } else {
     if (fully_initialized()) {
       {
@@ -990,6 +980,44 @@ zx_status_t DisplayEngine::DisplayEngineReleaseCapture(uint64_t capture_handle) 
   }
 
   return ZX_OK;
+}
+
+config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+    layer_composition_operations_t* out_layer_composition_operations_list,
+    size_t out_layer_composition_operations_size, size_t* out_layer_composition_operations_actual) {
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs_count == 0) {
+    return CONFIG_CHECK_RESULT_OK;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  if (banjo_display_configs_count > 1) {
+    ZX_DEBUG_ASSERT_MSG(false, "Multiple displays registered with the display coordinator");
+    return CONFIG_CHECK_RESULT_TOO_MANY;
+  }
+
+  return DisplayEngineCheckConfiguration(
+      banjo_display_configs_array, out_layer_composition_operations_list,
+      out_layer_composition_operations_size, out_layer_composition_operations_actual);
+}
+
+void DisplayEngine::DisplayEngineApplyConfiguration(
+    const display_config_t* banjo_display_configs_array, size_t banjo_display_configs_count,
+    const config_stamp_t* banjo_config_stamp) {
+  // The display coordinator currently uses zero-display configs to blank all
+  // displays. We'll remove this eventually.
+  if (banjo_display_configs_count == 0) {
+    return;
+  }
+
+  // This adapter does not support multiple-display operation. None of our
+  // drivers supports this mode.
+  ZX_DEBUG_ASSERT_MSG(banjo_display_configs_count == 1,
+                      "Display coordinator applied rejected multi-display config");
+  DisplayEngineApplyConfiguration(banjo_display_configs_array, banjo_config_stamp);
 }
 
 void DisplayEngine::OnVsync(zx::time timestamp) {
