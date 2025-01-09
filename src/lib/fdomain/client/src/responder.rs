@@ -21,8 +21,8 @@ pub(crate) enum Responder {
     SetSocketDisposition(Sender<Result<(), Error>>),
     ReadSocket(Sender<Result<proto::SocketReadSocketResponse, Error>>),
     ReadChannel(Sender<Result<proto::ChannelMessage, Error>>),
-    WriteSocket(Sender<Result<proto::SocketWriteSocketResponse, Error>>, proto::Hid),
-    WriteChannel(Sender<Result<(), Error>>, proto::Hid),
+    WriteSocket(Sender<Result<proto::SocketWriteSocketResponse, Error>>, proto::HandleId),
+    WriteChannel(Sender<Result<(), Error>>, proto::HandleId),
     Close(Sender<Result<(), Error>>),
     Duplicate(Sender<Result<(), Error>>),
     Replace(Sender<Result<(), Error>>),
@@ -45,7 +45,7 @@ pub(crate) enum Responder {
 /// Result after calling a responder. Indicates whether we need to acknowledge a write error.
 pub(crate) enum ResponderStatus {
     Ok,
-    WriteErrorOccurred(proto::Hid),
+    WriteErrorOccurred(proto::HandleId),
 }
 
 impl Responder {
@@ -181,7 +181,7 @@ impl Responder {
         ordinal: u64,
         sender: Sender<Result<R, Error>>,
         result: Result<(fidl_message::TransactionHeader, &[u8]), crate::InnerError>,
-        write_notify: Option<proto::Hid>,
+        write_notify: Option<proto::HandleId>,
     ) -> fidl::Result<ResponderStatus> {
         match result {
             Ok((header, body)) => {

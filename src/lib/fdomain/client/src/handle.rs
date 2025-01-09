@@ -248,14 +248,14 @@ impl Future for OnFDomainSignals {
 }
 
 impl Handle {
-    /// Get a proto::Hid with the ID of this handle.
-    pub(crate) fn proto(&self) -> proto::Hid {
-        proto::Hid { id: self.id }
+    /// Get a proto::HandleId with the ID of this handle.
+    pub(crate) fn proto(&self) -> proto::HandleId {
+        proto::HandleId { id: self.id }
     }
 
-    /// Get a proto::Hid with the ID of this handle, then destroy this object
+    /// Get a proto::HandleId with the ID of this handle, then destroy this object
     /// without sending a request to close the handlel.
-    pub(crate) fn take_proto(mut self) -> proto::Hid {
+    pub(crate) fn take_proto(mut self) -> proto::HandleId {
         let ret = self.proto();
         // Detach from the client so we don't close the handle when we drop self.
         self.client = Weak::new();

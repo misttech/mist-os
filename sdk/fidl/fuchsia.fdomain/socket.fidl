@@ -28,12 +28,12 @@ open protocol Socket {
     // Create a new socket in this FDomain and return both its ends.
     flexible CreateSocket(struct {
         options SocketType;
-        handles array<NewHid, 2>;
+        handles array<NewHandleId, 2>;
     }) -> () error Error;
 
     // Set the disposition of a given socket.
     flexible SetSocketDisposition(struct {
-        handle Hid;
+        handle HandleId;
         disposition SocketDisposition;
         disposition_peer SocketDisposition;
     }) -> () error Error;
@@ -41,7 +41,7 @@ open protocol Socket {
     // Read data from a socket. This method will fail if the socket is currently being read
     // asynchronously.
     flexible ReadSocket(struct {
-        handle Hid;
+        handle HandleId;
         max_bytes uint64;
     }) -> (struct {
         data vector<uint8>;
@@ -53,7 +53,7 @@ open protocol Socket {
     // indicate if some bytes were written successfully before the failure
     // occurred.
     flexible WriteSocket(struct {
-        handle Hid;
+        handle HandleId;
         data vector<uint8>;
     }) -> (struct {
         wrote uint64;
@@ -63,17 +63,17 @@ open protocol Socket {
     // event will occur repeatedly until `ReadSocketStreamingStop` is called for the same handle or the
     // event indicates the handle is closed.
     flexible ReadSocketStreamingStart(struct {
-        handle Hid;
+        handle HandleId;
     }) -> () error Error;
 
     // Stop asynchronous reading from the given socket.
     flexible ReadSocketStreamingStop(struct {
-        handle Hid;
+        handle HandleId;
     }) -> () error Error;
 
     // Data read asynchronously from a socket.
     flexible -> OnSocketStreamingData(struct {
-        handle Hid;
+        handle HandleId;
         socket_message flexible union {
             1: data vector<uint8>;
             2: stopped AioStopped;

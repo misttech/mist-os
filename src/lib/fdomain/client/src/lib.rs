@@ -63,7 +63,7 @@ fdomain_macros::extract_ordinals_env!("FDOMAIN_FIDL_PATH");
 fn write_fdomain_error(error: &FDomainError, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match error {
         FDomainError::TargetError(e) => write!(f, "Target-side error {e}"),
-        FDomainError::BadHid(proto::BadHid { id }) => {
+        FDomainError::BadHandleId(proto::BadHandleId { id }) => {
             write!(f, "Tried to use invalid handle id {id}")
         }
         FDomainError::WrongHandleType(proto::WrongHandleType { expected, got }) => write!(
@@ -79,10 +79,10 @@ fn write_fdomain_error(error: &FDomainError, f: &mut std::fmt::Formatter<'_>) ->
         FDomainError::NoErrorPending(proto::NoErrorPending {}) => {
             write!(f, "Tried to dismiss write errors on handle where none had occurred")
         }
-        FDomainError::NewHidOutOfRange(proto::NewHidOutOfRange { id }) => {
+        FDomainError::NewHandleIdOutOfRange(proto::NewHandleIdOutOfRange { id }) => {
             write!(f, "Tried to create a handle with id {id}, which is outside the valid range for client handles")
         }
-        FDomainError::NewHidReused(proto::NewHidReused { id, same_call }) => {
+        FDomainError::NewHandleIdReused(proto::NewHandleIdReused { id, same_call }) => {
             if *same_call {
                 write!(f, "Tried to create two or more new handles with the same id {id}")
             } else {
@@ -333,11 +333,11 @@ impl Transport {
 struct ClientInner {
     transport: Transport,
     transactions: HashMap<NonZeroU32, responder::Responder>,
-    socket_read_subscriptions: HashMap<proto::Hid, UnboundedSender<Result<Vec<u8>, Error>>>,
+    socket_read_subscriptions: HashMap<proto::HandleId, UnboundedSender<Result<Vec<u8>, Error>>>,
     channel_read_subscriptions:
-        HashMap<proto::Hid, UnboundedSender<Result<proto::ChannelMessage, Error>>>,
+        HashMap<proto::HandleId, UnboundedSender<Result<proto::ChannelMessage, Error>>>,
     next_tx_id: u32,
-    waiting_to_close: Vec<proto::Hid>,
+    waiting_to_close: Vec<proto::HandleId>,
 }
 
 impl ClientInner {
@@ -670,12 +670,12 @@ impl Client {
     }
 
     /// Allocate a new HID, which should be suitable for use with the connected FDomain.
-    pub(crate) fn new_hid(&self) -> proto::NewHid {
+    pub(crate) fn new_hid(&self) -> proto::NewHandleId {
         // TODO: On the target side we have to keep a table of these which means
         // we can automatically detect collisions in the random value. On the
         // client side we'd have to add a whole data structure just for that
         // purpose. Should we?
-        proto::NewHid { id: rand::random::<u32>() >> 1 }
+        proto::NewHandleId { id: rand::random::<u32>() >> 1 }
     }
 
     /// Create a future which sends a FIDL message to the connected FDomain and
@@ -701,7 +701,7 @@ impl Client {
     /// Start getting streaming events for socket reads.
     pub(crate) fn start_socket_streaming(
         &self,
-        id: proto::Hid,
+        id: proto::HandleId,
         output: UnboundedSender<Result<Vec<u8>, Error>>,
     ) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
@@ -717,7 +717,7 @@ impl Client {
     /// Stop getting streaming events for socket reads. Doesn't return errors
     /// because it's exclusively called in destructors where we have nothing to
     /// do with them.
-    pub(crate) fn stop_socket_streaming(&self, id: proto::Hid) {
+    pub(crate) fn stop_socket_streaming(&self, id: proto::HandleId) {
         let mut inner = self.0.lock().unwrap();
         if inner.socket_read_subscriptions.remove(&id).is_some() {
             // TODO: Log?
@@ -732,7 +732,7 @@ impl Client {
     /// Start getting streaming events for socket reads.
     pub(crate) fn start_channel_streaming(
         &self,
-        id: proto::Hid,
+        id: proto::HandleId,
         output: UnboundedSender<Result<proto::ChannelMessage, Error>>,
     ) -> Result<(), Error> {
         let mut inner = self.0.lock().unwrap();
@@ -748,7 +748,7 @@ impl Client {
     /// Stop getting streaming events for socket reads. Doesn't return errors
     /// because it's exclusively called in destructors where we have nothing to
     /// do with them.
-    pub(crate) fn stop_channel_streaming(&self, id: proto::Hid) {
+    pub(crate) fn stop_channel_streaming(&self, id: proto::HandleId) {
         let mut inner = self.0.lock().unwrap();
         if inner.channel_read_subscriptions.remove(&id).is_some() {
             // TODO: Log?

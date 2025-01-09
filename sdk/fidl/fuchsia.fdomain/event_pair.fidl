@@ -8,6 +8,6 @@ library fuchsia.fdomain;
 open protocol EventPair {
     // Create a new event pair in this FDomain and return both its ends.
     flexible CreateEventPair(struct {
-        handles array<NewHid, 2>;
+        handles array<NewHandleId, 2>;
     }) -> () error Error;
 };
