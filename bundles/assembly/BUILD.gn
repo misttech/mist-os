@@ -2902,13 +2902,13 @@ assembly_input_bundle("fshost_storage_host_gpt_fvm_minfs") {
           ]
         },
       ]
-      bootfs_packages = [
-        "//src/storage/gpt/component:package",
-        "//src/storage/blobfs/bin:package",
-        "//src/storage/minfs/bin:package",
-        "//src/storage/fvm:package",
-      ]
     },
+  ]
+  bootfs_packages = [
+    "//src/storage/gpt/component:package",
+    "//src/storage/blobfs/bin:package",
+    "//src/storage/minfs/bin:package",
+    "//src/storage/fvm:package",
   ]
 }
 
@@ -2936,12 +2936,12 @@ assembly_input_bundle("fshost_storage_host_fvm_minfs") {
           ]
         },
       ]
-      bootfs_packages = [
-        "//src/storage/blobfs/bin:package",
-        "//src/storage/minfs/bin:package",
-        "//src/storage/fvm:package",
-      ]
     },
+  ]
+  bootfs_packages = [
+    "//src/storage/blobfs/bin:package",
+    "//src/storage/minfs/bin:package",
+    "//src/storage/fvm:package",
   ]
 }
 

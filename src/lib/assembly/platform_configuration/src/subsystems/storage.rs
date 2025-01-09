@@ -143,7 +143,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                     builder.platform_bundle("fshost_storage_host_fxfs");
                 }
                 VolumeConfig::Fvm(FvmVolumeConfig { blob, data, .. }) => {
-                    builder.platform_bundle("fshost_fvm");
                     blob_deprecated_padded = blob.blob_layout == BlobfsLayout::DeprecatedPadded;
                     match data.data_filesystem_format {
                         DataFilesystemFormat::Fxfs => {
