@@ -220,7 +220,8 @@ impl ZxioBackedSocket {
             return error!(ENOTSUP);
         }
 
-        let program = convert_and_verify_cbpf(&code).map_err(|_| errno!(EINVAL))?;
+        let program = convert_and_verify_cbpf(&code, ebpf_api::SK_BUF_TYPE.clone())
+            .map_err(|_| errno!(EINVAL))?;
 
         // TODO(https://fxbug.dev/377332291) Use `zxio_borrow()` to avoid cloning the handle.
         let packet_socket = fidl::endpoints::ClientEnd::<fposix_socket_packet::SocketMarker>::new(

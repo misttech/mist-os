@@ -11,8 +11,9 @@ use linux_uapi::{
 };
 use std::collections::HashMap;
 
+use crate::program::{link_program, BpfProgramContext, EbpfProgram, ProgramArgument};
 use crate::verifier::{
-    verify_program, CallingContext, MemoryId, NullVerifierLogger, Type, VerifiedEbpfProgram,
+    verify_program, CallingContext, NullVerifierLogger, Type, VerifiedEbpfProgram,
 };
 use crate::visitor::Register;
 use crate::EbpfError;
@@ -364,12 +365,12 @@ fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
     Ok(ebpf_code)
 }
 
-/// This method instantiates an EbpfProgram given a cbpf original.
-pub fn convert_and_verify_cbpf(bpf_code: &[sock_filter]) -> Result<VerifiedEbpfProgram, EbpfError> {
-    // Pointer to the packet (e.g. `__sk_buff`). `buffer_size` is set to 0 because the
-    // packet is supposed to be access only through the `PacketAccessor` which validates
-    // the offset in runtime.
-    let packet_type = Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 0 };
+/// Instantiates an EbpfProgram given a cbpf original that will work with a packet of the
+/// specified type.
+pub fn convert_and_verify_cbpf(
+    bpf_code: &[sock_filter],
+    packet_type: Type,
+) -> Result<VerifiedEbpfProgram, EbpfError> {
     let context = CallingContext {
         maps: vec![],
         helpers: HashMap::new(),
@@ -377,12 +378,20 @@ pub fn convert_and_verify_cbpf(bpf_code: &[sock_filter]) -> Result<VerifiedEbpfP
             packet_type.clone(),
             // Packet size (see `BPF_LEN` in cBPF). This may be different from the size of the
             // value pointed by the first argument.
-            Type::ScalarValueParameter,
+            <usize as ProgramArgument>::get_type().clone(),
         ],
         packet_type: Some(packet_type),
     };
     let ebpf_code = cbpf_to_ebpf(bpf_code)?;
     verify_program(ebpf_code, context, &mut NullVerifierLogger)
+}
+
+/// Converts, verifies and links a cBPF program for execution in the specified context.
+pub fn convert_and_link_cbpf<C: BpfProgramContext>(
+    bpf_code: &[sock_filter],
+) -> Result<EbpfProgram<C>, EbpfError> {
+    let verified = convert_and_verify_cbpf(bpf_code, C::Packet::get_type().clone())?;
+    link_program(&verified, &[], &[], HashMap::new())
 }
 
 #[cfg(test)]

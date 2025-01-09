@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::maps::{Map, MapKey, RingBufferWakeupPolicy};
-use ebpf::{BpfValue, EbpfHelperImpl, EbpfRunContext};
+use ebpf::{BpfValue, EbpfHelperImpl, EbpfProgramContext};
 use inspect_stubs::track_stub;
 use linux_uapi::{
     bpf_func_id_BPF_FUNC_get_socket_cookie, bpf_func_id_BPF_FUNC_get_socket_uid,
@@ -14,8 +14,8 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_trace_printk, uid_t,
 };
 
-fn bpf_map_lookup_elem<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_map_lookup_elem<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     map: BpfValue,
     key: BpfValue,
     _: BpfValue,
@@ -33,8 +33,8 @@ fn bpf_map_lookup_elem<C: EbpfRunContext>(
     map.get_raw(&key).map(BpfValue::from).unwrap_or_else(BpfValue::default)
 }
 
-fn bpf_map_update_elem<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_map_update_elem<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     map: BpfValue,
     key: BpfValue,
     value: BpfValue,
@@ -56,8 +56,8 @@ fn bpf_map_update_elem<C: EbpfRunContext>(
     map.update(key, value, flags).map(|_| 0).unwrap_or(u64::MAX).into()
 }
 
-fn bpf_map_delete_elem<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_map_delete_elem<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     _map: BpfValue,
     _key: BpfValue,
     _: BpfValue,
@@ -68,8 +68,8 @@ fn bpf_map_delete_elem<C: EbpfRunContext>(
     u64::MAX.into()
 }
 
-fn bpf_trace_printk<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_trace_printk<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     _fmt: BpfValue,
     _fmt_size: BpfValue,
     _: BpfValue,
@@ -80,8 +80,8 @@ fn bpf_trace_printk<C: EbpfRunContext>(
     0.into()
 }
 
-fn bpf_ktime_get_ns<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_ktime_get_ns<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     _: BpfValue,
     _: BpfValue,
     _: BpfValue,
@@ -92,8 +92,8 @@ fn bpf_ktime_get_ns<C: EbpfRunContext>(
     42.into()
 }
 
-fn bpf_ringbuf_reserve<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_ringbuf_reserve<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     map: BpfValue,
     size: BpfValue,
     flags: BpfValue,
@@ -110,8 +110,8 @@ fn bpf_ringbuf_reserve<C: EbpfRunContext>(
     map.ringbuf_reserve(size, flags).map(BpfValue::from).unwrap_or_else(|_| BpfValue::default())
 }
 
-fn bpf_ringbuf_submit<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_ringbuf_submit<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     data: BpfValue,
     flags: BpfValue,
     _: BpfValue,
@@ -130,8 +130,8 @@ fn bpf_ringbuf_submit<C: EbpfRunContext>(
     0.into()
 }
 
-fn bpf_ringbuf_discard<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_ringbuf_discard<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     data: BpfValue,
     flags: BpfValue,
     _: BpfValue,
@@ -150,8 +150,8 @@ fn bpf_ringbuf_discard<C: EbpfRunContext>(
     0.into()
 }
 
-fn bpf_ktime_get_boot_ns<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_ktime_get_boot_ns<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     _: BpfValue,
     _: BpfValue,
     _: BpfValue,
@@ -162,7 +162,7 @@ fn bpf_ktime_get_boot_ns<C: EbpfRunContext>(
     0.into()
 }
 
-pub fn get_common_helpers<C: EbpfRunContext>() -> Vec<(u32, EbpfHelperImpl<C>)> {
+pub fn get_common_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)> {
     vec![
         (bpf_func_id_BPF_FUNC_map_lookup_elem, EbpfHelperImpl(bpf_map_lookup_elem)),
         (bpf_func_id_BPF_FUNC_map_update_elem, EbpfHelperImpl(bpf_map_update_elem)),
@@ -182,8 +182,8 @@ pub trait SocketFilterContext {
     fn get_socket_cookie(&self, sk_buf: &Self::SkBuf) -> u64;
 }
 
-fn bpf_get_socket_uid<'a, C: EbpfRunContext>(
-    context: &mut C::Context<'a>,
+fn bpf_get_socket_uid<'a, C: EbpfProgramContext>(
+    context: &mut C::RunContext<'a>,
     sk_buf: BpfValue,
     _: BpfValue,
     _: BpfValue,
@@ -191,15 +191,15 @@ fn bpf_get_socket_uid<'a, C: EbpfRunContext>(
     _: BpfValue,
 ) -> BpfValue
 where
-    for<'b> C::Context<'b>: SocketFilterContext,
+    for<'b> C::RunContext<'b>: SocketFilterContext,
 {
     // SAFETY: Verifier checks that the argument points at the `SkBuf`.
-    let sk_buf: &<C::Context<'a> as SocketFilterContext>::SkBuf = unsafe { &*sk_buf.as_ptr() };
+    let sk_buf: &<C::RunContext<'a> as SocketFilterContext>::SkBuf = unsafe { &*sk_buf.as_ptr() };
     context.get_socket_uid(sk_buf).into()
 }
 
-fn bpf_get_socket_cookie<'a, C: EbpfRunContext>(
-    context: &mut C::Context<'a>,
+fn bpf_get_socket_cookie<'a, C: EbpfProgramContext>(
+    context: &mut C::RunContext<'a>,
     sk_buf: BpfValue,
     _: BpfValue,
     _: BpfValue,
@@ -207,15 +207,15 @@ fn bpf_get_socket_cookie<'a, C: EbpfRunContext>(
     _: BpfValue,
 ) -> BpfValue
 where
-    for<'b> C::Context<'b>: SocketFilterContext,
+    for<'b> C::RunContext<'b>: SocketFilterContext,
 {
     // SAFETY: Verifier checks that the argument points at the `SkBuf`.
-    let sk_buf: &<C::Context<'a> as SocketFilterContext>::SkBuf = unsafe { &*sk_buf.as_ptr() };
+    let sk_buf: &<C::RunContext<'a> as SocketFilterContext>::SkBuf = unsafe { &*sk_buf.as_ptr() };
     context.get_socket_cookie(sk_buf).into()
 }
 
-fn bpf_skb_load_bytes_relative<C: EbpfRunContext>(
-    _context: &mut C::Context<'_>,
+fn bpf_skb_load_bytes_relative<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
     _: BpfValue,
     _: BpfValue,
     _: BpfValue,
@@ -227,9 +227,9 @@ fn bpf_skb_load_bytes_relative<C: EbpfRunContext>(
 }
 
 // Helpers that are supplied to socket filter programs in addition to the common helpers.
-pub fn get_socket_filter_helpers<C: EbpfRunContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
+pub fn get_socket_filter_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
 where
-    for<'a> C::Context<'a>: SocketFilterContext,
+    for<'a> C::RunContext<'a>: SocketFilterContext,
 {
     vec![
         (bpf_func_id_BPF_FUNC_get_socket_uid, EbpfHelperImpl(bpf_get_socket_uid)),

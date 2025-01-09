@@ -298,10 +298,10 @@ impl PartialOrd for Type {
         }
 
         // If one value is not initialized, the types are ordered.
-        if self == &NOT_INIT {
+        if self == &Type::UNINITIALIZED {
             return Some(Ordering::Greater);
         }
-        if other == &NOT_INIT {
+        if other == &Type::UNINITIALIZED {
             return Some(Ordering::Less);
         }
 
@@ -338,12 +338,6 @@ impl PartialOrd for Type {
     }
 }
 
-const NOT_INIT: Type = Type::ScalarValue {
-    value: 0,
-    unknown_mask: u64::max_value(),
-    unwritten_mask: u64::max_value(),
-};
-
 impl From<u64> for Type {
     fn from(value: u64) -> Self {
         Self::ScalarValue { value, unknown_mask: 0, unwritten_mask: 0 }
@@ -353,23 +347,41 @@ impl From<u64> for Type {
 impl Default for Type {
     /// A new instance of `Type` where no bit has been written yet.
     fn default() -> Self {
-        NOT_INIT.clone()
+        Self::UNINITIALIZED.clone()
     }
 }
 
 impl Type {
-    /// A new instance of `Type` where the data is usable by userspace, but the value is unknown
-    /// for the verifier.
-    pub const fn unknown_written_scalar_value() -> Self {
-        Self::ScalarValue { value: 0, unknown_mask: u64::max_value(), unwritten_mask: 0 }
+    /// An uninitialized value.
+    pub const UNINITIALIZED: Self =
+        Self::ScalarValue { value: 0, unknown_mask: u64::MAX, unwritten_mask: u64::MAX };
+
+    /// A `Type` where the data is usable by userspace, but the value is not known by the verifier.
+    pub const UNKNOWN_SCALAR: Self =
+        Self::ScalarValue { value: 0, unknown_mask: u64::MAX, unwritten_mask: 0 };
+    pub fn unknown_written_scalar_value() -> Self {
+        Self::UNKNOWN_SCALAR.clone()
     }
 
     /// The mask associated with a data of size `width`.
     fn mask(width: DataWidth) -> u64 {
         if width == DataWidth::U64 {
-            u64::max_value()
+            u64::MAX
         } else {
             (1 << width.bits()) - 1
+        }
+    }
+
+    /// Return true if `self` is a subtype of `super`.
+    pub fn is_subtype(&self, super_type: &Type) -> bool {
+        match (self, super_type) {
+            // Anything can be used in place of an uninitialized value.
+            (_, Self::ScalarValue { unwritten_mask: u64::MAX, .. }) => true,
+
+            // Every type is a subtype of itself.
+            (self_type, super_type) if self_type == super_type => true,
+
+            _ => false,
         }
     }
 
@@ -386,8 +398,8 @@ impl Type {
         }
     }
 
-    /// Given the given conditional jump `jump_type` having been tasken, constraint the type of
-    /// `type1` and `type2`.
+    /// Constraints `type1` and `type2` for a conditional jump with the specified `jump_type` and
+    /// `jump_width`.
     fn constraint(
         context: &mut ComputationContext,
         jump_type: JumpType,
@@ -700,6 +712,7 @@ pub(crate) struct StructAccess {
 #[derive(Debug)]
 pub struct VerifiedEbpfProgram {
     pub(crate) code: Vec<EbpfInstruction>,
+    pub(crate) args: Vec<Type>,
     pub(crate) struct_access_instructions: Vec<StructAccess>,
     pub(crate) maps: Vec<MapSchema>,
 }
@@ -713,8 +726,8 @@ impl VerifiedEbpfProgram {
         self.code
     }
 
-    pub fn from_verified_code(code: Vec<EbpfInstruction>) -> Self {
-        Self { code, struct_access_instructions: vec![], maps: vec![] }
+    pub fn from_verified_code(code: Vec<EbpfInstruction>, args: Vec<Type>) -> Self {
+        Self { code, struct_access_instructions: vec![], maps: vec![], args }
     }
 }
 
@@ -786,9 +799,8 @@ pub fn verify_program(
 
     let struct_access_instructions =
         verification_context.struct_access_instructions.into_values().collect::<Vec<_>>();
-    let maps = verification_context.calling_context.maps;
-
-    Ok(VerifiedEbpfProgram { code, struct_access_instructions, maps })
+    let CallingContext { maps, args, .. } = verification_context.calling_context;
+    Ok(VerifiedEbpfProgram { code, struct_access_instructions, maps, args })
 }
 
 struct VerificationContext<'a> {
@@ -901,11 +913,11 @@ impl Stack {
     }
 
     fn get(&self, index: usize) -> &Type {
-        self.data.get(&index).unwrap_or(&NOT_INIT)
+        self.data.get(&index).unwrap_or(&Type::UNINITIALIZED)
     }
 
     fn set(&mut self, index: usize, t: Type) {
-        if t == NOT_INIT {
+        if t == Type::UNINITIALIZED {
             self.data.remove(&index);
         } else {
             self.data.insert(index, t);
@@ -1026,7 +1038,7 @@ impl Stack {
                             // The value in the stack is not a scalar. Let consider it an scalar
                             // value with no written bits.
                             let Type::ScalarValue { value, unknown_mask, unwritten_mask } =
-                                NOT_INIT
+                                Type::UNINITIALIZED
                             else {
                                 unreachable!();
                             };

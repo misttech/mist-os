@@ -5,14 +5,15 @@
 #[cfg(test)]
 pub mod test {
     use crate::{
-        link_program, verify_program, BpfValue, CallingContext, DataWidth, EbpfHelperImpl,
-        EmptyPacketAccessor, FunctionSignature, MemoryId, MemoryParameterSize, NullVerifierLogger,
-        PacketAccessor, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC,
-        BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
-        BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32,
-        BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH,
-        BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG,
-        BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
+        link_program_dynamic, verify_program, BpfValue, CallingContext, DataWidth, EbpfHelperImpl,
+        EbpfProgramContext, FromBpfValue, FunctionSignature, MemoryId, MemoryParameterSize,
+        NullVerifierLogger, Packet, ProgramArgument, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64,
+        BPF_AND, BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END,
+        BPF_EXIT, BPF_FETCH, BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE,
+        BPF_JLT, BPF_JMP, BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT,
+        BPF_LD, BPF_LDX, BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH,
+        BPF_SRC_IMM, BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG,
+        BPF_XOR,
     };
     use linux_uapi::bpf_insn;
     use pest::iterators::Pair;
@@ -20,6 +21,7 @@ pub mod test {
     use pest_derive::Parser;
     use std::collections::HashMap;
     use std::str::FromStr;
+    use std::sync::LazyLock;
     use test_case::test_case;
     use zerocopy::{FromBytes, IntoBytes};
 
@@ -441,52 +443,100 @@ pub mod test {
         }
     }
 
-    // The `PacketAccessor` used in the conformance test. It assumes that consider that the data
-    // of the packet is at offset 8 of the packet buffer.
-    struct TestPacketAccessor {
-        packet_size: usize,
+    struct TestEbpfRunContext {
+        buffer_size: usize,
     }
 
-    impl TestPacketAccessor {
-        const DATA_OFFSET: usize = 8;
+    const DATA_OFFSET: usize = 8;
 
-        fn new(buffer_size: usize) -> Self {
-            Self { packet_size: buffer_size.checked_sub(Self::DATA_OFFSET).unwrap_or(0) }
+    // The pointer to the buffer passed to the test as an argument.
+    #[derive(Clone, Copy)]
+    struct TestBuffer {
+        ptr: *const u8,
+        size: usize,
+    }
+
+    impl TestBuffer {
+        fn new(memory: &mut Option<Vec<u8>>) -> Self {
+            match memory {
+                Some(data) => Self { ptr: data.as_mut_ptr(), size: data.len() },
+                None => Self { ptr: std::ptr::null(), size: 0 },
+            }
         }
     }
 
-    impl PacketAccessor<()> for TestPacketAccessor {
-        fn load(
-            &self,
-            _context: &mut (),
-            packet_ptr: BpfValue,
-            offset: i32,
-            width: DataWidth,
-        ) -> Option<BpfValue> {
-            if offset < 0 || offset as usize + width.bytes() > self.packet_size {
+    impl From<TestBuffer> for BpfValue {
+        fn from(v: TestBuffer) -> Self {
+            (v.ptr as u64).into()
+        }
+    }
+
+    static TEST_ARG_MEMORY_ID: LazyLock<MemoryId> = LazyLock::new(|| MemoryId::new());
+
+    impl ProgramArgument for TestBuffer {
+        fn get_type() -> &'static Type {
+            // Shouldn't be called - argument types are checked dynamically, see
+            // `link_program_dynamic`.
+            unreachable!();
+        }
+
+        fn get_value_type(&self) -> Type {
+            if self.ptr.is_null() {
+                Type::from(0)
+            } else {
+                Type::PtrToMemory {
+                    id: TEST_ARG_MEMORY_ID.clone(),
+                    offset: 0,
+                    buffer_size: self.size as u64,
+                }
+            }
+        }
+    }
+
+    impl Packet for TestBuffer {
+        fn len(&self) -> usize {
+            self.size
+        }
+
+        fn load(&self, offset: i32, width: DataWidth) -> Option<BpfValue> {
+            let TestBuffer { ptr: packet_ptr, size: packet_size } = self;
+            if offset < 0 || offset as usize + width.bytes() > *packet_size {
                 return None;
             }
-            let addr = packet_ptr.add(Self::DATA_OFFSET as u64 + offset as u64);
+            // SAFETY: Packet size is checked above.
+            let addr = unsafe { packet_ptr.add(DATA_OFFSET + offset as usize) };
             let value = match width {
-                DataWidth::U8 => {
-                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u8>()) })
-                }
+                DataWidth::U8 => BpfValue::from(unsafe { *addr }),
                 DataWidth::U16 => {
-                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u16>()) })
+                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr as *const u16) })
                 }
                 DataWidth::U32 => {
-                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u32>()) })
+                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr as *const u32) })
                 }
                 DataWidth::U64 => {
-                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u64>()) })
+                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr as *const u64) })
                 }
             };
             Some(value)
         }
+    }
 
-        fn packet_len(&self, _context: &mut (), _packet_ptr: BpfValue) -> usize {
-            self.packet_size
+    impl FromBpfValue<TestEbpfRunContext> for TestBuffer {
+        unsafe fn from_bpf_value(context: &mut TestEbpfRunContext, v: BpfValue) -> Self {
+            Self { ptr: v.as_ptr::<u8>(), size: context.buffer_size }
         }
+    }
+
+    struct TestEbpfProgramContext {}
+
+    impl EbpfProgramContext for TestEbpfProgramContext {
+        type RunContext<'a> = TestEbpfRunContext;
+        type Packet<'a> = TestBuffer;
+        type Arg1<'a> = TestBuffer;
+        type Arg2<'a> = usize;
+        type Arg3<'a> = ();
+        type Arg4<'a> = ();
+        type Arg5<'a> = ();
     }
 
     struct TestCase {
@@ -563,7 +613,7 @@ pub mod test {
     }
 
     fn gather_bytes(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         a: BpfValue,
         b: BpfValue,
         c: BpfValue,
@@ -579,7 +629,7 @@ pub mod test {
     }
 
     fn memfrob(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         ptr: BpfValue,
         n: BpfValue,
         _: BpfValue,
@@ -595,7 +645,7 @@ pub mod test {
     }
 
     fn trash_registers(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         _: BpfValue,
         _: BpfValue,
         _: BpfValue,
@@ -606,7 +656,7 @@ pub mod test {
     }
 
     fn sqrti(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         v: BpfValue,
         _: BpfValue,
         _: BpfValue,
@@ -617,7 +667,7 @@ pub mod test {
     }
 
     fn strcmp_ext(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         s1: BpfValue,
         s2: BpfValue,
         _: BpfValue,
@@ -645,7 +695,7 @@ pub mod test {
     }
 
     fn null_or(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         s1: BpfValue,
         _: BpfValue,
         _: BpfValue,
@@ -656,7 +706,7 @@ pub mod test {
     }
 
     fn read_only(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         s1: BpfValue,
         _: BpfValue,
         _: BpfValue,
@@ -669,7 +719,7 @@ pub mod test {
     }
 
     fn write_only(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         s1: BpfValue,
         s2: BpfValue,
         _: BpfValue,
@@ -682,7 +732,7 @@ pub mod test {
     }
 
     fn malloc(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         size: BpfValue,
         _: BpfValue,
         _: BpfValue,
@@ -693,7 +743,7 @@ pub mod test {
     }
 
     fn free(
-        _context: &mut (),
+        _context: &mut TestEbpfRunContext,
         ptr: BpfValue,
         _: BpfValue,
         _: BpfValue,
@@ -873,24 +923,13 @@ pub mod test {
             return;
         };
 
-        let args;
-        let packet_type;
-        match test_case.memory.as_ref() {
-            Some(memory) => {
-                let buffer_size = memory.len() as u64;
-                let packet = Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size };
-                args = vec![packet.clone(), Type::from(buffer_size)];
-                packet_type = Some(packet)
-            }
-            None => {
-                args = vec![Type::from(0), Type::from(0)];
-                packet_type = None;
-            }
-        };
+        let test_memory = TestBuffer::new(&mut test_case.memory);
+        let args = vec![test_memory.get_value_type(), Type::from(test_memory.size as u64)];
+        let packet_type = test_case.memory.is_some().then_some(test_memory.get_value_type());
 
         let malloc_id = MemoryId::new();
         let mut helpers = HashMap::<u32, FunctionSignature>::new();
-        let mut helper_impls = HashMap::<u32, EbpfHelperImpl<()>>::new();
+        let mut helper_impls = HashMap::<u32, EbpfHelperImpl<TestEbpfProgramContext>>::new();
         let mut add_helper = |id, signature, impl_| {
             helpers.insert(id, signature);
             helper_impls.insert(id, EbpfHelperImpl(impl_));
@@ -1028,21 +1067,16 @@ pub mod test {
 
         if let Some(value) = test_case.result {
             let verified_program = verified_program.expect("program must be loadable");
-            let program = link_program(&verified_program, &[], &[], helper_impls)
-                .expect("failed to link a test program");
-            let result = if let Some(memory) = test_case.memory.as_mut() {
-                program.run_with_slice(
-                    &mut (),
-                    &TestPacketAccessor::new(memory.len()),
-                    memory.as_mut_slice(),
-                )
-            } else {
-                program.run_with_arguments(
-                    &mut (),
-                    &EmptyPacketAccessor::default(),
-                    &[0.into(), 0.into()],
-                )
-            };
+            let program = link_program_dynamic::<TestEbpfProgramContext>(
+                &verified_program,
+                &[],
+                &[],
+                helper_impls,
+            )
+            .expect("failed to link a test program");
+
+            let mut context = TestEbpfRunContext { buffer_size: test_memory.size };
+            let result = program.run_with_2_arguments(&mut context, test_memory, test_memory.size);
             assert_eq!(result, value);
         } else {
             assert!(verified_program.is_err());

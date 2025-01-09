@@ -13,8 +13,8 @@ use crate::vfs::{
 };
 use bstr::ByteSlice;
 use ebpf::{
-    bpf_addressing_mode, bpf_class, convert_and_verify_cbpf, link_program, DirectPacketAccessor,
-    EbpfProgram, EbpfRunContext,
+    bpf_addressing_mode, bpf_class, convert_and_link_cbpf, BpfProgramContext, EbpfProgram,
+    MemoryId, ProgramArgument, Type,
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_warn, track_stub};
@@ -34,7 +34,8 @@ use starnix_uapi::{
 };
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU8, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 #[cfg(target_arch = "aarch64")]
 use starnix_uapi::__NR_clock_getres;
@@ -61,7 +62,7 @@ use starnix_uapi::AUDIT_ARCH_RISCV64;
 
 pub struct SeccompFilter {
     /// The BPF program associated with this filter.
-    program: EbpfProgram<()>,
+    program: EbpfProgram<SeccompFilter>,
 
     /// The unique-to-this-process id of thi1s filter.  SECCOMP_FILTER_FLAG_TSYNC only works if all
     /// threads in this process have filters that are a prefix of the filters of the thread
@@ -105,12 +106,10 @@ impl SeccompFilter {
             }
         }
 
-        let program = convert_and_verify_cbpf(code)
-            .and_then(|program| link_program(&program, &[], &[], HashMap::new()))
-            .map_err(|errmsg| {
-                log_warn!("{}", errmsg);
-                errno!(EINVAL)
-            })?;
+        let program = convert_and_link_cbpf::<SeccompFilter>(code).map_err(|errmsg| {
+            log_warn!("{}", errmsg);
+            errno!(EINVAL)
+        })?;
 
         Ok(SeccompFilter {
             program,
@@ -120,13 +119,28 @@ impl SeccompFilter {
         })
     }
 
-    pub fn run(&self, data: &mut seccomp_data) -> u32 {
-        self.program.run(&mut (), &DirectPacketAccessor::<seccomp_data>::default(), data) as u32
+    pub fn run(&self, data: &seccomp_data) -> u32 {
+        self.program.run(&mut (), &SeccompData(*data)) as u32
     }
 }
 
-impl EbpfRunContext for SeccompFilter {
-    type Context<'a> = seccomp_data;
+// Wrapper for `seccomp_data`. Required in order to implement the `ProgramArgument` trait below.
+#[repr(C)]
+#[derive(Debug, Default, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct SeccompData(seccomp_data);
+
+impl BpfProgramContext for SeccompFilter {
+    type RunContext<'a> = ();
+    type Packet<'a> = &'a SeccompData;
+}
+
+static SECCOMP_DATA_TYPE: LazyLock<Type> =
+    LazyLock::new(|| Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 0 });
+
+impl ProgramArgument for &'_ SeccompData {
+    fn get_type() -> &'static Type {
+        &*SECCOMP_DATA_TYPE
+    }
 }
 
 const SECCOMP_MAX_INSNS_PER_PATH: u16 = 32768;
@@ -248,14 +262,14 @@ impl SeccompFilterContainer {
             return r;
         }
 
+        let data = make_seccomp_data(
+            syscall,
+            current_task.thread_state.registers.instruction_pointer_register(),
+        );
+
         // Filters are executed in reverse order of addition
         for filter in self.filters.iter().rev() {
-            let mut data = make_seccomp_data(
-                syscall,
-                current_task.thread_state.registers.instruction_pointer_register(),
-            );
-
-            let new_result = filter.run(&mut data);
+            let new_result = filter.run(&data);
 
             let action = SeccompAction::from_u32(new_result).unwrap_or(SeccompAction::KillProcess);
 

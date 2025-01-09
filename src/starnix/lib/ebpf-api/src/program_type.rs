@@ -485,7 +485,7 @@ fn ptr_to_mem_type<T: IntoBytes>(id: MemoryId) -> Type {
 static RING_BUFFER_RESERVATION: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 
 pub static SK_BUF_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
-static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
+pub static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
     let cb_offset = std::mem::offset_of!(__sk_buff, cb);
     let hash_offset = std::mem::offset_of!(__sk_buff, hash);
     let data_id = MemoryId::new();
@@ -507,9 +507,9 @@ static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
         ],
     )
 });
-static SK_BUF_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![SK_BUF_TYPE.clone()]);
+pub static SK_BUF_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![SK_BUF_TYPE.clone()]);
 
-pub static XDP_MD_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
+static XDP_MD_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 static XDP_MD_TYPE: LazyLock<Type> = LazyLock::new(|| {
     let data_id = MemoryId::new();
 
