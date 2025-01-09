@@ -619,6 +619,16 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
     }
   }
 
+  // Converts the supplied offset into a VmPageListNode base offset, taking into account the skew.
+  static uint64_t NodeOffset(uint64_t offset, uint64_t skew) {
+    return ROUNDDOWN(offset + skew, PAGE_SIZE * VmPageListNode::kPageFanOut);
+  }
+
+  // Converts the supplied offset into a VmPageListNode index, taking into account the skew.
+  static uint64_t NodeIndex(uint64_t offset, uint64_t skew) {
+    return ((offset + skew) >> PAGE_SIZE_SHIFT) % VmPageListNode::kPageFanOut;
+  }
+
  private:
   template <typename PTR_TYPE, typename S, typename F>
   static zx_status_t ForEveryPageInRange(S self, F func, uint64_t start_offset, uint64_t end_offset,
@@ -792,6 +802,13 @@ class VmPageSpliceList final {
 
  private:
   void FreeAllPages();
+  uint64_t NodeOffset(uint64_t offset) const {
+    return VmPageListNode::NodeOffset(offset, list_skew_);
+  }
+
+  uint64_t NodeIndex(uint64_t offset) const {
+    return VmPageListNode::NodeIndex(offset, list_skew_);
+  }
 
   uint64_t offset_;
   uint64_t length_;
@@ -1219,6 +1236,14 @@ class VmPageList final {
                                     VmPageOrMarker::IntervalDirtyState new_dirty_state);
 
  private:
+  uint64_t NodeOffset(uint64_t offset) const {
+    return VmPageListNode::NodeOffset(offset, list_skew_);
+  }
+
+  uint64_t NodeIndex(uint64_t offset) const {
+    return VmPageListNode::NodeIndex(offset, list_skew_);
+  }
+
   // Returns true if the specified offset falls in a sparse page interval.
   bool IsOffsetInInterval(uint64_t offset) const;
 
@@ -1322,8 +1347,7 @@ class VmPageList final {
   static zx_status_t ForEveryPageInRange(S self, F per_page_func, uint64_t start_offset,
                                          uint64_t end_offset) {
     // Find the first node (if any) that will contain our starting offset.
-    auto cur = self->list_.lower_bound(
-        ROUNDDOWN(start_offset + self->list_skew_, VmPageListNode::kPageFanOut * PAGE_SIZE));
+    auto cur = self->list_.lower_bound(self->NodeOffset(start_offset));
     zx_status_t status = ForEveryPageInRangeInternal<PTR_TYPE, NODE_CHECK>(
         self, per_page_func, ktl::move(cur), start_offset, end_offset);
     if (status != ZX_ERR_NEXT) {
@@ -1340,8 +1364,7 @@ class VmPageList final {
   static zx_status_t ForEveryPageAndGapInRange(S self, PAGE_FUNC per_page_func,
                                                GAP_FUNC per_gap_func, uint64_t start_offset,
                                                uint64_t end_offset) {
-    auto cur = self->list_.lower_bound(
-        ROUNDDOWN(start_offset + self->list_skew_, VmPageListNode::kPageFanOut * PAGE_SIZE));
+    auto cur = self->list_.lower_bound(self->NodeOffset(start_offset));
 
     uint64_t expected_next_off = start_offset;
     // Set to true when we encounter an interval start but haven't yet encountered the end.

@@ -26,14 +26,6 @@
 
 namespace {
 
-inline uint64_t offset_to_node_offset(uint64_t offset, uint64_t skew) {
-  return ROUNDDOWN(offset + skew, PAGE_SIZE * VmPageListNode::kPageFanOut);
-}
-
-inline uint64_t offset_to_node_index(uint64_t offset, uint64_t skew) {
-  return ((offset + skew) >> PAGE_SIZE_SHIFT) % VmPageListNode::kPageFanOut;
-}
-
 inline void move_vm_page_list_node(VmPageListNode* dest, VmPageListNode* src) {
   // Called by move ctor/assignment. Move assignment clears the dest node first.
   ASSERT(dest->IsEmpty());
@@ -75,8 +67,8 @@ VmPageList& VmPageList::operator=(VmPageList&& other) {
 }
 
 VmPageOrMarker* VmPageList::LookupOrAllocateInternal(uint64_t offset) {
-  uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-  size_t index = offset_to_node_index(offset, list_skew_);
+  uint64_t node_offset = NodeOffset(offset);
+  size_t index = NodeIndex(offset);
 
   if (node_offset >= VmPageList::MAX_SIZE) {
     return nullptr;
@@ -107,8 +99,8 @@ VmPageOrMarker* VmPageList::LookupOrAllocateInternal(uint64_t offset) {
 }
 
 void VmPageList::ReturnEmptySlot(uint64_t offset) {
-  uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-  size_t index = offset_to_node_index(offset, list_skew_);
+  uint64_t node_offset = NodeOffset(offset);
+  size_t index = NodeIndex(offset);
 
   LTRACEF_LEVEL(2, "%p offset %#" PRIx64 " node_offset %#" PRIx64 " index %zu\n", this, offset,
                 node_offset, index);
@@ -127,8 +119,8 @@ void VmPageList::ReturnEmptySlot(uint64_t offset) {
 }
 
 const VmPageOrMarker* VmPageList::Lookup(uint64_t offset) const {
-  uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-  size_t index = offset_to_node_index(offset, list_skew_);
+  uint64_t node_offset = NodeOffset(offset);
+  size_t index = NodeIndex(offset);
 
   LTRACEF_LEVEL(2, "%p offset %#" PRIx64 " node_offset %#" PRIx64 " index %zu\n", this, offset,
                 node_offset, index);
@@ -143,8 +135,8 @@ const VmPageOrMarker* VmPageList::Lookup(uint64_t offset) const {
 }
 
 VmPageOrMarkerRef VmPageList::LookupMutable(uint64_t offset) {
-  uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-  size_t index = offset_to_node_index(offset, list_skew_);
+  uint64_t node_offset = NodeOffset(offset);
+  size_t index = NodeIndex(offset);
 
   LTRACEF_LEVEL(2, "%p offset %#" PRIx64 " node_offset %#" PRIx64 " index %zu\n", this, offset,
                 node_offset, index);
@@ -159,8 +151,8 @@ VmPageOrMarkerRef VmPageList::LookupMutable(uint64_t offset) {
 }
 
 VMPLCursor VmPageList::LookupMutableCursor(uint64_t offset) {
-  uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-  size_t index = offset_to_node_index(offset, list_skew_);
+  uint64_t node_offset = NodeOffset(offset);
+  size_t index = NodeIndex(offset);
 
   LTRACEF_LEVEL(2, "%p offset %#" PRIx64 " node_offset %#" PRIx64 " index %zu\n", this, offset,
                 node_offset, index);
@@ -175,8 +167,8 @@ VMPLCursor VmPageList::LookupMutableCursor(uint64_t offset) {
 }
 
 VmPageOrMarker VmPageList::RemoveContent(uint64_t offset) {
-  uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-  size_t index = offset_to_node_index(offset, list_skew_);
+  uint64_t node_offset = NodeOffset(offset);
+  size_t index = NodeIndex(offset);
 
   LTRACEF_LEVEL(2, "%p offset %#" PRIx64 " node_offset %#" PRIx64 " index %zu\n", this, offset,
                 node_offset, index);
@@ -214,10 +206,10 @@ bool VmPageList::HasNoPageOrRef() const {
 ktl::pair<const VmPageOrMarker*, uint64_t> VmPageList::FindIntervalStartForEnd(
     uint64_t end_offset) const {
   // Find the node that would contain the end offset.
-  const uint64_t node_offset = offset_to_node_offset(end_offset, list_skew_);
+  const uint64_t node_offset = NodeOffset(end_offset);
   auto pln = list_.find(node_offset);
   DEBUG_ASSERT(pln.IsValid());
-  const size_t node_index = offset_to_node_index(end_offset, list_skew_);
+  const size_t node_index = NodeIndex(end_offset);
   DEBUG_ASSERT(pln->Lookup(node_index).IsIntervalEnd());
 
   // The only populated slots in an interval are the start and the end. So the interval start will
@@ -250,10 +242,10 @@ ktl::pair<const VmPageOrMarker*, uint64_t> VmPageList::FindIntervalStartForEnd(
 ktl::pair<const VmPageOrMarker*, uint64_t> VmPageList::FindIntervalEndForStart(
     uint64_t start_offset) const {
   // Find the node that would contain the start offset.
-  const uint64_t node_offset = offset_to_node_offset(start_offset, list_skew_);
+  const uint64_t node_offset = NodeOffset(start_offset);
   auto pln = list_.find(node_offset);
   DEBUG_ASSERT(pln.IsValid());
-  const size_t node_index = offset_to_node_index(start_offset, list_skew_);
+  const size_t node_index = NodeIndex(start_offset);
   DEBUG_ASSERT(pln->Lookup(node_index).IsIntervalStart());
 
   // The only populated slots in an interval are the start and the end. So the interval end will
@@ -286,8 +278,8 @@ ktl::pair<const VmPageOrMarker*, uint64_t> VmPageList::FindIntervalEndForStart(
 ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(uint64_t offset,
                                                                               bool split_interval) {
   // Find the node that would contain this offset.
-  const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-  const size_t node_index = offset_to_node_index(offset, list_skew_);
+  const uint64_t node_offset = NodeOffset(offset);
+  const size_t node_index = NodeIndex(offset);
   if (node_offset >= VmPageList::MAX_SIZE) {
     return {nullptr, false};
   }
@@ -605,10 +597,10 @@ zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t 
   // |start_offset + PAGE_SIZE| will be populated in order for it to hold the interval start
   // sentinel at that offset. Similarly, we know that the node containing |end_offset - PAGE_SIZE|
   // will be populated. So all the unpopulated nodes (if any) will lie between these two nodes.
-  const uint64_t first_node_offset = offset_to_node_offset(start_offset + PAGE_SIZE, list_skew_);
-  const size_t first_node_index = offset_to_node_index(start_offset + PAGE_SIZE, list_skew_);
-  const uint64_t last_node_offset = offset_to_node_offset(end_offset - PAGE_SIZE, list_skew_);
-  const size_t last_node_index = offset_to_node_index(end_offset - PAGE_SIZE, list_skew_);
+  const uint64_t first_node_offset = NodeOffset(start_offset + PAGE_SIZE);
+  const size_t first_node_index = NodeIndex(start_offset + PAGE_SIZE);
+  const uint64_t last_node_offset = NodeOffset(end_offset - PAGE_SIZE);
+  const size_t last_node_index = NodeIndex(end_offset - PAGE_SIZE);
   DEBUG_ASSERT(last_node_offset >= first_node_offset);
   if (last_node_offset > first_node_offset + VmPageListNode::kPageFanOut * PAGE_SIZE) {
     const uint64_t first_unpopulated = first_node_offset + VmPageListNode::kPageFanOut * PAGE_SIZE;
@@ -706,7 +698,7 @@ zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t 
 
 bool VmPageList::IsOffsetInZeroInterval(uint64_t offset) const {
   // Find the node that would contain this offset.
-  const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
+  const uint64_t node_offset = NodeOffset(offset);
   // If the node containing offset is populated, the lower bound will return that node. If not
   // populated, it will return the next populated node.
   auto pln = list_.lower_bound(node_offset);
@@ -727,7 +719,7 @@ bool VmPageList::IsOffsetInZeroInterval(uint64_t offset) const {
 
 bool VmPageList::IsOffsetInInterval(uint64_t offset) const {
   // Find the node that would contain this offset.
-  const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
+  const uint64_t node_offset = NodeOffset(offset);
   // If the node containing offset is populated, the lower bound will return that node. If not
   // populated, it will return the next populated node.
   auto pln = list_.lower_bound(node_offset);
@@ -767,8 +759,8 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
   // Helper to look up a slot at an offset and return a mutable VmPageOrMarker*. Only finds an
   // existing slot and does not perform any allocations.
   auto lookup_slot = [this](uint64_t offset) -> VmPageOrMarker* {
-    const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-    const size_t index = offset_to_node_index(offset, list_skew_);
+    const uint64_t node_offset = NodeOffset(offset);
+    const size_t index = NodeIndex(offset);
     auto pln = list_.find(node_offset);
     if (!pln.IsValid()) {
       return nullptr;
@@ -944,14 +936,12 @@ zx_status_t VmPageList::AddZeroIntervalInternal(uint64_t start_offset, uint64_t 
     ReturnEmptySlot(prev_offset);
     // next_slot and prev_slot could have come from the same node, in which case we've already
     // freed up the node containing next_slot when returning prev_slot.
-    if (return_next_slot && offset_to_node_offset(prev_offset, list_skew_) ==
-                                offset_to_node_offset(next_offset, list_skew_)) {
+    if (return_next_slot && NodeOffset(prev_offset) == NodeOffset(next_offset)) {
       return_next_slot = false;
     }
   }
   if (return_next_slot) {
-    DEBUG_ASSERT(!return_prev_slot || offset_to_node_offset(prev_offset, list_skew_) !=
-                                          offset_to_node_offset(next_offset, list_skew_));
+    DEBUG_ASSERT(!return_prev_slot || NodeOffset(prev_offset) != NodeOffset(next_offset));
     ReturnEmptySlot(next_offset);
   }
 
@@ -989,8 +979,8 @@ zx_status_t VmPageList::OverwriteZeroInterval(uint64_t old_start_offset, uint64_
   // Helper to look up a slot at an offset and return a mutable VmPageOrMarker*. Only finds an
   // existing slot and does not perform any allocations.
   auto lookup_slot = [this](uint64_t offset) -> VmPageOrMarker* {
-    const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
-    const size_t index = offset_to_node_index(offset, list_skew_);
+    const uint64_t node_offset = NodeOffset(offset);
+    const size_t index = NodeIndex(offset);
     auto pln = list_.find(node_offset);
     if (!pln.IsValid()) {
       return nullptr;
@@ -1279,7 +1269,7 @@ void VmPageList::MergeFrom(
 
   // Calculate how much we need to shift nodes so that the node in |other| which contains
   // |offset| gets mapped to offset 0 in |this|.
-  const uint64_t node_shift = offset_to_node_offset(offset, other.list_skew_);
+  const uint64_t node_shift = other.NodeOffset(offset);
 
   auto other_iter = other.list_.lower_bound(node_shift);
   while (other_iter.IsValid()) {
@@ -1376,16 +1366,16 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
 
   // If we can't take the whole node at the start of the range,
   // the shove the pages into the splice list head_ node.
-  while (offset_to_node_index(offset, list_skew_) != 0 && offset < end) {
-    res.head_.Lookup(offset_to_node_index(offset, list_skew_)) = RemoveContent(offset);
+  while (NodeIndex(offset) != 0 && offset < end) {
+    res.head_.Lookup(NodeIndex(offset)) = RemoveContent(offset);
     offset += PAGE_SIZE;
   }
   DEBUG_ASSERT(res.head_.HasNoIntervalSentinel());
 
   // As long as the current and end node offsets are different, we
   // can just move the whole node into the splice list.
-  while (offset_to_node_offset(offset, list_skew_) != offset_to_node_offset(end, list_skew_)) {
-    ktl::unique_ptr<VmPageListNode> node = list_.erase(offset_to_node_offset(offset, list_skew_));
+  while (NodeOffset(offset) != NodeOffset(end)) {
+    ktl::unique_ptr<VmPageListNode> node = list_.erase(NodeOffset(offset));
     if (node) {
       DEBUG_ASSERT(node->HasNoIntervalSentinel());
       res.middle_.insert(ktl::move(node));
@@ -1395,7 +1385,7 @@ VmPageSpliceList VmPageList::TakePages(uint64_t offset, uint64_t length) {
 
   // Move any remaining pages into the splice list tail_ node.
   while (offset < end) {
-    res.tail_.Lookup(offset_to_node_index(offset, list_skew_)) = RemoveContent(offset);
+    res.tail_.Lookup(NodeIndex(offset)) = RemoveContent(offset);
     offset += PAGE_SIZE;
   }
   DEBUG_ASSERT(res.tail_.HasNoIntervalSentinel());
@@ -1486,11 +1476,11 @@ zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
   ASSERT(list_is_empty(&raw_pages_));
 
   const uint64_t cur_offset = offset_ + pos_;
-  const uint64_t node_idx = offset_to_node_index(cur_offset, list_skew_);
-  const uint64_t head_idx = offset_to_node_index(offset_, list_skew_);
-  const uint64_t node_offset = offset_to_node_offset(cur_offset, list_skew_);
-  const uint64_t head_offset = offset_to_node_offset(offset_, list_skew_);
-  const uint64_t tail_offset = offset_to_node_offset(offset_ + length_, list_skew_);
+  const uint64_t node_idx = NodeIndex(cur_offset);
+  const uint64_t head_idx = NodeIndex(offset_);
+  const uint64_t node_offset = NodeOffset(cur_offset);
+  const uint64_t head_offset = NodeOffset(offset_);
+  const uint64_t tail_offset = NodeOffset(offset_ + length_);
 
   if (head_idx != 0 && node_offset == head_offset) {
     head_.Lookup(node_idx) = ktl::move(content);
@@ -1542,16 +1532,15 @@ VmPageOrMarkerRef VmPageSpliceList::PeekReference() {
   }
 
   const uint64_t cur_offset = offset_ + pos_;
-  const auto cur_node_idx = offset_to_node_index(cur_offset, list_skew_);
-  const auto cur_node_offset = offset_to_node_offset(cur_offset, list_skew_);
+  const auto cur_node_idx = NodeIndex(cur_offset);
+  const auto cur_node_offset = NodeOffset(cur_offset);
 
   VmPageOrMarker* res = nullptr;
-  if (offset_to_node_index(offset_, list_skew_) != 0 &&
-      offset_to_node_offset(offset_, list_skew_) == cur_node_offset) {
+  if (NodeIndex(offset_) != 0 && NodeOffset(offset_) == cur_node_offset) {
     // If the original offset means that pages were placed in head_
     // and the current offset points to the same node, look there.
     res = &head_.Lookup(cur_node_idx);
-  } else if (cur_node_offset != offset_to_node_offset(offset_ + length_, list_skew_)) {
+  } else if (cur_node_offset != NodeOffset(offset_ + length_)) {
     // If the current offset isn't pointing to the tail node,
     // look in the middle tree.
     auto middle_node = middle_.find(cur_node_offset);
@@ -1587,15 +1576,14 @@ VmPageOrMarker VmPageSpliceList::Pop() {
     res = VmPageOrMarker::Page(head);
   } else {
     const uint64_t cur_offset = offset_ + pos_;
-    const auto cur_node_idx = offset_to_node_index(cur_offset, list_skew_);
-    const auto cur_node_offset = offset_to_node_offset(cur_offset, list_skew_);
+    const auto cur_node_idx = NodeIndex(cur_offset);
+    const auto cur_node_offset = NodeOffset(cur_offset);
 
-    if (offset_to_node_index(offset_, list_skew_) != 0 &&
-        offset_to_node_offset(offset_, list_skew_) == cur_node_offset) {
+    if (NodeIndex(offset_) != 0 && NodeOffset(offset_) == cur_node_offset) {
       // If the original offset means that pages were placed in head_
       // and the current offset points to the same node, look there.
       res = ktl::move(head_.Lookup(cur_node_idx));
-    } else if (cur_node_offset != offset_to_node_offset(offset_ + length_, list_skew_)) {
+    } else if (cur_node_offset != NodeOffset(offset_ + length_)) {
       // If the current offset isn't pointing to the tail node,
       // look in the middle tree.
       auto middle_node = middle_.find(cur_node_offset);
