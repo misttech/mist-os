@@ -23,7 +23,6 @@ use futures::select;
 use std::pin::pin;
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
-use tracing::error;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_power_system as fsystem, fuchsia_async as fasync};
 
 // The amount of time that the shim will spend trying to connect to
@@ -101,13 +100,31 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
                         SystemPowerState::Reboot
                     };
                     set_system_power_state(target_state);
-                    let res = self.forward_command(target_state, Some(reason), None).await;
+                    let res = self
+                        .forward_command(target_state, Some(RebootArguments::Reboot(reason)), None)
+                        .await;
                     let _ = responder.send(res.map_err(|s| s.into_raw()));
                 }
-                AdminRequest::PerformReboot { options: _, responder: _ } => {
-                    // TODO(https://fxbug.dev/385312336): Implement this
-                    // method.
-                    error!("Admin.PerformReboot is not yet implemented");
+                AdminRequest::PerformReboot { options, responder } => {
+                    let _reboot_control_lease = self.acquire_shutdown_control_lease().await;
+                    let target_state = if options
+                        .reasons
+                        .as_ref()
+                        .is_some_and(|reasons| reasons.contains(&RebootReason2::OutOfMemory))
+                    {
+                        SystemPowerState::RebootKernelInitiated
+                    } else {
+                        SystemPowerState::Reboot
+                    };
+                    set_system_power_state(target_state);
+                    let res = self
+                        .forward_command(
+                            target_state,
+                            Some(RebootArguments::PerformReboot(options)),
+                            None,
+                        )
+                        .await;
+                    let _ = responder.send(res.map_err(|s| s.into_raw()));
                 }
                 AdminRequest::RebootToBootloader { responder } => {
                     let _reboot_control_lease = self.acquire_shutdown_control_lease().await;
@@ -231,14 +248,17 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
     async fn forward_command(
         &self,
         fallback_state: SystemPowerState,
-        reboot_reason: Option<RebootReason>,
+        reboot_arguments: Option<RebootArguments>,
         mexec_request: Option<AdminMexecRequest>,
     ) -> Result<(), zx::Status> {
         let local = self.connect_to_protocol_with_timeout::<AdminMarker>();
         match local {
             Ok(local) => {
                 eprintln!("[shutdown-shim]: forwarding command {fallback_state:?}");
-                match self.send_command(local, fallback_state, reboot_reason, mexec_request).await {
+                match self
+                    .send_command(local, fallback_state, reboot_arguments, mexec_request)
+                    .await
+                {
                     Ok(()) => return Ok(()),
                     e @ Err(zx::Status::UNAVAILABLE | zx::Status::NOT_SUPPORTED) => {
                         // Power manager may decide not to support suspend. We should respect that and
@@ -270,31 +290,23 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
         &self,
         statecontrol_client: AdminProxy,
         fallback_state: SystemPowerState,
-        reboot_reason: Option<RebootReason>,
+        reboot_arguments: Option<RebootArguments>,
         mexec_request: Option<AdminMexecRequest>,
     ) -> Result<(), zx::Status> {
         match fallback_state {
-            SystemPowerState::Reboot => {
-                if let None = reboot_reason {
-                    eprintln!("[shutdown-shim]: internal error, no reason for reboot");
+            SystemPowerState::Reboot | SystemPowerState::RebootKernelInitiated => {
+                if let None = reboot_arguments {
+                    eprintln!("[shutdown-shim]: internal error, no arguments for reboot");
                     return Err(zx::Status::INTERNAL);
                 }
-                statecontrol_client
-                    .reboot(reboot_reason.unwrap())
-                    .await
-                    .map_err(|_| zx::Status::UNAVAILABLE)?
-                    .map_err(zx::Status::from_raw)
-            }
-            SystemPowerState::RebootKernelInitiated => {
-                if let None = reboot_reason {
-                    eprintln!("[shutdown-shim]: internal error, no reason for reboot");
-                    return Err(zx::Status::INTERNAL);
+                match reboot_arguments.unwrap() {
+                    RebootArguments::Reboot(reason) => statecontrol_client.reboot(reason).await,
+                    RebootArguments::PerformReboot(options) => {
+                        statecontrol_client.perform_reboot(&options).await
+                    }
                 }
-                statecontrol_client
-                    .reboot(reboot_reason.unwrap())
-                    .await
-                    .map_err(|_| zx::Status::UNAVAILABLE)?
-                    .map_err(zx::Status::from_raw)
+                .map_err(|_| zx::Status::UNAVAILABLE)?
+                .map_err(zx::Status::from_raw)
             }
             SystemPowerState::RebootBootloader => statecontrol_client
                 .reboot_to_bootloader()
@@ -414,6 +426,14 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
             Ok(()) => Err(format_err!("unexpected ok from {}", P::DEBUG_NAME)),
         }
     }
+}
+
+// The arguments for various reboot methods available on the `Admin` protocol.
+enum RebootArguments {
+    // Corresponds to the deprecated `Admin.Reboot` method.
+    Reboot(RebootReason),
+    // Corresponds to the `Admin.PerformReboot` method.
+    PerformReboot(RebootOptions),
 }
 
 struct SystemState {

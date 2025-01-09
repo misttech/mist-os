@@ -73,6 +73,7 @@ async fn run_mocks(
 #[derive(Debug, PartialEq)]
 pub enum Admin {
     Reboot(fstatecontrol::RebootReason),
+    PerformReboot(fstatecontrol::RebootOptions),
     RebootToBootloader,
     RebootToRecovery,
     Poweroff,
@@ -141,6 +142,11 @@ async fn run_statecontrol_admin(
             Some(fstatecontrol::AdminRequest::Reboot { reason, responder }) => {
                 info!("Reboot called");
                 send_signals.unbounded_send(Signal::Statecontrol(Admin::Reboot(reason)))?;
+                responder.send(Ok(()))?;
+            }
+            Some(fstatecontrol::AdminRequest::PerformReboot { options, responder }) => {
+                info!("PerformReboot called");
+                send_signals.unbounded_send(Signal::Statecontrol(Admin::PerformReboot(options)))?;
                 responder.send(Ok(()))?;
             }
             Some(fstatecontrol::AdminRequest::RebootToBootloader { responder }) => {

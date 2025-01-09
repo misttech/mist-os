@@ -5,7 +5,7 @@
 use crate::error::PowerManagerError;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
-use crate::shutdown_request::ShutdownRequest;
+use crate::shutdown_request::{InvalidRebootOptions, RebootReasons, ShutdownRequest};
 use crate::types::Seconds;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
@@ -230,14 +230,25 @@ impl SystemShutdownHandler {
                             let _ = responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()));
                         }
                         fpowercontrol::AdminRequest::Reboot { reason, responder } => {
+                            // TODO(https://fxbug.dev/385312336): Delete this
+                            // implementation once the `Reboot` method is
+                            // removed from the FIDL API. For now, translate
+                            // the request to the new API.
+                            let reasons = RebootReasons::from_deprecated(&reason);
                             let result =
-                                self.handle_shutdown(ShutdownRequest::Reboot(reason)).await;
+                                self.handle_shutdown(ShutdownRequest::Reboot(reasons)).await;
                             let _ = responder.send(result.map_err(|e| e.into_raw()));
                         }
-                        fpowercontrol::AdminRequest::PerformReboot { options: _, responder: _ } => {
-                            // TODO(https://fxbug.dev/385312336): Implement this
-                            // method.
-                            error!("Admin.PerformReboot is not yet implemented");
+                        fpowercontrol::AdminRequest::PerformReboot { options, responder } => {
+                            let result = match options.try_into() {
+                                Ok(reasons) => {
+                                    self.handle_shutdown(ShutdownRequest::Reboot(reasons)).await
+                                }
+                                Err(InvalidRebootOptions::NoReasons) => {
+                                    Err(zx::Status::INVALID_ARGS)
+                                }
+                            };
+                            let _ = responder.send(result.map_err(|e| e.into_raw()));
                         }
                         fpowercontrol::AdminRequest::RebootToBootloader { responder } => {
                             let result =
@@ -303,7 +314,8 @@ impl SystemShutdownHandler {
         // If we have one, notify the ShutdownWatcher node of the incoming shutdown request.
         // Since the call is blocking, the node could choose to delay shutdown if it likes.
         if let Some(watcher_node) = &self.shutdown_watcher {
-            let _ = self.send_message(watcher_node, &Message::SystemShutdown(request)).await;
+            let _ =
+                self.send_message(watcher_node, &Message::SystemShutdown(request.clone())).await;
         }
 
         // Handle the shutdown using a timeout if one is present in the config
@@ -428,7 +440,9 @@ impl Node for SystemShutdownHandler {
 
     async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, PowerManagerError> {
         match msg {
-            Message::SystemShutdown(request) => self.handle_system_shutdown_message(*request).await,
+            Message::SystemShutdown(request) => {
+                self.handle_system_shutdown_message(request.clone()).await
+            }
             _ => Err(PowerManagerError::Unsupported),
         }
     }
@@ -472,7 +486,6 @@ impl InspectData {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::shutdown_request::RebootReason;
     use crate::test::mock_node::{MessageMatcher, MockNodeMaker};
     use crate::{msg_eq, msg_ok_return};
     use assert_matches::assert_matches;
@@ -531,7 +544,11 @@ pub mod tests {
         // Issue a shutdown call that will fail (because the Component Manager mock node will
         // respond to Shutdown with an error), which causes a force shutdown to be issued.
         // This gives us something interesting to verify in Inspect.
-        let _ = node.handle_shutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature)).await;
+        let _ = node
+            .handle_shutdown(ShutdownRequest::Reboot(RebootReasons::new(
+                fpowercontrol::RebootReason2::HighTemperature,
+            )))
+            .await;
 
         assert_data_tree!(
             inspector,
@@ -540,7 +557,7 @@ pub mod tests {
                     config: {
                         "shutdown_timeout (s)": 100u64
                     },
-                    shutdown_request: "Reboot(HighTemperature)",
+                    shutdown_request: "Reboot(RebootReasons([HighTemperature]))",
                     force_shutdown_attempted: true
                 }
             }
@@ -553,7 +570,7 @@ pub mod tests {
     async fn test_shutdown() {
         // The test will call `shutdown` with each of these shutdown requests
         let shutdown_requests = vec![
-            ShutdownRequest::Reboot(RebootReason::UserRequest),
+            ShutdownRequest::Reboot(RebootReasons::new(fpowercontrol::RebootReason2::UserRequest)),
             ShutdownRequest::RebootBootloader,
             ShutdownRequest::RebootRecovery,
             ShutdownRequest::PowerOff,
@@ -575,7 +592,7 @@ pub mod tests {
 
         // Call `suspend` for each power state.
         for request in &shutdown_requests {
-            let _ = node.shutdown(*request).await;
+            let _ = node.shutdown(request.clone()).await;
         }
 
         // Verify the Component Manager shutdown was called for each shutdown call
@@ -641,7 +658,7 @@ pub mod tests {
         // Run the first shutdown request. This is expected to stall because the fake Component
         // Manager proxy will not be responding to the request.
         assert!(exec
-            .run_until_stalled(&mut Box::pin(node.handle_shutdown(shutdown_request)))
+            .run_until_stalled(&mut Box::pin(node.handle_shutdown(shutdown_request.clone())))
             .is_pending());
 
         // Run a second request and verify it returns with the expected error
@@ -679,13 +696,18 @@ pub mod tests {
         let mut mock_maker = MockNodeMaker::new();
 
         // Choose an arbitrary shutdown request for the test
-        let shutdown_request = ShutdownRequest::Reboot(RebootReason::HighTemperature);
+        let shutdown_request = ShutdownRequest::Reboot(RebootReasons::new(
+            fpowercontrol::RebootReason2::HighTemperature,
+        ));
 
         // A mock ShutdownWatcher node that expects the SystemShutdown message containing the above
         // shutdown_request
         let shutdown_watcher = mock_maker.make(
             "ShutdownWatcher",
-            vec![(msg_eq!(SystemShutdown(shutdown_request)), msg_ok_return!(SystemShutdown))],
+            vec![(
+                msg_eq!(SystemShutdown(shutdown_request.clone())),
+                msg_ok_return!(SystemShutdown),
+            )],
         );
 
         // Create the SystemShutdownHandler node and send the shutdown request

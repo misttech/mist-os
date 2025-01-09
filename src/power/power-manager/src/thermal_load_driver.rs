@@ -7,11 +7,12 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::platform_metrics::PlatformMetric;
-use crate::shutdown_request::{RebootReason, ShutdownRequest};
+use crate::shutdown_request::{RebootReasons, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
 use crate::types::{Celsius, Seconds, ThermalLoad};
 use anyhow::{format_err, Error, Result};
 use async_trait::async_trait;
+use fidl_fuchsia_hardware_power_statecontrol::RebootReason2;
 use fuchsia_inspect::{self as inspect, Property};
 use futures::{StreamExt, TryFutureExt as _};
 use log::*;
@@ -257,7 +258,9 @@ impl ThermalLoadDriver {
         match self
             .send_message(
                 &self.system_shutdown_node,
-                &Message::SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature)),
+                &Message::SystemShutdown(ShutdownRequest::Reboot(RebootReasons::new(
+                    RebootReason2::HighTemperature,
+                ))),
             )
             .await
         {
@@ -651,7 +654,9 @@ mod tests {
         let system_shutdown_node = mock_maker.make(
             "mock_system_shutdown_node",
             vec![(
-                msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature))),
+                msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReasons::new(
+                    RebootReason2::HighTemperature
+                )))),
                 msg_ok_return!(SystemShutdown),
             )],
         );
@@ -815,7 +820,9 @@ mod tests {
 
         // Verify if a sensor causes thermal shutdown then `ThrottlingResultShutdown` is sent
         mock_system_shutdown_node.add_msg_response_pair((
-            msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature))),
+            msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReasons::new(
+                RebootReason2::HighTemperature
+            )))),
             msg_ok_return!(SystemShutdown),
         ));
         mock_platform_metrics.add_msg_response_pair((

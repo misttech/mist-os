@@ -8,11 +8,12 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::platform_metrics::PlatformMetric;
-use crate::shutdown_request::{RebootReason, ShutdownRequest};
+use crate::shutdown_request::{RebootReasons, ShutdownRequest};
 use crate::temperature_handler::TemperatureFilter;
 use crate::types::{Celsius, Seconds};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
+use fidl_fuchsia_hardware_power_statecontrol::RebootReason2;
 use futures::future::{FutureExt, LocalBoxFuture};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -173,7 +174,9 @@ impl ThermalShutdown {
             );
             self.send_message(
                 &self.system_shutdown_node,
-                &Message::SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature)),
+                &Message::SystemShutdown(ShutdownRequest::Reboot(RebootReasons::new(
+                    RebootReason2::HighTemperature,
+                ))),
             )
             .await
             .map_err(|e| format_err!("Failed to shut down the system: {}", e))?;
@@ -239,7 +242,9 @@ mod tests {
         let shutdown_node = mock_maker.make(
             "Shutdown",
             vec![(
-                msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature))),
+                msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReasons::new(
+                    RebootReason2::HighTemperature
+                )))),
                 msg_ok_return!(SystemShutdown),
             )],
         );
@@ -269,7 +274,9 @@ mod tests {
             mock_maker.make(
                 "Shutdown",
                 vec![(
-                    msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReason::HighTemperature))),
+                    msg_eq!(SystemShutdown(ShutdownRequest::Reboot(RebootReasons::new(
+                        RebootReason2::HighTemperature
+                    )))),
                     msg_ok_return!(SystemShutdown),
                 )],
             ),
