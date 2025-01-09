@@ -7,6 +7,7 @@ mod clone;
 mod describe;
 mod directory;
 mod file;
+mod flags;
 mod get_connection_info;
 mod node;
 mod remote;

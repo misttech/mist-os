@@ -86,6 +86,7 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                         | fio::NodeAttributesQuery::CASEFOLD
                         | fio::NodeAttributesQuery::SELINUX_CONTEXT,
                     supports_services: false,
+                    supports_get_set_flags2: false,
                 })?;
             }
             TestHarnessRequest::CreateDirectory {
