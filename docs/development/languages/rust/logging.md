@@ -84,12 +84,12 @@ fn example_test_with_tags() {
 
 ## Record logs {#record}
 
-Rust programs on Fuchsia generally use the `tracing` crate macros to record
+Rust programs on Fuchsia generally use the `log` crate macros to record
 logs.
 
 ### GN dependencies
 
-Add the `tracing` crate to the `deps` entry of your `BUILD.gn` file:
+Add the `log` crate to the `deps` entry of your `BUILD.gn` file:
 
 ```gn
 deps = [
@@ -99,24 +99,25 @@ deps = [
 
 ### Log events
 
-Call the macros provided by the [`tracing`][trc] crate to record logs at the declared
+Call the macros provided by the [`log`][log-crate] crate to record logs at the declared
 severity level:
 
 ```rust
-use tracing;
-
 fn main() {
     log::trace!("something happened: {}", 5); // maps to TRACE
     log::debug!("something happened: {}", 4); // maps to DEBUG
     log::info!("something happened: {}", 3);  // maps to INFO
     log::warn!("something happened: {}", 2);  // maps to WARN
     log::error!("something happened: {}", 1); // maps to ERROR
+
+    # You can also use the log crate to emit structured logs.
+    log::info!(my_key = 3, other_key_debug:?; "something happened");
 }
 ```
 
 Note: While we provide our own `FX_` prefixed logging macros in
-C++, we have aligned on the [`tracing`][trc] crate as the logging
-interface for Rust. See their [documentation][trc] for guidance on
+C++, we have aligned on the [`log`][log-crate] crate as the logging
+interface for Rust. See their [documentation][log-crate] for guidance on
 how to format your logs.
 
 ## Standard streams
@@ -129,7 +130,7 @@ For more details, see the [standard streams][std-streams] section in the
 language-agnostic logging documentation.
 
 [doc-logging]: /docs/concepts/components/diagnostics/README.md#logs
+[log-crate]: https://fuchsia-docs.firebaseapp.com/rust/log/index.html
 [ref-fuchsia]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia/
 [rust-dev]: /docs/development/languages/rust/README.md
 [std-streams]: /docs/development/diagnostics/logs/recording.md#stdout-stderr
-[trc]: https://fuchsia-docs.firebaseapp.com/rust/tracing/index.html
