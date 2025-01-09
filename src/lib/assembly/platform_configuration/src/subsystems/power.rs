@@ -16,6 +16,16 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
         config: &PowerConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        if let Some(path) = &config.metrics_logging_config {
+            builder
+                .package("metrics-logger")
+                .config_data(FileEntry {
+                    source: path.as_utf8_pathbuf().into(),
+                    destination: "config.json".into(),
+                })
+                .context("Setting metrics-logger config data path")?;
+        }
+
         if let Some(energy_model_config) = &context.board_info.configuration.energy_model {
             builder
                 .bootfs()

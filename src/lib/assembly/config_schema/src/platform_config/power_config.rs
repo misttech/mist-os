@@ -2,11 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Platform configuration options for the starnix area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[derive(
+    Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema, SupportsFileRelativePaths,
+)]
 #[serde(default, deny_unknown_fields)]
 pub struct PowerConfig {
     /// Whether power suspend/resume is supported.
@@ -22,4 +25,9 @@ pub struct PowerConfig {
     /// for power system non-hermetic testing in the platform.
     #[serde(default)]
     pub enable_non_hermetic_testing: bool,
+
+    /// Configuration of devices and drivers for power-metrics collection
+    #[schemars(schema_with = "crate::option_path_schema")]
+    #[file_relative_paths]
+    pub metrics_logging_config: Option<FileRelativePathBuf>,
 }
