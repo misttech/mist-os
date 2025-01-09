@@ -44,7 +44,7 @@ __BEGIN_CDECLS
 #define RAM_CRASHLOG_MAGIC_1 (~RAM_CRASHLOG_MAGIC_0)
 
 typedef struct {
-  zx_duration_t uptime;          // Best estimate of system uptime.
+  zx_instant_boot_t uptime;      // Best estimate of system uptime.
   zircon_crash_reason_t reason;  // The system's best guess as to the reason for crash/reboot
   uint32_t payload_len;
   uint32_t payload_crc32;  // A CRC32 of just the payload section of the crashlog.
@@ -70,7 +70,7 @@ typedef struct {
 // 3) An indication of the payload's integrity.
 // 4) A length of the memory mapped payload.
 typedef struct {
-  zx_duration_t uptime;
+  zx_instant_boot_t uptime;
   zircon_crash_reason_t reason;
   bool payload_valid;
   const void* payload;
@@ -111,7 +111,7 @@ typedef struct {
 // ZX_OK               : Log was successfully stowed.
 //
 zx_status_t ram_crashlog_stow(void* buf, size_t buf_len, const void* payload, uint32_t payload_len,
-                              zircon_crash_reason_t sw_reason, zx_time_t uptime);
+                              zircon_crash_reason_t sw_reason, zx_instant_boot_t uptime);
 
 // Attempt to recover the crashlog located at |buf|, returning details about the
 // recovered log in the user-supplied log_out structure.  Provided that valid

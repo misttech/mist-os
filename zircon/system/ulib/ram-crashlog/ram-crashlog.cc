@@ -30,7 +30,7 @@ void clean_cache_range(void* ptr, size_t len) {}
 }  // namespace
 
 zx_status_t ram_crashlog_stow(void* buf, size_t buf_len, const void* payload, uint32_t payload_len,
-                              zircon_crash_reason_t sw_reason, zx_time_t uptime) {
+                              zircon_crash_reason_t sw_reason, zx_instant_boot_t uptime) {
   // The user needs to provide a valid buffer to stow the log, but they do not
   // have to provide a payload.  That said, they may not provide a null payload
   // pointer and a non-zero payload length.
