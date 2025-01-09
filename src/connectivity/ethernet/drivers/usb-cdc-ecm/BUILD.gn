@@ -45,7 +45,10 @@ fuchsia_cc_driver("usb-cdc-ecm-driver") {
 }
 
 fuchsia_driver_component("usb-cdc-ecm") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/connectivity/ethernet:drivers",
+  ]
   component_name = "usb-cdc-ecm"
   deps = [ ":usb-cdc-ecm-driver" ]
   info = "meta/usb-cdc-ecm-info.json"

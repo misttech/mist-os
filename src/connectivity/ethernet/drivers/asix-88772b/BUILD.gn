@@ -33,7 +33,10 @@ fuchsia_cc_driver("asix-88772b-driver") {
 }
 
 fuchsia_driver_component("asix-88772b") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/connectivity/ethernet:drivers",
+  ]
   component_name = "asix-88772b"
   deps = [ ":asix-88772b-driver" ]
   info = "meta/asix-88772b-info.json"
