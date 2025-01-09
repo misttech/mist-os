@@ -25,7 +25,10 @@ fuchsia_cc_driver("coordinator-driver") {
 }
 
 fuchsia_driver_component("coordinator") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/graphics/display:drivers",
+  ]
   component_name = "display-coordinator"
   deps = [ ":coordinator-driver" ]
   info = "meta/coordinator-info.json"
