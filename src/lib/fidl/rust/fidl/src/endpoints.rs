@@ -315,7 +315,7 @@ pub trait ServiceProxy: Sized {
 /// and this library, which cannot depend on fuchsia.io.
 #[doc(hidden)]
 #[cfg(target_os = "fuchsia")]
-pub trait MemberOpener {
+pub trait MemberOpener: Send + Sync {
     /// Opens a member protocol of a FIDL service by name, serving that protocol
     /// on the given channel.
     fn open_member(&self, member: &str, server_end: Channel) -> Result<(), Error>;
