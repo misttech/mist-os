@@ -20,15 +20,8 @@ namespace media_audio {
 
 // This provides unittest functions for Inspector and its child classes.
 class InspectorTest : public AudioDeviceRegistryServerTestBase {
- protected:
-  static inline const fuchsia_audio_device::RingBufferOptions kDefaultRingBufferOptions{{
-      .format = fuchsia_audio::Format{{.sample_type = fuchsia_audio::SampleType::kInt16,
-                                       .channel_count = 2,
-                                       .frames_per_second = 48000}},
-      .ring_buffer_min_bytes = 2000,
-  }};
-
-  static inspect::Hierarchy GetHierarchy() {
+ private:
+  static inspect::Hierarchy InnerGetHierarchy() {
     auto& component_inspector = Inspector::Singleton()->component_inspector();
     auto& inspector = component_inspector->inspector();
 
@@ -44,6 +37,20 @@ class InspectorTest : public AudioDeviceRegistryServerTestBase {
     }
 
     return inspect::Hierarchy();
+  }
+
+ protected:
+  static inline const fuchsia_audio_device::RingBufferOptions kDefaultRingBufferOptions{{
+      .format = fuchsia_audio::Format{{.sample_type = fuchsia_audio::SampleType::kInt16,
+                                       .channel_count = 2,
+                                       .frames_per_second = 48000}},
+      .ring_buffer_min_bytes = 2000,
+  }};
+
+  static inspect::Hierarchy GetHierarchy() {
+    auto h = InnerGetHierarchy();
+    h.Sort();
+    return h;
   }
 
   std::shared_ptr<FakeComposite> CreateAndAddFakeComposite() {
