@@ -10,6 +10,7 @@ use crate::vfs::socket::{
     SocketProtocol, SocketShutdownFlags, SocketType,
 };
 use crate::vfs::{AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer};
+use byteorder::ByteOrder;
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::user_buffer::UserBuffer;
@@ -23,14 +24,24 @@ use starnix_uapi::{
 use ebpf::convert_and_verify_cbpf;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use static_assertions::const_assert_eq;
+use std::mem::size_of;
 use std::sync::{Arc, OnceLock};
-use syncio::zxio::{IP_RECVERR, SOL_IP, SOL_SOCKET, SO_DOMAIN, SO_PROTOCOL, SO_TYPE};
+use syncio::zxio::{
+    zxio_socket_mark, IP_RECVERR, SOL_IP, SOL_SOCKET, SO_DOMAIN, SO_FUCHSIA_MARK, SO_MARK,
+    SO_PROTOCOL, SO_TYPE, ZXIO_SOCKET_MARK_DOMAIN_1,
+};
 use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorCode};
 use {
     fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
-    fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, zx,
 };
+
+/// Linux marks aren't compatible with Fuchsia marks, we store the `SO_MARK`
+/// value in the fuchsia `ZXIO_SOCKET_MARK_DOMAIN_1`. If a mark in this domain
+/// is absent, it will be reported to starnix applications as a `0` since that
+/// is the default mark value on Linux.
+const ZXIO_SOCKET_MARK_SO_MARK: u8 = ZXIO_SOCKET_MARK_DOMAIN_1;
 
 /// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.
 struct SocketProviderServiceConnector;
@@ -83,8 +94,10 @@ impl ZxioBackedSocket {
         .map_err(|status| from_status_like_fdio!(status))?
         .map_err(|out_code| errno_from_zxio_code!(out_code))?;
 
-        Ok(Self::new_with_zxio(zxio))
+        let socket = Self::new_with_zxio(zxio);
+        Ok(socket)
     }
+
     pub fn new_with_zxio(zxio: syncio::Zxio) -> ZxioBackedSocket {
         ZxioBackedSocket { zxio: Arc::new(zxio) }
     }
@@ -212,7 +225,7 @@ impl ZxioBackedSocket {
         // SO_ATTACH_FILTER is supported only for packet sockets.
         let domain = self
             .zxio
-            .getsockopt(SOL_SOCKET, SO_DOMAIN, std::mem::size_of::<u32>() as u32)
+            .getsockopt(SOL_SOCKET, SO_DOMAIN, size_of::<u32>() as u32)
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))?;
         let domain = u32::from_ne_bytes(domain.try_into().unwrap());
@@ -245,7 +258,7 @@ impl SocketOps for ZxioBackedSocket {
         let getsockopt = |optname: u32| -> Result<u32, Errno> {
             Ok(u32::from_ne_bytes(
                 self.zxio
-                    .getsockopt(SOL_SOCKET, optname, std::mem::size_of::<u32>() as u32)
+                    .getsockopt(SOL_SOCKET, optname, size_of::<u32>() as u32)
                     .map_err(|status| from_status_like_fdio!(status))?
                     .map_err(|out_code| errno_from_zxio_code!(out_code))?
                     .try_into()
@@ -446,6 +459,21 @@ impl SocketOps for ZxioBackedSocket {
                 track_stub!(TODO("https://fxbug.dev/333060595"), "SOL_IP.IP_RECVERR");
                 Ok(())
             }
+            (SOL_SOCKET, SO_MARK) => {
+                let mark = task.read_object::<u32>(user_opt.try_into()?)?;
+                let socket_mark = zxio_socket_mark {
+                    is_present: true,
+                    domain: ZXIO_SOCKET_MARK_SO_MARK,
+                    value: mark,
+                    ..Default::default()
+                };
+                let optval: &[u8; size_of::<zxio_socket_mark>()] =
+                    zerocopy::transmute_ref!(&socket_mark);
+                self.zxio
+                    .setsockopt(SOL_SOCKET as i32, SO_FUCHSIA_MARK as i32, optval)
+                    .map_err(|status| from_status_like_fdio!(status))?
+                    .map_err(|out_code| errno_from_zxio_code!(out_code))
+            }
             _ => {
                 let optval = task.read_buffer(&user_opt)?;
                 self.zxio
@@ -463,10 +491,42 @@ impl SocketOps for ZxioBackedSocket {
         optname: u32,
         optlen: u32,
     ) -> Result<Vec<u8>, Errno> {
-        self.zxio
-            .getsockopt(level, optname, optlen)
-            .map_err(|status| from_status_like_fdio!(status))?
-            .map_err(|out_code| errno_from_zxio_code!(out_code))
+        match (level, optname) {
+            // SO_MARK is specialized because linux socket marks are not compatible
+            // with fuchsia socket marks. We need to get the socket mark from the
+            // `ZXIO_SOCKET_MARK_SO_MARK` domain.
+            (SOL_SOCKET, SO_MARK) => {
+                let mut optval: [u8; size_of::<zxio_socket_mark>()] =
+                    zerocopy::try_transmute!(zxio_socket_mark {
+                        is_present: false,
+                        domain: ZXIO_SOCKET_MARK_SO_MARK,
+                        value: 0,
+                        ..Default::default()
+                    })
+                    .expect("invalid bit pattern");
+                // Retrieves the `zxio_socket_mark` from the domain.
+                let optlen = self
+                    .zxio
+                    .getsockopt_slice(level, optname, &mut optval)
+                    .map_err(|status| from_status_like_fdio!(status))?
+                    .map_err(|out_code| errno_from_zxio_code!(out_code))?;
+                if optlen as usize != size_of::<zxio_socket_mark>() {
+                    return error!(EINVAL);
+                }
+                let socket_mark: zxio_socket_mark =
+                    zerocopy::try_transmute!(optval).map_err(|_validity_err| errno!(EINVAL))?;
+                // Translate to a linux mark, the default value is 0.
+                let mark = if socket_mark.is_present { socket_mark.value } else { 0 };
+                let mut result = vec![0; 4];
+                byteorder::NativeEndian::write_u32(&mut result, mark);
+                Ok(result)
+            }
+            _ => self
+                .zxio
+                .getsockopt(level, optname, optlen)
+                .map_err(|status| from_status_like_fdio!(status))?
+                .map_err(|out_code| errno_from_zxio_code!(out_code)),
+        }
     }
 
     fn to_handle(

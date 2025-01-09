@@ -1230,7 +1230,7 @@ func (ep *endpoint) GetIpPacketInfo(fidl.Context) (socket.BaseNetworkSocketGetIp
 }
 
 func (ep *endpoint) SetMark(_ fidl.Context, domain socket.MarkDomain, mark socket.OptionalUint32) (socket.BaseSocketSetMarkResult, error) {
-	return socket.BaseSocketSetMarkResultWithErr(posix.ErrnoEopnotsupp), nil
+	return socket.BaseSocketSetMarkResultWithResponse(socket.BaseSocketSetMarkResponse{}), nil
 }
 
 func (ep *endpoint) GetMark(_ fidl.Context, domain socket.MarkDomain) (socket.BaseSocketGetMarkResult, error) {

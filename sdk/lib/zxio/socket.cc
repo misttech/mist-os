@@ -9,6 +9,7 @@
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/fit/result.h>
 #include <lib/zx/socket.h>
+#include <lib/zxio/bsdsocket.h>
 #include <lib/zxio/cpp/transitional.h>
 #include <lib/zxio/cpp/udp_socket_private.h>
 #include <lib/zxio/fault_catcher.h>
@@ -26,6 +27,7 @@
 #include <cstring>
 #include <type_traits>
 
+#include <fbl/unaligned.h>
 #include <safemath/safe_conversions.h>
 
 #include "sdk/lib/zxio/dgram_cache.h"
@@ -405,6 +407,54 @@ SockOptResult GetSockOptProcessor::StoreOption(const fuchsia_net::wire::SocketAd
   return SockOptResult::Ok();
 }
 
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+struct FidlSocketMarkWithDomain {
+  FidlSocketMarkWithDomain() = default;
+  explicit FidlSocketMarkWithDomain(fsocket::wire::OptionalUint32 mark,
+                                    fsocket::wire::MarkDomain domain)
+      : mark(mark), domain(domain) {}
+
+  fsocket::wire::OptionalUint32 mark;
+  fsocket::wire::MarkDomain domain;
+};
+
+zxio_socket_mark_domain_t from_fidl_mark_domain(fsocket::wire::MarkDomain domain) {
+  switch (domain) {
+    case fsocket::wire::MarkDomain::kMark1:
+      return ZXIO_SOCKET_MARK_DOMAIN_1;
+    case fsocket::wire::MarkDomain::kMark2:
+      return ZXIO_SOCKET_MARK_DOMAIN_2;
+  }
+}
+
+fit::result<int16_t, fsocket::wire::MarkDomain> into_fidl_mark_domain(
+    zxio_socket_mark_domain_t domain) {
+  switch (domain) {
+    case ZXIO_SOCKET_MARK_DOMAIN_1:
+      return fit::success(fsocket::wire::MarkDomain::kMark1);
+    case ZXIO_SOCKET_MARK_DOMAIN_2:
+      return fit::success(fsocket::wire::MarkDomain::kMark2);
+    default:
+      return fit::error(static_cast<int16_t>(EINVAL));
+  }
+}
+
+template <>
+SockOptResult GetSockOptProcessor::StoreOption(const FidlSocketMarkWithDomain& mark_and_domain) {
+  const auto& [mark, domain] = mark_and_domain;
+  // Fuchsia socket marks are optional. It's different between having a mark with 0
+  // and not having a mark at all. So if `is_present` is false, then `value` has
+  // no meaning.
+  zxio_socket_mark_t socket_mark{
+      .value = mark.is_value() ? mark.value() : 0,
+      .domain = from_fidl_mark_domain(domain),
+      .is_present = mark.is_value(),
+  };
+  return StoreRaw(&socket_mark, sizeof(socket_mark));
+}
+#endif
+
 // Used for various options that allow the caller to supply larger buffers than needed.
 struct PartialCopy {
   int32_t value;
@@ -590,6 +640,26 @@ int16_t SetSockOptProcessor::Get(IntOrChar& out) {
   out.value = *static_cast<const uint8_t*>(optval_);
   return 0;
 }
+
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+template <>
+int16_t SetSockOptProcessor::Get(FidlSocketMarkWithDomain& out) {
+  zxio_socket_mark_t socket_mark{};
+  if (Get(socket_mark) != 0) {
+    return EINVAL;
+  }
+  auto fidl_domain_result = into_fidl_mark_domain(socket_mark.domain);
+  if (fidl_domain_result.is_error()) {
+    return fidl_domain_result.error_value();
+  }
+  out.domain = fidl_domain_result.value();
+  out.mark = socket_mark.is_present
+                 ? fsocket::wire::OptionalUint32::WithValue(socket_mark.value)
+                 : fsocket::wire::OptionalUint32::WithUnset(fsocket::wire::Empty{});
+  return 0;
+}
+#endif
 
 template <typename Client,
           typename = std::enable_if_t<
@@ -789,6 +859,22 @@ class base_socket {
               .allow_char = false,
           };
         });
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+      case SO_FUCHSIA_MARK: {
+        if (*optlen < sizeof(zxio_socket_mark_t)) {
+          return SockOptResult::Errno(EINVAL);
+        }
+        zxio_socket_mark_domain_t domain = fbl::UnalignedLoad<zxio_socket_mark_t>(optval).domain;
+        auto fidl_domain_result = into_fidl_mark_domain(domain);
+        if (fidl_domain_result.is_error()) {
+          return SockOptResult::Errno(fidl_domain_result.error_value());
+        }
+        auto fidl_domain = fidl_domain_result.value();
+        return proc.Process(client()->GetMark(fidl_domain), [fidl_domain](const auto& response) {
+          return FidlSocketMarkWithDomain(response.mark, fidl_domain);
+        });
+      }
+#endif
       case SO_SNDTIMEO:
       case SO_RCVTIMEO:
       case SO_PEERCRED:
@@ -853,6 +939,14 @@ class base_socket {
             [this](bool value) { return client()->SetOutOfBandInline(value); });
       case SO_NO_CHECK:
         return proc.Process<bool>([this](bool value) { return client()->SetNoCheck(value); });
+// TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+      case SO_FUCHSIA_MARK:
+        return proc.Process<FidlSocketMarkWithDomain>([this](auto mark_and_domain) {
+          auto [mark, domain] = mark_and_domain;
+          return client()->SetMark(domain, mark);
+        });
+#endif
       case SO_SNDTIMEO:
       case SO_RCVTIMEO:
         return SockOptResult::Errno(ENOTSUP);

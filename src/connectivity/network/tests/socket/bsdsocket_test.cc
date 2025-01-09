@@ -2070,4 +2070,74 @@ INSTANTIATE_TEST_SUITE_P(NetSocket, IcmpSocketTest,
                          testing::Values(std::make_pair(SocketDomain::IPv4(), IPPROTO_ICMP),
                                          std::make_pair(SocketDomain::IPv6(), IPPROTO_ICMPV6)));
 
+#if defined(__Fuchsia__)
+#include <lib/zxio/bsdsocket.h>
+
+using SocketKindAndMarkDomain = std::tuple<SocketDomain, SocketType, uint8_t>;
+class ZxioSocketMarkTest : public SocketOptionTestBase,
+                           public testing::WithParamInterface<SocketKindAndMarkDomain> {
+ protected:
+  ZxioSocketMarkTest()
+      : SocketOptionTestBase(std::get<0>(GetParam()), std::get<1>(GetParam())),
+        mark_domain_(std::get<2>(GetParam())) {}
+  uint8_t mark_domain() const { return mark_domain_; }
+
+ private:
+  uint8_t mark_domain_;
+};
+
+TEST_P(ZxioSocketMarkTest, SetAndGet) {
+  zxio_socket_mark_t mark;
+  mark.domain = mark_domain();
+  socklen_t optlen = sizeof(mark);
+  ASSERT_EQ(getsockopt(sock().get(), SOL_SOCKET, SO_FUCHSIA_MARK, &mark, &optlen), 0)
+      << strerror(errno);
+  ASSERT_EQ(mark.is_present, 0);
+  ASSERT_EQ(mark.domain, mark_domain());
+  ASSERT_EQ(optlen, sizeof(mark));
+
+  constexpr uint32_t kMarkValue = 1000;
+  mark.is_present = 1;
+  mark.value = kMarkValue;
+  ASSERT_EQ(setsockopt(sock().get(), SOL_SOCKET, SO_FUCHSIA_MARK, &mark, sizeof(mark)), 0)
+      << strerror(errno);
+
+  memset(&mark, 0, sizeof(mark));
+  mark.domain = mark_domain();
+
+  // Should get back the socket mark we just set.
+  ASSERT_EQ(getsockopt(sock().get(), SOL_SOCKET, SO_FUCHSIA_MARK, &mark, &optlen), 0)
+      << strerror(errno);
+  ASSERT_NE(mark.is_present, 0);
+  ASSERT_EQ(mark.domain, mark_domain());
+  ASSERT_EQ(mark.value, kMarkValue);
+  ASSERT_EQ(optlen, sizeof(mark));
+}
+
+TEST_P(ZxioSocketMarkTest, InvalidMarkDomain) {
+  zxio_socket_mark_t mark;
+  mark.domain = 255;
+  socklen_t optlen = sizeof(mark);
+  ASSERT_EQ(getsockopt(sock().get(), SOL_SOCKET, SO_FUCHSIA_MARK, &mark, &optlen), -1);
+  ASSERT_EQ(errno, EINVAL);
+  ASSERT_EQ(setsockopt(sock().get(), SOL_SOCKET, SO_FUCHSIA_MARK, &mark, optlen), -1);
+  ASSERT_EQ(errno, EINVAL);
+}
+
+TEST_P(ZxioSocketMarkTest, InvalidOptLen) {
+  zxio_socket_mark_t mark;
+  mark.domain = ZXIO_SOCKET_MARK_DOMAIN_1;
+  socklen_t optlen = sizeof(mark) - 1;
+  ASSERT_EQ(getsockopt(sock().get(), SOL_SOCKET, SO_FUCHSIA_MARK, &mark, &optlen), -1);
+  ASSERT_EQ(errno, EINVAL);
+  ASSERT_EQ(setsockopt(sock().get(), SOL_SOCKET, SO_FUCHSIA_MARK, &mark, optlen), -1);
+  ASSERT_EQ(errno, EINVAL);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    ZxioSocketMarkTest, ZxioSocketMarkTest,
+    testing::Combine(testing::Values(SocketDomain::IPv4(), SocketDomain::IPv6()),
+                     testing::Values(SocketType::Stream(), SocketType::Dgram()),
+                     testing::Values(ZXIO_SOCKET_MARK_DOMAIN_1, ZXIO_SOCKET_MARK_DOMAIN_2)));
+#endif
 }  // namespace

@@ -8,6 +8,7 @@
 // Adding includes that are not detected by rust-bindings because they are
 // defined using functions
 
+#include <lib/zxio/bsdsocket.h>
 #include <lib/zxio/types.h>
 
 // generate.py will remove __bindgen_missing_ from the start of constant names.
@@ -46,5 +47,7 @@ C(zxio_object_type_t, ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET);
 C(zxio_object_type_t, ZXIO_OBJECT_TYPE_SYMLINK);
 C(zxio_selinux_context_state_t, ZXIO_SELINUX_CONTEXT_STATE_DATA);
 C(zxio_selinux_context_state_t, ZXIO_SELINUX_CONTEXT_STATE_USE_XATTRS);
+C(zxio_socket_mark_domain_t, ZXIO_SOCKET_MARK_DOMAIN_1);
+C(zxio_socket_mark_domain_t, ZXIO_SOCKET_MARK_DOMAIN_2);
 
 #endif  // SRC_STARNIX_LIB_SYNCIO_STUB_MISSING_INCLUDES_H_

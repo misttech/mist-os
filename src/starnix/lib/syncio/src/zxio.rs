@@ -16,7 +16,7 @@
 //!
 //!    ./src/starnix/lib/syncio/generate.py
 
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, TryFromBytes};
 
 pub const EPERM: u32 = 1;
 pub const ENOENT: u32 = 2;
@@ -319,6 +319,7 @@ pub const MSG_BATCH: u32 = 262144;
 pub const MSG_ZEROCOPY: u32 = 67108864;
 pub const MSG_FASTOPEN: u32 = 536870912;
 pub const MSG_CMSG_CLOEXEC: u32 = 1073741824;
+pub const SO_FUCHSIA_MARK: u32 = 10000;
 pub const IPPROTO_IP: u32 = 0;
 pub const IPPROTO_HOPOPTS: u32 = 0;
 pub const IPPROTO_ICMP: u32 = 1;
@@ -1236,6 +1237,15 @@ unsafe extern "C" {
         out_code: *mut i16,
     ) -> zx_status_t;
 }
+pub type zxio_socket_mark_domain_t = u8;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, TryFromBytes, Immutable, IntoBytes, KnownLayout)]
+pub struct zxio_socket_mark {
+    pub value: u32,
+    pub domain: zxio_socket_mark_domain_t,
+    pub is_present: bool,
+    pub __bindgen_padding_0: [u8; 2usize],
+}
 unsafe extern "C" {
     pub fn zxio_default_maybe_faultable_copy(
         dest: *mut ::std::os::raw::c_uchar,
@@ -1383,6 +1393,8 @@ pub const ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET: zxio_object_type_t = 13;
 pub const ZXIO_OBJECT_TYPE_SYMLINK: zxio_object_type_t = 14;
 pub const ZXIO_SELINUX_CONTEXT_STATE_DATA: zxio_selinux_context_state_t = 0;
 pub const ZXIO_SELINUX_CONTEXT_STATE_USE_XATTRS: zxio_selinux_context_state_t = 1;
+pub const ZXIO_SOCKET_MARK_DOMAIN_1: zxio_socket_mark_domain_t = 1;
+pub const ZXIO_SOCKET_MARK_DOMAIN_2: zxio_socket_mark_domain_t = 2;
 pub type __builtin_va_list = [__va_list_tag; 1usize];
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]

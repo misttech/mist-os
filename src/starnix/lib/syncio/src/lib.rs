@@ -1131,13 +1131,13 @@ impl Zxio {
         }
     }
 
-    pub fn getsockopt(
+    pub fn getsockopt_slice(
         &self,
         level: u32,
         optname: u32,
-        mut optlen: socklen_t,
-    ) -> Result<Result<Vec<u8>, ZxioErrorCode>, zx::Status> {
-        let mut optval = vec![0u8; optlen as usize];
+        optval: &mut [u8],
+    ) -> Result<Result<socklen_t, ZxioErrorCode>, zx::Status> {
+        let mut optlen = optval.len() as socklen_t;
         let mut out_code = 0;
         let status = unsafe {
             zxio::zxio_getsockopt(
@@ -1151,9 +1151,20 @@ impl Zxio {
         };
         zx::ok(status)?;
         match out_code {
-            0 => Ok(Ok(optval[..optlen as usize].to_vec())),
+            0 => Ok(Ok(optlen)),
             _ => Ok(Err(ZxioErrorCode(out_code))),
         }
+    }
+
+    pub fn getsockopt(
+        &self,
+        level: u32,
+        optname: u32,
+        optlen: socklen_t,
+    ) -> Result<Result<Vec<u8>, ZxioErrorCode>, zx::Status> {
+        let mut optval = vec![0u8; optlen as usize];
+        let result = self.getsockopt_slice(level, optname, &mut optval[..])?;
+        Ok(result.map(|optlen| optval[..optlen as usize].to_vec()))
     }
 
     pub fn setsockopt(
