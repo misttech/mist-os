@@ -108,6 +108,15 @@ macro_rules! publisher_options {
                     $self
                 }
 
+                /// Whether or not to log file/line information regardless of severity.
+                ///
+                /// Default: false.
+                pub fn log_file_line_info(mut $self, enable: bool) -> Self {
+                    let this = &mut $self$(.$self_arg)*;
+                    this.always_log_file_line = enable;
+                    $self
+                }
+
                 /// When set, a `fuchsia_async::Task` will be spawned and held that will be
                 /// listening for interest changes.
                 ///
