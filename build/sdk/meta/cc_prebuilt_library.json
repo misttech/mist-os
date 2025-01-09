@@ -166,6 +166,10 @@
                         "link_lib": {
                             "$ref": "common.json#/definitions/file",
                             "description": "The link-time version of the library"
+                        },
+                        "ifs": {
+                            "$ref": "common.json#/definitions/file",
+                            "description": "LLVM IFS file used to describe the ABI of the library"
                         }
                     },
                     "required": [

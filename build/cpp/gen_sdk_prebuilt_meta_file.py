@@ -132,8 +132,16 @@ def main():
             variant["values"]["link_lib"] = binary["link"]
         if "debug" in binary:
             variant["values"]["debug"] = binary["debug"]
-        metadata["variants"] = [variant]
         del metadata["binaries"]
+
+        assert ("ifs" in metadata) == bool(
+            args.ifs
+        ), "--ifs option should have been added to 'ifs' key in metadata."
+        if "ifs" in metadata:
+            variant["values"]["ifs"] = metadata["ifs"]
+            del metadata["ifs"]
+
+        metadata["variants"] = [variant]
 
     with open(args.out, "w") as out_file:
         json.dump(
