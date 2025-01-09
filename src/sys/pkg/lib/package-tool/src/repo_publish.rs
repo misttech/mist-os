@@ -278,9 +278,6 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
         let manifests_dir = Utf8PathBuf::from_path_buf(wrkdir)
             .map_err(|e| anyhow!("error converting path into UTF-8: {:?}", e))?;
 
-        // Extract product bundle
-        repo_package_manifest_list(pb.clone(), None, manifests_dir.clone()).await?;
-
         // Stage product bundle manifest
         let package_manifest_list_path = manifests_dir.join("package_manifests.list");
         repo_package_manifest_list(pb.clone(), None, manifests_dir).await?;
