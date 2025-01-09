@@ -77,7 +77,12 @@ impl AllocatedRanges {
         self.ranges.lock().unwrap().clear();
     }
 
-    /// Returns an iterator which slices up the query range into subranges of particular types.
+    /// Find the overlapping overwrite ranges in the given range for this file, so writes can be
+    /// split between them appropriately. Ranges with RangeType::Overwrite should be written to
+    /// with multi_overwrite and RangeType::Cow should use multi_write.
+    ///
+    /// Note: The returned iterator holds a lock on the ranges until it's dropped, so use it
+    /// accordingly.
     pub fn overlap<'a>(&'a self, query_range: Range<u64>) -> RangeOverlapIter<'a> {
         let ranges = self.ranges.lock().unwrap();
         let index = match ranges.binary_search_by_key(&query_range.start, |r| r.end) {

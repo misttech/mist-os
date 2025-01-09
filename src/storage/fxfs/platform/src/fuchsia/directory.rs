@@ -775,12 +775,12 @@ impl VfsDirectory for FxDirectory {
                     )
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) && node.verified_file() {
+                    if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) && node.is_verified_file() {
                         log::error!("Tried to open a verified file with the RIGHT_WRITABLE flag.");
                         return Err(zx::Status::NOT_SUPPORTED);
                     }
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
-                        if node.verified_file() {
+                        if node.is_verified_file() {
                             log::error!("Tried to expose a verified file as a block device.");
                             return Err(zx::Status::NOT_SUPPORTED);
                         }

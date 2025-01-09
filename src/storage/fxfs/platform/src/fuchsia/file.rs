@@ -116,8 +116,8 @@ impl FxFile {
         }
     }
 
-    pub fn verified_file(&self) -> bool {
-        self.handle.uncached_handle().verified_file()
+    pub fn is_verified_file(&self) -> bool {
+        self.handle.uncached_handle().is_verified_file()
     }
 
     pub fn handle(&self) -> &PagedObjectHandle {
@@ -326,7 +326,7 @@ impl vfs::node::Node for FxFile {
                 change_time: props.change_time.as_nanos(),
                 options: descriptor.clone().map(|a| a.0),
                 root_hash: descriptor.clone().map(|a| a.1),
-                verity_enabled: self.verified_file(),
+                verity_enabled: self.is_verified_file(),
             }
         ))
     }

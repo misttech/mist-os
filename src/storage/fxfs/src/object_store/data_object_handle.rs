@@ -41,8 +41,7 @@ use std::sync::{Arc, Mutex};
 use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
 
 mod allocated_ranges;
-pub use allocated_ranges::RangeType;
-use allocated_ranges::{AllocatedRanges, RangeOverlapIter};
+pub use allocated_ranges::{AllocatedRanges, RangeType};
 
 /// How much data each transaction will cover when writing an attribute across batches. Pulled from
 /// `FLUSH_BATCH_SIZE` in paged_object_handle.rs.
@@ -117,18 +116,12 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.attribute_id
     }
 
-    pub fn verified_file(&self) -> bool {
-        matches!(*self.fsverity_state.lock().unwrap(), FsverityState::Some(_))
+    pub fn overwrite_ranges(&self) -> &AllocatedRanges {
+        &self.overwrite_ranges
     }
 
-    /// Find the overlapping overwrite ranges in the given range for this file, so writes can be
-    /// split between them appropriately. Ranges with RangeType::Overwrite should be written to
-    /// with multi_overwrite and RangeType::Cow should use multi_write.
-    ///
-    /// Note: The returned iterator holds a lock on the ranges until it's dropped, so use it
-    /// accordingly.
-    pub fn overwrite_ranges_overlap<'a>(&'a self, range: Range<u64>) -> RangeOverlapIter<'a> {
-        self.overwrite_ranges.overlap(range)
+    pub fn is_verified_file(&self) -> bool {
+        matches!(*self.fsverity_state.lock().unwrap(), FsverityState::Some(_))
     }
 
     /// Sets `self.fsverity_state` to FsverityState::Started. Called at the top of `enable_verity`.
@@ -1521,10 +1514,6 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.read(0u64, buf.as_mut()).await?;
         Ok(buf.as_slice().into())
     }
-
-    fn apply_overwrite_range(&self, range: Range<u64>) {
-        self.overwrite_ranges.apply_range(range);
-    }
 }
 
 impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
@@ -1556,7 +1545,7 @@ impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
                 ..
             }) if self.object_id() == *object_id && self.attribute_id() == *attr_id => match mode {
                 ExtentMode::Overwrite | ExtentMode::OverwritePartial(_) => {
-                    self.apply_overwrite_range(range.clone())
+                    self.overwrite_ranges.apply_range(range.clone())
                 }
                 ExtentMode::Raw | ExtentMode::Cow(_) => (),
             },
@@ -1603,7 +1592,7 @@ impl<S: HandleOwner> ReadObjectHandle for DataObjectHandle<S> {
         let length = min(buf.len() as u64, size - offset) as usize;
         buf = buf.subslice_mut(0..length);
         self.handle.read_unchecked(self.attribute_id(), offset, buf.reborrow(), &guard).await?;
-        if self.verified_file() {
+        if self.is_verified_file() {
             self.verify_data(offset as usize, buf.as_slice()).await?;
         }
         Ok(length)
@@ -2536,7 +2525,7 @@ mod tests {
                 .await
                 .expect("open_object failed");
 
-        assert!(handle.verified_file());
+        assert!(handle.is_verified_file());
 
         fs.close().await.expect("Close failed");
     }

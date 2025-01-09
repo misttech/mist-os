@@ -2471,7 +2471,7 @@ mod tests {
                 .await
                 .expect("open_object failed");
 
-        assert!(handle.verified_file());
+        assert!(handle.is_verified_file());
 
         fs.close().await.expect("Close failed");
     }
@@ -2504,7 +2504,7 @@ mod tests {
                 .await
                 .expect("open_object failed");
 
-        assert!(!handle.verified_file());
+        assert!(!handle.is_verified_file());
 
         fs.close().await.expect("Close failed");
     }

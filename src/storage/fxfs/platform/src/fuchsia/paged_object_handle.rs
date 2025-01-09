@@ -213,7 +213,7 @@ impl Inner {
 
 impl PagedObjectHandle {
     pub fn new(handle: DataObjectHandle<FxVolume>, vmo: zx::Vmo) -> Self {
-        let verified_file = handle.verified_file();
+        let verified_file = handle.is_verified_file();
         Self {
             vmo: TempClonable::new(vmo),
             handle,
@@ -313,7 +313,7 @@ impl PagedObjectHandle {
             return Err(zx::Status::BAD_STATE);
         }
         let mut pages_added = 0;
-        for subrange in self.handle.overwrite_ranges_overlap(page_range.range()) {
+        for subrange in self.handle.overwrite_ranges().overlap(page_range.range()) {
             // Check the overwrite ranges we have recorded for this file. We only add to the
             // reservation if the range is not one of our overwrite ranges, since overwrite ranges
             // are already allocated.
@@ -439,7 +439,7 @@ impl PagedObjectHandle {
                 // Ranges must be returned in order.
                 assert!(range.start >= last_end);
                 last_end = range.end;
-                for range_chunk in self.uncached_handle().overwrite_ranges_overlap(range) {
+                for range_chunk in self.uncached_handle().overwrite_ranges().overlap(range) {
                     let (range, mode) = match range_chunk {
                         RangeType::Cow(range) => (
                             range,
