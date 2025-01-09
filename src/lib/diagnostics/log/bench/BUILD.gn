@@ -42,7 +42,6 @@ rustc_binary("core-bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
-    "//sdk/rust/zx",
     "//src/developer/fuchsia-criterion",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
@@ -50,7 +49,6 @@ rustc_binary("core-bin") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-log",
   ]
 
   sources = [ "src/core.rs" ]

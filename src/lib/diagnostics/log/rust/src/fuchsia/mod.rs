@@ -145,8 +145,7 @@ publisher_options!((PublisherOptions, self,), (PublishOptions, self, publisher))
 
 fn initialize_publishing(opts: PublishOptions<'_>) -> Result<Publisher, PublishError> {
     let publisher = Publisher::new(opts.publisher)?;
-    let publisher_clone = Publisher { inner: publisher.inner.clone() };
-    log::set_boxed_logger(Box::new(publisher_clone))?;
+    log::set_boxed_logger(Box::new(publisher.clone()))?;
     if opts.install_panic_hook {
         crate::install_panic_hook(opts.panic_prefix);
     }
