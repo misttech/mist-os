@@ -234,6 +234,11 @@ impl SystemShutdownHandler {
                                 self.handle_shutdown(ShutdownRequest::Reboot(reason)).await;
                             let _ = responder.send(result.map_err(|e| e.into_raw()));
                         }
+                        fpowercontrol::AdminRequest::PerformReboot { options: _, responder: _ } => {
+                            // TODO(https://fxbug.dev/385312336): Implement this
+                            // method.
+                            error!("Admin.PerformReboot is not yet implemented");
+                        }
                         fpowercontrol::AdminRequest::RebootToBootloader { responder } => {
                             let result =
                                 self.handle_shutdown(ShutdownRequest::RebootBootloader).await;

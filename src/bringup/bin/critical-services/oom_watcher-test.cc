@@ -31,6 +31,12 @@ class FakePowerManager : public fidl::WireServer<fuchsia_hardware_power_statecon
     }
   }
 
+  void PerformReboot(PerformRebootRequestView view,
+                     PerformRebootCompleter::Sync& completer) override {
+    // TODO(https://fxbud.dev/385312336): Add a fake "PerformReboot"
+    // implementation.
+  }
+
   void RebootToBootloader(RebootToBootloaderCompleter::Sync& completer) override {
     unexpected_calls_ = true;
     completer.Close(ZX_ERR_NOT_SUPPORTED);

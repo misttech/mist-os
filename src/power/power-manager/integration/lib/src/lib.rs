@@ -514,7 +514,13 @@ pub async fn test_thermal_reboot(mut env: TestEnv, sensor_path: &str, temperatur
     // 3) verify the system controller receives the reboot request
     // 4) verify the Driver Manager receives the termination state request
     env.set_temperature(sensor_path, temperature).await;
-    assert_eq!(reboot_watcher.get_reboot_reason().await, fpower::RebootReason::HighTemperature);
+    assert_eq!(
+        reboot_watcher.get_reboot_options().await,
+        fpower::RebootOptions {
+            reasons: Some(vec![fpower::RebootReason2::HighTemperature]),
+            ..Default::default()
+        }
+    );
     env.mocks.system_controller_service.wait_for_shutdown_request().await;
 
     env.destroy().await;

@@ -9,6 +9,7 @@ use crate::shutdown_request::{RebootReason, ShutdownRequest};
 use crate::types::Seconds;
 use anyhow::Error;
 use async_trait::async_trait;
+use either::Either;
 use fidl::endpoints::Proxy;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
@@ -97,7 +98,14 @@ impl<'a, 'b> ShutdownWatcherBuilder<'a, 'b> {
 pub struct ShutdownWatcher {
     /// Contains all the registered RebootMethodsWatcher channels to be notified when a reboot
     /// request is received.
-    reboot_watchers: Rc<RefCell<HashMap<u32, fpower::RebootMethodsWatcherProxy>>>,
+    reboot_watchers: Rc<
+        RefCell<
+            // TODO(https://fxbug.dev/385742868): The value is the proxy (either
+            // deprecated or not). Clean this up once the deprecated version is
+            // removed from the API.
+            HashMap<u32, Either<fpower::RebootMethodsWatcherProxy, fpower::RebootWatcherProxy>>,
+        >,
+    >,
 
     /// Struct for managing Component Inspection data
     inspect: Rc<InspectData>,
@@ -136,13 +144,24 @@ impl ShutdownWatcher {
             async move {
                 while let Some(req) = stream.try_next().await? {
                     match req {
+                        // TODO(https://fxbug.dev/385742868): Delete this method
+                        // once it's removed from the API.
                         fpower::RebootMethodsWatcherRegisterRequest::Register {
                             watcher,
                             control_handle: _,
                         } => {
-                            self.add_reboot_watcher(watcher.into_proxy());
+                            self.add_deprecated_reboot_watcher(watcher.into_proxy());
                         }
+                        // TODO(https://fxbug.dev/385742868): Delete this method
+                        // once it's removed from the API.
                         fpower::RebootMethodsWatcherRegisterRequest::RegisterWithAck {
+                            watcher,
+                            responder,
+                        } => {
+                            self.add_deprecated_reboot_watcher(watcher.into_proxy());
+                            let _ = responder.send();
+                        }
+                        fpower::RebootMethodsWatcherRegisterRequest::RegisterWatcher {
                             watcher,
                             responder,
                         } => {
@@ -159,7 +178,32 @@ impl ShutdownWatcher {
     }
 
     /// Adds a new RebootMethodsWatcher channel to the list of registered watchers.
-    fn add_reboot_watcher(&self, watcher: fpower::RebootMethodsWatcherProxy) {
+    fn add_deprecated_reboot_watcher(&self, watcher: fpower::RebootMethodsWatcherProxy) {
+        fuchsia_trace::duration!(
+            c"power_manager",
+            c"ShutdownWatcher::add_deprecated_reboot_watcher",
+            "watcher" => watcher.as_channel().raw_handle()
+        );
+
+        // If the client closes the watcher channel, remove it from our `reboot_watchers` map and
+        // update Inspect
+        let key = watcher.as_channel().raw_handle();
+        let proxy = watcher.clone();
+        let reboot_watchers = self.reboot_watchers.clone();
+        let inspect = self.inspect.clone();
+        fasync::Task::local(async move {
+            let _ = proxy.on_closed().await;
+            reboot_watchers.borrow_mut().remove(&key);
+            inspect.remove_reboot_watcher();
+        })
+        .detach();
+
+        self.inspect.add_reboot_watcher();
+        self.reboot_watchers.borrow_mut().insert(key, Either::Left(watcher));
+    }
+
+    /// Adds a new RebootMethodsWatcher channel to the list of registered watchers.
+    fn add_reboot_watcher(&self, watcher: fpower::RebootWatcherProxy) {
         fuchsia_trace::duration!(
             c"power_manager",
             c"ShutdownWatcher::add_reboot_watcher",
@@ -180,7 +224,7 @@ impl ShutdownWatcher {
         .detach();
 
         self.inspect.add_reboot_watcher();
-        self.reboot_watchers.borrow_mut().insert(key, watcher);
+        self.reboot_watchers.borrow_mut().insert(key, Either::Right(watcher));
     }
 
     /// Handles the SystemShutdown message by notifying the appropriate registered watchers.
@@ -225,12 +269,20 @@ impl ShutdownWatcher {
         // (https://fxbug.dev/42131208).
         let watcher_futures = watchers.into_iter().map(|(key, watcher_proxy)| async move {
             let deadline = zx::MonotonicDuration::from_seconds(timeout.0 as i64).after_now();
-            match watcher_proxy
-                .on_reboot(reason)
-                .map_err(|_| ())
-                .on_timeout(deadline, || Err(()))
-                .await
-            {
+            let result = match &watcher_proxy {
+                Either::Left(proxy) => futures::future::Either::Left(proxy.on_reboot(reason)),
+                Either::Right(proxy) => {
+                    futures::future::Either::Right(proxy.on_reboot(&fpower::RebootOptions {
+                        reasons: Some(vec![from_deprecated_reason(reason)]),
+                        __source_breaking: fidl::marker::SourceBreaking {},
+                    }))
+                }
+            }
+            .map_err(|_| ())
+            .on_timeout(deadline, || Err(()))
+            .await;
+
+            match result {
                 Ok(()) => Some((key, watcher_proxy)),
                 Err(()) => None,
             }
@@ -245,6 +297,26 @@ impl ShutdownWatcher {
 
         // Repopulate the successful watcher proxies back into the `reboot_watchers` RefCell
         self.reboot_watchers.replace(watchers);
+    }
+}
+
+// TODO(https://fxbug.dev/385742868): This function converts between the
+// deprecated `RebootReason` and the supported `RebootReason2`. Remove it once
+// `RebootReason` is removed from the API.
+fn from_deprecated_reason(reason: fpower::RebootReason) -> fpower::RebootReason2 {
+    match reason {
+        fpower::RebootReason::UserRequest => fpower::RebootReason2::UserRequest,
+        fpower::RebootReason::SystemUpdate => fpower::RebootReason2::SystemUpdate,
+        fpower::RebootReason::RetrySystemUpdate => fpower::RebootReason2::RetrySystemUpdate,
+        fpower::RebootReason::HighTemperature => fpower::RebootReason2::HighTemperature,
+        fpower::RebootReason::FactoryDataReset => fpower::RebootReason2::FactoryDataReset,
+        fpower::RebootReason::SessionFailure => fpower::RebootReason2::SessionFailure,
+        fpower::RebootReason::SysmgrFailure => fpower::RebootReason2::SysmgrFailure,
+        fpower::RebootReason::CriticalComponentFailure => {
+            fpower::RebootReason2::CriticalComponentFailure
+        }
+        fpower::RebootReason::ZbiSwap => fpower::RebootReason2::ZbiSwap,
+        fpower::RebootReason::OutOfMemory => fpower::RebootReason2::OutOfMemory,
     }
 }
 
@@ -333,8 +405,7 @@ mod tests {
             }
         );
 
-        let (watcher_proxy, _) =
-            fidl::endpoints::create_proxy::<fpower::RebootMethodsWatcherMarker>();
+        let (watcher_proxy, _) = fidl::endpoints::create_proxy::<fpower::RebootWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy.clone());
 
         assert_data_tree!(
@@ -360,8 +431,7 @@ mod tests {
             }
         );
 
-        let (watcher_proxy, _) =
-            fidl::endpoints::create_proxy::<fpower::RebootMethodsWatcherMarker>();
+        let (watcher_proxy, _) = fidl::endpoints::create_proxy::<fpower::RebootWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy.clone());
 
         assert_data_tree!(
@@ -405,19 +475,23 @@ mod tests {
 
         // Create the watcher proxy/stream to receive reboot notifications
         let (watcher_client, mut watcher_stream) =
-            fidl::endpoints::create_request_stream::<fpower::RebootMethodsWatcherMarker>();
+            fidl::endpoints::create_request_stream::<fpower::RebootWatcherMarker>();
 
         // Call the Register API, passing in the watcher_client end
-        assert_matches!(register_proxy.register_with_ack(watcher_client).await, Ok(()));
+        assert_matches!(register_proxy.register_watcher(watcher_client).await, Ok(()));
 
         // Signal the watchers
         node.notify_reboot_watchers(RebootReason::UserRequest, Seconds(0.0)).await;
 
         // Verify the watcher_stream gets the correct reboot notification
-        assert_matches!(
+        let reasons = assert_matches!(
             watcher_stream.try_next().await.unwrap().unwrap(),
-            fpower::RebootMethodsWatcherRequest::OnReboot { reason: RebootReason::UserRequest, .. }
+            fpower::RebootWatcherRequest::OnReboot {
+                options: fpower::RebootOptions{reasons: Some(reasons), ..},
+                ..
+            } => reasons
         );
+        assert_eq!(&reasons[..], [fpower::RebootReason2::UserRequest]);
     }
 
     /// Tests that a reboot watcher is delivered the correct reboot reason
@@ -425,16 +499,19 @@ mod tests {
     async fn test_reboot_watcher_reason() {
         let node = ShutdownWatcherBuilder::new().build().unwrap();
         let (watcher_proxy, mut watcher_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy);
         node.notify_reboot_watchers(RebootReason::HighTemperature, Seconds(0.0)).await;
 
-        let received_reboot_reason = match watcher_stream.try_next().await {
-            Ok(Some(fpower::RebootMethodsWatcherRequest::OnReboot { reason, .. })) => reason,
+        let reasons = match watcher_stream.try_next().await {
+            Ok(Some(fpower::RebootWatcherRequest::OnReboot {
+                options: fpower::RebootOptions { reasons: Some(reasons), .. },
+                ..
+            })) => reasons,
             e => panic!("Unexpected watcher_stream result: {:?}", e),
         };
 
-        assert_eq!(received_reboot_reason, RebootReason::HighTemperature);
+        assert_eq!(&reasons[..], [fpower::RebootReason2::HighTemperature]);
     }
 
     /// Tests that if there are multiple registered reboot watchers, each one will receive the
@@ -445,15 +522,15 @@ mod tests {
 
         // Create three separate reboot watchers
         let (watcher_proxy1, mut watcher_stream1) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy1);
 
         let (watcher_proxy2, mut watcher_stream2) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy2);
 
         let (watcher_proxy3, mut watcher_stream3) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy3);
 
         // Close the channel of the first watcher to verify the node still correctly notifies the
@@ -470,19 +547,21 @@ mod tests {
 
         // Verify the watcher received the correct OnReboot request
         match watcher_stream2.try_next().await {
-            Ok(Some(fpower::RebootMethodsWatcherRequest::OnReboot {
-                reason: RebootReason::HighTemperature,
+            Ok(Some(fpower::RebootWatcherRequest::OnReboot {
+                options: fpower::RebootOptions { reasons: Some(reasons), .. },
                 ..
-            })) => {}
+            })) => {
+                assert_eq!(&reasons[..], [fpower::RebootReason2::HighTemperature])
+            }
             e => panic!("Unexpected watcher_stream2 result: {:?}", e),
         };
 
         // Verify the watcher received the correct OnReboot request
         match watcher_stream3.try_next().await {
-            Ok(Some(fpower::RebootMethodsWatcherRequest::OnReboot {
-                reason: RebootReason::HighTemperature,
+            Ok(Some(fpower::RebootWatcherRequest::OnReboot {
+                options: fpower::RebootOptions { reasons: Some(reasons), .. },
                 ..
-            })) => {}
+            })) => assert_eq!(&reasons[..], [fpower::RebootReason2::HighTemperature]),
             e => panic!("Unexpected watcher_stream3 result: {:?}", e),
         };
     }
@@ -495,7 +574,7 @@ mod tests {
 
         // Register the reboot watcher
         let (watcher_proxy, mut watcher_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy);
         assert_eq!(node.reboot_watchers.borrow().len(), 1);
 
@@ -509,7 +588,7 @@ mod tests {
         assert!(exec.run_until_stalled(&mut notify_future).is_pending());
 
         // Ack the reboot notification, allowing the shutdown flow to continue
-        let fpower::RebootMethodsWatcherRequest::OnReboot { responder, .. } =
+        let fpower::RebootWatcherRequest::OnReboot { responder, .. } =
             exec.run_singlethreaded(&mut watcher_stream.try_next()).unwrap().unwrap();
         assert_matches!(responder.send(), Ok(()));
 
@@ -528,7 +607,7 @@ mod tests {
 
         // Register the reboot watcher
         let (watcher_proxy, _watcher_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fpower::RebootMethodsWatcherMarker>();
+            fidl::endpoints::create_proxy_and_stream::<fpower::RebootWatcherMarker>();
         node.add_reboot_watcher(watcher_proxy);
         assert_eq!(node.reboot_watchers.borrow().len(), 1);
 

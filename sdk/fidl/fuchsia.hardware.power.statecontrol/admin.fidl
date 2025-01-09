@@ -45,8 +45,24 @@ closed protocol Admin {
     strict PowerFullyOn() -> () error zx.Status;
 
     /// Asks the device to reboot.
+    ///
+    /// Deprecated: Replaced by `PerformReboot`.
+    // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
+    // to the SDK.
+    @available(deprecated=NEXT)
     strict Reboot(struct {
         reason RebootReason;
+    }) -> () error zx.Status;
+
+    /// Asks the device to reboot.
+    ///
+    /// Arguments:
+    ///   - options: The options with which to perform this requests.
+    ///              `ZX_ERR_INVALID_ARGS` is returned if the options are
+    ///              malformed (i.e. `reasons` is absent or empty).
+    @available(added=NEXT)
+    strict PerformReboot(struct {
+        options RebootOptions;
     }) -> () error zx.Status;
 
     /// Asks the device to reboot into the bootloader.
@@ -75,6 +91,21 @@ closed protocol Admin {
     strict SuspendToRam() -> () error zx.Status;
 };
 
+/// The maximum number of reboot reasons that can be attributed to a single
+/// reboot request.
+@available(added=NEXT)
+const MAX_REBOOT_REASONS uint8 = 100;
+
+/// The options specified when a reboot is requested.
+@available(added=NEXT)
+type RebootOptions = table {
+    /// The set of reboot reasons that are responsible for this reboot request.
+    // When calling `Admin.PerformReboot`, the majority of clients need only
+    // specify a single reason. Contact OWNERS if you believe your use case
+    // warrants providing multiple reasons.
+    1: reasons vector<RebootReason2>:MAX_REBOOT_REASONS;
+};
+
 /// Allows components to register a callback that will be executed when a Reboot
 /// method is called. The main purpose of this protocol is to be able to track
 /// reboot reasons. Consider relying on Component Framework's orderly shutdown
@@ -86,10 +117,11 @@ closed protocol RebootMethodsWatcherRegister {
     /// impending reboot and allow it the chance to respond.
     ///
     /// Watchers can unregister by closing the underlying channel.
-    // TODO(https://fxbug.dev/42061712): Remove this method after all clients have been
-    // moved to `RegisterWithAck`. After removal, consider renaming
-    // `RegisterWithAck` back to `Register`.
-    @available(deprecated=HEAD)
+    ///
+    /// Deprecated: Replaced by `RegisterWatcher`.
+    // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
+    // to the SDK.
+    @available(deprecated=NEXT)
     strict Register(resource struct {
         watcher client_end:RebootMethodsWatcher;
     });
@@ -109,9 +141,33 @@ closed protocol RebootMethodsWatcherRegister {
     /// watcher of an impending reboot and allow it the chance to respond.
     ///
     /// Watchers can unregister by closing their `RebootMethodsWatcher` channel.
-    @available(added=HEAD)
+    ///
+    /// Deprecated: Replaced by `RegisterWatcher`.
+    // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
+    // to the SDK.
+    @available(added=NEXT, deprecated=NEXT)
     strict RegisterWithAck(resource struct {
         watcher client_end:RebootMethodsWatcher;
+    }) -> ();
+
+    /// Registers a watcher to be notified when a Reboot method is called.
+    ///
+    /// Once the watcher has been successfully registered with the server, then
+    /// the request will be completed and the RebootMethodsWatcherRegister
+    /// channel will be left open (though a client is free to close it at this
+    /// time).
+    ///
+    /// If there is an error in registering the watcher, then the
+    /// RebootMethodsWatcherRegister channel will be closed without completing
+    /// the request.
+    ///
+    /// The provided `watcher` channel will be used at most once to notify the
+    /// watcher of an impending reboot and allow it the chance to respond.
+    ///
+    /// Watchers can unregister by closing their `RebootWatcher` channel.
+    @available(added=NEXT)
+    strict RegisterWatcher(resource struct {
+        watcher client_end:RebootWatcher;
     }) -> ();
 };
 
@@ -120,8 +176,25 @@ closed protocol RebootMethodsWatcherRegister {
 /// before the system power state is changed. The channel will be used once to
 /// send a notification to the watcher. Once the watcher responds or the timeout
 /// expires, the channel will be closed by the client of RebootMethodsWatcher.
+///
+/// Deprecated: Replaced by `RebootWatcher`
+// TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
+// to the SDK.
+@available(deprecated=NEXT)
 closed protocol RebootMethodsWatcher {
     strict OnReboot(struct {
         reason RebootReason;
+    }) -> ();
+};
+
+/// Allows components to be notified when Reboot related methods are called.
+/// Watchers will be given 'MAX_REBOOT_WATCHER_RESPONSE_TIME_SECONDS' to return
+/// before the system power state is changed. The channel will be used once to
+/// send a notification to the watcher. Once the watcher responds or the timeout
+/// expires, the channel will be closed by the client of RebootWatcher.
+@available(added=NEXT)
+closed protocol RebootWatcher {
+    strict OnReboot(struct {
+        options RebootOptions;
     }) -> ();
 };

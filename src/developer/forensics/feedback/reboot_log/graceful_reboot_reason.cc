@@ -123,30 +123,42 @@ GracefulRebootReason FromFileContent(const std::string reason) {
 }
 
 GracefulRebootReason ToGracefulRebootReason(
-    const fuchsia::hardware::power::statecontrol::RebootReason reason) {
-  using fuchsia::hardware::power::statecontrol::RebootReason;
+    const fuchsia::hardware::power::statecontrol::RebootOptions options) {
+  using fuchsia::hardware::power::statecontrol::RebootReason2;
 
-  switch (reason) {
-    case RebootReason::USER_REQUEST:
+  if (!options.has_reasons() || options.reasons().empty()) {
+    return GracefulRebootReason::kNotSupported;
+  }
+
+  // TODO(https://fxbug.dev/385734112): Consider multiple reboot reasons. For
+  // now, the naive thing is to just check the first.
+  const RebootReason2 first_reason = options.reasons()[0];
+
+  switch (first_reason) {
+    case RebootReason2::USER_REQUEST:
       return GracefulRebootReason::kUserRequest;
-    case RebootReason::SYSTEM_UPDATE:
+    case RebootReason2::SYSTEM_UPDATE:
       return GracefulRebootReason::kSystemUpdate;
-    case RebootReason::RETRY_SYSTEM_UPDATE:
+    case RebootReason2::RETRY_SYSTEM_UPDATE:
       return GracefulRebootReason::kRetrySystemUpdate;
-    case RebootReason::HIGH_TEMPERATURE:
+    case RebootReason2::HIGH_TEMPERATURE:
       return GracefulRebootReason::kHighTemperature;
-    case RebootReason::SESSION_FAILURE:
+    case RebootReason2::SESSION_FAILURE:
       return GracefulRebootReason::kSessionFailure;
-    case RebootReason::SYSMGR_FAILURE:
+    case RebootReason2::SYSMGR_FAILURE:
       return GracefulRebootReason::kSysmgrFailure;
-    case RebootReason::CRITICAL_COMPONENT_FAILURE:
+    case RebootReason2::CRITICAL_COMPONENT_FAILURE:
       return GracefulRebootReason::kCriticalComponentFailure;
-    case RebootReason::FACTORY_DATA_RESET:
+    case RebootReason2::FACTORY_DATA_RESET:
       return GracefulRebootReason::kFdr;
-    case RebootReason::ZBI_SWAP:
+    case RebootReason2::ZBI_SWAP:
       return GracefulRebootReason::kZbiSwap;
-    case RebootReason::OUT_OF_MEMORY:
+    case RebootReason2::OUT_OF_MEMORY:
       return GracefulRebootReason::kOutOfMemory;
+    case RebootReason2::NETSTACK_MIGRATION:
+      // TODO(https://fxbug.dev/385734112): Add a graceful reboot reason
+      // associated with Netstack Migration.
+      return GracefulRebootReason::kNotSupported;
     default:
       return GracefulRebootReason::kNotSupported;
   }

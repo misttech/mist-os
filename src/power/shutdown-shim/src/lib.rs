@@ -7,8 +7,8 @@ use fidl::endpoints::{self, DiscoverableProtocolMarker, ServerEnd};
 use fidl::HandleBased;
 use fidl_fuchsia_hardware_power_statecontrol::{
     AdminMarker, AdminMexecRequest, AdminProxy, AdminRequest, AdminRequestStream,
-    RebootMethodsWatcherMarker, RebootMethodsWatcherRegisterMarker, RebootMethodsWatcherRequest,
-    RebootReason,
+    RebootMethodsWatcherRegisterMarker, RebootOptions, RebootReason, RebootReason2,
+    RebootWatcherMarker, RebootWatcherRequest,
 };
 use fidl_fuchsia_sys2::SystemControllerMarker;
 use fidl_fuchsia_system_state::{
@@ -23,6 +23,7 @@ use futures::select;
 use std::pin::pin;
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
+use tracing::error;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_power_system as fsystem, fuchsia_async as fasync};
 
 // The amount of time that the shim will spend trying to connect to
@@ -90,6 +91,8 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
                 AdminRequest::PowerFullyOn { responder, .. } => {
                     let _ = responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()));
                 }
+                // TODO(https://fxbug.dev/385742868): Delete this method once
+                // it's removed from the API.
                 AdminRequest::Reboot { reason, responder } => {
                     let _reboot_control_lease = self.acquire_shutdown_control_lease().await;
                     let target_state = if reason == RebootReason::OutOfMemory {
@@ -100,6 +103,11 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
                     set_system_power_state(target_state);
                     let res = self.forward_command(target_state, Some(reason), None).await;
                     let _ = responder.send(res.map_err(|s| s.into_raw()));
+                }
+                AdminRequest::PerformReboot { options: _, responder: _ } => {
+                    // TODO(https://fxbug.dev/385312336): Implement this
+                    // method.
+                    error!("Admin.PerformReboot is not yet implemented");
                 }
                 AdminRequest::RebootToBootloader { responder } => {
                     let _reboot_control_lease = self.acquire_shutdown_control_lease().await;
@@ -189,8 +197,8 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
         fasync::Timer::new(Duration::from_secs(15)).await;
         match self.connect_to_protocol::<RebootMethodsWatcherRegisterMarker>() {
             Ok(local) => {
-                let (client, watcher) = endpoints::create_endpoints::<RebootMethodsWatcherMarker>();
-                match local.register_with_ack(client).await {
+                let (client, watcher) = endpoints::create_endpoints::<RebootWatcherMarker>();
+                match local.register_watcher(client).await {
                     Ok(()) => eprintln!("[shutdown-shim]: RegisterWithAck succeeded"),
                     Err(e) => {
                         eprintln!("[shutdown-shim]: RegisterWithAck failed: {e}");
@@ -200,10 +208,12 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
                 let mut stream = watcher.into_stream();
                 while let Ok(Some(request)) = stream.try_next().await {
                     match request {
-                        RebootMethodsWatcherRequest::OnReboot { reason, responder } => {
+                        RebootWatcherRequest::OnReboot { options, responder } => {
+                            let RebootOptions { reasons, __source_breaking: _ } = options;
                             // Ignore other reasons because they are from shutdown-shim and are
                             // processed already.
-                            if reason == RebootReason::HighTemperature {
+                            if reasons.is_some_and(|r| r.contains(&RebootReason2::HighTemperature))
+                            {
                                 set_system_power_state(SystemPowerState::Reboot);
                             }
                             let _ = responder.send();

@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use power_manager_integration_test_lib::client_connectors::{RebootWatcherClient, ThermalClient};
+use assert_matches::assert_matches;
+use power_manager_integration_test_lib::client_connectors::{
+    DeprecatedRebootWatcherClient, RebootWatcherClient, ThermalClient,
+};
 use power_manager_integration_test_lib::TestEnvBuilder;
 use {fidl_fuchsia_hardware_power_statecontrol as fpower, fuchsia_async as fasync};
 
@@ -43,10 +46,12 @@ async fn thermal_client_service_test() {
     env.destroy().await;
 }
 
-/// Verifies that shutdown/reboot requests sent to the Power Manager are handled as expected:
+/// Verifies that `fuchsia.hardware.power.statecontrol/Admin.Reboot` requests
+/// sent to Power Manager are handled as expected:
 ///     1) forward the reboot reason to connected RebootWatcher clients
 ///     2) update Driver Manager with the appropriate termination SystemPowerState
 ///     3) send a shutdown request to the system controller
+// TODO(https://fxbug.dev/385742868): Delete this test once the API is removed.
 #[fuchsia::test]
 async fn shutdown_test() {
     let mut env = TestEnvBuilder::new()
@@ -57,7 +62,9 @@ async fn shutdown_test() {
     // Check the device has finished enumerating before proceeding with the test
     env.wait_for_device("/dev/sys/platform/soc_thermal").await;
 
+    // Verify both the "current" and "deprecated" watcher APIs.
     let mut reboot_watcher = RebootWatcherClient::new(&env).await;
+    let mut deprecated_reboot_watcher = DeprecatedRebootWatcherClient::new(&env).await;
 
     // Send a reboot request to the Power Manager (in a separate Task because it never returns)
     let shutdown_client = env.connect_to_protocol::<fpower::AdminMarker>();
@@ -65,7 +72,15 @@ async fn shutdown_test() {
         fasync::Task::local(shutdown_client.reboot(fpower::RebootReason::SystemUpdate));
 
     // Verify Power Manager forwards the reboot reason to the watcher client
-    assert_eq!(reboot_watcher.get_reboot_reason().await, fpower::RebootReason::SystemUpdate);
+    let reasons = assert_matches!(
+        reboot_watcher.get_reboot_options().await,
+        fpower::RebootOptions{ reasons: Some(reasons), ..} => reasons
+    );
+    assert_eq!(&reasons[..], [fpower::RebootReason2::SystemUpdate]);
+    assert_eq!(
+        deprecated_reboot_watcher.get_reboot_reason().await,
+        fpower::RebootReason::SystemUpdate
+    );
 
     // Verify the system controller service gets the shutdown request from Power Manager
     env.mocks.system_controller_service.wait_for_shutdown_request().await;
@@ -76,3 +91,5 @@ async fn shutdown_test() {
 
     env.destroy().await;
 }
+
+// TODO(https://fxbug.dev/385312336): Add integration tests for `PerformReboot`.

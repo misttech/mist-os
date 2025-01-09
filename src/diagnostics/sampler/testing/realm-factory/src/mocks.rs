@@ -37,18 +37,28 @@ pub(crate) fn id_file_vmo() -> zx::Vmo {
 
 pub fn serve_reboot_server(
     mut stream: reboot::RebootMethodsWatcherRegisterRequestStream,
-    mut proxy_sender: mpsc::Sender<reboot::RebootMethodsWatcherProxy>,
+    mut proxy_sender: mpsc::Sender<reboot::RebootWatcherProxy>,
 ) {
     fasync::Task::spawn(async move {
         while let Some(req) = stream.try_next().await.unwrap() {
             match req {
+                // TODO(https://fxbug.dev/385742868): Remove this once the
+                // method is deleted from the FIDL API.
                 reboot::RebootMethodsWatcherRegisterRequest::Register {
-                    watcher,
+                    watcher: _,
                     control_handle: _,
                 } => {
-                    proxy_sender.send(watcher.into_proxy()).await.unwrap();
+                    panic!("`Register` is deprecated, use `RegisterWatcher` instead");
                 }
+                // TODO(https://fxbug.dev/385742868): Remove this once the
+                // method is deleted from the FIDL API.
                 reboot::RebootMethodsWatcherRegisterRequest::RegisterWithAck {
+                    watcher: _,
+                    responder: _,
+                } => {
+                    panic!("`RegisterWithAck` is deprecated, use `RegisterWatcher` instead");
+                }
+                reboot::RebootMethodsWatcherRegisterRequest::RegisterWatcher {
                     watcher,
                     responder,
                 } => {
@@ -63,22 +73,26 @@ pub fn serve_reboot_server(
 
 pub fn serve_reboot_controller(
     mut stream: controller::MockRebootControllerRequestStream,
-    proxy_receiver: Arc<Mutex<mpsc::Receiver<reboot::RebootMethodsWatcherProxy>>>,
+    proxy_receiver: Arc<Mutex<mpsc::Receiver<reboot::RebootWatcherProxy>>>,
 ) {
     fasync::Task::spawn(async move {
         while let Some(req) = stream.try_next().await.unwrap() {
             let proxy = proxy_receiver.lock().await.next().await.unwrap();
             match req {
-                controller::MockRebootControllerRequest::TriggerReboot { responder } => {
-                    match proxy.on_reboot(reboot::RebootReason::UserRequest).await {
-                        Err(_) => {
-                            responder.send(Err(controller::RebootError::ClientError)).unwrap();
-                        }
-                        Ok(()) => {
-                            responder.send(Ok(())).unwrap();
-                        }
+                controller::MockRebootControllerRequest::TriggerReboot { responder } => match proxy
+                    .on_reboot(&reboot::RebootOptions {
+                        reasons: Some(vec![reboot::RebootReason2::UserRequest]),
+                        __source_breaking: fidl::marker::SourceBreaking,
+                    })
+                    .await
+                {
+                    Err(_) => {
+                        responder.send(Err(controller::RebootError::ClientError)).unwrap();
                     }
-                }
+                    Ok(()) => {
+                        responder.send(Ok(())).unwrap();
+                    }
+                },
                 controller::MockRebootControllerRequest::CrashRebootChannel { responder } => {
                     drop(proxy);
                     responder.send(Ok(())).unwrap();

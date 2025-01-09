@@ -56,6 +56,7 @@ rustc_test("integration-test") {
     "//src/lib/test_util",
     "//src/power/power-manager/integration/lib",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:libm",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:serde_json",

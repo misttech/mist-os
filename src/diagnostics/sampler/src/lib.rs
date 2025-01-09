@@ -59,7 +59,7 @@ pub async fn main() -> Result<(), Error> {
         Ok(sampler_config) => {
             // Create endpoint for the reboot watcher register.
             let (reboot_watcher_client, reboot_watcher_request_stream) =
-                fidl::endpoints::create_request_stream::<reboot::RebootMethodsWatcherMarker>();
+                fidl::endpoints::create_request_stream::<reboot::RebootWatcherMarker>();
 
             {
                 // Let the transient connection fall out of scope once we've passed the client
@@ -69,7 +69,7 @@ pub async fn main() -> Result<(), Error> {
                         .context("Connect to Reboot watcher register")?;
 
                 reboot_watcher_register
-                    .register_with_ack(reboot_watcher_client)
+                    .register_watcher(reboot_watcher_client)
                     .await
                     .context("Providing the reboot register with callback channel.")?;
             }
@@ -102,10 +102,10 @@ pub async fn main() -> Result<(), Error> {
 }
 
 async fn reboot_watcher(
-    mut stream: reboot::RebootMethodsWatcherRequestStream,
+    mut stream: reboot::RebootWatcherRequestStream,
     task_canceller: executor::TaskCancellation,
 ) {
-    if let Some(reboot::RebootMethodsWatcherRequest::OnReboot { reason: _, responder }) =
+    if let Some(reboot::RebootWatcherRequest::OnReboot { options: _, responder }) =
         stream.try_next().await.unwrap_or_else(|err| {
             // If the channel closed for some reason, we can just let Sampler keep running
             // until component manager kills it.

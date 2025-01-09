@@ -58,6 +58,7 @@ power_manager_deps = [
   "//src/lib/trace/rust:trace-provider",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:async-trait",
+  "//third_party/rust_crates:either",
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:libm",
   "//third_party/rust_crates:log",

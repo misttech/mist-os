@@ -58,7 +58,7 @@ fpromise::promise<LifecycleStopSignal, Error> WaitForLifecycleStop(
 // hasn't already been sent.
 fpromise::promise<GracefulRebootReasonSignal, Error> WaitForRebootReason(
     async_dispatcher_t* dispatcher,
-    fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> request);
+    fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootWatcher> request);
 
 }  // namespace forensics::feedback
 

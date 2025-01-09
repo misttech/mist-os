@@ -38,7 +38,7 @@ enum class GracefulRebootReason {
 std::string ToString(GracefulRebootReason reason);
 
 GracefulRebootReason ToGracefulRebootReason(
-    fuchsia::hardware::power::statecontrol::RebootReason reason);
+    fuchsia::hardware::power::statecontrol::RebootOptions options);
 
 // The input is limited to values corresponding to |power::statecontrol::RebootReason|.
 GracefulRebootReason FromFileContent(std::string content);

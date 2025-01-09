@@ -99,7 +99,7 @@ TEST_F(WaitForRebootReasonTest, BadChannel) {
   async::Executor executor(dispatcher());
 
   std::optional<Error> error;
-  fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootMethodsWatcher> request;
+  fidl::InterfaceRequest<fuchsia::hardware::power::statecontrol::RebootWatcher> request;
   executor.schedule_task(
       WaitForRebootReason(dispatcher(), std::move(request)).or_else([&error](const Error& e) {
         error = e;
@@ -114,7 +114,7 @@ TEST_F(WaitForRebootReasonTest, ClientDisconnects) {
   async::Executor executor(dispatcher());
 
   std::optional<Error> error;
-  fuchsia::hardware::power::statecontrol::RebootMethodsWatcherPtr ptr;
+  fuchsia::hardware::power::statecontrol::RebootWatcherPtr ptr;
   executor.schedule_task(WaitForRebootReason(dispatcher(), ptr.NewRequest(dispatcher()))
                              .or_else([&error](const Error& e) {
                                error = e;
@@ -130,7 +130,7 @@ TEST_F(WaitForRebootReasonTest, ServerDisconnectsOnCallbackExecution) {
   async::Executor executor(dispatcher());
 
   std::optional<GracefulRebootReasonSignal> signal;
-  fuchsia::hardware::power::statecontrol::RebootMethodsWatcherPtr ptr;
+  fuchsia::hardware::power::statecontrol::RebootWatcherPtr ptr;
   executor.schedule_task(WaitForRebootReason(dispatcher(), ptr.NewRequest(dispatcher()))
                              .and_then([&signal](GracefulRebootReasonSignal& s) {
                                signal = std::move(s);
@@ -138,8 +138,13 @@ TEST_F(WaitForRebootReasonTest, ServerDisconnectsOnCallbackExecution) {
                              }));
 
   bool called{false};
-  ptr->OnReboot(fuchsia::hardware::power::statecontrol::RebootReason::USER_REQUEST,
-                [&called] { called = true; });
+
+  fuchsia::hardware::power::statecontrol::RebootOptions options;
+  std::vector<fuchsia::hardware::power::statecontrol::RebootReason2> reasons = {
+      fuchsia::hardware::power::statecontrol::RebootReason2::USER_REQUEST};
+  options.set_reasons(reasons);
+  ptr->OnReboot(std::move(options), [&called] { called = true; });
+
   RunLoopUntilIdle();
   EXPECT_TRUE(ptr.is_bound());
   ASSERT_NE(signal, std::nullopt);
@@ -155,7 +160,7 @@ TEST_F(WaitForRebootReasonTest, ServerDisconnectsOnCallbackDeletion) {
   async::Executor executor(dispatcher());
 
   std::optional<GracefulRebootReasonSignal> signal;
-  fuchsia::hardware::power::statecontrol::RebootMethodsWatcherPtr ptr;
+  fuchsia::hardware::power::statecontrol::RebootWatcherPtr ptr;
   executor.schedule_task(WaitForRebootReason(dispatcher(), ptr.NewRequest(dispatcher()))
                              .and_then([&signal](GracefulRebootReasonSignal& s) {
                                signal = std::move(s);
@@ -163,8 +168,13 @@ TEST_F(WaitForRebootReasonTest, ServerDisconnectsOnCallbackDeletion) {
                              }));
 
   bool called{false};
-  ptr->OnReboot(fuchsia::hardware::power::statecontrol::RebootReason::USER_REQUEST,
-                [&called] { called = true; });
+
+  fuchsia::hardware::power::statecontrol::RebootOptions options;
+  std::vector<fuchsia::hardware::power::statecontrol::RebootReason2> reasons = {
+      fuchsia::hardware::power::statecontrol::RebootReason2::USER_REQUEST};
+  options.set_reasons(reasons);
+  ptr->OnReboot(std::move(options), [&called] { called = true; });
+
   RunLoopUntilIdle();
   ASSERT_NE(signal, std::nullopt);
   EXPECT_EQ(signal->Reason(), GracefulRebootReason::kUserRequest);

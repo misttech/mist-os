@@ -451,6 +451,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.feedback/LastReboot.planned",
+        "ordinal": "4",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.feedback/LastReboot.reason",
         "ordinal": "2",
         "type": "fuchsia.feedback/RebootReason"
@@ -653,6 +659,11 @@
         "kind": "enum/member",
         "name": "fuchsia.feedback/RebootReason.KERNEL_PANIC",
         "value": "5"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.feedback/RebootReason.NETSTACK_MIGRATION",
+        "value": "20"
     },
     {
         "kind": "enum/member",
