@@ -92,6 +92,11 @@ closed protocol Resource {
     /// *name* is an invalid pointer, or the *kind* specified is `ZX_RSRC_KIND_ROOT`
     /// but *base* and *size* are not 0.
     ///
+    /// `ZX_ERR_NOT_FOUND` A suitable resource allocation was not found. This happens
+    /// if the address range is not valid, if the range is already owned by an exclusive
+    /// resource, or if a regular resource exists and the caller is trying to create
+    /// an exclusive resource in the same range.
+    ///
     /// `ZX_ERR_NO_MEMORY` Failure due to lack of memory. There is no good way for
     /// userspace to handle this (unlikely) error. In a future build this error will no
     /// longer occur.
