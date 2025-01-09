@@ -1864,6 +1864,38 @@ async fn add_expose_decl_if_needed(
                     return Ok(());
                 }
             }
+            // If the `Capability` is already something we expose we don't want to add
+            // a capability and expose entry.
+            {
+                let source_name = match &capability {
+                    ftest::Capability::Protocol(c) => c.name.clone(),
+                    ftest::Capability::Directory(c) => c.name.clone(),
+                    ftest::Capability::Storage(c) => c.name.clone(),
+                    ftest::Capability::Service(c) => c.name.clone(),
+                    ftest::Capability::EventStream(c) => c.name.clone(),
+                    ftest::Capability::Config(c) => c.name.clone(),
+                    #[cfg(fuchsia_api_level_at_least = "25")]
+                    ftest::Capability::Dictionary(c) => c.name.clone(),
+                    #[cfg(fuchsia_api_level_at_least = "24")]
+                    ftest::Capability::Resolver(c) => c.name.clone(),
+                    #[cfg(fuchsia_api_level_at_least = "24")]
+                    ftest::Capability::Runner(c) => c.name.clone(),
+                    _ => {
+                        return Err(RealmBuilderError::CapabilityInvalid(anyhow::format_err!(
+                            "Unrecognized capability variant: {:?}.",
+                            capability
+                        )));
+                    }
+                };
+
+                if decl
+                    .exposes
+                    .iter()
+                    .any(|x| Some(x.source_name().as_str()) == source_name.as_deref())
+                {
+                    return Ok(());
+                }
+            }
             push_if_not_present(
                 &mut decl.capabilities,
                 create_capability_decl(capability.clone())?,
