@@ -30,6 +30,7 @@ fuchsia_cc_driver("driver") {
     "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/zbi-format",
     "//src/devices/pci/lib/device-protocol-pci",
+    "//src/graphics/display/lib/api-types/cpp",
     "//src/graphics/display/lib/framebuffer-display",
     "//zircon/system/ulib/fbl",
   ]

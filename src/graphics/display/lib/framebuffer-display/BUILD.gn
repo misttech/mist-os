@@ -31,6 +31,7 @@ source_set("framebuffer-display") {
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
+    "//src/graphics/display/lib/api-protocols/cpp",
     "//src/graphics/display/lib/api-types/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/image-format",

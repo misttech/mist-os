@@ -5,15 +5,15 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_FRAMEBUFFER_DISPLAY_FRAMEBUFFER_DISPLAY_DRIVER_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_FRAMEBUFFER_DISPLAY_FRAMEBUFFER_DISPLAY_DRIVER_H_
 
-#include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <memory>
-#include <optional>
 
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-banjo-adapter.h"
+#include "src/graphics/display/lib/api-protocols/cpp/display-engine-events-banjo.h"
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
 
 namespace framebuffer_display {
@@ -48,12 +48,16 @@ class FramebufferDisplayDriver : public fdf::DriverBase {
   // Must be called after `framebuffer_display_` is initialized.
   zx::result<> InitializeBanjoServerNode();
 
+  // Must outlive `framebuffer_display_` and `engine_banjo_adapter_`.
+  display::DisplayEngineEventsBanjo engine_events_;
+
   fdf::SynchronizedDispatcher framebuffer_display_dispatcher_;
   std::unique_ptr<FramebufferDisplay> framebuffer_display_;
 
-  std::optional<compat::BanjoServer> banjo_server_;
+  std::unique_ptr<display::DisplayEngineBanjoAdapter> engine_banjo_adapter_;
+
   compat::SyncInitializedDeviceServer compat_server_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
 
 }  // namespace framebuffer_display

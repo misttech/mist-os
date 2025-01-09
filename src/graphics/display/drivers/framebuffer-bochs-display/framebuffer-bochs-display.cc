@@ -13,6 +13,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/framebuffer-bochs-display/bochs-vbe-registers.h"
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display-driver.h"
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
 
@@ -22,7 +23,7 @@ namespace {
 
 constexpr int kDisplayWidth = 1024;
 constexpr int kDisplayHeight = 768;
-constexpr auto kDisplayFormat = fuchsia_images2::wire::PixelFormat::kB8G8R8A8;
+constexpr auto kDisplayFormat = display::PixelFormat::kB8G8R8A8;
 constexpr int kBitsPerPixel = 32;
 
 zx::result<> SetUpBochsDisplayEngine(fdf::MmioView mmio_space, int width, int height,

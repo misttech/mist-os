@@ -12,6 +12,7 @@
 
 #include <fbl/alloc_checker.h>
 
+#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display-driver.h"
 #include "src/graphics/display/lib/framebuffer-display/framebuffer-display.h"
 
@@ -120,11 +121,18 @@ zx::result<DisplayProperties> FramebufferIntelDisplayDriver::GetDisplayPropertie
   }
   fuchsia_images2::wire::PixelFormat sysmem2_format = sysmem2_format_type_result.take_value();
 
+  if (!display::PixelFormat::IsSupported(sysmem2_format)) {
+    FDF_LOG(ERROR, "Unsupported framebuffer format: %" PRIu32,
+            static_cast<uint32_t>(sysmem2_format));
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  display::PixelFormat pixel_format(sysmem2_format);
+
   const DisplayProperties properties = {
       .width_px = static_cast<int32_t>(width),
       .height_px = static_cast<int32_t>(height),
       .row_stride_px = static_cast<int32_t>(stride),
-      .pixel_format = sysmem2_format,
+      .pixel_format = pixel_format,
   };
   return zx::ok(properties);
 }

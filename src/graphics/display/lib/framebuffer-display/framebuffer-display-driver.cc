@@ -73,23 +73,25 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
   }
   DisplayProperties display_properties = std::move(display_properties_result).value();
 
-  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> hardware_sysmem_result =
+  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> sysmem_hardware_client_result =
       incoming()->Connect<fuchsia_hardware_sysmem::Sysmem>();
-  if (hardware_sysmem_result.is_error()) {
+  if (sysmem_hardware_client_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get hardware sysmem protocol: %s",
-            hardware_sysmem_result.status_string());
-    return hardware_sysmem_result.take_error();
+            sysmem_hardware_client_result.status_string());
+    return sysmem_hardware_client_result.take_error();
   }
-  fidl::WireSyncClient hardware_sysmem{std::move(hardware_sysmem_result).value()};
+  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_hardware_client(
+      std::move(sysmem_hardware_client_result).value());
 
-  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_result =
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_client_result =
       incoming()->Connect<fuchsia_sysmem2::Allocator>();
-  if (sysmem_result.is_error()) {
+  if (sysmem_client_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get fuchsia.sysmem2.Allocator protocol: %s",
-            sysmem_result.status_string());
-    return sysmem_result.take_error();
+            sysmem_client_result.status_string());
+    return sysmem_client_result.take_error();
   }
-  fidl::WireSyncClient sysmem(std::move(sysmem_result).value());
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_client(
+      std::move(sysmem_client_result).value());
 
   zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
       fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
@@ -104,10 +106,18 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
 
   fbl::AllocChecker alloc_checker;
   auto framebuffer_display = fbl::make_unique_checked<FramebufferDisplay>(
-      &alloc_checker, std::move(hardware_sysmem), std::move(sysmem), std::move(frame_buffer_mmio),
-      std::move(display_properties), framebuffer_display_dispatcher_.async_dispatcher());
+      &alloc_checker, &engine_events_, std::move(sysmem_client), std::move(sysmem_hardware_client),
+      std::move(frame_buffer_mmio), std::move(display_properties),
+      framebuffer_display_dispatcher_.async_dispatcher());
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for FramebufferDisplay");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  engine_banjo_adapter_ = fbl::make_unique_checked<display::DisplayEngineBanjoAdapter>(
+      &alloc_checker, framebuffer_display.get(), &engine_events_);
+  if (!alloc_checker.check()) {
+    FDF_LOG(ERROR, "Failed to allocate memory for DisplayEngineBanjoAdapter");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -123,32 +133,31 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
 
 zx::result<> FramebufferDisplayDriver::InitializeBanjoServerNode() {
   ZX_DEBUG_ASSERT(framebuffer_display_ != nullptr);
-  display_engine_protocol_t protocol = framebuffer_display_->GetProtocol();
+  ZX_DEBUG_ASSERT(engine_banjo_adapter_ != nullptr);
 
   // Serves the [`fuchsia.hardware.display.controller/ControllerImpl`] protocol
   // over the compatibility server.
-  banjo_server_ = compat::BanjoServer(ZX_PROTOCOL_DISPLAY_ENGINE, protocol.ctx, protocol.ops);
-  compat::DeviceServer::BanjoConfig banjo_config;
-  banjo_config.callbacks[ZX_PROTOCOL_DISPLAY_ENGINE] = banjo_server_->callback();
   zx::result<> compat_server_init_result =
       compat_server_.Initialize(incoming(), outgoing(), node_name(), name(),
                                 /*forward_metadata=*/compat::ForwardMetadata::None(),
-                                /*banjo_config=*/std::move(banjo_config));
+                                engine_banjo_adapter_->CreateBanjoConfig());
   if (compat_server_init_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to initialize the compatibility server: %s",
+            compat_server_init_result.status_string());
     return compat_server_init_result.take_error();
   }
 
-  const std::vector<fuchsia_driver_framework::NodeProperty> node_properties = {
+  const fuchsia_driver_framework::NodeProperty node_properties[] = {
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_display::BIND_PROTOCOL_ENGINE),
   };
   const std::vector<fuchsia_driver_framework::Offer> node_offers = compat_server_.CreateOffers2();
-  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> controller_client_result =
-      AddChild(name(), node_properties, node_offers);
-  if (controller_client_result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add child node: %s", controller_client_result.status_string());
-    return controller_client_result.take_error();
+  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>>
+      node_controller_client_result = AddChild(name(), node_properties, node_offers);
+  if (node_controller_client_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to add child node: %s", node_controller_client_result.status_string());
+    return node_controller_client_result.take_error();
   }
-  controller_ = fidl::WireSyncClient(std::move(controller_client_result).value());
+  node_controller_ = fidl::WireSyncClient(std::move(node_controller_client_result).value());
 
   return zx::ok();
 }
