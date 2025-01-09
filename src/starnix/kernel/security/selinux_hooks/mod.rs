@@ -148,8 +148,7 @@ pub fn file_permission(
     mut permission_flags: PermissionFlags,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let file_mode = file.name.entry.node.info().mode;
-    let file_class = file_class_from_file_mode(file_mode)?;
+    let file_class = file.node().security_state.lock().class;
 
     if file.flags().contains(OpenFlags::APPEND) {
         permission_flags |= PermissionFlags::APPEND;
