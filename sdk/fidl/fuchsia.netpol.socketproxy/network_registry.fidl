@@ -19,6 +19,8 @@ type Network = table {
             1: mark uint32;
             2: handle uint64;
         };
+        /// Information about Fuchsia registered networks.
+        2: fuchsia @generated_name("FuchsiaNetworkInfo") table {};
     };
     /// The DNS servers associated with this network.
     3: dns_servers @generated_name("NetworkDnsServers") table {

@@ -7,6 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.netpol.socketproxy") {
   sources = [
     "dns_watcher.fidl",
+    "fuchsia.fidl",
     "network_registry.fidl",
     "socketproxy.fidl",
     "starnix.fidl",
