@@ -41,7 +41,7 @@ fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTas
         current_task,
         // TODO(https://fxbug.dev/322365477) consider making this configurable
         "hw_random".into(),
-        DeviceMetadata::new("hw_random".into(), DeviceType::HW_RANDOM, DeviceMode::Char),
+        DeviceMetadata::new("hwrng".into(), DeviceType::HW_RANDOM, DeviceMode::Char),
         misc_class.clone(),
         DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
