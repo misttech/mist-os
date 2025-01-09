@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2145
+From //build/config/BUILDCONFIG.gn:2073
 
 ### allowed_test_device_types
 
@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8726265853008124513"`
+**Current value for `target_cpu = "arm64"`:** `"8726220547383979489"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8726265853008124513"`
+**Current value for `target_cpu = "riscv64"`:** `"8726220547383979489"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8726265853008124513"`
+**Current value for `target_cpu = "x64"`:** `"8726220547383979489"`
 
 From //out/not-default/args.gn:10
 
@@ -1876,7 +1876,7 @@ From //third_party/perfetto/gn/perfetto.gni:310
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:132
+From //src/power/power-manager/BUILD.gn:133
 
 ### enable_suspend
 
@@ -1989,7 +1989,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1867
+From //build/config/BUILDCONFIG.gn:1865
 
 ### fastboot_product
 
@@ -2773,8 +2773,6 @@ To make use of a variant, set [`select_variant`](#select_variant).
 
 Normally this is not set as a build argument, but it serves to
 document the available set of variants.
-See also [`universal_variants`](#universal_variants).
-Only set this to remove all the default variants here.
 To add more, set [`extra_variants`](#extra_variants) instead.
 
 Each element of the list is one variant, which is a scope defining:
@@ -2951,7 +2949,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1675
+From //build/config/BUILDCONFIG.gn:1673
 
 ### legacy_base_package_labels
 
@@ -4728,8 +4726,7 @@ scope, described below.
 A string selector can match a name in
 [`select_variant_shortcuts`](#select_variant_shortcuts).  If it's not a
 specific shortcut listed there, then it can be the name of any variant
-described in [`known_variants`](#known_variants) and
-[`universal_variants`](#universal_variants) (and combinations thereof).
+described in [`known_variants`](#known_variants).
 A `selector` that's a simple variant name selects for every binary
 built in the target toolchain: `{ host=false variant=selector }`.
 
@@ -4744,8 +4741,7 @@ The scope that forms a full selector defines some of these:
         [string or `false`] The variant that applies if this selector
         matches.  This can be `false` to choose no variant, or a string
         that names the variant.  See
-        [`known_variants`](#known_variants) and
-        [`universal_variants`](#universal_variants).
+        [`known_variants`](#known_variants).
 
 The rest below are matching criteria.  All are optional.
 The selector matches if and only if all of its criteria match.
@@ -4784,7 +4780,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2135
+From //build/config/BUILDCONFIG.gn:2063
 
 ### select_variant_canonical
 
@@ -4794,7 +4790,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2140
+From //build/config/BUILDCONFIG.gn:2068
 
 ### select_variant_shortcuts
 
@@ -4853,7 +4849,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1913
+From //build/config/BUILDCONFIG.gn:1872
 
 ### size_checker_input
 
@@ -5355,22 +5351,6 @@ injected that way can override that option's setting in this list.
 **Current value (from the default):** `["print_stacktrace=1", "halt_on_error=1"]`
 
 From //build/config/sanitizers/sanitizer_default_options.gni:49
-
-### universal_variants
-
-**Current value (from the default):**
-
-```none
-[{
-  configs = []
-  name = "debug"
-  toolchain_args = {
-  is_debug = true
-}
-}]
-```
-
-From //build/config/BUILDCONFIG.gn:1897
 
 ### universe_package_labels
 
