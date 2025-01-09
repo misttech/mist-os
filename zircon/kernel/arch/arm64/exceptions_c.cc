@@ -582,6 +582,20 @@ extern "C" void arm64_invalid_exception(iframe_t* iframe, unsigned int which) {
 }
 
 /* called from assembly */
+extern "C" void arm64_unrestricted_arm32_exception(iframe_t* iframe, unsigned int which,
+                                                   uint32_t esr);
+extern "C" void arm64_unrestricted_arm32_exception(iframe_t* iframe, unsigned int which,
+                                                   uint32_t esr) {
+  platform_panic_start();
+
+  // See include/arch/arm64.h to decode the which value
+  printf("unrestricted exception from arm32, esr %#x which %#x\n", esr, which);
+  dump_iframe(iframe);
+
+  platform_halt(HALT_ACTION_HALT, ZirconCrashReason::Panic);
+}
+
+/* called from assembly */
 extern "C" void arch_iframe_process_pending_signals(iframe_t* iframe) {
   DEBUG_ASSERT(iframe != nullptr);
   Thread::Current::ProcessPendingSignals(GeneralRegsSource::Iframe, iframe);

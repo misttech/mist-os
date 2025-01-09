@@ -5,7 +5,7 @@
 loadable_module("restricted-blob") {
   testonly = true
   sources = [ "$current_cpu.S" ]
-  configs += [ "//build/config/zircon:nolibc" ]
+  configs += [ ":restricted-blob-config" ]
   exclude_toolchain_tags = [ "instrumented" ]
   deps = [ "//zircon/kernel/lib/arch" ]
 
@@ -20,6 +20,25 @@ loadable_module("restricted-blob") {
         source = rebase_path("$root_out_dir/$target_name.so", root_build_dir)
         label = get_label_info(":$target_name", "label_with_toolchain")
       },
+    ]
+  }
+}
+
+# Simplified version of //build/config/zircon:hermetic-code-blob
+# relying on :nolibc as a basis.
+config("restricted-blob-config") {
+  ldflags = []
+  configs = [
+    "//build/config/zircon:nolibc",
+    "//build/config/zircon:no-synthetic-sections",
+  ]
+  if (!is_gcc) {
+    ldflags += [
+      # lld defaults to PIE, while the GNU linkers do not.
+      "-Wl,--no-pie",
+
+      # libunwind will pull in libc dependencies.
+      "-unwindlib=none",
     ]
   }
 }

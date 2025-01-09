@@ -54,7 +54,8 @@ typedef struct zx_restricted_state {
   uint64_t sp;
   uint64_t pc;
   uint64_t tpidr_el0;
-  // Contains only the user-controllable upper 4-bits (NZCV).
+  // Contains the user-controllable upper 4-bits (NZCV) for aarch32/64.
+  // If M[4] is set, aarch32 bits are accessible: T, Q, IT, and GE.
   uint32_t cpsr;
   uint8_t padding1[4];
 } zx_restricted_state_t;

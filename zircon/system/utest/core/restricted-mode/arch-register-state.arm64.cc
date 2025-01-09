@@ -148,8 +148,68 @@ void ArchRegisterState::PrintExceptionState(const zx_restricted_exception_t& exc
   printf("FAR: 0x%lx\n", exc.exception.context.arch.u.arm_64.far);
 }
 
+// This derived class handles the differences between aarch64 and aarch32 in the
+// same tests.
+class Arch32RegisterState : public ArchRegisterState {
+ public:
+  void InitializeRegisters(TlsStorage* tls_storage) override {
+    ArchRegisterState::InitializeRegisters(tls_storage);
+    state_.cpsr = 0x10;
+  }
+
+  void InitializeFromThreadState(const zx_thread_state_general_regs_t& regs) override {
+    static_assert(sizeof(regs.r) <= sizeof(state_.x));
+    ASSERT_EQ(regs.cpsr & 0x10, 0x10);
+    memcpy(state_.x, regs.r, sizeof(regs.r));
+    state_.x[14] = regs.lr;
+    state_.x[15] = regs.pc;
+    state_.pc = regs.pc;
+    state_.tpidr_el0 = regs.tpidr;
+    state_.sp = regs.sp;
+    state_.cpsr = static_cast<uint32_t>(regs.cpsr);
+  }
+
+  void VerifyTwiddledRestrictedState(RegisterMutation mutation) const override {
+    // Validate the state of the registers is what was written inside restricted mode.
+    //
+    // NOTE: Each of the registers was incremented by one before exiting restricted mode.
+    // x0 was used as temp space by syscall_bounce, so skip that one.
+    EXPECT_EQ(0x0000000002020203, state_.x[1]);
+    EXPECT_EQ(0x0000000003030304, state_.x[2]);
+    EXPECT_EQ(0x0000000004040405, state_.x[3]);
+    EXPECT_EQ(0x0000000005050506, state_.x[4]);
+    EXPECT_EQ(0x0000000006060607, state_.x[5]);
+    EXPECT_EQ(0x0000000007070708, state_.x[6]);
+    EXPECT_EQ(0x000000000909090a, state_.x[8]);
+    EXPECT_EQ(0x000000000a0a0a0b, state_.x[9]);
+    EXPECT_EQ(0x000000000b0b0b0c, state_.x[10]);
+    EXPECT_EQ(0x000000000c0c0c0d, state_.x[11]);
+    EXPECT_EQ(0x000000000d0d0d0e, state_.x[12]);
+    if (mutation == RegisterMutation::kFromSyscall) {
+      EXPECT_EQ(0x40, state_.x[7]);  // syscall_bounce ran syscall 0x40
+    } else {
+      EXPECT_EQ(0x0000000008080809, state_.x[7]);
+    }
+    EXPECT_EQ(0x000000000e0e0e1e, state_.x[13]);  // aarch32 sp
+    EXPECT_EQ(0x000000000f0f0f0f, state_.x[14]);  // aarch32 lr
+    // Registers above 15 will not be saved/updated in restricted state.
+    EXPECT_EQ(0x0202020202020202, state_.x[16]);  // unchanged
+
+    // Check that thread local storage was updated correctly in restricted mode.
+    EXPECT_EQ(0x0000000008080809, tls()->tpidr);
+  }
+
+  void set_pc(uintptr_t pc) override {
+    state_.pc = pc;
+    state_.x[15] = pc;
+  }
+};
+
 // Map the types to machines.
 std::unique_ptr<ArchRegisterState> ArchRegisterStateFactory::Create(elfldltl::ElfMachine machine) {
-  ZX_ASSERT(machine == elfldltl::ElfMachine::kNative);
-  return std::make_unique<ArchRegisterState>();
+  if (machine == elfldltl::ElfMachine::kNative) {
+    return std::make_unique<ArchRegisterState>();
+  }
+  ZX_ASSERT(machine == elfldltl::ElfMachine::kArm);
+  return std::make_unique<Arch32RegisterState>();
 }

@@ -89,6 +89,11 @@ typedef struct zx_arm64_thread_state_general_regs {
   uint64_t lr;
   uint64_t sp;
   uint64_t pc;
+  // For all normal threads, only the top 4 bits (NCZV flags) may be modified.
+  // For restricted threads, additional flags may be set or cleared:
+  // - M[4], toggles A32 instruction mode.
+  // - T[5], with M[4], toggles T32 instruction mode.
+  // - GE[19:16], Q[27], and IT[15:10,26:25], are used across A32/T32 operations.
   uint64_t cpsr;
   uint64_t tpidr;
 } zx_arm64_thread_state_general_regs_t;

@@ -14,6 +14,17 @@
 // Current Program Status Register. It contains processor status and control
 // information. Only the top 4 bits (NCZV) are addressable from user mode.
 inline constexpr uint32_t kArmUserVisibleFlags = 0xf0000000;
+// M[4]/nRW. When bit 4 is set, aarch32 execution is enabled.
+inline constexpr uint32_t kArm32BitMode = 0x10;
+// When bit 5 is set, aarch32 thumb mode is enabled.
+inline constexpr uint32_t kArm32BitThumbMode = 0x20;
+// GE[19:16] and Q[27] bits which may be set by userland and should be preserved.
+inline constexpr uint32_t kArmGeQBits = 0x80f0000;
+// IT[15:10,26:25] bits which may be set by userland thumb mode and should be preserved.
+inline constexpr uint32_t kArmItBits = 0x600fc00;
+
+inline constexpr uint32_t kArmUserRestrictedVisibleFlags =
+    kArmUserVisibleFlags | kArm32BitMode | kArm32BitThumbMode | kArmGeQBits | kArmItBits;
 
 // MDSCR_EL1
 // Monitor Debug System Control Register. It's the main control register fot the debug

@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <trace.h>
 
+#include <arch/arm64/feature.h>
 #include <arch/arm64/registers.h>
 #include <arch/debugger.h>
 #include <arch/regs.h>
@@ -34,10 +35,44 @@ zx_status_t RestrictedState::ArchValidateStatePreRestrictedEntry(
     LTRACEF("fail due to bad PC %#" PRIx64 "\n", state.pc);
     return ZX_ERR_BAD_STATE;
   }
-  // Validate that only the NCZV flags of the CPSR are set.
-  if (unlikely((state.cpsr & ~kArmUserVisibleFlags) != 0)) {
-    LTRACEF("fail due to flags outside of kArmUserVisibleFlags set (%#" PRIx32 ")\n", state.cpsr);
-    return ZX_ERR_BAD_STATE;
+  // If kArm32BitMode, perform additional checks.
+  if (state.cpsr & kArm32BitMode) {
+    if (unlikely(!arm64_feature_test(ZX_ARM64_FEATURE_ISA_ARM32))) {
+      LTRACEF("fail due to lack of 32-bit ISA support\n");
+      return ZX_ERR_BAD_STATE;
+    }
+
+    // Make sure PC is <4Gb is kArm32BitMode
+    if (unlikely(state.pc >= (1ULL << 32))) {
+      LTRACEF("fail due to out of range 32-bit PC %#" PRIx64 "\n", state.pc);
+      return ZX_ERR_BAD_STATE;
+    }
+
+    // If CPSR's T bit is not set, then PC[1:0] must be 0 (32-bit aligned).
+    if (unlikely((state.cpsr & kArm32BitThumbMode) == 0 && (state.pc & 0x3))) {
+      LTRACEF("fail due to unaligned A32 32-bit PC %#" PRIx64 "\n", state.pc);
+      return ZX_ERR_BAD_STATE;
+    }
+
+    // If CPSR's T bit is set, then PC[0] must be 0 (16-bit aligned).
+    if (unlikely((state.cpsr & kArm32BitThumbMode) == 1 && (state.pc & 0x1))) {
+      LTRACEF("fail due to unaligned T32 32-bit PC %#" PRIx64 "\n", state.pc);
+      return ZX_ERR_BAD_STATE;
+    }
+
+    // Validate that only the NCZV flags and 32-bit relevant flags of the CPSR are set.
+    if (unlikely((state.cpsr & ~(kArmUserRestrictedVisibleFlags)) != 0)) {
+      LTRACEF("fail due to flags outside of kArmUserRestrictedVisibleFlags set (%#" PRIx32 ")\n",
+              state.cpsr);
+      return ZX_ERR_BAD_STATE;
+    }
+  } else {
+    // Validate that only the NCZV flags of the CPSR are set.
+    // For aarch64 restricted threads, the flags are the same as normal user threads.
+    if (unlikely((state.cpsr & ~(kArmUserVisibleFlags)) != 0)) {
+      LTRACEF("fail due to flags outside of kArmUserVisibleFlags set (%#" PRIx32 ")\n", state.cpsr);
+      return ZX_ERR_BAD_STATE;
+    }
   }
   return ZX_OK;
 }
@@ -92,7 +127,15 @@ void RestrictedState::ArchSaveRestrictedExceptionState(zx_restricted_state_t& st
 
   // Save the registers from restricted mode.
   static_assert(sizeof(regs.r) <= sizeof(state.x));
-  memcpy(state.x, regs.r, sizeof(regs.r));
+  // If the thread is in a 32-bit execution mode, then ignore the upper bits of
+  // the registers and only save up to x[15].
+  if (regs.cpsr & kArm32BitMode) {
+    for (size_t i = 0; i < ktl::size(state.x) >> 1; i++) {
+      state.x[i] = regs.r[i] & 0x00000000ffffffff;
+    }
+  } else {
+    memcpy(state.x, regs.r, sizeof(regs.r));
+  }
   state.x[30] = regs.lr;
   state.sp = regs.sp;
   state.pc = regs.pc;
@@ -108,7 +151,15 @@ void RestrictedState::ArchSaveRestrictedSyscallState(zx_restricted_state_t& stat
 
   // Save the registers from restricted mode.
   static_assert(sizeof(regs.r) <= sizeof(state.x));
-  memcpy(state.x, regs.r, sizeof(regs.r));
+  // If the thread is in a 32-bit execution mode, then ignore the upper bits of
+  // the registers and only save the upper half.
+  if (regs.spsr & kArm32BitMode) {
+    for (size_t i = 0; i < ktl::size(state.x) >> 1; i++) {
+      state.x[i] = regs.r[i] & 0x00000000ffffffff;
+    }
+  } else {
+    memcpy(state.x, regs.r, sizeof(regs.r));
+  }
   state.x[30] = regs.lr;
   state.sp = regs.usp;
   state.pc = regs.elr;

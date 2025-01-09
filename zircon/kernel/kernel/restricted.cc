@@ -195,6 +195,13 @@ void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs) {
   // Save the exception register state into the restricted state.
   RestrictedState::ArchSaveRestrictedExceptionState(*state);
 
+  // Update state to be in normal mode.
+  //
+  // This is done prior to calling into the architecture redirect calls
+  // as the thread is no longer be restricted.
+  rs->set_in_restricted(false);
+  arch_set_restricted_flag(false);
+
   // Redirect the exception so that we return to normal mode for handling.
   //
   // This will update the exception context so that when we return back to usermode
@@ -202,9 +209,6 @@ void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs) {
   RestrictedState::ArchRedirectRestrictedExceptionToNormal(rs->arch_normal_state(),
                                                            rs->vector_ptr(), rs->context());
 
-  // Update state to be in normal mode.
-  rs->set_in_restricted(false);
-  arch_set_restricted_flag(false);
   ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
   vmm_set_active_aspace(up->normal_aspace());
 }
