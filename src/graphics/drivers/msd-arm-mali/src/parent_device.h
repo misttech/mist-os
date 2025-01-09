@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/power/cpp/types.h>
+#include <lib/magma/platform/platform_device.h>
 #include <lib/magma/platform/platform_interrupt.h>
 #include <lib/magma/platform/platform_mmio.h>
 #include <lib/magma/util/dlog.h>
@@ -39,6 +40,8 @@ class ParentDevice {
   virtual zx::result<fdf::ClientEnd<fuchsia_hardware_gpu_mali::ArmMali>>
   ConnectToMaliRuntimeProtocol() = 0;
   virtual bool suspend_enabled() = 0;
+
+  virtual magma::PlatformDevice* GetPlatformDevice() = 0;
 
   virtual std::shared_ptr<fdf::Namespace> incoming() = 0;
 

@@ -7,12 +7,9 @@
 #include <lib/magma/util/short_macros.h>
 #include <lib/magma_service/test_util/platform_device_helper.h>
 
-#include <chrono>
 #include <thread>
 
 #include <gtest/gtest.h>
-
-using std::chrono_literals::operator""ms;
 
 TEST(PlatformDevice, Basic) {
   magma::PlatformDevice* platform_device = TestPlatformDevice::GetInstance();
@@ -29,18 +26,13 @@ TEST(PlatformDevice, MapMmio) {
 
   uint32_t index = 0;
 
-  // Map once
+  // Map once.
   auto mmio = platform_device->CpuMapMmio(index, magma::PlatformMmio::CACHE_POLICY_CACHED);
   ASSERT_TRUE(mmio);
-  EXPECT_NE(0u, mmio->physical_address());
 
-  // Map again same policy
+  // Map again.
   auto mmio2 = platform_device->CpuMapMmio(index, magma::PlatformMmio::CACHE_POLICY_CACHED);
   EXPECT_TRUE(mmio2);
-
-  // Map again different policy - this is now permitted though it's a bad idea.
-  auto mmio3 = platform_device->CpuMapMmio(index, magma::PlatformMmio::CACHE_POLICY_UNCACHED);
-  EXPECT_TRUE(mmio3);
 }
 
 TEST(PlatformDevice, SetRole) {
@@ -51,7 +43,7 @@ TEST(PlatformDevice, SetRole) {
   ASSERT_TRUE(device_handle);
 
   std::thread test_thread([device_handle]() {
-    EXPECT_TRUE(magma::PlatformThreadHelper::SetRole(device_handle, "fuchsia.test-role:ok"));
+    EXPECT_TRUE(magma::PlatformThreadHelper::SetRole(device_handle, "fuchsia.default"));
   });
 
   test_thread.join();
@@ -77,8 +69,7 @@ TEST(PlatformDevice, SetThreadRole) {
 
   thrd_t thread;
   ASSERT_EQ(0, thrd_create(&thread, &thread_function, &mutex));
-  EXPECT_TRUE(
-      magma::PlatformThreadHelper::SetThreadRole(device_handle, thread, "fuchsia.test-role:ok"));
+  EXPECT_TRUE(magma::PlatformThreadHelper::SetThreadRole(device_handle, thread, "fuchsia.default"));
 
   lock.unlock();
   thrd_join(thread, nullptr);

@@ -82,7 +82,9 @@ source_set("msd_arm_test_entry") {
   defines = [ "MAGMA_TEST_DRIVER=1" ]
   deps = entry_deps + [
            "tests/unit_tests:tests_requiring_hardware",
+           "//src/graphics/magma/lib/magma/platform/zircon:thread_profile_dfv2",
            "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",
+           "//src/graphics/magma/lib/magma_service/test_util:platform_device_helper",
            "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
            "//src/graphics/magma/tests/msd_conformance_tests",
            "//third_party/googletest:gtest",

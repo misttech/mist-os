@@ -50,6 +50,8 @@ class ParentDeviceDFv2 : public ParentDevice {
   static std::unique_ptr<ParentDeviceDFv2> Create(std::shared_ptr<fdf::Namespace> incoming,
                                                   config::Config config);
 
+  magma::PlatformDevice* GetPlatformDevice() override { return &pdev_; }
+
  private:
   std::shared_ptr<fdf::Namespace> incoming_;
   magma::ZirconPlatformDeviceDfv2 pdev_;

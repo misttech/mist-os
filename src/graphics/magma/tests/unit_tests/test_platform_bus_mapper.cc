@@ -64,3 +64,14 @@ TEST(PlatformDevice, BusMapperPhysical) {
     }
   }
 }
+
+// Test that we can map a 512MB buffer which requires multiple pins
+TEST(PlatformDevice, BusMapperLarge) {
+  magma::PlatformDevice* platform_device = TestPlatformDevice::GetInstance();
+  ASSERT_TRUE(platform_device);
+  auto mapper = magma::PlatformBusMapper::Create(platform_device->GetBusTransactionInitiator());
+  ASSERT_TRUE(mapper);
+
+  uint64_t constexpr kZirconPinPageLimit = 512 * 1024 * 1024 / 4096;
+  TestPlatformBusMapperCases::Basic(mapper.get(), kZirconPinPageLimit);
+}
