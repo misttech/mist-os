@@ -61,18 +61,26 @@ struct HciEventHeader {
 }  // namespace
 
 // fhbt::ScoConnection overrides.
-ScoConnectionServer::ScoConnectionServer(SendHandler send_handler, StopHandler stop_handler)
-    : send_handler_(std::move(send_handler)), stop_handler_(std::move(stop_handler)) {}
+ScoConnectionServer::ScoConnectionServer(
+    async_dispatcher_t* dispatcher,
+    fidl::ServerEnd<fuchsia_hardware_bluetooth::ScoConnection> server_end, SendHandler send_handler,
+    StopHandler stop_handler, fit::function<void(fidl::UnbindInfo)> close_handler)
+    : send_handler_(std::move(send_handler)),
+      stop_handler_(std::move(stop_handler)),
+      binding_(dispatcher, std::move(server_end), this, std::move(close_handler)) {}
 
 void ScoConnectionServer::Send(SendRequest& request, SendCompleter::Sync& completer) {
-  send_handler_(request.packet(),
-                [completer = completer.ToAsync()]() mutable { completer.Reply(); });
+  send_handler_(request.packet(), completer);
 }
 
 void ScoConnectionServer::AckReceive(AckReceiveCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/349616746): Implement flow control based on AckReceive.
 }
-void ScoConnectionServer::Stop(StopCompleter::Sync& completer) { stop_handler_(); }
+void ScoConnectionServer::Stop(StopCompleter::Sync& completer) {
+  binding_.Close(ZX_OK);
+  stop_handler_();
+}
+
 void ScoConnectionServer::handle_unknown_method(
     ::fidl::UnknownMethodMetadata<fhbt::ScoConnection> metadata,
     ::fidl::UnknownMethodCompleter::Sync& completer) {
@@ -85,12 +93,7 @@ Device::Device(zx_device_t* parent, async_dispatcher_t* dispatcher)
       dispatcher_(dispatcher),
       sco_reassembler_(
           /*length_param_index=*/2, /*header_size=*/3,
-          [this](cpp20::span<const uint8_t> pkt) { OnScoReassemblerPacketLocked(pkt); }),
-      sco_connection_server_(
-          [this](std::vector<uint8_t>& packet, fit::function<void(void)> callback) {
-            OnScoData(packet, std::move(callback));
-          },
-          [this] { OnScoStop(); }) {}
+          [this](cpp20::span<const uint8_t> pkt) { OnScoReassemblerPacketLocked(pkt); }) {}
 
 zx_status_t Device::Create(void* /*ctx*/, zx_device_t* parent) {
   return Create(parent, /*dispatcher=*/nullptr);
@@ -499,10 +502,7 @@ void Device::DdkRelease() {
   sync_completion_wait(&requests_freed_completion_, ZX_TIME_INFINITE);
   zxlogf(DEBUG, "%s: all requests freed", __FUNCTION__);
 
-  if (sco_connection_binding_.has_value()) {
-    sco_connection_binding_->Close(ZX_OK);
-    sco_connection_binding_.reset();
-  }
+  sco_connection_server_.reset();
 
   hci_transport_binding_.CloseAll(ZX_OK);
   hci_transport_binding_.RemoveAll();
@@ -990,14 +990,13 @@ void Device::HciScoReadComplete(usb_request_t* req) {
 }
 
 void Device::OnScoReassemblerPacketLocked(cpp20::span<const uint8_t> packet) {
-  if (sco_connection_binding_.has_value()) {
+  if (sco_connection_server_.has_value()) {
     // When channel is not open, send event through HciTransport protocol events if the protocol
     // is open.
     auto fidl_vec =
         std::vector<uint8_t>(packet.data(), packet.data() + static_cast<uint32_t>(packet.size()));
 
-    fit::result<fidl::OneWayError> result =
-        fidl::SendEvent(*sco_connection_binding_)->OnReceive(fidl_vec);
+    fit::result<fidl::OneWayError> result = sco_connection_server_->OnReceive(fidl_vec);
 
     if (result.is_error()) {
       zxlogf(ERROR, "Failed to send SCO packet to host: %s", result.error_value().status_string());
@@ -1023,7 +1022,7 @@ void Device::HciScoWriteComplete(usb_request_t* req) {
   ZX_ASSERT(status == ZX_OK);
 
   // Reply the completer for this packet.
-  if (sco_connection_binding_.has_value()) {
+  if (sco_connection_server_.has_value()) {
     ZX_DEBUG_ASSERT(!sco_callback_queue_.empty());
     (sco_callback_queue_.front())();
     sco_callback_queue_.pop();
@@ -1042,7 +1041,9 @@ void Device::HciScoWriteComplete(usb_request_t* req) {
   }
 }
 
-void Device::OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> callback) {
+void Device::OnScoData(
+    std::vector<uint8_t>& packet,
+    fidl::Server<fuchsia_hardware_bluetooth::ScoConnection>::SendCompleter::Sync& completer) {
   std::lock_guard lock(mutex_);
 
   list_node_t* node = list_peek_head(&free_sco_write_reqs_);
@@ -1050,11 +1051,11 @@ void Device::OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> c
   // We don't have enough reqs. Simply punt the channel read until later.
   if (!node) {
     zxlogf(ERROR, "Too many SCO packets in driver, closing SCO connection.");
-    sco_connection_binding_->Close(ZX_ERR_BAD_STATE);
+    completer.Close(ZX_ERR_BAD_STATE);
     return;
   }
 
-  sco_callback_queue_.push(std::move(callback));
+  sco_callback_queue_.push([completer = completer.ToAsync()]() mutable { completer.Reply(); });
 
   const size_t& length = packet.size();
 
@@ -1081,10 +1082,6 @@ void Device::OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> c
 }
 
 void Device::OnScoStop() {
-  // Stop SCO connection server.
-  sco_connection_binding_->Close(ZX_OK);
-  sco_connection_binding_.reset();
-
   uint8_t isoc_alt_setting = 0;
   {
     std::lock_guard lock(mutex_);
@@ -1217,12 +1214,16 @@ void Device::AckReceive(AckReceiveCompleter::Sync& completer) {
 
 void Device::ConfigureSco(ConfigureScoRequest& request, ConfigureScoCompleter::Sync& completer) {
   if (request.connection().has_value()) {
-    if (sco_connection_binding_.has_value()) {
+    if (sco_connection_server_.has_value()) {
       zxlogf(WARNING,
              "A ScoConnection server end received, but connection has already established.");
     } else {
-      sco_connection_binding_.emplace(dispatcher_, std::move(request.connection().value()),
-                                      &sco_connection_server_, fidl::kIgnoreBindingClosure);
+      sco_connection_server_.emplace(
+          dispatcher_, std::move(request.connection().value()),
+          [this](std::vector<uint8_t>& packet,
+                 fidl::Server<fuchsia_hardware_bluetooth::ScoConnection>::SendCompleter::Sync&
+                     completer) { OnScoData(packet, completer); },
+          [this] { OnScoStop(); }, [this](fidl::UnbindInfo) { sco_connection_server_.reset(); });
     }
   }
 
@@ -1234,9 +1235,12 @@ void Device::ConfigureSco(ConfigureScoRequest& request, ConfigureScoCompleter::S
            request.encoding().has_value() ? "" : "encoding");
     return;
   }
+
+  // NOLINTBEGIN: bugprone-unchecked-optional-access (false positive)
   const auto& coding_format = request.coding_format().value();
   const auto& sample_rate = request.sample_rate().value();
   const auto& encoding = request.encoding().value();
+  // NOLINTEND: bugprone-unchecked-optional-access
 
   uint8_t new_alt_setting = 0;
 
