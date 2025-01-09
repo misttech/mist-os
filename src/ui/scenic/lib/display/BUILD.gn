@@ -14,6 +14,8 @@ source_set("display") {
     "display_manager.h",
     "display_power_manager.cc",
     "display_power_manager.h",
+    "display_power_manager_deprecated.cc",
+    "display_power_manager_deprecated.h",
     "util.cc",
     "util.h",
   ]
@@ -24,6 +26,7 @@ source_set("display") {
     "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.color:fuchsia.ui.display.color_hlcpp",
     "//sdk/fidl/fuchsia.ui.display.internal:fuchsia.ui.display.internal_hlcpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/fidl/cpp:hlcpp_conversion",
     "//sdk/lib/fit",
