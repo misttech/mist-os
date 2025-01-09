@@ -975,10 +975,11 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
   VmCowPages* parent = child_range.parent;
   AssertHeld(parent->lock_ref());
 
+  VmCowPagesOptions options = inheritable_options_locked();
+
   fbl::AllocChecker ac;
-  auto cow_clone = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_,
-                           child_range.size, nullptr, nullptr));
+  auto cow_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+      hierarchy_state_ptr_, options, pmm_alloc_flags_, child_range.size, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -998,7 +999,7 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
     RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite);
 
     parent_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-        hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_, size_, nullptr, nullptr));
+        hierarchy_state_ptr_, options, pmm_alloc_flags_, size_, nullptr, nullptr));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
@@ -1059,10 +1060,11 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
   VmCowPages* parent = child_range.parent;
   AssertHeld(parent->lock_ref());
 
+  VmCowPagesOptions options = inheritable_options_locked();
+
   fbl::AllocChecker ac;
-  auto cow_clone = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(hierarchy_state_ptr_, VmCowPagesOptions::kNone, pmm_alloc_flags_,
-                           child_range.size, nullptr, nullptr));
+  auto cow_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+      hierarchy_state_ptr_, options, pmm_alloc_flags_, child_range.size, nullptr, nullptr));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

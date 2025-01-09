@@ -41,6 +41,7 @@ class DiscardableVmoTracker;
 enum class VmCowPagesOptions : uint32_t {
   // Externally-usable flags:
   kNone = 0u,
+  kUserPagerBackedRoot = (1u << 0),
 
   // With this clear, zeroing a page tries to decommit the page.  With this set, zeroing never
   // decommits the page.  Currently this is only set for contiguous VMOs.
@@ -51,10 +52,10 @@ enum class VmCowPagesOptions : uint32_t {
   // pages aren't pinned, but that mitigation should be sufficient (even assuming such a client) to
   // allow implicit decommit when zeroing or when zero scanning, as long as no clients are doing DMA
   // to/from contiguous while not pinned.
-  kCannotDecommitZeroPages = (1u << 0),
+  kCannotDecommitZeroPages = (1u << 1),
 
   // Internal-only flags:
-  kHidden = (1u << 1),
+  kHidden = (1u << 2),
 
   kInternalOnlyMask = kHidden,
 };
@@ -124,11 +125,14 @@ class VmCowPages final : public VmHierarchyBase,
   // other purpose.
   bool is_root_source_user_pager_backed_locked() const TA_REQ(lock()) {
     canary_.Assert();
-    auto root = GetRootLocked();
-    // The root will never be null. It will either point to a valid parent, or |this| if there's no
-    // parent.
-    DEBUG_ASSERT(root);
-    return root->page_source_ && root->page_source_->properties().is_user_pager;
+    return !!(options_ & VmCowPagesOptions::kUserPagerBackedRoot);
+  }
+
+  // Helper function for CowPage cloning methods. Returns any options that should be passed down to
+  // the child.
+  VmCowPagesOptions inheritable_options_locked() const TA_REQ(lock()) {
+    canary_.Assert();
+    return VmCowPagesOptions::kNone | (options_ & (VmCowPagesOptions::kUserPagerBackedRoot));
   }
 
   bool is_parent_hidden_locked() const TA_REQ(lock()) {

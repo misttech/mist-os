@@ -301,6 +301,8 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
     }
   }
 
+  // This function isn't used to create slices or pager-backed VMOs, so VmCowPageOptions can be
+  // kNone.
   fbl::RefPtr<VmCowPages> cow_pages;
   zx_status_t status = VmCowPages::Create(state, VmCowPagesOptions::kNone, pmm_alloc_flags, size,
                                           ktl::move(discardable), &cow_pages);
@@ -546,6 +548,10 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
   VmCowPagesOptions cow_options = VmCowPagesOptions::kNone;
   if (options & kContiguous) {
     cow_options |= VmCowPagesOptions::kCannotDecommitZeroPages;
+  }
+
+  if (src->properties().is_user_pager) {
+    cow_options |= VmCowPagesOptions::kUserPagerBackedRoot;
   }
 
   fbl::RefPtr<VmCowPages> cow_pages;
