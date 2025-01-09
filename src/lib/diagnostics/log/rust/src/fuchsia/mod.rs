@@ -265,6 +265,7 @@ pub fn initialize_sync(opts: PublishOptions<'_>) -> impl Drop {
 
 /// A `Publisher` acts as broker, implementing [`tracing::Subscriber`] to receive diagnostic
 /// events from a component, and then forwarding that data on to a diagnostics service.
+#[derive(Clone)]
 pub struct Publisher {
     inner: Arc<InnerPublisher>,
 }
