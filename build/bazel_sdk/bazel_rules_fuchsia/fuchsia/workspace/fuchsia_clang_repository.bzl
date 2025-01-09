@@ -112,6 +112,7 @@ def _fuchsia_clang_repository_impl(ctx):
             type = "zip",
             sha256 = sha256,
         )
+        prepare_clang_repository(ctx, str(ctx.path(".")), needs_symlinks = False)
     elif ctx.attr.cipd_bin and ctx.attr.cipd_ensure_file:
         fetch_cipd_contents(ctx, ctx.attr.cipd_bin, ctx.attr.cipd_ensure_file)
         prepare_clang_repository(ctx, str(ctx.path(".")), needs_symlinks = False)
