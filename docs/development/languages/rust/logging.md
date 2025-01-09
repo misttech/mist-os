@@ -115,9 +115,9 @@ fn main() {
 }
 ```
 
-Note: While we provide our own `FX_` prefixed logging macros in
-C++, we have aligned on the [`log`][log-crate] crate as the logging
-interface for Rust. See their [documentation][log-crate] for guidance on
+Note: While Fuchsia provides its own `FX_` prefixed logging macros in
+C++, Fuchsia has aligned on the [`log`][log-crate] crate as the logging
+interface for Rust. See the [documentation][log-crate] for guidance on
 how to format your logs.
 
 ## Standard streams
