@@ -208,11 +208,6 @@
 	url = https://chromium.googlesource.com/chromium/deps/icu
 	name = chromium/deps/icu@latest
 	ignore = all
-[submodule "third_party/imgtec-pvr-rgx-km"]
-	path = third_party/imgtec-pvr-rgx-km
-	url = https://fuchsia.googlesource.com/third_party/imgtec-pvr-rgx-km
-	name = third_party/imgtec-pvr-rgx-km
-	ignore = all
 [submodule "third_party/inih"]
 	path = third_party/inih
 	url = https://fuchsia.googlesource.com/third_party/inih
