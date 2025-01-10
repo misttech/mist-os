@@ -386,7 +386,7 @@ packet-beta
 the next `EXTENT` in the chain. The byte data for a buffer_value is retrieved
 by reading each `EXTENT` in order until **Total Length** bytes are read.
 
-The paylaod is byte data up to at most the end of the block. The size depends on
+The payload is byte data up to at most the end of the block. The size depends on
 the order.
 
 ## NAME {#name}
