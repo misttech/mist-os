@@ -5,6 +5,15 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
+netstack2_visibility = [
+  ":*",
+  "//src/connectivity/network/testing/netemul/configurable-netstack/tests:*",
+  "//src/connectivity/network/mdns/service:*",
+  "//src/connectivity/network/tests/external_network:*",
+  "//src/connectivity/network/tests/getifaddrs:*",
+  "//src/connectivity/network/tests/multi_nic:*",
+]
+
 rustc_binary("bin") {
   edition = "2021"
   testonly = true
@@ -43,6 +52,7 @@ fuchsia_component("netstack2") {
     ":bin",
     "//src/connectivity/network/netstack:component-debug",
   ]
+  visibility = netstack2_visibility
 }
 
 fuchsia_component("netstack2-fast-udp") {
@@ -53,6 +63,7 @@ fuchsia_component("netstack2-fast-udp") {
     ":bin",
     "//src/connectivity/network/netstack:component-with-fast-udp-debug",
   ]
+  visibility = netstack2_visibility
 }
 
 fuchsia_component("configurable-netstack-netstack3") {
