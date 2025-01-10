@@ -124,7 +124,7 @@ group("bitfield") {
 }
 
 group("bitflags") {
-  public_deps = [ ":bitflags-v2_4_1" ]
+  public_deps = [ ":bitflags-v2_7_0" ]
 }
 
 group("blocking") {
@@ -2709,18 +2709,18 @@ rust_library("bitflags-v1_3_2") {
   applicable_licenses = [ ":bitflags-v1_3_2.license" ]
 }
 
-license("bitflags-v2_4_1.license") {
+license("bitflags-v2_7_0.license") {
   public_package_name = "bitflags"
   license_files = [
-    "//third_party/rust_crates/vendor/bitflags-2.4.1/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/bitflags-2.4.1/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/bitflags-2.7.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/bitflags-2.7.0/LICENSE-MIT",
   ]
 }
 
-rust_library("bitflags-v2_4_1") {
+rust_library("bitflags-v2_7_0") {
   crate_name = "bitflags"
-  crate_root = "//third_party/rust_crates/vendor/bitflags-2.4.1/src/lib.rs"
-  output_name = "bitflags-2dca82e1c034ddb5"
+  crate_root = "//third_party/rust_crates/vendor/bitflags-2.7.0/src/lib.rs"
+  output_name = "bitflags-570d7adcce25f92c"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -2731,14 +2731,14 @@ rust_library("bitflags-v2_4_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=2dca82e1c034ddb5",
-    "-Cextra-filename=-2dca82e1c034ddb5",
+    "-Cmetadata=570d7adcce25f92c",
+    "-Cextra-filename=-570d7adcce25f92c",
     "--cfg=feature=\"serde\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":bitflags-v2_4_1.license" ]
+  applicable_licenses = [ ":bitflags-v2_7_0.license" ]
 }
 
 license("block-buffer-v0_10_4.license") {
@@ -9042,7 +9042,7 @@ rust_library("nix-v0_27_1") {
 
   deps = []
   deps += [ ":libc-v0_2_158" ]
-  deps += [ ":bitflags-v2_4_1" ]
+  deps += [ ":bitflags-v2_7_0" ]
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":memoffset-v0_9_1" ]
 
@@ -11260,7 +11260,7 @@ rust_library("proptest-v1_5_0") {
   deps = []
   deps += [ ":bit-set-v0_5_3" ]
   deps += [ ":bit-vec-v0_6_3" ]
-  deps += [ ":bitflags-v2_4_1" ]
+  deps += [ ":bitflags-v2_7_0" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":num-traits-v0_2_18" ]
   deps += [ ":rand-v0_8_4" ]
