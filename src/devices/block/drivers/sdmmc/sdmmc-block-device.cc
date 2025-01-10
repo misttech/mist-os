@@ -301,45 +301,34 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  auto power_broker = parent_->driver_incoming()->Connect<fuchsia_power_broker::Topology>();
-  if (power_broker.is_error() || !power_broker->is_valid()) {
-    FDF_LOGL(ERROR, logger(), "Failed to connect to power broker: %s",
-             power_broker.status_string());
-    return power_broker.take_error();
+  std::vector<fdf_power::PowerElementConfiguration> element_configs;
+  for (const fuchsia_hardware_power::PowerElementConfiguration& element_config :
+       power_configs.value().power_elements()) {
+    auto converted = fdf_power::PowerElementConfiguration::FromFidl(element_config);
+    if (converted.is_error()) {
+      FDF_LOGL(INFO, logger(), "Failed to convert power element config: %s",
+               converted.status_string());
+      return converted.take_error();
+    }
+    element_configs.push_back(std::move(converted.value()));
   }
 
+  fit::result<fdf_power::Error, std::vector<fdf_power::ElementDesc>> config_result =
+      fdf_power::ApplyPowerConfiguration(*parent_->driver_incoming(), element_configs);
+
+  if (config_result.is_error()) {
+    zx::result<> error = fdf_power::ErrorToZxError(config_result.error_value());
+    FDF_LOGL(INFO, logger(), "Failed to apply power config: %s", error.status_string());
+    return error;
+  }
+
+  std::vector<fdf_power::ElementDesc> elements = std::move(config_result.value());
+
   // Register power configs with the Power Broker.
-  for (size_t i = 0; i < power_configs->power_elements().size(); ++i) {
-    fdf_power::PowerElementConfiguration config;
-    {
-      const fuchsia_hardware_power::PowerElementConfiguration& config_fidl =
-          power_configs->power_elements()[i];
-      zx::result result = fdf_power::PowerElementConfiguration::FromFidl(config_fidl);
-      if (result.is_error()) {
-        FDF_SLOG(ERROR, "Failed to parse power element configuration.", KV("index", i),
-                 KV("status", result.status_string()));
-        return result.take_error();
-      }
-      config = std::move(result.value());
-    }
+  for (size_t i = 0; i < elements.size(); ++i) {
+    fdf_power::ElementDesc& description = elements.at(i);
 
-    auto tokens = fdf_power::GetDependencyTokens(*parent_->driver_incoming(), config);
-    if (tokens.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to get power dependency tokens: %u.",
-               static_cast<uint8_t>(tokens.error_value()));
-      return zx::error(ZX_ERR_INTERNAL);
-    }
-
-    fdf_power::ElementDesc description =
-        fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
-    auto result = fdf_power::AddElement(power_broker.value(), description);
-    if (result.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to add power element: %u",
-               static_cast<uint8_t>(result.error_value()));
-      return zx::error(ZX_ERR_INTERNAL);
-    }
-
-    if (config.element.name == kHardwarePowerElementName) {
+    if (description.element_config.element.name == kHardwarePowerElementName) {
       hardware_power_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
               std::move(description.element_control_client.value()));
@@ -353,7 +342,7 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
       hardware_power_element_assertive_token_ = std::move(description.assertive_token);
     } else {
       FDF_SLOG(ERROR, "Unexpected power element.", KV("index", i),
-               KV("element-name", config.element.name));
+               KV("element-name", description.element_config.element.name));
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }

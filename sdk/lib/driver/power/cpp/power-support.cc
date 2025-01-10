@@ -282,6 +282,28 @@ fit::result<Error> GetTokensFromSag(ElementDependencyMap& dependencies, TokenMap
 
 }  // namespace
 
+zx::error<int> ErrorToZxError(Error e) {
+  switch (e) {
+    case Error::INVALID_ARGS:
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    case Error::TOKEN_REQUEST:
+    case Error::IO:
+    case Error::TOPOLOGY_UNAVAILABLE:
+      return zx::error(ZX_ERR_IO);
+    case Error::DEPENDENCY_NOT_FOUND:
+      return zx::error(ZX_ERR_NOT_FOUND);
+    case Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND:
+    case Error::NO_TOKEN_SERVICE_INSTANCES:
+    case Error::ACTIVITY_GOVERNOR_UNAVAILABLE:
+      return zx::error(ZX_ERR_ACCESS_DENIED);
+    case Error::READ_INSTANCES:
+    case Error::ACTIVITY_GOVERNOR_REQUEST:
+      return zx::error(ZX_ERR_IO_REFUSED);
+    default:
+      return zx::error(ZX_ERR_INTERNAL);
+  }
+}
+
 void ElementRunner::RunPowerElement() {
   // * First, we watch for a new required level.
   // * Second, we report this level to |on_level_change_|.
