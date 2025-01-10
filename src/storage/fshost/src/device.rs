@@ -160,11 +160,11 @@ impl Device for NandDevice {
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
-        Err(anyhow!("not supported by nand device"))
+        self.block_device.partition_label().await
     }
 
     async fn partition_type(&mut self) -> Result<&[u8; 16], Error> {
-        Err(anyhow!("not supported by nand device"))
+        self.block_device.partition_type().await
     }
 
     async fn partition_instance(&mut self) -> Result<&[u8; 16], Error> {

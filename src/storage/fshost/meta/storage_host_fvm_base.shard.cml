@@ -55,7 +55,7 @@
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
             to: [
-                "#fvm",
+                "#fvm2",
                 "#storage-host",
             ],
             availability: "optional",
@@ -71,11 +71,11 @@
         },
         {
             directory: "volumes",
-            from: "#fvm",
+            from: "#fvm2",
         },
         {
             protocol: "fuchsia.fs.startup.Volumes",
-            from: "#fvm",
+            from: "#fvm2",
         },
         {
             protocol: [

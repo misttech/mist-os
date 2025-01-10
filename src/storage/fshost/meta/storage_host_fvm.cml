@@ -5,7 +5,7 @@
     include: [ "//src/storage/fshost/meta/storage_host_fvm_base.shard.cml" ],
     children: [
         {
-            name: "fvm",
+            name: "fvm2",
             url: "fuchsia-boot:///fvm2#meta/fvm2.cm",
         },
     ],
@@ -16,7 +16,7 @@
                 "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
-            to: "#fvm",
+            to: "#fvm2",
         },
     ],
 }
