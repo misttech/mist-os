@@ -137,10 +137,13 @@ config("internal.config") {
       "PLATFORM_POSIX_VERSION=200112L",
       "ZSTD_SETPRIORITY_SUPPORT=0",
     ]
+  } else if (!is_kernel) {
+    defines += [ "ZSTD_MULTITHREAD" ]
   }
 
-  if (!is_fuchsia && !is_kernel) {
-    defines += [ "ZSTD_MULTITHREAD" ]
+  if (is_kernel) {
+    # This avoids references to malloc and free.
+    defines += [ "XXH_NO_STDLIB" ]
   }
 
   # Suppress warnings the zstd code doesn't comply with.
@@ -219,6 +222,10 @@ config("zstdseek.config") {
 }
 
 if (!is_kernel) {
+  # TODO(https://fxbug.dev/389098415): After soft transition, remove this.
+  zstd_changelog = read_file("src/CHANGELOG", "list lines")
+  is_zstd_156 = zstd_changelog[0] == "V1.5.6 (Mar 2024)"
+
   if (current_toolchain == host_toolchain) {
     install_host_tools("host-tools") {
       deps = [ ":zstdcli" ]
@@ -250,6 +257,15 @@ if (!is_kernel) {
       "src/programs/zstdcli_trace.c",
       "src/programs/zstdcli_trace.h",
     ]
+
+    # TODO(https://fxbug.dev/389098415): After soft transition,
+    # deconditionalize and merge back into main list.
+    if (is_zstd_156) {
+      sources += [
+        "src/programs/lorem.c",
+        "src/programs/lorem.h",
+      ]
+    }
 
     configs += [
       ":internal.config",
