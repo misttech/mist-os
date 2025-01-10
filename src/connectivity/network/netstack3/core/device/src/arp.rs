@@ -154,11 +154,7 @@ pub trait ArpContext<D: ArpDevice, BC: ArpBindingsContext<D, Self::DeviceId>>:
     ///
     /// NOTE: If the interface has multiple addresses, an arbitrary one will be
     /// returned.
-    fn get_protocol_addr(
-        &mut self,
-        bindings_ctx: &mut BC,
-        device_id: &Self::DeviceId,
-    ) -> Option<Ipv4Addr>;
+    fn get_protocol_addr(&mut self, device_id: &Self::DeviceId) -> Option<Ipv4Addr>;
 
     /// Check if `addr` is assigned to this interface.
     ///
@@ -575,7 +571,7 @@ fn send_arp_request<
     lookup_addr: Ipv4Addr,
     remote_link_addr: Option<D::Address>,
 ) {
-    if let Some(sender_protocol_addr) = core_ctx.get_protocol_addr(bindings_ctx, device_id) {
+    if let Some(sender_protocol_addr) = core_ctx.get_protocol_addr(device_id) {
         let self_hw_addr = core_ctx.get_hardware_addr(bindings_ctx, device_id);
         let dst_addr = remote_link_addr.unwrap_or(D::Address::BROADCAST);
         core_ctx.increment(|counters| &counters.tx_requests);
@@ -800,11 +796,7 @@ mod tests {
             self.state.proto_addrs.iter().any(|&a| a == addr)
         }
 
-        fn get_protocol_addr(
-            &mut self,
-            _bindings_ctx: &mut FakeBindingsCtxImpl,
-            _device_id: &FakeLinkDeviceId,
-        ) -> Option<Ipv4Addr> {
+        fn get_protocol_addr(&mut self, _device_id: &FakeLinkDeviceId) -> Option<Ipv4Addr> {
             self.state.proto_addrs.first().copied()
         }
 

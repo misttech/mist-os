@@ -1126,11 +1126,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn get_protocol_addr(
-            &mut self,
-            _bindings_ctx: &mut FakeBindingsCtx,
-            _device_id: &Self::DeviceId,
-        ) -> Option<Ipv4Addr> {
+        fn get_protocol_addr(&mut self, _device_id: &Self::DeviceId) -> Option<Ipv4Addr> {
             unimplemented!()
         }
 

@@ -333,11 +333,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         x
     }
 
-    fn get_protocol_addr(
-        &mut self,
-        _bindings_ctx: &mut BC,
-        device_id: &EthernetDeviceId<BC>,
-    ) -> Option<Ipv4Addr> {
+    fn get_protocol_addr(&mut self, device_id: &EthernetDeviceId<BC>) -> Option<Ipv4Addr> {
         let mut state = integration::device_state(self, device_id);
         let mut state = state.cast();
         let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
