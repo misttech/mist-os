@@ -37,10 +37,6 @@ inline void move_vm_page_list_node(VmPageListNode* dest, VmPageListNode* src) {
 
 }  // namespace
 
-VmPageListNode::VmPageListNode(uint64_t offset) : obj_offset_(offset) {
-  LTRACEF("%p offset %#" PRIx64 "\n", this, obj_offset_);
-}
-
 VmPageListNode::~VmPageListNode() {
   LTRACEF("%p offset %#" PRIx64 "\n", this, obj_offset_);
   canary_.Assert();
@@ -118,54 +114,6 @@ void VmPageList::ReturnEmptySlot(uint64_t offset) {
   }
 }
 
-const VmPageOrMarker* VmPageList::Lookup(uint64_t offset) const {
-  uint64_t node_offset = NodeOffset(offset);
-  size_t index = NodeIndex(offset);
-
-  LTRACEF_LEVEL(2, "%p offset %#" PRIx64 " node_offset %#" PRIx64 " index %zu\n", this, offset,
-                node_offset, index);
-
-  // lookup the tree node that holds this page
-  auto pln = list_.find(node_offset);
-  if (!pln.IsValid()) {
-    return nullptr;
-  }
-
-  return &pln->Lookup(index);
-}
-
-VmPageOrMarkerRef VmPageList::LookupMutable(uint64_t offset) {
-  uint64_t node_offset = NodeOffset(offset);
-  size_t index = NodeIndex(offset);
-
-  LTRACEF_LEVEL(2, "%p offset %#" PRIx64 " node_offset %#" PRIx64 " index %zu\n", this, offset,
-                node_offset, index);
-
-  // lookup the tree node that holds this page
-  auto pln = list_.find(node_offset);
-  if (!pln.IsValid()) {
-    return VmPageOrMarkerRef(nullptr);
-  }
-
-  return VmPageOrMarkerRef(&pln->Lookup(index));
-}
-
-VMPLCursor VmPageList::LookupMutableCursor(uint64_t offset) {
-  uint64_t node_offset = NodeOffset(offset);
-  size_t index = NodeIndex(offset);
-
-  LTRACEF_LEVEL(2, "%p offset %#" PRIx64 " node_offset %#" PRIx64 " index %zu\n", this, offset,
-                node_offset, index);
-
-  // lookup the tree node that holds this page
-  auto pln = list_.find(node_offset);
-  if (!pln.IsValid()) {
-    return VMPLCursor();
-  }
-
-  return VMPLCursor(ktl::move(pln), static_cast<uint>(index));
-}
-
 VmPageOrMarker VmPageList::RemoveContent(uint64_t offset) {
   uint64_t node_offset = NodeOffset(offset);
   size_t index = NodeIndex(offset);
@@ -188,8 +136,6 @@ VmPageOrMarker VmPageList::RemoveContent(uint64_t offset) {
   }
   return page;
 }
-
-bool VmPageList::IsEmpty() const { return list_.is_empty(); }
 
 bool VmPageList::HasNoPageOrRef() const {
   bool no_pages = true;

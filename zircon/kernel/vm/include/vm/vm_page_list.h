@@ -465,7 +465,7 @@ class VmPageOrMarkerRef {
 
 class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmPageListNode>> {
  public:
-  explicit VmPageListNode(uint64_t offset);
+  explicit VmPageListNode(uint64_t offset) : obj_offset_(offset) {}
   ~VmPageListNode();
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmPageListNode);
@@ -930,15 +930,37 @@ class VmPageList final {
   //
   // Lookup may return 'nullptr' if there is no slot allocated for the given offset. If non-null
   // is returned it may still be the case that IsEmpty() on the returned PageOrMarker is true.
-  const VmPageOrMarker* Lookup(uint64_t offset) const;
+  const VmPageOrMarker* Lookup(uint64_t offset) const {
+    // lookup the tree node that holds this offset
+    NodeList::const_iterator pln = list_.find(NodeOffset(offset));
+
+    if (!pln.IsValid()) {
+      return nullptr;
+    }
+    return &pln->Lookup(NodeIndex(offset));
+  }
 
   // Similar to `Lookup` but returns a VmPageOrMarkerRef that allows for limited mutation of the
   // slot. General mutation requires calling `LookupOrAllocate`.
-  VmPageOrMarkerRef LookupMutable(uint64_t offset);
+  VmPageOrMarkerRef LookupMutable(uint64_t offset) {
+    // lookup the tree node that holds this offset
+    NodeList::iterator pln = list_.find(NodeOffset(offset));
+    if (!pln.IsValid()) {
+      return VmPageOrMarkerRef(nullptr);
+    }
+    return VmPageOrMarkerRef(&pln->Lookup(NodeIndex(offset)));
+  }
 
   // Similar to `LookupMutable` but returns a VMPLCursor that allows for iterating over any
   // contiguous slots from the provided offset.
-  VMPLCursor LookupMutableCursor(uint64_t offset);
+  VMPLCursor LookupMutableCursor(uint64_t offset) {
+    // lookup the tree node that holds this offset
+    NodeList::iterator pln = list_.find(NodeOffset(offset));
+    if (!pln.IsValid()) {
+      return VMPLCursor();
+    }
+    return VMPLCursor(ktl::move(pln), static_cast<uint>(NodeIndex(offset)));
+  }
 
   // The interval handling flag to be used by LookupOrAllocate. See comments near LookupOrAllocate.
   enum class IntervalHandling : uint8_t {
@@ -1041,7 +1063,7 @@ class VmPageList final {
   }
 
   // Returns true if there are no pages, references, markers, or intervals in the page list.
-  bool IsEmpty() const;
+  bool IsEmpty() const { return list_.is_empty(); }
 
   // Returns true if the page list does not own any pages or references. Meant to check whether the
   // page list has any resource that needs to be returned.
@@ -1692,7 +1714,8 @@ class VmPageList final {
     return ZX_OK;
   }
 
-  fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>> list_;
+  using NodeList = fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>>;
+  NodeList list_;
   // A skew added to offsets provided as arguments to VmPageList functions before
   // interfacing with list_. This allows all VmPageLists within a clone tree
   // to place individual vm_page_t entries at the same offsets within their nodes, so
