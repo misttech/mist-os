@@ -127,30 +127,6 @@ macro_rules! impl_from_unsigned {
 impl_from_signed!(i8, i16, i32, i64, i128);
 impl_from_unsigned!(u8, u16, u32, u64, u128);
 
-impl From<Severity> for tracing::Level {
-    fn from(s: Severity) -> tracing::Level {
-        match s {
-            Severity::Trace => tracing::Level::TRACE,
-            Severity::Debug => tracing::Level::DEBUG,
-            Severity::Info => tracing::Level::INFO,
-            Severity::Warn => tracing::Level::WARN,
-            Severity::Fatal | Severity::Error => tracing::Level::ERROR,
-        }
-    }
-}
-
-impl From<tracing::Level> for Severity {
-    fn from(level: tracing::Level) -> Severity {
-        match level {
-            tracing::Level::TRACE => Severity::Trace,
-            tracing::Level::DEBUG => Severity::Debug,
-            tracing::Level::INFO => Severity::Info,
-            tracing::Level::WARN => Severity::Warn,
-            tracing::Level::ERROR => Severity::Error,
-        }
-    }
-}
-
 impl From<log::Level> for Severity {
     fn from(level: log::Level) -> Severity {
         match level {

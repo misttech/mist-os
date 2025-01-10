@@ -1049,6 +1049,12 @@ rustflags = [
   "--cfg=tokio_unstable",
 ]
 
+[gn.package.tracing."0.1.40"]
+group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "tracing_visibility" }
+
+[gn.package.tracing-subscriber."0.3.18"]
+group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "tracing_subscriber_visibility" }
+
 # No build script but relies on cargo to populate environment variables.
 [gn.package.trust-dns-resolver."0.22.0"]
 env_vars = [ "CARGO_PKG_VERSION=\\\"0.22.0\\\"" ]
