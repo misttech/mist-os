@@ -25,4 +25,5 @@ pub mod profile_resource;
 pub mod root_job;
 #[cfg(target_arch = "aarch64")]
 pub mod smc_resource;
+pub mod stall_resource;
 pub mod vmex_resource;

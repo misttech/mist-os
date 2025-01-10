@@ -67,6 +67,7 @@
                 "fuchsia.kernel.RootJob",
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.SmcResource",
+                "fuchsia.kernel.StallResource",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.media.ProfileProvider",

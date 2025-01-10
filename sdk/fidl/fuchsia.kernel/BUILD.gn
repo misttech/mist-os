@@ -32,6 +32,7 @@ fidl("fuchsia.kernel") {
     "profile-resource.fidl",
     "root-job.fidl",
     "smc-resource.fidl",
+    "stall-resource.fidl",
     "vmex-resource.fidl",
   ]
 

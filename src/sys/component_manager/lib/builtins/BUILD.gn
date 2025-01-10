@@ -61,6 +61,7 @@ rustc_library("builtins") {
     "src/profile_resource.rs",
     "src/root_job.rs",
     "src/smc_resource.rs",
+    "src/stall_resource.rs",
     "src/vmex_resource.rs",
   ]
 }
