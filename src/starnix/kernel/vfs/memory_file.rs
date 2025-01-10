@@ -8,13 +8,15 @@ use crate::signals::{send_standard_signal, SignalInfo};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
-    anon_fs, fileops_impl_noop_sync, fs_node_impl_not_dir, fs_node_impl_xattr_delegate,
-    AppendLockGuard, DirEntry, FallocMode, FileHandle, FileObject, FileOps, FsNode, FsNodeInfo,
-    FsNodeOps, FsString, MemoryXattrStorage, MountInfo, NamespaceNode, XattrStorage as _,
-    MAX_LFS_FILESIZE,
+    anon_fs, default_ioctl, fileops_impl_noop_sync, fs_node_impl_not_dir,
+    fs_node_impl_xattr_delegate, AppendLockGuard, DirEntry, FallocMode, FileHandle, FileObject,
+    FileOps, FsNode, FsNodeInfo, FsNodeOps, FsString, MemoryXattrStorage, MountInfo, NamespaceNode,
+    XattrStorage as _, MAX_LFS_FILESIZE,
 };
+use linux_uapi::ASHMEM_SET_SIZE;
 use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, AccessCheck};
@@ -396,6 +398,23 @@ impl FileOps for MemoryFileObject {
     ) -> Result<(), Errno> {
         track_stub!(TODO("https://fxbug.dev/42082608"), "paged VMO readahead");
         Ok(())
+    }
+
+    fn ioctl(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        request: u32,
+        arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        match request {
+            ASHMEM_SET_SIZE => {
+                track_stub!(TODO("https://fxbug.dev/389102161"), "ashmem ioctl on memfd");
+                Ok(SUCCESS)
+            }
+            _ => default_ioctl(file, locked, current_task, request, arg),
+        }
     }
 }
 
