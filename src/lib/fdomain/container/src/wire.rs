@@ -41,11 +41,10 @@ impl FDomainCodec {
         };
 
         match header.ordinal {
-            ordinals::GET_NAMESPACE => {
-                let request = fidl_message::decode_message::<proto::FDomainGetNamespaceRequest>(
-                    header, rest,
-                )?;
-                let result = self.fdomain.get_namespace(request);
+            ordinals::NAMESPACE => {
+                let request =
+                    fidl_message::decode_message::<proto::FDomainNamespaceRequest>(header, rest)?;
+                let result = self.fdomain.namespace(request);
                 self.send_response(tx_id, header.ordinal, result)?;
             }
             ordinals::CREATE_CHANNEL => {

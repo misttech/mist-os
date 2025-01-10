@@ -562,8 +562,8 @@ impl Client {
     pub async fn namespace(self: &Arc<Self>) -> Result<Channel, Error> {
         let new_handle = self.new_hid();
         self.transaction(
-            ordinals::GET_NAMESPACE,
-            proto::FDomainGetNamespaceRequest { new_handle },
+            ordinals::NAMESPACE,
+            proto::FDomainNamespaceRequest { new_handle },
             Responder::Namespace,
         )
         .await?;
