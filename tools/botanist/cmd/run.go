@@ -86,16 +86,6 @@ type RunCommand struct {
 	// The path to the ffx tool.
 	ffxPath string
 
-	// The level of experimental ffx features to enable.
-	//
-	// The following levels enable the following ffx features:
-	// 0 or greater: ffx target flash, ffx bootloader boot, CSO-only mode
-	// 1 or greater: ffx emu, ffx log
-	// 2 or greater: ffx test, ffx target snapshot, keeps ffx output dir for debugging
-	// 3: enables parallel test execution
-	// TODO(ihuh): Remove when we've switched to specifying experiments by name instead.
-	ffxExperimentLevel int
-
 	// Experiments to enable. Supported experiments can be found at //tools/botanist/common.go.
 	experiments flagmisc.StringsValue
 
@@ -151,7 +141,6 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&r.localRepo, "local-repo", "", "path to a local package repository; the repo and blobs flags are ignored when this is set")
 	f.StringVar(&r.ffxPath, "ffx", "", "Path to the ffx tool.")
 	f.StringVar(&r.downloadManifest, "download-manifest", "", "Path to a manifest containing all package server downloads")
-	f.IntVar(&r.ffxExperimentLevel, "ffx-experiment-level", 0, "The level of experimental features to enable. If -ffx is not set, this will have no effect.")
 	f.Var(&r.experiments, "experiment", fmt.Sprintf("The name of an experiment to enable. Supported experiments are: %v.", botanist.SupportedExperiments))
 	f.BoolVar(&r.skipSetup, "skip-setup", false, "if set, botanist will not set up a target.")
 	// Temporary flag to enable a soft transition to uploading test results from botanist rather than from the recipe.
@@ -472,13 +461,6 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	// streamed from.
 	primaryTarget := fuchsiaTargets[0]
 
-	// TODO(ihuh): Remove when we've switched to passing in experiments by name.
-	if r.ffxExperimentLevel >= 2 {
-		r.experiments = append(r.experiments, string(botanist.UseFFXTest))
-	}
-	if r.ffxExperimentLevel == 3 {
-		r.experiments = append(r.experiments, string(botanist.UseFFXTestParallel))
-	}
 	experiments := botanist.GetExperiments(r.experiments)
 	for _, t := range fuchsiaTargets {
 		// Start serial servers for all targets. Will no-op for targets that
