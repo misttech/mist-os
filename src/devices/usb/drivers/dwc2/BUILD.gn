@@ -20,16 +20,28 @@ driver_bind_rules("dwc2_bind") {
   ]
 }
 
-fuchsia_cc_driver("dwc2-driver") {
-  output_name = "dwc2"
+source_set("common") {
+  sources = [
+    "dwc2.cc",
+    "dwc2.h",
+    "usb_dwc_regs.h",
+  ]
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "dwc2.cc" ]
   deps = [
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
+    "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/pretty",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zx",
+  ]
+  public_deps = [
     ":dwc2-config",
-    ":dwc2_bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
@@ -38,23 +50,21 @@ fuchsia_cc_driver("dwc2-driver") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fit",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//src/devices/usb/lib/usb",
+    "//src/devices/usb/lib/usb:dwc2",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
     "//src/devices/usb/lib/usb-phy",
     "//src/lib/ddk",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/pretty",
-    "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zx",
   ]
+}
+
+fuchsia_cc_driver("dwc2-driver") {
+  output_name = "dwc2"
+  deps = [ ":common" ]
 }
 
 fuchsia_component_manifest("dwc2-manifest") {
@@ -65,7 +75,10 @@ fuchsia_component_manifest("dwc2-manifest") {
 fuchsia_driver_component("dwc2") {
   info = "meta/dwc2-info.json"
   cm_label = ":dwc2-manifest"
-  deps = [ ":dwc2-driver" ]
+  deps = [
+    ":dwc2-driver",
+    ":dwc2_bind",
+  ]
 }
 
 fuchsia_structured_config_cpp_elf_lib("dwc2-config") {
@@ -87,37 +100,11 @@ fuchsia_driver_package("package") {
 }
 
 test("dwc2-test-bin") {
-  configs += [ "//build/config:all_source" ]
-  sources = [
-    "dwc2-test.cc",
-    "dwc2.cc",
-  ]
+  sources = [ "dwc2-test.cc" ]
   output_name = "dwc2-test"
   deps = [
-    ":dwc2-config",
-    ":dwc2_bind",
-    "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
+    ":common",
     "//src/devices/testing/mock-ddk",
-    "//src/devices/usb/lib/usb",
-    "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
-    "//src/devices/usb/lib/usb-phy",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/pretty",
-    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zxtest",
   ]
 }
