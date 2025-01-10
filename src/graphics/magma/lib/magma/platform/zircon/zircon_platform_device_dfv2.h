@@ -20,8 +20,7 @@ class ZirconPlatformDeviceDfv2 final : public PlatformDevice {
 
   std::unique_ptr<PlatformHandle> GetBusTransactionInitiator() const override;
 
-  std::unique_ptr<PlatformMmio> CpuMapMmio(unsigned int index,
-                                           PlatformMmio::CachePolicy cache_policy) override;
+  std::unique_ptr<PlatformMmio> CpuMapMmio(unsigned int index) override;
 
   uint32_t GetMmioCount() const override;
 

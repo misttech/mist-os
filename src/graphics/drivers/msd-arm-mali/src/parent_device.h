@@ -31,8 +31,7 @@ class ParentDevice {
   virtual bool SetThreadRole(const char* role_name) = 0;
 
   // Map an MMIO listed at |index| in the platform device
-  virtual std::unique_ptr<magma::PlatformMmio> CpuMapMmio(
-      unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) = 0;
+  virtual std::unique_ptr<magma::PlatformMmio> CpuMapMmio(unsigned int index) = 0;
 
   // Register an interrupt listed at |index| in the platform device.
   virtual std::unique_ptr<magma::PlatformInterrupt> RegisterInterrupt(unsigned int index) = 0;

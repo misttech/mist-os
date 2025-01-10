@@ -33,8 +33,7 @@ class ParentDeviceDFv2 : public ParentDevice {
   zx::bti GetBusTransactionInitiator() override;
 
   // Map an MMIO listed at |index| in the platform device
-  std::unique_ptr<magma::PlatformMmio> CpuMapMmio(
-      unsigned int index, magma::PlatformMmio::CachePolicy cache_policy) override;
+  std::unique_ptr<magma::PlatformMmio> CpuMapMmio(unsigned int index) override;
 
   // Register an interrupt listed at |index| in the platform device.
   std::unique_ptr<magma::PlatformInterrupt> RegisterInterrupt(unsigned int index) override;

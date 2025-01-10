@@ -15,8 +15,7 @@ TEST(PlatformDevice, Basic) {
   magma::PlatformDevice* platform_device = TestPlatformDevice::GetInstance();
   ASSERT_TRUE(platform_device);
 
-  auto platform_mmio =
-      platform_device->CpuMapMmio(0, magma::PlatformMmio::CACHE_POLICY_UNCACHED_DEVICE);
+  auto platform_mmio = platform_device->CpuMapMmio(0);
   EXPECT_TRUE(platform_mmio.get());
 }
 
@@ -27,11 +26,11 @@ TEST(PlatformDevice, MapMmio) {
   uint32_t index = 0;
 
   // Map once.
-  auto mmio = platform_device->CpuMapMmio(index, magma::PlatformMmio::CACHE_POLICY_CACHED);
+  auto mmio = platform_device->CpuMapMmio(index);
   ASSERT_TRUE(mmio);
 
   // Map again.
-  auto mmio2 = platform_device->CpuMapMmio(index, magma::PlatformMmio::CACHE_POLICY_CACHED);
+  auto mmio2 = platform_device->CpuMapMmio(index);
   EXPECT_TRUE(mmio2);
 }
 

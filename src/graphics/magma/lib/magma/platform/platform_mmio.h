@@ -21,13 +21,6 @@ class PlatformMmio {
 
   virtual ~PlatformMmio() {}
 
-  enum CachePolicy {
-    CACHE_POLICY_CACHED = 0,
-    CACHE_POLICY_UNCACHED = 1,
-    CACHE_POLICY_UNCACHED_DEVICE = 2,
-    CACHE_POLICY_WRITE_COMBINING = 3,
-  };
-
   // Gets the physical address of the MMIO. Not implemented for MMIOs from PCI devices.
   virtual uint64_t physical_address() = 0;
 

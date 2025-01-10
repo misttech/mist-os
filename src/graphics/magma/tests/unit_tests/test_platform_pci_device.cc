@@ -27,16 +27,12 @@ TEST(PlatformPciDevice, MapMmio) {
   uint32_t pci_bar = 0;
 
   // Map once
-  auto mmio = platform_device->CpuMapPciMmio(pci_bar, magma::PlatformMmio::CACHE_POLICY_CACHED);
+  auto mmio = platform_device->CpuMapPciMmio(pci_bar);
   EXPECT_TRUE(mmio);
 
-  // Map again same policy
-  auto mmio2 = platform_device->CpuMapPciMmio(pci_bar, magma::PlatformMmio::CACHE_POLICY_CACHED);
+  // Map again
+  auto mmio2 = platform_device->CpuMapPciMmio(pci_bar);
   EXPECT_TRUE(mmio2);
-
-  // Map again different policy - this is now permitted though it's a bad idea.
-  auto mmio3 = platform_device->CpuMapPciMmio(pci_bar, magma::PlatformMmio::CACHE_POLICY_UNCACHED);
-  EXPECT_TRUE(mmio3);
 }
 
 TEST(PlatformPciDevice, RegisterInterrupt) {
