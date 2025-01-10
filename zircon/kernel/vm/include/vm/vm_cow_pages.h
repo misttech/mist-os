@@ -42,6 +42,7 @@ enum class VmCowPagesOptions : uint32_t {
   // Externally-usable flags:
   kNone = 0u,
   kUserPagerBackedRoot = (1u << 0),
+  kPreservingPageContentRoot = (1u << 1),
 
   // With this clear, zeroing a page tries to decommit the page.  With this set, zeroing never
   // decommits the page.  Currently this is only set for contiguous VMOs.
@@ -52,10 +53,10 @@ enum class VmCowPagesOptions : uint32_t {
   // pages aren't pinned, but that mitigation should be sufficient (even assuming such a client) to
   // allow implicit decommit when zeroing or when zero scanning, as long as no clients are doing DMA
   // to/from contiguous while not pinned.
-  kCannotDecommitZeroPages = (1u << 1),
+  kCannotDecommitZeroPages = (1u << 2),
 
   // Internal-only flags:
-  kHidden = (1u << 2),
+  kHidden = (1u << 3),
 
   kInternalOnlyMask = kHidden,
 };
@@ -132,7 +133,13 @@ class VmCowPages final : public VmHierarchyBase,
   // the child.
   VmCowPagesOptions inheritable_options_locked() const TA_REQ(lock()) {
     canary_.Assert();
-    return VmCowPagesOptions::kNone | (options_ & (VmCowPagesOptions::kUserPagerBackedRoot));
+    return VmCowPagesOptions::kNone | (options_ & (VmCowPagesOptions::kUserPagerBackedRoot |
+                                                   VmCowPagesOptions::kPreservingPageContentRoot));
+  }
+
+  bool is_root_source_preserving_page_content_locked() const TA_REQ(lock()) {
+    canary_.Assert();
+    return !!(options_ & VmCowPagesOptions::kPreservingPageContentRoot);
   }
 
   bool is_parent_hidden_locked() const TA_REQ(lock()) {
@@ -147,12 +154,7 @@ class VmCowPages final : public VmHierarchyBase,
   }
 
   bool can_root_source_evict_locked() const TA_REQ(lock()) {
-    auto root = GetRootLocked();
-    // The root will never be null. It will either point to a valid parent, or |this| if there's no
-    // parent.
-    DEBUG_ASSERT(root);
-    AssertHeld(root->lock_ref());
-    bool result = root->can_evict();
+    bool result = is_root_source_preserving_page_content_locked();
     DEBUG_ASSERT(result == is_root_source_user_pager_backed_locked());
     return result;
   }
@@ -812,11 +814,7 @@ class VmCowPages final : public VmHierarchyBase,
       return false;
     }
 
-    auto root = GetRootLocked();
-    // The root will never be null. It will either point to a valid parent, or |this| if there's no
-    // parent.
-    DEBUG_ASSERT(root);
-    bool result = root->page_source_ && root->page_source_->properties().is_preserving_page_content;
+    bool result = is_root_source_preserving_page_content_locked();
     DEBUG_ASSERT(result == is_root_source_user_pager_backed_locked());
 
     return result;

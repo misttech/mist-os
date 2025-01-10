@@ -554,6 +554,10 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
     cow_options |= VmCowPagesOptions::kUserPagerBackedRoot;
   }
 
+  if (src->properties().is_preserving_page_content) {
+    cow_options |= VmCowPagesOptions::kPreservingPageContentRoot;
+  }
+
   fbl::RefPtr<VmCowPages> cow_pages;
   zx_status_t status =
       VmCowPages::CreateExternal(ktl::move(src), cow_options, state, size, &cow_pages);
