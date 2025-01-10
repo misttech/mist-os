@@ -1258,3 +1258,22 @@ async fn reset_initialized_gpt() {
 
     fixture.tear_down().await;
 }
+
+#[fuchsia::test]
+async fn blobfs_verifier_service() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    let fixture = builder.build().await;
+
+    let proxy = fuchsia_component::client::connect_to_protocol_at_dir_root::<
+        fidl_fuchsia_update_verify::BlobfsVerifierMarker,
+    >(fixture.exposed_dir())
+    .unwrap();
+    proxy
+        .verify(&fidl_fuchsia_update_verify::VerifyOptions::default())
+        .await
+        .expect("FIDL error")
+        .expect("Verify failed");
+
+    fixture.tear_down().await;
+}

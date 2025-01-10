@@ -6,12 +6,6 @@
         "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
     ],
-    collections: [
-        {
-            name: "storage-host",
-            durability: "transient",
-        },
-    ],
     capabilities: [
         {
             directory: "blob",
@@ -27,15 +21,20 @@
             path: "/fs/blob/root",
         },
         {
-            protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
+            protocol: "fuchsia.update.verify.BlobfsVerifier",
+            path: "/fs/blob/fuchsia.update.verify.BlobfsVerifier",
+        },
+        {
+            protocol: "fuchsia.update.verify.ComponentOtaHealthCheck",
+            path: "/fs/blob/fuchsia.update.verify.ComponentOtaHealthCheck",
         },
         {
             protocol: "fuchsia.fxfs.BlobCreator",
-            path: "/fs/blob/svc/fuchsia.fxfs.BlobCreator",
+            path: "/fs/blob/fuchsia.fxfs.BlobCreator",
         },
         {
             protocol: "fuchsia.fxfs.BlobReader",
-            path: "/fs/blob/svc/fuchsia.fxfs.BlobReader",
+            path: "/fs/blob/fuchsia.fxfs.BlobReader",
         },
     ],
     use: [
@@ -52,12 +51,12 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
-            from: "parent",
-            to: [
-                "#fvm2",
-                "#storage-host",
+            protocol: [
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.tracing.provider.Registry",
             ],
+            from: "parent",
+            to: [ "#fvm2" ],
             availability: "optional",
         },
     ],
@@ -81,6 +80,7 @@
             protocol: [
                 "fuchsia.fxfs.BlobCreator",
                 "fuchsia.update.verify.BlobfsVerifier",
+                "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
             from: "self",
         },

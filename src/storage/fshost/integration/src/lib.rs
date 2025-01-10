@@ -289,6 +289,10 @@ impl TestFixture {
         self.ramdisk_vmo = Some(vmo_clone);
     }
 
+    pub fn exposed_dir(&self) -> &fio::DirectoryProxy {
+        self.realm.root.get_exposed_dir()
+    }
+
     pub fn dir(&self, dir: &str, flags: fio::Flags) -> fio::DirectoryProxy {
         let (dev, server) = create_proxy::<fio::DirectoryMarker>();
         let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;

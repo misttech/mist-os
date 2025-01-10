@@ -218,6 +218,7 @@ template("fshost_integration_test_package") {
       "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
       "//src/storage/lib/delivery_blob",
       "//src/storage/lib/fs_management/rust:fs_management",
+      "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:futures",
