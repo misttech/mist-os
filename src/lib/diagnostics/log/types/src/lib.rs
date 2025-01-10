@@ -163,6 +163,32 @@ impl From<log::Level> for Severity {
     }
 }
 
+impl TryFrom<log::LevelFilter> for Severity {
+    type Error = ();
+    fn try_from(s: log::LevelFilter) -> Result<Severity, ()> {
+        match s {
+            log::LevelFilter::Off => Err(()),
+            log::LevelFilter::Trace => Ok(Severity::Trace),
+            log::LevelFilter::Debug => Ok(Severity::Debug),
+            log::LevelFilter::Info => Ok(Severity::Info),
+            log::LevelFilter::Warn => Ok(Severity::Warn),
+            log::LevelFilter::Error => Ok(Severity::Error),
+        }
+    }
+}
+
+impl From<Severity> for log::LevelFilter {
+    fn from(s: Severity) -> log::LevelFilter {
+        match s {
+            Severity::Trace => log::LevelFilter::Trace,
+            Severity::Debug => log::LevelFilter::Debug,
+            Severity::Info => log::LevelFilter::Info,
+            Severity::Warn => log::LevelFilter::Warn,
+            Severity::Fatal | Severity::Error => log::LevelFilter::Error,
+        }
+    }
+}
+
 impl From<Severity> for fdiagnostics::Severity {
     fn from(s: Severity) -> fdiagnostics::Severity {
         match s {

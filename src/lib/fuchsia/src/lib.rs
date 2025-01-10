@@ -135,7 +135,7 @@ fn init_logging_with_threads(logging: LoggingOptions<'_>) -> impl Drop {
 
 #[cfg(not(target_os = "fuchsia"))]
 fn init_logging_with_threads(logging: LoggingOptions<'_>) {
-    diagnostics_log::initialize(logging.into()).expect("initialize logging");
+    diagnostics_log::initialize(logging.into()).expect("initialize_logging");
 }
 
 //

@@ -3,9 +3,10 @@
 
 #![deny(missing_docs)]
 
-//! Provides the `tracing::Subscriber` implementation that allows to publish `tracing` events to
+//! Provides the `log::Log` implementation that allows to publish `log` events to
 //! Fuchsia Logging System.
-//! This library isn't Fuchsia-specific and provides a general `tracing::Subscriber` that allows
+//!
+//! This library isn't Fuchsia-specific and provides a general `log::Log` that allows
 //! the library to also be used in the host.
 
 #[cfg(target_os = "fuchsia")]
@@ -26,9 +27,32 @@ pub(crate) fn install_panic_hook(prefix: Option<&'static str>) {
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let prefix = prefix.unwrap_or("PANIC");
-        tracing::error!({ %info }, "{prefix}");
+        log::error!(info:%; "{prefix}");
         previous_hook(info);
     }));
+}
+
+/// A type which has a `Severity`.
+pub trait SeverityExt {
+    /// Return the severity of this value.
+    fn severity(&self) -> Severity;
+
+    /// Return the raw severity of this value.
+    fn raw_severity(&self) -> u8 {
+        self.severity() as u8
+    }
+}
+
+impl SeverityExt for log::Metadata<'_> {
+    fn severity(&self) -> Severity {
+        match self.level() {
+            log::Level::Error => Severity::Error,
+            log::Level::Warn => Severity::Warn,
+            log::Level::Info => Severity::Info,
+            log::Level::Debug => Severity::Debug,
+            log::Level::Trace => Severity::Trace,
+        }
+    }
 }
 
 /// Options to configure publishing. This is for initialization of logs, it's a superset of

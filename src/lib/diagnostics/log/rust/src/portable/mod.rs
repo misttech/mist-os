@@ -2,18 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
 use crate::{PublishOptions, Severity};
-use fidl_fuchsia_diagnostics::Interest;
+use fidl_fuchsia_diagnostics as fdiagnostics;
 use std::collections::HashSet;
-use std::fmt;
+use std::io::Write;
 use std::marker::PhantomData;
-use std::sync::{Arc, Once, RwLock};
+use std::sync::{Mutex, Once};
+use std::time::SystemTime;
 use thiserror::Error;
-use tracing::{span, Event, Level, Metadata, Subscriber};
-use tracing_log::{LogTracer, NormalizeEvent};
-use tracing_subscriber::fmt::format::Writer;
-use tracing_subscriber::fmt::time::{FormatTime, SystemTime};
-use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields, FormattedFields, MakeWriter};
-use tracing_subscriber::registry::LookupSpan;
 
 /// Tag derived from metadata.
 ///
@@ -28,9 +23,15 @@ pub enum Metatag {
     Target,
 }
 
+/// Errors arising while forwarding a diagnostics stream to the environment.
+#[derive(Debug, Error)]
+pub enum PublishError {
+    // Empty for future extensibility.
+}
+
 /// Options to configure a `Publisher`.
 pub struct PublisherOptions<'t> {
-    pub(crate) interest: Interest,
+    pub(crate) interest: fdiagnostics::Interest,
     pub(crate) metatags: HashSet<Metatag>,
     pub(crate) tags: &'t [&'t str],
     // Just for compatibility with the fuchsia struct which needs a lifetime.
@@ -40,7 +41,7 @@ pub struct PublisherOptions<'t> {
 impl Default for PublisherOptions<'_> {
     fn default() -> Self {
         Self {
-            interest: Interest::default(),
+            interest: fdiagnostics::Interest::default(),
             metatags: HashSet::new(),
             tags: &[],
             _lifetime: PhantomData,
@@ -52,9 +53,11 @@ impl Default for PublisherOptions<'_> {
 pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
     static START: Once = Once::new();
     START.call_once(|| {
-        let subscriber = create_subscriber(&opts, std::io::stderr).expect("create subscriber");
-        tracing::subscriber::set_global_default(subscriber).expect("set global subscriber");
-        LogTracer::init().expect("ingest log events");
+        let logger = create_logger(&opts, std::io::stderr());
+        log::set_boxed_logger(Box::new(logger)).expect("set logger");
+        let severity: Severity =
+            opts.publisher.interest.min_severity.unwrap_or(fdiagnostics::Severity::Info).into();
+        log::set_max_level(severity.into());
         if opts.install_panic_hook {
             crate::install_panic_hook(opts.panic_prefix);
         }
@@ -62,190 +65,110 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
     Ok(())
 }
 
-pub(crate) struct HostLogger {
-    // Log severity
-    min_severity: Arc<RwLock<Severity>>,
-    // Actual logger impl
-    logger: Box<dyn Subscriber + Send + Sync>,
+pub(crate) struct HostLogger<W> {
+    writable: Mutex<W>,
+    format: FormatOpts,
 }
 
-impl HostLogger {
-    /// Constructs a new `InterestFilter` and a future which should be polled to listen
-    /// to changes in the LogSink's interest.
-    pub fn new(logger: Box<dyn Subscriber + Send + Sync>, min_severity: Severity) -> Self {
-        Self { min_severity: Arc::new(RwLock::new(min_severity)), logger }
-    }
-
-    /// Sets the minimum severity.
-    pub fn set_minimum_severity(&self, severity: Severity) {
-        let mut min_severity = self.min_severity.write().unwrap();
-        *min_severity = severity;
+impl<W: Write + Send + 'static> HostLogger<W> {
+    /// Constructs a new `HostLogger` with a minimum severity configured.
+    fn new(writer: W, format: FormatOpts) -> Self
+    where
+        W: Write + Send + 'static,
+    {
+        Self { writable: Mutex::new(writer), format }
     }
 }
 
-// Convert a Level to a Severity
-fn level_to_severity(level: Level) -> Severity {
-    match level {
-        Level::ERROR => Severity::Error,
-        Level::WARN => Severity::Warn,
-        Level::INFO => Severity::Info,
-        Level::DEBUG => Severity::Debug,
-        Level::TRACE => Severity::Trace,
+impl<W: Write + Send + 'static> log::Log for HostLogger<W> {
+    fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+        true
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if self.enabled(record.metadata()) {
+            let mut writer = self.writable.lock().unwrap();
+            let _ =
+                write!(writer, "{}", chrono::DateTime::<chrono::Local>::from(SystemTime::now()));
+            let _ = write!(writer, " {} ", record.metadata().level());
+
+            if !self.format.tags.is_empty() {
+                let _ = write!(writer, "[{}] ", self.format.tags.join(", "));
+            }
+
+            if self.format.display_module_path {
+                let _ = write!(writer, "{}: ", record.metadata().target());
+            }
+
+            let _ = write!(writer, "{}", record.args());
+            let mut visitor = StringVisitor(&mut *writer);
+            let _ = record.key_values().visit(&mut visitor);
+
+            let _ = writeln!(writer);
+        }
+    }
+
+    fn flush(&self) {
+        let _ = self.writable.lock().unwrap().flush();
     }
 }
 
-impl Subscriber for HostLogger {
-    /// Always returns `sometimes` so that we can later change the filter on the fly.
-    fn register_callsite(
-        &self,
-        _metadata: &'static Metadata<'static>,
-    ) -> tracing::subscriber::Interest {
-        tracing::subscriber::Interest::sometimes()
+struct StringVisitor<'a, W>(&'a mut W);
+
+impl<W: Write> log::kv::VisitSource<'_> for StringVisitor<'_, W> {
+    fn visit_pair(
+        &mut self,
+        key: log::kv::Key<'_>,
+        value: log::kv::Value<'_>,
+    ) -> Result<(), log::kv::Error> {
+        value.visit(StringValueVisitor { buf: self.0, key: key.as_str() })
     }
+}
 
-    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
-        let min_severity = self.min_severity.read().unwrap();
+struct StringValueVisitor<'a, W> {
+    buf: &'a mut W,
+    key: &'a str,
+}
 
-        // Needed because Ord is broken for comparing to Level instances
-        level_to_severity(*metadata.level()) >= *min_severity
-    }
-
-    fn new_span(&self, span: &span::Attributes<'_>) -> span::Id {
-        self.logger.new_span(span)
-    }
-
-    fn record(&self, span: &span::Id, values: &span::Record<'_>) {
-        self.logger.record(span, values)
-    }
-
-    fn record_follows_from(&self, span: &span::Id, follows: &span::Id) {
-        self.logger.record_follows_from(span, follows)
-    }
-
-    fn event(&self, event: &Event<'_>) {
-        self.logger.event(event)
-    }
-
-    fn enter(&self, span: &span::Id) {
-        self.logger.enter(span)
-    }
-
-    fn exit(&self, span: &span::Id) {
-        self.logger.exit(span)
+impl<W: Write> log::kv::VisitValue<'_> for StringValueVisitor<'_, W> {
+    fn visit_any(&mut self, value: log::kv::Value<'_>) -> Result<(), log::kv::Error> {
+        write!(self.buf, " {}={}", self.key, value).expect("writing into strings does not fail");
+        Ok(())
     }
 }
 
 /// Sets the global minimum log severity.
 /// IMPORTANT: this function can panic if `initialize` wasn't called before.
-pub fn set_minimum_severity(severity: impl Into<Severity>) {
-    let severity: Severity = severity.into();
-    tracing::dispatcher::get_default(move |dispatcher| {
-        let publisher: &HostLogger = dispatcher.downcast_ref().unwrap();
-        publisher.set_minimum_severity(severity);
-    });
+pub fn set_minimum_severity(severity: impl Into<log::LevelFilter>) {
+    log::set_max_level(severity.into());
 }
 
-fn create_subscriber<W>(
-    opts: &PublishOptions<'_>,
-    w: W,
-) -> Result<impl Subscriber + Send + Sync + 'static, PublishError>
+fn create_logger<W>(opts: &PublishOptions<'_>, w: W) -> HostLogger<W>
 where
-    W: for<'writer> MakeWriter<'writer> + 'static + Send + Sync,
+    W: Write + Send + 'static,
 {
-    let builder = tracing_subscriber::fmt()
-        .with_ansi(false)
-        .event_format(HostFormatter {
+    HostLogger::new(
+        w,
+        FormatOpts {
             tags: opts.publisher.tags.iter().map(|s| s.to_string()).collect(),
             display_module_path: opts.publisher.metatags.contains(&Metatag::Target),
-        })
-        .with_writer(w);
-    let subscriber = builder.finish();
-    Ok(HostLogger::new(
-        Box::new(subscriber),
-        opts.publisher.interest.min_severity.unwrap_or_else(|| Severity::Info.into()).into(),
-    ))
-}
-
-/// Errors arising while forwarding a diagnostics stream to the environment.
-#[derive(Debug, Error)]
-pub enum PublishError {
-    /// Setting the default global [`tracing::Subscriber`] failed.
-    #[error("failed to install forwarder as the global default")]
-    SetGlobalDefault(#[from] tracing::subscriber::SetGlobalDefaultError),
-
-    /// Installing a forwarder from [`log`] macros to [`tracing`] macros failed.
-    #[error("failed to install a forwarder from `log` to `tracing`")]
-    InitLogForward(#[from] tracing_log::log_tracer::SetLoggerError),
+        },
+    )
 }
 
 /// Implements a compact formatter which also knows about tags.
-struct HostFormatter {
+struct FormatOpts {
     tags: Vec<String>,
     display_module_path: bool,
-}
-
-// This implementation is based on the tracing-subscriber Format<Comnpact> implementation, but
-// defaulting some fields and with support for tags.
-// TODO: consider supporting colors for Levels, Bold for spans, dimmed for time, etc. like the
-// default compact format with the ansi feature enabled.
-impl<S, N> FormatEvent<S, N> for HostFormatter
-where
-    S: Subscriber + for<'a> LookupSpan<'a>,
-    N: for<'a> FormatFields<'a> + 'static,
-{
-    fn format_event(
-        &self,
-        ctx: &FmtContext<'_, S, N>,
-        mut writer: Writer<'_>,
-        event: &Event<'_>,
-    ) -> fmt::Result {
-        let normalized_meta = event.normalized_metadata();
-        let meta = normalized_meta.as_ref().unwrap_or_else(|| event.metadata());
-
-        SystemTime.format_time(&mut writer)?;
-        write!(writer, " {} ", meta.level())?;
-
-        let mut seen = false;
-        let span = event.parent().and_then(|id| ctx.span(id)).or_else(|| ctx.lookup_current());
-        let scope = span.iter().flat_map(|span| span.scope().from_root());
-        for span in scope {
-            seen = true;
-            write!(writer, "{}:", span.metadata().name())?;
-        }
-        if seen {
-            writer.write_char(' ')?;
-        }
-
-        if !self.tags.is_empty() {
-            write!(writer, "[{}] ", self.tags.join(", "))?;
-        }
-
-        if self.display_module_path {
-            write!(writer, "{}: ", meta.target())?;
-        }
-
-        ctx.format_fields(writer.by_ref(), event)?;
-
-        let scope = span.iter().flat_map(|span| span.scope());
-        for span in scope {
-            let exts = span.extensions();
-            if let Some(fields) = exts.get::<FormattedFields<N>>() {
-                if !fields.is_empty() {
-                    write!(writer, " {}", fields.as_str())?;
-                }
-            }
-        }
-        writeln!(writer)
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use log::{error, info, warn};
     use regex::Regex;
     use std::io;
-    use std::sync::{Arc, Mutex};
-    use tracing::{error, info, warn};
+    use std::sync::{Arc, LazyLock, Mutex};
 
     struct MockWriter(Arc<Mutex<Vec<u8>>>);
 
@@ -259,14 +182,47 @@ mod tests {
         }
     }
 
+    static LOGGER: LazyLock<TestLogger> = LazyLock::new(|| {
+        let this = TestLogger { inner: Arc::new(Mutex::new(None)) };
+        log::set_boxed_logger(Box::new(this.clone())).expect("set logger");
+        log::set_max_level(log::LevelFilter::Info);
+        this
+    });
+
+    #[derive(Clone)]
+    struct TestLogger {
+        inner: Arc<Mutex<Option<HostLogger<MockWriter>>>>,
+    }
+
+    impl TestLogger {
+        fn replace(&self, logger: HostLogger<MockWriter>) {
+            LOGGER.inner.lock().unwrap().replace(logger);
+        }
+    }
+
+    impl log::Log for TestLogger {
+        fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+            let guard = self.inner.lock().unwrap();
+            guard.as_ref().unwrap().enabled(metadata)
+        }
+
+        fn log(&self, record: &log::Record<'_>) {
+            let guard = self.inner.lock().unwrap();
+            guard.as_ref().unwrap().log(record);
+        }
+
+        fn flush(&self) {
+            let guard = self.inner.lock().unwrap();
+            guard.as_ref().unwrap().flush();
+        }
+    }
+
     #[test]
     fn minimal_logging() {
         let buffer = Arc::new(Mutex::new(Vec::new()));
         let buf = buffer.clone();
-        let s = create_subscriber(&PublishOptions::default(), move || MockWriter(buf.clone()))
-            .expect("initialize logs");
-        let _s = tracing::subscriber::set_default(s);
-        info!(key = 2, "this is a test");
+        LOGGER.replace(create_logger(&PublishOptions::default(), MockWriter(buf.clone())));
+        info!(key = 2; "this is a test");
         let buf = buffer.lock().unwrap();
         let re = Regex::new(".+INFO this is a test key=2\n$").unwrap();
         let result = std::str::from_utf8(buf.as_slice()).unwrap();
@@ -277,13 +233,11 @@ mod tests {
     fn supports_tags() {
         let buffer = Arc::new(Mutex::new(Vec::new()));
         let buf = buffer.clone();
-        let s =
-            create_subscriber(&PublishOptions::default().tags(&["hello", "fuchsia"]), move || {
-                MockWriter(buf.clone())
-            })
-            .expect("initialize logs");
-        let _s = tracing::subscriber::set_default(s);
-        info!(key = 2, "this is a test");
+        LOGGER.replace(create_logger(
+            &PublishOptions::default().tags(&["hello", "fuchsia"]),
+            MockWriter(buf.clone()),
+        ));
+        info!(key = 2; "this is a test");
         let buf = buffer.lock().unwrap();
         let re = Regex::new(".+ INFO \\[hello, fuchsia\\] this is a test key=2\n$").unwrap();
         let result = std::str::from_utf8(buf.as_slice()).unwrap();
@@ -294,13 +248,11 @@ mod tests {
     fn supports_module_path() {
         let buffer = Arc::new(Mutex::new(Vec::new()));
         let buf = buffer.clone();
-        let s = create_subscriber(
+        LOGGER.replace(create_logger(
             &PublishOptions::default().enable_metatag(Metatag::Target),
-            move || MockWriter(buf.clone()),
-        )
-        .expect("initialize logs");
-        let _s = tracing::subscriber::set_default(s);
-        warn!(key = 2, "this is a test");
+            MockWriter(buf.clone()),
+        ));
+        warn!(key = 2; "this is a test");
         let buf = buffer.lock().unwrap();
         let re =
             Regex::new(".+WARN diagnostics_log_lib_test::portable::tests: this is a test key=2\n$")
@@ -313,14 +265,12 @@ mod tests {
     fn full_logging() {
         let buffer = Arc::new(Mutex::new(Vec::new()));
         let buf = buffer.clone();
-        let s = create_subscriber(
+        LOGGER.replace(create_logger(
             &PublishOptions::default().enable_metatag(Metatag::Target).tags(&["hello", "fuchsia"]),
-            move || MockWriter(buf.clone()),
-        )
-        .expect("initialize logs");
-        let _s = tracing::subscriber::set_default(s);
+            MockWriter(buf.clone()),
+        ));
 
-        error!(key = 2, "this is a test");
+        error!(key = 2; "this is a test");
         let buf = buffer.lock().unwrap();
         let re = Regex::new(concat!(
             ".+ERROR \\[hello, fuchsia\\] diagnostics_log_lib_test::portable::tests: ",

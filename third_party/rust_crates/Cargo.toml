@@ -226,7 +226,7 @@ thiserror = "1.0.57"
 tokio-rustls = "0.24.1"
 toml = "0.5"
 toml_edit = "0.2.1"
-tracing = { version = "0.1.40", default-features = false, features = ["std", "attributes"] }
+tracing = { version = "0.1.40", default-features = false, features = ["std", "attributes", "log"] }
 tracing-core = "0.1.32"
 tracing-log = "0.2.0"
 tracing-mutex = { version = "0.3.0", features = ["lockapi", "parkinglot"] }
@@ -1027,16 +1027,6 @@ rustflags = [
   "--cfg=feature=\\\"sync\\\"",
   "--cfg=feature=\\\"time\\\"",
   "--cfg=tokio_unstable",
-]
-
-# TODO(https://fxbug.dev/106164) This manual configuration enables the "log" so that
-# tracing macros also emit log events and binaries with setting up a
-# log::Logger receive tracing events as logs. On Fuchsia we don't need that
-# since all binaries set up a tracing Subscriber.
-[gn.package.tracing."0.1.40".platform."cfg(not(target_os = \"fuchsia\"))"]
-deps = [ ":log-v0_4_22" ]
-rustflags = [
-  "--cfg=feature=\\\"log\\\"",
 ]
 
 # No build script but relies on cargo to populate environment variables.

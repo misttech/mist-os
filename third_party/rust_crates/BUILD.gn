@@ -16309,11 +16309,9 @@ rust_library("tracing-v0_1_40") {
 
   deps = []
   deps += [ ":tracing-core-v0_1_32" ]
+  deps += [ ":log-v0_4_22" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
   deps += [ ":tracing-attributes-v0_1_27($host_toolchain)" ]
-  if (!(current_os == "fuchsia")) {
-    deps += [ ":log-v0_4_22" ]
-  }
 
   rustenv = []
 
@@ -16324,12 +16322,10 @@ rust_library("tracing-v0_1_40") {
     "-Cextra-filename=-f1b3fa5716d3f483",
     "--cfg=feature=\"attributes\"",
     "--cfg=feature=\"default\"",
+    "--cfg=feature=\"log\"",
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"tracing-attributes\"",
   ]
-  if (!(current_os == "fuchsia")) {
-    rustflags += [ "--cfg=feature=\"log\"" ]
-  }
 
   visibility = [ ":*" ]
 
