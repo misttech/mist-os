@@ -644,13 +644,15 @@ struct PrivateAnonymousMemoryManager {
 #[cfg(feature = "alternate_anon_allocs")]
 impl PrivateAnonymousMemoryManager {
     fn new(backing_size: u64) -> Self {
-        let backing = Arc::new(MemoryObject::from(
-            zx::Vmo::create(backing_size)
-                .unwrap()
-                .replace_as_executable(&VMEX_RESOURCE)
-                .unwrap()
-                .with_zx_name("starnix:memory_manager"),
-        ));
+        let backing = Arc::new(
+            MemoryObject::from(
+                zx::Vmo::create(backing_size)
+                    .unwrap()
+                    .replace_as_executable(&VMEX_RESOURCE)
+                    .unwrap(),
+            )
+            .with_zx_name(b"starnix:memory_manager"),
+        );
         Self { backing }
     }
 
@@ -4127,7 +4129,7 @@ impl MemoryManager {
                 match &mm_mapping.backing {
                     MappingBacking::Memory(m) => m.memory.get_koid(),
                     #[cfg(feature = "alternate_anon_allocs")]
-                    MappingBacking::PrivateAnonymous => state.private_anonymous.get_koid(),
+                    MappingBacking::PrivateAnonymous => state.private_anonymous.backing.get_koid(),
                 },
                 zx_details.vmo_koid,
                 "MemoryManager and Zircon must agree on which VMO is mapped in this range",
