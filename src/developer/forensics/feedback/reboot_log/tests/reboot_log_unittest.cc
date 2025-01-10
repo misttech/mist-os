@@ -52,7 +52,7 @@ struct CriticalProcessTestParam {
 struct RebootLogStrTestParam {
   std::string test_name;
   std::optional<std::string> zircon_reboot_log;
-  std::optional<RebootReason2> reboot_reason;
+  std::vector<RebootReason2> reboot_reasons;
   std::optional<std::string> output_reboot_log_str;
 };
 
@@ -77,7 +77,7 @@ class RebootLogTest : public UnitTestFixture, public testing::WithParamInterface
     cobalt::Logger cobalt(dispatcher(), services(), &clock_);
 
     FX_CHECK(files::WriteFile(graceful_reboot_log_path_,
-                              ToFileContent(ToGracefulRebootReason(std::move(options)))));
+                              ToFileContent(ToGracefulRebootReasons(std::move(options)))));
   }
 
   std::string zircon_reboot_log_path_;
@@ -122,9 +122,7 @@ INSTANTIATE_TEST_SUITE_P(
             "ZirconCleanGracefulNetstackMigration",
             "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234",
             RebootReason2::NETSTACK_MIGRATION,
-            // TODO(https://fxbug.dev/385734112) Add a dedicated reboot reason
-            // for NETSTACK_MIGRATION.
-            RebootReason::kGenericGraceful,
+            RebootReason::kNetstackMigration,
         },
         {
             "ZirconCleanGracefulHighTemperature",
@@ -279,10 +277,15 @@ INSTANTIATE_TEST_SUITE_P(WithVariousRebootLogs, RebootLogMultiReasonTest,
                                       RebootReason2::NETSTACK_MIGRATION,
                                       RebootReason2::SYSTEM_UPDATE,
                                   },
-                                  // TODO(https://fxbug.dev/385734112): Update the expected value
-                                  // once The graceful reboot reason correctly accounts for multiple
-                                  // reboot reasons.
-                                  RebootReason::kGenericGraceful,
+                                  RebootReason::kSystemUpdate,
+                              },
+                              {
+                                  "UnexpectedCombination",
+                                  {
+                                      RebootReason2::OUT_OF_MEMORY,
+                                      RebootReason2::SYSTEM_UPDATE,
+                                  },
+                                  RebootReason::kUnexpectedReasonGraceful,
                               }})),
                          [](const testing::TestParamInfo<RebootMultiReasonTestParam>& info) {
                            return info.param.test_name;
@@ -413,8 +416,8 @@ INSTANTIATE_TEST_SUITE_P(
         {
             "ConcatenatesZirconAndGraceful",
             "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234",
-            RebootReason2::USER_REQUEST,
-            "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234\nGRACEFUL REBOOT REASON (USER "
+            {RebootReason2::USER_REQUEST},
+            "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234\nGRACEFUL REBOOT REASONS: (USER "
             "REQUEST)\n\nFINAL REBOOT REASON (USER REQUEST)",
         },
         {
@@ -422,22 +425,29 @@ INSTANTIATE_TEST_SUITE_P(
             // ungraceful zircon reboot reason and a graceful reboot reason.
             "ConcatenatesZirconUngracefulAndGraceful",
             "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n1234",
-            RebootReason2::USER_REQUEST,
-            "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n1234\nGRACEFUL REBOOT REASON "
+            {RebootReason2::USER_REQUEST},
+            "ZIRCON REBOOT REASON (KERNEL PANIC)\n\nUPTIME (ms)\n1234\nGRACEFUL REBOOT REASONS: "
             "(USER REQUEST)\n\nFINAL REBOOT REASON (KERNEL PANIC)",
         },
         {
             "NoGracefulRebootLog",
             "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234",
-            std::nullopt,
-            "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234\nGRACEFUL REBOOT REASON "
+            {},
+            "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234\nGRACEFUL REBOOT REASONS: "
             "(NONE)\n\nFINAL REBOOT REASON (GENERIC GRACEFUL)",
+        },
+        {
+            "MultipleGracefulRebootLog",
+            "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234",
+            {RebootReason2::NETSTACK_MIGRATION, RebootReason2::SYSTEM_UPDATE},
+            "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234\nGRACEFUL REBOOT REASONS: "
+            "(NETSTACK MIGRATION,SYSTEM UPDATE)\n\nFINAL REBOOT REASON (SYSTEM UPDATE)",
         },
         {
             "NoZirconRebootLog",
             std::nullopt,
-            RebootReason2::USER_REQUEST,
-            "GRACEFUL REBOOT REASON (USER REQUEST)\n\nFINAL REBOOT REASON (COLD)",
+            {RebootReason2::USER_REQUEST},
+            "GRACEFUL REBOOT REASONS: (USER REQUEST)\n\nFINAL REBOOT REASON (COLD)",
         },
     })),
     [](const testing::TestParamInfo<RebootLogStrTestParam>& info) { return info.param.test_name; });
@@ -448,8 +458,8 @@ TEST_P(RebootLogStrTest, Succeed) {
     WriteZirconRebootLogContents(param.zircon_reboot_log.value());
   }
 
-  if (param.reboot_reason.has_value()) {
-    WriteGracefulRebootLogContents(NewRebootOptions({param.reboot_reason.value()}));
+  if (!param.reboot_reasons.empty()) {
+    WriteGracefulRebootLogContents(NewRebootOptions(param.reboot_reasons));
   }
 
   const RebootLog reboot_log(RebootLog::ParseRebootLog(
@@ -469,7 +479,7 @@ TEST_F(RebootLogStrTest, Succeed_SetGracefulFDR) {
       zircon_reboot_log_path_, graceful_reboot_log_path_, /*not_a_fdr=*/true));
   EXPECT_EQ(reboot_log.RebootLogStr(),
             "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234\n"
-            "GRACEFUL REBOOT REASON (FACTORY DATA RESET)\n\n"
+            "GRACEFUL REBOOT REASONS: (FACTORY DATA RESET)\n\n"
             "FINAL REBOOT REASON (FACTORY DATA RESET)");
 }
 
@@ -481,7 +491,7 @@ TEST_F(RebootLogStrTest, Succeed_InferFDR) {
   EXPECT_EQ(reboot_log.RebootReason(), RebootReason::kFdr);
   EXPECT_EQ(reboot_log.RebootLogStr(),
             "ZIRCON REBOOT REASON (NO CRASH)\n\nUPTIME (ms)\n1234\n"
-            "GRACEFUL REBOOT REASON (NONE)\n\nFINAL REBOOT REASON (FACTORY DATA RESET)");
+            "GRACEFUL REBOOT REASONS: (NONE)\n\nFINAL REBOOT REASON (FACTORY DATA RESET)");
 }
 
 }  // namespace

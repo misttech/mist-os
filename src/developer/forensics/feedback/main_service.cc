@@ -94,10 +94,11 @@ MainService::MainService(
   executor_.schedule_task(WaitForRebootReason(dispatcher_, handle.NewRequest())
                               .and_then([this, path = options.graceful_reboot_reason_write_path](
                                             GracefulRebootReasonSignal& signal) {
-                                FX_LOGS(INFO) << "Received reboot reason '"
-                                              << ToFileContent(signal.Reason()) << "'";
+                                const std::vector<GracefulRebootReason> reasons = signal.Reasons();
+                                FX_LOGS(INFO)
+                                    << "Received reboot reasons '" << ToFileContent(reasons) << "'";
 
-                                WriteGracefulRebootReason(signal.Reason(), cobalt_, path);
+                                WriteGracefulRebootReasons(reasons, cobalt_, path);
                                 signal.Respond();
                               })
                               .or_else([](const Error& error) {

@@ -12,13 +12,14 @@
 #include <fbl/unique_fd.h>
 
 #include "src/lib/files/file_descriptor.h"
+#include "src/lib/fxl/strings/join_strings.h"
+#include "src/lib/fxl/strings/split_string.h"
 
 namespace forensics {
 namespace feedback {
 namespace {
 
 constexpr char kReasonNotSet[] = "NOT SET";
-constexpr char kReasonNone[] = "NONE";
 constexpr char kReasonUserRequest[] = "USER REQUEST";
 constexpr char kReasonSystemUpdate[] = "SYSTEM UPDATE";
 constexpr char kReasonRetrySystemUpdate[] = "RETRY SYSTEM UPDATE";
@@ -29,8 +30,17 @@ constexpr char kReasonCriticalComponentFailure[] = "CRITICAL COMPONENT FAILURE";
 constexpr char kReasonFdr[] = "FACTORY DATA RESET";
 constexpr char kReasonZbiSwap[] = "ZBI SWAP";
 constexpr char kOutOfMemory[] = "OUT OF MEMORY";
+constexpr char kReasonNetstackMigration[] = "NETSTACK MIGRATION";
 constexpr char kReasonNotSupported[] = "NOT SUPPORTED";
 constexpr char kReasonNotParseable[] = "NOT PARSEABLE";
+
+// Used to separate multiple `GracefulRebootReason` when written to file.
+constexpr char kDeliminator[] = ",";
+
+// Used to represent the absence of a `GracefulRebootReason` when written to
+// file. Unlike the other "reason" strings above, this is translated to an
+// empty vector rather than a `GracefulRebootReason`, when read from file.
+constexpr char kNoReasons[] = "NONE";
 
 }  // namespace
 
@@ -38,8 +48,6 @@ std::string ToString(const GracefulRebootReason reason) {
   switch (reason) {
     case GracefulRebootReason::kNotSet:
       return kReasonNotSet;
-    case GracefulRebootReason::kNone:
-      return kReasonNone;
     case GracefulRebootReason::kUserRequest:
       return kReasonUserRequest;
     case GracefulRebootReason::kSystemUpdate:
@@ -60,6 +68,8 @@ std::string ToString(const GracefulRebootReason reason) {
       return kReasonZbiSwap;
     case GracefulRebootReason::kOutOfMemory:
       return kOutOfMemory;
+    case GracefulRebootReason::kNetstackMigration:
+      return kReasonNetstackMigration;
     case GracefulRebootReason::kNotSupported:
       return kReasonNotSupported;
     case GracefulRebootReason::kNotParseable:
@@ -69,31 +79,7 @@ std::string ToString(const GracefulRebootReason reason) {
   return kReasonNotSet;
 }
 
-std::string ToFileContent(const GracefulRebootReason reason) {
-  switch (reason) {
-    case GracefulRebootReason::kUserRequest:
-    case GracefulRebootReason::kSystemUpdate:
-    case GracefulRebootReason::kRetrySystemUpdate:
-    case GracefulRebootReason::kHighTemperature:
-    case GracefulRebootReason::kSessionFailure:
-    case GracefulRebootReason::kSysmgrFailure:
-    case GracefulRebootReason::kCriticalComponentFailure:
-    case GracefulRebootReason::kFdr:
-    case GracefulRebootReason::kZbiSwap:
-    case GracefulRebootReason::kOutOfMemory:
-    case GracefulRebootReason::kNotSupported:
-      return ToString(reason);
-    case GracefulRebootReason::kNotSet:
-    case GracefulRebootReason::kNone:
-    case GracefulRebootReason::kNotParseable:
-      FX_LOGS(ERROR) << "Invalid persisted graceful reboot reason: " << ToString(reason);
-      return kReasonNotSupported;
-  }
-
-  return kReasonNotSupported;
-}
-
-GracefulRebootReason FromFileContent(const std::string reason) {
+GracefulRebootReason FromString(const std::string_view reason) {
   if (reason == kReasonUserRequest) {
     return GracefulRebootReason::kUserRequest;
   } else if (reason == kReasonSystemUpdate) {
@@ -112,6 +98,8 @@ GracefulRebootReason FromFileContent(const std::string reason) {
     return GracefulRebootReason::kFdr;
   } else if (reason == kReasonZbiSwap) {
     return GracefulRebootReason::kZbiSwap;
+  } else if (reason == kReasonNetstackMigration) {
+    return GracefulRebootReason::kNetstackMigration;
   } else if (reason == kReasonNotSupported) {
     return GracefulRebootReason::kNotSupported;
   } else if (reason == kOutOfMemory) {
@@ -122,19 +110,92 @@ GracefulRebootReason FromFileContent(const std::string reason) {
   return GracefulRebootReason::kNotParseable;
 }
 
-GracefulRebootReason ToGracefulRebootReason(
-    const fuchsia::hardware::power::statecontrol::RebootOptions options) {
-  using fuchsia::hardware::power::statecontrol::RebootReason2;
+// Converts the list of `GracefulRebootReasons` into a single string.
+//
+// The format is:
+// "Reason 1,Reason 2,Reason 3"
+//
+// Note that some variants that should not be persisted (e.g. `kNotParseable`)
+// are translated to `kNotSupported`.
+std::string ToFileContent(const std::vector<GracefulRebootReason>& reasons) {
+  if (reasons.empty()) {
+    return kNoReasons;
+  }
+  std::vector<std::string> reason_strings;
+  reason_strings.reserve(reasons.size());
+  for (const auto& reason : reasons) {
+    std::string reason_string;
+    switch (reason) {
+      case GracefulRebootReason::kUserRequest:
+      case GracefulRebootReason::kSystemUpdate:
+      case GracefulRebootReason::kRetrySystemUpdate:
+      case GracefulRebootReason::kHighTemperature:
+      case GracefulRebootReason::kSessionFailure:
+      case GracefulRebootReason::kSysmgrFailure:
+      case GracefulRebootReason::kCriticalComponentFailure:
+      case GracefulRebootReason::kFdr:
+      case GracefulRebootReason::kZbiSwap:
+      case GracefulRebootReason::kOutOfMemory:
+      case GracefulRebootReason::kNetstackMigration:
+      case GracefulRebootReason::kNotSupported:
+        reason_string = ToString(reason);
+        break;
+      case GracefulRebootReason::kNotSet:
+      case GracefulRebootReason::kNotParseable:
+        FX_LOGS(ERROR) << "Invalid persisted graceful reboot reason: " << ToString(reason);
+        reason_string = kReasonNotSupported;
+        break;
+    }
+    if (reason_string.empty()) {
+      // The reason was out of the valid bounds of a `GracefulRebootReason`
+      // (None of the switch cases above applied).
+      reason_string = kReasonNotSupported;
+    }
 
-  if (!options.has_reasons() || options.reasons().empty()) {
-    return GracefulRebootReason::kNotSupported;
+    reason_strings.push_back(reason_string);
+  }
+  return fxl::JoinStrings(reason_strings, kDeliminator);
+}
+
+// Like `ToFileContent`, but does not perform any translation of the reasons.
+std::string ToLog(const std::vector<GracefulRebootReason>& reasons) {
+  if (reasons.empty()) {
+    return kNoReasons;
+  }
+  std::vector<std::string> reason_strings;
+  reason_strings.reserve(reasons.size());
+  for (const auto& reason : reasons) {
+    reason_strings.push_back(ToString(reason));
+  }
+  return fxl::JoinStrings(reason_strings, kDeliminator);
+}
+
+// Converts the file contents into a list of `GracefulRebootReason`.
+//
+// The expected format is:
+// "Reason 1,Reason 2,Reason 3"
+//
+// If the given string is empty, the returned list will be empty.
+std::vector<GracefulRebootReason> FromFileContent(const std::string reasons) {
+  if (reasons == kNoReasons) {
+    return {};
   }
 
-  // TODO(https://fxbug.dev/385734112): Consider multiple reboot reasons. For
-  // now, the naive thing is to just check the first.
-  const RebootReason2 first_reason = options.reasons()[0];
+  const std::vector<std::string_view> reason_strings =
+      fxl::SplitString(reasons, kDeliminator, fxl::WhiteSpaceHandling::kTrimWhitespace,
+                       fxl::SplitResult::kSplitWantNonEmpty);
+  std::vector<GracefulRebootReason> graceful_reasons;
+  graceful_reasons.reserve(reason_strings.size());
+  for (const auto& reason : reason_strings) {
+    graceful_reasons.push_back(FromString(reason));
+  }
+  return graceful_reasons;
+}
 
-  switch (first_reason) {
+GracefulRebootReason FromReason(
+    const fuchsia::hardware::power::statecontrol::RebootReason2& reason) {
+  using fuchsia::hardware::power::statecontrol::RebootReason2;
+  switch (reason) {
     case RebootReason2::USER_REQUEST:
       return GracefulRebootReason::kUserRequest;
     case RebootReason2::SYSTEM_UPDATE:
@@ -156,23 +217,35 @@ GracefulRebootReason ToGracefulRebootReason(
     case RebootReason2::OUT_OF_MEMORY:
       return GracefulRebootReason::kOutOfMemory;
     case RebootReason2::NETSTACK_MIGRATION:
-      // TODO(https://fxbug.dev/385734112): Add a graceful reboot reason
-      // associated with Netstack Migration.
-      return GracefulRebootReason::kNotSupported;
+      return GracefulRebootReason::kNetstackMigration;
     default:
       return GracefulRebootReason::kNotSupported;
   }
 }
 
-void WriteGracefulRebootReason(GracefulRebootReason reason, cobalt::Logger* cobalt,
-                               const std::string& path) {
+std::vector<GracefulRebootReason> ToGracefulRebootReasons(
+    const fuchsia::hardware::power::statecontrol::RebootOptions options) {
+  if (!options.has_reasons()) {
+    return {};
+  }
+
+  std::vector<GracefulRebootReason> reasons;
+  reasons.reserve(options.reasons().size());
+  for (const auto& reason : options.reasons()) {
+    reasons.push_back(FromReason(reason));
+  }
+  return reasons;
+}
+
+void WriteGracefulRebootReasons(const std::vector<GracefulRebootReason>& reasons,
+                                cobalt::Logger* cobalt, const std::string& path) {
   fbl::unique_fd fd(open(path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR));
   if (!fd.is_valid()) {
     FX_LOGS(INFO) << "Failed to open reboot reason file: " << path;
     return;
   }
 
-  if (const std::string content = ToFileContent(reason);
+  if (const std::string content = ToFileContent(reasons);
       !fxl::WriteFileDescriptor(fd.get(), content.data(), content.size())) {
     FX_LOGS(ERROR) << "Failed to write reboot reason '" << content << "' to " << path;
   }

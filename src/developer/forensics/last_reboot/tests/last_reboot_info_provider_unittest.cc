@@ -55,6 +55,30 @@ TEST(LastRebootInfoProviderTest, Succeed_NotGraceful) {
   EXPECT_EQ(last_reboot.reason(), ToFidlRebootReason(reboot_reason));
 }
 
+TEST(LastRebootInfoProviderTest, Succeed_Planned) {
+  const feedback::RebootReason reboot_reason = feedback::RebootReason::kSystemUpdate;
+
+  const auto last_reboot = GetLastReboot(reboot_reason);
+
+  ASSERT_TRUE(last_reboot.has_planned());
+  EXPECT_TRUE(last_reboot.planned());
+
+  ASSERT_TRUE(last_reboot.has_reason());
+  EXPECT_EQ(last_reboot.reason(), ToFidlRebootReason(reboot_reason));
+}
+
+TEST(LastRebootInfoProviderTest, Succeed_NotPlanned) {
+  const feedback::RebootReason reboot_reason = feedback::RebootReason::kUserRequest;
+
+  const auto last_reboot = GetLastReboot(reboot_reason);
+
+  ASSERT_TRUE(last_reboot.has_planned());
+  EXPECT_FALSE(last_reboot.planned());
+
+  ASSERT_TRUE(last_reboot.has_reason());
+  EXPECT_EQ(last_reboot.reason(), ToFidlRebootReason(reboot_reason));
+}
+
 TEST(LastRebootInfoProviderTest, Succeed_HasUptime) {
   const zx::duration uptime = zx::msec(100);
 

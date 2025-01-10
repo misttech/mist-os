@@ -31,16 +31,17 @@ class LifecycleStopSignal {
 };
 
 // Indicates `fuchsia.hardware.power.statecontrol/RebootMethodsWatcher.OnReboot` has been called and
-// provides a way to get the reason and send a response to the server.
+// provides a way to get the reasons and send a response to the server.
 class GracefulRebootReasonSignal {
  public:
-  GracefulRebootReasonSignal(GracefulRebootReason reason, fit::callback<void(void)> callback);
+  GracefulRebootReasonSignal(std::vector<GracefulRebootReason> reasons,
+                             fit::callback<void(void)> callback);
 
-  GracefulRebootReason Reason() const { return reason_; }
+  std::vector<GracefulRebootReason> Reasons() const { return reasons_; }
   void Respond() { callback_(); }
 
  private:
-  GracefulRebootReason reason_;
+  std::vector<GracefulRebootReason> reasons_;
   fit::callback<void(void)> callback_;
 };
 

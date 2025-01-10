@@ -137,15 +137,15 @@ void RebootWatcherServer::OnReboot(fuchsia::hardware::power::statecontrol::Reboo
     cb();
     b->Unbind();
   });
-  completer_.complete_ok(GracefulRebootReasonSignal(ToGracefulRebootReason(std::move(options)),
+  completer_.complete_ok(GracefulRebootReasonSignal(ToGracefulRebootReasons(std::move(options)),
                                                     [cb = std::move(cb)]() mutable { cb.call(); }));
 }
 
 }  // namespace
 
-GracefulRebootReasonSignal::GracefulRebootReasonSignal(const GracefulRebootReason reason,
+GracefulRebootReasonSignal::GracefulRebootReasonSignal(std::vector<GracefulRebootReason> reasons,
                                                        fit::callback<void(void)> callback)
-    : reason_(reason), callback_(std::move(callback)) {
+    : reasons_(std::move(reasons)), callback_(std::move(callback)) {
   FX_CHECK(callback_ != nullptr);
 }
 

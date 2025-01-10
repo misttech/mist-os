@@ -39,7 +39,7 @@ using testing::IsEmpty;
 using testing::UnorderedElementsAreArray;
 
 constexpr char kHasReportedOnPath[] = "/tmp/has_reported_on_reboot_log.txt";
-constexpr char kNoGracefulReason[] = "GRACEFUL REBOOT REASON (NONE)";
+constexpr char kNoGracefulReason[] = "GRACEFUL REBOOT REASONS: (NONE)";
 
 struct UngracefulRebootTestParam {
   std::string test_name;
@@ -556,9 +556,9 @@ TEST_P(GracefulWithCrashReporterTest, Succeed) {
   SetUpCrashReporterServer(
       std::make_unique<stubs::CrashReporter>(stubs::CrashReporter::Expectations{
           .crash_signature = param.output_crash_signature,
-          .reboot_log =
-              fxl::StringPrintf("%s\nGRACEFUL REBOOT REASON (%s)\n\n%s", zircon_reboot_log.c_str(),
-                                param.graceful_reboot_log.c_str(), param.reboot_reason.c_str()),
+          .reboot_log = fxl::StringPrintf(
+              "%s\nGRACEFUL REBOOT REASONS: (%s)\n\n%s", zircon_reboot_log.c_str(),
+              param.graceful_reboot_log.c_str(), param.reboot_reason.c_str()),
           .uptime = param.output_uptime,
           .is_fatal = param.output_is_fatal,
       }));

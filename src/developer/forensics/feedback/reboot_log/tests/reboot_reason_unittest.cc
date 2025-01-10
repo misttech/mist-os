@@ -132,6 +132,17 @@ TEST(RebootReasonTest, GenericGraceful) {
   EXPECT_EQ(ToFidlRebootReason(reason), std::nullopt);
 }
 
+TEST(RebootReasonTest, UnexpectedMultipleGraceful) {
+  const auto reason = RebootReason::kUnexpectedReasonGraceful;
+
+  EXPECT_TRUE(IsCrash(reason));
+  EXPECT_TRUE(IsFatal(reason));
+  EXPECT_EQ(ToCobaltLastRebootReason(reason), cobalt::LastRebootReason::kUnexpectedReasonGraceful);
+  EXPECT_EQ(ToCrashSignature(reason), "fuchsia-unexpected-reason-userspace-reboot");
+  EXPECT_EQ(ToCrashProgramName(reason), "system");
+  EXPECT_EQ(ToFidlRebootReason(reason), std::nullopt);
+}
+
 TEST(RebootReasonTest, UserRequest) {
   const auto reason = RebootReason::kUserRequest;
 
@@ -227,6 +238,14 @@ TEST(RebootReasonTest, FDR) {
   EXPECT_FALSE(IsFatal(reason));
   EXPECT_EQ(ToCobaltLastRebootReason(reason), cobalt::LastRebootReason::kFactoryDataReset);
   EXPECT_EQ(ToFidlRebootReason(reason), fuchsia::feedback::RebootReason::FACTORY_DATA_RESET);
+}
+
+TEST(RebootReasonTest, NetstackMigration) {
+  const auto reason = RebootReason::kNetstackMigration;
+  EXPECT_FALSE(IsCrash(reason));
+  EXPECT_FALSE(IsFatal(reason));
+  EXPECT_EQ(ToCobaltLastRebootReason(reason), cobalt::LastRebootReason::kNetstackMigration);
+  EXPECT_EQ(ToFidlRebootReason(reason), fuchsia::feedback::RebootReason::NETSTACK_MIGRATION);
 }
 
 }  // namespace

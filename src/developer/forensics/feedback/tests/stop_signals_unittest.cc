@@ -148,7 +148,7 @@ TEST_F(WaitForRebootReasonTest, ServerDisconnectsOnCallbackExecution) {
   RunLoopUntilIdle();
   EXPECT_TRUE(ptr.is_bound());
   ASSERT_NE(signal, std::nullopt);
-  EXPECT_EQ(signal->Reason(), GracefulRebootReason::kUserRequest);
+  EXPECT_THAT(signal->Reasons(), testing::ElementsAre(GracefulRebootReason::kUserRequest));
 
   signal->Respond();
   RunLoopUntilIdle();
@@ -177,7 +177,7 @@ TEST_F(WaitForRebootReasonTest, ServerDisconnectsOnCallbackDeletion) {
 
   RunLoopUntilIdle();
   ASSERT_NE(signal, std::nullopt);
-  EXPECT_EQ(signal->Reason(), GracefulRebootReason::kUserRequest);
+  EXPECT_THAT(signal->Reasons(), testing::ElementsAre(GracefulRebootReason::kUserRequest));
 
   signal = std::nullopt;
   RunLoopUntilIdle();
