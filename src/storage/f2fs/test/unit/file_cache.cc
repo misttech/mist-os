@@ -397,7 +397,7 @@ TEST_F(FileCacheTest, Truncate) TA_NO_THREAD_SAFETY_ANALYSIS {
 
   --start;
   // Punch a hole at start
-  file.TruncateHole(start, start + 1, true);
+  file.TruncateHole(start, start + 1);
 
   {
     LockedPage page = GetLockedPage(start);

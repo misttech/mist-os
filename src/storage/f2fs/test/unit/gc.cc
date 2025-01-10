@@ -64,45 +64,6 @@ class GcTest : public F2fsFakeDevTestFixture {
   }
 };
 
-TEST_F(GcTest, TruncateAndLargeFsync) {
-  fs_->GetSuperblockInfo().ClearOpt(MountOption::kForceLfs);
-  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
-  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
-  auto file = fbl::RefPtr<File>::Downcast(*std::move(test_file));
-  std::array<uint8_t, kPageSize> buf;
-  size_t num_blocks = 0;
-  size_t out;
-  // Append |file| until the out of space
-  while (true) {
-    zx_status_t ret =
-        FileTester::Write(file.get(), buf.data(), sizeof(buf), num_blocks * sizeof(buf), &out);
-    if (ret == ZX_OK) {
-      LockedPage page;
-      zx_status_t ret = file->GrabLockedPage(num_blocks, &page);
-      ASSERT_EQ(ret, ZX_OK);
-      ASSERT_TRUE(page->IsDirty());
-      ++num_blocks;
-      continue;
-    }
-    ASSERT_EQ(ret, ZX_ERR_NO_SPACE);
-    break;
-  }
-  ASSERT_EQ(file->GetSize(), num_blocks * sizeof(buf));
-  file->SyncFile();
-  // 4KiB Rand W. & fsync() for 10 * the size of |file|
-  for (uint32_t j = 1; j <= 10; ++j) {
-    for (size_t i = 0; i < num_blocks; ++i) {
-      zx_status_t ret =
-          FileTester::Write(file.get(), buf.data(), sizeof(buf), i * sizeof(buf), &out);
-      ASSERT_EQ(ret, ZX_OK);
-    }
-    file->Truncate((num_blocks - j) * kBlockSize);
-    file->SyncFile();
-  }
-
-  file->Close();
-}
-
 TEST_F(GcTest, CpError) TA_NO_THREAD_SAFETY_ANALYSIS {
   fs_->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
   auto result = fs_->StartGc();
@@ -465,6 +426,155 @@ TEST_P(GcTestWithLargeSec, GcConsistency) TA_NO_THREAD_SAFETY_ANALYSIS {
 const std::array<std::pair<uint64_t, uint32_t>, 2> kSecParams = {
     {{kDefaultSectorCount, 1}, {4 * kDefaultSectorCount, 4}}};
 INSTANTIATE_TEST_SUITE_P(GcTestWithLargeSec, GcTestWithLargeSec, ::testing::ValuesIn(kSecParams));
+
+class GcTestWithSsrAndLfs : public GcTest, public testing::WithParamInterface<bool> {
+ public:
+  GcTestWithSsrAndLfs() { mount_options_.SetValue(MountOption::kForceLfs, GetParam()); }
+};
+
+TEST_P(GcTestWithSsrAndLfs, TruncateAndLargeFsync) {
+  zx::result test_file = root_dir_->Create("test", fs::CreationType::kFile);
+  ASSERT_TRUE(test_file.is_ok()) << test_file.status_string();
+  auto file = fbl::RefPtr<File>::Downcast(*std::move(test_file));
+  std::array<uint8_t, kPageSize> buf;
+  size_t num_blocks = 0;
+  size_t out;
+  // Append |file| until the out of space
+  while (true) {
+    zx_status_t ret =
+        FileTester::Write(file.get(), buf.data(), sizeof(buf), num_blocks * sizeof(buf), &out);
+    if (ret == ZX_OK) {
+      LockedPage page;
+      zx_status_t ret = file->GrabLockedPage(num_blocks, &page);
+      ASSERT_EQ(ret, ZX_OK);
+      ASSERT_TRUE(page->IsDirty());
+      ++num_blocks;
+      continue;
+    }
+    ASSERT_EQ(ret, ZX_ERR_NO_SPACE);
+    break;
+  }
+  ASSERT_EQ(file->GetSize(), num_blocks * sizeof(buf));
+  file->SyncFile();
+  // 4KiB Rand W. & fsync() for 10 * the size of |file|
+  for (uint32_t j = 1; j <= 10; ++j) {
+    for (size_t i = 0; i < num_blocks; ++i) {
+      zx_status_t ret =
+          FileTester::Write(file.get(), buf.data(), sizeof(buf), i * sizeof(buf), &out);
+      ASSERT_EQ(ret, ZX_OK);
+    }
+    file->Truncate((num_blocks - j) * kBlockSize);
+    file->SyncFile();
+  }
+
+  file->Close();
+}
+
+TEST_P(GcTestWithSsrAndLfs, FillAndRemount) {
+  zx::result test_dir = root_dir_->Create("test", fs::CreationType::kDirectory);
+  ASSERT_TRUE(test_dir.is_ok()) << test_dir.status_string();
+  size_t file_no = 0;
+  const std::string prefix(kMaxNameLen - 10, '.');
+  while (true) {
+    zx::result child_or =
+        test_dir->Create(std::string(prefix + std::to_string(file_no++)), fs::CreationType::kFile);
+    if (child_or.is_error()) {
+      break;
+    }
+    child_or->Close();
+  }
+  FX_LOGS(WARNING) << " created : " << file_no;
+  test_dir->Close();
+  *test_dir = nullptr;
+  // No victim is available since there is no dirty segment.
+  zx::result victim_or =
+      fs_->GetSegmentManager().GetGcVictim(GcType::kFgGc, CursegType::kNoCheckType);
+  ASSERT_TRUE(victim_or.is_error());
+  Remount();
+
+  // Checkpoint writes during remount yield dirty segments.
+  victim_or = fs_->GetSegmentManager().GetGcVictim(GcType::kFgGc, CursegType::kNoCheckType);
+  ASSERT_TRUE(victim_or.is_ok());
+  size_t before = *victim_or;
+  Remount();
+
+  // GC should not happen.
+  victim_or = fs_->GetSegmentManager().GetGcVictim(GcType::kFgGc, CursegType::kNoCheckType);
+  ASSERT_TRUE(victim_or.is_ok());
+  ASSERT_EQ(before, *victim_or);
+  before = *victim_or;
+  // Punch holes on node segments.
+  size_t num_holes = 0;
+  {
+    fbl::RefPtr<fs::Vnode> vnode;
+    FileTester::Lookup(root_dir_.get(), "test", &vnode);
+    auto dir = fbl::RefPtr<Dir>::Downcast(std::move(vnode));
+    for (size_t i = 1;; i += 2) {
+      if (dir->Unlink(std::string(prefix + std::to_string(i)), false) != ZX_OK) {
+        break;
+      }
+      num_holes++;
+    }
+    dir->Close();
+    FX_LOGS(WARNING) << " deleted : " << num_holes;
+  }
+  Remount();
+
+  // GC should not happen.
+  victim_or = fs_->GetSegmentManager().GetGcVictim(GcType::kFgGc, CursegType::kNoCheckType);
+  ASSERT_TRUE(victim_or.is_ok());
+  ASSERT_EQ(before, *victim_or);
+
+  // Fill holes with data
+  constexpr char buf[kPageSize] = {
+      0,
+  };
+  fbl::RefPtr<fs::Vnode> vnode, dir;
+  FileTester::Lookup(root_dir_.get(), "test", &dir);
+  FileTester::Lookup(fbl::RefPtr<VnodeF2fs>::Downcast(dir).get(), std::string(prefix + "0"),
+                     &vnode);
+  size_t num_blocks = 0;
+  fbl::RefPtr<File> file = fbl::RefPtr<File>::Downcast(std::move(vnode));
+  while (true) {
+    size_t out;
+    zx_status_t ret =
+        FileTester::Write(file.get(), buf, sizeof(buf), num_blocks++ * sizeof(buf), &out);
+    if (ret != ZX_OK || num_blocks >= num_holes / 2) {
+      break;
+    }
+  }
+  file->Close();
+  file.reset();
+  FX_LOGS(WARNING) << " written data blocks : " << num_blocks;
+
+  // Fill holes with vnodes
+  num_blocks = 0;
+  {
+    auto test_dir = fbl::RefPtr<Dir>::Downcast(dir);
+    while (true) {
+      zx::result child_or = test_dir->Create(std::string(prefix + std::to_string(++file_no)),
+                                             fs::CreationType::kFile);
+      if (child_or.is_error()) {
+        break;
+      }
+      child_or->Close();
+      num_blocks++;
+    }
+  }
+  FX_LOGS(WARNING) << " created vnodes : " << num_blocks;
+  dir->Close();
+  dir.reset();
+  Remount();
+
+  // GC ran already.
+  victim_or = fs_->GetSegmentManager().GetGcVictim(GcType::kFgGc, CursegType::kNoCheckType);
+  ASSERT_TRUE(victim_or.is_ok());
+  ASSERT_NE(before, *victim_or);
+}
+
+const std::array<bool, 2> kAllocParams = {false, true};
+INSTANTIATE_TEST_SUITE_P(GcTestWithSsrAndLfs, GcTestWithSsrAndLfs,
+                         ::testing::ValuesIn(kAllocParams));
 
 }  // namespace
 }  // namespace f2fs

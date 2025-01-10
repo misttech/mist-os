@@ -38,6 +38,7 @@ class File : public VnodeF2fs, public fbl::Recyclable<File> {
   zx::result<zx::stream> CreateStream(uint32_t stream_options) final;
   block_t GetBlockAddr(LockedPage& page) final;
   zx_status_t ConvertInlineData();
+  zx::result<LockedPage> FindGcPage(pgoff_t index) final;
 
  private:
   friend FileTester;
