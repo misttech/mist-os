@@ -119,6 +119,7 @@ source_set("driver_runner") {
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_cpp",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp",
     "//sdk/fidl/fuchsia.driver.index:fuchsia.driver.index_cpp",

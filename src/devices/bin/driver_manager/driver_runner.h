@@ -63,6 +63,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   // |Dynamic_linker_args| should be set if dynamic linking is available.
   DriverRunner(fidl::ClientEnd<fuchsia_component::Realm> realm,
+               fidl::ClientEnd<fuchsia_component_sandbox::CapabilityStore> capability_store,
                fidl::ClientEnd<fuchsia_driver_index::DriverIndex> driver_index,
                InspectManager& inspect, LoaderServiceFactory loader_service_factory,
                async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays,
@@ -133,6 +134,10 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   zx::result<uint32_t> RestartNodesColocatedWithDriverUrl(
       std::string_view url, fuchsia_driver_development::RestartRematchFlags rematch_flags);
 
+  void RestartWithDictionary(fidl::StringView moniker,
+                             fuchsia_component_sandbox::wire::DictionaryRef dictionary,
+                             zx::eventpair reset_eventpair);
+
   std::unordered_set<const DriverHost*> DriverHostsWithDriverUrl(std::string_view url);
 
   fpromise::promise<inspect::Inspector> Inspect() const;
@@ -194,6 +199,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
 
   uint64_t next_driver_host_id_ = 0;
   fidl::WireClient<fuchsia_driver_index::DriverIndex> driver_index_;
+  fidl::WireClient<fuchsia_component_sandbox::CapabilityStore> capability_store_;
+  uint64_t cap_id_ = 0;
   LoaderServiceFactory loader_service_factory_;
   fidl::ServerBindingGroup<fuchsia_driver_framework::CompositeNodeManager> manager_bindings_;
   fidl::ServerBindingGroup<fuchsia_driver_token::NodeBusTopology> bus_topo_bindings_;

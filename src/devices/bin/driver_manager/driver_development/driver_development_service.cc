@@ -370,6 +370,20 @@ void DriverDevelopmentService::WaitForBootup(WaitForBootupCompleter::Sync& compl
   driver_runner_.WaitForBootup([completer = completer.ToAsync()]() mutable { completer.Reply(); });
 }
 
+void DriverDevelopmentService::RestartWithDictionary(
+    RestartWithDictionaryRequestView request, RestartWithDictionaryCompleter::Sync& completer) {
+  zx::eventpair endpoint0, endpoint1;
+  zx_status_t status = zx::eventpair::create(0, &endpoint0, &endpoint1);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
+  }
+
+  driver_runner_.RestartWithDictionary(std::move(request->moniker), std::move(request->dictionary),
+                                       std::move(endpoint1));
+  completer.ReplySuccess(std::move(endpoint0));
+}
+
 void DriverDevelopmentService::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_driver_development::Manager> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {

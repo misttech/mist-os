@@ -397,6 +397,9 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
                                          .Build());
   }
 
+  // Copy the dictionary from the primary parent.
+  composite->dictionary_ref_ = primary->dictionary_ref_;
+
   // Copy the offers from each parent.
   std::vector<NodeOffer> node_offers;
   size_t parent_index = 0;
@@ -961,6 +964,9 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   }
 
   child->bus_info_ = std::move(args.bus_info());
+
+  // Copy the dictionary of a parent node down to the child.
+  child->dictionary_ref_ = dictionary_ref_;
 
   child->SetNonCompositeProperties(properties);
 

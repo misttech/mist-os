@@ -301,6 +301,12 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<std::vector<fuchsia_driver_framework::NodeProperty>> GetDeprecatedNodeProperties(
       std::string_view parent_name = "default") const;
 
+  void SetDictionaryRef(std::optional<uint64_t> dictionary_ref) {
+    dictionary_ref_ = dictionary_ref;
+  }
+
+  std::optional<uint64_t> dictionary_ref() { return dictionary_ref_; }
+
   const Collection& collection() const { return collection_; }
 
   const fuchsia_driver_framework::DriverPackageType& driver_package_type() const {
@@ -494,6 +500,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
       properties_dict_;
 
   std::optional<fuchsia_driver_framework::BusInfo> bus_info_;
+
+  // A component framework dictionary that should be provided to the driver
+  // that binds to this node, as well as any children nodes.
+  std::optional<uint64_t> dictionary_ref_;
 
   Collection collection_ = Collection::kNone;
   fuchsia_driver_framework::DriverPackageType driver_package_type_;

@@ -20,6 +20,11 @@
             to: "#testing",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#testing",
+        },
+        {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: "#testing",

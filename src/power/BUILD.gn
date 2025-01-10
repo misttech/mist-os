@@ -32,6 +32,7 @@ group("drivers") {
     "power-manager/testing/fake_driver:fake-cpu-ctrl-component",
     "power-manager/testing/fake_driver:nelson-component",
     "power-manager/testing/fake_root:root",
+    "testing/system-integration/example/test-driver:component",
   ]
 }
 

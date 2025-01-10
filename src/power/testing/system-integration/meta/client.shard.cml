@@ -20,6 +20,10 @@
             name: "fake-suspend",
             url: "fuchsia-boot:///fake-suspend-pkg#meta/fake-suspend.cm",
         },
+        {
+            name: "config-use-suspender",
+            url: "fuchsia-boot:///config-use-suspender#meta/config-use-suspender.cm",
+        },
     ],
     use: [
         {
@@ -30,9 +34,14 @@
             protocol: [
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.BootControl",
                 "test.sagcontrol.State",
             ],
             from: "#system-activity-governor",
+        },
+        {
+            protocol: "test.suspendcontrol.Device",
+            from: "#fake-suspend",
         },
     ],
     offer: [
@@ -50,6 +59,17 @@
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
             to: "#system-activity-governor",
+        },
+        {
+            config: "fuchsia.power.UseSuspender",
+            from: "#config-use-suspender",
+            to: "#system-activity-governor",
+        },
+        {
+            config: "fuchsia.power.WaitForSuspendingToken",
+            from: "void",
+            to: "#system-activity-governor",
+            availability: "optional",
         },
     ],
 }

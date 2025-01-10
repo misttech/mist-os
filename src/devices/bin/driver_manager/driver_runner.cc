@@ -20,6 +20,7 @@
 #include <queue>
 #include <random>
 #include <stack>
+#include <utility>
 
 #include "src/devices/bin/driver_manager/composite_node_spec_impl.h"
 #include "src/devices/lib/log/log.h"
@@ -225,6 +226,43 @@ void PerformBFS(const std::shared_ptr<Node>& starting_node,
   }
 }
 
+void CallStartDriverOnRunner(Runner& runner, Node& node, const std::string& moniker,
+                             std::string_view url,
+                             std::optional<fuchsia_component_sandbox::DictionaryRef> ref,
+                             const std::shared_ptr<BootupTracker>& bootup_tracker) {
+  runner.StartDriverComponent(
+      moniker, url, CollectionName(node.collection()).get(), node.offers(), std::move(ref),
+      [node_weak = node.weak_from_this(), moniker,
+       bootup_tracker = std::weak_ptr<BootupTracker>(bootup_tracker)](
+          zx::result<driver_manager::Runner::StartedComponent> component) {
+        std::shared_ptr node = node_weak.lock();
+        if (!node) {
+          return;
+        }
+
+        if (component.is_error()) {
+          node->CompleteBind(component.take_error());
+          if (auto tracker_ptr = bootup_tracker.lock(); tracker_ptr) {
+            tracker_ptr->NotifyStartComplete(moniker);
+          }
+          return;
+        }
+
+        fidl::Arena arena;
+        node->StartDriver(fidl::ToWire(arena, std::move(component->info)),
+                          std::move(component->controller),
+                          [node_weak, moniker, bootup_tracker](zx::result<> result) {
+                            if (std::shared_ptr node = node_weak.lock(); node) {
+                              node->CompleteBind(result);
+                            }
+
+                            if (auto tracker_ptr = bootup_tracker.lock(); tracker_ptr) {
+                              tracker_ptr->NotifyStartComplete(moniker);
+                            }
+                          });
+      });
+}
+
 }  // namespace
 
 Collection ToCollection(const Node& node, fdf::DriverPackageType package_type) {
@@ -232,13 +270,15 @@ Collection ToCollection(const Node& node, fdf::DriverPackageType package_type) {
   return GetHighestRankingCollection(node, collection);
 }
 
-DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
-                           fidl::ClientEnd<fdi::DriverIndex> driver_index, InspectManager& inspect,
-                           LoaderServiceFactory loader_service_factory,
-                           async_dispatcher_t* dispatcher, bool enable_test_shutdown_delays,
-                           OfferInjector offer_injector,
-                           std::optional<DynamicLinkerArgs> dynamic_linker_args)
+DriverRunner::DriverRunner(
+    fidl::ClientEnd<fcomponent::Realm> realm,
+    fidl::ClientEnd<fuchsia_component_sandbox::CapabilityStore> capability_store,
+    fidl::ClientEnd<fdi::DriverIndex> driver_index, InspectManager& inspect,
+    LoaderServiceFactory loader_service_factory, async_dispatcher_t* dispatcher,
+    bool enable_test_shutdown_delays, OfferInjector offer_injector,
+    std::optional<DynamicLinkerArgs> dynamic_linker_args)
     : driver_index_(std::move(driver_index), dispatcher),
+      capability_store_(std::move(capability_store), dispatcher),
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
       root_node_(std::make_shared<Node>(kRootDeviceName, std::vector<std::weak_ptr<Node>>{}, this,
@@ -473,40 +513,47 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
   node.set_driver_package_type(package_type);
 
   std::weak_ptr node_weak = node.shared_from_this();
-
+  std::string url_string(url.data(), url.size());
   auto moniker = node.MakeComponentMoniker();
-  bootup_tracker_->NotifyNewStartRequest(moniker, std::string(url.data(), url.size()));
+  bootup_tracker_->NotifyNewStartRequest(moniker, url_string);
 
-  runner_.StartDriverComponent(
-      moniker, url, CollectionName(node.collection()).get(), node.offers(),
-      [node_weak, moniker, bootup_tracker = std::weak_ptr<BootupTracker>(bootup_tracker_)](
-          zx::result<driver_manager::Runner::StartedComponent> component) {
-        std::shared_ptr node = node_weak.lock();
-        if (!node) {
-          return;
-        }
+  if (node.dictionary_ref().has_value()) {
+    uint64_t dest = cap_id_++;
+    capability_store_->DictionaryCopy(node.dictionary_ref().value(), dest)
+        .Then(
+            [this, dest, node_weak, moniker, url_string,
+             bootup_tracker = std::weak_ptr<BootupTracker>(bootup_tracker_)](
+                fidl::WireUnownedResult<fuchsia_component_sandbox::CapabilityStore::DictionaryCopy>&
+                    result) {
+              if (!result.ok() || result->is_error()) {
+                LOGF(ERROR, "Failed to copy dictionary.");
+                return;
+              }
 
-        if (component.is_error()) {
-          node->CompleteBind(component.take_error());
-          if (auto tracker_ptr = bootup_tracker.lock(); tracker_ptr) {
-            tracker_ptr->NotifyStartComplete(moniker);
-          }
-          return;
-        }
+              capability_store_->Export(dest).Then(
+                  [this, node_weak, moniker, url_string](
+                      fidl::WireUnownedResult<fuchsia_component_sandbox::CapabilityStore::Export>&
+                          result) {
+                    if (!result.ok() || result->is_error()) {
+                      LOGF(ERROR, "Failed to export dictionary.");
+                      return;
+                    }
 
-        fidl::Arena arena;
-        node->StartDriver(fidl::ToWire(arena, std::move(component->info)),
-                          std::move(component->controller),
-                          [node_weak, moniker, bootup_tracker](zx::result<> result) {
-                            if (std::shared_ptr node = node_weak.lock(); node) {
-                              node->CompleteBind(result);
-                            }
+                    std::shared_ptr node = node_weak.lock();
+                    if (!node) {
+                      return;
+                    }
 
-                            if (auto tracker_ptr = bootup_tracker.lock(); tracker_ptr) {
-                              tracker_ptr->NotifyStartComplete(moniker);
-                            }
-                          });
-      });
+                    CallStartDriverOnRunner(
+                        runner_, *node, moniker, url_string,
+                        fidl::ToNatural(std::move(result->value()->capability.dictionary())),
+                        bootup_tracker_);
+                  });
+            });
+    return zx::ok();
+  }
+
+  CallStartDriverOnRunner(runner_, node, moniker, url, std::nullopt, bootup_tracker_);
   return zx::ok();
 }
 
@@ -781,6 +828,63 @@ zx::result<uint32_t> DriverRunner::RestartNodesColocatedWithDriverUrl(
   });
 
   return zx::ok(static_cast<uint32_t>(driver_hosts.size()));
+}
+
+void DriverRunner::RestartWithDictionary(fidl::StringView moniker,
+                                         fuchsia_component_sandbox::wire::DictionaryRef dictionary,
+                                         zx::eventpair reset_eventpair) {
+  uint64_t imported = cap_id_++;
+  capability_store_
+      ->Import(imported,
+               fuchsia_component_sandbox::wire::Capability::WithDictionary(std::move(dictionary)))
+      .Then([this, moniker = std::string(moniker.get()),
+             reset_eventpair = std::move(reset_eventpair),
+             imported](fidl::WireUnownedResult<fuchsia_component_sandbox::CapabilityStore::Import>&
+                           result) mutable {
+        if (!result.ok() || result->is_error()) {
+          LOGF(ERROR, "RestartWithDictionary failed to import the dictionary.");
+          return;
+        }
+
+        std::shared_ptr<driver_manager::Node> restarted_node = nullptr;
+        PerformBFS(root_node_, [&](const std::shared_ptr<driver_manager::Node>& current) {
+          if (current->MakeComponentMoniker() == moniker) {
+            if (current->dictionary_ref()) {
+              LOGF(
+                  ERROR,
+                  "RestartWithDictionary requested node id already contains a dictionary_ref from another RestartWithDictionary operation.");
+              return false;
+            }
+            ZX_ASSERT_MSG(restarted_node == nullptr,
+                          "Multiple nodes with same moniker not possible.");
+            restarted_node = current;
+            current->SetDictionaryRef(imported);
+            current->RestartNode();
+            return false;
+          }
+
+          return true;
+        });
+
+        if (restarted_node != nullptr) {
+          std::unique_ptr<async::WaitOnce> wait = std::make_unique<async::WaitOnce>(
+              reset_eventpair.release(), ZX_EVENTPAIR_PEER_CLOSED | ZX_EVENTPAIR_SIGNALED);
+          async::WaitOnce* wait_ptr = wait.get();
+          zx_status_t status = wait_ptr->Begin(
+              dispatcher_,
+              [restarted_node = std::move(restarted_node), moved_wait = std::move(wait)](
+                  async_dispatcher_t* dispatcher, async::WaitOnce* wait, zx_status_t status,
+                  const zx_packet_signal_t* signal) {
+                LOGF(INFO, "RestartWithDictionary operation released.");
+                restarted_node->SetDictionaryRef(std::nullopt);
+                restarted_node->RestartNode();
+              });
+
+          if (status != ZX_OK) {
+            LOGF(ERROR, "Failed to Begin async::Wait for RestartWithDictionary.");
+          }
+        }
+      });
 }
 
 std::unordered_set<const DriverHost*> DriverRunner::DriverHostsWithDriverUrl(std::string_view url) {

@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_TESTS_DRIVER_RUNNER_TEST_FIXTURE_H_
 
 #include <fidl/fuchsia.component.decl/cpp/test_base.h>
+#include <fidl/fuchsia.component.sandbox/cpp/test_base.h>
 #include <fidl/fuchsia.component/cpp/test_base.h>
 #include <fidl/fuchsia.driver.framework/cpp/test_base.h>
 #include <fidl/fuchsia.driver.host/cpp/test_base.h>
@@ -148,6 +149,17 @@ class TestRealm : public fidl::testing::TestBase<fuchsia_component::Realm> {
   std::vector<fdecl::ChildRef> destroyed_children_;
 };
 
+class TestCapStore : public fidl::testing::TestBase<fuchsia_component_sandbox::CapabilityStore> {
+ private:
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_component_sandbox::CapabilityStore> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    printf("Not implemented: CapabilityStore::%s\n", name.c_str());
+  }
+};
+
 class TestDirectory final : public fidl::testing::TestBase<fio::Directory> {
  public:
   using OpenHandler =
@@ -275,6 +287,7 @@ class DriverRunnerTestBase : public gtest::TestLoopFixture {
       std::string_view child_name);
 
   fidl::ClientEnd<fuchsia_component::Realm> ConnectToRealm();
+  fidl::ClientEnd<fuchsia_component_sandbox::CapabilityStore> ConnectToCapabilityStore();
 
   FakeDriverIndex CreateDriverIndex();
 
@@ -373,10 +386,12 @@ class DriverRunnerTestBase : public gtest::TestLoopFixture {
 
  private:
   TestRealm realm_;
+  TestCapStore cap_store_;
   TestDirectory driver_host_dir_{dispatcher()};
   TestDirectory driver_dir_{dispatcher()};
   TestDriverHost driver_host_;
   fidl::ServerBindingGroup<fuchsia_component::Realm> realm_bindings_;
+  fidl::ServerBindingGroup<fuchsia_component_sandbox::CapabilityStore> capstore_bindings_;
   fidl::ServerBindingGroup<fdh::DriverHost> driver_host_bindings_;
 
   std::optional<Devfs> devfs_;

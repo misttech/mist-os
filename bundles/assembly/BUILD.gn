@@ -4302,6 +4302,17 @@ assembly_input_bundle("power_framework_testing_sag") {
   ]
 }
 
+# An AIB for our power test related platform drivers.
+assembly_input_bundle("power_test_platform_drivers") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/power/testing/system-integration/example/test-driver:power-system-integration-example-test-driver"
+      driver_components =
+          [ "meta/power-system-integration-example-test-driver.cm" ]
+    },
+  ]
+}
+
 # TODO(https://fxbug.dev/335526423): Remove when migrated to power testing phase 2.
 #
 # Bootstrap shard for the power_framework_testing_sag.

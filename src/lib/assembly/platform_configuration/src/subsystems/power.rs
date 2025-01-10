@@ -73,7 +73,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
 
         if config.enable_non_hermetic_testing {
             context.ensure_build_type_and_feature_set_level(
-                &[BuildType::Eng, BuildType::UserDebug],
+                &[BuildType::Eng],
                 &[
                     FeatureSupportLevel::Bootstrap,
                     FeatureSupportLevel::Utility,
@@ -84,6 +84,7 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
 
             builder.platform_bundle("power_framework_broker");
             builder.platform_bundle("power_framework_testing_sag");
+            builder.platform_bundle("power_test_platform_drivers");
         }
 
         if config.suspend_enabled {

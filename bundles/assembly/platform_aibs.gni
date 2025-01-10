@@ -136,6 +136,7 @@ bootstrap_eng_platform_aib_names = [
   # Power Framework
   "power_framework_testing_sag",
   "power_framework_testing_sag_bootstrap_shard_deprecated",
+  "power_test_platform_drivers",
 
   # Storage
   "fshost_storage_host_fxfs",

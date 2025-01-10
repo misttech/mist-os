@@ -340,6 +340,7 @@
 //src/power/power-manager/testing/fake_driver:fake-temperature2
 //src/power/power-manager/testing/fake_driver:nelson-fake-driver
 //src/power/power-manager/testing/fake_root:root_driver
+//src/power/testing/system-integration/example/test-driver:driver
 //src/storage/fvm/driver:fuchsia_driver
 //src/sys/component_manager/tests/structured_config/client_integration/cpp_driver:receiver_driver
 //src/ui/backlight/drivers/ti-lp8556:ti-lp8556-driver

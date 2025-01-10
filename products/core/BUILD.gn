@@ -46,6 +46,10 @@ _platform_configuration_base = {
     enable_sessions = true
   }
 
+  power = {
+    enable_non_hermetic_testing = true
+  }
+
   setui = {
   }
 

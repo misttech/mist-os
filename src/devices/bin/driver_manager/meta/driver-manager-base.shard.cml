@@ -66,6 +66,10 @@
             protocol: "fuchsia.component.Realm",
         },
         {
+            protocol: "fuchsia.component.sandbox.CapabilityStore",
+            from: "framework",
+        },
+        {
             config: "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",
             key: "delay_fallback_until_base_drivers_indexed",
             availability: "optional",

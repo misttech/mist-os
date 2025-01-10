@@ -36,6 +36,7 @@ class Runner : public fidl::WireServer<fuchsia_component_runner::ComponentRunner
 
   void StartDriverComponent(std::string_view moniker, std::string_view url,
                             std::string_view collection_name, const std::vector<NodeOffer>& offers,
+                            std::optional<fuchsia_component_sandbox::DictionaryRef> dictionary_ref,
                             StartCallback callback);
 
   const fidl::WireClient<fuchsia_component::Realm>& realm() const { return realm_; }

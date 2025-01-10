@@ -11,5 +11,9 @@
     },
     use: [
         { protocol: "fuchsia.driver.development.Manager" },
+        {
+            protocol: "fuchsia.component.sandbox.CapabilityStore",
+            from: "framework",
+        },
     ],
 }

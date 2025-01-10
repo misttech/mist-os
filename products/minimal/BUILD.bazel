@@ -33,6 +33,9 @@ _PRODUCT_CONFIG_BASE_JSON = {
                 INPUT_DEVICE_TYPE.TOUCHSCREEN,
             ],
         },
+        "power": {
+            "enable_non_hermetic_testing": True,
+        },
     },
     "product": {
         "build_info": DEFAULT_PRODUCT_BUILD_INFO,
