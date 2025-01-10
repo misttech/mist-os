@@ -709,6 +709,13 @@ class VMPLCursor {
     return ZX_OK;
   }
 
+  // Returns the offset of the |current| position of the cursor. This is invalid to call if
+  // |current| is returning a nullptr.
+  uint64_t offset(uint64_t list_skew) const {
+    DEBUG_ASSERT(valid());
+    return node_->obj_offset_ - list_skew + (static_cast<uint64_t>(index_) * PAGE_SIZE);
+  }
+
  private:
   static constexpr size_t kPageFanOut = VmPageListNode::kPageFanOut;
 
@@ -869,6 +876,18 @@ class VmPageList final {
                                                       end_offset);
   }
 
+  // similar to ForEveryPageInRange but uses a valid VMPLCursor as the starting point.
+  template <typename F>
+  zx_status_t ForEveryPageInCursorRange(F per_page_func, VMPLCursor cursor,
+                                        uint64_t end_offset) const {
+    const uint64_t start_offset = cursor.offset(list_skew_);
+    if (start_offset >= end_offset) {
+      return ZX_OK;
+    }
+    return ForEveryPageInRangeInternal<const VmPageOrMarker*, NodeCheck::Skip>(
+        this, per_page_func, cursor.node_, start_offset, end_offset);
+  }
+
   // similar to ForEveryPageInRange, but the per_page_func gets called with a VmPageOrMarkerRef
   // instead of a const VmPageOrMarker*, allowing for limited mutation.
   template <typename F>
@@ -960,6 +979,19 @@ class VmPageList final {
       return VMPLCursor();
     }
     return VMPLCursor(ktl::move(pln), static_cast<uint>(NodeIndex(offset)));
+  }
+
+  // Similar to `LookupMutableCursor` but does a lower_bound search instead of a find, returning the
+  // first slot >= offset, if any exists.
+  VMPLCursor LookupNearestMutableCursor(uint64_t offset) {
+    // lookup the tree node that holds this offset or a larger one.
+    const uint64_t node_offset = NodeOffset(offset);
+    NodeList::iterator pln = list_.lower_bound(node_offset);
+    if (!pln.IsValid()) {
+      return VMPLCursor();
+    }
+    const uint64_t index = pln->offset() == node_offset ? NodeIndex(offset) : 0;
+    return VMPLCursor(ktl::move(pln), static_cast<uint>(index));
   }
 
   // The interval handling flag to be used by LookupOrAllocate. See comments near LookupOrAllocate.
