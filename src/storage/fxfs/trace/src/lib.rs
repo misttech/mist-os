@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub use cstr;
 pub use fxfs_trace_macros::*;
 pub use storage_trace::{self, TraceFutureExt};
+
+#[doc(hidden)]
+pub mod __reexport {
+    pub use cstringify::cstringify;
+}
 
 #[macro_export]
 macro_rules! duration {

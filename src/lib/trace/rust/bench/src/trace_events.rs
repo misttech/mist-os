@@ -2,15 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use cstr::cstr;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_trace as trace;
 use fuchsia_trace::Scope;
 use std::time::Duration;
 
+#[doc(hidden)]
+pub mod __reexport {
+    pub use cstringify::cstringify;
+}
+
 macro_rules! bench_trace_record_fn {
     ($bench:ident, $name:ident $(, $arg:expr)? $(, args: $key:expr => $val:expr)?) => {
-        let name = cstr!(stringify!($name));
+        let name = $crate::__reexport::cstringify!($name);
         $bench = $bench
             .with_function(
                 concat!(stringify!($name), "/0Args"),
@@ -44,7 +48,7 @@ macro_rules! bench_trace_record_fn {
 
 macro_rules! bench_async_trace_record_fn {
     ($bench:ident, $name:ident) => {
-        let name = cstr!(stringify!($name));
+        let name = $crate::__reexport::cstringify!($name);
         $bench = $bench
             .with_function(
                 concat!(stringify!($name), "/0Args"),

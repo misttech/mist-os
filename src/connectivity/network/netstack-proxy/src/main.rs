@@ -14,7 +14,6 @@
 //! extract out the capabilities that are routed to netstack-proxy that are not
 //! used by netstack itself.
 
-use cstr::cstr;
 use fidl::endpoints::DiscoverableProtocolMarker;
 
 use vfs::directory::entry_container::Directory;
@@ -35,12 +34,8 @@ pub async fn main() -> std::process::ExitCode {
 
     println!("netstack migration proxy using version {current_boot_version:?}");
     let bin_path = match current_boot_version {
-        fnet_migration::NetstackVersion::Netstack2 => {
-            cstr!("/pkg/bin/netstack")
-        }
-        fnet_migration::NetstackVersion::Netstack3 => {
-            cstr!("/pkg/bin/netstack3")
-        }
+        fnet_migration::NetstackVersion::Netstack2 => c"/pkg/bin/netstack",
+        fnet_migration::NetstackVersion::Netstack3 => c"/pkg/bin/netstack3",
     };
 
     let ns = fdio::Namespace::installed().expect("failed to get namespace");
@@ -116,8 +111,7 @@ pub async fn main() -> std::process::ExitCode {
         server_end,
     );
 
-    actions
-        .push(fdio::SpawnAction::add_namespace_entry(cstr!("/svc"), svc_dir.into_channel().into()));
+    actions.push(fdio::SpawnAction::add_namespace_entry(c"/svc", svc_dir.into_channel().into()));
 
     // Pass down the configuration VMO if we have it.
     let config_vmo_handle_info = fuchsia_runtime::HandleType::ComponentConfigVmo.into();

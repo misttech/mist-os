@@ -15,7 +15,6 @@ use crate::ddk_converter::{get_rssi_dbm, softmac_key_configuration_from_mlme};
 use crate::device::DeviceOps;
 use crate::disconnect::LocallyInitiated;
 use crate::error::Error;
-use cstr::cstr;
 use fuchsia_trace::Id as TraceId;
 use ieee80211::{Bssid, MacAddr, MacAddrBytes};
 use log::{debug, error, info, trace, warn};
@@ -666,7 +665,7 @@ impl Associated {
         data_frame: mac::DataFrame<B>,
         async_id: TraceId,
     ) {
-        const MSDU_TRACE_NAME: &'static std::ffi::CStr = cstr!("States::on_data_frame => MSDU");
+        const MSDU_TRACE_NAME: &'static std::ffi::CStr = c"States::on_data_frame => MSDU";
 
         wtrace::duration!(c"States::on_data_frame");
 

@@ -16,6 +16,7 @@ group("tests") {
     "cobalt:tests",
     "containers/cpp:containers_cpp_unittests($host_toolchain)",
     "containers/cpp:tests",
+    "cstringify:tests",
     "ddk:tests",
     "ddktl:tests",
     "debug:tests",
