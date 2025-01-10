@@ -9,6 +9,7 @@
 #include <lib/ddk/hw/arch_ops.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/clock.h>
@@ -671,9 +672,7 @@ void Dwc2::HandleEp0TransferComplete(bool is_in) {
           HandleEp0Status(false);
         } else {
           auto length = ep->req_length - ep->req_offset;
-          if (length > 64) {
-            length = 64;
-          }
+          length = std::min<uint32_t>(length, 64);
 
           // It's possible the data to be transmitted never makes it to the host. For all but the
           // last packet's worth of data, the core handles retransmission internally. To prepare to
@@ -981,10 +980,15 @@ zx_status_t Dwc2::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
-  pdev_ = ddk::PDevFidl::FromFragment(parent());
-  if (!pdev_.is_valid()) {
-    zxlogf(ERROR, "Dwc2::Create: could not get platform device protocol");
-    return ZX_ERR_NOT_SUPPORTED;
+  fdf::PDev pdev;
+  {
+    zx::result result =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>("pdev");
+    if (result.is_error()) {
+      zxlogf(ERROR, "Failed to connect to platform device: %s", result.status_string());
+      return result.status_value();
+    }
+    pdev = fdf::PDev{std::move(result.value())};
   }
 
   // USB PHY protocol is optional.
@@ -1006,24 +1010,28 @@ zx_status_t Dwc2::Init(const dwc2_config::Config& config) {
     return ZX_ERR_INTERNAL;
   }
 
-  status = pdev_.MapMmio(0, &mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Dwc2::Init MapMmio failed: %d", status);
-    return status;
+  zx::result mmio = pdev.MapMmio(0);
+  if (mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map mmio: %s", mmio.status_string());
+    return mmio.status_value();
   }
+  mmio_ = std::move(mmio.value());
 
   // If suspend is enabled, set interrupt to wakeable.
-  status = pdev_.GetInterrupt(0, config.enable_suspend() ? ZX_INTERRUPT_WAKE_VECTOR : 0, &irq_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Dwc2::Init GetInterrupt failed: %d", status);
-    return status;
+  zx::result interrupt =
+      pdev.GetInterrupt(0, config.enable_suspend() ? ZX_INTERRUPT_WAKE_VECTOR : 0);
+  if (interrupt.is_error()) {
+    zxlogf(ERROR, "Failed to get interrupt: %s", interrupt.status_string());
+    return interrupt.status_value();
   }
+  irq_ = std::move(interrupt.value());
 
-  status = pdev_.GetBti(0, &bti_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Dwc2::Init GetBti failed: %d", status);
-    return status;
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    zxlogf(ERROR, "Failed to get bti: %s", bti.status_string());
+    return bti.status_value();
   }
+  bti_ = std::move(bti.value());
 
   status = ep0_buffer_.Init(bti_.get(), UINT16_MAX, IO_BUFFER_RW | IO_BUFFER_CONTIG);
   if (status != ZX_OK) {
@@ -1108,7 +1116,8 @@ int Dwc2::IrqThread() {
     irq_dispatch_timestamp_ = zx::clock::get_boot();
     if (wait_res == ZX_ERR_CANCELED) {
       break;
-    } else if (wait_res != ZX_OK) {
+    }
+    if (wait_res != ZX_OK) {
       zxlogf(ERROR, "dwc_usb: irq wait failed, retcode = %d", wait_res);
     }
 
@@ -1339,7 +1348,8 @@ zx_status_t Dwc2::DciIntfWrapControl(const usb_setup_t* setup, const uint8_t* wr
   auto result = std::get<DciInterfaceFidlClient>(*dci_intf_).buffer(arena)->Control(fsetup, fwrite);
   if (!result.ok()) {
     return ZX_ERR_INTERNAL;  // framework error.
-  } else if (result->is_error()) {
+  }
+  if (result->is_error()) {
     return result->error_value();
   }
 

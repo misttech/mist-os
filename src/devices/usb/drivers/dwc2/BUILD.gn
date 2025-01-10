@@ -31,6 +31,7 @@ source_set("common") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   deps = [
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.designware.platform:fuchsia.designware.platform_cpp",
     "//src/devices/lib/driver",
@@ -50,7 +51,6 @@ source_set("common") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fit",
-    "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:dwc2",
