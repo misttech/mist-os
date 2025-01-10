@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/connectivity/network/mdns/service/meta/netemul-test.shard.cml" ],
+    include: [ "//src/connectivity/network/mdns/service/meta/netemul-test-ns3.shard.cml" ],
     program: {
         netstacks: [
             {

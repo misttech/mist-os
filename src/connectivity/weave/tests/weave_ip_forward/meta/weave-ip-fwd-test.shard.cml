@@ -42,37 +42,13 @@
             name: "sync-manager",
             url: "#meta/sync-manager.cm",
         },
-
-        // ================== fuchsia node ==================
         {
             name: "fuchsia-node",
             url: "#meta/fuchsia-node.cm",
         },
         {
-            name: "fuchsia-netstack",
-            url: "#meta/configurable-netstack-netstack2.cm",
-        },
-
-        // =================== weave node ===================
-        {
             name: "weave-node",
             url: "#meta/weave-node.cm",
-        },
-        {
-            name: "weave-netstack",
-            url: "#meta/configurable-netstack-netstack2.cm",
-        },
-
-        // =================== wlan node ====================
-        {
-            name: "wlan-netstack",
-            url: "#meta/configurable-netstack-netstack2.cm",
-        },
-
-        // =================== wpan node ====================
-        {
-            name: "wpan-netstack",
-            url: "#meta/configurable-netstack-netstack2.cm",
         },
     ],
     use: [
