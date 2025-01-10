@@ -324,6 +324,15 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         cb(&mut arp, &mut locked)
     }
 
+    fn addr_on_interface(&mut self, device_id: &EthernetDeviceId<BC>, addr: Ipv4Addr) -> bool {
+        let mut state = integration::device_state(self, device_id);
+        let mut state = state.cast();
+        let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
+        // NB: This assignment is satisfying borrow checking on state.
+        let x = ipv4.iter().map(|addr| addr.addr().addr()).any(|a| a == addr);
+        x
+    }
+
     fn get_protocol_addr(
         &mut self,
         _bindings_ctx: &mut BC,
