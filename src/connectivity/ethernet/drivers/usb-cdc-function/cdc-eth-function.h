@@ -119,9 +119,9 @@ class UsbCdc : public UsbCdcType,
   usb_speed_t speed_ = 0;
   // TX lock -- Must be acquired before ethernet_mutex
   // when both locks are held.
-  std::mutex* tx_mutex_ = &bulk_in_ep_.mutex_;
-  std::mutex* rx_mutex_ = &bulk_out_ep_.mutex_;
-  std::mutex* intr_mutex_ = &intr_ep_.mutex_;
+  std::mutex& tx_mutex_ = bulk_in_ep_.mutex_;
+  std::mutex& rx_mutex_ = bulk_out_ep_.mutex_;
+  std::mutex& intr_mutex_ = intr_ep_.mutex_;
 
   uint8_t bulk_out_addr_ = 0;
   uint8_t bulk_in_addr_ = 0;
