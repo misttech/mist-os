@@ -436,7 +436,7 @@ fit::result<int16_t, fsocket::wire::MarkDomain> into_fidl_mark_domain(
     case ZXIO_SOCKET_MARK_DOMAIN_2:
       return fit::success(fsocket::wire::MarkDomain::kMark2);
     default:
-      return fit::error(static_cast<int16_t>(EINVAL));
+      return fit::as_error<int16_t>(EINVAL);
   }
 }
 
@@ -476,22 +476,23 @@ class SetSockOptProcessor {
   SetSockOptProcessor(const void* optval, socklen_t optlen) : optval_(optval), optlen_(optlen) {}
 
   template <typename T>
-  int16_t Get(T& out) {
+  using GetResult = fit::result<int16_t, T>;
+
+  template <typename T>
+  GetResult<T> Get() {
     if (optlen_ < sizeof(T)) {
-      return EINVAL;
+      return fit::as_error<int16_t>(EINVAL);
     }
-    memcpy(&out, optval_, sizeof(T));
-    return 0;
+    return fit::success(fbl::UnalignedLoad<T>(optval_));
   }
 
   template <typename T, typename F>
   SockOptResult Process(F f) {
-    T v;
-    int16_t result = Get(v);
-    if (result) {
-      return SockOptResult::Errno(result);
+    auto result = Get<T>();
+    if (result.is_error()) {
+      return SockOptResult::Errno(result.error_value());
     }
-    return SockOptResult::FromFidlResponse(f(std::move(v)));
+    return SockOptResult::FromFidlResponse(f(result.value()));
   }
 
  private:
@@ -500,47 +501,46 @@ class SetSockOptProcessor {
 };
 
 template <>
-int16_t SetSockOptProcessor::Get(fidl::StringView& out) {
+SetSockOptProcessor::GetResult<fidl::StringView> SetSockOptProcessor::Get() {
   const char* optval = static_cast<const char*>(optval_);
-  out = fidl::StringView::FromExternal(optval, strnlen(optval, optlen_));
-  return 0;
+  return fit::success(fidl::StringView::FromExternal(optval, strnlen(optval, optlen_)));
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(bool& out) {
-  int32_t i;
-  int16_t r = Get(i);
-  out = i != 0;
-  return r;
+SetSockOptProcessor::GetResult<bool> SetSockOptProcessor::Get() {
+  auto r = Get<int32_t>();
+  if (r.is_error())
+    return r;
+  return fit::success(r.value() != 0);
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(uint32_t& out) {
-  int32_t& alt = *reinterpret_cast<int32_t*>(&out);
-  if (int16_t r = Get(alt); r) {
+SetSockOptProcessor::GetResult<uint32_t> SetSockOptProcessor::Get() {
+  auto r = Get<int32_t>();
+  if (r.is_error()) {
     return r;
   }
-  if (alt < 0) {
-    return EINVAL;
+  if (r.value() < 0) {
+    return fit::as_error<int16_t>(EINVAL);
   }
-  return 0;
+  return fit::success<uint32_t>(r.value());
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(fsocket::wire::OptionalUint8& out) {
-  int32_t i;
-  if (int16_t r = Get(i); r) {
-    return r;
+SetSockOptProcessor::GetResult<fsocket::wire::OptionalUint8> SetSockOptProcessor::Get() {
+  auto r = Get<int32_t>();
+  if (r.is_error()) {
+    return r.take_error();
   }
+  auto i = r.value();
   if (i < -1 || i > std::numeric_limits<uint8_t>::max()) {
-    return EINVAL;
+    return fit::as_error<int16_t>(EINVAL);
   }
   if (i == -1) {
-    out = fsocket::wire::OptionalUint8::WithUnset({});
+    return fit::success(fsocket::wire::OptionalUint8::WithUnset({}));
   } else {
-    out = fsocket::wire::OptionalUint8::WithValue(static_cast<uint8_t>(i));
+    return fit::success(fsocket::wire::OptionalUint8::WithValue(static_cast<uint8_t>(i)));
   }
-  return 0;
 }
 
 // Like OptionalUint8, but permits truncation to a single byte.
@@ -549,80 +549,77 @@ struct OptionalUint8CharAllowed {
 };
 
 template <>
-int16_t SetSockOptProcessor::Get(OptionalUint8CharAllowed& out) {
+SetSockOptProcessor::GetResult<OptionalUint8CharAllowed> SetSockOptProcessor::Get() {
   if (optlen_ == sizeof(uint8_t)) {
-    out.inner = fsocket::wire::OptionalUint8::WithValue(*static_cast<const uint8_t*>(optval_));
-    return 0;
+    return fit::success(
+        fsocket::wire::OptionalUint8::WithValue(*static_cast<const uint8_t*>(optval_)));
   }
-  return Get(out.inner);
+  return Get<fsocket::wire::OptionalUint8>();
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(fsocket::wire::IpMulticastMembership& out) {
-  union {
-    struct ip_mreqn reqn;
-    struct ip_mreq req;
-  } r;
-  struct in_addr* local;
-  struct in_addr* mcast;
+SetSockOptProcessor::GetResult<fsocket::wire::IpMulticastMembership> SetSockOptProcessor::Get() {
+  struct in_addr local;
+  struct in_addr mcast;
+  fsocket::wire::IpMulticastMembership out;
   if (optlen_ < sizeof(struct ip_mreqn)) {
-    if (Get(r.req) != 0) {
-      return EINVAL;
+    auto req = Get<struct ip_mreq>();
+    if (req.is_error()) {
+      return fit::as_error<int16_t>(EINVAL);
     }
     out.iface = 0;
-    local = &r.req.imr_interface;
-    mcast = &r.req.imr_multiaddr;
+    local = req->imr_interface;
+    mcast = req->imr_multiaddr;
   } else {
-    if (Get(r.reqn) != 0) {
-      return EINVAL;
+    auto reqn = Get<struct ip_mreqn>();
+    if (reqn.is_error()) {
+      return fit::as_error<int16_t>(EINVAL);
     }
-    out.iface = r.reqn.imr_ifindex;
-    local = &r.reqn.imr_address;
-    mcast = &r.reqn.imr_multiaddr;
+    out.iface = reqn->imr_ifindex;
+    local = reqn->imr_address;
+    mcast = reqn->imr_multiaddr;
   }
-  static_assert(sizeof(out.local_addr.addr) == sizeof(*local));
-  memcpy(out.local_addr.addr.data(), local, sizeof(*local));
-  static_assert(sizeof(out.mcast_addr.addr) == sizeof(*mcast));
-  memcpy(out.mcast_addr.addr.data(), mcast, sizeof(*mcast));
-  return 0;
+  static_assert(sizeof(out.local_addr.addr) == sizeof(local));
+  memcpy(out.local_addr.addr.data(), &local, sizeof(local));
+  static_assert(sizeof(out.mcast_addr.addr) == sizeof(mcast));
+  memcpy(out.mcast_addr.addr.data(), &mcast, sizeof(mcast));
+  return fit::success(out);
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(fsocket::wire::Ipv6MulticastMembership& out) {
-  struct ipv6_mreq req;
-  if (Get(req) != 0) {
-    return EINVAL;
+SetSockOptProcessor::GetResult<fsocket::wire::Ipv6MulticastMembership> SetSockOptProcessor::Get() {
+  auto req = Get<struct ipv6_mreq>();
+  if (req.is_error()) {
+    return fit::as_error<int16_t>(EINVAL);
   }
-  out.iface = req.ipv6mr_interface;
-  static_assert(std::size(req.ipv6mr_multiaddr.s6_addr) == decltype(out.mcast_addr.addr)::size());
-  std::copy(std::begin(req.ipv6mr_multiaddr.s6_addr), std::end(req.ipv6mr_multiaddr.s6_addr),
+  fsocket::wire::Ipv6MulticastMembership out;
+  out.iface = req->ipv6mr_interface;
+  static_assert(sizeof(req->ipv6mr_multiaddr.s6_addr) == decltype(out.mcast_addr.addr)::size());
+  std::copy(std::begin(req->ipv6mr_multiaddr.s6_addr), std::end(req->ipv6mr_multiaddr.s6_addr),
             out.mcast_addr.addr.begin());
-  return 0;
+  return fit::success(out);
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(frawsocket::wire::Icmpv6Filter& out) {
-  struct icmp6_filter filter;
-  if (Get(filter) != 0) {
-    return EINVAL;
+SetSockOptProcessor::GetResult<frawsocket::wire::Icmpv6Filter> SetSockOptProcessor::Get() {
+  auto filter = Get<struct icmp6_filter>();
+  if (filter.is_error()) {
+    return fit::as_error<int16_t>(EINVAL);
   }
 
-  static_assert(sizeof(filter) == sizeof(out.blocked_types));
-  memcpy(out.blocked_types.data(), &filter, sizeof(filter));
-  return 0;
+  static_assert(sizeof(filter.value()) == sizeof(frawsocket::wire::Icmpv6Filter::blocked_types));
+  return fit::success(fbl::UnalignedLoad<frawsocket::wire::Icmpv6Filter>(&filter.value()));
 }
 
 template <>
-int16_t SetSockOptProcessor::Get(fsocket::wire::TcpCongestionControl& out) {
+SetSockOptProcessor::GetResult<fsocket::wire::TcpCongestionControl> SetSockOptProcessor::Get() {
   if (strncmp(static_cast<const char*>(optval_), kCcCubic, optlen_) == 0) {
-    out = fsocket::wire::TcpCongestionControl::kCubic;
-    return 0;
+    return fit::success(fsocket::wire::TcpCongestionControl::kCubic);
   }
   if (strncmp(static_cast<const char*>(optval_), kCcReno, optlen_) == 0) {
-    out = fsocket::wire::TcpCongestionControl::kReno;
-    return 0;
+    return fit::success(fsocket::wire::TcpCongestionControl::kReno);
   }
-  return ENOENT;
+  return fit::as_error<int16_t>(ENOENT);
 }
 
 struct IntOrChar {
@@ -630,34 +627,33 @@ struct IntOrChar {
 };
 
 template <>
-int16_t SetSockOptProcessor::Get(IntOrChar& out) {
-  if (Get(out.value) == 0) {
-    return 0;
+SetSockOptProcessor::GetResult<IntOrChar> SetSockOptProcessor::Get() {
+  auto value = Get<int32_t>();
+  if (value.is_ok()) {
+    return value.take_value();
   }
   if (optlen_ == 0) {
-    return EINVAL;
+    return fit::as_error<int16_t>(EINVAL);
   }
-  out.value = *static_cast<const uint8_t*>(optval_);
-  return 0;
+  return fit::success(*static_cast<const uint8_t*>(optval_));
 }
 
 // TODO(https://fxbug.dev/384115233): Update after the API is stabilized.
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 template <>
-int16_t SetSockOptProcessor::Get(FidlSocketMarkWithDomain& out) {
-  zxio_socket_mark_t socket_mark{};
-  if (Get(socket_mark) != 0) {
-    return EINVAL;
+SetSockOptProcessor::GetResult<FidlSocketMarkWithDomain> SetSockOptProcessor::Get() {
+  auto socket_mark = Get<zxio_socket_mark_t>();
+  if (socket_mark.is_error()) {
+    return fit::as_error<int16_t>(EINVAL);
   }
-  auto fidl_domain_result = into_fidl_mark_domain(socket_mark.domain);
+  auto fidl_domain_result = into_fidl_mark_domain(socket_mark->domain);
   if (fidl_domain_result.is_error()) {
-    return fidl_domain_result.error_value();
+    return fidl_domain_result.take_error();
   }
-  out.domain = fidl_domain_result.value();
-  out.mark = socket_mark.is_present
-                 ? fsocket::wire::OptionalUint32::WithValue(socket_mark.value)
-                 : fsocket::wire::OptionalUint32::WithUnset(fsocket::wire::Empty{});
-  return 0;
+  return fit::success(FidlSocketMarkWithDomain(
+      socket_mark->is_present ? fsocket::wire::OptionalUint32::WithValue(socket_mark->value)
+                              : fsocket::wire::OptionalUint32::WithUnset(fsocket::wire::Empty{}),
+      fidl_domain_result.value()));
 }
 #endif
 
