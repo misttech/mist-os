@@ -42,11 +42,12 @@ MockCoordinatorListener::~MockCoordinatorListener() {
 
 void MockCoordinatorListener::Bind(
     fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> server_end,
-    async_dispatcher_t& dispatcher) {
-  ZX_DEBUG_ASSERT(server_end.is_valid());
-  ZX_DEBUG_ASSERT(!binding_.has_value());
-  binding_dispatcher_ = &dispatcher;
-  binding_ = fidl::BindServer(&dispatcher, std::move(server_end), this);
+    async_dispatcher_t* dispatcher) {
+  ZX_ASSERT(server_end.is_valid());
+  ZX_ASSERT(dispatcher != nullptr);
+  ZX_ASSERT(!binding_.has_value());
+  binding_dispatcher_ = dispatcher;
+  binding_ = fidl::BindServer(dispatcher, std::move(server_end), this);
 }
 
 void MockCoordinatorListener::OnDisplaysChanged(OnDisplaysChangedRequestView request,

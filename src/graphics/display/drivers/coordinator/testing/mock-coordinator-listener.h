@@ -37,9 +37,11 @@ class MockCoordinatorListener
   MockCoordinatorListener& operator=(MockCoordinatorListener&&) = delete;
 
   // Must be only called once for each `MockCoordinatorListener` instance.
-  // `server_end` must be valid.
+  //
+  // `server_end` must be valid. `dispatcher` must be non-null and must be
+  // running throughout the client's lifetime.
   void Bind(fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> server_end,
-            async_dispatcher_t& dispatcher);
+            async_dispatcher_t* dispatcher);
 
   // [`fuchsia.hardware.display/CoordinatorListener`]:
   void OnDisplaysChanged(OnDisplaysChangedRequestView request,

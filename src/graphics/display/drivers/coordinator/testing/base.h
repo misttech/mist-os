@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/fit/function.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/time.h>
@@ -23,16 +22,20 @@ namespace display_coordinator {
 
 class TestBase : public testing::Test {
  public:
-  TestBase() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  TestBase();
+  ~TestBase() override;
 
   void SetUp() override;
   void TearDown() override;
 
-  Controller* controller() { return tree_->coordinator_controller(); }
-  fake_display::FakeDisplay* display() { return tree_->display(); }
+  // Guaranteed to be non-null. The Coordinator is guaranteed to be alive
+  // throughout the entire test case, between SetUp() and TearDown().
+  Controller* CoordinatorController();
+
+  fake_display::FakeDisplay& FakeDisplayEngine();
 
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> ConnectToSysmemAllocatorV2();
-  const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_fidl();
+  const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& DisplayProviderClient();
 
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
@@ -48,7 +51,7 @@ class TestBase : public testing::Test {
  private:
   async::Loop loop_;
 
-  std::unique_ptr<display::FakeDisplayStack> tree_;
+  std::unique_ptr<display::FakeDisplayStack> fake_display_stack_;
 };
 
 }  // namespace display_coordinator

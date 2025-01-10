@@ -11,10 +11,8 @@
 #include <lib/fidl/cpp/message.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/event.h>
+#include <lib/zx/result.h>
 #include <zircon/types.h>
-
-#include <initializer_list>
-#include <memory>
 
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
@@ -59,9 +57,11 @@ class TestFidlClient {
 
   ~TestFidlClient();
 
+  // `coordinator_listener_dispatcher` must be non-null and must be running
+  // throughout the test.
   zx::result<> OpenCoordinator(
       const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
-      ClientPriority client_priority, async_dispatcher_t& coordinator_listener_dispatcher);
+      ClientPriority client_priority, async_dispatcher_t* coordinator_listener_dispatcher);
 
   bool HasOwnershipAndValidDisplay() const;
 

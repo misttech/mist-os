@@ -52,7 +52,9 @@ display::DisplayId TestFidlClient::display_id() const { return displays_[0].id_;
 
 zx::result<> TestFidlClient::OpenCoordinator(const fidl::WireSyncClient<fhd::Provider>& provider,
                                              ClientPriority client_priority,
-                                             async_dispatcher_t& coordinator_listener_dispatcher) {
+                                             async_dispatcher_t* coordinator_listener_dispatcher) {
+  ZX_ASSERT(coordinator_listener_dispatcher != nullptr);
+
   auto [dc_client, dc_server] = fidl::Endpoints<fhd::Coordinator>::Create();
   auto [coordinator_listener_client, coordinator_listener_server] =
       fidl::Endpoints<fhd::CoordinatorListener>::Create();

@@ -38,7 +38,7 @@ class LayerTest : public TestBase {
 
   fbl::RefPtr<Image> CreateReadyImage() {
     zx::result<display::DriverImageId> import_result =
-        display()->ImportVmoImageForTesting(zx::vmo(0), 0);
+        FakeDisplayEngine().ImportVmoImageForTesting(zx::vmo(0), 0);
     EXPECT_OK(import_result);
     EXPECT_NE(import_result.value(), display::kInvalidDriverImageId);
 
@@ -47,8 +47,8 @@ class LayerTest : public TestBase {
         .height = kDisplayHeight,
         .tiling_type = display::ImageTilingType::kLinear,
     });
-    fbl::RefPtr<Image> image = fbl::AdoptRef(
-        new Image(controller(), image_metadata, import_result.value(), nullptr, ClientId(1)));
+    fbl::RefPtr<Image> image = fbl::AdoptRef(new Image(
+        CoordinatorController(), image_metadata, import_result.value(), nullptr, ClientId(1)));
     image->id = next_image_id_++;
     image->Acquire();
     return image;
