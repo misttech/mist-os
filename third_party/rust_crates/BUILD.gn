@@ -529,7 +529,7 @@ group("munge") {
 import("//src/lib/fuchsia_nix/nix_visibility.gni")
 
 group("nix") {
-  public_deps = [ ":nix-v0_26_2" ]
+  public_deps = [ ":nix-v0_29_0" ]
 
   visibility = nix_visibility
 }
@@ -9022,9 +9022,7 @@ rust_library("nix-v0_26_2") {
     "--cfg=feature=\"zerocopy\"",
   ]
 
-  visibility = []
-  visibility += [ ":*" ]
-  visibility += [ "//third_party/rust_crates/compat/rustyline:*" ]
+  visibility = [ ":*" ]
 
   applicable_licenses = [ ":nix-v0_26_2.license" ]
 }
@@ -9067,6 +9065,68 @@ rust_library("nix-v0_27_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":nix-v0_27_1.license" ]
+}
+
+license("nix-v0_29_0.license") {
+  public_package_name = "nix"
+  license_files = [ "//third_party/rust_crates/vendor/nix-0.29.0/LICENSE" ]
+}
+
+rust_library("nix-v0_29_0") {
+  crate_name = "nix"
+  crate_root = "//third_party/rust_crates/vendor/nix-0.29.0/src/lib.rs"
+  output_name = "nix-667a724b6458b815"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":libc-v0_2_158" ]
+  deps += [ ":bitflags-v2_7_0" ]
+  deps += [ ":cfg-if-v1_0_0" ]
+  deps += [ ":memoffset-v0_9_1" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=667a724b6458b815",
+    "-Cextra-filename=-667a724b6458b815",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"feature\"",
+    "--cfg=feature=\"fs\"",
+    "--cfg=feature=\"hostname\"",
+    "--cfg=feature=\"memoffset\"",
+    "--cfg=feature=\"net\"",
+    "--cfg=feature=\"process\"",
+    "--cfg=feature=\"signal\"",
+    "--cfg=feature=\"socket\"",
+    "--cfg=feature=\"user\"",
+  ]
+  if (false) {
+    rustflags += [
+      "--cfg=bsd",
+      "--cfg=freebsd",
+      "--cfg=freebsdlike",
+    ]
+  }
+  if (current_os == "linux") {
+    rustflags += [
+      "--cfg=linux",
+      "--cfg=linux_android",
+    ]
+  }
+  if (current_os == "mac") {
+    rustflags += [
+      "--cfg=apple_targets",
+      "--cfg=bsd",
+      "--cfg=macos",
+    ]
+  }
+
+  visibility = []
+  visibility += [ ":*" ]
+
+  applicable_licenses = [ ":nix-v0_29_0.license" ]
 }
 
 license("nom-v7_1_3.license") {

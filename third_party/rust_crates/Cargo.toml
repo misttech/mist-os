@@ -148,7 +148,7 @@ miniz_oxide = "0.3.6"
 mock-omaha-server = { version = "0.3.3", default-features = false }
 mockall = "0.9"
 munge = "0.4.1"
-nix = "0.26.2"
+nix = { version = "0.29.0", features = ["feature", "fs", "hostname", "net", "process", "signal", "user"] }
 nom = { version = "7.1.3", default-features = false, features = ["std"] }
 nom_locate = "4.2.0"
 num = { version = "0.4.0", features = ["rand"] }
@@ -352,6 +352,7 @@ android-tzdata = { path = "empty/android-tzdata" }
 android_system_properties = { path = "empty/android_system_properties" }
 backtrace = { path = "empty/backtrace" }
 cc = { path = "empty/cc" }
+cfg_aliases = { path = "empty/cfg_aliases"}
 crossterm_winapi = { path = "empty/crossterm_winapi" }
 ctor = { path = "empty/ctor" }
 hermit-abi = { path = "empty/hermit-abi" }
@@ -665,9 +666,29 @@ deps = [
 [gn.package.mockall."0.9.0"]
 deps = ["//build/validate:non_production_tag"]
 
-[gn.package.nix."0.26.2"]
+[gn.package.nix."0.29.0"]
 group_visibility = { import = "//src/lib/fuchsia_nix/nix_visibility.gni", variable = "nix_visibility" }
-visibility = [":*", "//third_party/rust_crates/compat/rustyline:*"]
+visibility = [":*"]
+
+[gn.package.nix."0.29.0".platform."cfg(target_os = \"linux\")"]
+rustflags = [
+  "--cfg=linux",
+  "--cfg=linux_android",
+]
+
+[gn.package.nix."0.29.0".platform."cfg(target_os = \"freebsd\")"]
+rustflags = [
+  "--cfg=bsd",
+  "--cfg=freebsd",
+  "--cfg=freebsdlike",
+]
+
+[gn.package.nix."0.29.0".platform."cfg(target_os = \"macos\")"]
+rustflags = [
+  "--cfg=apple_targets",
+  "--cfg=bsd",
+  "--cfg=macos",
+]
 
 [gn.package.num-bigint."0.4.3"]
 rustflags = [
