@@ -26,6 +26,8 @@ import log
 import main
 import test_list_file
 
+WARNING_LEVEL = event.MessageLevel.WARNING
+
 
 class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     """Integration tests for the main entrypoint.
@@ -1262,4 +1264,53 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(
                     os.path.commonprefix([artifact_path, artifact_root]),
                     artifact_root,
+                )
+
+        with self.subTest(
+            # TODO(https://fxbug.dev/388927685): Invert logic when we make this an error..
+            "it is OK to output to an existing, non-empty directory, for now"
+        ):
+            with tempfile.TemporaryDirectory() as td:
+                logpath = os.path.join("log.json.gz")
+                artifact_root = os.path.join(td, "artifacts")
+                os.mkdir(artifact_root)
+                with open(os.path.join(artifact_root, "some_file"), "w") as f:
+                    f.write("Demo data")
+                flags = args.parse_args(
+                    [
+                        "--simple",
+                        "--logpath",
+                        logpath,
+                        "--outdir",
+                        artifact_root,
+                        "--no-timestamp-artifacts",
+                    ]
+                )
+                ret = await main.async_main_wrapper(flags)
+                self.assertEqual(ret, 0)
+
+                env = environment.ExecutionEnvironment.initialize_from_args(
+                    flags, create_log_file=False
+                )
+
+                artifact_path = None
+                found_warning_log = False
+                for log_entry in log.LogSource.from_env(env).read_log():
+                    if (event := log_entry.log_event) is not None:
+                        if (
+                            event.payload is not None
+                            and (message := event.payload.user_message)
+                            is not None
+                        ):
+                            if (
+                                message.level == WARNING_LEVEL
+                                and "Your output directory already exists"
+                                in message.value
+                            ):
+                                found_warning_log = True
+                                break
+
+                self.assertTrue(
+                    found_warning_log,
+                    "Expected to find a warning log about output directory existing",
                 )
