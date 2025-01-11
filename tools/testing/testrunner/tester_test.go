@@ -805,25 +805,107 @@ func (ctx *fakeContext) Value(key interface{}) interface{} {
 }
 
 func TestSerialTester(t *testing.T) {
+	fooTest := testsharder.Test{
+		Test: build.Test{
+			Name: "myfoo",
+			Path: "foo",
+		},
+	}
+
+	pkgTest := testsharder.Test{
+		Test: build.Test{
+			Name:       "fuchsia-boot:///myfoo#meta/bar.cm",
+			PackageURL: "fuchsia-boot:///myfoo#meta/bar.cm",
+		},
+	}
+
+	fooExpectedCmd := "\r\nruntests foo\r\n"
+	pkgExpectedCmd := "\r\nrun-test-suite --filter-ansi fuchsia-boot:///myfoo#meta/bar.cm\r\n"
+
+	fooStarted := runtests.StartedSignature + fooTest.Name
+	pkgStarted := "Running test '" + pkgTest.PackageURL + "'"
+
 	cases := []struct {
 		name           string
+		test           testsharder.Test
+		expectedCmd    string
 		expectedResult runtests.TestResult
 		wantErr        bool
 		wantRetry      bool
+		startedStr     string
+		returnStr      string
 	}{
 		{
 			name:           "test passes",
+			test:           fooTest,
+			expectedCmd:    fooExpectedCmd,
 			expectedResult: runtests.TestSuccess,
-		}, {
+			startedStr:     fooStarted,
+			returnStr:      runtests.SuccessSignature + fooTest.Name,
+		},
+		{
+			name:           "packaged test passes",
+			test:           pkgTest,
+			expectedCmd:    pkgExpectedCmd,
+			expectedResult: runtests.TestSuccess,
+			startedStr:     pkgStarted,
+			returnStr:      pkgTest.PackageURL + " completed with result: PASSED",
+		},
+		{
 			name:           "test fails",
+			test:           fooTest,
+			expectedCmd:    fooExpectedCmd,
 			expectedResult: runtests.TestFailure,
-		}, {
+			startedStr:     fooStarted,
+			returnStr:      runtests.FailureSignature + fooTest.Name,
+		},
+		{
+			name:           "packaged test fails",
+			test:           pkgTest,
+			expectedCmd:    pkgExpectedCmd,
+			expectedResult: runtests.TestFailure,
+			startedStr:     pkgStarted,
+			returnStr:      pkgTest.PackageURL + " completed with result: FAILED",
+		},
+		{
+			name:           "packaged test skipped",
+			test:           pkgTest,
+			expectedCmd:    pkgExpectedCmd,
+			expectedResult: runtests.TestSkipped,
+			startedStr:     pkgStarted,
+			returnStr:      pkgTest.PackageURL + " completed with result: SKIPPED",
+		},
+		{
+			name:           "packaged test canceled",
+			test:           pkgTest,
+			expectedCmd:    pkgExpectedCmd,
+			expectedResult: runtests.TestAborted,
+			startedStr:     pkgStarted,
+			returnStr:      pkgTest.PackageURL + " completed with result: CANCELLED",
+		},
+		{
 			name:           "test does not start on first try",
+			test:           fooTest,
+			expectedCmd:    fooExpectedCmd,
 			expectedResult: runtests.TestSuccess,
 			wantRetry:      true,
-		}, {
-			name:    "test returns fatal err",
-			wantErr: true,
+			startedStr:     fooStarted,
+			returnStr:      runtests.SuccessSignature + fooTest.Name,
+		},
+		{
+			name:           "packaged test does not start on first try",
+			test:           pkgTest,
+			expectedCmd:    pkgExpectedCmd,
+			expectedResult: runtests.TestSuccess,
+			wantRetry:      true,
+			startedStr:     pkgStarted,
+			returnStr:      pkgTest.PackageURL + " completed with result: PASSED",
+		},
+		{
+			name:        "test returns fatal err",
+			test:        fooTest,
+			expectedCmd: fooExpectedCmd,
+			wantErr:     true,
 		},
 	}
 
@@ -835,13 +917,7 @@ func TestSerialTester(t *testing.T) {
 			defer serial.Close()
 
 			tester := FuchsiaSerialTester{socket: socket}
-			test := testsharder.Test{
-				Test: build.Test{
-					Name: "myfoo",
-					Path: "foo",
-				},
-			}
-			expectedCmd := "\r\nruntests foo\r\n"
+			expectedCmd := tc.expectedCmd
 
 			if tc.wantRetry {
 				oldNewTestStartedContext := newTestStartedContext
@@ -862,7 +938,7 @@ func TestSerialTester(t *testing.T) {
 			results := make(chan testResult)
 			var stdout bytes.Buffer
 			go func() {
-				result, err := tester.Test(ctx, test, &stdout, io.Discard, "unused-out-dir")
+				result, err := tester.Test(ctx, tc.test, &stdout, io.Discard, "unused-out-dir")
 				results <- testResult{result, err}
 			}()
 
@@ -904,12 +980,8 @@ func TestSerialTester(t *testing.T) {
 			}
 
 			// At this point, the tester will be blocked reading from the socket.
-			started := runtests.StartedSignature + test.Name
-			testStatus := runtests.SuccessSignature
-			if tc.expectedResult == runtests.TestFailure {
-				testStatus = runtests.FailureSignature
-			}
-			testReturn := testStatus + test.Name
+			started := tc.startedStr
+			testReturn := tc.returnStr
 
 			if tc.wantErr {
 				// Close the serial connection so that the tester returns a fatal error.

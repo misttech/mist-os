@@ -1653,13 +1653,19 @@ func (t *FuchsiaSerialTester) Test(ctx context.Context, test testsharder.Test, s
 	t.socket.SetIOTimeout(testStartedTimeout)
 	reader := io.TeeReader(t.socket, &lastWrite)
 	commandStarted := false
+
+	startedStr := runtests.StartedSignature + test.Name
+	if test.PackageURL != "" {
+		// Packaged tests run with the "run-test-suite" tool which has different logs.
+		startedStr = "Running test '" + test.PackageURL + "'"
+	}
+
 	var readErr error
 	for i := 0; i < startSerialCommandMaxAttempts; i++ {
 		if err := serial.RunCommands(ctx, t.socket, []serial.Command{{Cmd: command}}); err != nil {
 			return nil, fmt.Errorf("failed to write to serial socket: %w", err)
 		}
 		startedCtx, cancel := newTestStartedContext(ctx)
-		startedStr := runtests.StartedSignature + test.Name
 		_, readErr = iomisc.ReadUntilMatchString(startedCtx, reader, startedStr)
 		cancel()
 		if readErr == nil {
@@ -1685,6 +1691,47 @@ func (t *FuchsiaSerialTester) Test(ctx context.Context, test testsharder.Test, s
 		&parseOutKernelReader{ctx: ctx, reader: io.MultiReader(&lastWrite, t.socket)},
 		// Writes to stdout as it reads from the above reader.
 		stdout)
+
+	if test.PackageURL != "" {
+		// The test was ran with the "run-test-suite" tool, parse the result.
+		res_success := test.PackageURL + " completed with result: PASSED"
+		res_failed := test.PackageURL + " completed with result: FAILED"
+		res_inconclusive := test.PackageURL + " completed with result: INCONCLUSIVE"
+		res_timed_out := test.PackageURL + " completed with result: TIMED_OUT"
+		res_errored := test.PackageURL + " completed with result: ERROR"
+		res_skipped := test.PackageURL + " completed with result: SKIPPED"
+		res_canceled := test.PackageURL + " completed with result: CANCELLED"
+		res_dnf := test.PackageURL + " completed with result: DID_NOT_FINISH"
+		match, err := iomisc.ReadUntilMatchString(ctx, testOutputReader, res_success, res_failed, res_inconclusive, res_timed_out, res_errored, res_skipped, res_canceled, res_dnf)
+		if err != nil {
+			err = fmt.Errorf("unable to derive test result from run-test-suite output: %w", err)
+			testResult.FailReason = err.Error()
+			return testResult, nil
+		}
+
+		if match == res_success {
+			testResult.Result = runtests.TestSuccess
+			return testResult, nil
+		}
+
+		if match == res_timed_out || match == res_canceled {
+			testResult.FailReason = "test timed out or canceled"
+			testResult.Result = runtests.TestAborted
+			return testResult, nil
+		}
+
+		if match == res_skipped {
+			testResult.FailReason = "test skipped"
+			testResult.Result = runtests.TestSkipped
+			return testResult, nil
+		}
+
+		logger.Errorf(ctx, "%s", match)
+		testResult.FailReason = "test failed"
+		testResult.Result = runtests.TestFailure
+		return testResult, nil
+	}
+
 	if success, err := runtests.TestPassed(ctx, testOutputReader, test.Name); err != nil {
 		testResult.FailReason = err.Error()
 		return testResult, nil
