@@ -47,18 +47,21 @@ pub struct SystemActivityGovernorControl {
 
     application_activity_lease: RefCell<Option<fbroker::LeaseControlProxy>>,
 
+    boot_complete: Rc<Mutex<bool>>,
     current_state: Rc<Mutex<fctrl::SystemActivityGovernorState>>,
     required_state: Rc<Mutex<fctrl::SystemActivityGovernorState>>,
-    sag_proxy: Arc<fsystem::ActivityGovernorProxy>,
+    sag_proxy: fsystem::ActivityGovernorProxy,
+    boot_control_proxy: fsystem::BootControlProxy,
     suspending_token: RefCell<Option<fsystem::LeaseToken>>,
 }
 
 impl SystemActivityGovernorControl {
     pub async fn new() -> Rc<Self> {
         let topology = connect_to_protocol::<fbroker::TopologyMarker>().unwrap();
-        let sag = connect_to_protocol::<fsystem::ActivityGovernorMarker>().unwrap();
-        let sag_power_elements = sag.get_power_elements().await.unwrap();
-        let sag_proxy = Arc::new(sag);
+        let sag_proxy = connect_to_protocol::<fsystem::ActivityGovernorMarker>().unwrap();
+        let sag_power_elements = sag_proxy.get_power_elements().await.unwrap();
+
+        let boot_control_proxy = connect_to_protocol::<fsystem::BootControlMarker>().unwrap();
 
         let aa_token =
             sag_power_elements.application_activity.unwrap().assertive_dependency_token.unwrap();
@@ -86,6 +89,8 @@ impl SystemActivityGovernorControl {
             .await;
         })
         .detach();
+
+        let boot_complete = Rc::new(Mutex::new(false));
 
         let element_info_provider = fclient::connect_to_service_instance::<
             fbroker::ElementInfoProviderServiceMarker,
@@ -179,9 +184,11 @@ impl SystemActivityGovernorControl {
             application_activity_controller: application_activity_controller.into(),
             hanging_get: RefCell::new(hanging_get),
             application_activity_lease: RefCell::new(None),
+            boot_complete,
             current_state,
             required_state,
             sag_proxy,
+            boot_control_proxy,
             suspending_token: RefCell::new(None),
         })
     }
@@ -200,6 +207,15 @@ impl SystemActivityGovernorControl {
                         }
                         fctrl::StateRequest::Get { responder } => {
                             let _ = responder.send(&*this.current_state.lock().await);
+                        }
+                        fctrl::StateRequest::SetBootComplete { responder } => {
+                            let () = this
+                                .boot_control_proxy
+                                .set_boot_complete()
+                                .await
+                                .expect("SetBootComplete should have succeeded");
+                            *this.boot_complete.lock().await = true;
+                            responder.send().unwrap();
                         }
                         fctrl::StateRequest::Watch { responder } => {
                             if let Err(error) = sub.register(responder) {
@@ -263,10 +279,9 @@ impl SystemActivityGovernorControl {
 
         match required_execution_state_level {
             ExecutionStateLevel::Inactive => {
-                // TODO: https://fxbug.dev/333699275 Consider to add SetBootComplete in the test
-                // fidl so that the test could use the api to notify the fake SAG know about the
-                // boot complete state.
-                if required_application_activity_level != ApplicationActivityLevel::Inactive {
+                if *self.boot_complete.lock().await == false
+                    || required_application_activity_level != ApplicationActivityLevel::Inactive
+                {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
                 drop(self.suspending_token.borrow_mut().take());
@@ -278,7 +293,9 @@ impl SystemActivityGovernorControl {
                     })?;
             }
             ExecutionStateLevel::Suspending => {
-                if required_application_activity_level != ApplicationActivityLevel::Inactive {
+                if *self.boot_complete.lock().await == false
+                    || required_application_activity_level != ApplicationActivityLevel::Inactive
+                {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
 
@@ -293,7 +310,9 @@ impl SystemActivityGovernorControl {
                     })?;
             }
             ExecutionStateLevel::Active => {
-                if required_application_activity_level != ApplicationActivityLevel::Active {
+                if *self.boot_complete.lock().await == true
+                    && required_application_activity_level != ApplicationActivityLevel::Active
+                {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
 

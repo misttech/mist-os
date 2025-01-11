@@ -103,13 +103,6 @@ async fn create_power_realm<'a>(
         )),
         ..Default::default()
     }));
-    netstack_uses.push(fnetemul::Capability::ChildDep(fnetemul::ChildDep {
-        name: Some(SAG_NAME.to_string()),
-        capability: Some(fnetemul::ExposedCapability::Protocol(
-            fpower_system::BootControlMarker::PROTOCOL_NAME.to_string(),
-        )),
-        ..Default::default()
-    }));
     netstack_def.config_values.get_or_insert_with(|| Default::default()).push(
         fnetemul::ChildConfigValue {
             key: "suspend_enabled".to_string(),
@@ -141,7 +134,6 @@ async fn create_power_realm<'a>(
         ])),
         exposes: Some(vec![
             fpower_system::ActivityGovernorMarker::PROTOCOL_NAME.to_string(),
-            fpower_system::BootControlMarker::PROTOCOL_NAME.to_string(),
             fsagcontrol::StateMarker::PROTOCOL_NAME.to_string(),
         ]),
         ..Default::default()
@@ -195,10 +187,7 @@ async fn create_power_realm<'a>(
     assert_eq!(sag_state.next().await, Some(fpower_system::ExecutionStateLevel::Active));
 
     // Kick SAG out of boot mode.
-    let boot_control = realm
-        .connect_to_protocol::<fpower_system::BootControlMarker>()
-        .expect("Couldn't connect to SAG");
-    let () = boot_control.set_boot_complete().await.expect("SetBootComplete");
+    let () = sagctl.set_boot_complete().await.expect("SetBootComplete");
 
     realm
 }

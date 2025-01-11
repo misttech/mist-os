@@ -90,13 +90,7 @@ zx_status_t TestLoopBase::AwaitSystemSuspend() {
 
 bool TestLoopBase::SetBootComplete() {
   {
-    auto result = component::Connect<fuchsia_power_system::BootControl>();
-    if (result.status_value()) {
-      std::cout << "Failed to connect to BootControl" << std::endl;
-      return false;
-    }
-    auto client_end = std::move(result.value());
-    auto status = fidl::WireCall(client_end)->SetBootComplete();
+    auto status = fidl::WireCall(sag_control_state_client_end_)->SetBootComplete();
     if (!status.ok()) {
       std::cout << "Failed to SetBootComplete" << std::endl;
       return false;

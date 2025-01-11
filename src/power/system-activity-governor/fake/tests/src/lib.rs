@@ -102,7 +102,6 @@ async fn create_test_env() -> TestEnv {
                 .capability(Capability::protocol_by_name("test.sagcontrol.State"))
                 .capability(Capability::protocol_by_name("fuchsia.power.suspend.Stats"))
                 .capability(Capability::protocol_by_name("fuchsia.power.system.ActivityGovernor"))
-                .capability(Capability::protocol_by_name("fuchsia.power.system.BootControl"))
                 .from(&component_ref)
                 .to(Ref::parent()),
         )
@@ -118,7 +117,6 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
     let env = create_test_env().await;
 
     let activity_governor = env.connect_to_protocol::<fsystem::ActivityGovernorMarker>();
-    let boot_control = env.connect_to_protocol::<fsystem::BootControlMarker>();
     let sag_ctrl_state = env.connect_to_protocol::<fctrl::StateMarker>();
     let topology = env.connect_to_protocol::<fbroker::TopologyMarker>();
 
@@ -204,7 +202,8 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
         .unwrap();
 
     // Trigger "boot complete" logic and a suspend/resume cycle.
-    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
+    let () =
+        sag_ctrl_state.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     let mut current_state = fctrl::SystemActivityGovernorState {
         execution_state_level: Some(ExecutionStateLevel::Active),
@@ -281,7 +280,6 @@ async fn test_fsystem_activity_governor_listener_and_get_power_element() -> Resu
 async fn test_set_valid_sag_states() -> Result<()> {
     let env = create_test_env().await;
 
-    let boot_control = env.connect_to_protocol::<fsystem::BootControlMarker>();
     let sag_ctrl_state = env.connect_to_protocol::<fctrl::StateMarker>();
 
     // Check initial booting state [2, 0].
@@ -307,7 +305,8 @@ async fn test_set_valid_sag_states() -> Result<()> {
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
 
     // Trigger "boot complete" logic.
-    let () = boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
+    let () =
+        sag_ctrl_state.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     let _ = sag_ctrl_state
         .set(&fctrl::SystemActivityGovernorState {
@@ -422,6 +421,9 @@ async fn test_set_invalid_sag_states() -> Result<()> {
     );
     state.application_activity_level.replace(ApplicationActivityLevel::Active);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), state);
+
+    let () =
+        sag_ctrl_state.set_boot_complete().await.expect("SetBootComplete should have succeeded");
 
     // After triggering "boot complete" logic, when ExecutionState is Active, ApplicationActivity has to be active.
     assert_eq!(
