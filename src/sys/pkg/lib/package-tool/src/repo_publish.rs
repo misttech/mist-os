@@ -97,16 +97,19 @@ pub async fn cmd_repo_package_manifest_list(cmd: RepoPMListCommand) -> Result<()
 }
 
 async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
-    let lock_path = dir.join(REPOSITORY_LOCK_FILENAME).into_std_path_buf();
+    let lock_path = dir.join(REPOSITORY_LOCK_FILENAME);
+
+    std::fs::create_dir_all(dir).context("creating repository parent dir")?;
+
     let _log_warning_task = fasync::Task::local({
         let lock_path = lock_path.clone();
         async move {
             fasync::Timer::new(fasync::MonotonicDuration::from_secs(30)).await;
-            warn!("Obtaining a lock at {} not complete after 30s", &lock_path.display());
+            warn!("Obtaining a lock at {} not complete after 30s", &lock_path.to_string());
         }
     });
 
-    Ok(Lockfile::lock_for(&lock_path, std::time::Duration::from_secs(LOCK_TIMEOUT_SEC))
+    Ok(Lockfile::lock_for(lock_path.as_ref(), std::time::Duration::from_secs(LOCK_TIMEOUT_SEC))
         .await
         .inspect_err(|e| {
             error!(
@@ -119,14 +122,7 @@ async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
 }
 
 async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
-    if !cmd.repo_path.exists() {
-        std::fs::create_dir_all(&cmd.repo_path).expect("creating repository parent dir");
-    }
-    let dir = cmd.repo_path.join("repository");
-    if !dir.exists() {
-        std::fs::create_dir_all(&dir).expect("creating repository dir");
-    }
-    let lock_file = lock_repository(&dir).await?;
+    let lock_file = lock_repository(&cmd.repo_path).await?;
     let publish_result = repo_publish_oneshot(cmd).await;
     lock_file.unlock()?;
     publish_result
