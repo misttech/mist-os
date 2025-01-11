@@ -1122,7 +1122,7 @@ rustflags = []
 # however we do not rely on any new or experimental features outside of the existing APIs these
 # crates provide. When we do update the zstd/zstd-safe crates, we should ensure that we update the
 # zstd version pinned in the integration repo via the fuchsia/third_party/flower file accordingly.
-[gn.package.zstd-sys."2.0.1+zstd.1.5.5"]
+[gn.package.zstd-sys."2.0.1+zstd.1.5.6"]
 rustflags = []
 # It is a fork:
 uses_fuchsia_license = true

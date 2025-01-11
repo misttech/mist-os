@@ -17,10 +17,9 @@ import("//build/zircon/migrated_targets.gni")
 #   3. Update the pinned version of zstd in //integration/third_party/flower
 #   4. Run third_party/rust_crates/forks/zstd-sys/bindgen.sh to update the Rust bindings
 #      and re-enable the check below.
-# TODO(https://fxbug.dev/389098415): Re-enable this check once we update to zstd-1.5.6.
-verify_rust_zstd_rust_crate_binding_version = false
+verify_rust_zstd_sys_crate_binding_version = true
 
-if (verify_rust_zstd_rust_crate_binding_version) {
+if (verify_rust_zstd_sys_crate_binding_version) {
   # zstd.h Header Version Information
   # Format: `#define ZSTD_VERSION_MAJOR 1`
   zstd_version_line_no = 106
@@ -292,10 +291,6 @@ config("zstdseek.config") {
 }
 
 if (!is_kernel) {
-  # TODO(https://fxbug.dev/389098415): After soft transition, remove this.
-  zstd_changelog = read_file("src/CHANGELOG", "list lines")
-  is_zstd_156 = zstd_changelog[0] == "V1.5.6 (Mar 2024)"
-
   if (current_toolchain == host_toolchain) {
     install_host_tools("host-tools") {
       deps = [ ":zstdcli" ]
@@ -318,6 +313,8 @@ if (!is_kernel) {
       "src/programs/fileio.h",
       "src/programs/fileio_asyncio.c",
       "src/programs/fileio_asyncio.h",
+      "src/programs/lorem.c",
+      "src/programs/lorem.h",
       "src/programs/platform.h",
       "src/programs/timefn.c",
       "src/programs/timefn.h",
@@ -327,15 +324,6 @@ if (!is_kernel) {
       "src/programs/zstdcli_trace.c",
       "src/programs/zstdcli_trace.h",
     ]
-
-    # TODO(https://fxbug.dev/389098415): After soft transition,
-    # deconditionalize and merge back into main list.
-    if (is_zstd_156) {
-      sources += [
-        "src/programs/lorem.c",
-        "src/programs/lorem.h",
-      ]
-    }
 
     configs += [
       ":internal.config",

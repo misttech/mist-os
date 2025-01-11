@@ -6,8 +6,8 @@
 
 pub const ZSTD_VERSION_MAJOR: u32 = 1;
 pub const ZSTD_VERSION_MINOR: u32 = 5;
-pub const ZSTD_VERSION_RELEASE: u32 = 5;
-pub const ZSTD_VERSION_NUMBER: u32 = 10505;
+pub const ZSTD_VERSION_RELEASE: u32 = 6;
+pub const ZSTD_VERSION_NUMBER: u32 = 10506;
 pub const ZSTD_CLEVEL_DEFAULT: u32 = 3;
 pub const ZSTD_MAGICNUMBER: u32 = 4247762216;
 pub const ZSTD_MAGIC_DICTIONARY: u32 = 3962610743;
@@ -119,9 +119,9 @@ unsafe extern "C" {
 unsafe extern "C" {
     /// ZSTD_compressCCtx() :
     ///  Same as ZSTD_compress(), using an explicit ZSTD_CCtx.
-    ///  Important : in order to behave similarly to `ZSTD_compress()`,
-    ///  this function compresses at requested compression level,
-    ///  __ignoring any other parameter__ .
+    ///  Important : in order to mirror `ZSTD_compress()` behavior,
+    ///  this function compresses at the requested compression level,
+    ///  __ignoring any other advanced parameter__ .
     ///  If any advanced parameter was set using the advanced API,
     ///  they will all be reset. Only `compressionLevel` remains.
     pub fn ZSTD_compressCCtx(
@@ -149,7 +149,7 @@ unsafe extern "C" {
     /// ZSTD_decompressDCtx() :
     ///  Same as ZSTD_decompress(),
     ///  requires an allocated ZSTD_DCtx.
-    ///  Compatible with sticky parameters.
+    ///  Compatible with sticky parameters (see below).
     pub fn ZSTD_decompressDCtx(
         dctx: *mut ZSTD_DCtx,
         dst: *mut ::core::ffi::c_void,
@@ -183,6 +183,7 @@ pub enum ZSTD_cParameter {
     ZSTD_c_minMatch = 105,
     ZSTD_c_targetLength = 106,
     ZSTD_c_strategy = 107,
+    ZSTD_c_targetCBlockSize = 130,
     ZSTD_c_enableLongDistanceMatching = 160,
     ZSTD_c_ldmHashLog = 161,
     ZSTD_c_ldmMinMatch = 162,
@@ -199,7 +200,6 @@ pub enum ZSTD_cParameter {
     ZSTD_c_experimentalParam3 = 1000,
     ZSTD_c_experimentalParam4 = 1001,
     ZSTD_c_experimentalParam5 = 1002,
-    ZSTD_c_experimentalParam6 = 1003,
     ZSTD_c_experimentalParam7 = 1004,
     ZSTD_c_experimentalParam8 = 1005,
     ZSTD_c_experimentalParam9 = 1006,
@@ -293,6 +293,7 @@ unsafe extern "C" {
 unsafe extern "C" {
     /// ZSTD_compress2() :
     ///  Behave the same as ZSTD_compressCCtx(), but compression parameters are set using the advanced API.
+    ///  (note that this entry point doesn't even expose a compression level parameter).
     ///  ZSTD_compress2() always starts a new frame.
     ///  Should cctx hold data from a previously unfinished frame, everything about it is forgotten.
     ///  - Compression parameters are pushed into CCtx before starting compression, using ZSTD_CCtx_set*()
@@ -319,6 +320,7 @@ pub enum ZSTD_dParameter {
     ZSTD_d_experimentalParam3 = 1002,
     ZSTD_d_experimentalParam4 = 1003,
     ZSTD_d_experimentalParam5 = 1004,
+    ZSTD_d_experimentalParam6 = 1005,
 }
 unsafe extern "C" {
     /// ZSTD_dParam_getBounds() :
@@ -410,6 +412,11 @@ unsafe extern "C" {
     ///            only ZSTD_e_end or ZSTD_e_flush operations are allowed.
     ///            Before starting a new compression job, or changing compression parameters,
     ///            it is required to fully flush internal buffers.
+    ///  - note: if an operation ends with an error, it may leave @cctx in an undefined state.
+    ///          Therefore, it's UB to invoke ZSTD_compressStream2() of ZSTD_compressStream() on such a state.
+    ///          In order to be re-employed after an error, a state must be reset,
+    ///          which can be done explicitly (ZSTD_CCtx_reset()),
+    ///          or is sometimes implied by methods starting a new compression job (ZSTD_initCStream(), ZSTD_compressCCtx())
     pub fn ZSTD_compressStream2(
         cctx: *mut ZSTD_CCtx,
         output: *mut ZSTD_outBuffer,
@@ -485,6 +492,12 @@ unsafe extern "C" {
     /// @return : 0 when a frame is completely decoded and fully flushed,
     ///           or an error code, which can be tested using ZSTD_isError(),
     ///           or any other value > 0, which means there is some decoding or flushing to do to complete current frame.
+    ///
+    /// Note: when an operation returns with an error code, the @zds state may be left in undefined state.
+    ///       It's UB to invoke `ZSTD_decompressStream()` on such a state.
+    ///       In order to re-use such a state, it must be first reset,
+    ///       which can be done explicitly (`ZSTD_DCtx_reset()`),
+    ///       or is implied for operations starting some new decompression job (`ZSTD_initDStream`, `ZSTD_decompressDCtx()`, `ZSTD_decompress_usingDict()`)
     pub fn ZSTD_decompressStream(
         zds: *mut ZSTD_DStream,
         output: *mut ZSTD_outBuffer,
