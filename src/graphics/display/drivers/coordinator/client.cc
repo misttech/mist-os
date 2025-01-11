@@ -16,7 +16,6 @@
 #include <lib/fit/function.h>
 #include <lib/image-format/image_format.h>
 #include <lib/inspect/cpp/inspect.h>
-#include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
@@ -399,7 +398,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
       fit::defer([this, &tear_down_status] { TearDown(tear_down_status); });
 
   fbl::AutoLock lock(controller_->mtx());
-  zx::result<cpp20::span<const display::DisplayTiming>> display_timings_result =
+  zx::result<std::span<const display::DisplayTiming>> display_timings_result =
       controller_->GetDisplayTimings(display_id);
   if (display_timings_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get display timings for display #%" PRIu64 ": %s", display_id.value(),
@@ -408,7 +407,7 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
     return;
   }
 
-  cpp20::span<const display::DisplayTiming> display_timings =
+  std::span<const display::DisplayTiming> display_timings =
       std::move(display_timings_result).value();
   auto display_timing_it = std::find_if(
       display_timings.begin(), display_timings.end(),
@@ -1214,15 +1213,15 @@ void Client::SetOwnership(bool is_owner) {
 }
 
 fidl::Status Client::NotifyDisplayChanges(
-    cpp20::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
-    cpp20::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids) {
+    std::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
+    std::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids) {
   // TODO(https://fxbug.dev/42052765): OnDisplayChanged() takes VectorViews
   // of non-const display Info and display::DisplayId types though it doesn't modify
   // the vectors. We have to perform a const_cast to drop their constness.
-  cpp20::span<fuchsia_hardware_display::wire::Info> non_const_added_display_infos(
+  std::span<fuchsia_hardware_display::wire::Info> non_const_added_display_infos(
       const_cast<fuchsia_hardware_display::wire::Info*>(added_display_infos.data()),
       added_display_infos.size());
-  cpp20::span<fuchsia_hardware_display_types::wire::DisplayId> non_const_removed_display_ids(
+  std::span<fuchsia_hardware_display_types::wire::DisplayId> non_const_removed_display_ids(
       const_cast<fuchsia_hardware_display_types::wire::DisplayId*>(removed_display_ids.data()),
       removed_display_ids.size());
 
@@ -1274,8 +1273,8 @@ fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time timesta
   return send_event_result;
 }
 
-void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_display_ids,
-                               cpp20::span<const display::DisplayId> removed_display_ids) {
+void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
+                               std::span<const display::DisplayId> removed_display_ids) {
   ZX_DEBUG_ASSERT(controller_->IsRunningOnClientDispatcher());
 
   controller_->AssertMtxAliasHeld(*controller_->mtx());
@@ -1298,7 +1297,7 @@ void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_displ
     }
     config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
 
-    zx::result<cpp20::span<const display::DisplayTiming>> display_timings_result =
+    zx::result<std::span<const display::DisplayTiming>> display_timings_result =
         controller_->GetDisplayTimings(config->id);
     if (display_timings_result.is_error()) {
       FDF_LOG(WARNING, "Failed to get display timings when processing hotplug: %s",
@@ -1310,7 +1309,7 @@ void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_displ
     config->current_.layer_list = nullptr;
     config->current_.layer_count = 0;
 
-    cpp20::span<const display::DisplayTiming> display_timings =
+    std::span<const display::DisplayTiming> display_timings =
         std::move(display_timings_result).value();
     ZX_DEBUG_ASSERT(!display_timings.empty());
     config->current_.mode = ToBanjoDisplayMode(display_timings[0]);
@@ -1342,11 +1341,11 @@ void Client::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_displ
     fhd::wire::Info info;
     info.id = ToFidlDisplayId(config->id);
 
-    zx::result<cpp20::span<const display::DisplayTiming>> display_timings_result =
+    zx::result<std::span<const display::DisplayTiming>> display_timings_result =
         controller_->GetDisplayTimings(config->id);
     ZX_DEBUG_ASSERT(display_timings_result.is_ok());
 
-    cpp20::span<const display::DisplayTiming> display_timings = display_timings_result.value();
+    std::span<const display::DisplayTiming> display_timings = display_timings_result.value();
     ZX_DEBUG_ASSERT(!display_timings.empty());
 
     std::vector<fuchsia_hardware_display_types::wire::Mode> modes;
@@ -1681,8 +1680,8 @@ void ClientProxy::SetOwnership(bool is_owner) {
   }
 }
 
-void ClientProxy::OnDisplaysChanged(cpp20::span<const display::DisplayId> added_display_ids,
-                                    cpp20::span<const display::DisplayId> removed_display_ids) {
+void ClientProxy::OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
+                                    std::span<const display::DisplayId> removed_display_ids) {
   handler_.OnDisplaysChanged(added_display_ids, removed_display_ids);
 }
 

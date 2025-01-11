@@ -126,7 +126,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // `display_id` is valid.
   //
   // `mtx()` must be held for as long as the return value is retained.
-  zx::result<cpp20::span<const display::DisplayTiming>> GetDisplayTimings(
+  zx::result<std::span<const display::DisplayTiming>> GetDisplayTimings(
       display::DisplayId display_id) __TA_REQUIRES(mtx());
 
   zx::result<fbl::Array<CoordinatorPixelFormat>> GetSupportedPixelFormats(

@@ -9,10 +9,9 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 
-#include <cstdint>
+#include <span>
 
 #include <fbl/vector.h>
 
@@ -31,7 +30,7 @@ struct CoordinatorPixelFormat {
   // banjo-typed Vector got from display engine drivers. Returned values may get
   // de-duplicated.
   static zx::result<fbl::Vector<CoordinatorPixelFormat>> CreateFblVectorFromBanjoVector(
-      cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats);
+      std::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats);
 
   // Converts a CoordinatorPixelFormat to format used in FIDL fuchsia.hardware.
   // display interface. The return type must match return the `pixel_format`

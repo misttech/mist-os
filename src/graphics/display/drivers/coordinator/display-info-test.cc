@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 

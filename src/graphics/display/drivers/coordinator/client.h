@@ -122,13 +122,13 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                 coordinator_listener_client_end,
             fidl::OnUnboundFn<Client> unbound_callback);
 
-  void OnDisplaysChanged(cpp20::span<const display::DisplayId> added_display_ids,
-                         cpp20::span<const display::DisplayId> removed_display_ids);
+  void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
+                         std::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
 
   fidl::Status NotifyDisplayChanges(
-      cpp20::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
-      cpp20::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids);
+      std::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
+      std::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids);
   fidl::Status NotifyOwnershipChange(bool client_has_ownership);
   fidl::Status NotifyVsync(display::DisplayId display_id, zx::time timestamp,
                            display::ConfigStamp config_stamp,
@@ -345,8 +345,8 @@ class ClientProxy {
   // Requires holding controller_->mtx() lock
   zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
                              display::ConfigStamp controller_stamp);
-  void OnDisplaysChanged(cpp20::span<const display::DisplayId> added_display_ids,
-                         cpp20::span<const display::DisplayId> removed_display_ids);
+  void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
+                         std::span<const display::DisplayId> removed_display_ids);
   void SetOwnership(bool is_owner);
   void ReapplyConfig();
   zx_status_t OnCaptureComplete();

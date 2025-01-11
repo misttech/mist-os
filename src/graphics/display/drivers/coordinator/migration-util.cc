@@ -7,10 +7,10 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
 
+#include <span>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
@@ -27,7 +27,7 @@ CoordinatorPixelFormat CoordinatorPixelFormat::FromBanjo(
 // static
 zx::result<fbl::Vector<CoordinatorPixelFormat>>
 CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
-    cpp20::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats) {
+    std::span<const fuchsia_images2_pixel_format_enum_value_t> banjo_pixel_formats) {
   fbl::AllocChecker alloc_checker;
   fbl::Vector<CoordinatorPixelFormat> result;
   result.reserve(banjo_pixel_formats.size(), &alloc_checker);

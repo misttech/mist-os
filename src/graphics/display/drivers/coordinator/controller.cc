@@ -10,7 +10,6 @@
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
-#include <lib/stdcompat/span.h>
 #include <lib/trace/event.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zx/channel.h>
@@ -33,6 +32,7 @@
 #include <cstring>
 #include <memory>
 #include <optional>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -185,7 +185,7 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
         fbl::AutoLock lock(mtx());
 
         const std::array<display::DisplayId, 1> added_id_candidates = {display_info->id};
-        cpp20::span<const display::DisplayId> added_ids(added_id_candidates);
+        std::span<const display::DisplayId> added_ids(added_id_candidates);
 
         // TODO(https://fxbug.dev/339311596): Do not trigger the client's
         // `OnDisplaysChanged` if an added display is ignored.
@@ -678,7 +678,7 @@ void Controller::OnClientDead(ClientProxy* client) {
       [client](std::unique_ptr<ClientProxy>& list_client) { return list_client.get() == client; });
 }
 
-zx::result<cpp20::span<const display::DisplayTiming>> Controller::GetDisplayTimings(
+zx::result<std::span<const display::DisplayTiming>> Controller::GetDisplayTimings(
     display::DisplayId display_id) {
   if (unbinding_) {
     return zx::error(ZX_ERR_BAD_STATE);
@@ -686,11 +686,11 @@ zx::result<cpp20::span<const display::DisplayTiming>> Controller::GetDisplayTimi
   for (auto& display : displays_) {
     if (display.id == display_id) {
       if (display.edid.has_value()) {
-        return zx::ok(cpp20::span(display.edid->timings));
+        return zx::ok(std::span(display.edid->timings));
       }
 
       ZX_DEBUG_ASSERT(display.mode.has_value());
-      return zx::ok(cpp20::span(&*display.mode, 1));
+      return zx::ok(std::span(&*display.mode, 1));
     }
   }
   return zx::error(ZX_ERR_NOT_FOUND);
@@ -817,9 +817,9 @@ zx_status_t Controller::CreateClient(
               ++initialized_display_count;
             }
           }
-          cpp20::span<display::DisplayId> removed_display_ids = {};
+          std::span<display::DisplayId> removed_display_ids = {};
           client_proxy->OnDisplaysChanged(
-              cpp20::span<display::DisplayId>(current_displays, initialized_display_count),
+              std::span<display::DisplayId>(current_displays, initialized_display_count),
               removed_display_ids);
         }
 

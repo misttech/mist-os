@@ -7,7 +7,6 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/driver/logging/cpp/logger.h>
-#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -21,6 +20,7 @@
 #include <cstring>
 #include <iterator>
 #include <limits>
+#include <span>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
@@ -72,7 +72,7 @@ fit::result<const char*, DisplayInfo::Edid> InitEdidFromI2c(ddk::I2cImplProtocol
   return fit::error(last_error);
 }
 
-fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(cpp20::span<const uint8_t> bytes) {
+fit::result<const char*, DisplayInfo::Edid> InitEdidFromBytes(std::span<const uint8_t> bytes) {
   ZX_DEBUG_ASSERT(bytes.size() <= std::numeric_limits<uint16_t>::max());
 
   fit::result<const char*, edid::Edid> result = edid::Edid::Create(bytes);
@@ -102,8 +102,8 @@ void DisplayInfo::InitializeInspect(inspect::Node* parent_node) {
 
   ZX_DEBUG_ASSERT(edid.has_value());
 
-  node.CreateByteVector(
-      "edid-bytes", cpp20::span(edid->base.edid_bytes(), edid->base.edid_length()), &properties);
+  node.CreateByteVector("edid-bytes", std::span(edid->base.edid_bytes(), edid->base.edid_length()),
+                        &properties);
 
   size_t i = 0;
   for (const display::DisplayTiming& t : edid->timings) {
@@ -138,8 +138,8 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
   out->id = display::ToDisplayId(banjo_display_info.display_id);
 
   zx::result get_display_info_pixel_formats_result =
-      CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(cpp20::span(
-          banjo_display_info.pixel_formats_list, banjo_display_info.pixel_formats_count));
+      CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(
+          std::span(banjo_display_info.pixel_formats_list, banjo_display_info.pixel_formats_count));
   if (get_display_info_pixel_formats_result.is_error()) {
     FDF_LOG(ERROR, "Cannot convert pixel formats to FIDL pixel format value: %s",
             get_display_info_pixel_formats_result.status_string());
@@ -160,8 +160,8 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
 
   auto edid_result = [&]() -> fit::result<const char*, Edid> {
     if (banjo_display_info.edid_bytes_count != 0) {
-      cpp20::span<const uint8_t> edid_bytes(banjo_display_info.edid_bytes_list,
-                                            banjo_display_info.edid_bytes_count);
+      std::span<const uint8_t> edid_bytes(banjo_display_info.edid_bytes_list,
+                                          banjo_display_info.edid_bytes_count);
       // TODO(https://fxbug.dev/348695412): Merge and de-duplicate the modes in
       // `preferred_modes` from the logic above.
       return InitEdidFromBytes(edid_bytes);
