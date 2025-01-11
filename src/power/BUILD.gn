@@ -26,6 +26,7 @@ group("battery") {
 
 group("drivers") {
   deps = [
+    "fake-powersensor:fake_power_sensor_package",
     "fake-powersource:fake_battery_component",
     "power-manager/testing/fake_driver:component",
     "power-manager/testing/fake_driver:component2",
@@ -50,6 +51,7 @@ group("tests") {
     "bench:integration",
     "broker:tests",
     "cpu-manager:tests",
+    "fake-powersensor:tests",
     "fake-powersource:tests",
     "fidl/testing",
     "metrics-logger:tests",
