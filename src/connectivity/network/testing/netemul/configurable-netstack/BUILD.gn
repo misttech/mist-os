@@ -66,15 +66,6 @@ fuchsia_component("netstack2-fast-udp") {
   visibility = netstack2_visibility
 }
 
-fuchsia_component("configurable-netstack-netstack3") {
-  testonly = true
-  manifest = "meta/configurable-netstack-netstack3.cml"
-  deps = [
-    ":bin",
-    "//src/connectivity/network/netstack3:component-debug",
-  ]
-}
-
 fuchsia_component("netstack3") {
   testonly = true
   component_name = "configurable-netstack-netstack3"
