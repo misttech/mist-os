@@ -100,6 +100,7 @@ rustc_binary("bin") {
     "src/match_common.rs",
     "src/resolved_driver.rs",
     "src/serde_ext.rs",
+    "src/test_common.rs",
   ]
 }
 

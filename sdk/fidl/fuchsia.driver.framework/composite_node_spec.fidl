@@ -12,7 +12,7 @@ type Condition = strict enum {
 
 /// Represents a bind rule in a parent specification.
 type BindRule = struct {
-    /// Property key.
+    /// Property key. Only string-based keys are supported.
     key NodePropertyKey;
 
     /// Condition for evaluating the property values in
@@ -32,7 +32,7 @@ type ParentSpec = struct {
     bind_rules vector<BindRule>:MAX_PROPERTY_COUNT;
 
     /// Properties for matching against a composite driver's bind rules.
-    /// Keys must be unique.
+    /// Keys must be unique and string-based.
     properties vector<NodeProperty>:MAX_PROPERTY_COUNT;
 };
 

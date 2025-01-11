@@ -37,6 +37,9 @@ mod match_common;
 mod resolved_driver;
 mod serde_ext;
 
+#[cfg(test)]
+mod test_common;
+
 /// Wraps all hosted protocols into a single type that can be matched against
 /// and dispatched.
 enum IncomingRequest {
@@ -652,10 +655,9 @@ mod tests {
     use super::*;
     use crate::composite_node_spec_manager::strip_parents_from_spec;
     use crate::resolved_driver::{DeviceCategoryDef, DriverPackageType};
-    use bind::compiler::{
-        CompiledBindRules, CompositeBindRules, CompositeNode, Symbol, SymbolicInstruction,
-        SymbolicInstructionInfo,
-    };
+    use crate::test_common::*;
+    use bind::compiler::test_lib::*;
+    use bind::compiler::{CompiledBindRules, CompositeBindRules, CompositeNode, Symbol};
     use bind::interpreter::decode_bind_rules::DecodedRules;
     use bind::parser::bind_library::ValueType;
     use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, Proxy};
@@ -962,13 +964,10 @@ mod tests {
     async fn test_bind_string() {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
-            instructions: vec![SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("my-key".to_string(), ValueType::Str),
-                    rhs: Symbol::StringValue("test-value".to_string()),
-                },
-            }],
+            instructions: vec![make_abort_ne_symbinst(
+                Symbol::Key("my-key".to_string(), ValueType::Str),
+                Symbol::StringValue("test-value".to_string()),
+            )],
             symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
@@ -1001,10 +1000,10 @@ mod tests {
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
-            let property = fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("my-key".to_string()),
-                value: fdf::NodePropertyValue::StringValue("test-value".to_string()),
-            };
+            let property = make_property(
+                "my-key",
+                fdf::NodePropertyValue::StringValue("test-value".to_string()),
+            );
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
@@ -1038,13 +1037,10 @@ mod tests {
     async fn test_bind_enum() {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
-            instructions: vec![SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("my-key".to_string(), ValueType::Enum),
-                    rhs: Symbol::EnumValue("test-value".to_string()),
-                },
-            }],
+            instructions: vec![make_abort_ne_symbinst(
+                Symbol::Key("my-key".to_string(), ValueType::Enum),
+                Symbol::EnumValue("test-value".to_string()),
+            )],
             symbol_table: HashMap::new(),
             use_new_bytecode: true,
             enable_debug: false,
@@ -1077,10 +1073,11 @@ mod tests {
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
-            let property = fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("my-key".to_string()),
-                value: fdf::NodePropertyValue::EnumValue("test-value".to_string()),
-            };
+            let property = make_property(
+                "my-key",
+                fdf::NodePropertyValue::EnumValue("test-value".to_string()),
+            );
+
             let args =
                 fdi::MatchDriverArgs { properties: Some(vec![property]), ..Default::default() };
 
@@ -1976,46 +1973,29 @@ mod tests {
 
         let test_task = async move {
             let bind_rules = vec![
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    condition: fdf::Condition::Accept,
-                    values: vec![
+                make_accept_list(
+                    "testkey_1",
+                    vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
-                },
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    condition: fdf::Condition::Accept,
-                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-                },
+                ),
+                make_accept("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
 
-            let properties = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let properties = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
-            let composite_spec = fdf::CompositeNodeSpec {
-                name: Some("test_group".to_string()),
-                parents: Some(vec![fdf::ParentSpec {
-                    bind_rules: bind_rules,
-                    properties: properties,
-                }]),
-                ..Default::default()
-            };
+            let composite_spec =
+                make_composite_spec("test_spec", vec![make_parent_spec(bind_rules, properties)]);
 
             assert_eq!(Ok(()), proxy.add_composite_node_spec(&composite_spec).await.unwrap());
 
             let device_properties_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    value: fdf::NodePropertyValue::IntValue(200),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("plover".to_string()),
-                },
+                make_property("testkey_1", fdf::NodePropertyValue::IntValue(200)),
+                make_property("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
@@ -2036,14 +2016,11 @@ mod tests {
             );
 
             let device_properties_mismatch = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    value: fdf::NodePropertyValue::IntValue(200),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("dotterel".to_string()),
-                },
+                make_property("testkey_1", fdf::NodePropertyValue::IntValue(200)),
+                make_property(
+                    "lapwing",
+                    fdf::NodePropertyValue::StringValue("dotterel".to_string()),
+                ),
             ];
             let mismatch_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_mismatch),
@@ -2074,49 +2051,34 @@ mod tests {
 
         let test_task = async move {
             let bind_rules = vec![
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    condition: fdf::Condition::Accept,
-                    values: vec![
+                make_accept_list(
+                    "testkey_1",
+                    vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
-                },
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    condition: fdf::Condition::Accept,
-                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-                },
+                ),
+                make_accept("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
 
-            let properties = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let properties = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
             // Load in a bunch of composite node specs that will match later.
             for i in 1..400 {
-                let composite_spec = fdf::CompositeNodeSpec {
-                    name: Some(format!("test_group_{}", i).to_string()),
-                    parents: Some(vec![fdf::ParentSpec {
-                        bind_rules: bind_rules.clone(),
-                        properties: properties.clone(),
-                    }]),
-                    ..Default::default()
-                };
+                let composite_spec = make_composite_spec(
+                    format!("test_group_{}", i).as_str(),
+                    vec![make_parent_spec(bind_rules.clone(), properties.clone())],
+                );
 
                 assert_eq!(Ok(()), proxy.add_composite_node_spec(&composite_spec).await.unwrap());
             }
 
             let device_properties_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    value: fdf::NodePropertyValue::IntValue(200),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("plover".to_string()),
-                },
+                make_property("testkey_1", fdf::NodePropertyValue::IntValue(200)),
+                make_property("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
@@ -2151,29 +2113,20 @@ mod tests {
     #[fuchsia::test]
     async fn test_add_composite_node_spec_matched_composite() {
         // Create the Composite Bind rules.
-        let primary_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("trembler".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("thrasher".to_string()),
-            },
-        }];
+        let primary_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("trembler".to_string(), ValueType::Str),
+            Symbol::StringValue("thrasher".to_string()),
+        )];
 
         let additional_node_inst = vec![
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                    rhs: Symbol::StringValue("catbird".to_string()),
-                },
-            },
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("catbird".to_string(), ValueType::Number),
-                    rhs: Symbol::NumberValue(1),
-                },
-            },
+            make_abort_ne_symbinst(
+                Symbol::Key("thrasher".to_string(), ValueType::Str),
+                Symbol::StringValue("catbird".to_string()),
+            ),
+            make_abort_ne_symbinst(
+                Symbol::Key("catbird".to_string(), ValueType::Number),
+                Symbol::NumberValue(1),
+            ),
         ];
 
         let bind_rules = CompositeBindRules {
@@ -2218,60 +2171,47 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let node_1_bind_rules = vec![
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    condition: fdf::Condition::Accept,
-                    values: vec![
+                make_accept_list(
+                    "testkey_1",
+                    vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
-                },
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    condition: fdf::Condition::Accept,
-                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-                },
+                ),
+                make_accept("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
 
-            let node_1_props_match = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let node_1_props_match = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
-            let node_2_bind_rules = vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            }];
+            let node_2_bind_rules =
+                vec![make_accept("testkey_1", fdf::NodePropertyValue::IntValue(10))];
 
             let node_2_props_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
-                    value: fdf::NodePropertyValue::IntValue(1),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
-                },
+                make_property("catbird", fdf::NodePropertyValue::IntValue(1)),
+                make_property(
+                    "thrasher",
+                    fdf::NodePropertyValue::StringValue("catbird".to_string()),
+                ),
             ];
 
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("spec_match".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_match.clone(),
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_match.clone(),
-                            },
-                        ]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(&make_composite_spec (
+                        "spec_match",
+                        vec![
+                            make_parent_spec(
+                                node_1_bind_rules.clone(),
+                                node_1_props_match.clone(),
+                            ),
+                            make_parent_spec(
+                                node_2_bind_rules.clone(),
+                                node_2_props_match.clone(),
+                            ),
+                        ]))
                     .await
                     .unwrap()
             );
@@ -2284,46 +2224,32 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("spec_non_match_1".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_nonmatch,
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_match,
-                            },
-                        ]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(&make_composite_spec(
+                        "spec_non_match_1",
+                        vec![
+                            make_parent_spec(node_1_bind_rules.clone(), node_1_props_nonmatch),
+                            make_parent_spec(node_2_bind_rules.clone(), node_2_props_match)
+                        ]
+                    ))
                     .await
                     .unwrap()
             );
 
             let node_2_props_nonmatch = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(1),
+                key: fdf::NodePropertyKey::StringValue("testkey_1".to_string()),
                 value: fdf::NodePropertyValue::IntValue(10),
             }];
 
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("spec_non_match_2".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_match,
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_nonmatch,
-                            },
-                        ]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(&make_composite_spec(
+                        "spec_non_match_2",
+                        vec![
+                            make_parent_spec(node_1_bind_rules.clone(), node_1_props_match),
+                            make_parent_spec(node_2_bind_rules.clone(), node_2_props_nonmatch)
+                        ]
+                    ))
                     .await
                     .unwrap()
             );
@@ -2342,38 +2268,26 @@ mod tests {
     #[fuchsia::test]
     async fn test_add_composite_node_spec_no_optional_matched_composite_with_optional() {
         // Create the Composite Bind rules.
-        let primary_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("trembler".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("thrasher".to_string()),
-            },
-        }];
+        let primary_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("trembler".to_string(), ValueType::Str),
+            Symbol::StringValue("thrasher".to_string()),
+        )];
 
         let additional_node_inst = vec![
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                    rhs: Symbol::StringValue("catbird".to_string()),
-                },
-            },
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("catbird".to_string(), ValueType::Number),
-                    rhs: Symbol::NumberValue(1),
-                },
-            },
+            make_abort_ne_symbinst(
+                Symbol::Key("thrasher".to_string(), ValueType::Str),
+                Symbol::StringValue("catbird".to_string()),
+            ),
+            make_abort_ne_symbinst(
+                Symbol::Key("catbird".to_string(), ValueType::Number),
+                Symbol::NumberValue(1),
+            ),
         ];
 
-        let optional_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("trembler".to_string()),
-            },
-        }];
+        let optional_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("thrasher".to_string(), ValueType::Str),
+            Symbol::StringValue("trembler".to_string()),
+        )];
 
         let bind_rules = CompositeBindRules {
             device_name: "mimid".to_string(),
@@ -2420,60 +2334,46 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let node_1_bind_rules = vec![
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    condition: fdf::Condition::Accept,
-                    values: vec![
+                make_accept_list(
+                    "testkey_1",
+                    vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
-                },
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    condition: fdf::Condition::Accept,
-                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-                },
+                ),
+                make_accept("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
 
-            let node_1_props_match = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let node_1_props_match = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
-            let node_2_bind_rules = vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            }];
+            let node_2_bind_rules =
+                vec![make_accept("testkey_1", fdf::NodePropertyValue::IntValue(10))];
 
             let node_2_props_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
-                    value: fdf::NodePropertyValue::IntValue(1),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
-                },
+                make_property("catbird", fdf::NodePropertyValue::IntValue(1)),
+                make_property(
+                    "thrasher",
+                    fdf::NodePropertyValue::StringValue("catbird".to_string()),
+                ),
             ];
 
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("spec_match".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_match.clone(),
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_match.clone(),
-                            },
-                        ]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(&make_composite_spec(
+                        "spec_match",
+                        vec![
+                            make_parent_spec(node_1_bind_rules.clone(), node_1_props_match.clone()),
+                            make_parent_spec(
+                                node_2_bind_rules.clone(),
+                                node_2_props_match.clone(),
+                            ),
+
+                        ]
+                    ))
                     .await
                     .unwrap()
             );
@@ -2486,46 +2386,32 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("spec_non_match_1".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_nonmatch,
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_match,
-                            },
-                        ]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(&make_composite_spec(
+                        "spec_non_match_1",
+                        vec![
+                            make_parent_spec(node_1_bind_rules.clone(), node_1_props_nonmatch),
+                            make_parent_spec(node_2_bind_rules.clone(), node_2_props_match)
+                        ]
+                    ))
                     .await
                     .unwrap()
             );
 
             let node_2_props_nonmatch = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(1),
+                key: fdf::NodePropertyKey::StringValue("testkey_1".to_string()),
                 value: fdf::NodePropertyValue::IntValue(10),
             }];
 
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("spec_non_match_2".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_match,
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_nonmatch,
-                            },
-                        ]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(&make_composite_spec(
+                        "spec_non_match_2",
+                        vec![
+                            make_parent_spec(node_1_bind_rules.clone(), node_1_props_match),
+                            make_parent_spec(node_2_bind_rules.clone(), node_2_props_nonmatch)
+                        ]
+                    ))
                     .await
                     .unwrap()
             );
@@ -2544,38 +2430,26 @@ mod tests {
     #[fuchsia::test]
     async fn test_add_composite_node_spec_with_optional_matched_composite_with_optional() {
         // Create the Composite Bind rules.
-        let primary_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("trembler".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("thrasher".to_string()),
-            },
-        }];
+        let primary_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("trembler".to_string(), ValueType::Str),
+            Symbol::StringValue("thrasher".to_string()),
+        )];
 
         let additional_node_inst = vec![
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                    rhs: Symbol::StringValue("catbird".to_string()),
-                },
-            },
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("catbird".to_string(), ValueType::Number),
-                    rhs: Symbol::NumberValue(1),
-                },
-            },
+            make_abort_ne_symbinst(
+                Symbol::Key("thrasher".to_string(), ValueType::Str),
+                Symbol::StringValue("catbird".to_string()),
+            ),
+            make_abort_ne_symbinst(
+                Symbol::Key("catbird".to_string(), ValueType::Number),
+                Symbol::NumberValue(1),
+            ),
         ];
 
-        let optional_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("trembler".to_string()),
-            },
-        }];
+        let optional_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("thrasher".to_string(), ValueType::Str),
+            Symbol::StringValue("trembler".to_string()),
+        )];
 
         let bind_rules = CompositeBindRules {
             device_name: "mimid".to_string(),
@@ -2622,78 +2496,63 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let node_1_bind_rules = vec![
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    condition: fdf::Condition::Accept,
-                    values: vec![
+                make_accept_list(
+                    "testkey_1",
+                    vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
-                },
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    condition: fdf::Condition::Accept,
-                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-                },
+                ),
+                make_accept("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
 
-            let node_1_props_match = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let node_1_props_match = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
-            let optional_1_bind_rules = vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(2),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            }];
+            let optional_1_bind_rules =
+                vec![make_accept("testkey_1", fdf::NodePropertyValue::IntValue(10))];
 
             let optional_1_props_match = vec![fdf::NodeProperty {
                 key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
                 value: fdf::NodePropertyValue::StringValue("trembler".to_string()),
             }];
 
-            let node_2_bind_rules = vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            }];
+            let node_2_bind_rules =
+                vec![make_accept("testkey_1", fdf::NodePropertyValue::IntValue(10))];
 
             let node_2_props_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
-                    value: fdf::NodePropertyValue::IntValue(1),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
-                },
+                make_property("catbird", fdf::NodePropertyValue::IntValue(1)),
+                make_property(
+                    "thrasher",
+                    fdf::NodePropertyValue::StringValue("catbird".to_string()),
+                ),
             ];
 
             assert_eq!(
-                Ok(()),
-                proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("spec_match".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_match.clone(),
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: optional_1_bind_rules.clone(),
-                                properties: optional_1_props_match.clone(),
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_match.clone(),
-                            },
-                        ]),
-                        ..Default::default()
-                    })
-                    .await
-                    .unwrap()
-            );
+                    Ok(()),
+                    proxy
+                        .add_composite_node_spec(&make_composite_spec(
+                            "spec_match",
+                            vec![
+                                make_parent_spec(
+                                    node_1_bind_rules.clone(),
+                                    node_1_props_match.clone(),
+                                ),
+                                make_parent_spec(
+                                    optional_1_bind_rules.clone(),
+                                    optional_1_props_match.clone(),
+                                ),
+                                make_parent_spec(
+                                    node_2_bind_rules.clone(),
+                                    node_2_props_match.clone(),
+                                )
+                            ]
+                        ))
+                        .await
+                        .unwrap()
+                );
         }
         .fuse();
 
@@ -2709,29 +2568,20 @@ mod tests {
     #[fuchsia::test]
     async fn test_add_composite_node_spec_then_driver() {
         // Create the Composite Bind rules.
-        let primary_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("trembler".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("thrasher".to_string()),
-            },
-        }];
+        let primary_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("trembler".to_string(), ValueType::Str),
+            Symbol::StringValue("thrasher".to_string()),
+        )];
 
         let additional_node_inst = vec![
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                    rhs: Symbol::StringValue("catbird".to_string()),
-                },
-            },
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("catbird".to_string(), ValueType::Number),
-                    rhs: Symbol::NumberValue(1),
-                },
-            },
+            make_abort_ne_symbinst(
+                Symbol::Key("thrasher".to_string(), ValueType::Str),
+                Symbol::StringValue("catbird".to_string()),
+            ),
+            make_abort_ne_symbinst(
+                Symbol::Key("catbird".to_string(), ValueType::Number),
+                Symbol::NumberValue(1),
+            ),
         ];
 
         let bind_rules = CompositeBindRules {
@@ -2765,74 +2615,56 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let node_1_bind_rules = vec![
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    condition: fdf::Condition::Accept,
-                    values: vec![
+                make_accept_list(
+                    "testkey_1",
+                    vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
-                },
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    condition: fdf::Condition::Accept,
-                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-                },
+                ),
+                make_accept("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
 
-            let node_1_props_match = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let node_1_props_match = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
-            let node_2_bind_rules = vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            }];
+            let node_2_bind_rules =
+                vec![make_accept("testkey_1", fdf::NodePropertyValue::IntValue(10))];
 
             let node_2_props_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
-                    value: fdf::NodePropertyValue::IntValue(1),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
-                },
+                make_property("catbird", fdf::NodePropertyValue::IntValue(1)),
+                make_property(
+                    "thrasher",
+                    fdf::NodePropertyValue::StringValue("catbird".to_string()),
+                ),
             ];
 
             // When we add the spec it should get not found since there's no drivers.
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("test_group".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_match.clone(),
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_match,
-                            },
-                        ]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(
+                        &make_composite_spec("test_spec",
+                        vec![
+                            make_parent_spec(
+                                 node_1_bind_rules.clone(),
+                                 node_1_props_match.clone(),
+                            ),
+                            make_parent_spec(
+                                node_2_bind_rules.clone(),
+                                node_2_props_match,
+                            ),
+                        ]
+                    ))
                     .await
                     .unwrap()
             );
 
             let device_properties_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    value: fdf::NodePropertyValue::IntValue(200),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("plover".to_string()),
-                },
+                make_property("testkey_1", fdf::NodePropertyValue::IntValue(200)),
+                make_property("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
@@ -2902,38 +2734,26 @@ mod tests {
     #[fuchsia::test]
     async fn test_add_composite_node_spec_no_optional_then_driver_with_optional() {
         // Create the Composite Bind rules.
-        let primary_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("trembler".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("thrasher".to_string()),
-            },
-        }];
+        let primary_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("trembler".to_string(), ValueType::Str),
+            Symbol::StringValue("thrasher".to_string()),
+        )];
 
         let additional_node_inst = vec![
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                    rhs: Symbol::StringValue("catbird".to_string()),
-                },
-            },
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("catbird".to_string(), ValueType::Number),
-                    rhs: Symbol::NumberValue(1),
-                },
-            },
+            make_abort_ne_symbinst(
+                Symbol::Key("thrasher".to_string(), ValueType::Str),
+                Symbol::StringValue("catbird".to_string()),
+            ),
+            make_abort_ne_symbinst(
+                Symbol::Key("catbird".to_string(), ValueType::Number),
+                Symbol::NumberValue(1),
+            ),
         ];
 
-        let optional_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("trembler".to_string()),
-            },
-        }];
+        let optional_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("thrasher".to_string(), ValueType::Str),
+            Symbol::StringValue("trembler".to_string()),
+        )];
 
         let bind_rules = CompositeBindRules {
             device_name: "mimid".to_string(),
@@ -2969,74 +2789,53 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let node_1_bind_rules = vec![
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    condition: fdf::Condition::Accept,
-                    values: vec![
+                make_accept_list(
+                    "testkey_1",
+                    vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
-                },
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    condition: fdf::Condition::Accept,
-                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-                },
+                ),
+                make_accept("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
 
-            let node_1_props_match = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let node_1_props_match = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
-            let node_2_bind_rules = vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            }];
+            let node_2_bind_rules =
+                vec![make_accept("testkey_1", fdf::NodePropertyValue::IntValue(10))];
 
             let node_2_props_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
-                    value: fdf::NodePropertyValue::IntValue(1),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
-                },
+                make_property("catbird", fdf::NodePropertyValue::IntValue(1)),
+                make_property(
+                    "thrasher",
+                    fdf::NodePropertyValue::StringValue("catbird".to_string()),
+                ),
             ];
 
             // When we add the spec it should get not found since there's no drivers.
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("test_group".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_match.clone(),
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_match,
-                            },
-                        ]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(
+                        &make_composite_spec("test_spec",
+                            vec![make_parent_spec(
+                                 node_1_bind_rules.clone(),
+                                 node_1_props_match.clone(),
+                            ),
+                            make_parent_spec(
+                                node_2_bind_rules.clone(),
+                                node_2_props_match,
+                            )]))
                     .await
                     .unwrap()
             );
 
             let device_properties_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    value: fdf::NodePropertyValue::IntValue(200),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("plover".to_string()),
-                },
+                make_property("testkey_1", fdf::NodePropertyValue::IntValue(200)),
+                make_property("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
@@ -3106,38 +2905,26 @@ mod tests {
     #[fuchsia::test]
     async fn test_add_composite_node_spec_with_optional_then_driver_with_optional() {
         // Create the Composite Bind rules.
-        let primary_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("trembler".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("thrasher".to_string()),
-            },
-        }];
+        let primary_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("trembler".to_string(), ValueType::Str),
+            Symbol::StringValue("thrasher".to_string()),
+        )];
 
         let additional_node_inst = vec![
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                    rhs: Symbol::StringValue("catbird".to_string()),
-                },
-            },
-            SymbolicInstructionInfo {
-                location: None,
-                instruction: SymbolicInstruction::AbortIfNotEqual {
-                    lhs: Symbol::Key("catbird".to_string(), ValueType::Number),
-                    rhs: Symbol::NumberValue(1),
-                },
-            },
+            make_abort_ne_symbinst(
+                Symbol::Key("thrasher".to_string(), ValueType::Str),
+                Symbol::StringValue("catbird".to_string()),
+            ),
+            make_abort_ne_symbinst(
+                Symbol::Key("catbird".to_string(), ValueType::Number),
+                Symbol::NumberValue(1),
+            ),
         ];
 
-        let optional_node_inst = vec![SymbolicInstructionInfo {
-            location: None,
-            instruction: SymbolicInstruction::AbortIfNotEqual {
-                lhs: Symbol::Key("thrasher".to_string(), ValueType::Str),
-                rhs: Symbol::StringValue("trembler".to_string()),
-            },
-        }];
+        let optional_node_inst = vec![make_abort_ne_symbinst(
+            Symbol::Key("thrasher".to_string(), ValueType::Str),
+            Symbol::StringValue("trembler".to_string()),
+        )];
 
         let bind_rules = CompositeBindRules {
             device_name: "mimid".to_string(),
@@ -3173,48 +2960,34 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let node_1_bind_rules = vec![
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    condition: fdf::Condition::Accept,
-                    values: vec![
+                make_accept_list(
+                    "testkey_1",
+                    vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
-                },
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    condition: fdf::Condition::Accept,
-                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-                },
+                ),
+                make_accept("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
 
-            let node_1_props_match = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let node_1_props_match = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
-            let node_2_bind_rules = vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            }];
+            let node_2_bind_rules =
+                vec![make_accept("testkey_1", fdf::NodePropertyValue::IntValue(10))];
 
             let node_2_props_match = vec![
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
-                    value: fdf::NodePropertyValue::IntValue(1),
-                },
-                fdf::NodeProperty {
-                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
-                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
-                },
+                make_property("catbird", fdf::NodePropertyValue::IntValue(1)),
+                make_property(
+                    "thrasher",
+                    fdf::NodePropertyValue::StringValue("catbird".to_string()),
+                ),
             ];
 
-            let optional_1_bind_rules = vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(2),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            }];
+            let optional_1_bind_rules =
+                vec![make_accept("testkey_2", fdf::NodePropertyValue::IntValue(10))];
 
             let optional_1_props_match = vec![fdf::NodeProperty {
                 key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
@@ -3225,30 +2998,24 @@ mod tests {
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("test_group".to_string()),
-                        parents: Some(vec![
-                            fdf::ParentSpec {
-                                bind_rules: node_1_bind_rules.clone(),
-                                properties: node_1_props_match.clone(),
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: node_2_bind_rules.clone(),
-                                properties: node_2_props_match,
-                            },
-                            fdf::ParentSpec {
-                                bind_rules: optional_1_bind_rules.clone(),
-                                properties: optional_1_props_match,
-                            },
-                        ]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(&make_composite_spec("test_spec",
+                        vec![make_parent_spec(
+                                 node_1_bind_rules.clone(),
+                                 node_1_props_match.clone(),
+                            ),
+                            make_parent_spec(
+                                node_2_bind_rules.clone(),
+                                node_2_props_match,
+                            ),
+                            make_parent_spec(optional_1_bind_rules.clone(),
+                                optional_1_props_match
+                        )]))
                     .await
                     .unwrap()
             );
 
             let device_properties_match = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::IntValue(2),
+                key: fdf::NodePropertyKey::StringValue("testkey_2".to_string()),
                 value: fdf::NodePropertyValue::IntValue(10),
             }];
             let match_args = fdi::MatchDriverArgs {
@@ -3351,59 +3118,46 @@ mod tests {
 
         let test_task = async move {
             let bind_rules = vec![
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(1),
-                    condition: fdf::Condition::Accept,
-                    values: vec![
+                make_accept_list(
+                    "testkey_1",
+                    vec![
                         fdf::NodePropertyValue::IntValue(200),
                         fdf::NodePropertyValue::IntValue(150),
                     ],
-                },
-                fdf::BindRule {
-                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
-                    condition: fdf::Condition::Accept,
-                    values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-                },
+                ),
+                make_accept("lapwing", fdf::NodePropertyValue::StringValue("plover".to_string())),
             ];
 
             assert_eq!(
                 Ok(()),
                 proxy
-                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                        name: Some("test_group".to_string()),
-                        parents: Some(vec![fdf::ParentSpec {
-                            bind_rules: bind_rules,
-                            properties: vec![fdf::NodeProperty {
-                                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-                            }]
-                        }]),
-                        ..Default::default()
-                    })
+                    .add_composite_node_spec(&make_composite_spec(
+                        "test_spec",
+                        vec![make_parent_spec(
+                            bind_rules,
+                            vec![make_property(
+                                "trembler",
+                                fdf::NodePropertyValue::StringValue("thrasher".to_string())
+                            )]
+                        )]
+                    ))
                     .await
                     .unwrap()
             );
 
-            let duplicate_bind_rules = vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(200),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(2)],
-            }];
+            let duplicate_bind_rules =
+                vec![make_accept("dupe_key", fdf::NodePropertyValue::IntValue(2))];
 
-            let node_transform = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let node_transform = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
             let result = proxy
-                .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                    name: Some("test_group".to_string()),
-                    parents: Some(vec![fdf::ParentSpec {
-                        bind_rules: duplicate_bind_rules,
-                        properties: node_transform,
-                    }]),
-                    ..Default::default()
-                })
+                .add_composite_node_spec(&make_composite_spec(
+                    "test_spec",
+                    vec![make_parent_spec(duplicate_bind_rules, node_transform)],
+                ))
                 .await
                 .unwrap();
             assert_eq!(Err(Status::ALREADY_EXISTS.into_raw()), result);
@@ -3455,7 +3209,7 @@ mod tests {
         let test_task = async move {
             let bind_rules = vec![
                 fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(20),
+                    key: fdf::NodePropertyKey::StringValue("testkey20".to_string()),
                     condition: fdf::Condition::Accept,
                     values: vec![
                         fdf::NodePropertyValue::IntValue(200),
@@ -3463,26 +3217,22 @@ mod tests {
                     ],
                 },
                 fdf::BindRule {
-                    key: fdf::NodePropertyKey::IntValue(20),
+                    key: fdf::NodePropertyKey::StringValue("testkey20".to_string()),
                     condition: fdf::Condition::Accept,
                     values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
                 },
             ];
 
-            let node_transform = vec![fdf::NodeProperty {
-                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
-                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
-            }];
+            let node_transform = vec![make_property(
+                "trembler",
+                fdf::NodePropertyValue::StringValue("thrasher".to_string()),
+            )];
 
             let result = proxy
-                .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                    name: Some("test_group".to_string()),
-                    parents: Some(vec![fdf::ParentSpec {
-                        bind_rules: bind_rules,
-                        properties: node_transform,
-                    }]),
-                    ..Default::default()
-                })
+                .add_composite_node_spec(&make_composite_spec(
+                    "test_spec",
+                    vec![make_parent_spec(bind_rules, node_transform)],
+                ))
                 .await
                 .unwrap();
             assert_eq!(Err(Status::INVALID_ARGS.into_raw()), result);
