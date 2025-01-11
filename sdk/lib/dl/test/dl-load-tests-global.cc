@@ -27,42 +27,42 @@ using dl::testing::TestSym;
 // call foo() from has-foo-v2 and expect foo() to return 7 (from previously
 // loaded RTLD_GLOBAL foo-v2).
 TYPED_TEST(DlTests, GlobalDep) {
-  const auto kGlobalDepFile = TestShlib("libld-dep-foo-v2");
-  const auto kParentFile = TestShlib("libhas-foo-v2");
+  const auto kGlobalFooV2File = TestShlib("libld-dep-foo-v2");
+  const auto kHasFooV2File = TestShlib("libhas-foo-v2");
   constexpr int64_t kReturnValueFromGlobalDep = 7;
 
-  this->Needed({kGlobalDepFile});
+  this->Needed({kGlobalFooV2File});
 
-  auto open_global_dep = this->DlOpen(kGlobalDepFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(open_global_dep.is_ok()) << open_global_dep.error_value();
-  EXPECT_TRUE(open_global_dep.value());
+  auto open_global_foo_v2 = this->DlOpen(kGlobalFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_foo_v2.is_ok()) << open_global_foo_v2.error_value();
+  EXPECT_TRUE(open_global_foo_v2.value());
 
-  auto global_foo = this->DlSym(open_global_dep.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(global_foo.is_ok()) << global_foo.error_value();
-  ASSERT_TRUE(global_foo.value());
+  auto global_foo_v2_foo = this->DlSym(open_global_foo_v2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(global_foo_v2_foo.is_ok()) << global_foo_v2_foo.error_value();
+  ASSERT_TRUE(global_foo_v2_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(global_foo.value()), kReturnValueFromGlobalDep);
+  EXPECT_EQ(RunFunction<int64_t>(global_foo_v2_foo.value()), kReturnValueFromGlobalDep);
 
-  this->Needed({kParentFile});
+  this->Needed({kHasFooV2File});
 
-  auto open_parent = this->DlOpen(kParentFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(open_parent.is_ok()) << open_parent.error_value();
-  EXPECT_TRUE(open_parent.value());
+  auto open_has_foo_v2 = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_foo_v2.is_ok()) << open_has_foo_v2.error_value();
+  EXPECT_TRUE(open_has_foo_v2.value());
 
-  auto parent_call_foo = this->DlSym(open_parent.value(), TestSym("call_foo").c_str());
-  ASSERT_TRUE(parent_call_foo.is_ok()) << parent_call_foo.error_value();
-  ASSERT_TRUE(parent_call_foo.value());
+  auto has_foo_v2_call_foo = this->DlSym(open_has_foo_v2.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(has_foo_v2_call_foo.is_ok()) << has_foo_v2_call_foo.error_value();
+  ASSERT_TRUE(has_foo_v2_call_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(parent_call_foo.value()), kReturnValueFromGlobalDep);
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2_call_foo.value()), kReturnValueFromGlobalDep);
 
-  auto parent_foo = this->DlSym(open_parent.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(parent_foo.is_ok()) << parent_foo.error_value();
-  ASSERT_TRUE(parent_foo.value());
+  auto has_foo_v2_foo = this->DlSym(open_has_foo_v2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(has_foo_v2_foo.is_ok()) << has_foo_v2_foo.error_value();
+  ASSERT_TRUE(has_foo_v2_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(parent_foo.value()), kReturnValueFromGlobalDep);
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2_foo.value()), kReturnValueFromGlobalDep);
 
-  ASSERT_TRUE(this->DlClose(open_global_dep.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(open_parent.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_foo_v2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_has_foo_v2.value()).is_ok());
 }
 
 // Test that loaded global module will take precedence over dependency ordering.
@@ -72,46 +72,46 @@ TYPED_TEST(DlTests, GlobalDep) {
 // call foo() from has-foo-v1 and expect foo() to return 7 (from previously
 // loaded RTLD_GLOBAL foo-v2).
 TYPED_TEST(DlTests, GlobalPrecedence) {
-  const std::string kFile1 = TestShlib("libld-dep-foo-v2");
-  const std::string kFile2 = TestShlib("libhas-foo-v1");
-  const std::string kDepFile = TestShlib("libld-dep-foo-v1");
-  constexpr int64_t kReturnValueFromFooV1 = 2;
-  constexpr int64_t kReturnValueFromFooV2 = 7;
+  const std::string kGlobalFooV2File = TestShlib("libld-dep-foo-v2");
+  const std::string kHasFooV1File = TestShlib("libhas-foo-v1");
+  const std::string kFooV1File = TestShlib("libld-dep-foo-v1");
+  constexpr int64_t kFooV1ReturnValue = 2;
+  constexpr int64_t kFooV2ReturnValue = 7;
 
-  this->Needed({kFile1});
+  this->Needed({kGlobalFooV2File});
 
-  auto res1 = this->DlOpen(kFile1.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
-  EXPECT_TRUE(res1.value());
+  auto open_global_foo_v2 = this->DlOpen(kGlobalFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_foo_v2.is_ok()) << open_global_foo_v2.error_value();
+  EXPECT_TRUE(open_global_foo_v2.value());
 
-  auto sym1 = this->DlSym(res1.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
-  ASSERT_TRUE(sym1.value());
+  auto global_foo_v2_foo = this->DlSym(open_global_foo_v2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(global_foo_v2_foo.is_ok()) << global_foo_v2_foo.error_value();
+  ASSERT_TRUE(global_foo_v2_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(global_foo_v2_foo.value()), kFooV2ReturnValue);
 
-  this->Needed({kFile2, kDepFile});
+  this->Needed({kHasFooV1File, kFooV1File});
 
-  auto res2 = this->DlOpen(kFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
-  EXPECT_TRUE(res2.value());
+  auto open_has_foo_v1 = this->DlOpen(kHasFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_foo_v1.is_ok()) << open_has_foo_v1.error_value();
+  EXPECT_TRUE(open_has_foo_v1.value());
 
-  auto sym2 = this->DlSym(res2.value(), TestSym("call_foo").c_str());
-  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
-  ASSERT_TRUE(sym2.value());
+  auto has_foo_v1_call_foo = this->DlSym(open_has_foo_v1.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(has_foo_v1_call_foo.is_ok()) << has_foo_v1_call_foo.error_value();
+  ASSERT_TRUE(has_foo_v1_call_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v1_call_foo.value()), kFooV2ReturnValue);
 
   // dlsym will always use dependency ordering from the local scope when looking
   // up a symbol
-  auto sym3 = this->DlSym(res2.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(sym3.is_ok()) << sym3.error_value();
-  ASSERT_TRUE(sym3.value());
+  auto has_foo_v1_foo = this->DlSym(open_has_foo_v1.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(has_foo_v1_foo.is_ok()) << has_foo_v1_foo.error_value();
+  ASSERT_TRUE(has_foo_v1_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym3.value()), kReturnValueFromFooV1);
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v1_foo.value()), kFooV1ReturnValue);
 
-  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_foo_v2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_has_foo_v1.value()).is_ok());
 }
 
 // Test that RTLD_GLOBAL applies to deps and load order will take precedence in
@@ -122,47 +122,48 @@ TYPED_TEST(DlTests, GlobalPrecedence) {
 //   - foo-v2 -> foo() returns 7
 // call foo from has-foo-v2 and expect 2.
 TYPED_TEST(DlTests, GlobalPrecedenceDeps) {
-  const std::string kFile1 = TestShlib("libhas-foo-v1");
-  const std::string kDepFile1 = TestShlib("libld-dep-foo-v1");
-  const std::string kFile2 = TestShlib("libhas-foo-v2");
-  const std::string kDepFile2 = TestShlib("libld-dep-foo-v2");
-  constexpr int64_t kReturnValueFromFooV1 = 2;
-  constexpr int64_t kReturnValueFromFooV2 = 7;
+  const std::string GlobalFooV1ParentFile = TestShlib("libhas-foo-v1");
+  const std::string kFooV1File = TestShlib("libld-dep-foo-v1");
+  const std::string kHasFooV2File = TestShlib("libhas-foo-v2");
+  const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
+  constexpr int64_t kFooV1ReturnValue = 2;
+  constexpr int64_t kFooV2ReturnValue = 7;
 
-  this->Needed({kFile1, kDepFile1});
+  this->Needed({GlobalFooV1ParentFile, kFooV1File});
 
-  auto res1 = this->DlOpen(kFile1.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
-  EXPECT_TRUE(res1.value());
+  auto open_global_has_foo_v1 = this->DlOpen(GlobalFooV1ParentFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_has_foo_v1.is_ok()) << open_global_has_foo_v1.error_value();
+  EXPECT_TRUE(open_global_has_foo_v1.value());
 
-  auto sym1 = this->DlSym(res1.value(), TestSym("call_foo").c_str());
-  ASSERT_TRUE(sym1.is_ok()) << sym1.error_value();
-  ASSERT_TRUE(sym1.value());
+  auto global_has_foo_v1_call_foo =
+      this->DlSym(open_global_has_foo_v1.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(global_has_foo_v1_call_foo.is_ok()) << global_has_foo_v1_call_foo.error_value();
+  ASSERT_TRUE(global_has_foo_v1_call_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym1.value()), kReturnValueFromFooV1);
+  EXPECT_EQ(RunFunction<int64_t>(global_has_foo_v1_call_foo.value()), kFooV1ReturnValue);
 
-  this->Needed({kFile2, kDepFile2});
+  this->Needed({kHasFooV2File, kFooV2File});
 
-  auto res2 = this->DlOpen(kFile2.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
-  EXPECT_TRUE(res2.value());
+  auto open_has_foo_v2 = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_has_foo_v2.is_ok()) << open_has_foo_v2.error_value();
+  EXPECT_TRUE(open_has_foo_v2.value());
 
-  auto sym2 = this->DlSym(res2.value(), TestSym("call_foo").c_str());
-  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
-  ASSERT_TRUE(sym2.value());
+  auto has_foo_v2_call_foo = this->DlSym(open_has_foo_v2.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(has_foo_v2_call_foo.is_ok()) << has_foo_v2_call_foo.error_value();
+  ASSERT_TRUE(has_foo_v2_call_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValueFromFooV1);
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2_call_foo.value()), kFooV1ReturnValue);
 
   // dlsym will always use dependency ordering from the local scope when looking
   // up a symbol
-  auto sym3 = this->DlSym(res2.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(sym3.is_ok()) << sym3.error_value();
-  ASSERT_TRUE(sym3.value());
+  auto has_foo_v2_foo = this->DlSym(open_has_foo_v2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(has_foo_v2_foo.is_ok()) << has_foo_v2_foo.error_value();
+  ASSERT_TRUE(has_foo_v2_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym3.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2_foo.value()), kFooV2ReturnValue);
 
-  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_has_foo_v1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_has_foo_v2.value()).is_ok());
 }
 
 // Test that missing dep will use global symbol if there's a loaded global
@@ -173,39 +174,41 @@ TYPED_TEST(DlTests, GlobalPrecedenceDeps) {
 // call missing_sym() from missing-sym and expect 6 (4 + 2 from previously
 // loaded module).
 TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
-  const std::string kFile1 = TestShlib("libld-dep-defines-missing-sym");
-  const std::string kFile2 = TestModule("missing-sym");
-  const std::string kDepFile = TestShlib("libld-dep-missing-sym-dep");
+  const std::string kGlobalDefinesSymFile = TestShlib("libld-dep-defines-missing-sym");
+  const std::string kMissingSymFile = TestModule("missing-sym");
+  const std::string kMissingSymDepFile = TestShlib("libld-dep-missing-sym-dep");
   constexpr int64_t kReturnValue = 6;
 
-  this->Needed({kFile1});
+  this->Needed({kGlobalDefinesSymFile});
 
-  auto res1 = this->DlOpen(kFile1.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(res1.is_ok()) << res1.error_value();
-  EXPECT_TRUE(res1.value());
+  auto open_global_defines_sym =
+      this->DlOpen(kGlobalDefinesSymFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_defines_sym.is_ok()) << open_global_defines_sym.error_value();
+  EXPECT_TRUE(open_global_defines_sym.value());
 
-  this->ExpectRootModule(kFile2);
-  this->Needed({kDepFile});
+  this->ExpectRootModule(kMissingSymFile);
+  this->Needed({kMissingSymDepFile});
 
-  auto res2 = this->DlOpen(kFile2.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(res2.is_ok()) << res2.error_value();
-  EXPECT_TRUE(res2.value());
+  auto open_missing_sym = this->DlOpen(kMissingSymFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_missing_sym.is_ok()) << open_missing_sym.error_value();
+  EXPECT_TRUE(open_missing_sym.value());
 
-  auto sym2 = this->DlSym(res2.value(), TestSym("TestStart").c_str());
-  ASSERT_TRUE(sym2.is_ok()) << sym2.error_value();
-  ASSERT_TRUE(sym2.value());
+  auto global_sym = this->DlSym(open_missing_sym.value(), TestSym("TestStart").c_str());
+  ASSERT_TRUE(global_sym.is_ok()) << global_sym.error_value();
+  ASSERT_TRUE(global_sym.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValue);
+  EXPECT_EQ(RunFunction<int64_t>(global_sym.value()), kReturnValue);
 
   const std::string symbol_name = TestSym("missing-sym");
 
   // dlsym will not be able to find the global symbol from the local scope
-  auto sym3 = this->DlSym(res2.value(), symbol_name.c_str());
-  ASSERT_TRUE(sym3.is_error()) << sym3.error_value();
-  EXPECT_THAT(sym3.error_value().take_str(), IsUndefinedSymbolErrMsg(symbol_name, kFile2));
+  auto local_sym = this->DlSym(open_missing_sym.value(), symbol_name.c_str());
+  ASSERT_TRUE(local_sym.is_error()) << local_sym.error_value();
+  EXPECT_THAT(local_sym.error_value().take_str(),
+              IsUndefinedSymbolErrMsg(symbol_name, kMissingSymFile));
 
-  ASSERT_TRUE(this->DlClose(res1.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(res2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_defines_sym.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_missing_sym.value()).is_ok());
 }
 
 // Test dlopen-ing a previously non-global loaded module with RTLD_GLOBAL will
@@ -220,74 +223,74 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
 // Call foo() from bar_v1() and get 7 from RTLD_GLOBAL foo-v2
 TYPED_TEST(DlTests, UpdateModeToGlobal) {
   const std::string kHasFooV1File = TestShlib("libhas-foo-v1");
-  const std::string kFooV1DepFile = TestShlib("libld-dep-foo-v1");
+  const std::string kFooV1File = TestShlib("libld-dep-foo-v1");
   const std::string kHasFooV2File = TestShlib("libhas-foo-v2");
-  const std::string kFooV2DepFile = TestShlib("libld-dep-foo-v2");
+  const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
   const std::string kBarV1File = TestShlib("libbar-v1");
-  constexpr int64_t kReturnValueFromFooV1 = 2;
-  constexpr int64_t kReturnValueFromFooV2 = 7;
+  constexpr int64_t kFooV1ReturnValue = 2;
+  constexpr int64_t kFooV2ReturnValue = 7;
 
-  this->Needed({kHasFooV1File, kFooV1DepFile});
+  this->Needed({kHasFooV1File, kFooV1File});
 
-  auto local_foo_v1_open = this->DlOpen(kHasFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(local_foo_v1_open.is_ok()) << local_foo_v1_open.error_value();
-  EXPECT_TRUE(local_foo_v1_open.value());
+  auto open_has_foo_v1 = this->DlOpen(kHasFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_foo_v1.is_ok()) << open_has_foo_v1.error_value();
+  EXPECT_TRUE(open_has_foo_v1.value());
 
-  auto local_foo_v1 = this->DlSym(local_foo_v1_open.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(local_foo_v1.is_ok()) << local_foo_v1.error_value();
-  EXPECT_TRUE(local_foo_v1.value());
-
-  // Confirm the resolved symbol is from the local dependency.
-  EXPECT_EQ(RunFunction<int64_t>(local_foo_v1.value()), kReturnValueFromFooV1);
-
-  this->Needed({kHasFooV2File, kFooV2DepFile});
-
-  auto local_foo_v2_open = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(local_foo_v2_open.is_ok()) << local_foo_v2_open.error_value();
-  EXPECT_TRUE(local_foo_v2_open.value());
-
-  auto local_foo_v2 = this->DlSym(local_foo_v2_open.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(local_foo_v2.is_ok()) << local_foo_v2.error_value();
-  EXPECT_TRUE(local_foo_v2.value());
+  auto has_foo_v1_foo = this->DlSym(open_has_foo_v1.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(has_foo_v1_foo.is_ok()) << has_foo_v1_foo.error_value();
+  EXPECT_TRUE(has_foo_v1_foo.value());
 
   // Confirm the resolved symbol is from the local dependency.
-  EXPECT_EQ(RunFunction<int64_t>(local_foo_v2.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v1_foo.value()), kFooV1ReturnValue);
+
+  this->Needed({kHasFooV2File, kFooV2File});
+
+  auto open_has_foo_v2 = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_foo_v2.is_ok()) << open_has_foo_v2.error_value();
+  EXPECT_TRUE(open_has_foo_v2.value());
+
+  auto has_foo_v2_foo = this->DlSym(open_has_foo_v2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(has_foo_v2_foo.is_ok()) << has_foo_v2_foo.error_value();
+  EXPECT_TRUE(has_foo_v2_foo.value());
+
+  // Confirm the resolved symbol is from the local dependency.
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2_foo.value()), kFooV2ReturnValue);
 
   // Dlopen the file and promote it and its dep (foo-v2) to global modules
   // (expecting the files to already be loaded).
-  auto global_foo_v2_open =
+  auto open_global_has_foo_v2 =
       this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
-  ASSERT_TRUE(global_foo_v2_open.is_ok()) << global_foo_v2_open.error_value();
-  EXPECT_TRUE(global_foo_v2_open.value());
+  ASSERT_TRUE(open_global_has_foo_v2.is_ok()) << open_global_has_foo_v2.error_value();
+  EXPECT_TRUE(open_global_has_foo_v2.value());
 
-  EXPECT_EQ(local_foo_v2_open.value(), global_foo_v2_open.value());
+  EXPECT_EQ(open_has_foo_v2.value(), open_global_has_foo_v2.value());
 
   this->Needed({kBarV1File});
 
   // Dlopen a new file that depends on a previously-loaded non-global dependency.
-  auto local_bar_v1_open = this->DlOpen(kBarV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(local_bar_v1_open.is_ok()) << local_bar_v1_open.error_value();
-  EXPECT_TRUE(local_bar_v1_open.value());
+  auto open_bar_v1 = this->DlOpen(kBarV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_bar_v1.is_ok()) << open_bar_v1.error_value();
+  EXPECT_TRUE(open_bar_v1.value());
 
   // Expect the resolved symbol to be provided by the global module.
-  auto local_bar_v1 = this->DlSym(local_bar_v1_open.value(), TestSym("bar_v1").c_str());
-  ASSERT_TRUE(local_bar_v1.is_ok()) << local_bar_v1.error_value();
-  EXPECT_TRUE(local_bar_v1.value());
+  auto bar_v1 = this->DlSym(open_bar_v1.value(), TestSym("bar_v1").c_str());
+  ASSERT_TRUE(bar_v1.is_ok()) << bar_v1.error_value();
+  EXPECT_TRUE(bar_v1.value());
 
   if constexpr (TestFixture::kStrictLoadOrderPriority) {
     // Musl will prioritize the symbol that was loaded first (from foo-v1),
     // even though the file does not have global scope.
-    EXPECT_EQ(RunFunction<int64_t>(local_bar_v1.value()), kReturnValueFromFooV1);
+    EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kFooV1ReturnValue);
   } else {
     // Glibc & libdl will use the first global module that contains the symbol
     // (foo-v2)
-    EXPECT_EQ(RunFunction<int64_t>(local_bar_v1.value()), kReturnValueFromFooV2);
+    EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kFooV2ReturnValue);
   }
 
-  ASSERT_TRUE(this->DlClose(local_foo_v1_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(local_foo_v2_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(local_bar_v1_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(global_foo_v2_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_has_foo_v1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_has_foo_v2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_bar_v1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_has_foo_v2.value()).is_ok());
 }
 
 // Test that promoting a module to a global module, will change the "global load
@@ -299,72 +302,71 @@ TYPED_TEST(DlTests, UpdateModeToGlobal) {
 //  - foo-v1 -> foo() returns 7
 // call foo() from has-foo-v1 and expect 2 from the first loaded global foo-v2
 TYPED_TEST(DlTests, GlobalModuleOrdering) {
-  const std::string kFooV1DepFile = TestShlib("libld-dep-foo-v1");
-  const std::string kFooV2DepFile = TestShlib("libld-dep-foo-v2");
+  const std::string kFooV1File = TestShlib("libld-dep-foo-v1");
+  const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
   const std::string kHasFooV1File = TestShlib("libhas-foo-v1");
-  constexpr int64_t kReturnValueFromFooV1 = 2;
-  constexpr int64_t kReturnValueFromFooV2 = 7;
+  constexpr int64_t kFooV1ReturnValue = 2;
+  constexpr int64_t kFooV2ReturnValue = 7;
 
-  this->Needed({kFooV1DepFile});
+  this->Needed({kFooV1File});
 
-  auto local_foo_v1_open = this->DlOpen(kFooV1DepFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(local_foo_v1_open.is_ok()) << local_foo_v1_open.error_value();
-  EXPECT_TRUE(local_foo_v1_open.value());
+  auto open_foo_v1 = this->DlOpen(kFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_foo_v1.is_ok()) << open_foo_v1.error_value();
+  EXPECT_TRUE(open_foo_v1.value());
 
-  auto local_foo_v1 = this->DlSym(local_foo_v1_open.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(local_foo_v1.is_ok()) << local_foo_v1.error_value();
-  EXPECT_TRUE(local_foo_v1.value());
+  auto foo_v1_foo = this->DlSym(open_foo_v1.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(foo_v1_foo.is_ok()) << foo_v1_foo.error_value();
+  EXPECT_TRUE(foo_v1_foo.value());
 
   // Validity check foo() return value from foo-v1.
-  EXPECT_EQ(RunFunction<int64_t>(local_foo_v1.value()), kReturnValueFromFooV1);
+  EXPECT_EQ(RunFunction<int64_t>(foo_v1_foo.value()), kFooV1ReturnValue);
 
-  this->Needed({kFooV2DepFile});
+  this->Needed({kFooV2File});
 
-  auto global_foo_v2_open = this->DlOpen(kFooV2DepFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(global_foo_v2_open.is_ok()) << global_foo_v2_open.error_value();
-  EXPECT_TRUE(global_foo_v2_open.value());
+  auto open_global_foo_v2 = this->DlOpen(kFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_foo_v2.is_ok()) << open_global_foo_v2.error_value();
+  EXPECT_TRUE(open_global_foo_v2.value());
 
-  auto global_foo_v2 = this->DlSym(global_foo_v2_open.value(), TestSym("foo").c_str());
-  ASSERT_TRUE(global_foo_v2.is_ok()) << global_foo_v2.error_value();
-  EXPECT_TRUE(global_foo_v2.value());
+  auto global_foo_v2_foo = this->DlSym(open_global_foo_v2.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(global_foo_v2_foo.is_ok()) << global_foo_v2_foo.error_value();
+  EXPECT_TRUE(global_foo_v2_foo.value());
 
   // Validity check foo() return value from foo-v2.
-  EXPECT_EQ(RunFunction<int64_t>(global_foo_v2.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(global_foo_v2_foo.value()), kFooV2ReturnValue);
 
   // Promote foo-v1 to a global module (expecting it to already be loaded).
-  auto global_foo_v1_open =
-      this->DlOpen(kFooV1DepFile.c_str(), RTLD_NOW | RTLD_NOLOAD | RTLD_GLOBAL);
-  ASSERT_TRUE(global_foo_v1_open.is_ok()) << global_foo_v1_open.error_value();
-  EXPECT_TRUE(global_foo_v1_open.value());
+  auto open_global_foo_v1 = this->DlOpen(kFooV1File.c_str(), RTLD_NOW | RTLD_NOLOAD | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_foo_v1.is_ok()) << open_global_foo_v1.error_value();
+  EXPECT_TRUE(open_global_foo_v1.value());
 
-  EXPECT_EQ(local_foo_v1_open.value(), global_foo_v1_open.value());
+  EXPECT_EQ(open_foo_v1.value(), open_global_foo_v1.value());
 
   this->Needed({kHasFooV1File});
 
   // Test that has-foo-v1 will now resolve its foo symbol from the recently
   // promoted global foo-v1 module because it comes first in the load order of
   // global modules.
-  auto local_has_foo_v1_open = this->DlOpen(kHasFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(local_has_foo_v1_open.is_ok()) << local_has_foo_v1_open.error_value();
-  EXPECT_TRUE(local_has_foo_v1_open.value());
+  auto open_has_foo_v1 = this->DlOpen(kHasFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_foo_v1.is_ok()) << open_has_foo_v1.error_value();
+  EXPECT_TRUE(open_has_foo_v1.value());
 
-  auto local_has_foo_v1 = this->DlSym(local_has_foo_v1_open.value(), TestSym("call_foo").c_str());
-  ASSERT_TRUE(local_has_foo_v1.is_ok()) << local_has_foo_v1.error_value();
-  EXPECT_TRUE(local_has_foo_v1.value());
+  auto has_foo_v1_call_foo = this->DlSym(open_has_foo_v1.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(has_foo_v1_call_foo.is_ok()) << has_foo_v1_call_foo.error_value();
+  EXPECT_TRUE(has_foo_v1_call_foo.value());
 
   if constexpr (TestFixture::kStrictLoadOrderPriority) {
     // Musl will prioritize the symbol from the (global) module that was loaded
     // first (foo-v1).
-    EXPECT_EQ(RunFunction<int64_t>(local_has_foo_v1.value()), kReturnValueFromFooV1);
+    EXPECT_EQ(RunFunction<int64_t>(has_foo_v1_call_foo.value()), kFooV1ReturnValue);
   } else {
     // Glibc will use the module that was loaded first _with_ RTLD_GLOBAL.
-    EXPECT_EQ(RunFunction<int64_t>(local_has_foo_v1.value()), kReturnValueFromFooV2);
+    EXPECT_EQ(RunFunction<int64_t>(has_foo_v1_call_foo.value()), kFooV2ReturnValue);
   }
 
-  ASSERT_TRUE(this->DlClose(local_foo_v1_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(global_foo_v2_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(global_foo_v1_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(local_has_foo_v1_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_foo_v1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_foo_v2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_foo_v1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_has_foo_v1.value()).is_ok());
 }
 
 // This tests that calling dlopen(..., RTLD_GLOBAL) multiple times on a module
@@ -377,46 +379,46 @@ TYPED_TEST(DlTests, GlobalModuleOrdering) {
 // Call foo() from bar-v1 and get 7 from global foo-v2, because foo-v2 was
 // loaded first with RTLD_GLOBAL, and its order did not change.
 TYPED_TEST(DlTests, GlobalModuleOrderingMultiDlopen) {
-  const std::string kFooV2DepFile = TestShlib("libld-dep-foo-v2");
-  const std::string kFooV1DepFile = TestShlib("libld-dep-foo-v1");
-  const std::string kBarV2File = TestShlib("libbar-v1");
-  constexpr int64_t kReturnValueFromFooV2 = 7;
+  const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
+  const std::string kFooV1File = TestShlib("libld-dep-foo-v1");
+  const std::string kBarV1File = TestShlib("libbar-v1");
+  constexpr int64_t kFooV2ReturnValue = 7;
 
-  this->Needed({kFooV2DepFile});
+  this->Needed({kFooV2File});
 
-  auto global_foo_v2_open = this->DlOpen(kFooV2DepFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(global_foo_v2_open.is_ok()) << global_foo_v2_open.error_value();
-  EXPECT_TRUE(global_foo_v2_open.value());
+  auto open_global_foo_v2 = this->DlOpen(kFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_foo_v2.is_ok()) << open_global_foo_v2.error_value();
+  EXPECT_TRUE(open_global_foo_v2.value());
 
-  this->Needed({kFooV1DepFile});
+  this->Needed({kFooV1File});
 
-  auto global_foo_v1_open = this->DlOpen(kFooV1DepFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(global_foo_v1_open.is_ok()) << global_foo_v1_open.error_value();
-  EXPECT_TRUE(global_foo_v1_open.value());
+  auto open_global_foo_v1 = this->DlOpen(kFooV1File.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_foo_v1.is_ok()) << open_global_foo_v1.error_value();
+  EXPECT_TRUE(open_global_foo_v1.value());
 
-  auto global_foo_v2_open_again =
-      this->DlOpen(kFooV2DepFile.c_str(), RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
-  ASSERT_TRUE(global_foo_v2_open_again.is_ok()) << global_foo_v2_open_again.error_value();
-  EXPECT_TRUE(global_foo_v2_open_again.value());
+  auto open_global_foo_v2_again =
+      this->DlOpen(kFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open_global_foo_v2_again.is_ok()) << open_global_foo_v2_again.error_value();
+  EXPECT_TRUE(open_global_foo_v2_again.value());
 
-  EXPECT_EQ(global_foo_v2_open.value(), global_foo_v2_open_again.value());
+  EXPECT_EQ(open_global_foo_v2.value(), open_global_foo_v2_again.value());
 
-  this->ExpectRootModule(kBarV2File);
+  this->ExpectRootModule(kBarV1File);
 
-  auto local_bar_v1_open = this->DlOpen(kBarV2File.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(local_bar_v1_open.is_ok()) << local_bar_v1_open.error_value();
-  EXPECT_TRUE(local_bar_v1_open.value());
+  auto open_bar_v1 = this->DlOpen(kBarV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_bar_v1.is_ok()) << open_bar_v1.error_value();
+  EXPECT_TRUE(open_bar_v1.value());
 
-  auto local_bar_v1 = this->DlSym(local_bar_v1_open.value(), TestSym("bar_v1").c_str());
-  ASSERT_TRUE(local_bar_v1.is_ok()) << local_bar_v1.error_value();
-  EXPECT_TRUE(local_bar_v1.value());
+  auto bar_v1 = this->DlSym(open_bar_v1.value(), TestSym("bar_v1").c_str());
+  ASSERT_TRUE(bar_v1.is_ok()) << bar_v1.error_value();
+  EXPECT_TRUE(bar_v1.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(local_bar_v1.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kFooV2ReturnValue);
 
-  ASSERT_TRUE(this->DlClose(global_foo_v2_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(global_foo_v1_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(global_foo_v2_open_again.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(local_bar_v1_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_foo_v2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_foo_v1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_foo_v2_again.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_bar_v1.value()).is_ok());
 }
 
 // This tests that calling dlopen(..., RTLD_GLOBAL) with a previously loaded
@@ -430,47 +432,48 @@ TYPED_TEST(DlTests, GlobalModuleOrderingMultiDlopen) {
 // Call foo() from bar-v1 and get 7 from global foo-v2, because foo-v2 was
 // loaded first with RTLD_GLOBAL, and its order did not change.
 TYPED_TEST(DlTests, GlobalModuleOrderingOfDeps) {
-  const std::string kFooV2DepFile = TestShlib("libld-dep-foo-v2");
-  const std::string kParentFile = TestModule("multiple-foo-deps");
-  const std::string kFooV1DepFile = TestShlib("libld-dep-foo-v1");
-  const std::string kBarV2File = TestShlib("libbar-v1");
-  constexpr int64_t kReturnValueFromFooV2 = 7;
+  const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
+  const std::string kMultiFooDepsFile = TestModule("multiple-foo-deps");
+  const std::string kFooV1File = TestShlib("libld-dep-foo-v1");
+  const std::string kBarV1File = TestShlib("libbar-v1");
+  constexpr int64_t kFooV2ReturnValue = 7;
 
-  this->Needed({kFooV2DepFile});
+  this->Needed({kFooV2File});
 
-  auto global_foo_v2_open = this->DlOpen(kFooV2DepFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(global_foo_v2_open.is_ok()) << global_foo_v2_open.error_value();
-  EXPECT_TRUE(global_foo_v2_open.value());
+  auto open_global_foo_v2 = this->DlOpen(kFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_global_foo_v2.is_ok()) << open_global_foo_v2.error_value();
+  EXPECT_TRUE(open_global_foo_v2.value());
 
-  this->ExpectRootModule(kParentFile);
-  this->Needed({kFooV1DepFile});
+  this->ExpectRootModule(kMultiFooDepsFile);
+  this->Needed({kFooV1File});
 
-  auto global_parent_open = this->DlOpen(kParentFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(global_parent_open.is_ok()) << global_parent_open.error_value();
-  EXPECT_TRUE(global_parent_open.value());
+  auto open_multi_foo_deps = this->DlOpen(kMultiFooDepsFile.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_multi_foo_deps.is_ok()) << open_multi_foo_deps.error_value();
+  EXPECT_TRUE(open_multi_foo_deps.value());
 
-  auto global_parent = this->DlSym(global_parent_open.value(), TestSym("call_foo").c_str());
-  ASSERT_TRUE(global_parent.is_ok()) << global_parent.error_value();
-  EXPECT_TRUE(global_parent.value());
+  auto multi_foo_deps_call_foo =
+      this->DlSym(open_multi_foo_deps.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(multi_foo_deps_call_foo.is_ok()) << multi_foo_deps_call_foo.error_value();
+  EXPECT_TRUE(multi_foo_deps_call_foo.value());
 
   // Validity check foo() return value from first loaded (global) foo-v2.
-  EXPECT_EQ(RunFunction<int64_t>(global_parent.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(multi_foo_deps_call_foo.value()), kFooV2ReturnValue);
 
-  this->ExpectRootModule(kBarV2File);
+  this->ExpectRootModule(kBarV1File);
 
-  auto local_bar_v1_open = this->DlOpen(kBarV2File.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(local_bar_v1_open.is_ok()) << local_bar_v1_open.error_value();
-  EXPECT_TRUE(local_bar_v1_open.value());
+  auto open_bar_v1 = this->DlOpen(kBarV1File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_bar_v1.is_ok()) << open_bar_v1.error_value();
+  EXPECT_TRUE(open_bar_v1.value());
 
-  auto local_bar_v1 = this->DlSym(local_bar_v1_open.value(), TestSym("bar_v1").c_str());
-  ASSERT_TRUE(local_bar_v1.is_ok()) << local_bar_v1.error_value();
-  EXPECT_TRUE(local_bar_v1.value());
+  auto bar_v1 = this->DlSym(open_bar_v1.value(), TestSym("bar_v1").c_str());
+  ASSERT_TRUE(bar_v1.is_ok()) << bar_v1.error_value();
+  EXPECT_TRUE(bar_v1.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(local_bar_v1.value()), kReturnValueFromFooV2);
+  EXPECT_EQ(RunFunction<int64_t>(bar_v1.value()), kFooV2ReturnValue);
 
-  ASSERT_TRUE(this->DlClose(global_foo_v2_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(global_parent_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(local_bar_v1_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_global_foo_v2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_multi_foo_deps.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_bar_v1.value()).is_ok());
 }
 
 // TODO(https://fxbug.dev/338233824): Add more global module tests:
@@ -516,37 +519,38 @@ TYPED_TEST(DlTests, StartupModulesBasic) {
   const std::string kFooV1File = TestShlib("libld-dep-foo-v1");
   const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
   const std::string kHasFooV2File = TestShlib("libhas-foo-v2");
-  constexpr int64_t kReturnValueFromFooV1 = 2;
-  constexpr int64_t kReturnValueFromFooV2 = 7;
+  constexpr int64_t kFooV1ReturnValue = 2;
+  constexpr int64_t kFooV2ReturnValue = 7;
 
   // Make sure foo-v1, foo-v2 are linked in with this test by making direct
   // calls to their unique symbols.
-  EXPECT_EQ(foo_v1_StartupModulesBasic(), kReturnValueFromFooV1);
-  EXPECT_EQ(foo_v2_StartupModulesBasic(), kReturnValueFromFooV2);
+  EXPECT_EQ(foo_v1_StartupModulesBasic(), kFooV1ReturnValue);
+  EXPECT_EQ(foo_v2_StartupModulesBasic(), kFooV2ReturnValue);
 
-  auto foo_v1_open = this->DlOpen(kFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
-  ASSERT_TRUE(foo_v1_open.is_ok()) << foo_v1_open.error_value();
-  EXPECT_TRUE(foo_v1_open.value());
+  // Expect libld-dep-foo-v1/libld-dep-foo-v2 to already have been loaded at startup.
+  auto open_foo_v1 = this->DlOpen(kFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open_foo_v1.is_ok()) << open_foo_v1.error_value();
+  EXPECT_TRUE(open_foo_v1.value());
 
-  auto foo_v2_open = this->DlOpen(kFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
-  ASSERT_TRUE(foo_v2_open.is_ok()) << foo_v2_open.error_value();
-  EXPECT_TRUE(foo_v2_open.value());
+  auto open_foo_v2 = this->DlOpen(kFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open_foo_v2.is_ok()) << open_foo_v2.error_value();
+  EXPECT_TRUE(open_foo_v2.value());
 
   this->Needed({kHasFooV2File});
 
-  auto has_foov2_open = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(has_foov2_open.is_ok()) << has_foov2_open.error_value();
-  EXPECT_TRUE(has_foov2_open.value());
+  auto open_has_foo_v2 = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_foo_v2.is_ok()) << open_has_foo_v2.error_value();
+  EXPECT_TRUE(open_has_foo_v2.value());
 
-  auto has_foo_v2 = this->DlSym(has_foov2_open.value(), TestSym("call_foo").c_str());
-  ASSERT_TRUE(has_foo_v2.is_ok()) << has_foo_v2.error_value();
-  ASSERT_TRUE(has_foo_v2.value());
+  auto has_foo_v2_call_foo = this->DlSym(open_has_foo_v2.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(has_foo_v2_call_foo.is_ok()) << has_foo_v2_call_foo.error_value();
+  ASSERT_TRUE(has_foo_v2_call_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2.value()), kReturnValueFromFooV1);
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2_call_foo.value()), kFooV1ReturnValue);
 
-  ASSERT_TRUE(this->DlClose(foo_v1_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(foo_v2_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(has_foov2_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_foo_v1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_foo_v2.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_has_foo_v2.value()).is_ok());
 }
 
 // Test that global modules that are dlopen-ed are ordered after startup modules.
@@ -559,32 +563,32 @@ TYPED_TEST(DlTests, StartupModulesBasic) {
 TYPED_TEST(DlTests, StartupModulesPriorityOverGlobal) {
   const std::string kHasFooV1File = TestShlib("libhas-foo-v1");
   const std::string kHasFooV2File = TestShlib("libhas-foo-v2");
-  const std::string kFooV2DepFile = TestShlib("libld-dep-foo-v2");
-  constexpr int64_t kReturnValueFromFooV1 = 2;
+  const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
+  constexpr int64_t kFooV1ReturnValue = 2;
 
   // Make sure has-foo-v1 is linked in with this test by making a direct call to
   // its unique symbol.
-  EXPECT_EQ(call_foo_v1_StartupModulesPriorityOverGlobal(), kReturnValueFromFooV1);
+  EXPECT_EQ(call_foo_v1_StartupModulesPriorityOverGlobal(), kFooV1ReturnValue);
 
-  auto startup_parent_open =
-      this->DlOpen(kHasFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
-  ASSERT_TRUE(startup_parent_open.is_ok()) << startup_parent_open.error_value();
-  EXPECT_TRUE(startup_parent_open.value());
+  // Expect libhas-foo-v1 to already have been loaded at startup.
+  auto open_has_foo_v1 = this->DlOpen(kHasFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open_has_foo_v1.is_ok()) << open_has_foo_v1.error_value();
+  EXPECT_TRUE(open_has_foo_v1.value());
 
-  this->Needed({kHasFooV2File, kFooV2DepFile});
+  this->Needed({kHasFooV2File, kFooV2File});
 
-  auto has_foov2_open = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL);
-  ASSERT_TRUE(has_foov2_open.is_ok()) << has_foov2_open.error_value();
-  EXPECT_TRUE(has_foov2_open.value());
+  auto open_has_foo_v2 = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_GLOBAL);
+  ASSERT_TRUE(open_has_foo_v2.is_ok()) << open_has_foo_v2.error_value();
+  EXPECT_TRUE(open_has_foo_v2.value());
 
-  auto has_foo_v2 = this->DlSym(has_foov2_open.value(), TestSym("call_foo").c_str());
-  ASSERT_TRUE(has_foo_v2.is_ok()) << has_foo_v2.error_value();
-  ASSERT_TRUE(has_foo_v2.value());
+  auto has_foo_v2_call_foo = this->DlSym(open_has_foo_v2.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(has_foo_v2_call_foo.is_ok()) << has_foo_v2_call_foo.error_value();
+  ASSERT_TRUE(has_foo_v2_call_foo.value());
 
-  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2.value()), kReturnValueFromFooV1);
+  EXPECT_EQ(RunFunction<int64_t>(has_foo_v2_call_foo.value()), kFooV1ReturnValue);
 
-  ASSERT_TRUE(this->DlClose(startup_parent_open.value()).is_ok());
-  ASSERT_TRUE(this->DlClose(has_foov2_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_has_foo_v1.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_has_foo_v2.value()).is_ok());
 }
 
 }  // namespace
