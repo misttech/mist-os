@@ -17,10 +17,8 @@ fidl("fuchsia.scheduler.deprecated") {
     "//src/media/audio/audio_core/tools/output_pipeline_benchmark:*",
     "//vendor/google/media/*",
 
-    # Needed by the RoleManager, which implements this protocol.
+    # Needed by the RoleManager, which implements this protocol, and its tests.
     "//src/zircon/bin/role_manager:*",
-
-    # Needed by the ProfileProvider tests.
-    "//src/zircon/tests/profile",
+    "//src/zircon/bin/role_manager/tests/profile:*",
   ]
 }
