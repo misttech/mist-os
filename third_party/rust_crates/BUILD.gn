@@ -18684,7 +18684,7 @@ rust_library("zstd-safe-v5_0_2+zstd_1_5_2") {
 
   deps = []
   deps += [ ":libc-v0_2_158" ]
-  deps += [ ":zstd-sys-v2_0_1+zstd_1_5_2" ]
+  deps += [ ":zstd-sys-v2_0_1+zstd_1_5_5" ]
 
   rustenv = []
 
@@ -18704,10 +18704,10 @@ rust_library("zstd-safe-v5_0_2+zstd_1_5_2") {
   applicable_licenses = [ ":zstd-safe-v5_0_2+zstd_1_5_2.license" ]
 }
 
-rust_library("zstd-sys-v2_0_1+zstd_1_5_2") {
+rust_library("zstd-sys-v2_0_1+zstd_1_5_5") {
   crate_name = "zstd_sys"
   crate_root = "//third_party/rust_crates/forks/zstd-sys/src/lib.rs"
-  output_name = "zstd_sys-5bd6a773923f5de5"
+  output_name = "zstd_sys-6e9c89524257bc1f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -18718,8 +18718,8 @@ rust_library("zstd-sys-v2_0_1+zstd_1_5_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=5bd6a773923f5de5",
-    "-Cextra-filename=-5bd6a773923f5de5",
+    "-Cmetadata=6e9c89524257bc1f",
+    "-Cextra-filename=-6e9c89524257bc1f",
     "--cfg=feature=\"legacy\"",
     "--cfg=feature=\"std\"",
     "--cfg=feature=\"zdict_builder\"",

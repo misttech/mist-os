@@ -1118,7 +1118,11 @@ rustflags = [ "--cfg=zerocopy_derive_union_into_bytes" ]
 [gn.package.zstd-safe."5.0.2+zstd.1.5.2"]
 rustflags = []
 
-[gn.package.zstd-sys."2.0.1+zstd.1.5.2"]
+# Note that the zstd version we use on Fuchsia doesn't match the current zstd/zstd-safe crate,
+# however we do not rely on any new or experimental features outside of the existing APIs these
+# crates provide. When we do update the zstd/zstd-safe crates, we should ensure that we update the
+# zstd version pinned in the integration repo via the fuchsia/third_party/flower file accordingly.
+[gn.package.zstd-sys."2.0.1+zstd.1.5.5"]
 rustflags = []
 # It is a fork:
 uses_fuchsia_license = true
