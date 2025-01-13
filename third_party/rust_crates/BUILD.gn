@@ -250,7 +250,7 @@ group("ecdsa") {
 }
 
 group("either") {
-  public_deps = [ ":either-v1_8_0" ]
+  public_deps = [ ":either-v1_13_0" ]
 }
 
 group("elliptic-curve") {
@@ -4978,18 +4978,18 @@ rust_library("ecdsa-v0_14_8") {
   applicable_licenses = [ ":ecdsa-v0_14_8.license" ]
 }
 
-license("either-v1_8_0.license") {
+license("either-v1_13_0.license") {
   public_package_name = "either"
   license_files = [
-    "//third_party/rust_crates/vendor/either-1.8.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/either-1.8.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/either-1.13.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/either-1.13.0/LICENSE-MIT",
   ]
 }
 
-rust_library("either-v1_8_0") {
+rust_library("either-v1_13_0") {
   crate_name = "either"
-  crate_root = "//third_party/rust_crates/vendor/either-1.8.0/src/lib.rs"
-  output_name = "either-f4134ec734cf166b"
+  crate_root = "//third_party/rust_crates/vendor/either-1.13.0/src/lib.rs"
+  output_name = "either-4ca1980293bbeb89"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -4999,15 +4999,15 @@ rust_library("either-v1_8_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=f4134ec734cf166b",
-    "-Cextra-filename=-f4134ec734cf166b",
+    "-Cmetadata=4ca1980293bbeb89",
+    "-Cextra-filename=-4ca1980293bbeb89",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"use_std\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":either-v1_8_0.license" ]
+  applicable_licenses = [ ":either-v1_13_0.license" ]
 }
 
 license("elliptic-curve-v0_12_3.license") {
@@ -7656,7 +7656,7 @@ rust_library("itertools-v0_10_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":either-v1_8_0" ]
+  deps += [ ":either-v1_13_0" ]
 
   rustenv = []
 
@@ -7690,7 +7690,7 @@ rust_library("itertools-v0_8_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":either-v1_8_0" ]
+  deps += [ ":either-v1_13_0" ]
 
   rustenv = []
 
@@ -12245,7 +12245,7 @@ rust_library("rayon-v1_10_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":either-v1_8_0" ]
+  deps += [ ":either-v1_13_0" ]
   deps += [ ":rayon-core-v1_12_1" ]
 
   rustenv = []

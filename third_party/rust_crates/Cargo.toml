@@ -92,7 +92,7 @@ downcast-rs = "1.2.0"
 dyn-clone = "1.0.5"
 ecdsa = { version = "0.14.3", features = ["pkcs8"] }
 elliptic-curve = { version = "0.12.3", features = [ "ecdh" ] }
-either = "1.5.0"
+either = "1.13.0"
 eui48 = { version = "1.1.0", default-features = false, features = ["serde", "disp_hexstring"] }
 event-listener = "5.3.1"
 # TODO(https://fxbug.dev/112722): We're importing this explicitly for now, but eventually
