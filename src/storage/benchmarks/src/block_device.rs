@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use fidl_fuchsia_device::ControllerProxy;
 use fidl_fuchsia_io as fio;
+#[cfg(target_os = "fuchsia")]
+use fs_management::filesystem::BlockConnector;
 
 /// Block device configuration options.
 pub struct BlockDeviceConfig {
@@ -20,7 +21,8 @@ pub struct BlockDeviceConfig {
 pub trait BlockDevice: Send + Sync {
     fn dir(&self) -> &fio::DirectoryProxy;
 
-    fn controller(&self) -> &ControllerProxy;
+    #[cfg(target_os = "fuchsia")]
+    fn connector(&self) -> Box<dyn BlockConnector>;
 }
 
 /// A trait for constructing block devices.

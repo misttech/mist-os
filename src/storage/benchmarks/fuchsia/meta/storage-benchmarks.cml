@@ -25,6 +25,14 @@
             protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
         },
         {
+            service: [ "fuchsia.storage.partitions.PartitionService" ],
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.storage.partitions.PartitionsManager" ],
+            availability: "optional",
+        },
+        {
             storage: "custom_artifacts",
             path: "/custom_artifacts",
         },

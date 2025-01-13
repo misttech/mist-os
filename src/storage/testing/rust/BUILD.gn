@@ -16,6 +16,7 @@ rustc_library("storage-isolated-driver-manager") {
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.storage.partitions:fuchsia.storage.partitions_rust",
     "//sdk/lib/device-watcher/rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",

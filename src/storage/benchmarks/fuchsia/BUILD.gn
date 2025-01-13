@@ -11,7 +11,7 @@ import("//src/storage/testing/driver_test_realm.gni")
 rustc_library("framework") {
   testonly = true
   edition = "2021"
-  name = "fuchsia_storage_benchmarks_lib"
+  name = "fuchsia_storage_benchmarks"
   sources = [
     "src/block_devices.rs",
     "src/filesystems/blobfs.rs",
@@ -24,23 +24,29 @@ rustc_library("framework") {
     "src/filesystems/pkgdir.rs",
     "src/filesystems/testing.rs",
     "src/lib.rs",
+    "src/testing.rs",
   ]
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.storage.partitions:fuchsia.storage.partitions_rust",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
     "//sdk/rust/zx",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
     "//src/storage/benchmarks:framework",
     "//src/storage/benchmarks/fuchsia/pkgdir-component/fidl/test.pkgdir:test.pkgdir_rust",
+    "//src/storage/crypt/policy",
+    "//src/storage/crypt/zxcrypt",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/blob_writer:blob-writer",
@@ -54,6 +60,14 @@ rustc_library("framework") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
   ]
+  test_deps = [
+    "//src/lib/fuchsia",
+    "//src/storage/gpt/rust",
+    "//src/storage/lib/block_client/rust:block-client",
+    "//src/storage/lib/block_server:fake_block_server",
+    "//src/sys/test_runners:tmp_storage",
+  ]
+  with_unit_tests = true
 }
 
 rustc_binary("fuchsia-storage-benchmarks") {
@@ -86,12 +100,6 @@ rustc_binary("fuchsia-storage-benchmarks") {
     "//third_party/rust_crates:rand_xorshift",
     "//third_party/rust_crates:regex",
   ]
-  test_deps = [
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/test_util",
-    "//src/sys/test_runners:tmp_storage",
-  ]
-  with_unit_tests = true
 }
 
 fuchsia_test_component("fuchsia-storage-benchmarks-component") {
@@ -122,9 +130,8 @@ fuchsia_test_package("storage-benchmarks") {
 
 storage_driver_test_realm_v2_component(
     "fuchsia-storage-benchmarks-tests-component") {
-  component_name = "fuchsia-storage-benchmarks-tests"
   manifest = "meta/fuchsia-storage-benchmarks-tests.cml"
-  deps = [ ":fuchsia-storage-benchmarks_test" ]
+  deps = [ ":framework_test" ]
 }
 
 fuchsia_test_package("fuchsia-storage-benchmarks-tests") {

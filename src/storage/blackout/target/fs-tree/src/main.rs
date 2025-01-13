@@ -21,8 +21,8 @@ use rand::{Rng, SeedableRng};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use storage_isolated_driver_manager::{
-    create_random_guid, find_block_device, into_guid, wait_for_block_device, BlockDeviceMatcher,
-    Guid,
+    create_random_guid, find_block_device_devfs, into_guid, wait_for_block_device_devfs,
+    BlockDeviceMatcher, Guid,
 };
 
 const DATA_FILESYSTEM_FORMAT: &'static str = std::env!("DATA_FILESYSTEM_FORMAT");
@@ -54,7 +54,7 @@ async fn find_partition_helper(
         path.into()
     } else {
         log::info!("fs-tree blackout finding gpt for load gen");
-        find_block_device(&[BlockDeviceMatcher::Name(&device_label)])
+        find_block_device_devfs(&[BlockDeviceMatcher::Name(&device_label)])
             .await
             .context("finding block device")?
     };
@@ -192,14 +192,15 @@ impl Test for FsTree {
         let mut partition_path = if let Some(path) = device_path {
             log::info!("fs-tree blackout test using provided path");
             path.into()
-        } else if let Ok(path) = find_block_device(&[BlockDeviceMatcher::Name(&device_label)]).await
+        } else if let Ok(path) =
+            find_block_device_devfs(&[BlockDeviceMatcher::Name(&device_label)]).await
         {
             log::info!("fs-tree blackout test found existing partition");
             path
         } else {
             log::info!("fs-tree blackout test setting up gpt");
             let mut gpt_block_path =
-                find_block_device(&[BlockDeviceMatcher::ContentsMatch(DiskFormat::Gpt)])
+                find_block_device_devfs(&[BlockDeviceMatcher::ContentsMatch(DiskFormat::Gpt)])
                     .await
                     .context("finding gpt device failed")?;
             gpt_block_path.push("device_controller");
@@ -242,7 +243,7 @@ impl Test for FsTree {
                 .context("allocating test partition fidl error")?;
             zx::ok(status).context("allocating test partition returned error")?;
 
-            wait_for_block_device(&[
+            wait_for_block_device_devfs(&[
                 BlockDeviceMatcher::Name(&device_label),
                 BlockDeviceMatcher::TypeGuid(&BLACKOUT_TYPE_GUID),
             ])

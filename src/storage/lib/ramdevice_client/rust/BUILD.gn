@@ -24,6 +24,7 @@ rustc_library("ramdevice_client") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
+    "//src/storage/lib/fs_management/rust:fs_management",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]

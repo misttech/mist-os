@@ -2,17 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_device::ControllerProxy;
-use fidl_fuchsia_io as fio;
-use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use async_trait::async_trait;
+use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl_fuchsia_hardware_block_volume::VolumeMarker;
+use fs_management::filesystem::{
+    BlockConnector, DirBasedBlockConnector, ServingMultiVolumeFilesystem,
+};
+use fs_management::Fvm;
+use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use ramdevice_client::RamdiskClient;
 use storage_benchmarks::block_device::BlockDevice;
 use storage_benchmarks::{BlockDeviceConfig, BlockDeviceFactory};
-use storage_isolated_driver_manager::{fvm, zxcrypt};
+use storage_isolated_driver_manager::{create_random_guid, fvm};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
-use crate::block_devices::set_up_fvm_volume;
+use crate::block_devices::create_fvm_volume;
 
-const RAMDISK_FVM_SLICE_SIZE: usize = 1024 * 1024;
+pub const RAMDISK_FVM_SLICE_SIZE: usize = 1024 * 1024;
 
 /// Creates block devices on ramdisks.
 pub struct RamdiskFactory {
@@ -37,8 +43,9 @@ impl BlockDeviceFactory for RamdiskFactory {
 /// A ramdisk backed block device.
 pub struct Ramdisk {
     _ramdisk: RamdiskClient,
+    _fvm: ServingMultiVolumeFilesystem,
     volume_dir: fio::DirectoryProxy,
-    volume_controller: ControllerProxy,
+    _crypt_task: Option<fasync::Task<()>>,
 }
 
 impl Ramdisk {
@@ -49,28 +56,24 @@ impl Ramdisk {
             .await
             .expect("Failed to create RamdiskClient");
 
-        // TODO switch to component FVM
-        let volume_manager = fvm::set_up_fvm(
-            ramdisk.as_controller().expect("invalid controller"),
-            ramdisk.as_dir().expect("invalid directory proxy"),
-            RAMDISK_FVM_SLICE_SIZE,
+        let block_device = ramdisk.open().expect("Failed to connect to block").into_proxy();
+        fvm::format_for_fvm(&block_device, RAMDISK_FVM_SLICE_SIZE).expect("Failed to format FVM");
+
+        let fvm = fs_management::filesystem::Filesystem::from_boxed_config(
+            ramdisk.connector().unwrap(),
+            Box::new(Fvm::default()),
         )
+        .serve_multi_volume()
         .await
-        .expect("Failed to set up FVM");
-        let volume_dir = set_up_fvm_volume(&volume_manager, config.fvm_volume_size).await;
-        let volume_dir = if config.use_zxcrypt {
-            zxcrypt::set_up_insecure_zxcrypt(&volume_dir).await.expect("Failed to set up zxcrypt")
-        } else {
-            volume_dir
-        };
-
-        let volume_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
-            &volume_dir,
-            "device_controller",
+        .expect("Failed to serve FVM");
+        let volumes = connect_to_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumesMarker>(
+            fvm.exposed_dir(),
         )
-        .expect("failed to connect to the device controller");
+        .unwrap();
+        let (volume_dir, crypt_task) =
+            create_fvm_volume(&volumes, create_random_guid(), config).await;
 
-        Self { _ramdisk: ramdisk, volume_dir, volume_controller: volume_controller }
+        Self { _ramdisk: ramdisk, _fvm: fvm, volume_dir, _crypt_task: crypt_task }
     }
 }
 
@@ -79,7 +82,11 @@ impl BlockDevice for Ramdisk {
         &self.volume_dir
     }
 
-    fn connector(&self) -> &ControllerProxy {
-        &self.volume_controller
+    fn connector(&self) -> Box<dyn BlockConnector> {
+        let volume_dir = fuchsia_fs::directory::clone(&self.volume_dir).unwrap();
+        Box::new(DirBasedBlockConnector::new(
+            volume_dir,
+            format!("svc/{}", VolumeMarker::PROTOCOL_NAME),
+        ))
     }
 }

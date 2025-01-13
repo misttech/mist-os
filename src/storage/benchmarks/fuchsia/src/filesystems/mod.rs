@@ -89,8 +89,10 @@ impl FsManagementFilesystemInstance {
         crypt_client_fn: Option<CryptClientFn>,
         as_blob: bool,
     ) -> Self {
-        let mut fs =
-            fs_management::filesystem::Filesystem::new(block_device.controller().clone(), config);
+        let mut fs = fs_management::filesystem::Filesystem::from_boxed_config(
+            block_device.connector(),
+            Box::new(config),
+        );
         fs.format().await.expect("Failed to format the filesystem");
         let serving_filesystem = if fs.config().is_multi_volume() {
             let mut serving_filesystem =

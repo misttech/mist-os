@@ -4,3 +4,4 @@
 
 pub mod block_devices;
 pub mod filesystems;
+pub mod testing;

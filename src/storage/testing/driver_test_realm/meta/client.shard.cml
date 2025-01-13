@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/client.shard.cml" ],
+    include: [
+        "//src/storage/lib/fs_management/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     children: [
         {
             name: "storage_driver_test_realm",

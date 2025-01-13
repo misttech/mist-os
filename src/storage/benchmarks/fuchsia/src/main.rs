@@ -7,8 +7,8 @@ use crate::blob_benchmarks::{
     OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
     PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
 };
-use fuchsia_storage_benchmarks_lib::block_devices::FvmVolumeFactory;
-use fuchsia_storage_benchmarks_lib::filesystems::{
+use fuchsia_storage_benchmarks::block_devices::FvmInstance;
+use fuchsia_storage_benchmarks::filesystems::{
     Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest,
 };
 use regex::{Regex, RegexSetBuilder};
@@ -160,8 +160,14 @@ async fn main() {
     filter.case_insensitive(true);
     let filter = filter.build().unwrap();
 
-    let fvm_volume_factory = FvmVolumeFactory::new().await;
-    if fvm_volume_factory.is_none() {
+    // TODO(https://fxbug.dev/372555079): Detect storage-host configuration.  While we're at it,
+    // we can also detect Fxblob v.s. FVM and use that instead of trying to connect to the system
+    // FVM first.
+    let mut fvm_instance = FvmInstance::connect_to_system_fvm_devfs().await;
+    if fvm_instance.is_none() {
+        fvm_instance = FvmInstance::connect_to_test_fvm_devfs().await;
+    }
+    if fvm_instance.is_none() {
         log::warn!("Not running any tests -- neither FVM nor GPT could be found.");
         log::warn!("To run these test locally on an emulator, see the README.md.");
         return;
@@ -171,7 +177,7 @@ async fn main() {
     add_io_benchmarks(&mut benchmark_set);
     add_directory_benchmarks(&mut benchmark_set);
     add_blob_benchmarks(&mut benchmark_set);
-    let results = benchmark_set.run(fvm_volume_factory.as_ref().unwrap(), &filter).await;
+    let results = benchmark_set.run(fvm_instance.as_ref().unwrap(), &filter).await;
 
     results.write_table(std::io::stdout());
     if args.output_csv {

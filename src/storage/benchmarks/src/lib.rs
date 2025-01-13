@@ -221,9 +221,9 @@ impl BenchmarkSet {
 
     /// Runs all of the added benchmarks against their configured filesystems. The filesystems will
     /// be brought up on block devices created from `block_device_factory`.
-    pub async fn run<BDF: BlockDeviceFactory>(
+    pub async fn run(
         &self,
-        block_device_factory: &BDF,
+        block_device_factory: &dyn BlockDeviceFactory,
         filter: &RegexSet,
     ) -> BenchmarkSetResults {
         let mut results = Vec::new();

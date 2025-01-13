@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 
+# Generates a component with a storage-driver-test-realm.
 template("storage_driver_test_realm_v2_component") {
   fuchsia_unittest_component(target_name) {
     forward_variables_from(invoker, "*")
