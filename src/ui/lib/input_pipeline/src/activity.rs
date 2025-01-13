@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 #![cfg(fuchsia_api_level_at_least = "HEAD")]
 use anyhow::{Context, Error};
-use async_utils::hanging_get::server::{HangingGet, Publisher};
+use async_utils::hanging_get::server::{HangingGet, Publisher, Subscriber};
 use fidl_fuchsia_input_interaction::{
     NotifierRequest, NotifierRequestStream, NotifierWatchStateResponder, State,
 };
@@ -64,50 +64,99 @@ impl LeaseHolder {
     }
 }
 
-type NotifyFn = Box<dyn Fn(&State, NotifierWatchStateResponder) -> bool>;
+pub type NotifyFn = Box<dyn Fn(&State, NotifierWatchStateResponder) -> bool>;
+pub type InteractionStatePublisher = Publisher<State, NotifierWatchStateResponder, NotifyFn>;
+pub type InteractionStateSubscriber = Subscriber<State, NotifierWatchStateResponder, NotifyFn>;
 type InteractionHangingGet = HangingGet<State, NotifierWatchStateResponder, NotifyFn>;
-type StatePublisher = Publisher<State, NotifierWatchStateResponder, NotifyFn>;
 
-struct StateTransitioner {
+/// An [`ActivityManager`] tracks the state of user input interaction activity.
+pub struct ActivityManager {
+    // When `idle_threshold_ms` has transpired since the last user input
+    // interaction, the activity state will transition from active to idle.
     idle_threshold_ms: zx::MonotonicDuration,
+
+    // The task holding the timer-based idle transition after last user input.
     idle_transition_task: Cell<Option<Task<()>>>,
+
+    // Hanging get managing active/idle state publishers and subscribers.
+    interaction_hanging_get: RefCell<InteractionHangingGet>,
+
+    // The event time of the last user input interaction.
     last_event_time: RefCell<zx::MonotonicInstant>,
 
     // To support power management, the caller must provide `Some` value for
     // `lease_holder`. The existence of a `LeaseHolder` implies power framework
     // availability in the platform.
     lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
-    state_publisher: StatePublisher,
+
+    // The publisher used to set active/idle state with hanging-get subscribers.
+    state_publisher: InteractionStatePublisher,
 }
 
-impl StateTransitioner {
-    pub fn new(
-        initial_timestamp: zx::MonotonicInstant,
-        idle_threshold_ms: zx::MonotonicDuration,
-        state_publisher: StatePublisher,
-        lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
-    ) -> Self {
+impl ActivityManager {
+    /// Creates a new [`ActivityManager`] that listens for user input
+    /// input interactions and notifies clients of activity state changes.
+    pub async fn new(idle_threshold_ms: zx::MonotonicDuration, suspend_enabled: bool) -> Rc<Self> {
         log::info!(
             "Activity Manager is initialized with idle_threshold_ms: {:?}",
             idle_threshold_ms.into_millis()
         );
+
+        let lease_holder = match suspend_enabled {
+            true => {
+                let activity_governor = connect_to_protocol::<ActivityGovernorMarker>()
+                    .expect("connect to fuchsia.power.system.ActivityGovernor");
+                match LeaseHolder::new(activity_governor).await {
+                    Ok(holder) => Some(Rc::new(RefCell::new(holder))),
+                    Err(e) => {
+                        log::error!("Unable to integrate with power, system may incorrectly enter suspend: {:?}", e);
+                        None
+                    }
+                }
+            }
+            false => None,
+        };
+
+        Rc::new(Self::new_internal(idle_threshold_ms, zx::MonotonicInstant::get(), lease_holder))
+    }
+
+    #[cfg(test)]
+    /// Sets the initial idleness timer relative to fake time at 0 for tests.
+    async fn new_for_test(
+        idle_threshold_ms: zx::MonotonicDuration,
+        lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
+    ) -> Rc<Self> {
+        fuchsia_async::TestExecutor::advance_to(zx::MonotonicInstant::ZERO.into()).await;
+        Rc::new(Self::new_internal(idle_threshold_ms, zx::MonotonicInstant::ZERO, lease_holder))
+    }
+
+    fn new_internal(
+        idle_threshold_ms: zx::MonotonicDuration,
+        initial_timestamp: zx::MonotonicInstant,
+        lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
+    ) -> Self {
+        let initial_state = State::Active;
+        let interaction_hanging_get = ActivityManager::init_hanging_get(initial_state);
+        let state_publisher = interaction_hanging_get.new_publisher();
 
         let task = Self::create_idle_transition_task(
             initial_timestamp + idle_threshold_ms,
             state_publisher.clone(),
             lease_holder.clone(),
         );
+
         Self {
             idle_threshold_ms,
             idle_transition_task: Cell::new(Some(task)),
+            interaction_hanging_get: RefCell::new(interaction_hanging_get),
             last_event_time: RefCell::new(initial_timestamp),
             lease_holder,
             state_publisher,
         }
     }
 
-    pub async fn transition_to_active(
-        state_publisher: &StatePublisher,
+    async fn transition_to_active(
+        state_publisher: &InteractionStatePublisher,
         lease_holder: &Option<Rc<RefCell<LeaseHolder>>>,
     ) {
         if let Some(holder) = lease_holder {
@@ -121,9 +170,9 @@ impl StateTransitioner {
         state_publisher.set(State::Active);
     }
 
-    pub fn create_idle_transition_task(
+    fn create_idle_transition_task(
         timeout: zx::MonotonicInstant,
-        state_publisher: StatePublisher,
+        state_publisher: InteractionStatePublisher,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
     ) -> Task<()> {
         Task::local(async move {
@@ -133,7 +182,7 @@ impl StateTransitioner {
         })
     }
 
-    pub async fn transition_to_idle_after_new_time(&self, event_time: zx::MonotonicInstant) {
+    async fn transition_to_idle_after_new_time(&self, event_time: zx::MonotonicInstant) {
         if *self.last_event_time.borrow() > event_time {
             return;
         }
@@ -162,65 +211,6 @@ impl StateTransitioner {
 
         false
     }
-}
-
-/// An [`ActivityManager`] tracks the state of user input interaction activity.
-pub struct ActivityManager {
-    state_transitioner: StateTransitioner,
-    interaction_hanging_get: RefCell<InteractionHangingGet>,
-}
-
-impl ActivityManager {
-    /// Creates a new [`ActivityManager`] that listens for user input
-    /// input interactions and notifies clients of activity state changes.
-    pub async fn new(idle_threshold_ms: zx::MonotonicDuration, suspend_enabled: bool) -> Rc<Self> {
-        let lease_holder = match suspend_enabled {
-            true => {
-                let activity_governor = connect_to_protocol::<ActivityGovernorMarker>()
-                    .expect("connect to fuchsia.power.system.ActivityGovernor");
-                match LeaseHolder::new(activity_governor).await {
-                    Ok(holder) => Some(Rc::new(RefCell::new(holder))),
-                    Err(e) => {
-                        log::error!("Unable to integrate with power, system may incorrectly enter suspend: {:?}", e);
-                        None
-                    }
-                }
-            }
-            false => None,
-        };
-
-        Self::new_internal(idle_threshold_ms, zx::MonotonicInstant::get(), lease_holder).await
-    }
-
-    #[cfg(test)]
-    /// Sets the initial idleness timer relative to fake time at 0 for tests.
-    async fn new_for_test(
-        idle_threshold_ms: zx::MonotonicDuration,
-        lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
-    ) -> Rc<Self> {
-        fuchsia_async::TestExecutor::advance_to(zx::MonotonicInstant::ZERO.into()).await;
-        Self::new_internal(idle_threshold_ms, zx::MonotonicInstant::ZERO, lease_holder).await
-    }
-
-    async fn new_internal(
-        idle_threshold_ms: zx::MonotonicDuration,
-        initial_timestamp: zx::MonotonicInstant,
-        lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
-    ) -> Rc<Self> {
-        let initial_state = State::Active;
-        let interaction_hanging_get = ActivityManager::init_hanging_get(initial_state);
-        let state_publisher = interaction_hanging_get.new_publisher();
-
-        Rc::new(Self {
-            interaction_hanging_get: RefCell::new(interaction_hanging_get),
-            state_transitioner: StateTransitioner::new(
-                initial_timestamp,
-                idle_threshold_ms,
-                state_publisher,
-                lease_holder,
-            ),
-        })
-    }
 
     /// Handles the request stream for
     /// fuchsia.input.interaction.observation.Aggregator.
@@ -244,7 +234,7 @@ impl ActivityManager {
                         fuchsia_async::MonotonicInstant::now().into_zx(),
                     );
 
-                    self.state_transitioner.transition_to_idle_after_new_time(event_time).await;
+                    self.transition_to_idle_after_new_time(event_time).await;
 
                     let _: Result<(), fidl::Error> = responder.send();
                 }
@@ -288,11 +278,6 @@ impl ActivityManager {
         });
 
         InteractionHangingGet::new(initial_state, notify_fn)
-    }
-
-    #[cfg(test)]
-    fn is_holding_lease(&self) -> bool {
-        self.state_transitioner.is_holding_lease()
     }
 }
 
