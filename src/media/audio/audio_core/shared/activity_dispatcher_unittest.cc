@@ -21,8 +21,18 @@ using RenderUsage2Vector = std::vector<AudioRenderUsage2>;
 using CaptureUsageVector = std::vector<fuchsia::media::AudioCaptureUsage>;
 
 namespace {
+
 [[maybe_unused]] RenderActivity UsageVectorToActivity(
     const std::vector<AudioRenderUsage>& usage_vector) {
+  RenderActivity activity;
+  for (const auto& usage : usage_vector) {
+    activity.set(static_cast<uint32_t>(usage));
+  }
+  return activity;
+}
+
+[[maybe_unused]] RenderActivity UsageVectorToActivity(
+    const std::vector<fuchsia::media::AudioRenderUsage2>& usage_vector) {
   RenderActivity activity;
   for (const auto& usage : usage_vector) {
     activity.set(static_cast<uint32_t>(usage));
@@ -38,9 +48,11 @@ namespace {
   }
   return activity;
 }
+
 }  // namespace
 
-using UsageVectorTypes = ::testing::Types<RenderUsageVector, CaptureUsageVector>;
+using UsageVectorTypes =
+    ::testing::Types<RenderUsageVector, RenderUsage2Vector, CaptureUsageVector>;
 TYPED_TEST_SUITE(ActivityDispatcherTest, UsageVectorTypes);
 
 template <typename Type>
@@ -73,6 +85,12 @@ class ActivityDispatcherTest : public gtest::TestLoopFixture {
   }
 
   template <>
+  void WatchActivity<RenderUsage2Vector>(fuchsia::media::ActivityReporterPtr& reporter,
+                                         std::function<void(const RenderUsage2Vector& v)> cb) {
+    reporter->WatchRenderActivity2(cb);
+  }
+
+  template <>
   void WatchActivity<CaptureUsageVector>(fuchsia::media::ActivityReporterPtr& reporter,
                                          std::function<void(const CaptureUsageVector& v)> cb) {
     reporter->WatchCaptureActivity(cb);
@@ -86,6 +104,10 @@ class ActivityDispatcherTest : public gtest::TestLoopFixture {
 
   template <>
   void UpdateActivity<RenderUsageVector>(const RenderUsageVector& usage_vector) {
+    activity_dispatcher_.OnRenderActivityChanged(UsageVectorToActivity(usage_vector));
+  }
+  template <>
+  void UpdateActivity<RenderUsage2Vector>(const RenderUsage2Vector& usage_vector) {
     activity_dispatcher_.OnRenderActivityChanged(UsageVectorToActivity(usage_vector));
   }
 
@@ -107,6 +129,10 @@ class ActivityDispatcherTest : public gtest::TestLoopFixture {
     return {*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND)};
   }
   template <>
+  RenderUsage2Vector SingleVector<RenderUsage2Vector>() {
+    return {AudioRenderUsage2::BACKGROUND};
+  }
+  template <>
   CaptureUsageVector SingleVector<CaptureUsageVector>() {
     return {fuchsia::media::AudioCaptureUsage::BACKGROUND};
   }
@@ -120,6 +146,10 @@ class ActivityDispatcherTest : public gtest::TestLoopFixture {
   RenderUsageVector MultiVector<RenderUsageVector>() {
     return {*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND),
             *FromFidlRenderUsage2(AudioRenderUsage2::SYSTEM_AGENT)};
+  }
+  template <>
+  RenderUsage2Vector MultiVector<RenderUsage2Vector>() {
+    return {AudioRenderUsage2::BACKGROUND, AudioRenderUsage2::SYSTEM_AGENT};
   }
   template <>
   CaptureUsageVector MultiVector<CaptureUsageVector>() {

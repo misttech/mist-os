@@ -6,14 +6,20 @@
 library fuchsia.media;
 
 /// A protocol for monitoring the usage activity of the AudioRenderers and AudioCapturers.
-// TODO(https://fxbug.dev/384932846): add new protocol or method with |AudioRenderUsage2|
 // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
-@discoverable
-closed protocol ActivityReporter {
+@discoverable(server="platform")
+closed(removed=NEXT) open(added=NEXT) protocol ActivityReporter {
     /// Notifies the client whenever there is a change in the set of active AudioRenderUsages.
     /// It returns immediately the first time that it is called.
     strict WatchRenderActivity() -> (struct {
         active_usages vector<AudioRenderUsage>:RENDER_USAGE_COUNT;
+    });
+
+    /// Notifies the client whenever there is a change in the set of active AudioRenderUsages.
+    /// It returns immediately the first time that it is called.
+    @available(added=NEXT)
+    strict WatchRenderActivity2() -> (struct {
+        active_usages vector<AudioRenderUsage2>:MAX_USAGE_COUNT;
     });
 
     /// Notifies the client whenever there is a change in the set of active AudioCaptureUsages.

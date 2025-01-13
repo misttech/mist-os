@@ -14,6 +14,7 @@
 #include "src/media/audio/audio_core/shared/audio_admin.h"
 
 namespace media::audio {
+
 class ActivityDispatcherImpl : public AudioAdmin::ActivityDispatcher {
  public:
   ActivityDispatcherImpl();
@@ -36,12 +37,14 @@ class ActivityDispatcherImpl : public AudioAdmin::ActivityDispatcher {
   // Binds a new request to the underlying binding set.
   void Bind(fidl::InterfaceRequest<fuchsia::media::ActivityReporter> request);
 
-  // Last activity observerd by the dispatcher.
+  // Last activity observed by the dispatcher.
   RenderActivity last_known_render_activity_;
   CaptureActivity last_known_capture_activity_;
 
   fidl::BindingSet<fuchsia::media::ActivityReporter, std::unique_ptr<ActivityReporterImpl>>
       bindings_;
 };
+
 }  // namespace media::audio
+
 #endif  // SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_ACTIVITY_DISPATCHER_H_

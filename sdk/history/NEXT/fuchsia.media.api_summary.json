@@ -259,9 +259,17 @@
         "response": "fuchsia.media/ActivityReporterWatchRenderActivityResponse"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.media/ActivityReporter.WatchRenderActivity2",
+        "strictness": "strict",
+        "ordinal": "5206784575450342374",
+        "direction": "two_way",
+        "response": "fuchsia.media/ActivityReporterWatchRenderActivity2Response"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.media/ActivityReporter",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -273,6 +281,16 @@
     {
         "kind": "struct",
         "name": "fuchsia.media/ActivityReporterWatchCaptureActivityResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/ActivityReporterWatchRenderActivity2Response.active_usages",
+        "ordinal": "1",
+        "type": "vector<fuchsia.media/AudioRenderUsage2>:8"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/ActivityReporterWatchRenderActivity2Response"
     },
     {
         "kind": "struct/member",
