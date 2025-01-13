@@ -165,7 +165,7 @@ impl Coordinator {
         &self,
         id: Option<DisplayId>,
     ) -> Result<mpsc::UnboundedReceiver<VsyncEvent>> {
-        self.inner.read().proxy.enable_vsync(true)?;
+        self.inner.read().proxy.set_vsync_event_delivery(true)?;
 
         // TODO(armansito): Switch to a bounded channel instead.
         let (sender, receiver) = mpsc::unbounded::<VsyncEvent>();

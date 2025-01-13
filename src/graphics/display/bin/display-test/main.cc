@@ -210,7 +210,7 @@ static bool bind_display(const char* coordinator, async::Loop& coordinator_liste
     displays->push_back(display);
   }
 
-  if (!dc->EnableVsync(true).ok()) {
+  if (!dc->SetVsyncEventDelivery(true).ok()) {
     printf("Failed to enable vsync\n");
     return false;
   }

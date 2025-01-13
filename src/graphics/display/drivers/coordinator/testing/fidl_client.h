@@ -65,7 +65,7 @@ class TestFidlClient {
 
   bool HasOwnershipAndValidDisplay() const;
 
-  zx::result<> EnableVsync();
+  zx::result<> EnableVsyncEventDelivery();
 
   zx::result<display::ImageId> ImportImageWithSysmem(
       const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) TA_EXCL(mtx());

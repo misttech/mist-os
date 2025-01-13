@@ -160,9 +160,9 @@ bool TestFidlClient::HasOwnershipAndValidDisplay() const {
   return has_ownership_ && !displays_.is_empty();
 }
 
-zx::result<> TestFidlClient::EnableVsync() {
+zx::result<> TestFidlClient::EnableVsyncEventDelivery() {
   fbl::AutoLock lock(mtx());
-  return zx::make_result(dc_->EnableVsync(true).status());
+  return zx::make_result(dc_->SetVsyncEventDelivery(true).status());
 }
 
 TestFidlClient::~TestFidlClient() = default;

@@ -801,9 +801,9 @@ void Client::GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::S
   completer.Reply(ToFidlConfigStamp(latest_config_stamp_));
 }
 
-void Client::EnableVsync(EnableVsyncRequestView request,
-                         EnableVsyncCompleter::Sync& /*_completer*/) {
-  proxy_->EnableVsync(request->enable);
+void Client::SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,
+                                   SetVsyncEventDeliveryCompleter::Sync& /*_completer*/) {
+  proxy_->SetVsyncEventDelivery(request->vsync_delivery_enabled);
   // no Reply defined
 }
 
@@ -1481,7 +1481,7 @@ void Client::TearDown(zx_status_t epitaph) {
 
   // Break FIDL connections. First stop Vsync messages from the controller since there will be no
   // FIDL connections to forward the messages over.
-  proxy_->EnableVsync(false);
+  proxy_->SetVsyncEventDelivery(false);
   binding_->Close(epitaph);
   binding_.reset();
   coordinator_listener_.AsyncTeardown();
@@ -1753,7 +1753,7 @@ zx_status_t ClientProxy::OnDisplayVsync(display::DisplayId display_id, zx_time_t
 
   {
     fbl::AutoLock l(&mtx_);
-    if (!enable_vsync_) {
+    if (!vsync_delivery_enabled_) {
       return ZX_ERR_NOT_SUPPORTED;
     }
   }

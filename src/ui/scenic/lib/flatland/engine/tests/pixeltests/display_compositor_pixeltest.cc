@@ -317,7 +317,7 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
     std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator =
         display_manager_->default_display_coordinator();
     [[maybe_unused]] fit::result<fidl::OneWayStatus> enable_vsync_result =
-        (*display_coordinator)->EnableVsync(true);
+        (*display_coordinator)->SetVsyncEventDelivery(true);
   }
 
   void TearDown() override {

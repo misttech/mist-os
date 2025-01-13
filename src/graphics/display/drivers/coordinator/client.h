@@ -186,7 +186,8 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void ApplyConfig3(ApplyConfig3RequestView request,
                     ApplyConfigCompleter::Sync& _completer) override;
   void GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::Sync& _completer) override;
-  void EnableVsync(EnableVsyncRequestView request, EnableVsyncCompleter::Sync& _completer) override;
+  void SetVsyncEventDelivery(SetVsyncEventDeliveryRequestView request,
+                             SetVsyncEventDeliveryCompleter::Sync& _completer) override;
   void SetVirtconMode(SetVirtconModeRequestView request,
                       SetVirtconModeCompleter::Sync& _completer) override;
   void ImportBufferCollection(ImportBufferCollectionRequestView request,
@@ -351,9 +352,9 @@ class ClientProxy {
   void ReapplyConfig();
   zx_status_t OnCaptureComplete();
 
-  void EnableVsync(bool enable) {
+  void SetVsyncEventDelivery(bool vsync_delivery_enabled) {
     fbl::AutoLock lock(&mtx_);
-    enable_vsync_ = enable;
+    vsync_delivery_enabled_ = vsync_delivery_enabled;
   }
 
   void EnableCapture(bool enable) {
@@ -412,7 +413,7 @@ class ClientProxy {
   Controller* const controller_;
 
   Client handler_;
-  bool enable_vsync_ __TA_GUARDED(&mtx_) = false;
+  bool vsync_delivery_enabled_ __TA_GUARDED(&mtx_) = false;
   bool enable_capture_ __TA_GUARDED(&mtx_) = false;
 
   fbl::Mutex task_mtx_;

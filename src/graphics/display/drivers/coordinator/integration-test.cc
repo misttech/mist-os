@@ -58,8 +58,8 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
     }
     fbl::AutoLock cl(&CoordinatorController()->primary_client_->mtx_);
     return (CoordinatorController()->primary_client_ == CoordinatorController()->active_client_ &&
-            // DC processed the EnableVsync request. We can now expect vsync events.
-            CoordinatorController()->primary_client_->enable_vsync_);
+            // DC processed the SetVsyncEventDelivery request. We can now expect VSync events.
+            CoordinatorController()->primary_client_->vsync_delivery_enabled_);
   }
 
   bool virtcon_client_connected() {
@@ -85,7 +85,8 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
     client.reset();
     ClientProxy* client_ptr = CoordinatorController()->active_client_;
     EXPECT_OK(sync_completion_wait(client_ptr->handler_.fidl_unbound(), zx::sec(1).get()));
-    // EnableVsync(false) has not completed here, because we are still holding controller()->mtx()
+    // SetVsyncEventDelivery(false) has not completed here, because we are still
+    // holding controller()->mtx()
     client_ptr->OnDisplayVsync(display_id, 0, display::kInvalidConfigStamp);
   }
 
@@ -122,7 +123,7 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
                   "Failed to wait until client has ownership of the coordinator "
                   "and has a valid display");
 
-    zx::result<> enable_vsync_result = client->EnableVsync();
+    zx::result<> enable_vsync_result = client->EnableVsyncEventDelivery();
     ZX_ASSERT_MSG(enable_vsync_result.is_ok(), "Failed to enable Vsync for client: %s",
                   enable_vsync_result.status_string());
 
