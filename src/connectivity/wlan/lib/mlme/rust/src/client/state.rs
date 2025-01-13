@@ -10,7 +10,7 @@
 use crate::akm_algorithm as akm;
 use crate::block_ack::{BlockAckState, Closed};
 use crate::client::lost_bss::LostBssCounter;
-use crate::client::{BoundClient, Client, Context, ParsedAssociateResp, TimedEvent};
+use crate::client::{BoundClient, ParsedAssociateResp, TimedEvent};
 use crate::ddk_converter::{get_rssi_dbm, softmac_key_configuration_from_mlme};
 use crate::device::DeviceOps;
 use crate::disconnect::LocallyInitiated;
@@ -21,7 +21,7 @@ use log::{debug, error, info, trace, warn};
 use wlan_common::buffer_reader::BufferReader;
 use wlan_common::capabilities::{intersect_with_ap_as_client, ApCapabilities, StaCapabilities};
 use wlan_common::energy::DecibelMilliWatt;
-use wlan_common::mac::{self, BeaconHdr, PowerState};
+use wlan_common::mac::{self, BeaconHdr};
 use wlan_common::stats::SignalStrengthAverage;
 use wlan_common::timer::{EventId, Timer};
 use wlan_common::{ie, tim};
@@ -481,10 +481,8 @@ pub fn schedule_association_status_timeout(
     beacon_period: zx::MonotonicDuration,
     timer: &mut Timer<TimedEvent>,
 ) -> StatusCheckTimeout {
-    let last_fired = timer.now();
     let duration = beacon_period * ASSOCIATION_STATUS_TIMEOUT_BEACON_COUNT;
     StatusCheckTimeout {
-        last_fired,
         next_id: Some(timer.schedule_after(duration, TimedEvent::AssociationStatusCheck)),
     }
 }
@@ -513,7 +511,6 @@ impl Qos {
 
 #[derive(Debug)]
 pub struct StatusCheckTimeout {
-    last_fired: zx::MonotonicInstant,
     next_id: Option<EventId>,
 }
 
@@ -944,22 +941,6 @@ impl Associated {
                 schedule_association_status_timeout(sta.sta.beacon_period(), &mut sta.ctx.timer);
         }
         auto_deauth
-    }
-
-    fn off_channel<D: DeviceOps>(&mut self, sta: &mut Client, ctx: &mut Context<D>) {
-        if let Err(e) = sta.send_power_state_frame(ctx, PowerState::DOZE) {
-            warn!("unable to send doze frame: {:?}", e);
-        }
-        self.0.lost_bss_counter.add_time(ctx.timer.now() - self.0.status_check_timeout.last_fired);
-        self.0.status_check_timeout.next_id.take();
-    }
-
-    fn on_channel<D: DeviceOps>(&mut self, sta: &mut Client, ctx: &mut Context<D>) {
-        if let Err(e) = sta.send_power_state_frame(ctx, PowerState::AWAKE) {
-            warn!("unable to send awake frame: {:?}", e);
-        }
-        self.0.status_check_timeout =
-            schedule_association_status_timeout(sta.beacon_period(), &mut ctx.timer);
     }
 }
 
@@ -1392,24 +1373,6 @@ impl States {
             States::Associated(_) => class <= mac::FrameClass::Class3,
         }
     }
-
-    pub fn pre_switch_off_channel<D: DeviceOps>(&mut self, sta: &mut Client, ctx: &mut Context<D>) {
-        match self {
-            States::Associated(state) => {
-                state.off_channel(sta, ctx);
-            }
-            _ => (),
-        }
-    }
-
-    pub fn handle_back_on_channel<D: DeviceOps>(&mut self, sta: &mut Client, ctx: &mut Context<D>) {
-        match self {
-            States::Associated(state) => {
-                state.on_channel(sta, ctx);
-            }
-            _ => (),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -1475,7 +1438,7 @@ mod tests {
     use crate::client::channel_switch::ChannelState;
     use crate::client::scanner::Scanner;
     use crate::client::test_utils::drain_timeouts;
-    use crate::client::{ParsedConnectRequest, TimedEventClass};
+    use crate::client::{Client, Context, ParsedConnectRequest, TimedEventClass};
     use crate::device::{FakeDevice, FakeDeviceState};
     use crate::test_utils::{fake_set_keys_req, fake_wlan_channel, MockWlanRxInfo};
     use akm::AkmAlgorithm;

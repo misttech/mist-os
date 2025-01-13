@@ -31,7 +31,7 @@ use wlan_common::capabilities::{derive_join_capabilities, ClientCapabilities};
 use wlan_common::channel::Channel;
 use wlan_common::ie::rsn::rsne;
 use wlan_common::ie::{self, Id};
-use wlan_common::mac::{self, Aid, CapabilityInfo, PowerState};
+use wlan_common::mac::{self, Aid, CapabilityInfo};
 use wlan_common::sequence::SequenceManager;
 use wlan_common::time::TimeUnit;
 use wlan_common::timer::{EventId, Timer};
@@ -580,53 +580,6 @@ impl Client {
         channel_state: &'a mut ChannelState,
     ) -> BoundClient<'a, D> {
         BoundClient { sta: self, ctx, scanner, channel_state }
-    }
-
-    pub fn pre_switch_off_channel<D: DeviceOps>(&mut self, ctx: &mut Context<D>) {
-        // Safe to unwrap() because state is never None.
-        let mut state = self.state.take().unwrap();
-        state.pre_switch_off_channel(self, ctx);
-        self.state.replace(state);
-    }
-
-    pub fn handle_back_on_channel<D: DeviceOps>(&mut self, ctx: &mut Context<D>) {
-        // Safe to unwrap() because state is never None.
-        let mut state = self.state.take().unwrap();
-        state.handle_back_on_channel(self, ctx);
-        self.state.replace(state);
-    }
-
-    /// Sends a power management data frame to the associated AP indicating that the client has
-    /// entered the given power state. See `PowerState`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the data frame cannot be sent to the AP.
-    fn send_power_state_frame<D: DeviceOps>(
-        &mut self,
-        ctx: &mut Context<D>,
-        state: PowerState,
-    ) -> Result<(), Error> {
-        let buffer = write_frame!({
-            headers: {
-                mac::FixedDataHdrFields: &mac::FixedDataHdrFields {
-                    frame_ctrl: mac::FrameControl(0)
-                        .with_frame_type(mac::FrameType::DATA)
-                        .with_data_subtype(mac::DataSubtype(0).with_null(true))
-                        .with_power_mgmt(state)
-                        .with_to_ds(true),
-                    duration: 0,
-                    addr1: self.bssid().into(),
-                    addr2: self.iface_mac,
-                    addr3: self.bssid().into(),
-                    seq_ctrl: mac::SequenceControl(0)
-                        .with_seq_num(ctx.seq_mgr.next_sns1(&self.bssid().into()) as u16)
-                },
-            },
-        })?;
-        ctx.device
-            .send_wlan_frame(buffer, fidl_softmac::WlanTxInfoFlags::empty(), None)
-            .map_err(|error| Error::Status(format!("error sending power management frame"), error))
     }
 
     /// Only management and data frames should be processed. Furthermore, the source address should
@@ -2381,28 +2334,6 @@ mod tests {
         assert_eq!(received_key.key, Some(sent_key.key));
         assert_eq!(received_key.key_idx, Some(sent_key.key_id as u8));
         assert_eq!(received_key.key_type, Some(fidl_common::WlanKeyType::Pairwise));
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn send_ps_poll_frame() {
-        let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme().await;
-        me.make_client_station();
-        let mut client = me.get_bound_client().expect("client should be present");
-        client.send_ps_poll_frame(0xABCD).expect("failed sending PS POLL frame");
-    }
-
-    #[fuchsia::test(allow_stalls = false)]
-    async fn send_power_state_doze_frame_success() {
-        let mut m = MockObjects::new().await;
-        let mut me = m.make_mlme().await;
-        let mut client = make_client_station();
-        client
-            .send_power_state_frame(&mut me.ctx, PowerState::DOZE)
-            .expect("failed sending doze frame");
-        client
-            .send_power_state_frame(&mut me.ctx, PowerState::AWAKE)
-            .expect("failed sending awake frame");
     }
 
     #[fuchsia::test(allow_stalls = false)]
