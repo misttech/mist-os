@@ -4448,10 +4448,41 @@
         "request": "fuchsia.media/UsageGainReporterRegisterListenerRequest"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.media/UsageGainReporter.RegisterListener2",
+        "strictness": "strict",
+        "ordinal": "8505767098636788380",
+        "direction": "one_way",
+        "request": "fuchsia.media/UsageGainReporterRegisterListener2Request"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.media/UsageGainReporter",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/UsageGainReporterRegisterListener2Request.device_unique_id",
+        "ordinal": "1",
+        "type": "string:36"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/UsageGainReporterRegisterListener2Request.usage",
+        "ordinal": "2",
+        "type": "fuchsia.media/Usage2"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/UsageGainReporterRegisterListener2Request.usage_gain_listener",
+        "ordinal": "3",
+        "type": "client_end:fuchsia.media/UsageGainListener"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/UsageGainReporterRegisterListener2Request",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

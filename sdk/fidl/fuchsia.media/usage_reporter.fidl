@@ -73,8 +73,8 @@ closed protocol UsageWatcher2 {
 };
 
 /// A protocol for setting up watchers of usage gain.
-@discoverable
-closed protocol UsageGainReporter {
+@discoverable(server="platform")
+closed(removed=NEXT) open(added=NEXT) protocol UsageGainReporter {
     /// Connects a listener to a stream of usage gain setting changes
     /// for `usage` on the device identified by `device_token`. Usage
     /// Gain is not set directly by any client; it is a translation of
@@ -87,11 +87,30 @@ closed protocol UsageGainReporter {
     /// `AudioDeviceEnumerator` provides programmatic access to devices
     /// and their unique ids if it is necessary for a client to select
     /// an id at runtime.
-    // TODO(https://fxbug.dev/384932846): create new protocol or method with |Usage2|
     // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
+    @available(deprecated=NEXT, note="Use RegisterListener2 and Usage2")
     strict RegisterListener(resource struct {
         device_unique_id string:36;
         usage Usage;
+        usage_gain_listener client_end:UsageGainListener;
+    });
+
+    /// Connects a listener to a stream of usage gain setting changes
+    /// for `usage` on the device identified by `device_token`. Usage
+    /// Gain is not set directly by any client; it is a translation of
+    /// the usage volume setting for each device, summed with active
+    /// muting/ducking gain adjustments.
+    ///
+    /// Devices may map the same volume level to different dbfs, so
+    /// a `device_unique_id` is needed to identify the device.
+    ///
+    /// `AudioDeviceEnumerator` provides programmatic access to devices
+    /// and their unique ids if it is necessary for a client to select
+    /// an id at runtime.
+    @available(added=NEXT)
+    strict RegisterListener2(resource struct {
+        device_unique_id string:36;
+        usage Usage2;
         usage_gain_listener client_end:UsageGainListener;
     });
 };

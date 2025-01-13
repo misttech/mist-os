@@ -17,6 +17,12 @@ void UsageGainReporterImpl::RegisterListener(
     std::string device_unique_id, fuchsia::media::Usage _usage,
     fidl::InterfaceHandle<fuchsia::media::UsageGainListener> usage_gain_listener_handler) {
   auto usage = ToFidlUsage2(_usage);
+  RegisterListener2(device_unique_id, std::move(usage), std::move(usage_gain_listener_handler));
+}
+
+void UsageGainReporterImpl::RegisterListener2(
+    std::string device_unique_id, fuchsia::media::Usage2 usage,
+    fidl::InterfaceHandle<fuchsia::media::UsageGainListener> usage_gain_listener_handler) {
   const auto deserialize_result = DeviceUniqueIdFromString(device_unique_id);
   if (deserialize_result.is_error()) {
     FX_LOGS(WARNING) << "UsageGainReporter client provided invalid device id";

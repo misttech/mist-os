@@ -53,7 +53,7 @@ class FakeGainListener : public fuchsia::media::UsageGainListener {
 
 class TestDeviceLister : public DeviceLister {
  public:
-  void AddDeviceInfo(fuchsia::media::AudioDeviceInfo device_info) {
+  void AddDeviceInfo(const fuchsia::media::AudioDeviceInfo& device_info) {
     device_info_.push_back(device_info);
   }
 
@@ -85,24 +85,96 @@ class UsageGainReporterTest : public gtest::TestLoopFixture {
                 .Build()),
         usage_(fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA)) {}
 
-  std::unique_ptr<FakeGainListener> Listen(std::string device_id) {
+  enum class ListenerType : uint8_t { kOld, kNew };
+
+  std::unique_ptr<FakeGainListener> Listen(const std::string& device_id, ListenerType lt) {
     auto device_lister = std::make_unique<TestDeviceLister>();
     device_lister->AddDeviceInfo({.unique_id = device_id});
 
     stream_volume_manager_ = std::make_unique<StreamVolumeManager>(dispatcher());
     under_test_ = std::make_unique<UsageGainReporterImpl>(
-        *device_lister.get(), *stream_volume_manager_.get(), process_config_);
+        *device_lister.get(), *stream_volume_manager_, process_config());
 
     auto fake_gain_listener = std::make_unique<FakeGainListener>();
 
-    under_test_->RegisterListener(device_id, fidl::Clone(*FromFidlUsage2(usage_)),
-                                  fake_gain_listener->NewBinding());
+    if (lt == ListenerType::kOld) {
+      under_test()->RegisterListener(device_id, fidl::Clone(*FromFidlUsage2(usage())),
+                                     fake_gain_listener->NewBinding());
+    } else {
+      under_test()->RegisterListener2(device_id, fidl::Clone(usage()),
+                                      fake_gain_listener->NewBinding());
+    }
 
     return fake_gain_listener;
   }
 
-  size_t NumListeners() { return under_test_->listeners_.size(); }
+  void TestUpdatesSingleListenerUsageGain(ListenerType listener_type) {
+    auto fake_listener = Listen(DEVICE_ID_STRING, listener_type);
+    const float expected_gain_dbfs = -10.0;
+    stream_volume_manager()->SetUsageGain(fidl::Clone(usage()), expected_gain_dbfs);
 
+    RunLoopUntilIdle();
+    EXPECT_FLOAT_EQ(fake_listener->gain_dbfs(), expected_gain_dbfs);
+    EXPECT_EQ(fake_listener->call_count(), 2u);
+  }
+
+  void TestUpdatesSingleListenerUsageGainAdjustment(ListenerType listener_type) {
+    auto fake_listener = Listen(DEVICE_ID_STRING, listener_type);
+    const float expected_gain_dbfs = -10.0;
+    stream_volume_manager()->SetUsageGainAdjustment(fidl::Clone(usage()), expected_gain_dbfs);
+
+    RunLoopUntilIdle();
+    EXPECT_FLOAT_EQ(fake_listener->gain_dbfs(), expected_gain_dbfs);
+    EXPECT_EQ(fake_listener->call_count(), 2u);
+  }
+
+  void TestUpdatesSingleListenerUsageGainCombination(ListenerType listener_type) {
+    auto fake_listener = Listen(DEVICE_ID_STRING, listener_type);
+    const float expected_gain_dbfs = -10.0;
+    stream_volume_manager()->SetUsageGain(fidl::Clone(usage()), expected_gain_dbfs);
+    stream_volume_manager()->SetUsageGainAdjustment(fidl::Clone(usage()), expected_gain_dbfs);
+
+    RunLoopUntilIdle();
+    EXPECT_FLOAT_EQ(fake_listener->gain_dbfs(), (2 * expected_gain_dbfs));
+    EXPECT_EQ(fake_listener->call_count(), 3u);
+  }
+
+  void TestNoUpdateIndependentVolumeControlSingleListener(ListenerType listener_type) {
+    auto fake_listener = Listen(BLUETOOTH_DEVICE_ID_STRING, listener_type);
+    const float attempted_gain_dbfs = -10.0;
+    stream_volume_manager()->SetUsageGain(fidl::Clone(usage()), attempted_gain_dbfs);
+
+    RunLoopUntilIdle();
+    EXPECT_FLOAT_EQ(fake_listener->gain_dbfs(), 0.0f);
+    EXPECT_EQ(fake_listener->call_count(), 0u);
+  }
+
+  void TestHandlesClosedChannel(ListenerType listener_type) {
+    auto fake_listener = Listen(DEVICE_ID_STRING, listener_type);
+    RunLoopUntilIdle();
+    EXPECT_EQ(fake_listener->call_count(), 1u);
+    EXPECT_EQ(NumListeners(), 1ul);
+
+    fake_listener->CloseBinding();
+    RunLoopUntilIdle();
+    EXPECT_EQ(NumListeners(), 0ul);
+
+    // Destruct.
+    fake_listener = nullptr;
+
+    // Verify we removed the listener from StreamVolumeManager. If we did not, this will crash.
+    stream_volume_manager()->SetUsageGain(
+        fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA), 0.42f);
+  }
+
+  size_t NumListeners() { return under_test()->listeners_.size(); }
+
+  std::unique_ptr<StreamVolumeManager>& stream_volume_manager() { return stream_volume_manager_; }
+  std::unique_ptr<UsageGainReporterImpl>& under_test() { return under_test_; }
+  const ProcessConfig& process_config() { return process_config_; }
+  const fuchsia::media::Usage2& usage() { return usage_; }
+
+ private:
   std::unique_ptr<StreamVolumeManager> stream_volume_manager_;
   std::unique_ptr<UsageGainReporterImpl> under_test_;
   ProcessConfig process_config_;
@@ -110,63 +182,38 @@ class UsageGainReporterTest : public gtest::TestLoopFixture {
 };
 
 TEST_F(UsageGainReporterTest, UpdatesSingleListenerUsageGain) {
-  auto fake_listener = Listen(DEVICE_ID_STRING);
-  const float expected_gain_dbfs = -10.0;
-  stream_volume_manager_->SetUsageGain(fidl::Clone(usage_), expected_gain_dbfs);
-
-  RunLoopUntilIdle();
-  EXPECT_FLOAT_EQ(fake_listener->gain_dbfs(), expected_gain_dbfs);
-  EXPECT_EQ(fake_listener->call_count(), 2u);
+  TestUpdatesSingleListenerUsageGain(ListenerType::kOld);
+}
+TEST_F(UsageGainReporterTest, UpdatesSingleListenerUsageGain2) {
+  TestUpdatesSingleListenerUsageGain(ListenerType::kNew);
 }
 
 TEST_F(UsageGainReporterTest, UpdatesSingleListenerUsageGainAdjustment) {
-  auto fake_listener = Listen(DEVICE_ID_STRING);
-  const float expected_gain_dbfs = -10.0;
-  stream_volume_manager_->SetUsageGainAdjustment(fidl::Clone(usage_), expected_gain_dbfs);
-
-  RunLoopUntilIdle();
-  EXPECT_FLOAT_EQ(fake_listener->gain_dbfs(), expected_gain_dbfs);
-  EXPECT_EQ(fake_listener->call_count(), 2u);
+  TestUpdatesSingleListenerUsageGainAdjustment(ListenerType::kOld);
+}
+TEST_F(UsageGainReporterTest, UpdatesSingleListenerUsageGainAdjustment2) {
+  TestUpdatesSingleListenerUsageGainAdjustment(ListenerType::kNew);
 }
 
 TEST_F(UsageGainReporterTest, UpdatesSingleListenerUsageGainCombination) {
-  auto fake_listener = Listen(DEVICE_ID_STRING);
-  const float expected_gain_dbfs = -10.0;
-  stream_volume_manager_->SetUsageGain(fidl::Clone(usage_), expected_gain_dbfs);
-  stream_volume_manager_->SetUsageGainAdjustment(fidl::Clone(usage_), expected_gain_dbfs);
-
-  RunLoopUntilIdle();
-  EXPECT_FLOAT_EQ(fake_listener->gain_dbfs(), (2 * expected_gain_dbfs));
-  EXPECT_EQ(fake_listener->call_count(), 3u);
+  TestUpdatesSingleListenerUsageGainCombination(ListenerType::kOld);
+}
+TEST_F(UsageGainReporterTest, UpdatesSingleListenerUsageGainCombination2) {
+  TestUpdatesSingleListenerUsageGainCombination(ListenerType::kNew);
 }
 
 TEST_F(UsageGainReporterTest, NoUpdateIndependentVolumeControlSingleListener) {
-  auto fake_listener = Listen(BLUETOOTH_DEVICE_ID_STRING);
-  const float attempted_gain_dbfs = -10.0;
-  stream_volume_manager_->SetUsageGain(fidl::Clone(usage_), attempted_gain_dbfs);
-
-  RunLoopUntilIdle();
-  EXPECT_FLOAT_EQ(fake_listener->gain_dbfs(), 0.0f);
-  EXPECT_EQ(fake_listener->call_count(), 0u);
+  TestNoUpdateIndependentVolumeControlSingleListener(ListenerType::kOld);
+}
+TEST_F(UsageGainReporterTest, NoUpdateIndependentVolumeControlSingleListener2) {
+  TestNoUpdateIndependentVolumeControlSingleListener(ListenerType::kNew);
 }
 
 TEST_F(UsageGainReporterTest, HandlesClosedChannel) {
-  auto fake_listener = Listen(DEVICE_ID_STRING);
-  RunLoopUntilIdle();
-  EXPECT_EQ(fake_listener->call_count(), 1u);
-  EXPECT_EQ(NumListeners(), 1ul);
-
-  fake_listener->CloseBinding();
-  RunLoopUntilIdle();
-  EXPECT_EQ(NumListeners(), 0ul);
-
-  // Destruct.
-  fake_listener = nullptr;
-
-  // Verify we removed the listener from StreamVolumeManager.
-  // If we did not, this will crash.
-  stream_volume_manager_->SetUsageGain(
-      fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA), 0.42f);
+  TestHandlesClosedChannel(ListenerType::kOld);
+}
+TEST_F(UsageGainReporterTest, HandlesClosedChannel2) {
+  TestHandlesClosedChannel(ListenerType::kNew);
 }
 
 }  // namespace media::audio

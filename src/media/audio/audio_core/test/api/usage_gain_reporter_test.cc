@@ -82,6 +82,23 @@ class UsageGainReporterTest : public HermeticAudioTest {
     return c;
   }
 
+  std::unique_ptr<Controller> CreateControllerWithRenderUsage2(
+      fuchsia::media::AudioRenderUsage2 render_usage) {
+    std::unique_ptr<media::audio::test::UsageGainReporterTest::Controller> c;
+    auto usage = fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage));
+    c = std::make_unique<Controller>(this);
+    audio_core_->BindUsageVolumeControl2(std::move(usage), c->volume_control.NewRequest());
+    AddErrorHandler(c->volume_control, "VolumeControl");
+
+    realm().Connect(c->gain_reporter.NewRequest());
+    AddErrorHandler(c->gain_reporter, "GainReporter");
+    auto usage2 = fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage));
+    c->gain_reporter->RegisterListener2(device_id_string_, std::move(usage2),
+                                        c->fake_listener.NewBinding());
+
+    return c;
+  }
+
   std::unique_ptr<Controller> CreateControllerWithCaptureUsage(
       fuchsia::media::AudioCaptureUsage capture_usage) {
     std::unique_ptr<media::audio::test::UsageGainReporterTest::Controller> c;
@@ -154,9 +171,81 @@ TEST_F(UsageGainReporterTest, SetVolumeAndMute) {
 #endif
 }
 
+TEST_F(UsageGainReporterTest, SetVolumeAndMute2) {
+  auto c = CreateControllerWithRenderUsage2(fuchsia::media::AudioRenderUsage2::MEDIA);
+
+  // The initial callback happens immediately.
+  c->fake_listener.SetNextHandler(AddCallback("OnGainMuteChanged InitialCall"));
+  ExpectCallbacks();
+
+  bool last_muted;
+  float last_gain_db;
+
+  auto set_callback = [this, &c, &last_muted, &last_gain_db](const std::string& stage) {
+    last_muted = true;
+    last_gain_db = kTooHighGainDb;
+    c->fake_listener.SetNextHandler(
+        AddCallback("OnGainMuteChanged after " + stage,
+                    [&last_muted, &last_gain_db](bool muted, float gain_db) {
+                      last_muted = muted;
+                      last_gain_db = gain_db;
+                    }));
+  };
+
+  set_callback("SetVolume(0)");
+  c->volume_control->SetVolume(0);
+  ExpectCallbacks();
+  EXPECT_FALSE(last_muted);
+  EXPECT_FLOAT_EQ(last_gain_db, fuchsia::media::audio::MUTED_GAIN_DB);
+
+  set_callback("SetVolume(1)");
+  c->volume_control->SetVolume(1);
+  ExpectCallbacks();
+  EXPECT_FALSE(last_muted);
+  EXPECT_FLOAT_EQ(last_gain_db, 0);
+
+  // TODO(https://fxbug.dev/42132524): SetMute(true) events are broken
+#if 0
+  set_callback("SetMute(true)");
+  c->volume_control->SetMute(true);
+  ExpectCallbacks();
+  EXPECT_TRUE(last_muted);
+  EXPECT_FLOAT_EQ(last_gain_db, fuchsia::media::audio::MUTED_GAIN_DB);
+
+  // Unmute should restore the volume.
+  set_callback("SetMute(false)");
+  c->volume_control->SetMute(false);
+  ExpectCallbacks();
+  EXPECT_FALSE(last_muted);
+  EXPECT_FLOAT_EQ(last_gain_db, 0);
+#endif
+}
+
 TEST_F(UsageGainReporterTest, RoutedCorrectly) {
   auto c1 = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA);
   auto c2 = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage2::BACKGROUND);
+
+  // The initial callbacks happen immediately.
+  c1->fake_listener.SetNextHandler(AddCallbackUnordered("OnGainMuteChanged1 InitialCall"));
+  c2->fake_listener.SetNextHandler(AddCallbackUnordered("OnGainMuteChanged2 InitialCall"));
+  ExpectCallbacks();
+
+  // Routing to c1.
+  c1->fake_listener.SetNextHandler(AddCallback("OnGainMuteChanged1 RouteTo1"));
+  c2->fake_listener.SetNextHandler(AddUnexpectedCallback("OnGainMuteChanged2 RouteTo1"));
+  c1->volume_control->SetVolume(0);
+  ExpectCallbacks();
+
+  // Routing to c2.
+  c1->fake_listener.SetNextHandler(AddUnexpectedCallback("OnGainMuteChanged1 RouteTo2"));
+  c2->fake_listener.SetNextHandler(AddCallback("OnGainMuteChanged2 RouteTo2"));
+  c2->volume_control->SetVolume(0);
+  ExpectCallbacks();
+}
+
+TEST_F(UsageGainReporterTest, RoutedCorrectly2) {
+  auto c1 = CreateControllerWithRenderUsage2(fuchsia::media::AudioRenderUsage2::MEDIA);
+  auto c2 = CreateControllerWithRenderUsage2(fuchsia::media::AudioRenderUsage2::BACKGROUND);
 
   // The initial callbacks happen immediately.
   c1->fake_listener.SetNextHandler(AddCallbackUnordered("OnGainMuteChanged1 InitialCall"));

@@ -32,6 +32,15 @@ class UsageGainReporterImpl : public fuchsia::media::UsageGainReporter {
       std::string device_unique_id, fuchsia::media::Usage usage,
       fidl::InterfaceHandle<fuchsia::media::UsageGainListener> usage_gain_listener_handler) final;
 
+  void RegisterListener2(
+      std::string device_unique_id, fuchsia::media::Usage2 usage,
+      fidl::InterfaceHandle<fuchsia::media::UsageGainListener> usage_gain_listener_handler) final;
+
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(ERROR) << "UsageGainReporterImpl: UsageGainReporter::handle_unknown_method(ordinal "
+                   << ordinal << ", method_has_response " << method_has_response << ")";
+  }
+
  private:
   friend class UsageGainReporterTest;
 
