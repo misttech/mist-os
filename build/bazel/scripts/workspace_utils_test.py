@@ -77,5 +77,116 @@ class TestWorkspaceShouldExcludeFile(unittest.TestCase):
             )
 
 
+class TestForceSymlink(unittest.TestCase):
+    def test_force_symlink(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir).resolve()
+
+            # Create a new symlink, then ensure its embedded target is relative.
+            # The target doesn't need to exist.
+            target_path = tmp_path / "target" / "file"
+            link_path = tmp_path / "links" / "dir" / "symlink"
+
+            workspace_utils.force_symlink(link_path, target_path)
+
+            self.assertTrue(link_path.is_symlink())
+            self.assertEqual(str(link_path.readlink()), "../../target/file")
+
+            # Update the target to a new path, verify the symlink was updated.
+            target_path = tmp_path / "target" / "new_file"
+
+            workspace_utils.force_symlink(link_path, target_path)
+            self.assertTrue(link_path.is_symlink())
+            self.assertEqual(str(link_path.readlink()), "../../target/new_file")
+
+
+class TestGeneratedWorkspaceFiles(unittest.TestCase):
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.out = Path(self._td.name)
+        (self.out / "elephant").write_text("trumpet!")
+
+    def tearDown(self):
+        self._td.cleanup()
+
+    def test_with_no_file_hasher(self):
+        ws_files = workspace_utils.GeneratedWorkspaceFiles()
+        ws_files.record_file_content("zoo/lion", "roar!")
+        ws_files.record_symlink("zoo/elephant", self.out / "elephant")
+        ws_files.record_input_file_hash("no/such/file/exists")
+
+        expected_json = r"""{
+  "zoo/elephant": {
+    "target": "@OUT@/elephant",
+    "type": "symlink"
+  },
+  "zoo/lion": {
+    "content": "roar!",
+    "type": "file"
+  }
+}""".replace(
+            "@OUT@", str(self.out)
+        )
+
+        self.assertEqual(ws_files.to_json(), expected_json)
+
+        ws_files.write(self.out / "workspace")
+        self.assertEqual(
+            (self.out / "workspace" / "zoo" / "lion").read_text(), "roar!"
+        )
+        self.assertEqual(
+            (self.out / "workspace" / "zoo" / "elephant").read_text(),
+            "trumpet!",
+        )
+        self.assertEqual(
+            str((self.out / "workspace" / "zoo" / "elephant").readlink()),
+            "../../elephant",
+        )
+
+    def test_with_file_hasher(self):
+        ws_files = workspace_utils.GeneratedWorkspaceFiles()
+        ws_files.set_file_hasher(lambda path: f"SHA256[{path}]")
+        ws_files.record_file_content("zoo/lion", "roar!")
+        ws_files.record_symlink("zoo/elephant", self.out / "elephant")
+        ws_files.record_input_file_hash("no/such/file/exists")
+
+        expected_json = r"""{
+  "no/such/file/exists": {
+    "hash": "SHA256[no/such/file/exists]",
+    "type": "input_file"
+  },
+  "zoo/elephant": {
+    "target": "@OUT@/elephant",
+    "type": "symlink"
+  },
+  "zoo/lion": {
+    "content": "roar!",
+    "type": "file"
+  }
+}""".replace(
+            "@OUT@", str(self.out)
+        )
+
+        self.assertEqual(ws_files.to_json(), expected_json)
+
+        ws_files.write(self.out / "workspace")
+        self.assertEqual(
+            (self.out / "workspace" / "zoo" / "lion").read_text(), "roar!"
+        )
+        self.assertEqual(
+            (self.out / "workspace" / "zoo" / "elephant").read_text(),
+            "trumpet!",
+        )
+        self.assertEqual(
+            str((self.out / "workspace" / "zoo" / "elephant").readlink()),
+            "../../elephant",
+        )
+        self.assertFalse(
+            (
+                self.out / "workspace" / "no" / "such" / "file" / "exists"
+            ).exists()
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

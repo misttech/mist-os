@@ -33,32 +33,16 @@ old ones are removed.
 
 import argparse
 import difflib
-import errno
 import json
 import os
 import stat
 import sys
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import check_ninja_build_plan
 import compute_content_hash
 import workspace_utils
-
-
-def force_symlink(target_path: str, dst_path: str) -> None:
-    """Create a symlink at |dst_path| that points to |target_path|."""
-    dst_dir = os.path.dirname(dst_path)
-    os.makedirs(dst_dir, exist_ok=True)
-    target_path = os.path.relpath(target_path, dst_dir)
-    try:
-        os.symlink(target_path, dst_path)
-    except OSError as e:
-        if e.errno == errno.EEXIST:
-            os.remove(dst_path)
-            os.symlink(target_path, dst_path)
-        else:
-            raise
 
 
 def make_removable(path: str) -> None:
@@ -151,86 +135,10 @@ def get_fx_build_dir(fuchsia_dir: str) -> str | None:
         return os.path.join(fuchsia_dir, build_dir)
 
 
-def content_hash_all_files(paths: list[str]) -> str:
+def content_hash_file(path: str | Path) -> str:
     fstate = compute_content_hash.FileState()
-    for path in paths:
-        fstate.hash_source_path(Path(path))
+    fstate.hash_source_path(Path(path))
     return fstate.content_hash
-
-
-class GeneratedFiles(object):
-    """Models the content of a generated Bazel workspace."""
-
-    def __init__(self, files: dict[str, Any] = {}) -> None:
-        self._files = files
-
-    def _check_new_path(self, path: str) -> None:
-        assert path not in self._files, (
-            "File entry already in generated list: " + path
-        )
-
-    def add_symlink(self, dst_path: str, target_path: str) -> None:
-        self._check_new_path(dst_path)
-        self._files[dst_path] = {
-            "type": "symlink",
-            "target": target_path,
-        }
-
-    def add_file(
-        self, dst_path: str, content: str, executable: bool = False
-    ) -> None:
-        self._check_new_path(dst_path)
-        entry: dict[str, Any] = {
-            "type": "file",
-            "content": content,
-        }
-        if executable:
-            entry["executable"] = True
-        self._files[dst_path] = entry
-
-    def add_file_hash(self, dst_path: str) -> None:
-        self._check_new_path(dst_path)
-        self._files[dst_path] = {
-            "type": "content_hash",
-            "hash": content_hash_all_files([dst_path]),
-        }
-
-    def add_top_entries(
-        self,
-        fuchsia_dir: str,
-        subdir: str,
-        excluded_file: Callable[[str], bool],
-    ) -> None:
-        for name in os.listdir(fuchsia_dir):
-            if not excluded_file(name):
-                self.add_symlink(
-                    os.path.join(subdir, name), os.path.join(fuchsia_dir, name)
-                )
-
-    def to_json(self) -> str:
-        """Convert to JSON file."""
-        return json.dumps(self._files, indent=2, sort_keys=True)
-
-    def write(self, out_dir: str) -> None:
-        """Write workspace content to directory."""
-        for path, entry in self._files.items():
-            type = entry["type"]
-            if type == "symlink":
-                target_path = entry["target"]
-                link_path = os.path.join(out_dir, path)
-                force_symlink(target_path, link_path)
-            elif type == "file":
-                file_path = os.path.join(out_dir, path)
-                os.makedirs(os.path.dirname(file_path), exist_ok=True)
-                with open(file_path, "w") as f:
-                    f.write(entry["content"])
-                if entry.get("executable", False):
-                    os.chmod(file_path, 0o755)
-            elif type == "content_hash":
-                # Nothing to do here.
-                pass
-            else:
-                assert False, "Unknown entry type: " % entry["type"]
 
 
 def find_host_binary_path(program: str) -> str:
@@ -439,44 +347,45 @@ def main() -> int:
 
     log2("Ninja build plan up to date.")
 
-    generated = GeneratedFiles()
+    generated = workspace_utils.GeneratedWorkspaceFiles()
+    generated.set_file_hasher(content_hash_file)
 
     def expand_template_file(filename: str, **kwargs: Any) -> str:
         """Expand a template file and add it to the set of tracked input files."""
         template_file = os.path.join(templates_dir, filename)
-        generated.add_file_hash(os.path.abspath(template_file))
+        generated.record_input_file_hash(os.path.abspath(template_file))
         with open(template_file) as f:
             return f.read().format(**kwargs)
 
     def write_workspace_file(path: str, content: str) -> None:
-        generated.add_file(os.path.join("workspace", path), content)
+        generated.record_file_content(os.path.join("workspace", path), content)
 
     def create_workspace_symlink(path: str, target_path: str) -> None:
-        generated.add_symlink(os.path.join("workspace", path), target_path)
+        generated.record_symlink(os.path.join("workspace", path), target_path)
 
     templates_dir = os.path.join(fuchsia_dir, "build", "bazel", "templates")
 
     if args.use_bzlmod:
-        generated.add_file(
+        generated.record_file_content(
             os.path.join("workspace", "WORKSPACE.bazel"),
             "# Empty on purpose, see MODULE.bazel\n",
         )
 
-        generated.add_symlink(
+        generated.record_symlink(
             os.path.join("workspace", "WORKSPACE.bzlmod"),
             os.path.join(
                 fuchsia_dir, "build", "bazel", "toplevel.WORKSPACE.bzlmod"
             ),
         )
 
-        generated.add_symlink(
+        generated.record_symlink(
             os.path.join("workspace", "MODULE.bazel"),
             os.path.join(
                 fuchsia_dir, "build", "bazel", "toplevel.MODULE.bazel"
             ),
         )
     else:
-        generated.add_symlink(
+        generated.record_symlink(
             os.path.join("workspace", "WORKSPACE.bazel"),
             os.path.join(
                 fuchsia_dir, "build", "bazel", "toplevel.WORKSPACE.bazel"
@@ -485,11 +394,13 @@ def main() -> int:
 
     # Generate symlinks
 
-    generated.add_top_entries(
-        fuchsia_dir, "workspace", workspace_utils.workspace_should_exclude_file
-    )
+    for name in os.listdir(fuchsia_dir):
+        if not workspace_utils.workspace_should_exclude_file(name):
+            generated.record_symlink(
+                os.path.join("workspace", name), os.path.join(fuchsia_dir, name)
+            )
 
-    generated.add_symlink(
+    generated.record_symlink(
         os.path.join("workspace", "BUILD.bazel"),
         os.path.join(fuchsia_dir, "build", "bazel", "toplevel.BUILD.bazel"),
     )
@@ -511,7 +422,7 @@ def main() -> int:
     fuchsia_git_dir = os.path.join(fuchsia_dir, ".git")
     for git_file in os.listdir(fuchsia_git_dir):
         if not (git_file == "jiri" or git_file.startswith("JIRI")):
-            generated.add_symlink(
+            generated.record_symlink(
                 "workspace/.git/" + git_file,
                 os.path.join(fuchsia_git_dir, git_file),
             )
@@ -528,7 +439,7 @@ def main() -> int:
         host_cpu=host_cpu,
         bazel_host_cpu=_BAZEL_CPU_MAP[host_cpu],
     )
-    generated.add_file(
+    generated.record_file_content(
         os.path.join("workspace", "platform_mappings"),
         platform_mappings_content,
     )
@@ -555,7 +466,9 @@ common --experimental_enable_bzlmod
 # enables BzlMod by default.
 common --enable_bzlmod=false
 """
-    generated.add_file(os.path.join("workspace", ".bazelrc"), bazelrc_content)
+    generated.record_file_content(
+        os.path.join("workspace", ".bazelrc"), bazelrc_content
+    )
 
     # Generate wrapper script in topdir/bazel that invokes Bazel with the right --output_base.
     bazel_launcher_content = expand_template_file(
@@ -569,12 +482,14 @@ common --enable_bzlmod=false
         output_base=os.path.relpath(output_base_dir, topdir),
         output_user_root=os.path.relpath(output_user_root, topdir),
     )
-    generated.add_file("bazel", bazel_launcher_content, executable=True)
+    generated.record_file_content(
+        "bazel", bazel_launcher_content, executable=True
+    )
 
     # Ensure regeneration when this script's content changes!
-    generated.add_file_hash(os.path.abspath(__file__))
+    generated.record_input_file_hash(os.path.abspath(__file__))
 
-    generated.add_symlink(
+    generated.record_symlink(
         os.path.join(
             "workspace",
             "fuchsia_build_generated",
@@ -584,7 +499,7 @@ common --enable_bzlmod=false
     )
 
     # LINT.IfChange
-    generated.add_symlink(
+    generated.record_symlink(
         os.path.join("workspace", "fuchsia_build_generated", "args.json"),
         os.path.join(gn_output_dir, "args.json"),
     )
@@ -596,7 +511,7 @@ common --enable_bzlmod=false
     # a standard location.
     git_bin_path = find_host_binary_path("git")
     assert git_bin_path, "Missing `git` program in current PATH!"
-    generated.add_symlink(
+    generated.record_symlink(
         os.path.join("workspace", "fuchsia_build_generated", "git"),
         git_bin_path,
     )
@@ -606,7 +521,7 @@ common --enable_bzlmod=false
     # .jiri_root/ is not exposed to the workspace, but //build/info/BUILD.bazel
     # needs to access .jiri_root/update_history/latest so create a symlink just
     # for this file.
-    generated.add_symlink(
+    generated.record_symlink(
         os.path.join(
             "workspace", "fuchsia_build_generated", "jiri_snapshot.xml"
         ),
