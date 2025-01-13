@@ -916,6 +916,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.media/AudioCore.BindUsageVolumeControl2",
+        "strictness": "strict",
+        "ordinal": "516189893657481301",
+        "direction": "one_way",
+        "request": "fuchsia.media/AudioCoreBindUsageVolumeControl2Request"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.media/AudioCore.CreateAudioCapturer",
         "strictness": "strict",
         "ordinal": "8682290724921257680",
@@ -957,12 +965,30 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.media/AudioCore.GetDbFromVolume2",
+        "strictness": "strict",
+        "ordinal": "6864077982460697587",
+        "direction": "two_way",
+        "request": "fuchsia.media/AudioCoreGetDbFromVolume2Request",
+        "response": "fuchsia.media/AudioCoreGetDbFromVolume2Response"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.media/AudioCore.GetVolumeFromDb",
         "strictness": "strict",
         "ordinal": "5828724741801210047",
         "direction": "two_way",
         "request": "fuchsia.media/AudioCoreGetVolumeFromDbRequest",
         "response": "fuchsia.media/AudioCoreGetVolumeFromDbResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.media/AudioCore.GetVolumeFromDb2",
+        "strictness": "strict",
+        "ordinal": "1611304674859653594",
+        "direction": "two_way",
+        "request": "fuchsia.media/AudioCoreGetVolumeFromDb2Request",
+        "response": "fuchsia.media/AudioCoreGetVolumeFromDb2Response"
     },
     {
         "kind": "protocol/member",
@@ -996,6 +1022,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.media/AudioCore.SetInteraction2",
+        "strictness": "strict",
+        "ordinal": "8225481426530584111",
+        "direction": "one_way",
+        "request": "fuchsia.media/AudioCoreSetInteraction2Request"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.media/AudioCore.SetRenderUsageGain",
         "strictness": "strict",
         "ordinal": "5190819983992731879",
@@ -1003,10 +1037,35 @@
         "request": "fuchsia.media/AudioCoreSetRenderUsageGainRequest"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.media/AudioCore.SetRenderUsageGain2",
+        "strictness": "strict",
+        "ordinal": "8618505615802524916",
+        "direction": "one_way",
+        "request": "fuchsia.media/AudioCoreSetRenderUsageGain2Request"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.media/AudioCore",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreBindUsageVolumeControl2Request.usage",
+        "ordinal": "1",
+        "type": "fuchsia.media/Usage2"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreBindUsageVolumeControl2Request.volume_control",
+        "ordinal": "2",
+        "type": "server_end:fuchsia.media.audio/VolumeControl"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/AudioCoreBindUsageVolumeControl2Request",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -1088,6 +1147,32 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreGetDbFromVolume2Request.usage",
+        "ordinal": "1",
+        "type": "fuchsia.media/Usage2"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreGetDbFromVolume2Request.volume",
+        "ordinal": "2",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/AudioCoreGetDbFromVolume2Request"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreGetDbFromVolume2Response.gain_db",
+        "ordinal": "1",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/AudioCoreGetDbFromVolume2Response"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.media/AudioCoreGetDbFromVolumeRequest.usage",
         "ordinal": "1",
         "type": "fuchsia.media/Usage"
@@ -1111,6 +1196,32 @@
     {
         "kind": "struct",
         "name": "fuchsia.media/AudioCoreGetDbFromVolumeResponse"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreGetVolumeFromDb2Request.gain_db",
+        "ordinal": "2",
+        "type": "float32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreGetVolumeFromDb2Request.usage",
+        "ordinal": "1",
+        "type": "fuchsia.media/Usage2"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/AudioCoreGetVolumeFromDb2Request"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreGetVolumeFromDb2Response.volume",
+        "ordinal": "1",
+        "type": "float32"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/AudioCoreGetVolumeFromDb2Response"
     },
     {
         "kind": "struct/member",
@@ -1156,6 +1267,28 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreSetInteraction2Request.active",
+        "ordinal": "1",
+        "type": "fuchsia.media/Usage2"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreSetInteraction2Request.affected",
+        "ordinal": "2",
+        "type": "fuchsia.media/Usage2"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreSetInteraction2Request.behavior",
+        "ordinal": "3",
+        "type": "fuchsia.media/Behavior"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/AudioCoreSetInteraction2Request"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.media/AudioCoreSetInteractionRequest.active",
         "ordinal": "1",
         "type": "fuchsia.media/Usage"
@@ -1175,6 +1308,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.media/AudioCoreSetInteractionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreSetRenderUsageGain2Request.gain_db",
+        "ordinal": "2",
+        "type": "float32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCoreSetRenderUsageGain2Request.usage",
+        "ordinal": "1",
+        "type": "fuchsia.media/AudioRenderUsage2"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/AudioCoreSetRenderUsageGain2Request"
     },
     {
         "kind": "struct/member",

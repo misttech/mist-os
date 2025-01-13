@@ -95,6 +95,15 @@ class Consumer : public fidl::Server<fuchsia_media::AudioConsumer>,
    private:
     fit::function<void(fidl::UnbindInfo)> fidl_error_callback_;
   };
+  template <typename Protocol>
+  class AsyncEventHandlerFlex : public AsyncEventHandler<Protocol> {
+   public:
+    explicit AsyncEventHandlerFlex(fit::function<void(fidl::UnbindInfo)> fidl_error_callback)
+        : AsyncEventHandler<Protocol>(std::move(fidl_error_callback)) {}
+    void handle_unknown_event(fidl::UnknownEventMetadata<Protocol> metadata) override {
+      FX_LOGS(WARNING) << "Consumer: unknown event (AudioCore) ordinal " << metadata.event_ordinal;
+    }
+  };
 
   // Binds to an audio renderer and to |server_end|. If successful, this method calls
   // |shared_from_this|, so this |Consumer| must be managed using a |shared_ptr| prior to calling
@@ -131,7 +140,7 @@ class Consumer : public fidl::Server<fuchsia_media::AudioConsumer>,
   std::optional<fidl::ServerBindingRef<fuchsia_media::StreamSink>> stream_sink_binding_ref_;
   std::optional<fidl::ServerBindingRef<fuchsia_media_audio::VolumeControl>> volume_binding_ref_;
 
-  AsyncEventHandler<fuchsia_media::AudioCore> audio_core_event_handler_;
+  AsyncEventHandlerFlex<fuchsia_media::AudioCore> audio_core_event_handler_;
   fidl::Client<fuchsia_media::AudioCore> audio_core_;
 
   fidl::Client<fuchsia_media::AudioRenderer> renderer_;

@@ -15,7 +15,7 @@ namespace media::audio::test {
 using fuchsia::media::AudioRenderUsage2;
 
 // TODO(https://fxbug.dev/326083019): unittest AudioCore methods more directly (SetRenderUsageGain,
-// SetCaptureUsageGaqin, ResetInteractions, LoadDefaults).
+// SetRenderUsageGain2, SetCaptureUsageGain, ResetInteractions, LoadDefaults).
 
 class AudioRendererBufferErrorTest : public AudioRendererBufferTest {};
 

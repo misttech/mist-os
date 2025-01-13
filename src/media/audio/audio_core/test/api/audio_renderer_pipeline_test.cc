@@ -506,9 +506,8 @@ TEST_F(AudioRendererPipelineTestInt16, DiscardDuringPlayback) {
 // shared code.
 TEST_F(AudioRendererPipelineTestInt16, RampOnGainChanges) {
   fuchsia::media::audio::VolumeControlPtr volume;
-  audio_core_->BindUsageVolumeControl(
-      *FromFidlUsage2(fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)),
-      volume.NewRequest());
+  audio_core_->BindUsageVolumeControl2(
+      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA), volume.NewRequest());
   volume->SetVolume(0.3f);
 
   auto [renderer, format] = CreateRenderer(kOutputFrameRate);
@@ -624,9 +623,8 @@ TEST_F(AudioRendererPipelineTestInt16, SetGainBeforeSetFormat) {
 // During playback, gain changes should not introduce high-frequency distortion.
 TEST_F(AudioRendererPipelineTestFloat, NoDistortionOnGainChanges) {
   fuchsia::media::audio::VolumeControlPtr volume;
-  audio_core_->BindUsageVolumeControl(
-      *FromFidlUsage2(fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)),
-      volume.NewRequest());
+  audio_core_->BindUsageVolumeControl2(
+      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA), volume.NewRequest());
   volume->SetVolume(0.5);
 
   auto [renderer, format] = CreateRenderer(kOutputFrameRate);

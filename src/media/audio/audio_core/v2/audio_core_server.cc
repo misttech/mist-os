@@ -105,10 +105,21 @@ void AudioCoreServer::SetRenderUsageGain(SetRenderUsageGainRequestView request,
                                          SetRenderUsageGainCompleter::Sync& completer) {
   TRACE_DURATION("audio", "AudioCoreServer::SetRenderUsageGain");
 
-  stream_volume_manager_->SetUsageGain(
-      fuchsia::media::Usage2::WithRenderUsage(
-          static_cast<fuchsia::media::AudioRenderUsage2>(request->usage)),
-      request->gain_db);
+  SetRenderUsageGainBase(static_cast<fuchsia::media::AudioRenderUsage2>(request->usage),
+                         request->gain_db);
+}
+
+void AudioCoreServer::SetRenderUsageGain2(SetRenderUsageGain2RequestView request,
+                                          SetRenderUsageGain2Completer::Sync& completer) {
+  TRACE_DURATION("audio", "AudioCoreServer::SetRenderUsageGain2");
+  SetRenderUsageGainBase(static_cast<fuchsia::media::AudioRenderUsage2>(request->usage),
+                         request->gain_db);
+}
+
+void AudioCoreServer::SetRenderUsageGainBase(const fuchsia::media::AudioRenderUsage2& usage,
+                                             float gain_db) {
+  stream_volume_manager_->SetUsageGain(fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(usage)),
+                                       gain_db);
 }
 
 void AudioCoreServer::SetCaptureUsageGain(SetCaptureUsageGainRequestView request,
@@ -134,10 +145,40 @@ void AudioCoreServer::BindUsageVolumeControl(BindUsageVolumeControlRequestView r
     request->volume_control.Close(ZX_ERR_NOT_SUPPORTED);
   }
 }
+void AudioCoreServer::BindUsageVolumeControl2(BindUsageVolumeControl2RequestView request,
+                                              BindUsageVolumeControl2Completer::Sync& completer) {
+  TRACE_DURATION("audio", "AudioCoreServer::BindUsageVolumeControl2");
+
+  if (request->usage.is_render_usage()) {
+    stream_volume_manager_->BindUsageVolumeClient(
+        fidl::NaturalToHLCPP(fidl::ToNatural(request->usage)),
+        fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl>(
+            request->volume_control.TakeChannel()));
+  } else {
+    request->volume_control.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+}
 
 void AudioCoreServer::GetVolumeFromDb(GetVolumeFromDbRequestView request,
                                       GetVolumeFromDbCompleter::Sync& completer) {
   TRACE_DURATION("audio", "AudioCoreServer::GetVolumeFromDb");
+
+  float volume;
+  auto volume_curve = request->usage.is_render_usage()
+                          ? route_graph_->VolumeCurveForUsage(
+                                static_cast<RenderUsage>(request->usage.render_usage()))
+                          : route_graph_->VolumeCurveForUsage(
+                                static_cast<CaptureUsage>(request->usage.capture_usage()));
+  if (volume_curve) {
+    volume = volume_curve->DbToVolume(request->gain_db);
+  } else {
+    volume = default_volume_curve_.DbToVolume(request->gain_db);
+  }
+  completer.Reply(volume);
+}
+void AudioCoreServer::GetVolumeFromDb2(GetVolumeFromDb2RequestView request,
+                                       GetVolumeFromDb2Completer::Sync& completer) {
+  TRACE_DURATION("audio", "AudioCoreServer::GetVolumeFromDb2");
 
   float volume;
   auto volume_curve = request->usage.is_render_usage()
@@ -170,6 +211,23 @@ void AudioCoreServer::GetDbFromVolume(GetDbFromVolumeRequestView request,
   }
   completer.Reply(db);
 }
+void AudioCoreServer::GetDbFromVolume2(GetDbFromVolume2RequestView request,
+                                       GetDbFromVolume2Completer::Sync& completer) {
+  TRACE_DURATION("audio", "AudioCoreServer::GetDbFromVolume2");
+
+  float db;
+  auto volume_curve = request->usage.is_render_usage()
+                          ? route_graph_->VolumeCurveForUsage(
+                                static_cast<RenderUsage>(request->usage.render_usage()))
+                          : route_graph_->VolumeCurveForUsage(
+                                static_cast<CaptureUsage>(request->usage.capture_usage()));
+  if (volume_curve) {
+    db = volume_curve->VolumeToDb(request->volume);
+  } else {
+    db = default_volume_curve_.VolumeToDb(request->volume);
+  }
+  completer.Reply(db);
+}
 
 void AudioCoreServer::SetInteraction(SetInteractionRequestView request,
                                      SetInteractionCompleter::Sync& completer) {
@@ -178,6 +236,14 @@ void AudioCoreServer::SetInteraction(SetInteractionRequestView request,
       media::audio::ToFidlUsage2(fidl::NaturalToHLCPP(fidl::ToNatural(request->active))),
       media::audio::ToFidlUsage2(fidl::NaturalToHLCPP(fidl::ToNatural(request->affected))),
       static_cast<fuchsia::media::Behavior>(request->behavior));
+}
+
+void AudioCoreServer::SetInteraction2(SetInteraction2RequestView request,
+                                      SetInteraction2Completer::Sync& completer) {
+  TRACE_DURATION("audio", "AudioCoreServer::SetInteraction2");
+  audio_admin_->SetInteraction(fidl::NaturalToHLCPP(fidl::ToNatural(request->active)),
+                               fidl::NaturalToHLCPP(fidl::ToNatural(request->affected)),
+                               static_cast<fuchsia::media::Behavior>(request->behavior));
 }
 
 void AudioCoreServer::ResetInteractions(ResetInteractionsCompleter::Sync& completer) {

@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.audio.mixer/cpp/wire.h>
 #include <fidl/fuchsia.media/cpp/wire.h>
 #include <lib/fidl/cpp/wire/client.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/sys/cpp/component_context.h>
 
 #include <map>
@@ -59,31 +60,51 @@ class AudioCoreServer
 
   void SetRenderUsageGain(SetRenderUsageGainRequestView request,
                           SetRenderUsageGainCompleter::Sync& completer) final;
+  void SetRenderUsageGain2(SetRenderUsageGain2RequestView request,
+                           SetRenderUsageGain2Completer::Sync& completer) final;
 
   void SetCaptureUsageGain(SetCaptureUsageGainRequestView request,
                            SetCaptureUsageGainCompleter::Sync& completer) final;
 
   void BindUsageVolumeControl(BindUsageVolumeControlRequestView request,
                               BindUsageVolumeControlCompleter::Sync& completer) final;
+  void BindUsageVolumeControl2(BindUsageVolumeControl2RequestView request,
+                               BindUsageVolumeControl2Completer::Sync& completer) final;
 
   void GetVolumeFromDb(GetVolumeFromDbRequestView request,
                        GetVolumeFromDbCompleter::Sync& completer) final;
+  void GetVolumeFromDb2(GetVolumeFromDb2RequestView request,
+                        GetVolumeFromDb2Completer::Sync& completer) final;
 
   void GetDbFromVolume(GetDbFromVolumeRequestView request,
                        GetDbFromVolumeCompleter::Sync& completer) final;
+  void GetDbFromVolume2(GetDbFromVolume2RequestView request,
+                        GetDbFromVolume2Completer::Sync& completer) final;
 
   void SetInteraction(SetInteractionRequestView request,
                       SetInteractionCompleter::Sync& completer) final;
+  void SetInteraction2(SetInteraction2RequestView request,
+                       SetInteraction2Completer::Sync& completer) final;
 
   void ResetInteractions(ResetInteractionsCompleter::Sync& completer) final;
 
   void LoadDefaults(LoadDefaultsCompleter::Sync& completer) final;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_media::AudioCore> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) final {
+    FX_LOGS(ERROR) << "AudioCoreServer: AudioCore::handle_unknown_method(ordinal "
+                   << metadata.method_ordinal << ", "
+                   << (metadata.unknown_method_type == fidl::UnknownMethodType::kOneWay
+                           ? "OneWay)"
+                           : "TwoWay)");
+  }
 
  private:
   static inline constexpr std::string_view kClassName = "AudioCoreServer";
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
+  void SetRenderUsageGainBase(const fuchsia::media::AudioRenderUsage2& usage, float gain_db);
   void LoadDefaults();
 
   explicit AudioCoreServer(Args args);

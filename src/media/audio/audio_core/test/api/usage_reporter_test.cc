@@ -131,9 +131,9 @@ TEST_F(UsageReporterTest, RenderUsageDucked) {
       }));
 
   // Duck MEDIA when SYSTEM_AGENT is active.
-  audio_core_->SetInteraction(
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::SYSTEM_AGENT),
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::MEDIA),
+  audio_core_->SetInteraction2(
+      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::SYSTEM_AGENT),
+      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
       fuchsia::media::Behavior::DUCK);
 
   StartRendererWithUsage(AudioRenderUsage2::SYSTEM_AGENT);
@@ -160,9 +160,9 @@ TEST_F(UsageReporterTest, RenderUsageMuted) {
       }));
 
   // Mute MEDIA when SYSTEM_AGENT is active.
-  audio_core_->SetInteraction(
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::SYSTEM_AGENT),
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::MEDIA),
+  audio_core_->SetInteraction2(
+      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::SYSTEM_AGENT),
+      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
       fuchsia::media::Behavior::MUTE);
 
   StartRendererWithUsage(AudioRenderUsage2::SYSTEM_AGENT);
@@ -208,9 +208,9 @@ TEST_F(UsageReporterTest, CaptureUsageDucked) {
       }));
 
   // Duck COMMUNICATION when SYSTEM_AGENT is active.
-  audio_core_->SetInteraction(
-      fuchsia::media::Usage::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
-      fuchsia::media::Usage::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
+  audio_core_->SetInteraction2(
+      fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
+      fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
       fuchsia::media::Behavior::DUCK);
 
   StartCapturerWithUsage(AudioCaptureUsage::SYSTEM_AGENT);
@@ -237,9 +237,9 @@ TEST_F(UsageReporterTest, CaptureUsageMuted) {
       }));
 
   // Mute COMMUNICATION when SYSTEM_AGENT is active.
-  audio_core_->SetInteraction(
-      fuchsia::media::Usage::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
-      fuchsia::media::Usage::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
+  audio_core_->SetInteraction2(
+      fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
+      fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
       fuchsia::media::Behavior::MUTE);
 
   StartCapturerWithUsage(AudioCaptureUsage::SYSTEM_AGENT);
