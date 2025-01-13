@@ -464,8 +464,8 @@ TEST_F(AudioConsumerTests, BindVolumeControl) {
   EXPECT_TRUE(volume_control_under_test()->SetVolume({{.volume = kVolume}}).is_ok());
   RunLoopUntilIdle();
 
-  const fuchsia_media::Usage kUsage =
-      fuchsia_media::Usage::WithRenderUsage(fuchsia_media::AudioRenderUsage::kMedia);
+  const fuchsia_media::Usage2 kUsage =
+      fuchsia_media::Usage2::WithRenderUsage(fuchsia_media::AudioRenderUsage2::kMedia);
 
   fake_audio_core().WasGetDbFromVolumeCalled(kUsage, kVolume, kGain);
   RunLoopUntilIdle();

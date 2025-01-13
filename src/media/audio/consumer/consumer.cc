@@ -357,8 +357,8 @@ void Consumer::SetVolume(SetVolumeRequest& request, SetVolumeCompleter::Sync& co
   }
 
   audio_core_
-      ->GetDbFromVolume({{
-          .usage = fuchsia_media::Usage::WithRenderUsage(fuchsia_media::AudioRenderUsage::kMedia),
+      ->GetDbFromVolume2({{
+          .usage = fuchsia_media::Usage2::WithRenderUsage(fuchsia_media::AudioRenderUsage2::kMedia),
           .volume = request.volume(),
       }})
       .Then([this](auto& result) {

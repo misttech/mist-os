@@ -87,14 +87,12 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
 
   void GetDbFromVolume(GetDbFromVolumeRequest& request,
                        GetDbFromVolumeCompleter::Sync& completer) override {
-    EXPECT_FALSE(get_db_from_volume_artifact_);
-    get_db_from_volume_artifact_ = std::make_unique<GetDbFromValueArtifact>(
-        std::move(request.usage()), request.volume(), completer.ToAsync());
+    FX_NOTIMPLEMENTED();
   }
   void GetDbFromVolume2(GetDbFromVolume2Request& request,
                         GetDbFromVolume2Completer::Sync& completer) override {
-    EXPECT_FALSE(get_db_from_volume2_artifact_);
-    get_db_from_volume2_artifact_ = std::make_unique<GetDbFromValue2Artifact>(
+    EXPECT_FALSE(get_db_from_volume_artifact_);
+    get_db_from_volume_artifact_ = std::make_unique<GetDbFromValueArtifact>(
         std::move(request.usage()), request.volume(), completer.ToAsync());
   }
 
@@ -137,7 +135,7 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
   }
 
   // Checks
-  bool WasGetDbFromVolumeCalled(const fuchsia_media::Usage& expected_usage, float expected_volume,
+  bool WasGetDbFromVolumeCalled(const fuchsia_media::Usage2& expected_usage, float expected_volume,
                                 float gain_db_to_return) {
     EXPECT_TRUE(get_db_from_volume_artifact_);
     if (!get_db_from_volume_artifact_) {
@@ -157,26 +155,6 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
     get_db_from_volume_artifact_.reset();
     return true;
   }
-  bool WasGetDbFromVolume2Called(const fuchsia_media::Usage2& expected_usage, float expected_volume,
-                                 float gain_db_to_return) {
-    EXPECT_TRUE(get_db_from_volume2_artifact_);
-    if (!get_db_from_volume2_artifact_) {
-      return false;
-    }
-
-    EXPECT_EQ(expected_usage, get_db_from_volume2_artifact_->usage);
-    EXPECT_EQ(expected_volume, get_db_from_volume2_artifact_->volume);
-    if (expected_usage != get_db_from_volume2_artifact_->usage ||
-        expected_volume != get_db_from_volume2_artifact_->volume) {
-      get_db_from_volume2_artifact_.reset();
-      return false;
-    }
-
-    get_db_from_volume2_artifact_->completer.Reply({{.gain_db = gain_db_to_return}});
-
-    get_db_from_volume2_artifact_.reset();
-    return true;
-  }
 
   // Returns a unique pointer to the previously-created audio renderer, if one was created, a null
   // unique pointer otherwise. Note that the caller is responsible for the lifetime of the fake
@@ -187,16 +165,8 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
 
  private:
   struct GetDbFromValueArtifact {
-    GetDbFromValueArtifact(fuchsia_media::Usage usage, float volume,
-                           GetDbFromVolumeCompleter::Async completer)
-        : usage(std::move(usage)), volume(volume), completer(std::move(completer)) {}
-    fuchsia_media::Usage usage;
-    float volume;
-    GetDbFromVolumeCompleter::Async completer;
-  };
-  struct GetDbFromValue2Artifact {
-    GetDbFromValue2Artifact(fuchsia_media::Usage2 usage, float volume,
-                            GetDbFromVolume2Completer::Async completer)
+    GetDbFromValueArtifact(fuchsia_media::Usage2 usage, float volume,
+                           GetDbFromVolume2Completer::Async completer)
         : usage(std::move(usage)), volume(volume), completer(std::move(completer)) {}
     fuchsia_media::Usage2 usage;
     float volume;
@@ -208,7 +178,6 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
   std::optional<fidl::ServerBindingRef<fuchsia_media::AudioCore>> binding_ref_;
   std::unique_ptr<FakeAudioRenderer> create_audio_renderer_artifact_;
   std::unique_ptr<GetDbFromValueArtifact> get_db_from_volume_artifact_;
-  std::unique_ptr<GetDbFromValue2Artifact> get_db_from_volume2_artifact_;
 };
 
 }  // namespace media::audio::tests
