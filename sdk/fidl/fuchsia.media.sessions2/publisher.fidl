@@ -12,9 +12,14 @@ type PlayerRegistration = table {
     /// The domain on which the player exists. Unset if it is the native
     /// Fuchsia domain.
     1: domain Domain;
-    /// The usage of the player's audio output. By default, this is assumed
-    /// to be MEDIA.
+
+    /// The usage of the player's audio output. Either 'usage' or 'usage2'
+    /// may be set, but not both. If neither is set, this is assumed to be MEDIA.
+    // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
+    @available(deprecated=NEXT, note="Use usage2 and AudioRenderUsage2")
     2: usage fuchsia.media.AudioRenderUsage;
+    @available(added=NEXT)
+    3: usage2 fuchsia.media.AudioRenderUsage2;
 };
 
 /// `Publisher` publishes media players so they may be discovered and

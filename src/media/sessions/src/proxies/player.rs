@@ -23,14 +23,18 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
-const DEFAULT_PLAYER_USAGE: AudioRenderUsage = AudioRenderUsage::Media;
+const DEFAULT_PLAYER_USAGE: AudioRenderUsage2 = AudioRenderUsage2::Media;
 
 #[derive(Debug, Clone, ValidFidlTable, PartialEq)]
 #[fidl_table_src(PlayerRegistration)]
 pub struct ValidPlayerRegistration {
     pub domain: String,
+
+    #[fidl_field_type(optional)]
+    pub usage: Option<AudioRenderUsage>,
+
     #[fidl_field_with_default(DEFAULT_PLAYER_USAGE)]
-    pub usage: AudioRenderUsage,
+    pub usage2: AudioRenderUsage2,
 }
 
 #[derive(Debug, Clone, ValidFidlTable, PartialEq)]
@@ -212,11 +216,25 @@ impl Player {
         published_sender: oneshot::Sender<()>,
     ) -> Result<Self> {
         let inspect_state = inspect_handle.create_child("state");
+        let usage2: Option<AudioRenderUsage2> =
+            // If client did not explicitly set 'usage2', set it from 'usage'.
+            registration.usage2.or(match registration.usage {
+                Some(AudioRenderUsage::Background) => Some(AudioRenderUsage2::Background),
+                Some(AudioRenderUsage::Communication) => Some(AudioRenderUsage2::Communication),
+                Some(AudioRenderUsage::Interruption) => Some(AudioRenderUsage2::Interruption),
+                Some(AudioRenderUsage::Media) => Some(AudioRenderUsage2::Media),
+                Some(AudioRenderUsage::SystemAgent) => Some(AudioRenderUsage2::SystemAgent),
+                None => None,
+            });
+        let mut valid_registration = ValidPlayerRegistration::try_from(registration)?;
+        if usage2.is_some() {
+            valid_registration.usage2 = usage2.unwrap();
+        }
         Ok(Player {
             id,
             inner: client_end.into_proxy(),
             state: ValidPlayerInfoDelta::default(),
-            registration: ValidPlayerRegistration::try_from(registration)?,
+            registration: valid_registration,
             hanging_get: None,
             terminated: false,
             inspect_handle,
@@ -248,13 +266,13 @@ impl Player {
 
     /// Returns the usage which, when interrupted, should cause the player
     /// to pause until the interruption is over.
-    pub fn usage_to_pause_on_interruption(&self) -> Option<AudioRenderUsage> {
+    pub fn usage_to_pause_on_interruption(&self) -> Option<AudioRenderUsage2> {
         self.state
             .interruption_behavior
             .as_ref()
             .copied()
             .filter(|behavior| *behavior == InterruptionBehavior::Pause)
-            .map(|_| self.registration.usage)
+            .map(|_| self.registration.usage2)
     }
 
     /// Sends a pause command to the backing player.

@@ -32,8 +32,8 @@ struct TestService {
     discovery: DiscoveryProxy,
     archive: ArchiveAccessorProxy,
     observer_discovery: ObserverDiscoveryProxy,
-    new_usage_watchers: mpsc::Receiver<(AudioRenderUsage, UsageWatcherProxy)>,
-    usage_watchers: HashMap<AudioRenderUsage, UsageWatcherProxy>,
+    new_usage_watchers: mpsc::Receiver<(AudioRenderUsage2, UsageWatcher2Proxy)>,
+    usage_watchers: HashMap<AudioRenderUsage2, UsageWatcher2Proxy>,
 }
 
 impl TestService {
@@ -139,7 +139,7 @@ impl TestService {
 
     async fn usage_reporter_mock(
         handles: LocalComponentHandles,
-        new_usage_watchers_sink: mpsc::Sender<(AudioRenderUsage, UsageWatcherProxy)>,
+        new_usage_watchers_sink: mpsc::Sender<(AudioRenderUsage2, UsageWatcher2Proxy)>,
     ) -> Result<()> {
         let mut fs = ServiceFs::new();
         let mut tasks = vec![];
@@ -148,14 +148,16 @@ impl TestService {
             move |mut request_stream| {
                 let mut new_usage_watchers_sink = new_usage_watchers_sink.clone();
                 tasks.push(fasync::Task::local(async move {
-                    while let Some(Ok(UsageReporterRequest::Watch {
-                        usage, usage_watcher, ..
+                    while let Some(Ok(UsageReporterRequest::Watch2 {
+                        usage2,
+                        usage_watcher2,
+                        ..
                     })) = request_stream.next().await
                     {
-                        match usage {
-                            Usage::RenderUsage(usage) => {
+                        match usage2 {
+                            Usage2::RenderUsage(usage2) => {
                                 new_usage_watchers_sink
-                                    .send((usage, usage_watcher.into_proxy()))
+                                    .send((usage2, usage_watcher2.into_proxy()))
                                     .await
                                     .expect("Forwarding new UsageWatcher from service under test");
                             }
@@ -194,11 +196,11 @@ impl TestService {
         }
     }
 
-    async fn start_interruption(&mut self, usage: AudioRenderUsage) {
+    async fn start_interruption(&mut self, usage: AudioRenderUsage2) {
         if let Some(watcher) = self.usage_watchers.get(&usage) {
             watcher
-                .on_state_changed(
-                    &Usage::RenderUsage(usage),
+                .on_state_changed2(
+                    &Usage2::RenderUsage(usage),
                     &UsageState::Muted(UsageStateMuted::default()),
                 )
                 .await
@@ -208,11 +210,11 @@ impl TestService {
         }
     }
 
-    async fn stop_interruption(&mut self, usage: AudioRenderUsage) {
+    async fn stop_interruption(&mut self, usage: AudioRenderUsage2) {
         if let Some(watcher) = self.usage_watchers.get(&usage) {
             watcher
-                .on_state_changed(
-                    &Usage::RenderUsage(usage),
+                .on_state_changed2(
+                    &Usage2::RenderUsage(usage),
                     &UsageState::Unadjusted(UsageStateUnadjusted::default()),
                 )
                 .await
@@ -833,13 +835,13 @@ async fn player_is_interrupted() -> Result<()> {
     // the stream of requests coming in that we match on down below doesn't contain it.
     let _watch_request = player.requests.try_next().await?;
 
-    service.start_interruption(AudioRenderUsage::Media).await;
+    service.start_interruption(AudioRenderUsage2::Media).await;
     player
         .wait_for_request(|request| matches!(request, PlayerRequest::Pause { .. }))
         .await
         .expect("Waiting for player to receive pause");
 
-    service.stop_interruption(AudioRenderUsage::Media).await;
+    service.stop_interruption(AudioRenderUsage2::Media).await;
     player
         .wait_for_request(|request| matches!(request, PlayerRequest::Play { .. }))
         .await
@@ -865,7 +867,7 @@ async fn unenrolled_player_is_not_paused_when_interrupted() -> Result<()> {
     let _watch_request1 = player1.requests.try_next().await?;
     let _watch_request2 = player2.requests.try_next().await?;
 
-    service.start_interruption(AudioRenderUsage::Media).await;
+    service.start_interruption(AudioRenderUsage2::Media).await;
     player2
         .wait_for_request(|request| matches!(request, PlayerRequest::Pause { .. }))
         .await
@@ -897,13 +899,13 @@ async fn player_paused_before_interruption_is_not_resumed_by_its_end() -> Result
     let _watch_request1 = player1.requests.try_next().await?;
     let _watch_request2 = player2.requests.try_next().await?;
 
-    service.start_interruption(AudioRenderUsage::Media).await;
+    service.start_interruption(AudioRenderUsage2::Media).await;
     player1
         .wait_for_request(|request| matches!(request, PlayerRequest::Pause { .. }))
         .await
         .expect("Waiting for player to receive pause");
 
-    service.stop_interruption(AudioRenderUsage::Media).await;
+    service.stop_interruption(AudioRenderUsage2::Media).await;
     player1
         .wait_for_request(|request| matches!(request, PlayerRequest::Play { .. }))
         .await
@@ -932,7 +934,7 @@ async fn player_paused_during_interruption_is_not_resumed_by_its_end() -> Result
     // the stream of requests coming in that we match on down below doesn't contain it.
     let _watch_request = player.requests.try_next().await?;
 
-    service.start_interruption(AudioRenderUsage::Media).await;
+    service.start_interruption(AudioRenderUsage2::Media).await;
     player
         .wait_for_request(|request| matches!(request, PlayerRequest::Pause { .. }))
         .await
@@ -944,7 +946,7 @@ async fn player_paused_during_interruption_is_not_resumed_by_its_end() -> Result
         .await
         .expect("Waiting for player to receive pause");
 
-    service.stop_interruption(AudioRenderUsage::Media).await;
+    service.stop_interruption(AudioRenderUsage2::Media).await;
 
     drop(service);
     let next = player.requests.try_next().await?;

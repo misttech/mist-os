@@ -631,6 +631,12 @@
         "type": "fuchsia.media/AudioRenderUsage"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.media.sessions2/PlayerRegistration.usage2",
+        "ordinal": "3",
+        "type": "fuchsia.media/AudioRenderUsage2"
+    },
+    {
         "kind": "table",
         "name": "fuchsia.media.sessions2/PlayerRegistration"
     },
