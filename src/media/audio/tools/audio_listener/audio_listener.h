@@ -32,7 +32,8 @@ class AudioListener;
 
 class UsageGainListenerImpl : public fuchsia::media::UsageGainListener {
  public:
-  UsageGainListenerImpl(AudioListener* parent, std::string device_str, fuchsia::media::Usage usage);
+  UsageGainListenerImpl(AudioListener* parent, std::string device_str,
+                        fuchsia::media::Usage2 usage);
 
   fidl::InterfaceHandle<fuchsia::media::UsageGainListener> NewBinding() {
     return binding_.NewBinding();
@@ -51,36 +52,39 @@ class UsageGainListenerImpl : public fuchsia::media::UsageGainListener {
   AudioListener* parent_;
   fidl::Binding<fuchsia::media::UsageGainListener> binding_{this};
   std::string device_str_;
-  fuchsia::media::Usage usage_;
+  fuchsia::media::Usage2 usage_;
 
   bool muted_ = false;
   float gain_db_ = 0.0;
   std::string usage_str_;
 };
 
-class UsageWatcherImpl : public fuchsia::media::UsageWatcher {
+class UsageWatcherImpl : public fuchsia::media::UsageWatcher2 {
  public:
-  UsageWatcherImpl(AudioListener* parent, fuchsia::media::Usage usage);
+  UsageWatcherImpl(AudioListener* parent, fuchsia::media::Usage2 usage);
 
-  fidl::InterfaceHandle<fuchsia::media::UsageWatcher> NewBinding() { return binding_.NewBinding(); }
+  fidl::InterfaceHandle<fuchsia::media::UsageWatcher2> NewBinding() {
+    return binding_.NewBinding();
+  }
 
   AudioListener* parent() { return parent_; }
-  fidl::Binding<fuchsia::media::UsageWatcher>& binding() { return binding_; }
+  fidl::Binding<fuchsia::media::UsageWatcher2>& binding() { return binding_; }
 
-  const fuchsia::media::Usage& usage() const { return usage_; }
+  const fuchsia::media::Usage2& usage() const { return usage_; }
   const fuchsia::media::UsageState& usage_state() const { return usage_state_; }
   std::string usage_state_str() const;
-  void set_active(bool active) { active_ = active; }
+  void set_active() { active_ = true; }
+  void clear_active() { active_ = false; }
   bool active() const { return active_; }
 
  private:
-  // |fuchsia::media::UsageWatcher|
-  void OnStateChanged(fuchsia::media::Usage usage, fuchsia::media::UsageState usage_state,
-                      OnStateChangedCallback callback) override;
+  // |fuchsia::media::UsageWatcher2|
+  void OnStateChanged2(fuchsia::media::Usage2 usage, fuchsia::media::UsageState usage_state,
+                       OnStateChanged2Callback callback) override;
 
   AudioListener* parent_;
-  fidl::Binding<fuchsia::media::UsageWatcher> binding_;
-  fuchsia::media::Usage usage_;
+  fidl::Binding<fuchsia::media::UsageWatcher2> binding_;
+  fuchsia::media::Usage2 usage_;
   fuchsia::media::UsageState usage_state_;
   std::string usage_str_;
   bool active_;
@@ -89,7 +93,7 @@ class UsageWatcherImpl : public fuchsia::media::UsageWatcher {
 class AudioListener {
  public:
   struct Usage {
-    fuchsia::media::Usage usage;
+    fuchsia::media::Usage2 usage;
     std::string short_name;
   };
 
@@ -104,7 +108,7 @@ class AudioListener {
 
   void WatchRenderActivity();
   void WatchCaptureActivity();
-  void OnRenderActivity(const std::vector<fuchsia::media::AudioRenderUsage>& render_usages);
+  void OnRenderActivity(const std::vector<fuchsia::media::AudioRenderUsage2>& render_usages);
   void OnCaptureActivity(const std::vector<fuchsia::media::AudioCaptureUsage>& capture_usages);
   void DisplayUsageActivity();
 
@@ -130,20 +134,20 @@ class AudioListener {
 
   fuchsia::media::UsageReporterPtr usage_reporter_;
   // UsageWatchers are stored in alphabetical order of their usage.
-  std::unique_ptr<UsageWatcherImpl> render_usage_watchers_[fuchsia::media::RENDER_USAGE_COUNT];
+  std::unique_ptr<UsageWatcherImpl> render_usage_watchers_[fuchsia::media::RENDER_USAGE2_COUNT];
   std::unique_ptr<UsageWatcherImpl> capture_usage_watchers_[fuchsia::media::CAPTURE_USAGE_COUNT];
 
   fuchsia::media::AudioCorePtr audio_core_;
   // VolumeControls, volumes and mutes are stored in alphabetical order of their usage.
-  std::array<fuchsia::media::audio::VolumeControlPtr, fuchsia::media::RENDER_USAGE_COUNT>
+  std::array<fuchsia::media::audio::VolumeControlPtr, fuchsia::media::RENDER_USAGE2_COUNT>
       render_usage_volume_ctls_;
-  std::array<float, fuchsia::media::RENDER_USAGE_COUNT> render_usage_volumes_;
-  std::array<bool, fuchsia::media::RENDER_USAGE_COUNT> render_usage_mutes_;
+  std::array<float, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_volumes_;
+  std::array<bool, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_mutes_;
 
   fuchsia::media::UsageGainReporterPtr usage_gain_reporter_;
   // UsageGainListeners are stored in alphabetical order of their usage.
   std::unique_ptr<UsageGainListenerImpl>
-      render_usage_gain_listeners_[fuchsia::media::RENDER_USAGE_COUNT];
+      render_usage_gain_listeners_[fuchsia::media::RENDER_USAGE2_COUNT];
   std::unique_ptr<UsageGainListenerImpl>
       capture_usage_gain_listeners_[fuchsia::media::CAPTURE_USAGE_COUNT];
 

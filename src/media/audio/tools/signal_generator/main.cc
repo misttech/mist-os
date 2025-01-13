@@ -309,7 +309,7 @@ int main(int argc, const char** argv) {
                            });
     if (it == kRenderUsageOptions.cend()) {
       usage(argv[0]);
-      fprintf(stderr, "Unrecognized AudioRenderUsage %s\n\n", usage_option.c_str());
+      fprintf(stderr, "Unrecognized AudioRenderUsage '%s'\n\n", usage_option.c_str());
       return 1;
     }
     media_app.set_usage(it->second);
@@ -317,7 +317,7 @@ int main(int argc, const char** argv) {
 
   // Handle signal type and frequency specifications.
   // If >1 type is specified, obey usage order: sine, square, saw, noise.
-  std::string frequency_str = "";
+  std::string frequency_str;
   if (command_line.HasOption(kSineWaveSwitch)) {
     media_app.set_output_type(kOutputTypeSine);
     command_line.GetOptionValue(kSineWaveSwitch, &frequency_str);
@@ -516,7 +516,7 @@ int main(int argc, const char** argv) {
     auto ramp_duration_nsec =
         static_cast<zx_duration_t>(media_app.get_duration() * 1'000'000'000.0);
     if (command_line.HasOption(kStreamRampDurationSwitch)) {
-      std::string ramp_duration_str = "";
+      std::string ramp_duration_str;
       command_line.GetOptionValue(kStreamRampDurationSwitch, &ramp_duration_str);
 
       if (ramp_duration_str != "") {

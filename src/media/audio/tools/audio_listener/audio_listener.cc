@@ -29,29 +29,31 @@ constexpr std::array<uint8_t, fuchsia::media::CAPTURE_USAGE_COUNT> kAlphaIndexFo
     1,  // COMMUNICATION
 };
 
-// This should reflect the order of the fuchsia::media::AudioRenderUsage enum's underlying values.
-constexpr std::array<uint8_t, fuchsia::media::RENDER_USAGE_COUNT> kAlphaIndexForRenderUsage = {
-    0,  // BACKGROUND
-    3,  // MEDIA
-    2,  // INTERRUPTION
-    4,  // SYSTEM_AGENT
-    1,  // COMMUNICATION
+// This should reflect the order of the fuchsia::media::AudioRenderUsage2 enum's underlying values.
+constexpr std::array<uint8_t, fuchsia::media::RENDER_USAGE2_COUNT> kAlphaIndexForRenderUsage = {
+    1,  // BACKGROUND
+    4,  // MEDIA
+    3,  // INTERRUPTION
+    5,  // SYSTEM_AGENT
+    2,  // COMMUNICATION
+    0,  // ACCESSIBILITY
 };
 uint8_t CaptureUsageToAlphaIndex(fuchsia::media::AudioCaptureUsage capture_usage) {
   return kAlphaIndexForCaptureUsage[static_cast<uint8_t>(capture_usage)];
 }
-uint8_t RenderUsageToAlphaIndex(fuchsia::media::AudioRenderUsage render_usage) {
+uint8_t RenderUsageToAlphaIndex(fuchsia::media::AudioRenderUsage2 render_usage) {
   return kAlphaIndexForRenderUsage[static_cast<uint8_t>(render_usage)];
 }
 
 // We can list these in alphabetical, so that the UI displays in that order.
-const std::pair<fuchsia::media::AudioRenderUsage, std::string>
-    kRenderUsages[fuchsia::media::RENDER_USAGE_COUNT] = {
-        {fuchsia::media::AudioRenderUsage::BACKGROUND, "Backgd"},
-        {fuchsia::media::AudioRenderUsage::COMMUNICATION, "Comm  "},
-        {fuchsia::media::AudioRenderUsage::INTERRUPTION, "Interr"},
-        {fuchsia::media::AudioRenderUsage::MEDIA, "Media "},
-        {fuchsia::media::AudioRenderUsage::SYSTEM_AGENT, "SysAgt"},
+const std::pair<fuchsia::media::AudioRenderUsage2, std::string>
+    kRenderUsages[fuchsia::media::RENDER_USAGE2_COUNT] = {
+        {fuchsia::media::AudioRenderUsage2::ACCESSIBILITY, "A11y  "},
+        {fuchsia::media::AudioRenderUsage2::BACKGROUND, "Backgd"},
+        {fuchsia::media::AudioRenderUsage2::COMMUNICATION, "Comm  "},
+        {fuchsia::media::AudioRenderUsage2::INTERRUPTION, "Interr"},
+        {fuchsia::media::AudioRenderUsage2::MEDIA, "Media "},
+        {fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT, "SysAgt"},
 };
 const std::pair<fuchsia::media::AudioCaptureUsage, std::string>
     kCaptureUsages[fuchsia::media::CAPTURE_USAGE_COUNT] = {
@@ -65,7 +67,7 @@ constexpr const char* kBlankUsageName = "      ";
 }  // namespace
 
 UsageGainListenerImpl::UsageGainListenerImpl(AudioListener* parent, std::string device_str,
-                                             fuchsia::media::Usage usage)
+                                             fuchsia::media::Usage2 usage)
     : parent_(parent),
       binding_(this),
       device_str_(std::move(device_str)),
@@ -74,8 +76,8 @@ UsageGainListenerImpl::UsageGainListenerImpl(AudioListener* parent, std::string 
     usage_str_ = "AudioCaptureUsage::" +
                  kCaptureUsages[CaptureUsageToAlphaIndex(usage_.capture_usage())].second;
   } else {
-    usage_str_ =
-        "AudioRenderUsage::" + kRenderUsages[RenderUsageToAlphaIndex(usage_.render_usage())].second;
+    usage_str_ = "AudioRenderUsage2::" +
+                 kRenderUsages[RenderUsageToAlphaIndex(usage_.render_usage())].second;
   }
 }
 
@@ -93,20 +95,20 @@ void UsageGainListenerImpl::OnGainMuteChanged(bool muted, float gain_dbfs,
   parent()->RefreshDisplay();
 }
 
-UsageWatcherImpl::UsageWatcherImpl(AudioListener* parent, fuchsia::media::Usage usage)
+UsageWatcherImpl::UsageWatcherImpl(AudioListener* parent, fuchsia::media::Usage2 usage)
     : parent_(parent), binding_(this), usage_(std::move(usage)) {
   if (usage_.is_capture_usage()) {
     usage_str_ = "AudioCaptureUsage::" +
                  kCaptureUsages[CaptureUsageToAlphaIndex(usage_.capture_usage())].second;
   } else {
-    usage_str_ =
-        "AudioRenderUsage::" + kRenderUsages[RenderUsageToAlphaIndex(usage_.render_usage())].second;
+    usage_str_ = "AudioRenderUsage2::" +
+                 kRenderUsages[RenderUsageToAlphaIndex(usage_.render_usage())].second;
   }
 }
 
-void UsageWatcherImpl::OnStateChanged(fuchsia::media::Usage usage,
-                                      fuchsia::media::UsageState usage_state,
-                                      OnStateChangedCallback callback) {
+void UsageWatcherImpl::OnStateChanged2(fuchsia::media::Usage2 usage,
+                                       fuchsia::media::UsageState usage_state,
+                                       OnStateChanged2Callback callback) {
   if (usage_.is_capture_usage()) {
     if (!usage.is_capture_usage()) {
       FX_LOGS(ERROR) << "Usage Mismatch: usage_ is_cap(" << usage_.is_capture_usage() << ")";
@@ -131,7 +133,8 @@ void UsageWatcherImpl::OnStateChanged(fuchsia::media::Usage usage,
   } else {
     usage_state_str = usage_state.is_ducked() ? "Ducked" : "Muted";
   }
-  FX_LOGS(DEBUG) << "UsageWatcher::OnStateChanged(" << usage_str_ << ", " << usage_state_str << ")";
+  FX_LOGS(DEBUG) << "UsageWatcher2::OnStateChanged2(" << usage_str_ << ", " << usage_state_str
+                 << ")";
 
   usage_state_ = std::move(usage_state);
 
@@ -190,8 +193,8 @@ void AudioListener::Run() {
 }
 
 void AudioListener::WatchRenderActivity() {
-  activity_reporter_->WatchRenderActivity(
-      [this](const std::vector<fuchsia::media::AudioRenderUsage>& render_usages) {
+  activity_reporter_->WatchRenderActivity2(
+      [this](const std::vector<fuchsia::media::AudioRenderUsage2>& render_usages) {
         OnRenderActivity(render_usages);
       });
 }
@@ -204,14 +207,14 @@ void AudioListener::WatchCaptureActivity() {
 }
 
 void AudioListener::OnRenderActivity(
-    const std::vector<fuchsia::media::AudioRenderUsage>& render_usages) {
+    const std::vector<fuchsia::media::AudioRenderUsage2>& render_usages) {
   // First clear the existing activity
   for (const auto& render_usage_watcher : render_usage_watchers_) {
-    render_usage_watcher->set_active(false);
+    render_usage_watcher->clear_active();
   }
   // Then set the usages 'active' that are contained in the render_usages vector
   for (auto render_usage : render_usages) {
-    render_usage_watchers_[RenderUsageToAlphaIndex(render_usage)]->set_active(true);
+    render_usage_watchers_[RenderUsageToAlphaIndex(render_usage)]->set_active();
   }
   RefreshDisplay();
   WatchRenderActivity();
@@ -221,50 +224,50 @@ void AudioListener::OnCaptureActivity(
     const std::vector<fuchsia::media::AudioCaptureUsage>& capture_usages) {
   // First clear the existing activity
   for (const auto& capture_usage_watcher : capture_usage_watchers_) {
-    capture_usage_watcher->set_active(false);
+    capture_usage_watcher->clear_active();
   }
   // Then set the usages 'active' that are contained in the capture_usages vector
   for (auto capture_usage : capture_usages) {
-    capture_usage_watchers_[CaptureUsageToAlphaIndex(capture_usage)]->set_active(true);
+    capture_usage_watchers_[CaptureUsageToAlphaIndex(capture_usage)]->set_active();
   }
   RefreshDisplay();
   WatchCaptureActivity();
 }
 
 void AudioListener::WatchUsageStates() {
-  for (auto r_idx = 0u; r_idx < fuchsia::media::RENDER_USAGE_COUNT; ++r_idx) {
-    fuchsia::media::Usage usage =
-        fuchsia::media::Usage::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first));
+  for (auto r_idx = 0u; r_idx < fuchsia::media::RENDER_USAGE2_COUNT; ++r_idx) {
+    fuchsia::media::Usage2 usage =
+        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first));
     render_usage_watchers_[r_idx] = std::make_unique<UsageWatcherImpl>(
-        this, fuchsia::media::Usage::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first)));
+        this, fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first)));
 
-    usage_reporter_->Watch(std::move(usage), render_usage_watchers_[r_idx]->NewBinding());
+    usage_reporter_->Watch2(std::move(usage), render_usage_watchers_[r_idx]->NewBinding());
     render_usage_watchers_[r_idx]->binding().set_error_handler([this, r_idx](zx_status_t status) {
-      FX_PLOGS(ERROR, status) << "Client connection to fuchsia.media.UsageWatcher failed for r_idx "
-                              << r_idx;
+      FX_PLOGS(ERROR, status)
+          << "Client connection to fuchsia.media.UsageWatcher2 failed for r_idx " << r_idx;
       quit_callback_();
     });
   }
 
   for (auto c_idx = 0u; c_idx < fuchsia::media::CAPTURE_USAGE_COUNT; ++c_idx) {
-    fuchsia::media::Usage usage =
-        fuchsia::media::Usage::WithCaptureUsage(fidl::Clone(kCaptureUsages[c_idx].first));
+    fuchsia::media::Usage2 usage =
+        fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(kCaptureUsages[c_idx].first));
     capture_usage_watchers_[c_idx] = std::make_unique<UsageWatcherImpl>(
-        this, fuchsia::media::Usage::WithCaptureUsage(fidl::Clone(kCaptureUsages[c_idx].first)));
+        this, fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(kCaptureUsages[c_idx].first)));
 
-    usage_reporter_->Watch(std::move(usage), capture_usage_watchers_[c_idx]->NewBinding());
+    usage_reporter_->Watch2(std::move(usage), capture_usage_watchers_[c_idx]->NewBinding());
     capture_usage_watchers_[c_idx]->binding().set_error_handler([this, c_idx](zx_status_t status) {
-      FX_PLOGS(ERROR, status) << "Client connection to fuchsia.media.UsageWatcher failed for c_idx "
-                              << c_idx;
+      FX_PLOGS(ERROR, status)
+          << "Client connection to fuchsia.media.UsageWatcher2 failed for c_idx " << c_idx;
       quit_callback_();
     });
   }
 }
 
 void AudioListener::WatchUsageVolumes() {
-  for (auto r_idx = 0u; r_idx < fuchsia::media::RENDER_USAGE_COUNT; ++r_idx) {
-    audio_core_->BindUsageVolumeControl(
-        fuchsia::media::Usage::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first)),
+  for (auto r_idx = 0u; r_idx < fuchsia::media::RENDER_USAGE2_COUNT; ++r_idx) {
+    audio_core_->BindUsageVolumeControl2(
+        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first)),
         render_usage_volume_ctls_[r_idx].NewRequest());
 
     render_usage_volume_ctls_[r_idx].set_error_handler([this, r_idx](zx_status_t status) {
@@ -286,15 +289,15 @@ void AudioListener::WatchUsageGains() {
   const std::string output_device_str = "01000000000000000000000000000000";
   const std::string input_device_str = "03000000000000000000000000000000";
 
-  for (auto r_idx = 0u; r_idx < fuchsia::media::RENDER_USAGE_COUNT; ++r_idx) {
-    fuchsia::media::Usage usage =
-        fuchsia::media::Usage::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first));
+  for (auto r_idx = 0u; r_idx < fuchsia::media::RENDER_USAGE2_COUNT; ++r_idx) {
+    fuchsia::media::Usage2 usage =
+        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first));
     render_usage_gain_listeners_[r_idx] = std::make_unique<UsageGainListenerImpl>(
         this, output_device_str,
-        fuchsia::media::Usage::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first)));
+        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(kRenderUsages[r_idx].first)));
 
-    usage_gain_reporter_->RegisterListener(output_device_str, std::move(usage),
-                                           render_usage_gain_listeners_[r_idx]->NewBinding());
+    usage_gain_reporter_->RegisterListener2(output_device_str, std::move(usage),
+                                            render_usage_gain_listeners_[r_idx]->NewBinding());
     render_usage_gain_listeners_[r_idx]->binding().set_error_handler(
         [this, r_idx](zx_status_t status) {
           FX_PLOGS(ERROR, status)
@@ -304,14 +307,14 @@ void AudioListener::WatchUsageGains() {
   }
 
   for (auto c_idx = 0u; c_idx < fuchsia::media::CAPTURE_USAGE_COUNT; ++c_idx) {
-    fuchsia::media::Usage usage =
-        fuchsia::media::Usage::WithCaptureUsage(fidl::Clone(kCaptureUsages[c_idx].first));
+    fuchsia::media::Usage2 usage =
+        fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(kCaptureUsages[c_idx].first));
     capture_usage_gain_listeners_[c_idx] = std::make_unique<UsageGainListenerImpl>(
         this, input_device_str,
-        fuchsia::media::Usage::WithCaptureUsage(fidl::Clone(kCaptureUsages[c_idx].first)));
+        fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(kCaptureUsages[c_idx].first)));
 
-    usage_gain_reporter_->RegisterListener(input_device_str, std::move(usage),
-                                           capture_usage_gain_listeners_[c_idx]->NewBinding());
+    usage_gain_reporter_->RegisterListener2(input_device_str, std::move(usage),
+                                            capture_usage_gain_listeners_[c_idx]->NewBinding());
     capture_usage_gain_listeners_[c_idx]->binding().set_error_handler(
         [this, c_idx](zx_status_t status) {
           FX_PLOGS(ERROR, status)
@@ -323,14 +326,15 @@ void AudioListener::WatchUsageGains() {
 
 // static
 void AudioListener::DisplayHeader() {
-  std::cout << "\n         |                   Render usages                  ||             "
-               "Capture usages              |";
+  std::cout << "\n         "                                                    //
+            << "|                       Render usages                       |"  //
+            << "|             Capture usages              |";                   //
   std::cout << kHideCursor << '\n';
 }
 
 void AudioListener::DisplayUsageActivity() {
   std::cout << "Active: |    ";
-  for (uint8_t r_idx = 0; r_idx < fuchsia::media::RENDER_USAGE_COUNT; ++r_idx) {
+  for (uint8_t r_idx = 0; r_idx < fuchsia::media::RENDER_USAGE2_COUNT; ++r_idx) {
     std::cout << (render_usage_watchers_[r_idx]->active() ? kRenderUsages[r_idx].second
                                                           : kBlankUsageName);
     std::cout << "   ";
@@ -345,7 +349,7 @@ void AudioListener::DisplayUsageActivity() {
 
 void AudioListener::DisplayUsageStates() {
   std::cout << "States: |    ";
-  for (uint8_t r_idx = 0; r_idx < fuchsia::media::RENDER_USAGE_COUNT; ++r_idx) {
+  for (uint8_t r_idx = 0; r_idx < fuchsia::media::RENDER_USAGE2_COUNT; ++r_idx) {
     std::cout << fxl::StringPrintf("%c %s   ", kRenderUsages[r_idx].second[0],
                                    render_usage_watchers_[r_idx]->usage_state_str().c_str());
   }
@@ -358,7 +362,7 @@ void AudioListener::DisplayUsageStates() {
 
 void AudioListener::DisplayUsageVolumes() {
   std::cout << "Volume: |    ";
-  for (uint8_t r_idx = 0; r_idx < fuchsia::media::RENDER_USAGE_COUNT; ++r_idx) {
+  for (uint8_t r_idx = 0; r_idx < fuchsia::media::RENDER_USAGE2_COUNT; ++r_idx) {
     std::cout << fxl::StringPrintf("%c %4.2f   ", kRenderUsages[r_idx].second[0],
                                    render_usage_volumes_[r_idx]);
   }
@@ -367,7 +371,7 @@ void AudioListener::DisplayUsageVolumes() {
 
 void AudioListener::DisplayUsageGains() {
   std::cout << "GainDb: |    ";
-  for (uint8_t r_idx = 0; r_idx < fuchsia::media::RENDER_USAGE_COUNT; ++r_idx) {
+  for (uint8_t r_idx = 0; r_idx < fuchsia::media::RENDER_USAGE2_COUNT; ++r_idx) {
     std::cout << fxl::StringPrintf("%c%6.1f  ", kRenderUsages[r_idx].second[0],
                                    render_usage_gain_listeners_[r_idx]->gain_db());
   }
@@ -454,23 +458,23 @@ void DisplayUsage(const std::string& name, std::optional<std::string> error_str 
   printf("in real-time, for all render and capture usages:\n\n");
 
   printf("  - Activity (whether the usage is active), per fuchsia.media.ActivityReporter\n");
-  printf("  - State (Normal/Ducked/Muted), per fuchsia.media.UsageWatcher\n");
-  printf("  - Volume (0.0 - 1.0), from fuchsia.media.AudioCore/BindUsageVolumeControl\n");
+  printf("  - State (Normal/Ducked/Muted), per fuchsia.media.UsageWatcher2\n");
+  printf("  - Volume (0.0 - 1.0), from fuchsia.media.AudioCore/BindUsageVolumeControl2\n");
   printf("  - Gain (dB), per fuchsia.media.UsageGainListener\n\n");
 
   printf("To switch between Activity | State | Volume | Gain display modes, press arrow keys\n");
   printf("(up | left | down | right for Activity | State | Volume | Gain respectively), or\n");
   printf("numerical keys 1-4 (handy when arrow keys are unavailable).\n\n");
 
-  printf("In Activity mode, for every usage a six-letter abbreviation is displayed IFF it is\n");
-  printf("active: Backgd, Comm, Foregd, Interr, Media, SysAgt.\n\n");
+  printf("In Activity mode, for every usage a 4-6 letter abbreviation is displayed IFF it is\n");
+  printf("active: A11y, Backgd, Comm, Foregd, Interr, Media, SysAgt.\n\n");
 
   printf("In State, Volume and Gain modes, the first letter of each usage is shown alongside\n");
   printf("that usage's information.\n\n");
 
   printf(
       "Render Usages include:  "
-      "Background, Communication, Interruption, Media, SystemAgent\n");
+      "Accessibility, Background, Communication, Interruption, Media, SystemAgent\n");
   printf("Capture Usages include: Background, Communication, Foreground, SystemAgent\n\n");
 
   printf("To quit the %s tool, press Q or [Enter].\n\n", name.c_str());

@@ -7,8 +7,8 @@ well as usage VolumeControls available from the AudioCore interface.
 Current per-usage data is updated in real-time, for all render/capture usages:
 
   - Activity (whether the usage is active), per fuchsia.media.ActivityReporter
-  - State (Normal/Ducked/Muted), per fuchsia.media.UsageWatcher
-  - Volume (0.0 - 1.0), from fuchsia.media.AudioCore/BindUsageVolumeControl
+  - State (Normal/Ducked/Muted), per fuchsia.media.UsageWatcher2
+  - Volume (0.0 - 1.0), from fuchsia.media.AudioCore/BindUsageVolumeControl2
   - Gain (dB), per fuchsia.media.UsageGainListener
 
 To switch between Activity | State | Volume | Gain displays, press arrow keys

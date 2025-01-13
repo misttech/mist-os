@@ -24,7 +24,7 @@ namespace {
 
 constexpr float kUnityGainDb = 0.0f;
 
-using OutputSignalType = enum {
+using OutputSignalType = enum : uint8_t {
   kOutputTypeNoise,
   kOutputTypePinkNoise,
   kOutputTypeSine,
@@ -35,16 +35,17 @@ using OutputSignalType = enum {
 };
 // TODO(https://fxbug.dev/42126165): refactor to make it easier to add new signal-generators.
 
-using ClockType = enum { Default, Flexible, Monotonic, Custom };
+using ClockType = enum : uint8_t { Default, Flexible, Monotonic, Custom };
 
-constexpr std::array<std::pair<const char*, fuchsia::media::AudioRenderUsage>,
-                     fuchsia::media::RENDER_USAGE_COUNT>
+constexpr std::array<std::pair<const char*, fuchsia::media::AudioRenderUsage2>,
+                     fuchsia::media::RENDER_USAGE2_COUNT>
     kRenderUsageOptions = {{
-        {"BACKGROUND", fuchsia::media::AudioRenderUsage::BACKGROUND},
-        {"COMMUNICATION", fuchsia::media::AudioRenderUsage::COMMUNICATION},
-        {"INTERRUPTION", fuchsia::media::AudioRenderUsage::INTERRUPTION},
-        {"MEDIA", fuchsia::media::AudioRenderUsage::MEDIA},
-        {"SYSTEM_AGENT", fuchsia::media::AudioRenderUsage::SYSTEM_AGENT},
+        {"ACCESSIBILITY", fuchsia::media::AudioRenderUsage2::ACCESSIBILITY},
+        {"BACKGROUND", fuchsia::media::AudioRenderUsage2::BACKGROUND},
+        {"COMMUNICATION", fuchsia::media::AudioRenderUsage2::COMMUNICATION},
+        {"INTERRUPTION", fuchsia::media::AudioRenderUsage2::INTERRUPTION},
+        {"MEDIA", fuchsia::media::AudioRenderUsage2::MEDIA},
+        {"SYSTEM_AGENT", fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT},
     }};
 
 // Any audio output device fed by the system audio mixer will have this min_lead_time, at least.
@@ -58,7 +59,7 @@ constexpr zx::duration kRealDeviceMinLeadTime = zx::msec(1);
 namespace media::tools {
 class MediaApp {
  public:
-  MediaApp(fit::closure quit_callback);
+  explicit MediaApp(fit::closure quit_callback);
 
   void set_num_channels(uint32_t num_channels) { num_channels_ = num_channels; }
   void set_frame_rate(uint32_t frame_rate) { frame_rate_ = frame_rate; }
@@ -68,12 +69,12 @@ class MediaApp {
   void set_initial_delay(double secs) {
     initial_delay_ = zx::duration(static_cast<int64_t>(secs * 1'000'000'000.0));
   }
-  void set_usage(fuchsia::media::AudioRenderUsage usage) { usage_ = usage; }
+  void set_usage(fuchsia::media::AudioRenderUsage2 usage) { usage_ = usage; }
   void set_frequency(double frequency) { frequency_ = frequency; }
   void set_amplitude(float amplitude) { amplitude_ = amplitude; }
 
   void set_duration(double duration_secs) { duration_secs_ = duration_secs; }
-  double get_duration() { return duration_secs_; }
+  double get_duration() const { return duration_secs_; }
 
   void set_duty_cycle_percent(float duty_cycle_percent) {
     duty_cycle_percent_ = duty_cycle_percent;
@@ -180,7 +181,7 @@ class MediaApp {
   uint32_t sample_size_;
   uint32_t frame_size_;
 
-  fuchsia::media::AudioRenderUsage usage_ = fuchsia::media::AudioRenderUsage::MEDIA;
+  fuchsia::media::AudioRenderUsage2 usage_ = fuchsia::media::AudioRenderUsage2::MEDIA;
   fuchsia::media::audio::VolumeControlPtr usage_volume_control_;  // for usage volume
 
   OutputSignalType output_signal_type_;

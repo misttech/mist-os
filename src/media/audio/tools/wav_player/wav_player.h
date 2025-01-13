@@ -15,16 +15,17 @@
 
 constexpr float kUnityGainDb = 0.0f;
 
-enum class ClockType { Default, Flexible };
+enum class ClockType : uint8_t { Default, Flexible };
 
-constexpr std::array<std::pair<const char*, fuchsia::media::AudioRenderUsage>,
-                     fuchsia::media::RENDER_USAGE_COUNT>
+constexpr std::array<std::pair<const char*, fuchsia::media::AudioRenderUsage2>,
+                     fuchsia::media::RENDER_USAGE2_COUNT>
     kRenderUsageOptions = {{
-        {"BACKGROUND", fuchsia::media::AudioRenderUsage::BACKGROUND},
-        {"COMMUNICATION", fuchsia::media::AudioRenderUsage::COMMUNICATION},
-        {"INTERRUPTION", fuchsia::media::AudioRenderUsage::INTERRUPTION},
-        {"MEDIA", fuchsia::media::AudioRenderUsage::MEDIA},
-        {"SYSTEM_AGENT", fuchsia::media::AudioRenderUsage::SYSTEM_AGENT},
+        {"ACCESSIBILITY", fuchsia::media::AudioRenderUsage2::ACCESSIBILITY},
+        {"BACKGROUND", fuchsia::media::AudioRenderUsage2::BACKGROUND},
+        {"COMMUNICATION", fuchsia::media::AudioRenderUsage2::COMMUNICATION},
+        {"INTERRUPTION", fuchsia::media::AudioRenderUsage2::INTERRUPTION},
+        {"MEDIA", fuchsia::media::AudioRenderUsage2::MEDIA},
+        {"SYSTEM_AGENT", fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT},
     }};
 
 // Any audio output device fed by the system audio mixer will have this min_lead_time, at least.
@@ -47,7 +48,7 @@ class WavPlayer {
 
     ClockType clock_type;
 
-    std::optional<fuchsia::media::AudioRenderUsage> usage;
+    std::optional<fuchsia::media::AudioRenderUsage2> usage;
     std::optional<float> usage_gain_db;
     std::optional<float> usage_volume;
     std::optional<float> stream_gain_db;
@@ -55,8 +56,8 @@ class WavPlayer {
 
     bool verbose;
   };
-  static constexpr fuchsia::media::AudioRenderUsage kDefaultUsage =
-      fuchsia::media::AudioRenderUsage::MEDIA;
+  static constexpr fuchsia::media::AudioRenderUsage2 kDefaultUsage =
+      fuchsia::media::AudioRenderUsage2::MEDIA;
 
   explicit WavPlayer(Options options);
 
@@ -79,10 +80,10 @@ class WavPlayer {
   void Play();
 
   void SendPacket();
-  bool CheckPayloadSpace();
+  bool CheckPayloadSpace() const;
   void OnSendPacketComplete(uint64_t frames_completed);
 
-  fuchsia::media::StreamPacket CreateAudioPacket(uint64_t packet_num);
+  fuchsia::media::StreamPacket CreateAudioPacket(uint64_t packet_num) const;
   uint64_t RetrieveAudioForPacket(const fuchsia::media::StreamPacket& packet, uint64_t packet_num);
 
   bool Shutdown();
