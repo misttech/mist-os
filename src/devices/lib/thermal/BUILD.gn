@@ -9,6 +9,7 @@ import("//build/zircon/zx_library.gni")
 zx_library("thermal") {
   sdk = "source"
   sdk_headers = [
+    "lib/thermal/linear_lookup_table.h",
     "lib/thermal/metadata.h",
     "lib/thermal/ntc.h",
   ]
