@@ -691,6 +691,41 @@ mod tests {
         fixture.close().await;
     }
 
+    /// Ensure we get `IO_DATA_INTEGRITY` if one of the compressed chunks is corrupted.
+    #[fasync::run(10, test)]
+    async fn test_detect_corruption() {
+        let fixture = new_blob_fixture().await;
+
+        let mut data = vec![1; 65536];
+        thread_rng().fill(&mut data[..]);
+
+        let hash = fuchsia_merkle::from_slice(&data).root();
+        let mut compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
+        let len = compressed_data.len();
+        compressed_data[len - 1024..].fill(0);
+        {
+            let writer =
+                fixture.create_blob(&hash.into(), false).await.expect("failed to create blob");
+            let vmo = writer
+                .get_vmo(compressed_data.len() as u64)
+                .await
+                .expect("transport error on get_vmo")
+                .expect("failed to get vmo");
+            vmo.write(&compressed_data, 0).expect("failed to write to vmo");
+
+            assert_eq!(
+                writer
+                    .bytes_ready(compressed_data.len() as u64)
+                    .await
+                    .expect("transport error on bytes_ready")
+                    .map_err(Status::from_raw)
+                    .expect_err("write unexpectedly succeeded"),
+                zx::Status::IO_DATA_INTEGRITY
+            );
+        }
+        fixture.close().await;
+    }
+
     #[fasync::run(10, test)]
     async fn test_new_rewrite_fails() {
         let fixture = new_blob_fixture().await;

@@ -14,6 +14,11 @@ use thiserror::Error;
 use zerocopy::byteorder::{LE, U16, U32, U64};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout, Ref, Unaligned};
 
+/// Validated chunk information from an archive. Compressed ranges are relative to the start of
+/// compressed data (i.e. they start after the header and seek table).
+// *NOTE*: Use caution when using the `#[source]` attribute or naming fields `source`. Some callers
+// attempt to downcast library errors into the concrete type of the root cause.
+// See https://docs.rs/thiserror/latest/thiserror/ for more information.
 #[derive(Debug, Error)]
 pub enum ChunkedArchiveError {
     #[error("Invalid or unsupported archive version.")]
@@ -29,13 +34,13 @@ pub enum ChunkedArchiveError {
     OutOfRange,
 
     #[error("Error invoking Zstd function: `{0:?}`.")]
-    ZstdError(#[source] std::io::Error),
+    ZstdError(std::io::Error),
 
-    #[error("Error decompressing chunk {index}: `{source:?}`.")]
-    DecompressionError { index: usize, source: std::io::Error },
+    #[error("Error decompressing chunk {index}: `{error}`.")]
+    DecompressionError { index: usize, error: std::io::Error },
 
-    #[error("Error compressing chunk {index}: `{source:?}`.")]
-    CompressionError { index: usize, source: std::io::Error },
+    #[error("Error compressing chunk {index}: `{error}`.")]
+    CompressionError { index: usize, error: std::io::Error },
 }
 
 /// Validated chunk information from an archive. Compressed ranges are relative to the start of
@@ -284,7 +289,7 @@ impl ChunkedArchive {
                     let mut compressor = compressor.borrow_mut();
                     compressor
                         .compress(chunk)
-                        .map_err(|err| ChunkedArchiveError::CompressionError { index, source: err })
+                        .map_err(|error| ChunkedArchiveError::CompressionError { index, error })
                 })?;
                 Ok(CompressedChunk { compressed_data, decompressed_size: chunk.len() })
             })
@@ -418,9 +423,9 @@ impl ChunkedDecompressor {
         let decompressed_size = self
             .decompressor
             .decompress_to_buffer(data, self.decompressed_buffer.as_mut_slice())
-            .map_err(|err| ChunkedArchiveError::DecompressionError {
+            .map_err(|error| ChunkedArchiveError::DecompressionError {
                 index: self.curr_chunk,
-                source: err,
+                error,
             })?;
         if decompressed_size != chunk.decompressed_range.len() {
             return Err(ChunkedArchiveError::IntegrityError);
