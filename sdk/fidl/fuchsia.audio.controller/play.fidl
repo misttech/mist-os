@@ -30,7 +30,8 @@ open protocol Player {
                 1: standard_renderer @generated_name("StandardRendererConfig") table {
                     /// The usage of the audio stream.
                     ///
-                    /// Required.
+                    /// One of 'usage' or 'usage2' is required.
+                    // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
                     1: usage fuchsia.media.AudioRenderUsage;
 
                     /// The reference clock type used by the stream.
@@ -43,6 +44,11 @@ open protocol Player {
                     ///
                     /// Optional. If not specified, defaults to four packets.
                     3: packet_count uint32;
+
+                    /// The usage of the audio stream.
+                    ///
+                    /// One of 'usage' or 'usage2' is required.
+                    4: usage2 fuchsia.media.AudioRenderUsage2;
                 };
 
                 /// Renderer for ultrasonic frequencies.

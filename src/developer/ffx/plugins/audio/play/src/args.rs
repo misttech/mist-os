@@ -12,32 +12,33 @@ use {fidl_fuchsia_audio_controller as fac, fidl_fuchsia_media as fmedia};
 #[argh(
     subcommand,
     name = "play",
-    description = "Reads a WAV file from stdin and sends the audio data to audio_core AudioRenderer API.",
+    description = "Reads a WAV file from stdin and sends the audio data to audio_core's \
+    AudioRenderer API.",
     example = "$ ffx audio gen sine --duration 1s --frequency 440 --amplitude 0.5 --format 48000,int16,2ch | ffx audio play \n\
             $ ffx audio play --file ~/path/to/sine.wav"
 )]
 pub struct PlayCommand {
     #[argh(
         option,
-        description = "purpose of the stream being used to render audio.\
-        Accepted values: BACKGROUND, MEDIA, SYSTEM-AGENT, COMMUNICATION, INTERRUPTION,\
-        ULTRASOUND. Default: MEDIA.",
+        description = "purpose of the audio being played. Accepted values: ACCESSIBILITY (and \
+        A11Y), BACKGROUND, COMMUNICATION, INTERRUPTION, MEDIA, SYSTEM-AGENT, ULTRASOUND. \
+        Default: MEDIA.",
         from_str_fn(str_to_usage),
-        default = "AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media)"
+        default = "AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage2::Media)"
     )]
     pub usage: AudioRenderUsageExtended,
 
     #[argh(
         option,
-        description = "buffer size (bytes) to allocate on device VMO.\
-        Used to send audio data from ffx tool to AudioRenderer.\
+        description = "buffer size (bytes) to allocate on device VMO. \
+        Used to send audio data from ffx tool to AudioRenderer. \
         Defaults to size to hold 1 second of audio data. "
     )]
     pub buffer_size: Option<u32>,
 
     #[argh(
         option,
-        description = "how many packets to use when sending data to an AudioRenderer.\
+        description = "how many packets to use when sending data to an AudioRenderer. \
         Defaults to 4 packets."
     )]
     pub packet_count: Option<u32>,
@@ -54,10 +55,10 @@ pub struct PlayCommand {
 
     #[argh(
         option,
-        description = "explicitly set the renderer's reference clock. By default,\
+        description = "explicitly set the renderer's reference clock. By default, \
         SetReferenceClock is not called, which leads to a flexible clock. \
         Options include: 'flexible', 'monotonic', and 'custom,<rate adjustment>,<offset>' where \
-        rate adjustment and offset are integers. To set offset without rate adjustment, pass 0\
+        rate adjustment and offset are integers. To set offset without rate adjustment, pass 0 \
         in place of rate adjustment.",
         from_str_fn(str_to_clock),
         default = "fac::ClockType::Flexible(fac::Flexible)"
@@ -74,28 +75,32 @@ pub struct PlayCommand {
 
 #[derive(Debug, PartialEq)]
 pub enum AudioRenderUsageExtended {
-    Background(fmedia::AudioRenderUsage),
-    Communication(fmedia::AudioRenderUsage),
-    Media(fmedia::AudioRenderUsage),
-    Interruption(fmedia::AudioRenderUsage),
-    SystemAgent(fmedia::AudioRenderUsage),
+    Accessibility(fmedia::AudioRenderUsage2),
+    Background(fmedia::AudioRenderUsage2),
+    Communication(fmedia::AudioRenderUsage2),
+    Media(fmedia::AudioRenderUsage2),
+    Interruption(fmedia::AudioRenderUsage2),
+    SystemAgent(fmedia::AudioRenderUsage2),
     Ultrasound,
 }
 
 fn str_to_usage(src: &str) -> Result<AudioRenderUsageExtended, String> {
     match src.to_uppercase().as_str() {
+        "ACCESSIBILITY" | "A11Y" => {
+            Ok(AudioRenderUsageExtended::Background(fmedia::AudioRenderUsage2::Accessibility))
+        }
         "BACKGROUND" => {
-            Ok(AudioRenderUsageExtended::Background(fmedia::AudioRenderUsage::Background))
+            Ok(AudioRenderUsageExtended::Background(fmedia::AudioRenderUsage2::Background))
         }
         "COMMUNICATION" => {
-            Ok(AudioRenderUsageExtended::Communication(fmedia::AudioRenderUsage::Communication))
+            Ok(AudioRenderUsageExtended::Communication(fmedia::AudioRenderUsage2::Communication))
         }
         "INTERRUPTION" => {
-            Ok(AudioRenderUsageExtended::Interruption(fmedia::AudioRenderUsage::Interruption))
+            Ok(AudioRenderUsageExtended::Interruption(fmedia::AudioRenderUsage2::Interruption))
         }
-        "MEDIA" => Ok(AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media)),
+        "MEDIA" => Ok(AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage2::Media)),
         "SYSTEM-AGENT" => {
-            Ok(AudioRenderUsageExtended::SystemAgent(fmedia::AudioRenderUsage::SystemAgent))
+            Ok(AudioRenderUsageExtended::SystemAgent(fmedia::AudioRenderUsage2::SystemAgent))
         }
         "ULTRASOUND" => Ok(AudioRenderUsageExtended::Ultrasound),
         _ => Err(String::from("Couldn't parse usage.")),

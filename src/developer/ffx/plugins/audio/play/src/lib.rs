@@ -57,13 +57,14 @@ async fn play_impl(
             })
         }
 
-        AudioRenderUsageExtended::Background(usage)
+        AudioRenderUsageExtended::Accessibility(usage)
+        | AudioRenderUsageExtended::Background(usage)
         | AudioRenderUsageExtended::Communication(usage)
         | AudioRenderUsageExtended::Interruption(usage)
         | AudioRenderUsageExtended::Media(usage)
         | AudioRenderUsageExtended::SystemAgent(usage) => {
             fac::RendererConfig::StandardRenderer(fac::StandardRendererConfig {
-                usage: Some(usage),
+                usage2: Some(usage),
                 clock: Some(command.clock),
                 ..Default::default()
             })
@@ -117,7 +118,7 @@ mod tests {
         let writer: MachineWriter<PlayResult> = MachineWriter::new_test(None, &test_buffers);
 
         let stdin_command = PlayCommand {
-            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media),
+            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage2::Media),
             buffer_size: Some(48000),
             packet_count: None,
             file: None,
@@ -171,7 +172,7 @@ mod tests {
             .map_err(|e| anyhow!("Error trying to open file \"{}\": {e}", wav_path))?;
 
         let file_command = PlayCommand {
-            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage::Media),
+            usage: AudioRenderUsageExtended::Media(fmedia::AudioRenderUsage2::Media),
             buffer_size: Some(48000),
             packet_count: None,
             file: Some(wav_path),
