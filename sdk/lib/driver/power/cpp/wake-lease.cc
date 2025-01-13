@@ -53,9 +53,11 @@ WakeLease::WakeLease(async_dispatcher_t* dispatcher, std::string_view lease_name
 
 bool WakeLease::HandleInterrupt(zx::duration timeout) {
   // Only acquire a wake lease if the system state is appropriate.
-  if (!system_suspended_) {
-    return false;
-  }
+  // TODO(https://fxbug.dev/389163722) Restore this optimization once we can
+  // acquire a wake lease in a suspend handler.
+  // if (!system_suspended_) {
+  //   return false;
+  // }
   return AcquireWakeLease(timeout);
 }
 
