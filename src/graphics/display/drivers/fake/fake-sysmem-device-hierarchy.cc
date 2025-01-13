@@ -23,7 +23,7 @@
 #include "src/sysmem/server/allocator.h"
 #include "src/sysmem/server/sysmem.h"
 
-namespace display {
+namespace fake_display {
 
 zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> FakeSysmemDeviceHierarchy::Create() {
   return zx::ok(std::make_unique<FakeSysmemDeviceHierarchy>());
@@ -81,4 +81,4 @@ FakeSysmemDeviceHierarchy::~FakeSysmemDeviceHierarchy() {
   done.Wait();
 }
 
-}  // namespace display
+}  // namespace fake_display

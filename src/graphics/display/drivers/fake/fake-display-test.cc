@@ -52,10 +52,10 @@ class FakeDisplayTest : public testing::Test {
   FakeDisplayTest() = default;
 
   void SetUp() override {
-    zx::result<std::unique_ptr<display::FakeSysmemDeviceHierarchy>> create_sysmem_provider_result =
-        display::FakeSysmemDeviceHierarchy::Create();
+    zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> create_sysmem_provider_result =
+        FakeSysmemDeviceHierarchy::Create();
     ASSERT_OK(create_sysmem_provider_result);
-    fake_display_stack_ = std::make_unique<display::FakeDisplayStack>(
+    fake_display_stack_ = std::make_unique<FakeDisplayStack>(
         std::move(create_sysmem_provider_result).value(), GetFakeDisplayDeviceConfig());
   }
 
@@ -69,7 +69,7 @@ class FakeDisplayTest : public testing::Test {
   }
 
  protected:
-  std::unique_ptr<display::FakeDisplayStack> fake_display_stack_;
+  std::unique_ptr<FakeDisplayStack> fake_display_stack_;
 };
 
 TEST_F(FakeDisplayTest, Inspect) {

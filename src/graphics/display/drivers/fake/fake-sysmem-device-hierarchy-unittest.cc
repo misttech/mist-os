@@ -17,7 +17,7 @@
 
 #include "src/lib/testing/predicates/status.h"
 
-namespace display {
+namespace fake_display {
 
 namespace {
 
@@ -72,4 +72,4 @@ TEST(FakeSysmemDeviceHierarchy, OpenAllocatorV2) {
 
 }  // namespace
 
-}  // namespace display
+}  // namespace fake_display

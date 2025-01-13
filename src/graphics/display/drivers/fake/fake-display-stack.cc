@@ -14,14 +14,15 @@
 #include <memory>
 #include <utility>
 
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 
-namespace display {
+namespace fake_display {
 
 FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem_service_provider,
-                                   const fake_display::FakeDisplayDeviceConfig& device_config)
+                                   const FakeDisplayDeviceConfig& device_config)
     : driver_runtime_(mock_ddk::GetDriverRuntime()),
       sysmem_service_provider_(std::move(sysmem_service_provider)) {
   if (!fdf::Logger::HasGlobalInstance()) {
@@ -29,8 +30,8 @@ FakeDisplayStack::FakeDisplayStack(std::unique_ptr<SysmemServiceProvider> sysmem
   }
 
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem_allocator = ConnectToSysmemAllocatorV2();
-  display_engine_ = std::make_unique<fake_display::FakeDisplay>(
-      device_config, std::move(sysmem_allocator), inspect::Inspector{});
+  display_engine_ = std::make_unique<FakeDisplay>(device_config, std::move(sysmem_allocator),
+                                                  inspect::Inspector{});
   zx_status_t status = display_engine_->Initialize();
   if (status != ZX_OK) {
     ZX_PANIC("Failed to initialize fake-display: %s", zx_status_get_string(status));
@@ -78,7 +79,7 @@ display_coordinator::Controller* FakeDisplayStack::coordinator_controller() {
   return coordinator_controller_.get();
 }
 
-fake_display::FakeDisplay& FakeDisplayStack::display_engine() {
+FakeDisplay& FakeDisplayStack::display_engine() {
   ZX_ASSERT(!shutdown_);
   ZX_ASSERT(display_engine_ != nullptr);
   return *display_engine_;
@@ -126,4 +127,4 @@ void FakeDisplayStack::SyncShutdown() {
   sysmem_service_provider_.reset();
 }
 
-}  // namespace display
+}  // namespace fake_display

@@ -32,15 +32,15 @@ TestBase::~TestBase() = default;
 void TestBase::SetUp() {
   loop_.StartThread("display::TestBase::loop_");
 
-  zx::result<std::unique_ptr<display::FakeSysmemDeviceHierarchy>> create_sysmem_provider_result =
-      display::FakeSysmemDeviceHierarchy::Create();
+  zx::result<std::unique_ptr<fake_display::FakeSysmemDeviceHierarchy>>
+      create_sysmem_provider_result = fake_display::FakeSysmemDeviceHierarchy::Create();
   ASSERT_OK(create_sysmem_provider_result);
 
   static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
       .manual_vsync_trigger = true,
       .no_buffer_access = false,
   };
-  fake_display_stack_ = std::make_unique<display::FakeDisplayStack>(
+  fake_display_stack_ = std::make_unique<fake_display::FakeDisplayStack>(
       std::move(create_sysmem_provider_result).value(), kDeviceConfig);
 }
 

@@ -12,7 +12,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 
-namespace display {
+namespace fake_display {
 
 // static
 zx::result<std::unique_ptr<SysmemServiceForwarder>> SysmemServiceForwarder::Create() {
@@ -61,4 +61,4 @@ SysmemServiceForwarder::ConnectHardwareSysmem() {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-}  // namespace display
+}  // namespace fake_display

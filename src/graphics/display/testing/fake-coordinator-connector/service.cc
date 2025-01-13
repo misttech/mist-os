@@ -21,11 +21,11 @@ FakeDisplayCoordinatorConnector::FakeDisplayCoordinatorConnector(
     const fake_display::FakeDisplayDeviceConfig& fake_display_device_config) {
   FX_DCHECK(dispatcher);
 
-  zx::result<std::unique_ptr<SysmemServiceForwarder>> sysmem_service_forwarder_result =
-      display::SysmemServiceForwarder::Create();
+  zx::result<std::unique_ptr<fake_display::SysmemServiceForwarder>>
+      sysmem_service_forwarder_result = fake_display::SysmemServiceForwarder::Create();
   FX_CHECK(sysmem_service_forwarder_result.is_ok());
 
-  auto fake_display_stack = std::make_unique<display::FakeDisplayStack>(
+  auto fake_display_stack = std::make_unique<fake_display::FakeDisplayStack>(
       std::move(sysmem_service_forwarder_result).value(), fake_display_device_config);
   state_ = std::shared_ptr<State>(
       new State{.dispatcher = dispatcher, .fake_display_stack = std::move(fake_display_stack)});

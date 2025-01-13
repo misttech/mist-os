@@ -61,15 +61,16 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
     fit::function<void(zx_status_t)> on_coordinator_opened;
   };
 
-  // Encapsulates state for thread safety, since |display::FakeDisplayStack| invokes callbacks
-  // from other threads.
+  // Encapsulates state for thread safety, since
+  // `fake_display::FakeDisplayStack` invokes callbacks from other threads.
+  //
   // TODO(https://fxbug.dev/42079944): The comments are vague since it lacks the thread-
   // safety model of the struct. We need to rigorize the thread-safety model and
   // make sure that the access pattern is correct.
   struct State {
     async_dispatcher_t* const dispatcher;
 
-    const std::unique_ptr<display::FakeDisplayStack> fake_display_stack;
+    const std::unique_ptr<fake_display::FakeDisplayStack> fake_display_stack;
 
     bool primary_coordinator_claimed = false;
     bool virtcon_coordinator_claimed = false;

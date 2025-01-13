@@ -51,7 +51,7 @@ class TestBase : public testing::Test {
  private:
   async::Loop loop_;
 
-  std::unique_ptr<display::FakeDisplayStack> fake_display_stack_;
+  std::unique_ptr<fake_display::FakeDisplayStack> fake_display_stack_;
 };
 
 }  // namespace display_coordinator

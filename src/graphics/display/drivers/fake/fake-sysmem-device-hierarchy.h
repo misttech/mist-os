@@ -17,7 +17,7 @@
 #include "src/graphics/display/drivers/fake/sysmem-service-provider.h"
 #include "src/sysmem/server/sysmem.h"
 
-namespace display {
+namespace fake_display {
 
 // WARNING: Don't use this test as a template for new tests as it uses the old driver testing
 // library.
@@ -45,6 +45,6 @@ class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
   std::unique_ptr<sysmem_service::Sysmem> sysmem_service_;
 };
 
-}  // namespace display
+}  // namespace fake_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_SYSMEM_DEVICE_HIERARCHY_H_

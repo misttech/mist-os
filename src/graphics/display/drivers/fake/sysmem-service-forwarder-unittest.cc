@@ -15,7 +15,7 @@
 
 #include "src/lib/testing/predicates/status.h"
 
-namespace display {
+namespace fake_display {
 
 namespace {
 
@@ -70,4 +70,4 @@ TEST(SysmemServiceForwarder, OpenAllocatorV2) {
 
 }  // namespace
 
-}  // namespace display
+}  // namespace fake_display

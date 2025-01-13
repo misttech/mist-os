@@ -12,7 +12,7 @@
 
 #include "src/graphics/display/drivers/fake/sysmem-service-provider.h"
 
-namespace display {
+namespace fake_display {
 
 // Forwards the following sysmem protocols from the component's incoming service
 // directory to the forwarder's outgoing service directory:
@@ -43,6 +43,6 @@ class SysmemServiceForwarder : public SysmemServiceProvider {
   fidl::ClientEnd<fuchsia_io::Directory> component_incoming_root_;
 };
 
-}  // namespace display
+}  // namespace fake_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_SERVICE_FORWARDER_H_

@@ -9,7 +9,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/zx/result.h>
 
-namespace display {
+namespace fake_display {
 
 // Interface for a component that exposes Sysmem.
 class SysmemServiceProvider {
@@ -26,6 +26,6 @@ class SysmemServiceProvider {
   virtual zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> ConnectHardwareSysmem() = 0;
 };
 
-}  // namespace display
+}  // namespace fake_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_SERVICE_PROVIDER_H_
