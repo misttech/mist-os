@@ -64,6 +64,7 @@ action("generate_main_workspace") {
     "//build/bazel/scripts/check_ninja_build_plan.py",
     "//build/bazel/scripts/compute_content_hash.py",
     "//build/bazel/scripts/get_git_head_commit.py",
+    "//build/bazel/scripts/workspace_utils.py",
 
     # The script reads RBE configs
     rewrapper_config_file,

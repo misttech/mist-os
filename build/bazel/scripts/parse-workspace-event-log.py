@@ -14,6 +14,9 @@ from typing import Optional
 _SCRIPT_DIR = os.path.dirname(__file__)
 _FUCHSIA_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 
+sys.path.insert(0, _SCRIPT_DIR)
+import workspace_utils
+
 
 def get_host_platform() -> str:
     """Return host platform name, following Fuchsia conventions."""
@@ -88,24 +91,6 @@ def find_ninja_build_dir(fuchsia_dir: str) -> Optional[str]:
     return os.path.join(fuchsia_dir, build_dir)
 
 
-def find_bazel_top_dir(fuchsia_dir: str, ninja_build_dir: str) -> Optional[str]:
-    """Find Bazel top directory
-
-    Args:
-        fuchsia_dir: Fuchsia source directory.
-        ninja_build_dir: Ninja build directory.
-
-    Returns:
-        Bazel topdir path, or None if it could not be found.
-    """
-    top_dir_file = os.path.join(
-        fuchsia_dir, "build", "bazel", "config", "main_workspace_top_dir"
-    )
-    with open(top_dir_file) as f:
-        top_dir_relative = f.read().strip()
-    return os.path.join(ninja_build_dir, top_dir_relative)
-
-
 def find_default_log_file() -> Optional[str]:
     """Find the location of the default log file.
 
@@ -120,7 +105,10 @@ def find_default_log_file() -> Optional[str]:
     if not build_dir:
         return None
 
-    top_dir = find_bazel_top_dir(fuchsia_dir, build_dir)
+    top_dir = os.path.join(
+        build_dir,
+        workspace_utils.get_bazel_relative_topdir(fuchsia_dir, "main"),
+    )
     log_file = os.path.join(top_dir, "logs", "workspace-events.log")
     return log_file
 

@@ -27,7 +27,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import remote_services_utils
-import update_workspace
+import workspace_utils
 
 _THIS_SCRIPT = Path(__file__)
 _SCRIPT_DIR = _THIS_SCRIPT.resolve().parent
@@ -89,7 +89,7 @@ def main(argv: Sequence[str]) -> int:
 
     logs_dir = topdir / "logs"
 
-    host_tag = update_workspace.get_host_tag()
+    host_tag = workspace_utils.get_host_tag()
     host_tag_alt = host_tag.replace("-", "_")
 
     workspace_dir = topdir / "workspace"

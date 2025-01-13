@@ -39,36 +39,11 @@ import os
 import stat
 import sys
 from pathlib import Path
-from typing import Any, Callable, Sequence
+from typing import Any, Callable
 
 import check_ninja_build_plan
 import compute_content_hash
-
-
-def get_host_platform() -> str:
-    """Return host platform name, following Fuchsia conventions."""
-    if sys.platform == "linux":
-        return "linux"
-    elif sys.platform == "darwin":
-        return "mac"
-    else:
-        return os.uname().sysname
-
-
-def get_host_arch() -> str:
-    """Return host CPU architecture, following Fuchsia conventions."""
-    host_arch = os.uname().machine
-    if host_arch == "x86_64":
-        return "x64"
-    elif host_arch.startswith(("armv8", "aarch64")):
-        return "arm64"
-    else:
-        return host_arch
-
-
-def get_host_tag() -> str:
-    """Return host tag, following Fuchsia conventions."""
-    return "%s-%s" % (get_host_platform(), get_host_arch())
+import workspace_utils
 
 
 def force_symlink(target_path: str, dst_path: str) -> None:
@@ -155,20 +130,6 @@ def create_clean_dir(path: str) -> None:
     if os.path.exists(path):
         remove_dir(path)
     os.makedirs(path)
-
-
-def get_bazel_relative_topdir(fuchsia_dir: str, workspace_name: str) -> str:
-    """Return Bazel topdir for a given workspace, relative to Ninja output dir."""
-    input_file = os.path.join(
-        fuchsia_dir,
-        "build",
-        "bazel",
-        "config",
-        f"{workspace_name}_workspace_top_dir",
-    )
-    assert os.path.exists(input_file), "Missing input file: " + input_file
-    with open(input_file) as f:
-        return f.read().strip()
 
 
 def get_fx_build_dir(fuchsia_dir: str) -> str | None:
@@ -270,113 +231,6 @@ class GeneratedFiles(object):
                 pass
             else:
                 assert False, "Unknown entry type: " % entry["type"]
-
-
-def maybe_regenerate_ninja(gn_output_dir: str, ninja: str) -> bool:
-    """Regenerate Ninja build plan if needed, returns True on update."""
-    # This reads the build.ninja.d directly and tries to stat() all
-    # dependencies in it directly (around 7000+), which is much
-    # faster than Ninja trying to stat all build graph paths!
-    build_ninja_d = os.path.join(gn_output_dir, "build.ninja.d")
-    if not os.path.exists(build_ninja_d):
-        return False
-
-    with open(build_ninja_d) as f:
-        build_ninja_deps = f.read().split(" ")
-
-    assert len(build_ninja_deps) > 1
-    ninja_stamp = os.path.join(gn_output_dir, build_ninja_deps[0][:-1])
-    ninja_stamp_timestamp = os.stat(ninja_stamp).st_mtime
-
-    try:
-        for dep in build_ninja_deps[1:]:
-            dep_path = os.path.join(gn_output_dir, dep)
-            dep_timestamp = os.stat(dep_path).st_mtime
-            if dep_timestamp > ninja_stamp_timestamp:
-                return True
-    except FileNotFoundError:
-        return True
-
-    return False
-
-
-def get_git_head_path(git_path: str) -> str:
-    """Get the path of the .git/HEAD file of a given git directory.
-
-    This function handles git submodules properly when they are used.
-
-    Args:
-        git_path: Path to git repository, which can be a submodule file.
-
-    Returns:
-        Path to the final .git/HEAD file.
-    """
-    git_dir = os.path.join(git_path, ".git")
-    if os.path.isfile(git_dir):
-        with open(git_dir) as f:
-            # Example: "gitdir: ../../.git/modules/third_party/example"
-            submodule_dir = f.readlines()[0].split()[1]
-        git_dir = os.path.join(git_path, submodule_dir)
-
-    return os.path.join(git_dir, "HEAD")
-
-
-def depfile_quote(path: str) -> str:
-    """Quote a path properly for depfiles, if necessary.
-
-    shlex.quote() does not work because paths with spaces
-    are simply encased in single-quotes, while the Ninja
-    depfile parser only supports escaping single chars
-    (e.g. ' ' -> '\ ').
-
-    Args:
-       path: input file path.
-    Retursn:
-       The input file path with proper quoting to be included
-       directly in a depfile.
-    """
-    return path.replace("\\", "\\\\").replace(" ", "\\ ")
-
-
-def find_all_files_under(path: str) -> Sequence[str]:
-    """Find all files under a specific directory path.
-
-    Args:
-      path: Source directory path.
-    Returns:
-      A list of file paths.
-    """
-    result: list[str] = []
-    for root, dirs, files in os.walk(path):
-        result.extend(os.path.join(root, file) for file in files)
-
-    return result
-
-
-def find_prebuilt_python_content_files(install_path: str) -> Sequence[str]:
-    """Find all prebuilt python files for content hash computation.
-
-    In particular, this ignores .pyc files which are problematic because
-    they include their own timestamp which does not necessarily match
-    the actual file timestamp, which triggers the python interpreter
-    to regenerate them randomly.
-
-    See https://stackoverflow.com/questions/23775760/how-does-the-python-interpreter-know-when-to-compile-and-update-a-pyc-file
-
-    Args:
-      install_path: Path of Python installation directory.
-    Returns:
-      A list of file paths.
-    """
-    result: list[str] = []
-    for root, dirs, files in os.walk(install_path):
-        result.extend(
-            os.path.join(root, file)
-            for file in files
-            if not file.endswith(".pyc")
-        )
-
-    return result
 
 
 def find_host_binary_path(program: str) -> str:
@@ -521,14 +375,16 @@ def main() -> int:
             args.target_arch = target_cpu
 
     if not args.topdir:
-        default_topdir = get_bazel_relative_topdir(fuchsia_dir, "main")
+        default_topdir = workspace_utils.get_bazel_relative_topdir(
+            fuchsia_dir, "main"
+        )
         args.topdir = os.path.join(gn_output_dir, default_topdir)
 
     topdir = os.path.abspath(args.topdir)
 
     logs_dir = os.path.join(topdir, "logs")
 
-    host_tag = get_host_tag()
+    host_tag = workspace_utils.get_host_tag()
     host_tag_alt = host_tag.replace("-", "_")
 
     ninja_binary = os.path.join(
@@ -629,22 +485,9 @@ def main() -> int:
 
     # Generate symlinks
 
-    def excluded_file(path: str) -> bool:
-        """Return true if a file path must be excluded from the symlink list."""
-        # Never symlink to the 'out' directory.
-        if path == "out":
-            return True
-        # Don't symlink the Jiri files, this can confuse Jiri during an 'jiri update'
-        # Don't symlink the .fx directory (TODO(digit): I don't remember why?)
-        # Don´t symlink the .git directory as well, since it needs to be handled separately.
-        if path.startswith((".jiri", ".fx", ".git")):
-            return True
-        # Don't symlink the convenience symlinks from the Fuchsia source tree
-        if path in ("bazel-bin", "bazel-out", "bazel-repos", "bazel-workspace"):
-            return True
-        return False
-
-    generated.add_top_entries(fuchsia_dir, "workspace", excluded_file)
+    generated.add_top_entries(
+        fuchsia_dir, "workspace", workspace_utils.workspace_should_exclude_file
+    )
 
     generated.add_symlink(
         os.path.join("workspace", "BUILD.bazel"),
@@ -677,8 +520,8 @@ def main() -> int:
     # also sets --cpu properly, as required by the Bazel SDK rules. See comments
     # in template file for more details.
     _BAZEL_CPU_MAP = {"x64": "k8", "arm64": "aarch64"}
-    host_os = get_host_platform()
-    host_cpu = get_host_arch()
+    host_os = workspace_utils.get_host_platform()
+    host_cpu = workspace_utils.get_host_arch()
     platform_mappings_content = expand_template_file(
         "template.platform_mappings",
         host_os=host_os,
@@ -770,11 +613,6 @@ common --enable_bzlmod=false
         os.path.join(fuchsia_dir, ".jiri_root", "update_history", "latest"),
     )
     # LINT.ThenChange(//build/info/info.gni)
-
-    def _get_repo_hash_file_path(repo_name: str) -> str:
-        return os.path.join(
-            "workspace", "fuchsia_build_generated", repo_name + ".hash"
-        )
 
     force = args.force
     generated_json = generated.to_json()
