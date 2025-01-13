@@ -48,12 +48,12 @@ struct __CPU_ALIGN LockupDetectorState {
     ktl::atomic<bool> active = false;
 
     // The last time at which this CPU checked in.
-    ktl::atomic<zx_time_t> last_heartbeat = 0;
+    ktl::atomic<zx_instant_boot_t> last_heartbeat = 0;
 
     // The largest gap between last_heartbeat and now ever observed by a checker.
     // Note that writes to the field are "protected" by the exclusive role of
     // "checker".
-    ktl::atomic<zx_duration_t> max_gap = 0;
+    ktl::atomic<zx_duration_boot_t> max_gap = 0;
 
     // limiter for the rate at which heartbeat failures are reported.  "Protected"
     // by the exclusive role of "checker".
@@ -93,7 +93,7 @@ struct __CPU_ALIGN LockupDetectorState {
     // as a result of a new worst case value.
     //
     // Accessed by both this CPU and observers.
-    ktl::atomic<zx_ticks_t> worst_case_ticks{0};
+    ktl::atomic<zx_duration_boot_ticks_t> worst_case_ticks{0};
 
     // The time (tick count) at which the CPU entered the critical section.
     //
@@ -101,13 +101,13 @@ struct __CPU_ALIGN LockupDetectorState {
     // by critical section threads and observed by observers.
     //
     // Accessed by both this CPU and observers.
-    ktl::atomic<zx_ticks_t> begin_ticks{0};
+    ktl::atomic<zx_instant_boot_ticks_t> begin_ticks{0};
 
     // State variable used to de-dupe the critical section lockup events for the
     // purposes of updating kcounters.
     //
     // Accessed only by observers.
-    zx_ticks_t last_counted_begin_ticks{0};
+    zx_instant_boot_ticks_t last_counted_begin_ticks{0};
 
     // The largest worst case value ever _reported_ by a heartbeat checker.
     // This variable is only ever used by the current checker, and the
@@ -115,7 +115,7 @@ struct __CPU_ALIGN LockupDetectorState {
     // ensure that it is coherent on architectures with weak memory ordering.
     //
     // Accessed only by observers.
-    zx_ticks_t reported_worst_case_ticks{0};
+    zx_duration_boot_ticks_t reported_worst_case_ticks{0};
 
     // The alert limiter used to rate limit warnings printed for ongoing
     // critical section times (eg; CPUs which enter critical sections, but don't

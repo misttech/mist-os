@@ -97,15 +97,15 @@ struct percpu {
 
   // lockup_detector state.
   //
-  // Every active CPU wakes up periodically to record a heartbeat, as well as
-  // to check to see if any of its peers are showing signs of problems.  The
+  // Every active CPU wakes up periodically (even during periods of suspend-to-idle) to record a
+  // heartbeat, as well as to check to see if any of its peers are showing signs of problems.  The
   // lockup detector timer is the timer used for this.
   //
   // This field is not a member of LockupDetectorState because Timer depends on
   // SpinLock, which depends on lockup_detector.  By pulling it out of
   // LockupDetectorState we can inline performance critical lockup_detector
   // functions.  See also gLockupDetectorPerCpuState.
-  Timer lockup_detector_timer;
+  Timer lockup_detector_timer{ZX_CLOCK_BOOT};
 
   // The accumulated memory stall timers for this CPU.
   StallAccumulator memory_stall_accumulator;
