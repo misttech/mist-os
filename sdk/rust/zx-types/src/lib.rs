@@ -1688,7 +1688,8 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_IOB                        = 34; // zx_info_iob_t[1]
     ZX_INFO_IOB_REGIONS                = 35; // zx_iob_region_info_t[n]
     ZX_INFO_VMAR_MAPS                  = 36; // zx_info_maps_t[n]
-    ZX_INFO_POWER_DOMAINS                  = 37; // zx_info_power_domain_info_t[n]
+    ZX_INFO_POWER_DOMAINS              = 37; // zx_info_power_domain_info_t[n]
+    ZX_INFO_MEMORY_STALL               = 38; // zx_info_memory_stall_t[1]
 ]);
 
 // This macro takes struct-like syntax and creates another macro that can be used to create
@@ -2128,6 +2129,18 @@ impl Default for zx_info_process_handle_stats_t {
 }
 
 zx_info_process_handle_stats_t!(zx_info_process_handle_stats_t);
+
+struct_decl_macro! {
+    #[repr(C)]
+    #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    #[derive(zerocopy::FromBytes, zerocopy::Immutable, zerocopy::IntoBytes)]
+    pub struct <zx_info_memory_stall_t> {
+        pub stall_time_some: zx_duration_t,
+        pub stall_time_full: zx_duration_t,
+    }
+}
+
+zx_info_memory_stall_t!(zx_info_memory_stall_t);
 
 // from //zircon/system/public/zircon/syscalls/hypervisor.h
 multiconst!(zx_guest_option_t, [

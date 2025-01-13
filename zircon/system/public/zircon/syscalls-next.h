@@ -225,6 +225,21 @@ typedef uint32_t zx_iob_allocate_id_options_t;
 
 // ====== End of upcoming IOB support ====== //
 
+// ====== Stall measurement and notification ====== //
+
+// Contains the accumulated monotonic stall times since boot.
+typedef struct zx_info_memory_stall {
+  // Total monotonic time spent with at least one memory-stalled thread.
+  zx_duration_t stall_time_some;
+
+  // Total monotonic time spent with all threads memory-stalled.
+  zx_duration_t stall_time_full;
+} zx_info_memory_stall_t;
+
+#define ZX_INFO_MEMORY_STALL ((zx_object_info_topic_t)38u)  // zx_info_memory_stall_t[1]
+
+// ====== End stall measurement and notification ====== //
+
 #ifndef _KERNEL
 
 #include <zircon/syscalls.h>

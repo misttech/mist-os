@@ -9,6 +9,7 @@
 #include <lib/kconcurrent/chainlock_transaction.h>
 #include <lib/power-management/energy-model.h>
 #include <lib/power-management/kernel-registry.h>
+#include <lib/stall.h>
 #include <lib/syscalls/forward.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
@@ -1306,6 +1307,23 @@ zx_status_t sys_object_get_info(zx_handle_t handle, uint32_t topic, user_out_ptr
       }
       return _buffer.reinterpret<zx_power_domain_info_t>().copy_array_to_user(entries.get(),
                                                                               actual);
+    }
+
+    case ZX_INFO_MEMORY_STALL: {
+      if (zx_status_t res =
+              validate_ranged_resource(handle, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_STALL_BASE, 1);
+          res != ZX_OK) {
+        return res;
+      }
+
+      // build the info structure
+      StallAggregator::Stats stats = StallAggregator::GetStallAggregator()->ReadStats();
+      zx_info_memory_stall_t info = {
+          .stall_time_some = stats.stalled_time_some,
+          .stall_time_full = stats.stalled_time_full,
+      };
+
+      return single_record_result(_buffer, buffer_size, _actual, _avail, info);
     }
 
     default:

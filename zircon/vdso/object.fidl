@@ -2140,6 +2140,32 @@ closed protocol Object {
     /// } zx_power_domain_info_t;
     ///```
     ///
+    /// ### ZX_INFO_MEMORY_STALL
+    ///
+    /// Returns the total stall time measured since boot. The stall timers are
+    /// monotonic counters that increase at the rate of the monotonic clock
+    /// multiplied by (approximately) the fraction of time spent with at least
+    /// one/all threads in a memory stall state.
+    ///
+    /// A memory stall is, in principle, any kind of delay induced by memory
+    /// pressure that prevents a thread from otherwise doing useful work. In
+    /// practice, only select code paths in the kernel are regarded as memory
+    /// stalls.
+    ///
+    /// *handle* type: `Resource` (Specifically, the stall resource)
+    ///
+    /// *buffer* type: `zx_info_memory_stall_t[1]`
+    ///
+    /// ```c
+    /// typedef struct zx_info_memory_stall {
+    ///   // Total monotonic time spent with at least one memory-stalled thread.
+    ///   zx_duration_t stall_time_some;
+    ///
+    ///   // Total monotonic time spent with all threads memory-stalled.
+    ///   zx_duration_t stall_time_full;
+    /// } zx_info_memory_stall_t;
+    /// ```
+    ///
     /// ## Rights
     ///
     /// If *topic* is `ZX_INFO_PROCESS`, *handle* must be of type `ZX_OBJ_TYPE_PROCESS` and have `ZX_RIGHT_INSPECT`.
@@ -2193,6 +2219,8 @@ closed protocol Object {
     /// If *topic* is `ZX_INFO_TASK_RUNTIME`, *handle* must be of type `ZX_OBJ_TYPE_THREAD`, `ZX_OBJ_TYPE_PROCESS`, or `ZX_OBJ_TYPE_JOB`, and have `ZX_RIGHT_INSPECT`.
     ///
     /// If *topic* is `ZX_INFO_POWER_DOMAINS`, *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_INFO_BASE`.
+    ///
+    /// If *topic* is `ZX_INFO_MEMORY_STALL`, *handle* must have resource kind `ZX_RSRC_KIND_SYSTEM` with base `ZX_RSRC_SYSTEM_STALL_BASE`.
     ///
     /// ## Return value
     ///
