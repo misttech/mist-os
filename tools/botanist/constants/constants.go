@@ -12,8 +12,6 @@ const (
 	FailedToResolveIPErrorMsg = "could not resolve target IP address"
 	PackageRepoSetupErrorMsg  = "failed to set up a package repository"
 	SerialReadErrorMsg        = "error reading serial log line"
-	FailedToExtendFVMMsg      = "failed to extend fvm.blk"
-	FailedToExtendBlkMsg      = "failed to extend blk"
 	CommandExceededTimeoutMsg = "Command exceeded timeout"
 	FailedToServeMsg          = "[package server] failed to serve"
 	FailedToCaptureSyslogMsg  = "failed to capture syslog"

@@ -6,16 +6,12 @@ package targets
 
 import (
 	"context"
-	"debug/pe"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"math/rand"
-	"net"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -24,12 +20,9 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
-	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
-	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
 	"go.fuchsia.dev/fuchsia/tools/qemu"
-	testrunnerconstants "go.fuchsia.dev/fuchsia/tools/testing/testrunner/constants"
 
 	"github.com/creack/pty"
 )
@@ -38,19 +31,15 @@ const (
 	// DefaultEmulatorNodename is the default nodename given to an emulator target.
 	DefaultEmulatorNodename = "botanist-target-emu"
 
-	// DefaultInterfaceName is the name given to the emulated tap interface.
-	defaultInterfaceName = "qemu"
-
-	// The size in bytes of minimimum desired size for the storage-full image.
-	// The image should be large enough to hold all downloaded test packages
-	// for a given test shard.
-	//
-	// No host-side disk blocks are allocated on extension (by use of the `fvm`
-	// host tool), so the operation is cheap regardless of the size we extend to.
-	storageFullMinSize int64 = 17179869184 // 16 GiB
-
 	// Minimum number of bytes of entropy bits required for the kernel's PRNG.
 	minEntropyBytes uint = 32 // 256 bits
+
+	// qemuSystemPrefix is the prefix of the QEMU binary name, which is of the
+	// form qemu-system-<QEMU arch suffix>.
+	qemuSystemPrefix = "qemu-system"
+
+	// aemuBinaryName is the name of the AEMU binary.
+	aemuBinaryName = "emulator"
 )
 
 type Target string
@@ -61,12 +50,11 @@ const (
 	TargetX64     Target = "x64"
 )
 
-type BlockDevice struct {
-	// ID is the block device identifier.
-	ID string
-
-	// File is the disk image file backing the device.
-	File string
+// qemuTargetMapping maps the Fuchsia target name to the name recognized by QEMU.
+var qemuTargetMapping = map[Target]qemu.Target{
+	TargetX64:     qemu.TargetEnum.X86_64,
+	TargetARM64:   qemu.TargetEnum.AArch64,
+	TargetRISCV64: qemu.TargetEnum.RiscV64,
 }
 
 // EmulatorConfig gives the common configuration for supported emulators.
@@ -77,22 +65,10 @@ type EmulatorConfig struct {
 	// Target is the target to emulate.
 	Target Target `json:"target"`
 
-	// CPU is the number of processors to emulate.
-	CPU int `json:"cpu"`
-
-	// Memory is the amount of memory (in MB) to provide.
-	Memory int `json:"memory"`
-
 	// VirtualDeviceSpec is the name of the virtual device spec to pass to
-	// `ffx emu start --device`. This will only be used if UseProductBundle
-	// is set to true. If empty, ffx emu will use the default recommended spec
-	// or the first spec in its device list.
+	// `ffx emu start --device`. If empty, ffx emu will use the default
+	// recommended spec or the first spec in its device list.
 	VirtualDeviceSpec string `json:"virtual_device"`
-
-	// UseProductBundle specifies whether to call `ffx emu` directly with the
-	// product bundle instead of a custom config. If true, the VirtualDeviceSpec
-	// will be used instead of the CPU and Memory.
-	UseProductBundle bool `json:"use_product_bundle"`
 
 	// KVM specifies whether to enable hardware virtualization acceleration.
 	KVM bool `json:"kvm"`
@@ -114,12 +90,11 @@ type EmulatorConfig struct {
 	ZBITool string `json:"zbi_tool"`
 }
 
-// emulator is the base emulator target abstraction, wrapped by QEMU, AEMU, and
-// crosvm targets.
-type emulator struct {
+// Emulator represents a Fuchsia emulator target. The supported emulator types are
+// QEMU, AEMU, and crosvm.
+type Emulator struct {
 	*genericFuchsiaTarget
 	binary  string
-	builder emulatorCommandBuilder
 	c       chan error
 	config  EmulatorConfig
 	mac     [6]byte
@@ -129,34 +104,36 @@ type emulator struct {
 	serial  io.ReadWriteCloser
 }
 
-var _ FuchsiaTarget = (*emulator)(nil)
+var _ FuchsiaTarget = (*Emulator)(nil)
 
-// emulatorCommandBuilder defines the common set of functions used to build up
-// an emulator command-line.
-type emulatorCommandBuilder interface {
-	SetBinary(string)
-	SetKernel(string)
-	SetInitrd(string)
-	SetUEFIVolumes(string, string, string)
-	SetTarget(target Target, kvm bool)
-	SetMemory(int)
-	SetCPUCount(int)
-	AddBlockDevice(BlockDevice)
-	AddSerial()
-	AddTapNetwork(mac string, interfaceName string)
-	AddKernelArg(string)
-	BuildFFXConfig() (*qemu.Config, error)
-	BuildInvocation() ([]string, error)
+func getBinaryName(emuType string, target Target) (string, error) {
+	switch emuType {
+	case "aemu":
+		return aemuBinaryName, nil
+	case "qemu":
+		qemuTarget, ok := qemuTargetMapping[target]
+		if !ok {
+			return "", fmt.Errorf("invalid target %q", target)
+		}
+		return fmt.Sprintf("%s-%s", qemuSystemPrefix, qemuTarget), nil
+	case "crosvm":
+		return "crosvm", nil
+	default:
+		return "", fmt.Errorf("unknown emulator type found: %q", emuType)
+	}
 }
 
-// newEmulator returns a new emulator target with a given configuration.
-func newEmulator(ctx context.Context, binary string, config EmulatorConfig, opts Options, builder emulatorCommandBuilder) (*emulator, error) {
-	t := &emulator{
-		binary:  binary,
-		builder: builder,
-		c:       make(chan error),
-		config:  config,
-		opts:    opts,
+// NewEmulator returns a new Emulator target with a given configuration.
+func NewEmulator(ctx context.Context, config EmulatorConfig, opts Options, emuType string) (*Emulator, error) {
+	binary, err := getBinaryName(emuType, config.Target)
+	if err != nil {
+		return nil, err
+	}
+	t := &Emulator{
+		binary: binary,
+		c:      make(chan error),
+		config: config,
+		opts:   opts,
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	if _, err := r.Read(t.mac[:]); err != nil {
@@ -189,20 +166,20 @@ func newEmulator(ctx context.Context, binary string, config EmulatorConfig, opts
 }
 
 // Nodename returns the name of the target node.
-func (t *emulator) Nodename() string { return DefaultEmulatorNodename }
+func (t *Emulator) Nodename() string { return DefaultEmulatorNodename }
 
 // Serial returns the serial device associated with the target for serial i/o.
-func (t *emulator) Serial() io.ReadWriteCloser {
+func (t *Emulator) Serial() io.ReadWriteCloser {
 	return t.serial
 }
 
 // SSHKey returns the private SSH key path associated with a previously embedded authorized key.
-func (t *emulator) SSHKey() string {
+func (t *Emulator) SSHKey() string {
 	return t.opts.SSHKey
 }
 
 // SSHClient creates and returns an SSH client connected to the emulator target.
-func (t *emulator) SSHClient() (*sshutil.Client, error) {
+func (t *Emulator) SSHClient() (*sshutil.Client, error) {
 	addr, err := t.IPv6()
 	if err != nil {
 		return nil, err
@@ -211,13 +188,10 @@ func (t *emulator) SSHClient() (*sshutil.Client, error) {
 }
 
 // Start starts the emulator target.
-// TODO(https://fxbug.dev/42177999): Add logic to use PB with ffx emu
-func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) (err error) {
+func (t *Emulator) Start(ctx context.Context, images []bootserver.Image, args []string, pbPath string, isBootTest bool) (err error) {
 	if t.process != nil {
 		return fmt.Errorf("a process has already been started with PID %d", t.process.Pid)
 	}
-	cmdLine := t.builder
-	cmdLine.SetTarget(t.config.Target, t.config.KVM)
 
 	if t.config.Path == "" {
 		return fmt.Errorf("directory must be set")
@@ -227,197 +201,38 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 	if err != nil {
 		return fmt.Errorf("could not find %s binary %q: %w", t.binary, bin, err)
 	}
-	cmdLine.SetBinary(absBin)
 
 	if pbPath == "" {
 		return fmt.Errorf("missing product bundle")
 	}
 
-	// If a QEMU kernel was specified, use that; else, a UEFI disk image (which does not
-	// require a QEMU kernel) must be specified in the product bundle to use.
-	var qemuKernel, efiDisk *bootserver.Image
-	// `ffx product get-image-path` prints an error message if it can't find the
-	// requested image in the product bundle, which is ok. Since the error message
-	// is confusing, we'll discard the output and only return an error if a
-	// required image is missing.
-	origStdout := t.ffx.Stdout()
-	origStderr := t.ffx.Stderr()
-	resetStdoutStderr := func() {
-		t.ffx.SetStdoutStderr(origStdout, origStderr)
+	allKernelArgs := []string{
+		// Manually set nodename, since MAC is randomly generated.
+		"zircon.nodename=" + t.nodename,
+		// The system will halt on a kernel panic instead of rebooting.
+		"kernel.halt-on-panic=true",
+		// Disable kernel lockup detector in emulated environments to prevent false alarms from
+		// potentially oversubscribed hosts.
+		"kernel.lockup-detector.critical-section-threshold-ms=0",
+		"kernel.lockup-detector.critical-section-fatal-threshold-ms=0",
+		"kernel.lockup-detector.heartbeat-period-ms=0",
+		"kernel.lockup-detector.heartbeat-age-threshold-ms=0",
+		"kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0",
 	}
-	t.ffx.SetStdoutStderr(io.Discard, io.Discard)
-	qemuKernel, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "qemu-kernel", "")
-	if err != nil {
-		return err
-	}
-	if qemuKernel == nil {
-		if !isBootTest {
-			return fmt.Errorf("failed to find qemu kernel from product bundle")
-		}
-		efiDisk, err = t.ffx.GetImageFromPB(ctx, pbPath, "", "", "firmware_fat")
-		if err != nil {
-			return err
-		}
-		if efiDisk == nil {
-			return fmt.Errorf("failed to find either qemu kernel or efi disk from product bundle")
-		}
-	}
-
-	var zbi *bootserver.Image
-	zbi, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
-	if err != nil {
-		return err
-	}
-	// The zbi image may not exist as part of the
-	// product bundle for a boot test, which is ok.
-	if zbi == nil && !isBootTest {
-		return fmt.Errorf("failed to find zbi from product bundle")
-	}
-
-	// The QEMU command needs to be invoked within an empty directory, as QEMU
-	// will attempt to pick up files from its working directory, one notable
-	// culprit being multiboot.bin. This can result in strange behavior.
-	workdir, err := os.MkdirTemp("", "emu-working-dir")
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			os.RemoveAll(workdir)
-		}
-	}()
-
-	var fvmImage *bootserver.Image
-	var fxfsImage *bootserver.Image
-	fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
-	if err != nil {
-		return err
-	}
-	fxfsImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs", "")
-	if err != nil {
-		return err
-	}
-	resetStdoutStderr()
-
-	if err := copyImagesToDir(ctx, workdir, false, qemuKernel, zbi, efiDisk, fvmImage, fxfsImage); err != nil {
-		return err
-	}
-
-	if zbi != nil && t.config.ZBITool != "" {
-		if err := embedZBIWithKey(ctx, zbi, t.config.ZBITool, t.opts.AuthorizedKey); err != nil {
-			return fmt.Errorf("failed to embed zbi with key: %w", err)
-		}
-	}
-
-	// Now that the images hav successfully been copied to the working
-	// directory, Path points to their path on disk.
-	if qemuKernel != nil {
-		cmdLine.SetKernel(qemuKernel.Path)
-	}
-	if zbi != nil {
-		cmdLine.SetInitrd(zbi.Path)
-	}
-
-	// Checks whether the reader represents a PE (Portable Executable) file, the
-	// format of UEFI applications.
-	isPE := func(r io.ReaderAt) bool {
-		_, err := pe.NewFile(r)
-		return err == nil
-	}
-	// If a UEFI filesystem/disk image was specified, or if the provided QEMU
-	// kernel is a UEFI application, ensure that the emulator boots through UEFI.
-	if efiDisk != nil || (qemuKernel != nil && isPE(qemuKernel.Reader)) {
-		edk2Dir := filepath.Join(t.config.EDK2Dir, "qemu-"+string(t.config.Target))
-		var code, data string
-		switch t.config.Target {
-		case TargetX64:
-			code = filepath.Join(edk2Dir, "OVMF_CODE.fd")
-			data = filepath.Join(edk2Dir, "OVMF_VARS.fd")
-		case TargetARM64:
-			code = filepath.Join(edk2Dir, "QEMU_EFI.fd")
-			data = filepath.Join(edk2Dir, "QEMU_VARS.fd")
-		}
-		code, err = normalizeFile(code)
-		if err != nil {
-			return err
-		}
-		data, err = normalizeFile(data)
-		if err != nil {
-			return err
-		}
-		diskPath := ""
-		if efiDisk != nil {
-			diskPath = efiDisk.Path
-		}
-		cmdLine.SetUEFIVolumes(code, data, diskPath)
-	}
-
-	if fxfsImage != nil {
-		if err := extendImage(ctx, fxfsImage, storageFullMinSize); err != nil {
-			return fmt.Errorf("%s to %d bytes: %w", constants.FailedToExtendBlkMsg, storageFullMinSize, err)
-		}
-		cmdLine.AddBlockDevice(BlockDevice{
-			ID:   "maindisk",
-			File: fxfsImage.Path,
-		})
-	} else if fvmImage != nil {
-		if t.config.FVMTool != "" {
-			if err := extendFvmImage(ctx, fvmImage, t.config.FVMTool, storageFullMinSize); err != nil {
-				return fmt.Errorf("%s to %d bytes: %w", constants.FailedToExtendFVMMsg, storageFullMinSize, err)
-			}
-		}
-		cmdLine.AddBlockDevice(BlockDevice{
-			ID:   "maindisk",
-			File: fvmImage.Path,
-		})
-	}
-
-	cmdLine.AddTapNetwork(net.HardwareAddr(t.mac[:]).String(), defaultInterfaceName)
-	cmdLine.AddSerial()
-
-	// Manually set nodename, since MAC is randomly generated.
-	cmdLine.AddKernelArg("zircon.nodename=" + t.nodename)
-	// The system will halt on a kernel panic instead of rebooting.
-	cmdLine.AddKernelArg("kernel.halt-on-panic=true")
-	// Disable kernel lockup detector in emulated environments to prevent false alarms from
-	// potentially oversubscribed hosts.
-	cmdLine.AddKernelArg("kernel.lockup-detector.critical-section-threshold-ms=0")
-	cmdLine.AddKernelArg("kernel.lockup-detector.critical-section-fatal-threshold-ms=0")
-	cmdLine.AddKernelArg("kernel.lockup-detector.heartbeat-period-ms=0")
-	cmdLine.AddKernelArg("kernel.lockup-detector.heartbeat-age-threshold-ms=0")
-	cmdLine.AddKernelArg("kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0")
 
 	// Add entropy to simulate bootloader entropy.
 	entropy := make([]byte, minEntropyBytes)
 	if _, err := rand.Read(entropy); err == nil {
-		cmdLine.AddKernelArg("kernel.entropy-mixin=" + hex.EncodeToString(entropy))
+		allKernelArgs = append(allKernelArgs, "kernel.entropy-mixin="+hex.EncodeToString(entropy))
 	}
 	// Do not print colors.
-	cmdLine.AddKernelArg("TERM=dumb")
+	allKernelArgs = append(allKernelArgs, "TERM=dumb")
 	if t.config.Target == TargetX64 {
 		// Necessary to redirect to stdout.
-		cmdLine.AddKernelArg("kernel.serial=legacy")
+		allKernelArgs = append(allKernelArgs, "kernel.serial=legacy")
 	}
-	for _, arg := range args {
-		cmdLine.AddKernelArg(arg)
-	}
+	allKernelArgs = append(allKernelArgs, args...)
 
-	cmdLine.SetCPUCount(t.config.CPU)
-	cmdLine.SetMemory(t.config.Memory)
-
-	ffxConfig, err := cmdLine.BuildFFXConfig()
-	if err != nil {
-		return err
-	}
-
-	ffxConfigFile := filepath.Join(os.Getenv(testrunnerconstants.TestOutDirEnvKey), "ffx_emu_config.json")
-	absFFXConfigFile, err := filepath.Abs(ffxConfigFile)
-	if err != nil {
-		return err
-	}
-	if err := jsonutil.WriteToFile(absFFXConfigFile, ffxConfig); err != nil {
-		return err
-	}
 	cwd, err := os.Getwd()
 	if err != nil {
 		return err
@@ -437,19 +252,15 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 		UEFI:     code,
 	}
 	startArgs := ffxutil.EmuStartArgs{
-		Engine: strings.ToLower(os.Getenv("FUCHSIA_DEVICE_TYPE")),
+		Engine:        strings.ToLower(os.Getenv("FUCHSIA_DEVICE_TYPE")),
+		ProductBundle: filepath.Join(cwd, pbPath),
+		KernelArgs:    allKernelArgs,
+		Device:        t.config.VirtualDeviceSpec,
 	}
-	if t.config.UseProductBundle || t.UseFFXExperiment(botanist.UseFFXEmuProductBundle) {
-		startArgs.ProductBundle = filepath.Join(cwd, pbPath)
-		startArgs.KernelArgs = ffxConfig.KernelArgs
-		startArgs.Device = t.config.VirtualDeviceSpec
-		if t.config.KVM {
-			startArgs.Accel = "hyper"
-		} else {
-			startArgs.Accel = "none"
-		}
+	if t.config.KVM {
+		startArgs.Accel = "hyper"
 	} else {
-		startArgs.Config = absFFXConfigFile
+		startArgs.Accel = "none"
 	}
 
 	cmd, err := t.ffx.EmuStartConsole(ctx, cwd, DefaultEmulatorNodename, tools, startArgs)
@@ -457,7 +268,6 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 		return err
 	}
 
-	cmd.Dir = workdir
 	stdout, stderr, flush := botanist.NewStdioWriters(ctx, t.binary)
 	// Since serial is already printed to stdout, we can copy it to the
 	// serial logfile as well.
@@ -523,13 +333,12 @@ func (t *emulator) Start(ctx context.Context, images []bootserver.Image, args []
 			err = fmt.Errorf("%s invocation error: %w", t.binary, err)
 		}
 		t.c <- err
-		os.RemoveAll(workdir)
 	}()
 	return nil
 }
 
 // Stop stops the emulator target.
-func (t *emulator) Stop() error {
+func (t *Emulator) Stop() error {
 	var err error
 	if err = t.ffx.EmuStop(context.Background()); err != nil {
 		logger.Debugf(t.targetCtx, "failed to stop emulator: %s", err)
@@ -545,7 +354,7 @@ func (t *emulator) Stop() error {
 }
 
 // Wait waits for the QEMU target to stop.
-func (t *emulator) Wait(ctx context.Context) error {
+func (t *Emulator) Wait(ctx context.Context) error {
 	select {
 	case err := <-t.c:
 		return err
@@ -555,7 +364,7 @@ func (t *emulator) Wait(ctx context.Context) error {
 }
 
 // Config returns fields describing the target.
-func (t *emulator) TestConfig(expectsSSH bool) (any, error) {
+func (t *Emulator) TestConfig(expectsSSH bool) (any, error) {
 	return TargetInfo(t, expectsSSH, nil)
 }
 
@@ -568,74 +377,4 @@ func normalizeFile(path string) (string, error) {
 		return "", err
 	}
 	return absPath, nil
-}
-
-func overwriteFileWithCopy(path string) error {
-	tmpfile, err := os.CreateTemp(filepath.Dir(path), "botanist")
-	if err != nil {
-		return err
-	}
-	defer tmpfile.Close()
-	if err := osmisc.CopyFile(path, tmpfile.Name()); err != nil {
-		return err
-	}
-	return os.Rename(tmpfile.Name(), path)
-}
-
-func embedZBIWithKey(ctx context.Context, zbiImage *bootserver.Image, zbiTool string, authorizedKeysFile string) error {
-	absToolPath, err := filepath.Abs(zbiTool)
-	if err != nil {
-		return err
-	}
-	logger.Debugf(ctx, "embedding %s with key %s", zbiImage.Name, authorizedKeysFile)
-	cmd := exec.CommandContext(ctx, absToolPath, "-o", zbiImage.Path, zbiImage.Path, "--entry", fmt.Sprintf("data/ssh/authorized_keys=%s", authorizedKeysFile))
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "zbi")
-	defer flush()
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-	return nil
-}
-
-func extendFvmImage(ctx context.Context, fvmImage *bootserver.Image, fvmTool string, size int64) error {
-	if fvmTool == "" {
-		return nil
-	}
-	absToolPath, err := filepath.Abs(fvmTool)
-	if err != nil {
-		return err
-	}
-	logger.Debugf(ctx, "extending fvm.blk to %d bytes", size)
-	cmd := exec.CommandContext(ctx, absToolPath, fvmImage.Path, "extend", "--length", strconv.Itoa(int(size)))
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "fvm")
-	defer flush()
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-	fvmImage.Size = size
-	return nil
-}
-
-func extendImage(ctx context.Context, image *bootserver.Image, size int64) error {
-	if image.Size >= size {
-		return nil
-	}
-	if err := os.Truncate(image.Path, size); err != nil {
-		return err
-	}
-	image.Size = size
-	return nil
-}
-
-func getImageByNameAndCPU(imgs []bootserver.Image, name, cpu string) *bootserver.Image {
-	for _, img := range imgs {
-		if img.Name == name && img.CPU == cpu {
-			return &img
-		}
-	}
-	return nil
 }

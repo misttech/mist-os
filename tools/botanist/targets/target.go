@@ -661,24 +661,12 @@ func FromJSON(ctx context.Context, config json.RawMessage, opts Options) (Base, 
 		return nil, fmt.Errorf("object in list has no \"type\" field: %w", err)
 	}
 	switch x.Type {
-	case "aemu":
+	case "aemu", "qemu", "crosvm":
 		var cfg EmulatorConfig
 		if err := json.Unmarshal(config, &cfg); err != nil {
 			return nil, fmt.Errorf("invalid QEMU config found: %w", err)
 		}
-		return NewAEMU(ctx, cfg, opts)
-	case "qemu":
-		var cfg EmulatorConfig
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("invalid QEMU config found: %w", err)
-		}
-		return NewQEMU(ctx, cfg, opts)
-	case "crosvm":
-		var cfg EmulatorConfig
-		if err := json.Unmarshal(config, &cfg); err != nil {
-			return nil, fmt.Errorf("invalid crosvm config found: %w", err)
-		}
-		return NewCrosvm(ctx, cfg, opts)
+		return NewEmulator(ctx, cfg, opts, x.Type)
 	case "device":
 		var cfg DeviceConfig
 		if err := json.Unmarshal(config, &cfg); err != nil {

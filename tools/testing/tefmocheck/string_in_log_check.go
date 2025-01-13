@@ -607,11 +607,6 @@ func infraToolLogChecks() []FailureModeCheck {
 			String: botanistconstants.FailedToCopyImageMsg,
 			Type:   swarmingOutputType,
 		},
-		// For https://fxbug.dev/42163022.
-		&stringInLogCheck{
-			String: botanistconstants.FailedToExtendFVMMsg,
-			Type:   swarmingOutputType,
-		},
 		// Error is being logged at https://fuchsia.googlesource.com/fuchsia/+/559948a1a4cbd995d765e26c32923ed862589a61/src/storage/lib/paver/paver.cc#175
 		&stringInLogCheck{
 			String: "Failed to stream partitions to FVM",

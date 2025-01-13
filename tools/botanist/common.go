@@ -35,12 +35,11 @@ func (e Experiments) Contains(experiment Experiment) bool {
 type Experiment string
 
 const (
-	UseFFXTest             Experiment = "use_ffx_test"
-	UseFFXTestParallel     Experiment = "use_ffx_test_parallel"
-	UseFFXEmuProductBundle Experiment = "use_ffx_emu_product_bundle"
+	UseFFXTest         Experiment = "use_ffx_test"
+	UseFFXTestParallel Experiment = "use_ffx_test_parallel"
 )
 
-var SupportedExperiments = []Experiment{UseFFXTest, UseFFXTestParallel, UseFFXEmuProductBundle}
+var SupportedExperiments = []Experiment{UseFFXTest, UseFFXTestParallel}
 
 // LockedWriter is a wrapper around a writer that locks around each write so
 // that multiple writes won't interleave with each other.
