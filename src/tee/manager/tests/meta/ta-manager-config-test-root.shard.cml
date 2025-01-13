@@ -30,6 +30,11 @@
             to: "#ta-manager",
         },
         {
+            directory: "props",
+            from: "#ta-manager",
+            to: "#ta",
+        },
+        {
             dictionary: "diagnostics",
             from: "parent",
             to: "all",

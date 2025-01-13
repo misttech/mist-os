@@ -50,11 +50,13 @@ resource("tee-system-properties") {
 }
 
 resource("test-tee-system-properties") {
+  testonly = true
   sources = [ "config/test_system_properties.json5" ]
   outputs = [ "data/properties/system_properties" ]
 }
 
 fuchsia_component("manager-realm-test-component") {
+  testonly = true
   manifest = "meta/ta-manager-realm-test.cml"
   component_name = "ta-manager"
   deps = [
@@ -71,6 +73,7 @@ fuchsia_package("ta-manager") {
 }
 
 fuchsia_package("ta-manager-realm-test") {
+  testonly = true
   deps = [ ":manager-realm-test-component" ]
 }
 

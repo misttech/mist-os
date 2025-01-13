@@ -8,6 +8,7 @@ use std::ops::AddAssign;
 use crate::params::ParamAdapter;
 use crate::ta_loader::TAInterface;
 use anyhow::Error;
+use api_impl::context;
 use fidl_fuchsia_tee::{OpResult, Parameter, ReturnOrigin};
 use tee_internal::{binding, Result as TeeResult, SessionContext};
 
@@ -36,8 +37,10 @@ where
     F: FnOnce(tee_internal::ParamTypes, &mut [tee_internal::Param; 4]) -> TeeResult<R>,
 {
     let (tee_result, return_params) = {
-        let (mut adapter, param_types) = ParamAdapter::from_fidl(parameter_set)?;
+        let (mut adapter, param_types) =
+            context::with_current_mut(|_context| ParamAdapter::from_fidl(parameter_set))?;
         let tee_result = entry_point(param_types, adapter.tee_params_mut());
+        context::with_current_mut(|context| context.cleanup_after_call());
         (tee_result, adapter.export_to_fidl()?)
     };
     let return_code = match tee_result {
