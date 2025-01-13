@@ -4276,8 +4276,12 @@ pub fn offer_to_all_and_component_diff_sources_message<'a>(
         }
         write!(&mut output, "{}", capability.name()).unwrap();
     }
-    write!(&mut output, r#" is offered to both "all" and "{}" with different sources"#, component)
-        .unwrap();
+    write!(
+        &mut output,
+        r#" is offered to both "all" and child component "{}" with different sources"#,
+        component
+    )
+    .unwrap();
     output
 }
 
