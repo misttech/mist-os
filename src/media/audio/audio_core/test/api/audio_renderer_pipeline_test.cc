@@ -18,7 +18,7 @@
 
 namespace media::audio::test {
 
-using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
+using AudioRenderUsage2 = fuchsia::media::AudioRenderUsage2;
 using ASF = fuchsia::media::AudioSampleFormat;
 using AudioRendererPipelineTestInt16 = AudioRendererPipelineTest<ASF::SIGNED_16>;
 using AudioRendererPipelineTestFloat = AudioRendererPipelineTest<ASF::FLOAT>;
@@ -507,7 +507,8 @@ TEST_F(AudioRendererPipelineTestInt16, DiscardDuringPlayback) {
 TEST_F(AudioRendererPipelineTestInt16, RampOnGainChanges) {
   fuchsia::media::audio::VolumeControlPtr volume;
   audio_core_->BindUsageVolumeControl(
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::MEDIA), volume.NewRequest());
+      *FromFidlUsage2(fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)),
+      volume.NewRequest());
   volume->SetVolume(0.3f);
 
   auto [renderer, format] = CreateRenderer(kOutputFrameRate);
@@ -580,7 +581,7 @@ TEST_F(AudioRendererPipelineTestInt16, SetGainBeforeSetFormat) {
   auto format = Format::Create<ASF::SIGNED_16>(2, kOutputFrameRate).take_value();
   auto renderer =
       CreateAudioRenderer(format, PacketsToFrames(kNumPacketsInPayload, kOutputFrameRate),
-                          fuchsia::media::AudioRenderUsage::MEDIA,
+                          fuchsia::media::AudioRenderUsage2::MEDIA,
                           /*reference_clock=*/std::nullopt, /*initial_gain_db=*/-20);
   const auto [num_packets, num_frames] = NumPacketsAndFramesPerBatch(renderer);
   const auto frames_per_packet = num_frames / num_packets;
@@ -624,7 +625,8 @@ TEST_F(AudioRendererPipelineTestInt16, SetGainBeforeSetFormat) {
 TEST_F(AudioRendererPipelineTestFloat, NoDistortionOnGainChanges) {
   fuchsia::media::audio::VolumeControlPtr volume;
   audio_core_->BindUsageVolumeControl(
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::MEDIA), volume.NewRequest());
+      *FromFidlUsage2(fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)),
+      volume.NewRequest());
   volume->SetVolume(0.5);
 
   auto [renderer, format] = CreateRenderer(kOutputFrameRate);

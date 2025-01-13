@@ -7,6 +7,7 @@
 
 #include <memory>
 
+#include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/lib/test/constants.h"
 #include "src/media/audio/lib/test/test_fixture.h"
@@ -65,16 +66,16 @@ class UsageGainReporterTest : public HermeticAudioTest {
   };
 
   std::unique_ptr<Controller> CreateControllerWithRenderUsage(
-      fuchsia::media::AudioRenderUsage render_usage) {
+      fuchsia::media::AudioRenderUsage2 render_usage) {
     std::unique_ptr<media::audio::test::UsageGainReporterTest::Controller> c;
-    fuchsia::media::Usage usage = fuchsia::media::Usage::WithRenderUsage(std::move(render_usage));
+    auto usage1 = fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(render_usage));
     c = std::make_unique<Controller>(this);
-    audio_core_->BindUsageVolumeControl(fidl::Clone(usage), c->volume_control.NewRequest());
+    audio_core_->BindUsageVolumeControl(fidl::Clone(usage1), c->volume_control.NewRequest());
     AddErrorHandler(c->volume_control, "VolumeControl");
 
     realm().Connect(c->gain_reporter.NewRequest());
     AddErrorHandler(c->gain_reporter, "GainReporter");
-    c->gain_reporter->RegisterListener(device_id_string_, fidl::Clone(usage),
+    c->gain_reporter->RegisterListener(device_id_string_, std::move(usage1),
                                        c->fake_listener.NewBinding());
 
     return c;
@@ -83,12 +84,12 @@ class UsageGainReporterTest : public HermeticAudioTest {
   std::unique_ptr<Controller> CreateControllerWithCaptureUsage(
       fuchsia::media::AudioCaptureUsage capture_usage) {
     std::unique_ptr<media::audio::test::UsageGainReporterTest::Controller> c;
-    fuchsia::media::Usage usage = fuchsia::media::Usage::WithCaptureUsage(std::move(capture_usage));
+    auto usage1 = fuchsia::media::Usage::WithCaptureUsage(fidl::Clone(capture_usage));
     c = std::make_unique<Controller>(this);
 
     realm().Connect(c->gain_reporter.NewRequest());
     AddErrorHandler(c->gain_reporter, "GainReporter");
-    c->gain_reporter->RegisterListener(device_id_string_, fidl::Clone(usage),
+    c->gain_reporter->RegisterListener(device_id_string_, std::move(usage1),
                                        c->fake_listener.NewBinding());
 
     return c;
@@ -103,7 +104,7 @@ class UsageGainReporterTest : public HermeticAudioTest {
 };
 
 TEST_F(UsageGainReporterTest, SetVolumeAndMute) {
-  auto c = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage::MEDIA);
+  auto c = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA);
 
   // The initial callback happens immediately.
   c->fake_listener.SetNextHandler(AddCallback("OnGainMuteChanged InitialCall"));
@@ -153,8 +154,8 @@ TEST_F(UsageGainReporterTest, SetVolumeAndMute) {
 }
 
 TEST_F(UsageGainReporterTest, RoutedCorrectly) {
-  auto c1 = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage::MEDIA);
-  auto c2 = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage::BACKGROUND);
+  auto c1 = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA);
+  auto c2 = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage2::BACKGROUND);
 
   // The initial callbacks happen immediately.
   c1->fake_listener.SetNextHandler(AddCallbackUnordered("OnGainMuteChanged1 InitialCall"));

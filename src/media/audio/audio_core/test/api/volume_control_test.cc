@@ -7,27 +7,28 @@
 
 #include <cmath>
 
+#include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 
-using AudioCaptureUsage = fuchsia::media::AudioCaptureUsage;
-using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
+using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioRenderUsage2;
 
 namespace media::audio::test {
 
 class VolumeControlTest : public HermeticAudioTest {
  protected:
-  fuchsia::media::audio::VolumeControlPtr CreateRenderUsageControl(AudioRenderUsage u) {
+  fuchsia::media::audio::VolumeControlPtr CreateRenderUsageControl(AudioRenderUsage2 u) {
     fuchsia::media::audio::VolumeControlPtr c;
-    audio_core_->BindUsageVolumeControl(fuchsia::media::Usage::WithRenderUsage(std::move(u)),
-                                        c.NewRequest());
+    audio_core_->BindUsageVolumeControl(
+        fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(u)), c.NewRequest());
     AddErrorHandler(c, "VolumeControl");
     return c;
   }
 };
 
 TEST_F(VolumeControlTest, SetVolumeAndMute) {
-  auto client1 = CreateRenderUsageControl(AudioRenderUsage::MEDIA);
-  auto client2 = CreateRenderUsageControl(AudioRenderUsage::MEDIA);
+  auto client1 = CreateRenderUsageControl(AudioRenderUsage2::MEDIA);
+  auto client2 = CreateRenderUsageControl(AudioRenderUsage2::MEDIA);
 
   float volume = 0.0;
   bool muted = false;
@@ -66,8 +67,8 @@ TEST_F(VolumeControlTest, SetVolumeAndMute) {
 }
 
 TEST_F(VolumeControlTest, RoutedCorrectly) {
-  auto c1 = CreateRenderUsageControl(AudioRenderUsage::MEDIA);
-  auto c2 = CreateRenderUsageControl(AudioRenderUsage::BACKGROUND);
+  auto c1 = CreateRenderUsageControl(AudioRenderUsage2::MEDIA);
+  auto c2 = CreateRenderUsageControl(AudioRenderUsage2::BACKGROUND);
 
   // The initial callbacks happen immediately.
   c1.events().OnVolumeMuteChanged = AddCallback("OnVolumeMuteChanged1 InitialCall");
@@ -89,9 +90,9 @@ TEST_F(VolumeControlTest, RoutedCorrectly) {
 
 TEST_F(VolumeControlTest, FailToConnectToCaptureUsageVolume) {
   fuchsia::media::audio::VolumeControlPtr client;
-  audio_core_->BindUsageVolumeControl(fidl::Clone(fuchsia::media::Usage::WithCaptureUsage(
-                                          fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT)),
-                                      client.NewRequest());
+  audio_core_->BindUsageVolumeControl(
+      fuchsia::media::Usage::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
+      client.NewRequest());
   AddErrorHandler(client, "VolumeControl");
 
   ExpectError(client, ZX_ERR_NOT_SUPPORTED);
@@ -102,25 +103,26 @@ TEST_F(VolumeControlTest, VolumeCurveLookups) {
   float db_lookup = 0.0f;
   float volume_lookup = 0.0f;
   audio_core_->GetDbFromVolume(
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::MEDIA), 0.0f,
+      fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)), 0.0f,
       AddCallback("GetDbFromVolume", [&db_lookup](float db) { db_lookup = db; }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, -160.0f);
 
   audio_core_->GetDbFromVolume(
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::MEDIA), 1.0f,
+      fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)), 1.0f,
       AddCallback("GetDbFromVolume", [&db_lookup](float db) { db_lookup = db; }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, 0.0f);
 
   audio_core_->GetVolumeFromDb(
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::MEDIA), -160.0f,
+      fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)),
+      -160.0f,
       AddCallback("GetVolumeFromDb", [&volume_lookup](float volume) { volume_lookup = volume; }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 0.0f);
 
   audio_core_->GetVolumeFromDb(
-      fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage::MEDIA), 0.0f,
+      fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)), 0.0f,
       AddCallback("GetVolumeFromDb", [&volume_lookup](float volume) { volume_lookup = volume; }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 1.0f);

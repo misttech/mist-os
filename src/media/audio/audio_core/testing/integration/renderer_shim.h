@@ -16,6 +16,7 @@
 
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/vmo_backed_buffer.h"
 #include "src/media/audio/lib/clock/utils.h"
 #include "src/media/audio/lib/format/audio_buffer.h"
@@ -174,7 +175,7 @@ class AudioRendererShim : public RendererShimImpl {
   // Don't call this directly. Use HermeticAudioTest::CreateAudioRenderer so the object is
   // appropriately bound into the test environment.
   AudioRendererShim(TestFixture* fixture, fuchsia::media::AudioCorePtr& audio_core, Format fmt,
-                    int64_t payload_frame_count, fuchsia::media::AudioRenderUsage usage,
+                    int64_t payload_frame_count, fuchsia::media::AudioRenderUsage2 usage,
                     size_t reporting_id, std::optional<zx::clock> reference_clock,
                     std::optional<float> initial_gain_db)
       : RendererShimImpl(fmt, payload_frame_count, reporting_id) {
@@ -188,7 +189,7 @@ class AudioRendererShim : public RendererShimImpl {
       gain()->SetGain(*initial_gain_db);
     }
 
-    fidl()->SetUsage(usage);
+    fidl()->SetUsage(*FromFidlRenderUsage2(usage));
     if (reference_clock) {
       SetReferenceClock(fixture, *reference_clock);
     }

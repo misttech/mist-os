@@ -33,13 +33,13 @@ class UsageReporterImpl : public AudioAdmin::PolicyActionReporter,
   void Watch(fuchsia::media::Usage usage,
              fidl::InterfaceHandle<fuchsia::media::UsageWatcher> usage_state_watcher) override;
 
-  void ReportPolicyAction(fuchsia::media::Usage usage,
+  void ReportPolicyAction(fuchsia::media::Usage2 usage,
                           fuchsia::media::Behavior policy_action) override;
 
-  WatcherSet& watcher_set(const fuchsia::media::Usage& usage);
+  WatcherSet& watcher_set(const fuchsia::media::Usage2& usage);
 
   fidl::BindingSet<fuchsia::media::UsageReporter, UsageReporterImpl*> bindings_;
-  std::array<WatcherSet, fuchsia::media::RENDER_USAGE_COUNT> render_usage_watchers_;
+  std::array<WatcherSet, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_watchers_;
   std::array<WatcherSet, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_watchers_;
   int next_watcher_id_ = 0;
 

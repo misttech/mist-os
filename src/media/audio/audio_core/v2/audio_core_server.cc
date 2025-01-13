@@ -106,8 +106,8 @@ void AudioCoreServer::SetRenderUsageGain(SetRenderUsageGainRequestView request,
   TRACE_DURATION("audio", "AudioCoreServer::SetRenderUsageGain");
 
   stream_volume_manager_->SetUsageGain(
-      fuchsia::media::Usage::WithRenderUsage(
-          static_cast<fuchsia::media::AudioRenderUsage>(request->usage)),
+      fuchsia::media::Usage2::WithRenderUsage(
+          static_cast<fuchsia::media::AudioRenderUsage2>(request->usage)),
       request->gain_db);
 }
 
@@ -116,7 +116,7 @@ void AudioCoreServer::SetCaptureUsageGain(SetCaptureUsageGainRequestView request
   TRACE_DURATION("audio", "AudioCoreServer::SetCaptureUsageGain");
 
   stream_volume_manager_->SetUsageGain(
-      fuchsia::media::Usage::WithCaptureUsage(
+      fuchsia::media::Usage2::WithCaptureUsage(
           static_cast<fuchsia::media::AudioCaptureUsage>(request->usage)),
       request->gain_db);
 }
@@ -127,7 +127,7 @@ void AudioCoreServer::BindUsageVolumeControl(BindUsageVolumeControlRequestView r
 
   if (request->usage.is_render_usage()) {
     stream_volume_manager_->BindUsageVolumeClient(
-        fidl::NaturalToHLCPP(fidl::ToNatural(request->usage)),
+        media::audio::ToFidlUsage2(fidl::NaturalToHLCPP(fidl::ToNatural(request->usage))),
         fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl>(
             request->volume_control.TakeChannel()));
   } else {
@@ -174,9 +174,10 @@ void AudioCoreServer::GetDbFromVolume(GetDbFromVolumeRequestView request,
 void AudioCoreServer::SetInteraction(SetInteractionRequestView request,
                                      SetInteractionCompleter::Sync& completer) {
   TRACE_DURATION("audio", "AudioCoreServer::SetInteraction");
-  audio_admin_->SetInteraction(fidl::NaturalToHLCPP(fidl::ToNatural(std::move(request->active))),
-                               fidl::NaturalToHLCPP(fidl::ToNatural(std::move(request->affected))),
-                               static_cast<fuchsia::media::Behavior>(request->behavior));
+  audio_admin_->SetInteraction(
+      media::audio::ToFidlUsage2(fidl::NaturalToHLCPP(fidl::ToNatural(request->active))),
+      media::audio::ToFidlUsage2(fidl::NaturalToHLCPP(fidl::ToNatural(request->affected))),
+      static_cast<fuchsia::media::Behavior>(request->behavior));
 }
 
 void AudioCoreServer::ResetInteractions(ResetInteractionsCompleter::Sync& completer) {

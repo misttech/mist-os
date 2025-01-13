@@ -6,12 +6,13 @@
 #include <cmath>
 #include <cstdint>
 
+#include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/test/api/audio_renderer_test_shared.h"
 #include "src/media/audio/lib/clock/clone_mono.h"
 
 namespace media::audio::test {
 
-using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
+using fuchsia::media::AudioRenderUsage2;
 
 // TODO(https://fxbug.dev/326083019): unittest AudioCore methods more directly (SetRenderUsageGain,
 // SetCaptureUsageGaqin, ResetInteractions, LoadDefaults).
@@ -314,7 +315,7 @@ class AudioRendererFormatUsageErrorTest : public AudioRendererFormatUsageTest {}
 // Once the format has been set, SetUsage may no longer be called any time thereafter.
 TEST_F(AudioRendererFormatUsageErrorTest, SetUsageAfterFormatShouldDisconnect) {
   audio_renderer()->SetPcmStreamType(kTestStreamType);
-  audio_renderer()->SetUsage(AudioRenderUsage::COMMUNICATION);
+  audio_renderer()->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::COMMUNICATION));
 
   ExpectDisconnect(audio_renderer());
 }
@@ -331,7 +332,7 @@ TEST_F(AudioRendererFormatUsageErrorTest, SetUsageAfterOperatingShouldDisconnect
   audio_renderer()->Pause(AddCallback("Pause"));
   ExpectCallbacks();
 
-  audio_renderer()->SetUsage(AudioRenderUsage::BACKGROUND);
+  audio_renderer()->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND));
 
   ExpectDisconnect(audio_renderer());
 }

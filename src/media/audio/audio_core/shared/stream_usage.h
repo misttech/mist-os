@@ -16,8 +16,8 @@
 
 namespace media::audio {
 
-static_assert(fuchsia::media::RENDER_USAGE_COUNT == 5);
-// These must be listed in the order of the fuchsia::media::AudioRenderUsage enum.
+static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 5);
+// These must be listed in the order of the fuchsia::media::AudioRenderUsage2 enum.
 #define EXPAND_EACH_FIDL_RENDER_USAGE \
   EXPAND_RENDER_USAGE(BACKGROUND)     \
   EXPAND_RENDER_USAGE(MEDIA)          \
@@ -50,9 +50,9 @@ static constexpr uint32_t kStreamInternalCaptureUsageCount = 2;
   EXPAND_EACH_INTERNAL_CAPTURE_USAGE
 
 static constexpr uint32_t kStreamRenderUsageCount =
-    fuchsia::media::RENDER_USAGE_COUNT + kStreamInternalRenderUsageCount;
-enum class RenderUsage : std::underlying_type_t<fuchsia::media::AudioRenderUsage> {
-#define EXPAND_RENDER_USAGE(U) U = fidl::ToUnderlying(fuchsia::media::AudioRenderUsage::U),
+    fuchsia::media::RENDER_USAGE2_COUNT + kStreamInternalRenderUsageCount;
+enum class RenderUsage : std::underlying_type_t<fuchsia::media::AudioRenderUsage2> {
+#define EXPAND_RENDER_USAGE(U) U = fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::U),
   EXPAND_EACH_FIDL_RENDER_USAGE
 #undef EXPAND_RENDER_USAGE
 #define EXPAND_RENDER_USAGE(U) U,
@@ -60,7 +60,7 @@ enum class RenderUsage : std::underlying_type_t<fuchsia::media::AudioRenderUsage
 #undef EXPAND_RENDER_USAGE
 };
 
-constexpr std::array<RenderUsage, fuchsia::media::RENDER_USAGE_COUNT> kFidlRenderUsages = {{
+constexpr std::array<RenderUsage, fuchsia::media::RENDER_USAGE2_COUNT> kFidlRenderUsages = {{
 #define EXPAND_RENDER_USAGE(U) RenderUsage::U,
     EXPAND_EACH_FIDL_RENDER_USAGE
 #undef EXPAND_RENDER_USAGE
@@ -99,16 +99,21 @@ static constexpr uint32_t kStreamUsageCount = kStreamRenderUsageCount + kStreamC
 
 // Since we define the RenderUsage enum to have the same numeric values for each fidl enum entry,
 // we can convert by casting the underlying numeric value.
-static RenderUsage RenderUsageFromFidlRenderUsage(fuchsia::media::AudioRenderUsage u) {
+static RenderUsage RenderUsageFromFidlRenderUsage(fuchsia::media::AudioRenderUsage2 u) {
   return static_cast<RenderUsage>(fidl::ToUnderlying(u));
 }
 static CaptureUsage CaptureUsageFromFidlCaptureUsage(fuchsia::media::AudioCaptureUsage u) {
   return static_cast<CaptureUsage>(fidl::ToUnderlying(u));
 }
 
-std::optional<fuchsia::media::AudioRenderUsage> FidlRenderUsageFromRenderUsage(RenderUsage u);
-
+std::optional<fuchsia::media::AudioRenderUsage2> FidlRenderUsageFromRenderUsage(RenderUsage u);
 std::optional<fuchsia::media::AudioCaptureUsage> FidlCaptureUsageFromCaptureUsage(CaptureUsage u);
+
+fuchsia::media::AudioRenderUsage2 ToFidlRenderUsage2(const fuchsia::media::AudioRenderUsage& usage);
+fuchsia::media::Usage2 ToFidlUsage2(const fuchsia::media::Usage& usage);
+std::optional<fuchsia::media::AudioRenderUsage> FromFidlRenderUsage2(
+    const fuchsia::media::AudioRenderUsage2& usage2);
+std::optional<fuchsia::media::Usage> FromFidlUsage2(const fuchsia::media::Usage2& usage2);
 
 const char* RenderUsageToString(const RenderUsage& usage);
 const char* CaptureUsageToString(const CaptureUsage& usage);
@@ -117,7 +122,7 @@ class StreamUsage {
  public:
   static constexpr StreamUsage WithRenderUsage(RenderUsage u) { return StreamUsage(u); }
   static constexpr StreamUsage WithCaptureUsage(CaptureUsage u) { return StreamUsage(u); }
-  static constexpr StreamUsage WithRenderUsage(fuchsia::media::AudioRenderUsage u) {
+  static constexpr StreamUsage WithRenderUsage(fuchsia::media::AudioRenderUsage2 u) {
     return StreamUsage(RenderUsageFromFidlRenderUsage(u));
   }
   static constexpr StreamUsage WithCaptureUsage(fuchsia::media::AudioCaptureUsage u) {
@@ -197,7 +202,7 @@ using RenderUsageSet = std::unordered_set<RenderUsage, internal::EnumHash>;
 using CaptureUsageSet = std::unordered_set<CaptureUsage, internal::EnumHash>;
 using StreamUsageSet = std::unordered_set<StreamUsage, internal::StreamUsageHash>;
 
-StreamUsage StreamUsageFromFidlUsage(const fuchsia::media::Usage& usage);
+StreamUsage StreamUsageFromFidlUsage(const fuchsia::media::Usage2& usage);
 
 template <typename Container>
 static StreamUsageSet StreamUsageSetFromRenderUsages(const Container& container) {

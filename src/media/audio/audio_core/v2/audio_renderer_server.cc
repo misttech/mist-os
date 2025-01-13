@@ -250,7 +250,7 @@ void AudioRendererServer::SetUsage(SetUsageRequestView request,
   }
 
   usage_ = media::audio::RenderUsageFromFidlRenderUsage(
-      static_cast<fuchsia::media::AudioRenderUsage>(request->usage));
+      static_cast<fuchsia::media::AudioRenderUsage2>(request->usage));
 }
 
 void AudioRendererServer::SetPcmStreamType(SetPcmStreamTypeRequestView request,
@@ -398,8 +398,8 @@ void AudioRendererServer::RemovePayloadBuffer(RemovePayloadBufferRequestView req
   // reporter_->RemovePayloadBuffer(id);
 }
 
-// TODO(https://fxbug.dev/42181009): implement: need to create a fuchsia.media.audio.GainControl server that
-// forwards to stream_gain_control_client_
+// TODO(https://fxbug.dev/42181009): implement: need to create a fuchsia.media.audio.GainControl
+// server that forwards to stream_gain_control_client_
 void AudioRendererServer::BindGainControl(BindGainControlRequestView request,
                                           BindGainControlCompleter::Sync& completer) {
   FX_LOGS(ERROR) << "BindGainControl not implemented";
@@ -760,7 +760,8 @@ void AudioRendererServer::MaybeConfigure() {
     media_ticks_per_second_ = TimelineRate(1'000'000'000, 1);
   }
 
-  // TODO(https://fxbug.dev/42181009): add media_ticks_continuity_threshold_seconds_ to mixer service
+  // TODO(https://fxbug.dev/42181009): add media_ticks_continuity_threshold_seconds_ to mixer
+  // service
 
   state_ = State::kConfigured;
 
@@ -903,8 +904,8 @@ void AudioRendererServer::MaybeSetFullyCreated() {
     on_fully_created_(shared_from_this());
   }
 
-  // TODO(https://fxbug.dev/42181009): after implementing RouteGraph, this is where we should add this renderer
-  // to the RouteGroup.
+  // TODO(https://fxbug.dev/42181009): after implementing RouteGraph, this is where we should add
+  // this renderer to the RouteGroup.
 
   // Flush all queued tasks.
   for (auto& fn : queued_tasks_) {

@@ -33,7 +33,7 @@ class NullAudioRenderer : public fuchsia::media::AudioRenderer {
   void GetMinLeadTime(GetMinLeadTimeCallback callback) override {}
   void BindGainControl(::fidl::InterfaceRequest<::fuchsia::media::audio::GainControl>
                            gain_control_request) override {}
-  void SetUsage(fuchsia::media::AudioRenderUsage usage) override {}
+  void SetUsage(fuchsia::media::AudioRenderUsage _usage) override {}
 };
 
 }  // namespace media::audio::test

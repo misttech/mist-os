@@ -12,32 +12,35 @@
 
 namespace media::audio {
 
+using fuchsia::media::AudioRenderUsage;
+using fuchsia::media::AudioRenderUsage2;
 using RenderActivity = ActivityDispatcherImpl::RenderActivity;
 using CaptureActivity = ActivityDispatcherImpl::CaptureActivity;
-using RenderUsageVector = std::vector<fuchsia::media::AudioRenderUsage>;
+using RenderUsageVector = std::vector<AudioRenderUsage>;
+using RenderUsage2Vector = std::vector<AudioRenderUsage2>;
 using CaptureUsageVector = std::vector<fuchsia::media::AudioCaptureUsage>;
 
 namespace {
-RenderActivity UsageVectorToActivity(
-    const std::vector<fuchsia::media::AudioRenderUsage>& usage_vector) {
+[[maybe_unused]] RenderActivity UsageVectorToActivity(
+    const std::vector<AudioRenderUsage>& usage_vector) {
   RenderActivity activity;
   for (const auto& usage : usage_vector) {
-    activity.set(static_cast<int>(usage));
+    activity.set(static_cast<uint32_t>(usage));
   }
   return activity;
 }
 
-CaptureActivity UsageVectorToActivity(
+[[maybe_unused]] CaptureActivity UsageVectorToActivity(
     const std::vector<fuchsia::media::AudioCaptureUsage>& usage_vector) {
   CaptureActivity activity;
   for (const auto& usage : usage_vector) {
-    activity.set(static_cast<int>(usage));
+    activity.set(static_cast<uint32_t>(usage));
   }
   return activity;
 }
 }  // namespace
 
-typedef ::testing::Types<RenderUsageVector, CaptureUsageVector> UsageVectorTypes;
+using UsageVectorTypes = ::testing::Types<RenderUsageVector, CaptureUsageVector>;
 TYPED_TEST_SUITE(ActivityDispatcherTest, UsageVectorTypes);
 
 template <typename Type>
@@ -101,7 +104,7 @@ class ActivityDispatcherTest : public gtest::TestLoopFixture {
 
   template <>
   RenderUsageVector SingleVector<RenderUsageVector>() {
-    return {fuchsia::media::AudioRenderUsage::BACKGROUND};
+    return {*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND)};
   }
   template <>
   CaptureUsageVector SingleVector<CaptureUsageVector>() {
@@ -115,8 +118,8 @@ class ActivityDispatcherTest : public gtest::TestLoopFixture {
 
   template <>
   RenderUsageVector MultiVector<RenderUsageVector>() {
-    return {fuchsia::media::AudioRenderUsage::BACKGROUND,
-            fuchsia::media::AudioRenderUsage::SYSTEM_AGENT};
+    return {*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND),
+            *FromFidlRenderUsage2(AudioRenderUsage2::SYSTEM_AGENT)};
   }
   template <>
   CaptureUsageVector MultiVector<CaptureUsageVector>() {

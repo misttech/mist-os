@@ -14,14 +14,15 @@ UsageReporterImpl::GetFidlRequestHandler() {
 }
 
 void UsageReporterImpl::Watch(
-    fuchsia::media::Usage usage,
+    fuchsia::media::Usage _usage,
     fidl::InterfaceHandle<fuchsia::media::UsageWatcher> usage_state_watcher) {
+  auto usage = ToFidlUsage2(_usage);
   auto watcher = usage_state_watcher.Bind();
   auto& set = watcher_set(usage);
   int current_id = next_watcher_id_++;
   watcher.set_error_handler(
       [&set, current_id](zx_status_t status) { set.watchers.erase(current_id); });
-  watcher->OnStateChanged(fidl::Clone(usage), fidl::Clone(set.cached_state), [current_id, &set]() {
+  watcher->OnStateChanged(fidl::Clone(_usage), fidl::Clone(set.cached_state), [current_id, &set]() {
     --set.watchers[current_id].outstanding_ack_count;
   });
 
@@ -29,8 +30,13 @@ void UsageReporterImpl::Watch(
   set.watchers[current_id] = {std::move(watcher), 1};
 }
 
-void UsageReporterImpl::ReportPolicyAction(fuchsia::media::Usage usage,
+void UsageReporterImpl::ReportPolicyAction(fuchsia::media::Usage2 usage,
                                            fuchsia::media::Behavior policy_action) {
+  auto usage1 = FromFidlUsage2(usage);
+  if (!usage1.has_value()) {
+    return;
+  }
+
   const auto state = [&policy_action] {
     fuchsia::media::UsageState usage_state;
     if (policy_action == fuchsia::media::Behavior::NONE) {
@@ -53,19 +59,18 @@ void UsageReporterImpl::ReportPolicyAction(fuchsia::media::Usage usage,
       it = set.watchers.erase(it);
     } else {
       ++it->second.outstanding_ack_count;
-      it->second.watcher_ptr->OnStateChanged(fidl::Clone(usage), fidl::Clone(state),
+      it->second.watcher_ptr->OnStateChanged(fidl::Clone(*usage1), fidl::Clone(state),
                                              [it]() { --it->second.outstanding_ack_count; });
       ++it;
     }
   }
 }
 
-UsageReporterImpl::WatcherSet& UsageReporterImpl::watcher_set(const fuchsia::media::Usage& usage) {
+UsageReporterImpl::WatcherSet& UsageReporterImpl::watcher_set(const fuchsia::media::Usage2& usage) {
   if (usage.is_render_usage()) {
     return render_usage_watchers_[fidl::ToUnderlying(usage.render_usage())];
-  } else {
-    return capture_usage_watchers_[fidl::ToUnderlying(usage.capture_usage())];
   }
+  return capture_usage_watchers_[fidl::ToUnderlying(usage.capture_usage())];
 }
 
 }  // namespace media::audio

@@ -14,7 +14,7 @@
 namespace media::audio {
 
 const auto kMediaUsage =
-    fuchsia::media::Usage::WithRenderUsage(fuchsia::media::AudioRenderUsage::MEDIA);
+    fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA);
 const auto kMutedState = fuchsia::media::UsageState::WithMuted({});
 const auto kUnadjustedState = fuchsia::media::UsageState::WithUnadjusted({});
 const auto kActivateCallback = true;
@@ -24,14 +24,14 @@ class FakeUsageWatcher : public fuchsia::media::UsageWatcher {
  public:
   explicit FakeUsageWatcher(bool activate_callback) : activate_callback_(activate_callback) {}
 
-  const fuchsia::media::Usage& last_usage() const { return last_usage_; }
+  const fuchsia::media::Usage2& last_usage() const { return last_usage_; }
 
   const fuchsia::media::UsageState& last_usage_state() const { return last_usage_state_; }
 
  private:
   void OnStateChanged(fuchsia::media::Usage usage, fuchsia::media::UsageState usage_state,
                       OnStateChangedCallback callback) override {
-    last_usage_ = std::move(usage);
+    last_usage_ = ToFidlUsage2(usage);
     last_usage_state_ = std::move(usage_state);
 
     if (activate_callback_) {
@@ -40,21 +40,24 @@ class FakeUsageWatcher : public fuchsia::media::UsageWatcher {
   }
 
   bool activate_callback_;
-  fuchsia::media::Usage last_usage_;
+  fuchsia::media::Usage2 last_usage_;
   fuchsia::media::UsageState last_usage_state_;
 };
 
 class UsageReporterImplTest : public gtest::TestLoopFixture {
  protected:
   fidl::Binding<fuchsia::media::UsageWatcher, std::unique_ptr<FakeUsageWatcher>> Watch(
-      fuchsia::media::Usage usage, bool activate_callback) {
+      fuchsia::media::Usage2 usage, bool activate_callback) {
     fidl::InterfaceHandle<fuchsia::media::UsageWatcher> state_watcher_handle;
     auto request = state_watcher_handle.NewRequest();
-    usage_reporter_->Watch(std::move(usage), std::move(state_watcher_handle));
+    auto usage1 = FromFidlUsage2(usage);
+    if (usage1.has_value()) {
+      usage_reporter_->Watch(std::move(usage1.value()), std::move(state_watcher_handle));
+    }
     return fidl::Binding(std::make_unique<FakeUsageWatcher>(activate_callback), std::move(request));
   }
 
-  bool AcksComplete(const fuchsia::media::Usage& usage) {
+  bool AcksComplete(const fuchsia::media::Usage2& usage) {
     auto& set = usage_reporter_impl_.watcher_set(usage);
     for (auto& watcher : set.watchers) {
       if (watcher.second.outstanding_ack_count != 0) {
@@ -64,7 +67,7 @@ class UsageReporterImplTest : public gtest::TestLoopFixture {
     return true;
   }
 
-  bool WatchersDisconnected(const fuchsia::media::Usage& usage) {
+  bool WatchersDisconnected(const fuchsia::media::Usage2& usage) {
     auto& set = usage_reporter_impl_.watcher_set(usage);
     return set.watchers.empty();
   }

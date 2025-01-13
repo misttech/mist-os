@@ -70,7 +70,7 @@
         "output_channels": {
           "$ref": "#/definitions/channel_count"
         },
-        "config": {},
+        "config": { },
         "_comment": "string"
       },
       "required": [

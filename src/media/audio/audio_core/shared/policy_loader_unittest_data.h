@@ -187,12 +187,12 @@ constexpr char capture_capture[] = R"JSON(
 
 // Some static asserts that document the values we used to generate the JSON blob below with. If
 // these fail we'll want to update the corresponding test data.
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage::BACKGROUND) == 0);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage::MEDIA) == 1);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage::INTERRUPTION) == 2);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage::SYSTEM_AGENT) == 3);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage::COMMUNICATION) == 4);
-static_assert(fuchsia::media::RENDER_USAGE_COUNT == 5);
+static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::BACKGROUND) == 0);
+static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::MEDIA) == 1);
+static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::INTERRUPTION) == 2);
+static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT) == 3);
+static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::COMMUNICATION) == 4);
+static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 5);
 static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::BACKGROUND) == 0);
 static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::FOREGROUND) == 1);
 static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT) == 2);
@@ -206,8 +206,8 @@ constexpr char contains_all_usages_and_behaviors[] = R"JSON(
     {
       "audio_policy_rules": [
         {
-          "active": {"render_usage":"BACKGROUND"},
-          "affected": {"render_usage":"MEDIA"},
+          "active": {"render_usage":"MEDIA"},
+          "affected": {"render_usage":"BACKGROUND"},
           "behavior": "DUCK"
         },
         {
@@ -217,12 +217,12 @@ constexpr char contains_all_usages_and_behaviors[] = R"JSON(
         },
         {
           "active": {"render_usage":"COMMUNICATION"},
-          "affected": {"capture_usage":"BACKGROUND"},
+          "affected": {"render_usage":"MEDIA"},
           "behavior": "NONE"
         },
         {
           "active": {"capture_usage":"FOREGROUND"},
-          "affected": {"capture_usage":"SYSTEM_AGENT"},
+          "affected": {"capture_usage":"BACKGROUND"},
           "behavior": "DUCK"
         },
         {

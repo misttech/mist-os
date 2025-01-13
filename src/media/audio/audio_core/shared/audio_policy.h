@@ -15,8 +15,8 @@ namespace media::audio {
 class AudioPolicy {
  public:
   struct Rule {
-    fuchsia::media::Usage active;
-    fuchsia::media::Usage affected;
+    fuchsia::media::Usage2 active;
+    fuchsia::media::Usage2 affected;
     fuchsia::media::Behavior behavior;
   };
 

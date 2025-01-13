@@ -1214,15 +1214,15 @@ TEST_F(ReporterTest, AudioPolicyMetrics) {
               AllOf(NameMatches("1"), PropertyList(Contains(BoolIs("active", true)))))))))));
 
   // Structures to hold active usages and usage behaviors.
-  std::vector<fuchsia::media::Usage> active_usages;
-  std::array<fuchsia::media::Behavior, fuchsia::media::RENDER_USAGE_COUNT> render_usage_behaviors;
+  std::vector<fuchsia::media::Usage2> active_usages;
+  std::array<fuchsia::media::Behavior, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_behaviors;
   std::array<fuchsia::media::Behavior, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_behaviors;
   render_usage_behaviors.fill(fuchsia::media::Behavior::NONE);
   capture_usage_behaviors.fill(fuchsia::media::Behavior::NONE);
 
   // Expect active RenderUsage::MEDIA to be logged, with default policy NONE.
   active_usages.push_back(
-      fuchsia::media::Usage::WithRenderUsage((fuchsia::media::AudioRenderUsage::MEDIA)));
+      fuchsia::media::Usage2::WithRenderUsage((fuchsia::media::AudioRenderUsage2::MEDIA)));
   under_test_.UpdateActiveUsagePolicy(active_usages, render_usage_behaviors,
                                       capture_usage_behaviors);
   EXPECT_THAT(
@@ -1242,8 +1242,8 @@ TEST_F(ReporterTest, AudioPolicyMetrics) {
   // Expect active RenderUsage::MEDIA and CaptureUsage::SYSTEM_AGENT to be logged, with DUCK applied
   // to MEDIA.
   active_usages.push_back(
-      fuchsia::media::Usage::WithCaptureUsage((fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT)));
-  render_usage_behaviors[static_cast<int>(fuchsia::media::AudioRenderUsage::MEDIA)] =
+      fuchsia::media::Usage2::WithCaptureUsage((fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT)));
+  render_usage_behaviors[static_cast<int>(fuchsia::media::AudioRenderUsage2::MEDIA)] =
       fuchsia::media::Behavior::DUCK;
   under_test_.UpdateActiveUsagePolicy(active_usages, render_usage_behaviors,
                                       capture_usage_behaviors);

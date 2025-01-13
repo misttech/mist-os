@@ -12,7 +12,7 @@
 
 namespace media::audio {
 
-float UsageGainSettings::GetAdjustedUsageGain(const fuchsia::media::Usage& usage) const {
+float UsageGainSettings::GetAdjustedUsageGain(const fuchsia::media::Usage2& usage) const {
   TRACE_DURATION("audio", "UsageGainSettings::GetUsageGain");
   if (usage.is_render_usage()) {
     const auto usage_index = fidl::ToUnderlying(usage.render_usage());
@@ -28,7 +28,7 @@ float UsageGainSettings::GetAdjustedUsageGain(const fuchsia::media::Usage& usage
   }
 }
 
-float UsageGainSettings::GetUnadjustedUsageGain(const fuchsia::media::Usage& usage) const {
+float UsageGainSettings::GetUnadjustedUsageGain(const fuchsia::media::Usage2& usage) const {
   TRACE_DURATION("audio", "UsageGainSettings::GetUnadjustedUsageGain");
   if (usage.is_render_usage()) {
     const auto usage_index = fidl::ToUnderlying(usage.render_usage());
@@ -40,7 +40,7 @@ float UsageGainSettings::GetUnadjustedUsageGain(const fuchsia::media::Usage& usa
   }
 }
 
-float UsageGainSettings::GetUsageGainAdjustment(const fuchsia::media::Usage& usage) const {
+float UsageGainSettings::GetUsageGainAdjustment(const fuchsia::media::Usage2& usage) const {
   TRACE_DURATION("audio", "UsageGainSettings::GetUsageGainAdjustment");
   if (usage.is_render_usage()) {
     const auto usage_index = fidl::ToUnderlying(usage.render_usage());
@@ -52,7 +52,7 @@ float UsageGainSettings::GetUsageGainAdjustment(const fuchsia::media::Usage& usa
   }
 }
 
-void UsageGainSettings::SetUsageGain(fuchsia::media::Usage usage, float gain_db) {
+void UsageGainSettings::SetUsageGain(fuchsia::media::Usage2 usage, float gain_db) {
   TRACE_DURATION("audio", "UsageGainSettings::SetUsageGain");
   if (usage.is_render_usage()) {
     render_usage_gain_[fidl::ToUnderlying(usage.render_usage())] = gain_db;
@@ -61,7 +61,7 @@ void UsageGainSettings::SetUsageGain(fuchsia::media::Usage usage, float gain_db)
   }
 }
 
-void UsageGainSettings::SetUsageGainAdjustment(fuchsia::media::Usage usage, float gain_db) {
+void UsageGainSettings::SetUsageGainAdjustment(fuchsia::media::Usage2 usage, float gain_db) {
   TRACE_DURATION("audio", "UsageGainSettings::SetUsageGainAdjustment");
   if (usage.is_render_usage()) {
     render_usage_gain_adjustment_[fidl::ToUnderlying(usage.render_usage())] = gain_db;
@@ -80,7 +80,7 @@ UsageVolumeSettings::UsageVolumeSettings() {
   }
 }
 
-float UsageVolumeSettings::GetUsageVolume(const fuchsia::media::Usage& usage) const {
+float UsageVolumeSettings::GetUsageVolume(const fuchsia::media::Usage2& usage) const {
   TRACE_DURATION("audio", "UsageVolumeSettings::GetUsageVolume");
   if (usage.is_render_usage()) {
     return render_usage_volume_[fidl::ToUnderlying(usage.render_usage())];
@@ -89,7 +89,7 @@ float UsageVolumeSettings::GetUsageVolume(const fuchsia::media::Usage& usage) co
   }
 }
 
-void UsageVolumeSettings::SetUsageVolume(fuchsia::media::Usage usage, float volume) {
+void UsageVolumeSettings::SetUsageVolume(fuchsia::media::Usage2 usage, float volume) {
   TRACE_DURATION("audio", "UsageVolumeSettings::SetUsageVolume");
   if (usage.is_render_usage()) {
     render_usage_volume_[fidl::ToUnderlying(usage.render_usage())] = volume;

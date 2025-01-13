@@ -105,7 +105,7 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
 
   std::pair<AudioRendererShim<SampleType>*, TypedFormat<SampleType>> CreateRenderer(
       int32_t frame_rate,
-      fuchsia::media::AudioRenderUsage usage = fuchsia::media::AudioRenderUsage::MEDIA) {
+      fuchsia::media::AudioRenderUsage2 usage = fuchsia::media::AudioRenderUsage2::MEDIA) {
     auto format = Format::Create<SampleType>(2, frame_rate).take_value();
     return std::make_pair(
         CreateAudioRenderer(format, PacketsToFrames(kNumPacketsInPayload, frame_rate), usage),
@@ -204,12 +204,13 @@ class AudioRendererGainLimitsTest
     // Set usage gain/mute.
     if (tc.media_mute) {
       fuchsia::media::audio::VolumeControlPtr volume_control;
-      audio_core_->BindUsageVolumeControl(
-          fuchsia::media::Usage::WithRenderUsage(fuchsia::media::AudioRenderUsage::MEDIA),
-          volume_control.NewRequest());
+      audio_core_->BindUsageVolumeControl(*FromFidlUsage2(fuchsia::media::Usage2::WithRenderUsage(
+                                              (fuchsia::media::AudioRenderUsage2::MEDIA))),
+                                          volume_control.NewRequest());
       volume_control->SetMute(true);
     } else {
-      audio_core_->SetRenderUsageGain(fuchsia::media::AudioRenderUsage::MEDIA, tc.media_gain_db);
+      audio_core_->SetRenderUsageGain(
+          *FromFidlRenderUsage2(fuchsia::media::AudioRenderUsage2::MEDIA), tc.media_gain_db);
     }
 
     // Render.

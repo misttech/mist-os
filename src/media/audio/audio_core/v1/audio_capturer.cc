@@ -177,11 +177,11 @@ void AudioCapturer::SetUsage(fuchsia::media::AudioCaptureUsage usage) {
   }
 }
 
-fuchsia::media::Usage AudioCapturer::GetStreamUsage() const {
+fuchsia::media::Usage2 AudioCapturer::GetStreamUsage() const {
   // We should only be calling these from the StreamVolumeManager. We don't register LOOPBACK
   // capturers with the StreamVolumeManager since those capturers do not have a compatible usage.
   FX_CHECK(!loopback_);
-  fuchsia::media::Usage usage;
+  fuchsia::media::Usage2 usage;
   usage.set_capture_usage(FidlCaptureUsageFromCaptureUsage(usage_).value());
   return usage;
 }
@@ -212,8 +212,8 @@ void AudioCapturer::RealizeVolume(VolumeCommand volume_command) {
         link.mixer->gain.SetDestGain(gain_db);
 
         if constexpr (kLogCaptureUsageVolumeGainActions) {
-          // TODO(https://fxbug.dev/42128197) Logging should be removed upon creation of inspect tool or
-          // other real-time method for gain observation
+          // TODO(https://fxbug.dev/42128197) Logging should be removed upon creation of inspect
+          // tool or other real-time method for gain observation
           FX_LOGS(INFO) << log_string;
         }
       }

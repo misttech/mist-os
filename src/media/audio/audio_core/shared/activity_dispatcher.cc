@@ -10,6 +10,7 @@ namespace media::audio {
 namespace {
 using fuchsia::media::AudioCaptureUsage;
 using fuchsia::media::AudioRenderUsage;
+using fuchsia::media::AudioRenderUsage2;
 
 std::vector<AudioRenderUsage> ActivityToUsageVector(
     const ActivityDispatcherImpl::RenderActivity& activity) {
@@ -19,6 +20,19 @@ std::vector<AudioRenderUsage> ActivityToUsageVector(
   for (int i = 0; i < fuchsia::media::RENDER_USAGE_COUNT; i++) {
     if (activity[i]) {
       usage_vector.push_back(static_cast<AudioRenderUsage>(i));
+    }
+  }
+  return usage_vector;
+}
+
+[[maybe_unused]] std::vector<AudioRenderUsage2> ActivityToUsage2Vector(
+    const ActivityDispatcherImpl::RenderActivity& activity) {
+  std::vector<AudioRenderUsage2> usage_vector;
+  usage_vector.reserve(activity.count());
+
+  for (int i = 0; i < fuchsia::media::RENDER_USAGE2_COUNT; i++) {
+    if (activity[i]) {
+      usage_vector.push_back(static_cast<AudioRenderUsage2>(i));
     }
   }
   return usage_vector;

@@ -17,7 +17,8 @@
 
 namespace media::audio::test {
 
-using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
+using fuchsia::media::AudioRenderUsage;
+using fuchsia::media::AudioRenderUsage2;
 
 // Sanity test adding a payload buffer. Just verify we don't get a disconnect.
 TEST_F(AudioRendererBufferTest, AddPayloadBuffer) {

@@ -62,7 +62,7 @@ class AudioRenderer : public BaseRenderer,
   void PauseInternal(PauseCallback callback) final;
 
   // |media::audio::StreamVolume|
-  fuchsia::media::Usage GetStreamUsage() const final;
+  fuchsia::media::Usage2 GetStreamUsage() const final;
   void RealizeVolume(VolumeCommand volume_command) final;
 
   // |fuchsia::media::audio::GainControl|
@@ -106,7 +106,7 @@ class AudioRenderer : public BaseRenderer,
   bool mute_ = false;
   std::optional<Format> format_;
 
-  fuchsia::media::AudioRenderUsage usage_ = fuchsia::media::AudioRenderUsage::MEDIA;
+  fuchsia::media::AudioRenderUsage2 usage_ = fuchsia::media::AudioRenderUsage2::MEDIA;
 
   // Set when pause is ramping, cleared when the ramp is finished.
   // Must be accessed on the FIDL thread only.

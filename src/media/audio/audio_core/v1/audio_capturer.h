@@ -63,7 +63,7 @@ class AudioCapturer : public BaseCapturer,
   }
 
   // |media::audio::StreamVolume|
-  fuchsia::media::Usage GetStreamUsage() const final;
+  fuchsia::media::Usage2 GetStreamUsage() const final;
   void RealizeVolume(VolumeCommand volume_command) final;
 
   fidl::BindingSet<fuchsia::media::audio::GainControl> gain_control_bindings_;

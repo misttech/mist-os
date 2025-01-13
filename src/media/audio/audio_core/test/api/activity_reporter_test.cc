@@ -8,10 +8,12 @@
 
 #include <gmock/gmock.h>
 
+#include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 
-using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
-using AudioSampleFormat = fuchsia::media::AudioSampleFormat;
+using fuchsia::media::AudioRenderUsage;
+using fuchsia::media::AudioRenderUsage2;
+using fuchsia::media::AudioSampleFormat;
 using testing::UnorderedElementsAre;
 using testing::UnorderedElementsAreArray;
 
@@ -26,7 +28,7 @@ class ActivityReporterTest : public HermeticAudioTest {
     AddErrorHandler(activity_reporter_, "ActivityReporter");
   }
 
-  AudioRendererShim<AudioSampleFormat::SIGNED_16>* CreateAndPlayWithUsage(AudioRenderUsage usage) {
+  AudioRendererShim<AudioSampleFormat::SIGNED_16>* CreateAndPlayWithUsage(AudioRenderUsage2 usage) {
     auto format = Format::Create<AudioSampleFormat::SIGNED_16>(1, 8000).value();  // arbitrary
     auto r = CreateAudioRenderer(format, 1024, usage);
     r->fidl()->PlayNoReply(0, 0);
@@ -48,28 +50,31 @@ TEST_F(ActivityReporterTest, AddAndRemove) {
   // First call should return immediately, others should wait for updates.
   add_callback("WatchRenderActivity InitialCall");
   ExpectCallbacks();
-  EXPECT_EQ(active_usages, std::vector<AudioRenderUsage>{});
+  EXPECT_TRUE(active_usages.empty());
 
   add_callback("WatchRenderActivity AfterPlayBackground");
-  auto r1 = CreateAndPlayWithUsage(AudioRenderUsage::BACKGROUND);
-  ExpectCallbacks();
-  EXPECT_THAT(active_usages, UnorderedElementsAreArray({AudioRenderUsage::BACKGROUND}));
-
-  add_callback("WatchRenderActivity AfterPlayMedia");
-  auto r2 = CreateAndPlayWithUsage(AudioRenderUsage::MEDIA);
+  auto r1 = CreateAndPlayWithUsage(AudioRenderUsage2::BACKGROUND);
   ExpectCallbacks();
   EXPECT_THAT(active_usages,
-              UnorderedElementsAreArray({AudioRenderUsage::BACKGROUND, AudioRenderUsage::MEDIA}));
+              UnorderedElementsAreArray({*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND)}));
+
+  add_callback("WatchRenderActivity AfterPlayMedia");
+  auto r2 = CreateAndPlayWithUsage(AudioRenderUsage2::MEDIA);
+  ExpectCallbacks();
+  EXPECT_THAT(active_usages,
+              UnorderedElementsAreArray({*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND),
+                                         *FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)}));
 
   add_callback("WatchRenderActivity AfterPauseBackground");
   r1->fidl()->PauseNoReply();
   ExpectCallbacks();
-  EXPECT_THAT(active_usages, UnorderedElementsAreArray({AudioRenderUsage::MEDIA}));
+  EXPECT_THAT(active_usages,
+              UnorderedElementsAreArray({*FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)}));
 
   add_callback("WatchRenderActivity AfterDisconnectMedia");
   Unbind(r2);
   ExpectCallbacks();
-  EXPECT_THAT(active_usages, UnorderedElementsAre());
+  EXPECT_TRUE(active_usages.empty());
   Unbind(r1);
 }
 

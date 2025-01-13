@@ -9,7 +9,7 @@
 
 namespace media::audio {
 
-// Usage loudness settings in gain dbfs units.
+// Usage2 loudness settings in gain dbfs units.
 // This class is not thread safe.
 class UsageGainSettings {
  public:
@@ -20,40 +20,40 @@ class UsageGainSettings {
   //
   // Since this value includes adjustments, it should only be used for mixing and not reflected to
   // users.
-  float GetAdjustedUsageGain(const fuchsia::media::Usage& usage) const;
+  float GetAdjustedUsageGain(const fuchsia::media::Usage2& usage) const;
 
   // Gets the gain of the usage, without accounting for transient adjustments.
-  float GetUnadjustedUsageGain(const fuchsia::media::Usage& usage) const;
+  float GetUnadjustedUsageGain(const fuchsia::media::Usage2& usage) const;
 
   // Gets the gain adjustment included in the usage's total adjusted usage gain.
-  float GetUsageGainAdjustment(const fuchsia::media::Usage& usage) const;
+  float GetUsageGainAdjustment(const fuchsia::media::Usage2& usage) const;
 
-  void SetUsageGain(fuchsia::media::Usage usage, float gain_db);
+  void SetUsageGain(fuchsia::media::Usage2 usage, float gain_db);
 
-  void SetUsageGainAdjustment(fuchsia::media::Usage usage, float gain_db);
+  void SetUsageGainAdjustment(fuchsia::media::Usage2 usage, float gain_db);
 
  private:
   // TODO(https://fxbug.dev/42111800): Determine whether mute must be tracked here
 
-  std::array<float, fuchsia::media::RENDER_USAGE_COUNT> render_usage_gain_ = {};
+  std::array<float, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_gain_ = {};
   std::array<float, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_gain_ = {};
 
-  std::array<float, fuchsia::media::RENDER_USAGE_COUNT> render_usage_gain_adjustment_ = {};
+  std::array<float, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_gain_adjustment_ = {};
   std::array<float, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_gain_adjustment_ = {};
 };
 
-// Usage loudness settings in volume units.
+// Usage2 loudness settings in volume units.
 class UsageVolumeSettings {
  public:
   UsageVolumeSettings();
 
   // Gets the volume that should affect all audio elements of the given usage.
-  float GetUsageVolume(const fuchsia::media::Usage& usage) const;
+  float GetUsageVolume(const fuchsia::media::Usage2& usage) const;
 
-  void SetUsageVolume(fuchsia::media::Usage usage, float volume);
+  void SetUsageVolume(fuchsia::media::Usage2 usage, float volume);
 
  private:
-  std::array<float, fuchsia::media::RENDER_USAGE_COUNT> render_usage_volume_;
+  std::array<float, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_volume_;
   std::array<float, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_volume_;
 };
 

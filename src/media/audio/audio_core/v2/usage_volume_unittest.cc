@@ -80,7 +80,8 @@ TEST(UsageVolumeTest, RealizeVolume) {
   h.loop.RunUntilIdle();
   ASSERT_TRUE(usage_volume);
   ASSERT_TRUE(usage_volume->GetStreamUsage().is_render_usage());
-  EXPECT_EQ(usage_volume->GetStreamUsage().render_usage(), fuchsia::media::AudioRenderUsage::MEDIA);
+  EXPECT_EQ(usage_volume->GetStreamUsage().render_usage(),
+            fuchsia::media::AudioRenderUsage2::MEDIA);
 
   // Expect two CreateGainControl calls.
   auto& graph_calls = h.graph_server->calls();

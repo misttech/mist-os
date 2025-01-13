@@ -6,10 +6,10 @@
 
 namespace media::audio {
 
-std::optional<fuchsia::media::AudioRenderUsage> FidlRenderUsageFromRenderUsage(RenderUsage u) {
+std::optional<fuchsia::media::AudioRenderUsage2> FidlRenderUsageFromRenderUsage(RenderUsage u) {
   auto underlying = static_cast<std::underlying_type_t<RenderUsage>>(u);
   if (underlying < fuchsia::media::RENDER_USAGE_COUNT) {
-    return {static_cast<fuchsia::media::AudioRenderUsage>(underlying)};
+    return {static_cast<fuchsia::media::AudioRenderUsage2>(underlying)};
   }
   return {};
 }
@@ -22,7 +22,38 @@ std::optional<fuchsia::media::AudioCaptureUsage> FidlCaptureUsageFromCaptureUsag
   return {};
 }
 
-StreamUsage StreamUsageFromFidlUsage(const fuchsia::media::Usage& usage) {
+fuchsia::media::AudioRenderUsage2 ToFidlRenderUsage2(
+    const fuchsia::media::AudioRenderUsage& usage) {
+  return fuchsia::media::AudioRenderUsage2(fidl::ToUnderlying(usage));
+}
+
+fuchsia::media::Usage2 ToFidlUsage2(const fuchsia::media::Usage& usage) {
+  if (usage.is_render_usage()) {
+    return fuchsia::media::Usage2::WithRenderUsage(ToFidlRenderUsage2(usage.render_usage()));
+  }
+  return fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(usage.capture_usage()));
+}
+
+std::optional<fuchsia::media::AudioRenderUsage> FromFidlRenderUsage2(
+    const fuchsia::media::AudioRenderUsage2& usage2) {
+  if (auto index = fidl::ToUnderlying(usage2); index < fuchsia::media::RENDER_USAGE_COUNT) {
+    return fuchsia::media::AudioRenderUsage(index);
+  }
+  return {};
+}
+
+std::optional<fuchsia::media::Usage> FromFidlUsage2(const fuchsia::media::Usage2& usage2) {
+  if (usage2.is_capture_usage()) {
+    return fuchsia::media::Usage::WithCaptureUsage(fidl::Clone(usage2.capture_usage()));
+  }
+  if (auto index = fidl::ToUnderlying(usage2.render_usage());
+      index < fuchsia::media::RENDER_USAGE_COUNT) {
+    return fuchsia::media::Usage::WithRenderUsage(fuchsia::media::AudioRenderUsage(index));
+  }
+  return {};
+}
+
+StreamUsage StreamUsageFromFidlUsage(const fuchsia::media::Usage2& usage) {
   if (usage.is_render_usage()) {
     return StreamUsage::WithRenderUsage(usage.render_usage());
   }

@@ -83,7 +83,7 @@ class UsageGainReporterTest : public gtest::TestLoopFixture {
                          /* independent_volume_control=*/true, PipelineConfig::Default(),
                          /*driver_gain_db=*/0.0, /*software_gain_db=*/0.0)})
                 .Build()),
-        usage_(fuchsia::media::Usage::WithRenderUsage(fuchsia::media::AudioRenderUsage::MEDIA)) {}
+        usage_(fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA)) {}
 
   std::unique_ptr<FakeGainListener> Listen(std::string device_id) {
     auto device_lister = std::make_unique<TestDeviceLister>();
@@ -94,7 +94,9 @@ class UsageGainReporterTest : public gtest::TestLoopFixture {
         *device_lister.get(), *stream_volume_manager_.get(), process_config_);
 
     auto fake_gain_listener = std::make_unique<FakeGainListener>();
-    under_test_->RegisterListener(device_id, fidl::Clone(usage_), fake_gain_listener->NewBinding());
+
+    under_test_->RegisterListener(device_id, fidl::Clone(*FromFidlUsage2(usage_)),
+                                  fake_gain_listener->NewBinding());
 
     return fake_gain_listener;
   }
@@ -104,7 +106,7 @@ class UsageGainReporterTest : public gtest::TestLoopFixture {
   std::unique_ptr<StreamVolumeManager> stream_volume_manager_;
   std::unique_ptr<UsageGainReporterImpl> under_test_;
   ProcessConfig process_config_;
-  const fuchsia::media::Usage usage_;
+  const fuchsia::media::Usage2 usage_;
 };
 
 TEST_F(UsageGainReporterTest, UpdatesSingleListenerUsageGain) {
@@ -164,7 +166,7 @@ TEST_F(UsageGainReporterTest, HandlesClosedChannel) {
   // Verify we removed the listener from StreamVolumeManager.
   // If we did not, this will crash.
   stream_volume_manager_->SetUsageGain(
-      fuchsia::media::Usage::WithRenderUsage(fuchsia::media::AudioRenderUsage::MEDIA), 0.42f);
+      fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA), 0.42f);
 }
 
 }  // namespace media::audio

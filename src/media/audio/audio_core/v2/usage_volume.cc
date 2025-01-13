@@ -110,15 +110,15 @@ UsageVolume::~UsageVolume() {
   }
 }
 
-fuchsia::media::Usage UsageVolume::GetStreamUsage() const {
+fuchsia::media::Usage2 UsageVolume::GetStreamUsage() const {
   if (usage_.is_render_usage()) {
     auto out = media::audio::FidlRenderUsageFromRenderUsage(usage_.render_usage());
     FX_CHECK(out);
-    return fuchsia::media::Usage::WithRenderUsage(std::move(*out));
+    return fuchsia::media::Usage2::WithRenderUsage(std::move(*out));
   } else {
     auto out = media::audio::FidlCaptureUsageFromCaptureUsage(usage_.capture_usage());
     FX_CHECK(out);
-    return fuchsia::media::Usage::WithCaptureUsage(std::move(*out));
+    return fuchsia::media::Usage2::WithCaptureUsage(std::move(*out));
   }
 }
 

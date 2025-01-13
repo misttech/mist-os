@@ -3,6 +3,7 @@
 
 #include <zircon/types.h>
 
+#include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/test/api/ultrasound_test_shared.h"
 #include "src/media/audio/lib/clock/utils.h"
 
@@ -35,7 +36,7 @@ TEST_F(UltrasoundErrorTest, RendererDoesNotSupportSetUsage) {
   std::optional<zx_status_t> renderer_error;
   renderer->fidl().set_error_handler([&renderer_error](auto status) { renderer_error = {status}; });
 
-  renderer->fidl()->SetUsage(fuchsia::media::AudioRenderUsage::MEDIA);
+  renderer->fidl()->SetUsage(*FromFidlRenderUsage2(fuchsia::media::AudioRenderUsage2::MEDIA));
 
   // Now expect we get disconnected with ZX_ERR_NOT_SUPPORTED.
   RunLoopUntil([&renderer_error] { return renderer_error.has_value(); });

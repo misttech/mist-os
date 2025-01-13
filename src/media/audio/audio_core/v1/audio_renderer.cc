@@ -95,7 +95,8 @@ void AudioRenderer::ReportStop() {
   context().audio_admin().UpdateRendererState(RenderUsageFromFidlRenderUsage(usage_), false, this);
 }
 
-void AudioRenderer::SetUsage(fuchsia::media::AudioRenderUsage usage) {
+void AudioRenderer::SetUsage(fuchsia::media::AudioRenderUsage _usage) {
+  auto usage = ToFidlRenderUsage2(_usage);
   TRACE_DURATION("audio", "AudioRenderer::SetUsage");
   if (format_) {
     FX_LOGS(ERROR) << "SetUsage called after SetPcmStreamType.";
@@ -419,8 +420,8 @@ void AudioRenderer::BindGainControl(
   gain_control_bindings_.AddBinding(GainControlBinding::Create(this), std::move(request));
 }
 
-fuchsia::media::Usage AudioRenderer::GetStreamUsage() const {
-  return fuchsia::media::Usage::WithRenderUsage(fidl::Clone(usage_));
+fuchsia::media::Usage2 AudioRenderer::GetStreamUsage() const {
+  return fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(usage_));
 }
 
 // Set a change to the usage volume+gain_adjustment

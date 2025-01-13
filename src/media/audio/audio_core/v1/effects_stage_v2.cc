@@ -25,15 +25,15 @@ static_assert(fuchsia_audio_effects::wire::kMaxProcessStageNameLength <=
 // We expect StreamUsageMask to map r to (1<<r) for each RenderUsage r.
 // See ProcessOptions.usage_mask_per_input in sdk/fidl/fuchsia.audio.effects/processor.fidl.
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND)}).mask() ==
-              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::BACKGROUND)));
+              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage2::BACKGROUND)));
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION)}).mask() ==
-              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::COMMUNICATION)));
+              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage2::COMMUNICATION)));
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION)}).mask() ==
-              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::INTERRUPTION)));
+              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage2::INTERRUPTION)));
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA)}).mask() ==
-              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::MEDIA)));
+              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage2::MEDIA)));
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT)}).mask() ==
-              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage::SYSTEM_AGENT)));
+              (1 << static_cast<int>(fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT)));
 
 // Ignore internal usages, such as ULTRASOUND.
 constexpr uint32_t kSupportedUsageMask =
