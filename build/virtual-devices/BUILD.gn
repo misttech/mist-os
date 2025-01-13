@@ -35,6 +35,10 @@ if (board_is_emu) {
         units = "megabytes"
       }
     }
+    storage = {
+      quantity = 10
+      units = "gigabytes"
+    }
     cpu = {
       arch = target_cpu
       count = 4

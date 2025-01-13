@@ -105,7 +105,7 @@ fuchsia_virtual_device = rule(
         ),
         "storage_quantity": attr.int(
             doc = "Storage of the virtual device.",
-            default = 2,
+            default = 10,
         ),
         "storage_unit": attr.string(
             doc = "Unit for storage of the virtual device (e.g. megabytes, gigabytes, etc.).",
