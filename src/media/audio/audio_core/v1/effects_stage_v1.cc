@@ -22,6 +22,8 @@ constexpr int64_t kMaxFramesPerFrameBuffer = 1024;
 
 // We expect our render flags to be the same between StreamUsageMask and the effects bitmask. Both
 // are defined as 1u << static_cast<uint32_t>(RenderUsage).
+static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::ACCESSIBILITY)}).mask() ==
+              FUCHSIA_AUDIO_EFFECTS_USAGE_ACCESSIBILITY);
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND)}).mask() ==
               FUCHSIA_AUDIO_EFFECTS_USAGE_BACKGROUND);
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION)}).mask() ==
@@ -33,7 +35,8 @@ static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA)}
 static_assert(StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::SYSTEM_AGENT)}).mask() ==
               FUCHSIA_AUDIO_EFFECTS_USAGE_SYSTEM_AGENT);
 constexpr uint32_t kSupportedUsageMask =
-    StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND),
+    StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::ACCESSIBILITY),
+                     StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND),
                      StreamUsage::WithRenderUsage(RenderUsage::COMMUNICATION),
                      StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION),
                      StreamUsage::WithRenderUsage(RenderUsage::MEDIA),

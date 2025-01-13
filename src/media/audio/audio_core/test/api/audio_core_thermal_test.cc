@@ -24,6 +24,7 @@ class AudioCoreThermalTest : public HermeticPipelineTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -33,6 +34,7 @@ class AudioCoreThermalTest : public HermeticPipelineTest {
                 "pipeline": {
                   "name": "Single MixStage 48k",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",

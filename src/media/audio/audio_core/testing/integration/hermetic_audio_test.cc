@@ -53,6 +53,7 @@ component_testing::DirectoryContents HermeticAudioTest::MakeAudioCoreConfig(
     options.output_device_config = R"x(
         "device_id": "*",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",

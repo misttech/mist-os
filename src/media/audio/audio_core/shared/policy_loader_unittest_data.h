@@ -192,7 +192,8 @@ static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::MEDIA) == 1)
 static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::INTERRUPTION) == 2);
 static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT) == 3);
 static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::COMMUNICATION) == 4);
-static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 5);
+static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::ACCESSIBILITY) == 5);
+static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 6);
 static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::BACKGROUND) == 0);
 static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::FOREGROUND) == 1);
 static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT) == 2);
@@ -217,7 +218,7 @@ constexpr char contains_all_usages_and_behaviors[] = R"JSON(
         },
         {
           "active": {"render_usage":"COMMUNICATION"},
-          "affected": {"render_usage":"MEDIA"},
+          "affected": {"render_usage":"ACCESSIBILITY"},
           "behavior": "NONE"
         },
         {

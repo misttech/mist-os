@@ -968,6 +968,7 @@ TEST_F(AudioRendererPipelineTuningTest, CorrectStreamOutputUponUpdatedPipeline) 
   PipelineConfig::MixGroup root{.name = "linearize",
                                 .input_streams =
                                     {
+                                        RenderUsage::ACCESSIBILITY,
                                         RenderUsage::COMMUNICATION,
                                         RenderUsage::INTERRUPTION,
                                         RenderUsage::MEDIA,

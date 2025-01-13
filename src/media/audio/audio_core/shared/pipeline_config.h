@@ -71,8 +71,8 @@ class PipelineConfig {
     PipelineConfig config;
     config.root_.name = "default";
     config.root_.input_streams = {
-        RenderUsage::BACKGROUND, RenderUsage::COMMUNICATION, RenderUsage::INTERRUPTION,
-        RenderUsage::MEDIA,      RenderUsage::SYSTEM_AGENT,
+        RenderUsage::ACCESSIBILITY, RenderUsage::BACKGROUND, RenderUsage::COMMUNICATION,
+        RenderUsage::INTERRUPTION,  RenderUsage::MEDIA,      RenderUsage::SYSTEM_AGENT,
     };
     config.root_.output_rate = frame_rate;
     config.root_.output_channels = channels;

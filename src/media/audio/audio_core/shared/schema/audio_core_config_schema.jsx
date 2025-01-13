@@ -39,11 +39,13 @@
     "stream_type": {
       "type": "string",
       "enum": [
+        "accessibility",
         "background",
         "communication",
         "interruption",
         "media",
         "system_agent",
+        "render:accessibility",
         "render:background",
         "render:communication",
         "render:interruption",

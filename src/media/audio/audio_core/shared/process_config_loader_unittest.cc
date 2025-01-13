@@ -132,6 +132,7 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicy) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -201,6 +202,7 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingMultipleDeviceIds) {
       {
         "device_id": "*",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -255,6 +257,7 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicyNoDefault) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -305,6 +308,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithUnknownStreamTypes) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -323,7 +327,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithUnknownStreamTypes) {
   ASSERT_THAT(result.error(), ::testing::HasSubstr("Parse error: Schema validation error"));
   ASSERT_THAT(
       result.error(),
-      ::testing::HasSubstr("\"instanceRef\": \"#/output_devices/0/supported_stream_types/5\""));
+      ::testing::HasSubstr("\"instanceRef\": \"#/output_devices/0/supported_stream_types/6\""));
   ASSERT_THAT(result.error(), ::testing::HasSubstr("\"schemaRef\": \"#/definitions/stream_type\""));
 }
 
@@ -344,6 +348,7 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicyInsufficientCove
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
+          "render:accessibility",
           "render:interruption",
           "render:media",
           "render:system_agent",
@@ -363,6 +368,44 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithRoutingPolicyInsufficientCove
 }
 
 TEST(ProcessConfigLoaderTest, AllowConfigWithoutUltrasound) {
+  static const std::string kConfigWithRoutingPolicy =
+      R"JSON({
+    "volume_curve": [
+      {
+          "level": 0.0,
+          "db": -160.0
+      },
+      {
+          "level": 1.0,
+          "db": 0.0
+      }
+    ],
+    "output_devices": [
+      {
+        "device_id": "34384e7da9d52c8062a9765baeb6053a",
+        "supported_stream_types": [
+          "render:accessibility",
+          "render:background",
+          "render:communication",
+          "render:interruption",
+          "render:media",
+          "render:system_agent",
+          "capture:loopback"
+        ]
+      }
+    ]
+  })JSON";
+  ASSERT_TRUE(files::WriteFile(kTestAudioCoreConfigFilename, kConfigWithRoutingPolicy.data(),
+                               kConfigWithRoutingPolicy.size()));
+
+  auto result = ProcessConfigLoader::LoadProcessConfig(kTestAudioCoreConfigFilename);
+  ASSERT_TRUE(result.is_ok()) << result.error();
+}
+
+// TODO(https://fxbug.dev/388190715): Remove this test case once clients and products have been
+// updated to include AudioRenderUsage2::ACCESSIBILITY.
+TEST(ProcessConfigLoaderTest, AllowConfigWithoutAccessibility) {
+  // render:accessibility is missing from "supported_stream_types".
   static const std::string kConfigWithRoutingPolicy =
       R"JSON({
     "volume_curve": [
@@ -413,6 +456,7 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithOutputGains) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -564,6 +608,7 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV1) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -573,6 +618,7 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV1) {
         ],
         "pipeline": {
           "streams": [
+            "render:accessibility",
             "render:background",
             "render:interruption",
             "render:media",
@@ -672,11 +718,12 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV1) {
   {  // 'linearize' mix_group
     const auto& mix_group = root;
     EXPECT_EQ("", mix_group.name);
-    EXPECT_EQ(4u, mix_group.input_streams.size());
-    EXPECT_EQ(RenderUsage::BACKGROUND, mix_group.input_streams[0]);
-    EXPECT_EQ(RenderUsage::INTERRUPTION, mix_group.input_streams[1]);
-    EXPECT_EQ(RenderUsage::MEDIA, mix_group.input_streams[2]);
-    EXPECT_EQ(RenderUsage::SYSTEM_AGENT, mix_group.input_streams[3]);
+    EXPECT_EQ(5u, mix_group.input_streams.size());
+    EXPECT_EQ(RenderUsage::ACCESSIBILITY, mix_group.input_streams[0]);
+    EXPECT_EQ(RenderUsage::BACKGROUND, mix_group.input_streams[1]);
+    EXPECT_EQ(RenderUsage::INTERRUPTION, mix_group.input_streams[2]);
+    EXPECT_EQ(RenderUsage::MEDIA, mix_group.input_streams[3]);
+    EXPECT_EQ(RenderUsage::SYSTEM_AGENT, mix_group.input_streams[4]);
     ASSERT_EQ(1u, mix_group.effects_v1.size());
     {
       const auto& effect = mix_group.effects_v1[0];
@@ -782,6 +829,7 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV2) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -791,6 +839,7 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV2) {
         ],
         "pipeline": {
           "streams": [
+          "render:accessibility",
           "render:background",
           "render:interruption",
           "render:media",
@@ -852,11 +901,12 @@ TEST(ProcessConfigLoaderTest, LoadProcessConfigWithEffectsV2) {
   {  // 'effect1' mix_group
     const auto& mix_group = root;
     EXPECT_EQ("", mix_group.name);
-    EXPECT_EQ(4u, mix_group.input_streams.size());
-    EXPECT_EQ(RenderUsage::BACKGROUND, mix_group.input_streams[0]);
-    EXPECT_EQ(RenderUsage::INTERRUPTION, mix_group.input_streams[1]);
-    EXPECT_EQ(RenderUsage::MEDIA, mix_group.input_streams[2]);
-    EXPECT_EQ(RenderUsage::SYSTEM_AGENT, mix_group.input_streams[3]);
+    EXPECT_EQ(5u, mix_group.input_streams.size());
+    EXPECT_EQ(RenderUsage::ACCESSIBILITY, mix_group.input_streams[0]);
+    EXPECT_EQ(RenderUsage::BACKGROUND, mix_group.input_streams[1]);
+    EXPECT_EQ(RenderUsage::INTERRUPTION, mix_group.input_streams[2]);
+    EXPECT_EQ(RenderUsage::MEDIA, mix_group.input_streams[3]);
+    EXPECT_EQ(RenderUsage::SYSTEM_AGENT, mix_group.input_streams[4]);
     ASSERT_TRUE(mix_group.effects_v2.has_value());
     {
       const auto& effect = mix_group.effects_v2.value();
@@ -991,6 +1041,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithMultipleLoopbackStages) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -1002,6 +1053,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithMultipleLoopbackStages) {
           "inputs": [
             {
               "streams": [
+                "render:accessibility",
                 "render:background",
                 "render:interruption",
                 "render:media",
@@ -1046,6 +1098,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithoutLoopbackPointSpecified) {
       {
         "device_id": "34384e7da9d52c8062a9765baeb6053a",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -1055,6 +1108,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigWithoutLoopbackPointSpecified) {
         ],
         "pipeline": {
           "streams": [
+            "render:accessibility",
             "render:background",
             "render:communication",
             "render:interruption",
@@ -1093,6 +1147,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidChannelCount) {
         {
           "device_id": "*",
           "supported_stream_types": [
+            "render:accessibility",
             "render:background",
             "render:communication",
             "render:interruption",
@@ -1101,6 +1156,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidChannelCount) {
           ],
           "pipeline": {
             "streams": [
+              "render:accessibility",
               "render:background",
               "render:communication",
               "render:interruption",
@@ -1432,6 +1488,7 @@ TEST(ProcessConfigLoaderTest, LoadOutputDevicePolicyWithDefaultPipeline) {
       {
         "device_id": "*",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -1483,6 +1540,7 @@ TEST(ProcessConfigLoaderTest, LoadOutputDevicePolicyWithNoSupportedStreamTypes) 
       {
         "device_id": "*",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -1540,6 +1598,7 @@ TEST(ProcessConfigLoaderTest, LoadOutputDevicePolicyVolumeCurve) {
       {
         "device_id": "*",
         "supported_stream_types": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",
@@ -1583,6 +1642,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithIndefiniteDeviceGainDb) {
           {
             "device_id": "34384e7da9d52c8062a9765baeb6053a",
             "supported_stream_types": [
+              "render:accessibility",
               "render:background",
               "render:communication",
               "render:interruption",
@@ -1601,6 +1661,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithIndefiniteDeviceGainDb) {
           {
             "device_id": "34384e7da9d52c8062a9765baeb6053a",
             "supported_stream_types": [
+              "render:accessibility",
               "render:background",
               "render:communication",
               "render:interruption",
@@ -1619,6 +1680,7 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithIndefiniteDeviceGainDb) {
           {
             "device_id": "34384e7da9d52c8062a9765baeb6053a",
             "supported_stream_types": [
+              "render:accessibility",
               "render:background",
               "render:communication",
               "render:interruption",
@@ -1751,12 +1813,12 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
       "output_devices": [
         {
           "device_id": "34384e7da9d52c8062a9765baeb6053a",
-          "supported_stream_types": [  "render:background",
+          "supported_stream_types": [  "render:accessibility", "render:background",
               "render:communication",  "render:interruption",  "render:media",
               "render:system_agent" ],
           "pipeline": {
             "name": "default",
-            "streams": [                 "render:background",
+            "streams": [                 "render:accessibility", "render:background",
                 "render:communication",  "render:interruption",  "render:media",
                 "render:system_agent" ],
             "max_gain_db": 25.0
@@ -1770,12 +1832,12 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
       "output_devices": [
         {
           "device_id": "34384e7da9d52c8062a9765baeb6053a",
-          "supported_stream_types": [  "render:background",
+          "supported_stream_types": [  "render:accessibility", "render:background",
               "render:communication",  "render:interruption",  "render:media",
               "render:system_agent",   "render:ultrasound" ],
           "pipeline": {
             "name": "default",
-            "streams": [                 "render:background",
+            "streams": [                 "render:accessibility", "render:background",
                 "render:communication",  "render:interruption",  "render:media",
                 "render:system_agent",   "render:ultrasound" ],
             "max_gain_db": -6.0
@@ -1789,12 +1851,12 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
       "output_devices": [
         {
           "device_id": "34384e7da9d52c8062a9765baeb6053a",
-          "supported_stream_types": [  "render:background",
+          "supported_stream_types": [  "render:accessibility", "render:background",
               "render:communication",  "render:interruption",  "render:media",
               "render:system_agent" ],
           "pipeline": {
             "name": "default",
-            "streams": [                 "render:background",
+            "streams": [                 "render:accessibility", "render:background",
                 "render:communication",  "render:interruption",  "render:media",
                 "render:system_agent" ],
             "min_gain_db": -161
@@ -1808,12 +1870,12 @@ TEST(ProcessConfigLoaderTest, RejectConfigsWithInvalidMixGroupGainValues) {
       "output_devices": [
         {
           "device_id": "34384e7da9d52c8062a9765baeb6053a",
-          "supported_stream_types": [  "render:background",
+          "supported_stream_types": [  "render:accessibility", "render:background",
               "render:communication",  "render:interruption",  "render:media",
               "render:system_agent",   "render:ultrasound" ],
           "pipeline": {
             "name": "default",
-            "streams": [                 "render:background",
+            "streams": [                 "render:accessibility", "render:background",
                 "render:communication",  "render:interruption",  "render:media",
                 "render:system_agent",   "render:ultrasound" ],
             "min_gain_db": -6

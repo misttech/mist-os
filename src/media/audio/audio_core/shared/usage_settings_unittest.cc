@@ -168,6 +168,7 @@ TEST(UsageVolumeSettingsTest, RenderUsageVolumePersists) {
         kArbitraryVolumeValue);
   };
 
+  test_usage(fuchsia::media::AudioRenderUsage2::ACCESSIBILITY);
   test_usage(fuchsia::media::AudioRenderUsage2::BACKGROUND);
   test_usage(fuchsia::media::AudioRenderUsage2::MEDIA);
   test_usage(fuchsia::media::AudioRenderUsage2::INTERRUPTION);

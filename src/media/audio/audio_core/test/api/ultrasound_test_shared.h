@@ -66,6 +66,7 @@ class UltrasoundTest : public HermeticAudioTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -85,6 +86,7 @@ class UltrasoundTest : public HermeticAudioTest {
                     {
                       "name": "mix",
                       "streams": [
+                        "render:accessibility",
                         "render:background",
                         "render:communication",
                         "render:interruption",

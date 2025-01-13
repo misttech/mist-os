@@ -20,6 +20,7 @@
         "01010101010101010101010101010101"
       ],
       "supported_stream_types": [
+        "render:accessibility",
         "render:background",
         "render:communication",
         "render:interruption",
@@ -31,6 +32,7 @@
       "pipeline": {
         "name": "all",
         "streams": [
+          "render:accessibility",
           "render:background",
           "render:communication",
           "render:interruption",

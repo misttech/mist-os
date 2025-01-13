@@ -16,14 +16,15 @@
 
 namespace media::audio {
 
-static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 5);
+static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 6);
 // These must be listed in the order of the fuchsia::media::AudioRenderUsage2 enum.
 #define EXPAND_EACH_FIDL_RENDER_USAGE \
   EXPAND_RENDER_USAGE(BACKGROUND)     \
   EXPAND_RENDER_USAGE(MEDIA)          \
   EXPAND_RENDER_USAGE(INTERRUPTION)   \
   EXPAND_RENDER_USAGE(SYSTEM_AGENT)   \
-  EXPAND_RENDER_USAGE(COMMUNICATION)
+  EXPAND_RENDER_USAGE(COMMUNICATION)  \
+  EXPAND_RENDER_USAGE(ACCESSIBILITY)
 
 static constexpr uint32_t kStreamInternalRenderUsageCount = 1;
 #define EXPAND_EACH_INTERNAL_RENDER_USAGE EXPAND_RENDER_USAGE(ULTRASOUND)

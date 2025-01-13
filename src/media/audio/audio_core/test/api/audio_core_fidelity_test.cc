@@ -71,6 +71,7 @@ class AudioCore48kFidelityTest : public AudioCoreFidelityTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -81,6 +82,7 @@ class AudioCore48kFidelityTest : public AudioCoreFidelityTest {
                 "pipeline": {
                     "name": "Single MixStage 48k",
                     "streams": [
+                        "render:accessibility",
                         "render:background",
                         "render:communication",
                         "render:interruption",
@@ -110,6 +112,7 @@ class AudioCore96kFidelityTest : public AudioCoreFidelityTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -121,6 +124,7 @@ class AudioCore96kFidelityTest : public AudioCoreFidelityTest {
                 "pipeline": {
                     "name": "Single MixStage 96k",
                     "streams": [
+                        "render:accessibility",
                         "render:background",
                         "render:communication",
                         "render:interruption",
@@ -151,6 +155,7 @@ class AudioCore48k96kFidelityTest : public AudioCoreFidelityTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -165,6 +170,7 @@ class AudioCore48k96kFidelityTest : public AudioCoreFidelityTest {
                         {
                             "name": "Initial MixStage 48k",
                             "streams": [
+                                "render:accessibility",
                                 "render:background",
                                 "render:communication",
                                 "render:interruption",
@@ -201,6 +207,7 @@ class AudioCoreMaxGainTest : public AudioCoreFidelityTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -211,6 +218,7 @@ class AudioCoreMaxGainTest : public AudioCoreFidelityTest {
                     "name": "Gain-limited MixStage 48k (max 0db)",
                     "max_gain_db": 0,
                     "streams": [
+                        "render:accessibility",
                         "render:background",
                         "render:communication",
                         "render:interruption",
@@ -239,6 +247,7 @@ class AudioCoreMinGainTest : public AudioCoreFidelityTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -249,6 +258,7 @@ class AudioCoreMinGainTest : public AudioCoreFidelityTest {
                     "name": "Gain-limited MixStage 48k (min 0db)",
                     "min_gain_db": 0,
                     "streams": [
+                        "render:accessibility",
                         "render:background",
                         "render:communication",
                         "render:interruption",

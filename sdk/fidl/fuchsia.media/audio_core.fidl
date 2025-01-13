@@ -60,9 +60,13 @@ type AudioRenderUsage2 = strict enum : uint32 {
     /// Stream is intended to be used for some form of real time user to user
     /// communication. Voice/Video chat should use this.
     COMMUNICATION = 4;
+
+    /// Stream is intended to be used for accessibility or other non-system-
+    /// agent speech output, such as screen reader TTS.
+    ACCESSIBILITY = 5;
 };
 @available(added=NEXT)
-const RENDER_USAGE2_COUNT uint8 = 5;
+const RENDER_USAGE2_COUNT uint8 = 6;
 
 /// Usages annotating the purpose of the stream being used to capture audio. The
 /// AudioCaptureUsage is used by audio policy to dictate how audio streams

@@ -919,7 +919,8 @@ class CheckOptionsProcessor : public BaseProcessor {
   static constexpr float kExpectedAppliedGainDb = -25.0f;
   static constexpr uint32_t kExpectedUsageMask =
       StreamUsageMask({StreamUsage::WithRenderUsage(RenderUsage::MEDIA),
-                       StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION)})
+                       StreamUsage::WithRenderUsage(RenderUsage::INTERRUPTION),
+                       StreamUsage::WithRenderUsage(RenderUsage::ACCESSIBILITY)})
           .mask();
 
   CheckOptionsProcessor(const ConfigOptions& options,

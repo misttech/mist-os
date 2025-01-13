@@ -10,6 +10,8 @@ namespace media::audio {
 namespace {
 
 TEST(StreamUsageTest, ToString) {
+  EXPECT_STREQ("RenderUsage::ACCESSIBILITY",
+               StreamUsage::WithRenderUsage(RenderUsage::ACCESSIBILITY).ToString());
   EXPECT_STREQ("RenderUsage::BACKGROUND",
                StreamUsage::WithRenderUsage(RenderUsage::BACKGROUND).ToString());
   EXPECT_STREQ("RenderUsage::COMMUNICATION",

@@ -66,6 +66,7 @@ class OutputPipelineTest : public testing::ThreadingModelFixture {
                         .name = "default",
                         .input_streams =
                             {
+                                RenderUsage::ACCESSIBILITY,
                                 RenderUsage::MEDIA,
                                 RenderUsage::SYSTEM_AGENT,
                             },
@@ -290,6 +291,7 @@ TEST_F(OutputPipelineTest, Loopback) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::ACCESSIBILITY,
                   RenderUsage::COMMUNICATION,
                   RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
@@ -385,6 +387,7 @@ TEST_F(OutputPipelineTest, LoopbackWithUpsample) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::ACCESSIBILITY,
                   RenderUsage::COMMUNICATION,
                   RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
@@ -482,6 +485,7 @@ TEST_F(OutputPipelineTest, UpdateEffect) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::ACCESSIBILITY,
                   RenderUsage::COMMUNICATION,
                   RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
@@ -537,6 +541,7 @@ TEST_F(OutputPipelineTest, ReportPresentationDelay) {
                      .name = "default",
                      .input_streams =
                          {
+                             RenderUsage::ACCESSIBILITY,
                              RenderUsage::INTERRUPTION,
                              RenderUsage::MEDIA,
                              RenderUsage::SYSTEM_AGENT,
@@ -632,6 +637,7 @@ void OutputPipelineTest::TestDifferentMixRates(ClockMode clock_mode) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::ACCESSIBILITY,
                   RenderUsage::COMMUNICATION,
                   RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
@@ -771,6 +777,7 @@ TEST_F(OutputPipelineTest, PipelineWithRechannelEffects) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::ACCESSIBILITY,
                   RenderUsage::COMMUNICATION,
                   RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
@@ -827,6 +834,7 @@ TEST_F(OutputPipelineTest, LoopbackClock) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::ACCESSIBILITY,
                   RenderUsage::COMMUNICATION,
                   RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,
@@ -911,6 +919,7 @@ TEST_F(OutputPipelineTest, PipelineWithEffectsV2) {
           .name = "mix",
           .input_streams =
               {
+                  RenderUsage::ACCESSIBILITY,
                   RenderUsage::COMMUNICATION,
                   RenderUsage::INTERRUPTION,
                   RenderUsage::MEDIA,

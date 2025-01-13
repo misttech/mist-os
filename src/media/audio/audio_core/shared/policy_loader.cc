@@ -34,7 +34,7 @@ const std::string kStartupCountdownMsKey = "startup_idle_countdown_milliseconds"
 const std::string kUltrasonicChannelsKey = "use_all_ultrasonic_channels";
 
 std::optional<fuchsia::media::AudioRenderUsage2> JsonToRenderUsage(const rapidjson::Value& usage) {
-  static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 5,
+  static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 6,
                 "New Render Usage(s) added to fidl without updating config loader");
 
   auto rule_str = usage.GetString();
@@ -53,6 +53,9 @@ std::optional<fuchsia::media::AudioRenderUsage2> JsonToRenderUsage(const rapidjs
   }
   if (!strcmp(rule_str, "SYSTEM_AGENT")) {
     return fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT;
+  }
+  if (!strcmp(rule_str, "ACCESSIBILITY")) {
+    return fuchsia::media::AudioRenderUsage2::ACCESSIBILITY;
   }
   FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioRenderUsage2.";
 

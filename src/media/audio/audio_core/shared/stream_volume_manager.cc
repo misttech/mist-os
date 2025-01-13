@@ -37,6 +37,7 @@ StreamVolumeManager::StreamVolumeManager(async_dispatcher_t* fidl_dispatcher)
           VolumeSettingImpl(Usage2::WithRenderUsage(AudioRenderUsage2::INTERRUPTION), this),
           VolumeSettingImpl(Usage2::WithRenderUsage(AudioRenderUsage2::SYSTEM_AGENT), this),
           VolumeSettingImpl(Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION), this),
+          VolumeSettingImpl(Usage2::WithRenderUsage(AudioRenderUsage2::ACCESSIBILITY), this),
       },
       // These must be listed in the order of the fuchsia::media::AudioCaptureUsage enum.
       capture_usage_volume_setting_impls_{
@@ -62,6 +63,9 @@ StreamVolumeManager::StreamVolumeManager(async_dispatcher_t* fidl_dispatcher)
           VolumeControl(&render_usage_volume_setting_impls_[fidl::ToUnderlying(
                             AudioRenderUsage2::COMMUNICATION)],
                         fidl_dispatcher),
+          VolumeControl(&render_usage_volume_setting_impls_[fidl::ToUnderlying(
+                            AudioRenderUsage2::ACCESSIBILITY)],
+                        fidl_dispatcher),
       },
       // These must be listed in the order of the fuchsia::media::AudioCaptureUsage enum.
       capture_usage_volume_controls_{
@@ -85,6 +89,7 @@ StreamVolumeManager::StreamVolumeManager(async_dispatcher_t* fidl_dispatcher)
   static_assert(fidl::ToUnderlying(AudioRenderUsage2::INTERRUPTION) == 2);
   static_assert(fidl::ToUnderlying(AudioRenderUsage2::SYSTEM_AGENT) == 3);
   static_assert(fidl::ToUnderlying(AudioRenderUsage2::COMMUNICATION) == 4);
+  static_assert(fidl::ToUnderlying(AudioRenderUsage2::ACCESSIBILITY) == 5);
 
   static_assert(fidl::ToUnderlying(AudioCaptureUsage::BACKGROUND) == 0);
   static_assert(fidl::ToUnderlying(AudioCaptureUsage::FOREGROUND) == 1);

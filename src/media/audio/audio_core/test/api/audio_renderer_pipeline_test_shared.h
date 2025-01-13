@@ -45,6 +45,7 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -54,6 +55,7 @@ class AudioRendererPipelineTest : public HermeticAudioTest {
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -149,6 +151,7 @@ class AudioRendererGainLimitsTest
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -158,6 +161,7 @@ class AudioRendererGainLimitsTest
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -265,6 +269,7 @@ class AudioRendererPipelineUnderflowTest : public HermeticAudioTest {
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -274,6 +279,7 @@ class AudioRendererPipelineUnderflowTest : public HermeticAudioTest {
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -331,6 +337,7 @@ class AudioRendererEffectsV1Test
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -340,6 +347,7 @@ class AudioRendererEffectsV1Test
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -391,6 +399,7 @@ class AudioRendererEffectsV2Test
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -400,6 +409,7 @@ class AudioRendererEffectsV2Test
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",
@@ -450,6 +460,7 @@ class AudioRendererPipelineTuningTest
               .output_device_config = R"x(
                 "device_id": "*",
                 "supported_stream_types": [
+                  "render:accessibility",
                   "render:background",
                   "render:communication",
                   "render:interruption",
@@ -459,6 +470,7 @@ class AudioRendererPipelineTuningTest
                 "pipeline": {
                   "name": "default",
                   "streams": [
+                    "render:accessibility",
                     "render:background",
                     "render:communication",
                     "render:interruption",

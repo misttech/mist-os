@@ -1609,6 +1609,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.media/AudioRenderUsage2.ACCESSIBILITY",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.media/AudioRenderUsage2.BACKGROUND",
         "value": "0"
     },
@@ -3022,7 +3027,7 @@
         "kind": "const",
         "name": "fuchsia.media/RENDER_USAGE2_COUNT",
         "type": "uint8",
-        "value": "5"
+        "value": "6"
     },
     {
         "kind": "const",

@@ -19,10 +19,13 @@ type StreamType = strict enum {
     /// Stream is intended to be used for some form of real time user to user
     /// communication render.
     RENDER_COMMUNICATION = 4;
+    /// Stream is intended to be used for accessibility or other non-system-
+    /// agent speech output, such as screen reader TTS.
+    RENDER_ACCESSIBILITY = 5;
     /// Stream is intended to be used for ultrasound-specific renderer streams.
     /// A standard renderer is not able to assign this usage; rather, an ultrasound
     /// renderer is explicitly created with fuchsia.ultrasound.Factory.
-    RENDER_ULTRASOUND = 5;
+    RENDER_ULTRASOUND = 6;
 };
 
 /// Specification of an audio stream effect name and compiled library module.
