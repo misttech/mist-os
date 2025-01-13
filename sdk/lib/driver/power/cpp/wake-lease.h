@@ -25,17 +25,12 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
             fidl::ClientEnd<fuchsia_power_system::ActivityGovernor> sag_client,
             inspect::Node* parent_node = nullptr, bool log = false);
 
-  // Ensure that the system stays awake until the timeout is reached. To accomplish this we either:
-  //   * obtain a wake lease immediately if the system is currently suspended
-  //   * obtain a wake lease in the future if the system begins suspension before the timeout is
-  //     reached
-  // If a wake lease is acquired, it is dropped when the timeout is reached. The timeout may be
-  // extended by additional calls to `HandleInterrupt`. If the system is not suspended and does not
-  // attempt suspension during the timeout period, no wake lease is obtained.
-  //
-  // Ideally this is only called after we wake up due to an interrupt. Note that a duration is
-  // taken because the deadline is computed once the lease is acquired, rather than at the point
-  // this method is called.
+  // Acquire a wake lease if the system is suspend state. Ideally this is only called after
+  // we wake up due to an interrupt, however it may be called due to an interrupt firing after the
+  // suspension process begins. If acquired, the wake lease will be dropped after the specified
+  // timeout. If a lease was still held from an earlier invocation, it will be extended until the
+  // new timeout. Note that a duration is taken because the deadline is computed once the lease is
+  // acquired, rather than at the point this method is called.
   bool HandleInterrupt(zx::duration timeout);
 
   // Acquire a wake lease and automatically drop it after the specified timeout. If a lease was
@@ -78,9 +73,6 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   std::optional<fidl::ServerBinding<fuchsia_power_system::ActivityGovernorListener>>
       listener_binding_;
   bool system_suspended_ = false;
-  // Time before which we should take a wake lease if we are informed of
-  // suspension.
-  zx_time_t prevent_sleep_before_ = 0;
 
   async::TaskClosureMethod<WakeLease, &WakeLease::HandleTimeout> lease_task_{this};
   zx::eventpair lease_;
