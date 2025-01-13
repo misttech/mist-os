@@ -86,6 +86,7 @@ group("dl-test-data.deps") {
     ":init-fini-array",
     ":init-fini-array-with-deps",
     ":init-fini-array-with-legacy",
+    ":init-fini-array-with-loaded-deps",
     ":init-fini-legacy",
     ":static-tls-desc-module",
     ":static-tls-module",
@@ -1693,6 +1694,122 @@ init_fini_array_tests = [
   },
   {
     name = "init-fini-array-c"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 2
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 9
+      },
+    ]
+    shlib_deps = []
+  },
+
+  # An init-fini-array module with an already-loaded dep. These modules will
+  # have different expected `value`s than the above test modules.
+  # - init-fini-array-with-loaded-deps (loaded third):
+  #   - init-fini-array-with-loaded-deps-a (loaded first):
+  #     - init-fini-array-with-loaded-deps-a-dep
+  #   - init-fini-array-with-loaded-deps-b:
+  #     - init-fini-array-with-loaded-deps-b-dep
+  #   - init-fini-array-with-loaded-deps-c (loaded second)
+  {
+    name = "init-fini-array-with-loaded-deps"
+    type = "test_loadable_module"
+    ctors = [
+      {
+        prio = false
+        value = 5
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 6
+      },
+    ]
+    shlib_deps = [
+      ":init-fini-array-with-loaded-deps-a",
+      ":init-fini-array-with-loaded-deps-b",
+      ":init-fini-array-with-loaded-deps-c",
+    ]
+  },
+
+  {
+    name = "init-fini-array-with-loaded-deps-a"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 1
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 7
+      },
+    ]
+    shlib_deps = [ ":init-fini-array-with-loaded-deps-a-dep" ]
+  },
+  {
+    name = "init-fini-array-with-loaded-deps-a-dep"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 0
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 8
+      },
+    ]
+    shlib_deps = []
+  },
+  {
+    name = "init-fini-array-with-loaded-deps-b"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 4
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 10
+      },
+    ]
+    shlib_deps = [ ":init-fini-array-with-loaded-deps-b-dep" ]
+  },
+  {
+    name = "init-fini-array-with-loaded-deps-b-dep"
+    type = "test_shared_library"
+    ctors = [
+      {
+        prio = false
+        value = 3
+      },
+    ]
+    dtors = [
+      {
+        prio = false
+        value = 11
+      },
+    ]
+    shlib_deps = []
+  },
+  {
+    name = "init-fini-array-with-loaded-deps-c"
     type = "test_shared_library"
     ctors = [
       {

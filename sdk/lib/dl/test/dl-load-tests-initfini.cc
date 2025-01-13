@@ -195,4 +195,114 @@ TYPED_TEST(DlTests, InitFiniArrayWithLegacy) {
   gRegisterInitFini = nullptr;
 }
 
+// Test that dlopen will only run initializers of modules when they are first
+// loaded.
+// dlopen init-fini-array-with-loaded-deps-a:
+//  - init-fini-array-with-loaded-deps-a-dep
+// dlopen init-fini-array-with-loaded-deps-a again.
+// dlopen init-fini-array-with-loaded-deps-c
+// dlopen init-fini-array-with-loaded-deps-with-loaded-deps:
+//   - init-fini-array-with-loaded-deps-a (already loaded)
+//     - init-fini-array-with-loaded-deps-a-dep (already loaded)
+//   - init-fini-array-with-loaded-deps-b:
+//     - init-fini-array-with-loaded-deps-b-dep
+//   - init-fini-array-with-loaded-deps-c (already loaded)
+//
+// Module initializers are run in this order:
+// ... in dlopen(init-fini-array-with-loaded-deps-with-loaded-deps-a):
+//   init-fini-array-with-loaded-deps-a-dep
+//   init-fini-array-with-loaded-deps-a
+// ... in dlopen(init-fini-array-with-loaded-deps-with-loaded-deps-c):
+//   init-fini-array-with-loaded-deps-c
+// ... in dlopen(init-fini-array-with-loaded-deps-with-loaded-deps):
+//   init-fini-array-with-loaded-deps-b-dep
+//   init-fini-array-with-loaded-deps-b
+//   init-fini-array-with-loaded-deps
+//
+// Note: Finalizers are run in the order in which the modules were loaded and
+// this is triggered by the unloading of the last reference held by the root
+// module:
+//   init-fini-array-with-loaded-deps
+//   init-fini-array-with-loaded-deps-a
+//   init-fini-array-with-loaded-deps-a-dep
+//   init-fini-array-with-loaded-deps-c
+//   init-fini-array-with-loaded-deps-b
+//   init-fini-array-with-loaded-deps-b-dep
+TYPED_TEST(DlTests, InitFiniArrayWithLoadedDeps) {
+  const std::string kFile = "init-fini-array-with-loaded-deps.so";
+  const std::string kAFile = "libinit-fini-array-with-loaded-deps-a.so";
+  const std::string kADepFile = "libinit-fini-array-with-loaded-deps-a-dep.so";
+  const std::string kBFile = "libinit-fini-array-with-loaded-deps-b.so";
+  const std::string kBDepFile = "libinit-fini-array-with-loaded-deps-b-dep.so";
+  const std::string kCDepFile = "libinit-fini-array-with-loaded-deps-c.so";
+
+  InitFiniCheck init_fini_check;
+  gRegisterInitFini = &init_fini_check;
+
+  this->Needed({kAFile, kADepFile});
+  auto dep_a_open = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(dep_a_open.is_ok()) << dep_a_open.error_value();
+  EXPECT_TRUE(dep_a_open.value()) << dep_a_open.error_value();
+
+  init_fini_check.CheckInit({0, 1});
+
+  // Don't expect another dlopen on dep-a will run initializers.
+  auto second_dep_a_open = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(second_dep_a_open.is_ok()) << second_dep_a_open.error_value();
+  EXPECT_TRUE(second_dep_a_open.value()) << second_dep_a_open.error_value();
+
+  init_fini_check.CheckInit({});
+
+  this->Needed({kCDepFile});
+  auto c_open = this->DlOpen(kCDepFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(c_open.is_ok()) << c_open.error_value();
+  EXPECT_TRUE(c_open.value()) << c_open.error_value();
+
+  init_fini_check.CheckInit({2});
+
+  this->ExpectRootModule(kFile);
+  this->Needed({kBFile, kBDepFile});
+
+  // This will only run initializers on the modules that are loaded by this call.
+  auto root_open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(root_open.is_ok()) << root_open.error_value();
+  EXPECT_TRUE(root_open.value()) << root_open.error_value();
+
+  init_fini_check.CheckInit({3, 4, 5});
+
+  // Don't expect these dlclose calls on dep-a will run any finalizers.
+  ASSERT_TRUE(this->DlClose(dep_a_open.value()).is_ok());
+
+  init_fini_check.CheckFini({});
+
+  ASSERT_TRUE(this->DlClose(second_dep_a_open.value()).is_ok());
+
+  init_fini_check.CheckFini({});
+
+  ASSERT_TRUE(this->DlClose(c_open.value()).is_ok());
+
+  init_fini_check.CheckFini({});
+
+  // After this dlclose, all references are dropped and all finalizers should
+  // run.
+  ASSERT_TRUE(this->DlClose(root_open.value()).is_ok());
+
+  if (TestFixture::kDlCloseCanRunFinalizers) {
+    // TODO(https://fxbug.dev/385377689): In older versions of glibc, destructor
+    // order can be re-sorted in dlclose. Remove this detection when our x86-64
+    // builders upgrade its glibc version.
+    char version[16];
+    size_t res = confstr(_CS_GNU_LIBC_VERSION, version, sizeof(version));
+    ASSERT_GT(res, 0lu);
+    ASSERT_LE(res, sizeof(version));
+    if (!strcmp(version, "glibc 2.31")) {
+      init_fini_check.CheckFini({6, 9, 7, 8, 10, 11});
+    } else {
+      init_fini_check.CheckFini({6, 7, 8, 9, 10, 11});
+    }
+  }
+
+  gRegisterInitFini = nullptr;
+}
+
 }  // namespace
