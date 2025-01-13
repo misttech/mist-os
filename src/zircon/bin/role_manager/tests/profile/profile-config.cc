@@ -128,6 +128,42 @@ TEST(ProfileConfig, Parse) {
     EXPECT_EQ(iter->second.output_parameters[1].value().float_value().value(), 42.6);
   }
 
+  {
+    const auto iter = result->thread.find(*Role::Create("test.board.a"));
+    ASSERT_TRUE(iter != result->thread.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 20);
+  }
+
+  {
+    const auto iter = result->thread.find(*Role::Create("test.board.a:affinity"));
+    ASSERT_TRUE(iter != result->thread.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Board);
+    EXPECT_EQ(iter->second.info.flags,
+              ZX_PROFILE_INFO_FLAG_CPU_MASK | ZX_PROFILE_INFO_FLAG_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 11);
+    EXPECT_EQ(iter->second.info.cpu_affinity_mask.mask[0], 0b001);
+  }
+
+  {
+    const auto iter = result->thread.find(*Role::Create("test.board.b"));
+    ASSERT_TRUE(iter != result->thread.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Product);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 20);
+  }
+
+  {
+    const auto iter = result->thread.find(*Role::Create("test.board.b:affinity"));
+    ASSERT_TRUE(iter != result->thread.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags,
+              ZX_PROFILE_INFO_FLAG_CPU_MASK | ZX_PROFILE_INFO_FLAG_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 6);
+    EXPECT_EQ(iter->second.info.cpu_affinity_mask.mask[0], 0b0010);
+  }
+
   // The next two test cases validate that the order of selectors does not change the role that is
   // fetched.
   {
@@ -205,6 +241,22 @@ TEST(ProfileConfig, Parse) {
     EXPECT_EQ(iter->second.info.priority, 20);
   }
 
+  {
+    const auto iter = result->memory.find(*Role::Create("test.board.a"));
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Core);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 20);
+  }
+
+  {
+    const auto iter = result->memory.find(*Role::Create("test.board.b"));
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, ProfileScope::Board);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 24);
+  }
+
   const std::unordered_set<std::string> expected_thread_profiles{
       "test.product.a",
       "test.core.a:affinity",
@@ -217,6 +269,10 @@ TEST(ProfileConfig, Parse) {
       "test.core.parameterized.role:param1=foo,param2=bar",
       "test.bringup.a",
       "fuchsia.default",
+      "test.board.a",
+      "test.board.a:affinity",
+      "test.board.b",
+      "test.board.b:affinity",
   };
   EXPECT_EQ(result->thread.size(), expected_thread_profiles.size());
   for (auto expected_thread_profile : expected_thread_profiles) {
@@ -226,7 +282,8 @@ TEST(ProfileConfig, Parse) {
   }
 
   const std::unordered_set<std::string> expected_memory_profiles{
-      "test.bringup.a", "test.bringup.b", "test.core.a", "test.core.mem", "fuchsia.default",
+      "test.bringup.a",  "test.bringup.b", "test.core.a",  "test.core.mem",
+      "fuchsia.default", "test.board.a",   "test.board.b",
   };
   EXPECT_EQ(result->memory.size(), expected_memory_profiles.size());
   for (auto expected_memory_profile : expected_memory_profiles) {

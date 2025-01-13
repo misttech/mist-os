@@ -1,0 +1,14 @@
+// board-test.profiles: Test board scope profiles.
+{
+  "scope": "board",
+  "profiles": {
+    "test.board.a": { "priority": 11 },
+    "test.board.a:affinity": { "priority": 11, "affinity": 1 },
+    "test.board.b": { "priority": 2 },
+    "test.board.b:affinity": { "priority": 2, "affinity": 0 },
+  },
+  "memory": {
+    "test.board.a": { "priority": 24 },
+    "test.board.b": { "priority": 24 },
+  },
+}

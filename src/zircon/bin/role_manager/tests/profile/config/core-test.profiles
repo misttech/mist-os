@@ -3,7 +3,9 @@
   "scope": "core",
   "profiles": {
     "test.bringup.a": { "priority": 10 },
+    "test.board.a": { "priority": 20 },
     "test.bringup.b:affinity": { "priority": 1, "affinity": 3 },
+    "test.board.b:affinity": { "priority": 6, "affinity": 2 },
     "test.core.a": { "capacity": "5ms", "deadline": "10ms", "period": "10ms" },
     "test.core.a:affinity": { "capacity": "5ms", "deadline": "10ms", "period": "10ms", "affinity": [ 0, 1, 2 ] },
     "test.core.parameterized.role:input=foo": { "capacity": "5ms", "deadline": "10ms", "period": "10ms", "output_parameters": { "output1": 1, "output2": 2.5 } },
@@ -12,6 +14,7 @@
   },
   "memory": {
     "test.bringup.a": { "priority": 20 },
+    "test.board.a": { "priority": 20 },
     "test.core.a": { "priority": 24},
     "test.core.mem": { "priority": 20 },
   },

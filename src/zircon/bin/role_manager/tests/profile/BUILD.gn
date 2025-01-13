@@ -40,6 +40,7 @@ resource("profile-config-files") {
   testonly = true
   sources = [
     "config/bad.extension",
+    "config/board-test.profiles",
     "config/bringup-test.profiles",
     "config/core-test.profiles",
     "config/error-test.profiles",
