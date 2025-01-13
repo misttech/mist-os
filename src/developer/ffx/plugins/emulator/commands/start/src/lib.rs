@@ -555,7 +555,7 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8PathBuf;
     use emulator_instance::{LogLevel, RuntimeConfig};
-    use ffx_config::{ConfigLevel, TestEnv};
+    use ffx_config::{ConfigLevel, ConfigQuery, TestEnv};
     use ffx_writer::TestBuffers;
     use pbms::ProductBundle;
     use sdk_metadata::ProductBundleV2;
@@ -1812,5 +1812,196 @@ mod tests {
 
         // This is set as the recommended device in the product bundle.
         assert_eq!(tool.cmd.device, Some("virtual_device_1".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_uefi_vbmeta_from_ffx_config() {
+        let env = ffx_config::test_init().await.unwrap();
+        let emu_instances = EmulatorInstances::new(PathBuf::from(env.isolate_root.path()));
+        make_fake_sdk(&env).await;
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let mut pb =
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
+        pb.product_name = "pb.x64".into();
+        let pb = ProductBundle::V2(pb);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let tmpfile = tmp.path().display().to_string();
+
+        env.context
+            .query("emu.vbmeta.key")
+            .level(Some(ConfigLevel::User))
+            .set(tmpfile.clone().into())
+            .await
+            .expect("emu.vbmeta.key setting");
+        env.context
+            .query("emu.vbmeta.metadata")
+            .level(Some(ConfigLevel::User))
+            .set(tmpfile.clone().into())
+            .await
+            .expect("emu.vbmeta.metadata setting");
+
+        let cmd = StartCommand {
+            uefi: true,
+            name: Some("test-instance-name".into()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        let emu_config = make_configs(&env.context, &tool.cmd, Some(pb.clone()), &emu_instances)
+            .await
+            .expect("emu config");
+
+        assert_eq!(emu_config.guest.vbmeta_key_file, Some(tmp.path().to_path_buf()));
+        assert_eq!(emu_config.guest.vbmeta_key_metadata_file, Some(tmp.path().to_path_buf()));
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        tool.finalize_start_command(&mut writer).await.unwrap();
+
+        // TODO(https://fxbug.dev/382694675): When zircon.nodename can be persisted across reboots
+        // from a running instance, rewriting the name won't be necessary anymore.
+        assert_eq!(tool.cmd.name, Some("fuchsia-5254-ea06-13fe".into()));
+        assert_eq!(tool.cmd.engine, Some("qemu".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_uefi_vbmeta_from_cmd_line() {
+        let env = ffx_config::test_init().await.unwrap();
+        let emu_instances = EmulatorInstances::new(PathBuf::from(env.isolate_root.path()));
+        make_fake_sdk(&env).await;
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let mut pb =
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
+        pb.product_name = "pb.x64".into();
+        let pb = ProductBundle::V2(pb);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        ffx_config::query(ConfigQuery {
+            name: Some("emu.vbmeta.key"),
+            ctx: Some(&env.context),
+            level: Some(ConfigLevel::User),
+            ..Default::default()
+        })
+        .set("/some/vbmeta/key".into())
+        .await
+        .unwrap();
+        ffx_config::query(ConfigQuery {
+            name: Some("emu.vbmeta.metadata"),
+            ctx: Some(&env.context),
+            level: Some(ConfigLevel::User),
+            ..Default::default()
+        })
+        .set("/some/vbmeta/metadata".into())
+        .await
+        .unwrap();
+
+        let tmp = tempfile::NamedTempFile::new().unwrap();
+        let tmpfile = tmp.path().display().to_string();
+
+        let cmd = StartCommand {
+            uefi: true,
+            name: Some("test-instance-name".into()),
+            vbmeta_key: Some(tmpfile.clone()),
+            vbmeta_key_metadata: Some(tmpfile.clone()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        let emu_config = make_configs(&env.context, &tool.cmd, Some(pb.clone()), &emu_instances)
+            .await
+            .expect("emu_config");
+
+        assert_eq!(emu_config.guest.vbmeta_key_file, Some(tmp.path().to_path_buf()));
+        assert_eq!(emu_config.guest.vbmeta_key_metadata_file, Some(tmp.path().to_path_buf()));
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        tool.finalize_start_command(&mut writer).await.unwrap();
+
+        // TODO(https://fxbug.dev/382694675): When zircon.nodename can be persisted across reboots
+        // from a running instance, rewriting the name won't be necessary anymore.
+        assert_eq!(tool.cmd.name, Some("fuchsia-5254-ea06-13fe".into()));
+        assert_eq!(tool.cmd.engine, Some("qemu".into()));
+    }
+
+    #[fuchsia::test]
+    async fn test_finalize_start_command_uefi_vbmeta_non_existing_files() {
+        let env = ffx_config::test_init().await.unwrap();
+        let emu_instances = EmulatorInstances::new(PathBuf::from(env.isolate_root.path()));
+        make_fake_sdk(&env).await;
+
+        let test_buffers = TestBuffers::default();
+        let mut writer = VerifiedMachineWriter::new_test(None, &test_buffers);
+
+        let mut pb =
+            make_test_product_bundle(env.isolate_root.path()).expect("test product bundle");
+        pb.product_name = "pb.x64".into();
+        let pb = ProductBundle::V2(pb);
+        let loaded_pb = LoadedProductBundle::new(pb.clone(), "some/path/to_bundle");
+
+        ffx_config::query(ConfigQuery {
+            name: Some("emu.vbmeta.key"),
+            ctx: Some(&env.context),
+            level: Some(ConfigLevel::User),
+            ..Default::default()
+        })
+        .set("/some/vbmeta/key".into())
+        .await
+        .unwrap();
+        ffx_config::query(ConfigQuery {
+            name: Some("emu.vbmeta.metadata"),
+            ctx: Some(&env.context),
+            level: Some(ConfigLevel::User),
+            ..Default::default()
+        })
+        .set("/some/vbmeta/metadata".into())
+        .await
+        .unwrap();
+
+        let cmd = StartCommand {
+            uefi: true,
+            name: Some("test-instance-name".into()),
+            ..Default::default()
+        };
+
+        let mut tool = make_test_emu_start_tool(cmd).await;
+
+        let emu_config = make_configs(&env.context, &tool.cmd, Some(pb.clone()), &emu_instances)
+            .await
+            .expect("emu_config");
+
+        assert_eq!(emu_config.guest.vbmeta_key_file, None);
+        assert_eq!(emu_config.guest.vbmeta_key_metadata_file, None);
+
+        tool.engine_operations
+            .expect_load_product_bundle()
+            .returning(move |_| Ok(loaded_pb.clone()))
+            .times(1);
+        tool.engine_operations.expect_context().times(0);
+
+        tool.finalize_start_command(&mut writer).await.unwrap();
+
+        // TODO(https://fxbug.dev/382694675): When zircon.nodename can be persisted across reboots
+        // from a running instance, rewriting the name won't be necessary anymore.
+        assert_eq!(tool.cmd.name, Some("fuchsia-5254-ea06-13fe".into()));
+        assert_eq!(tool.cmd.engine, Some("qemu".into()));
     }
 }

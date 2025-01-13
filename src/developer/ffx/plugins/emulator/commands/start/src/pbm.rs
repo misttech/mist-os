@@ -81,16 +81,18 @@ pub(crate) async fn make_configs(
             emu_config.guest.ovmf_vars = vars;
 
             // If provided, pass the vbmeta signing key and metadata to the emulator config
-            if let Some(p) = &cmd.vbmeta_key {
-                let p = PathBuf::from(p);
+            let vbmeta_key_filename = cmd.vbmeta_key()?.unwrap_or_default();
+            if !vbmeta_key_filename.is_empty() {
+                let p = PathBuf::from(vbmeta_key_filename);
                 if p.exists() {
                     emu_config.guest.vbmeta_key_file = Some(p);
                 } else {
                     tracing::warn!("cannot find PEM file at {p:?}");
                 }
             }
-            if let Some(p) = &cmd.vbmeta_key_metadata {
-                let p = PathBuf::from(p);
+            let vbmeta_metadata_filename = cmd.vbmeta_key_metadata()?.unwrap_or_default();
+            if !vbmeta_metadata_filename.is_empty() {
+                let p = PathBuf::from(vbmeta_metadata_filename);
                 if p.exists() {
                     emu_config.guest.vbmeta_key_metadata_file = Some(p);
                 } else {

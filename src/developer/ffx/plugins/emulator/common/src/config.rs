@@ -54,3 +54,9 @@ pub const EMU_START_TIMEOUT: &'static str = "emu.start.timeout";
 /// The full path to the script to run initializing any network interfaces
 /// before starting the emulator.
 pub const EMU_UPSCRIPT_FILE: &'static str = "emu.upscript";
+
+/// The full path to the vbmeta key file for re-signing a ZBI
+pub const VBMETA_KEY_FILE: &'static str = "emu.vbmeta.key";
+
+/// The full path to the vbmeta metadata file for re-signing a ZBI
+pub const VBMETA_METADATA_FILE: &'static str = "emu.vbmeta.metadata";
