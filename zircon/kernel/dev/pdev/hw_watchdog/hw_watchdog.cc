@@ -15,8 +15,8 @@ static const struct pdev_watchdog_ops default_ops = {
     .pet = []() {},
     .set_enabled = [](bool) -> zx_status_t { return ZX_ERR_NOT_SUPPORTED; },
     .is_enabled = []() -> bool { return false; },
-    .get_timeout_nsec = []() -> zx_duration_t { return ZX_TIME_INFINITE; },
-    .get_last_pet_time = []() -> zx_time_t { return 0; },
+    .get_timeout_nsec = []() -> zx_duration_boot_t { return ZX_TIME_INFINITE; },
+    .get_last_pet_time = []() -> zx_instant_boot_t { return 0; },
     .suppress_petting = [](bool) {},
     .is_petting_suppressed = []() -> bool { return true; },
 };
@@ -27,8 +27,8 @@ bool hw_watchdog_present() { return watchdog_ops != &default_ops; }
 void hw_watchdog_pet() { watchdog_ops->pet(); }
 zx_status_t hw_watchdog_set_enabled(bool enabled) { return watchdog_ops->set_enabled(enabled); }
 bool hw_watchdog_is_enabled() { return watchdog_ops->is_enabled(); }
-zx_duration_t hw_watchdog_get_timeout_nsec() { return watchdog_ops->get_timeout_nsec(); }
-zx_time_t hw_watchdog_get_last_pet_time() { return watchdog_ops->get_last_pet_time(); }
+zx_duration_boot_t hw_watchdog_get_timeout_nsec() { return watchdog_ops->get_timeout_nsec(); }
+zx_instant_boot_t hw_watchdog_get_last_pet_time() { return watchdog_ops->get_last_pet_time(); }
 void hw_watchdog_suppress_petting(bool suppressed) { watchdog_ops->suppress_petting(suppressed); }
 bool hw_watchdog_is_petting_suppressed(void) { return watchdog_ops->is_petting_suppressed(); }
 
