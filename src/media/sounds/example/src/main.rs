@@ -38,9 +38,9 @@ async fn main() -> Result<()> {
                         })?;
                     print!("{:?}\n", std::time::Duration::from_nanos(duration.try_into().unwrap()));
                     player_proxy
-                        .play_sound(id, AudioRenderUsage::Media)
+                        .play_sound2(id, AudioRenderUsage2::Media)
                         .await?
-                        .map_err(|err| anyhow::format_err!("PlaySound failed: {:?}", err))?;
+                        .map_err(|err| anyhow::format_err!("PlaySound2 failed: {:?}", err))?;
 
                     id = id + 1;
                 }
@@ -72,36 +72,36 @@ async fn main() -> Result<()> {
 
     // Play the file-based sound.
     player_proxy
-        .play_sound(0, AudioRenderUsage::Media)
+        .play_sound2(0, AudioRenderUsage2::Media)
         .await?
-        .map_err(|err| anyhow::format_err!("PlaySound failed: {:?}", err))?;
+        .map_err(|err| anyhow::format_err!("PlaySound2 failed: {:?}", err))?;
 
     // Play the VMO-based sounds in sequence.
     player_proxy
-        .play_sound(1, AudioRenderUsage::Media)
+        .play_sound2(1, AudioRenderUsage2::Media)
         .await?
-        .map_err(|err| anyhow::format_err!("PlaySound failed: {:?}", err))?;
+        .map_err(|err| anyhow::format_err!("PlaySound2 failed: {:?}", err))?;
     player_proxy
-        .play_sound(2, AudioRenderUsage::Media)
+        .play_sound2(2, AudioRenderUsage2::Media)
         .await?
-        .map_err(|err| anyhow::format_err!("PlaySound failed: {:?}", err))?;
+        .map_err(|err| anyhow::format_err!("PlaySound2 failed: {:?}", err))?;
     player_proxy
-        .play_sound(3, AudioRenderUsage::Media)
+        .play_sound2(3, AudioRenderUsage2::Media)
         .await?
-        .map_err(|err| anyhow::format_err!("PlaySound failed: {:?}", err))?;
+        .map_err(|err| anyhow::format_err!("PlaySound2 failed: {:?}", err))?;
 
     // Play the VMO-based sounds all at once.
     join!(
-        player_proxy.play_sound(1, AudioRenderUsage::Media).map(|_| ()),
-        player_proxy.play_sound(2, AudioRenderUsage::Media).map(|_| ()),
-        player_proxy.play_sound(3, AudioRenderUsage::Media).map(|_| ())
+        player_proxy.play_sound2(1, AudioRenderUsage2::Media).map(|_| ()),
+        player_proxy.play_sound2(2, AudioRenderUsage2::Media).map(|_| ()),
+        player_proxy.play_sound2(3, AudioRenderUsage2::Media).map(|_| ())
     );
 
     // Play only 250ms of a sound by stopping it after a timer elapses.
     let timer = Timer::new(MonotonicInstant::after(zx::MonotonicDuration::from_millis(250)))
         .map(|_| player_proxy.stop_playing_sound(1));
 
-    join!(player_proxy.play_sound(1, AudioRenderUsage::Media).map(|_| ()), timer.map(|_| ()));
+    join!(player_proxy.play_sound2(1, AudioRenderUsage2::Media).map(|_| ()), timer.map(|_| ()));
 
     Ok(())
 }

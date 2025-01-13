@@ -66,6 +66,7 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
                           SetRenderUsageGainCompleter::Sync& completer) override {
     FX_NOTIMPLEMENTED();
   }
+
   void SetRenderUsageGain2(SetRenderUsageGain2Request& request,
                            SetRenderUsageGain2Completer::Sync& completer) override {
     FX_NOTIMPLEMENTED();
@@ -80,6 +81,7 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
                               BindUsageVolumeControlCompleter::Sync& completer) override {
     FX_NOTIMPLEMENTED();
   }
+
   void BindUsageVolumeControl2(BindUsageVolumeControl2Request& request,
                                BindUsageVolumeControl2Completer::Sync& completer) override {
     FX_NOTIMPLEMENTED();
@@ -89,6 +91,7 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
                        GetDbFromVolumeCompleter::Sync& completer) override {
     FX_NOTIMPLEMENTED();
   }
+
   void GetDbFromVolume2(GetDbFromVolume2Request& request,
                         GetDbFromVolume2Completer::Sync& completer) override {
     EXPECT_FALSE(get_db_from_volume_artifact_);
@@ -100,6 +103,7 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
                        GetVolumeFromDbCompleter::Sync& completer) override {
     FX_NOTIMPLEMENTED();
   }
+
   void GetVolumeFromDb2(GetVolumeFromDb2Request& request,
                         GetVolumeFromDb2Completer::Sync& completer) override {
     FX_NOTIMPLEMENTED();
@@ -109,6 +113,7 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
                       SetInteractionCompleter::Sync& completer) override {
     FX_NOTIMPLEMENTED();
   }
+
   void SetInteraction2(SetInteraction2Request& request,
                        SetInteraction2Completer::Sync& completer) override {
     FX_NOTIMPLEMENTED();

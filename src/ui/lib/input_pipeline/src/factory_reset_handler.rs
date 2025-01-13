@@ -9,7 +9,7 @@ use anyhow::{anyhow, Context as _, Error};
 use async_trait::async_trait;
 use async_utils::hanging_get::server::HangingGet;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
-use fidl_fuchsia_media::AudioRenderUsage;
+use fidl_fuchsia_media::AudioRenderUsage2;
 use fidl_fuchsia_media_sounds::{PlaySoundError, PlayerMarker};
 use fidl_fuchsia_recovery::FactoryResetMarker;
 use fidl_fuchsia_recovery_policy::{DeviceRequest, DeviceRequestStream};
@@ -368,10 +368,10 @@ impl FactoryResetHandler {
         log::debug!("Added sound from file");
 
         sound_player
-            .play_sound(sound_id, AudioRenderUsage::Media)
+            .play_sound2(sound_id, AudioRenderUsage2::Media)
             .await
-            .context("PlaySound error")?
-            .map_err(|err: PlaySoundError| anyhow!("PlaySound failed: {:?}", err))?;
+            .context("PlaySound2 error")?
+            .map_err(|err: PlaySoundError| anyhow!("PlaySound2 failed: {:?}", err))?;
 
         log::debug!("Played sound");
 

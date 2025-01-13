@@ -38,6 +38,11 @@ SoundPlayerImpl::SoundPlayerImpl(fuchsia::media::AudioPtr audio_service,
 
 SoundPlayerImpl::~SoundPlayerImpl() {}
 
+void SoundPlayerImpl::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
+  FX_LOGS(ERROR) << "SoundPlayerImpl: media::sounds::Player::handle_unknown_method(ordinal "
+                 << ordinal << ", method_has_response " << method_has_response << ")";
+}
+
 void SoundPlayerImpl::AddSoundFromFile(uint32_t id,
                                        fidl::InterfaceHandle<class fuchsia::io::File> file,
                                        AddSoundFromFileCallback callback) {
@@ -71,13 +76,13 @@ void SoundPlayerImpl::AddSoundBuffer(uint32_t id, fuchsia::mem::Buffer buffer,
     return;
   }
 
-  sounds_by_id_.emplace(id, std::make_shared<UndiscardableSound>(std::move(buffer.vmo), buffer.size,
-                                                                 std::move(stream_type)));
+  sounds_by_id_.emplace(
+      id, std::make_shared<UndiscardableSound>(std::move(buffer.vmo), buffer.size, stream_type));
 }
 
 void SoundPlayerImpl::RemoveSound(uint32_t id) { sounds_by_id_.erase(id); }
 
-void SoundPlayerImpl::PlaySound(uint32_t id, fuchsia::media::AudioRenderUsage usage,
+void SoundPlayerImpl::PlaySound(uint32_t id, fuchsia::media::AudioRenderUsage _usage,
                                 PlaySoundCallback callback) {
   auto iter = sounds_by_id_.find(id);
   if (iter == sounds_by_id_.end()) {
@@ -88,6 +93,7 @@ void SoundPlayerImpl::PlaySound(uint32_t id, fuchsia::media::AudioRenderUsage us
 
   fuchsia::media::AudioRendererPtr audio_renderer;
   audio_service_->CreateAudioRenderer(audio_renderer.NewRequest());
+  auto usage = fuchsia::media::AudioRenderUsage2(fidl::ToUnderlying(_usage));
   auto renderer = std::make_unique<Renderer>(std::move(audio_renderer), usage);
   auto renderer_raw_ptr = renderer.get();
   if (renderer->PlaySound(
@@ -107,6 +113,39 @@ void SoundPlayerImpl::PlaySound(uint32_t id, fuchsia::media::AudioRenderUsage us
     renderers_.emplace(renderer_raw_ptr, std::move(renderer));
   } else {
     callback(fuchsia::media::sounds::Player_PlaySound_Result::WithErr(
+        fuchsia::media::sounds::PlaySoundError::RENDERER_FAILED));
+  }
+}
+void SoundPlayerImpl::PlaySound2(uint32_t id, fuchsia::media::AudioRenderUsage2 usage,
+                                 PlaySound2Callback callback) {
+  auto iter = sounds_by_id_.find(id);
+  if (iter == sounds_by_id_.end()) {
+    callback(fuchsia::media::sounds::Player_PlaySound2_Result::WithErr(
+        fuchsia::media::sounds::PlaySoundError::NO_SUCH_SOUND));
+    return;
+  }
+
+  fuchsia::media::AudioRendererPtr audio_renderer;
+  audio_service_->CreateAudioRenderer(audio_renderer.NewRequest());
+  auto renderer = std::make_unique<Renderer>(std::move(audio_renderer), usage);
+  auto renderer_raw_ptr = renderer.get();
+  if (renderer->PlaySound2(id, iter->second,
+                           [this, id, renderer_raw_ptr, callback = std::move(callback)](
+                               fuchsia::media::sounds::Player_PlaySound2_Result result) {
+                             auto iter = renderers_by_sound_id_.find(id);
+                             if (iter != renderers_by_sound_id_.end() &&
+                                 iter->second == renderer_raw_ptr) {
+                               renderers_by_sound_id_.erase(iter);
+                             }
+
+                             renderers_.erase(renderer_raw_ptr);
+
+                             callback(std::move(result));
+                           }) == ZX_OK) {
+    renderers_by_sound_id_.insert_or_assign(id, renderer_raw_ptr);
+    renderers_.emplace(renderer_raw_ptr, std::move(renderer));
+  } else {
+    callback(fuchsia::media::sounds::Player_PlaySound2_Result::WithErr(
         fuchsia::media::sounds::PlaySoundError::RENDERER_FAILED));
   }
 }
@@ -157,6 +196,7 @@ void SoundPlayerImpl::WhenAudioServiceIsWarm(fit::closure callback) {
   });
 }
 
+// static
 fpromise::result<std::shared_ptr<Sound>, zx_status_t> SoundPlayerImpl::SoundFromFile(
     fidl::InterfaceHandle<fuchsia::io::File> file) {
   FX_DCHECK(file);
@@ -207,7 +247,7 @@ fpromise::result<std::shared_ptr<Sound>, zx_status_t> SoundPlayerImpl::SoundFrom
 // SoundPlayerImpl::Renderer
 
 SoundPlayerImpl::Renderer::Renderer(fuchsia::media::AudioRendererPtr audio_renderer,
-                                    fuchsia::media::AudioRenderUsage usage)
+                                    fuchsia::media::AudioRenderUsage2 usage)
     : audio_renderer_(std::move(audio_renderer)) {
   audio_renderer_.set_error_handler([this](zx_status_t status) {
     if (locked_sound_) {
@@ -215,7 +255,13 @@ SoundPlayerImpl::Renderer::Renderer(fuchsia::media::AudioRendererPtr audio_rende
       locked_sound_ = nullptr;
     }
 
-    if (play_sound_callback_) {
+    if (play_sound2_callback_) {
+      // This renderer may be deleted during the callback, so we move the callback to prevent
+      // it from being deleted out from under us.
+      auto callback = std::move(play_sound2_callback_);
+      callback(fuchsia::media::sounds::Player_PlaySound2_Result::WithErr(
+          fuchsia::media::sounds::PlaySoundError::RENDERER_FAILED));
+    } else if (play_sound_callback_) {
       // This renderer may be deleted during the callback, so we move the callback to prevent
       // it from being deleted out from under us.
       auto callback = std::move(play_sound_callback_);
@@ -224,7 +270,7 @@ SoundPlayerImpl::Renderer::Renderer(fuchsia::media::AudioRendererPtr audio_rende
     }
   });
 
-  audio_renderer_->SetUsage(usage);
+  audio_renderer_->SetUsage2(usage);
 }
 
 SoundPlayerImpl::Renderer::~Renderer() {}
@@ -265,7 +311,7 @@ zx_status_t SoundPlayerImpl::Renderer::PlaySound(uint32_t id, std::shared_ptr<So
     };
 
     if (frames_to_send == frames_remaining) {
-      audio_renderer_->SendPacket(std::move(packet), [this]() {
+      audio_renderer_->SendPacket(packet, [this]() {
         locked_sound_->Unlock();
         locked_sound_ = nullptr;
         // This renderer may be deleted during the callback, so we move the callback to prevent
@@ -275,7 +321,69 @@ zx_status_t SoundPlayerImpl::Renderer::PlaySound(uint32_t id, std::shared_ptr<So
             fuchsia::media::sounds::Player_PlaySound_Response()));
       });
     } else {
-      audio_renderer_->SendPacketNoReply(std::move(packet));
+      audio_renderer_->SendPacketNoReply(packet);
+    }
+
+    frames_remaining -= frames_to_send;
+    offset += frames_to_send * sound->frame_size();
+  }
+
+  audio_renderer_->PlayNoReply(fuchsia::media::NO_TIMESTAMP, 0);
+
+  // No cleanup here. This renderer is deleted when the sound finishes playing or when playback
+  // is stopped by |StopPlayingSound|. When the renderer is deleted, the FIDL AudioRenderer is
+  // destroyed, so no cleanup of the AudioRenderer is required.
+
+  return ZX_OK;
+}
+
+zx_status_t SoundPlayerImpl::Renderer::PlaySound2(uint32_t id, std::shared_ptr<Sound> sound,
+                                                  PlaySound2Callback completion_callback) {
+  audio_renderer_->SetPcmStreamType(fidl::Clone(sound->stream_type()));
+
+  zx::vmo vmo;
+  auto status = sound->LockForRead().duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
+  if (status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "Failed to duplicate VMO handle";
+    sound->Unlock();
+    return status;
+  }
+
+  locked_sound_ = sound;
+
+  play_sound2_callback_ = std::move(completion_callback);
+
+  audio_renderer_->AddPayloadBuffer(0, std::move(vmo));
+
+  uint64_t frames_remaining = sound->frame_count();
+  uint64_t offset = 0;
+
+  while (frames_remaining != 0) {
+    uint64_t frames_to_send = std::min(
+        frames_remaining, static_cast<uint64_t>(fuchsia::media::MAX_FRAMES_PER_RENDERER_PACKET));
+
+    fuchsia::media::StreamPacket packet{
+        .pts = fuchsia::media::NO_TIMESTAMP,
+        .payload_buffer_id = 0,
+        .payload_offset = offset,
+        .payload_size = frames_to_send * sound->frame_size(),
+        .flags = 0,
+        .buffer_config = 0,
+        .stream_segment_id = 0,
+    };
+
+    if (frames_to_send == frames_remaining) {
+      audio_renderer_->SendPacket(packet, [this]() {
+        locked_sound_->Unlock();
+        locked_sound_ = nullptr;
+        // This renderer may be deleted during the callback, so we move the callback to prevent
+        // it from being deleted out from under us.
+        auto callback = std::move(play_sound2_callback_);
+        callback(fuchsia::media::sounds::Player_PlaySound2_Result::WithResponse(
+            fuchsia::media::sounds::Player_PlaySound2_Response()));
+      });
+    } else {
+      audio_renderer_->SendPacketNoReply(packet);
     }
 
     frames_remaining -= frames_to_send;
@@ -293,7 +401,16 @@ zx_status_t SoundPlayerImpl::Renderer::PlaySound(uint32_t id, std::shared_ptr<So
 
 void SoundPlayerImpl::Renderer::StopPlayingSound() {
   audio_renderer_ = nullptr;
-  if (play_sound_callback_) {
+  if (play_sound2_callback_) {
+    locked_sound_->Unlock();
+    locked_sound_ = nullptr;
+
+    // This renderer may be deleted during the callback, so we move the callback to prevent
+    // it from being deleted out from under us.
+    auto callback = std::move(play_sound2_callback_);
+    callback(fuchsia::media::sounds::Player_PlaySound2_Result::WithErr(
+        fuchsia::media::sounds::PlaySoundError::STOPPED));
+  } else if (play_sound_callback_) {
     locked_sound_->Unlock();
     locked_sound_ = nullptr;
 

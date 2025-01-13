@@ -20,7 +20,7 @@ pub(crate) enum SoundPlayerBehavior {
 #[derive(Debug, PartialEq)]
 pub(crate) enum SoundPlayerRequestName {
     AddSoundFromFile,
-    PlaySound,
+    PlaySound2,
 }
 
 /// A mock implementation of `fuchsia.media.sounds.Player`, which
@@ -56,9 +56,9 @@ impl SoundPlayerMock {
         }
     }
 
-    fn play_sound(&self) -> Result<(), PlaySoundError> {
+    fn play_sound2(&self) -> Result<(), PlaySoundError> {
         if let Some(relay) = self.request_relay_write_end.as_ref() {
-            relay.unbounded_send(SoundPlayerRequestName::PlaySound).unwrap();
+            relay.unbounded_send(SoundPlayerRequestName::PlaySound2).unwrap();
         }
         match self.behavior {
             SoundPlayerBehavior::Succeed => Ok(()),
@@ -76,8 +76,8 @@ impl SoundPlayerMock {
                 PlayerRequest::AddSoundFromFile { responder, .. } => {
                     responder.send(self.add_sound_from_file()).unwrap();
                 }
-                PlayerRequest::PlaySound { responder, .. } => {
-                    responder.send(self.play_sound()).unwrap();
+                PlayerRequest::PlaySound2 { responder, .. } => {
+                    responder.send(self.play_sound2()).unwrap();
                 }
                 _ => panic!("Unexpected {:?}", request),
             };

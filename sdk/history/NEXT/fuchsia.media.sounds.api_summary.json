@@ -50,6 +50,16 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.media.sounds/Player.PlaySound2",
+        "strictness": "flexible",
+        "ordinal": "6802887319907187769",
+        "direction": "two_way",
+        "request": "fuchsia.media.sounds/PlayerPlaySound2Request",
+        "response": "fuchsia.media.sounds/Player_PlaySound2_Response",
+        "error": "fuchsia.media.sounds/PlaySoundError"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.media.sounds/Player.RemoveSound",
         "strictness": "strict",
         "ordinal": "1875309027020173506",
@@ -67,7 +77,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.media.sounds/Player",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -109,6 +119,22 @@
         "kind": "struct",
         "name": "fuchsia.media.sounds/PlayerAddSoundFromFileRequest",
         "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media.sounds/PlayerPlaySound2Request.id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media.sounds/PlayerPlaySound2Request.usage",
+        "ordinal": "2",
+        "type": "fuchsia.media/AudioRenderUsage2"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media.sounds/PlayerPlaySound2Request"
     },
     {
         "kind": "struct/member",

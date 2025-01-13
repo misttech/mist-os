@@ -8,7 +8,7 @@ use anyhow::{Context, Error};
 use async_trait::async_trait;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
-use fidl_fuchsia_media::{AudioRenderUsage, AudioSampleFormat, AudioStreamType};
+use fidl_fuchsia_media::{AudioRenderUsage2, AudioSampleFormat, AudioStreamType};
 use fidl_fuchsia_media_sounds::{PlayerMarker, PlayerProxy};
 use fidl_fuchsia_test_audio_recording::{AudioRecordingControlMarker, AudioRecordingControlProxy};
 use fuchsia_component::client::connect_to_protocol;
@@ -135,7 +135,7 @@ impl AudioFacade {
         Ok(to_value(BASE64_STANDARD.encode(&buffer))?)
     }
 
-    // This will play a 440Hz sine wave to the default sound device.
+    // This will play a 399 Hz sine wave to the default sound device.
     pub async fn play_sine_wave(&self) -> Result<Value, Error> {
         let mut id = self.sound_buffer_id.lock().await;
         *(id) += 1;
@@ -152,9 +152,9 @@ impl AudioFacade {
             Err(e) => return Err(format_err!("Cannot add sound to buffer: {}", e)),
         };
         self.player_proxy
-            .play_sound(*id, AudioRenderUsage::Media)
+            .play_sound2(*id, AudioRenderUsage2::Media)
             .await?
-            .map_err(|err| format_err!("PlaySound failed: {:?}", err))?;
+            .map_err(|err| format_err!("PlaySound2 failed: {:?}", err))?;
         Ok(to_value(true)?)
     }
 
