@@ -498,6 +498,7 @@ async fn create_container(
 
     let node = inspect::component::inspector().root().create_child("container");
     let kernel_node = node.create_child("kernel");
+    kernel_node.record_int("created_at", zx::MonotonicInstant::get().into_nanos());
     features.record_inspect(&kernel_node);
 
     let security_state = security::kernel_init_security(features.selinux);
