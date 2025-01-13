@@ -21,7 +21,7 @@ function parseGerritResponse(response) {
   return JSON.parse(rawJson);
 }
 
-const APPSHEET_API_URL = 'https://api.appsheet.com/api/v2/apps/4bb7fc16-9d88-4802-a122-9c29483a1bce/tables/RFCs/Action';
+const APPSHEET_API_URL = 'https://api.appsheet.com/api/v2/apps/4bb7fc16-9d88-4802-a122-9c29483a1bce/tables/CLs/Action';
 
 // Calls the AppSheet API to trigger an action on the RFCs table of the
 // production instance.
