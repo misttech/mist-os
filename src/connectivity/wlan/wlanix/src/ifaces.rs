@@ -12,14 +12,14 @@ use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::{select, FutureExt, TryStreamExt};
 use ieee80211::Bssid;
-use log::{info, warn};
+use log::{error, info, warn};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use wlan_common::bss::BssDescription;
-use wlan_common::scan::Compatibility;
+use wlan_common::scan::{Compatibility, CompatibilityExt as _};
 use {
     fidl_fuchsia_power_broker as fidl_power_broker, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_device_service as fidl_device_service,
@@ -393,13 +393,21 @@ impl ClientIface for SmeClientIface {
             .iter()
             .filter_map(|r| {
                 let bss_description = BssDescription::try_from(r.bss_description.clone());
-                let compatibility =
-                    r.compatibility.clone().map(|c| Compatibility::try_from(*c)).transpose();
+                let compatibility = Compatibility::try_from_fidl(r.compatibility.clone());
                 match (bss_description, compatibility) {
                     (Ok(bss_description), Ok(compatibility)) if bss_description.ssid == *ssid => {
-                        match bssid {
-                            Some(bssid) if bss_description.bssid != bssid => None,
-                            _ => Some((bss_description, compatibility)),
+                        match compatibility {
+                            Ok(compatible) => match bssid {
+                                Some(bssid) if bss_description.bssid != bssid => None,
+                                _ => Some((bss_description, compatible)),
+                            },
+                            Err(incompatible) => {
+                                error!(
+                                    "BSS ({:?}) is incompatible: {}",
+                                    bss_description.bssid, incompatible,
+                                );
+                                None
+                            }
                         }
                     }
                     _ => None,
@@ -408,14 +416,14 @@ impl ClientIface for SmeClientIface {
             .collect::<Vec<_>>();
         scan_results.sort_by_key(|(bss_description, _)| self.bss_scorer.score_bss(bss_description));
 
-        let (bss_description, compatibility) = match scan_results.pop() {
+        let (bss_description, compatible) = match scan_results.pop() {
             Some(scan_result) => scan_result,
             None => bail!("Requested network not found"),
         };
 
         let credential = passphrase.map(Credential::Password).unwrap_or(Credential::None);
         let authenticator =
-            match get_authenticator(bss_description.bssid, compatibility, &credential) {
+            match get_authenticator(bss_description.bssid, compatible, &credential) {
                 Some(authenticator) => authenticator,
                 None => bail!("Failed to create authenticator for requested network. Unsupported security type, channel, or data rate."),
             };
@@ -591,7 +599,10 @@ pub mod test_utils {
 
     pub fn fake_scan_result() -> fidl_sme::ScanResult {
         fidl_sme::ScanResult {
-            compatibility: None,
+            compatibility: fidl_sme::Compatibility::Incompatible(fidl_sme::Incompatible {
+                description: String::from("unknown"),
+                disjoint_security_protocols: None,
+            }),
             timestamp_nanos: 1000,
             bss_description: fidl_common::BssDescription {
                 bssid: [1, 2, 3, 4, 5, 6],
@@ -1264,7 +1275,9 @@ mod tests {
         );
         *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
             bss_description: bss_description.clone(),
-            compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+                mutual_security_protocols,
+            }),
             timestamp_nanos: 1,
         }];
 
@@ -1342,9 +1355,9 @@ mod tests {
             );
             *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
                 bss_description: bss_description.clone(),
-                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                     mutual_security_protocols,
-                })),
+                }),
                 timestamp_nanos: 1,
             }];
         }
@@ -1364,9 +1377,9 @@ mod tests {
         );
         *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
             bss_description: bss_description.clone(),
-            compatibility: Some(Box::new(fidl_sme::Compatibility {
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Open],
-            })),
+            }),
             timestamp_nanos: 1,
         }];
 
@@ -1438,9 +1451,9 @@ mod tests {
         );
         *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
             bss_description: bss_description.clone(),
-            compatibility: Some(Box::new(fidl_sme::Compatibility {
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                 mutual_security_protocols: vec![fidl_security::Protocol::Open],
-            })),
+            }),
             timestamp_nanos: 1,
         }];
 
@@ -1533,9 +1546,9 @@ mod tests {
             // for the BSS described by `bss_description`
             *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
                 bss_description,
-                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                     mutual_security_protocols: vec![fidl_security::Protocol::Open],
-                })),
+                }),
                 timestamp_nanos: 1,
             }];
 
@@ -1553,9 +1566,9 @@ mod tests {
             .into_iter()
             .map(|bss_description| fidl_sme::ScanResult {
                 bss_description,
-                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
                     mutual_security_protocols: vec![fidl_security::Protocol::Open],
-                })),
+                }),
                 timestamp_nanos: 1,
             })
             .collect::<Vec<_>>();

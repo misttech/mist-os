@@ -4,6 +4,7 @@
 
 use crate::buffer_reader::{BufferReader, IntoBufferReader};
 use crate::{ie, UnalignedView};
+use fidl_fuchsia_wlan_common as fidl_common;
 use ieee80211::MacAddr;
 use num::Unsigned;
 use zerocopy::{Immutable, IntoBytes, KnownLayout, Ref, SplitByteSlice};
@@ -50,6 +51,36 @@ pub trait IntoBytesExt: IntoBytes + KnownLayout + Immutable + Sized {
 }
 
 impl<T> IntoBytesExt for T where T: IntoBytes + Immutable + KnownLayout + Sized {}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum MacRole {
+    Client,
+    Ap,
+    Mesh,
+}
+
+impl From<MacRole> for fidl_common::WlanMacRole {
+    fn from(role: MacRole) -> Self {
+        match role {
+            MacRole::Client => fidl_common::WlanMacRole::Client,
+            MacRole::Ap => fidl_common::WlanMacRole::Ap,
+            MacRole::Mesh => fidl_common::WlanMacRole::Mesh,
+        }
+    }
+}
+
+impl TryFrom<fidl_common::WlanMacRole> for MacRole {
+    type Error = fidl_common::WlanMacRole;
+
+    fn try_from(role: fidl_common::WlanMacRole) -> Result<Self, Self::Error> {
+        match role {
+            fidl_common::WlanMacRole::Client => Ok(MacRole::Client),
+            fidl_common::WlanMacRole::Ap => Ok(MacRole::Ap),
+            fidl_common::WlanMacRole::Mesh => Ok(MacRole::Mesh),
+            role => Err(role),
+        }
+    }
+}
 
 pub struct CtrlFrame<B> {
     // Control Header: frame control

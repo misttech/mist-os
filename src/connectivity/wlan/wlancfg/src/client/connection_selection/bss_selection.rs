@@ -91,6 +91,7 @@ mod test {
     use futures::channel::mpsc;
     use ieee80211_testutils::{BSSID_REGEX, SSID_REGEX};
     use rand::Rng;
+    use wlan_common::scan::Incompatible;
     use wlan_common::{assert_variant, random_fidl_bss_description};
     use {
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync,
@@ -266,7 +267,7 @@ mod test {
         );
 
         // Make the stronger BSS incompatible.
-        candidates[0].bss.compatibility = None;
+        candidates[0].bss.compatibility = Incompatible::unknown();
 
         // The weaker, but still compatible, BSS is selected.
         assert_eq!(
@@ -282,7 +283,7 @@ mod test {
         // TODO(https://fxbug.dev/42071595): After `select_bss` filters out incompatible BSSs, this None
         // compatibility should change to a Some, to test that logic.
         // Make both BSSs incompatible.
-        candidates[1].bss.compatibility = None;
+        candidates[1].bss.compatibility = Incompatible::unknown();
 
         // No BSS is selected.
         assert_eq!(
@@ -350,7 +351,7 @@ mod test {
                         security_type_saved: candidates[2].saved_security_type_to_string(),
                         security_type_scanned: format!("{}", wlan_common::bss::Protection::from(candidates[2].security_type_detailed)),
                         channel: AnyStringProperty,
-                        compatible: candidates[2].bss.compatibility.is_some(),
+                        compatible: candidates[2].bss.is_compatible(),
                         recent_failure_count: candidates[2].recent_failure_count(),
                         saved_network_has_ever_connected: candidates[2].saved_network_info.has_ever_connected,
                     },

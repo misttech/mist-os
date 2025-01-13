@@ -579,9 +579,9 @@ impl WriteInspect for types::ScannedCandidate {
 
 fn get_authenticator(bss: &Bss, credential: &Credential) -> Option<SecurityAuthenticator> {
     let mutual_security_protocols = match bss.compatibility.as_ref() {
-        Some(compatibility) => compatibility.mutual_security_protocols().clone(),
-        None => {
-            error!("BSS ({:?}) lacks compatibility information", bss.bssid.clone());
+        Ok(compatible) => compatible.mutual_security_protocols().clone(),
+        Err(incompatible) => {
+            error!("BSS ({:?}) is incompatible: {}", bss.bssid, incompatible);
             return None;
         }
     };
@@ -590,8 +590,8 @@ fn get_authenticator(bss: &Bss, credential: &Credential) -> Option<SecurityAuthe
         Some(authenticator) => Some(authenticator),
         None => {
             error!(
-                "Failed to negotiate authentication for BSS ({:?}) with mutually supported
-                security protocols: {:?}, and credential type: {:?}.",
+                "Failed to negotiate authentication for BSS ({:?}) with mutually supported \
+                 security protocols: {:?}, and credential type: {:?}.",
                 bss.bssid,
                 mutual_security_protocols,
                 credential.type_str()
@@ -746,7 +746,7 @@ mod tests {
     use std::pin::pin;
     use std::rc::Rc;
     use test_case::test_case;
-    use wlan_common::scan::Compatibility;
+    use wlan_common::scan::Compatible;
     use wlan_common::security::SecurityDescriptor;
     use wlan_common::{assert_variant, random_fidl_bss_description};
     use {
@@ -848,21 +848,15 @@ mod tests {
                 security_type_detailed: test_security_1,
                 entries: vec![
                     types::Bss {
-                        compatibility: Compatibility::expect_some([
-                            SecurityDescriptor::WPA3_PERSONAL,
-                        ]),
+                        compatibility: Compatible::expect_ok([SecurityDescriptor::WPA3_PERSONAL]),
                         ..generate_random_bss()
                     },
                     types::Bss {
-                        compatibility: Compatibility::expect_some([
-                            SecurityDescriptor::WPA3_PERSONAL,
-                        ]),
+                        compatibility: Compatible::expect_ok([SecurityDescriptor::WPA3_PERSONAL]),
                         ..generate_random_bss()
                     },
                     types::Bss {
-                        compatibility: Compatibility::expect_some([
-                            SecurityDescriptor::WPA3_PERSONAL,
-                        ]),
+                        compatibility: Compatible::expect_ok([SecurityDescriptor::WPA3_PERSONAL]),
                         ..generate_random_bss()
                     },
                 ],
@@ -872,7 +866,7 @@ mod tests {
                 ssid: test_ssid_2.clone(),
                 security_type_detailed: test_security_2,
                 entries: vec![types::Bss {
-                    compatibility: Compatibility::expect_some([SecurityDescriptor::WPA1]),
+                    compatibility: Compatible::expect_ok([SecurityDescriptor::WPA1]),
                     ..generate_random_bss()
                 }],
                 compatibility: types::Compatibility::DisallowedNotSupported,
@@ -1036,7 +1030,7 @@ mod tests {
                 compatibility: types::Compatibility::Supported,
                 entries: vec![types::Bss {
                     bssid: passively_scanned_candidate.bss.bssid,
-                    compatibility: wlan_common::scan::Compatibility::expect_some([
+                    compatibility: wlan_common::scan::Compatible::expect_ok([
                         wlan_common::security::SecurityDescriptor::WPA1,
                     ]),
                     bss_description: new_bss_desc.clone().into(),
@@ -1099,7 +1093,7 @@ mod tests {
                 security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                 compatibility: types::Compatibility::Supported,
                 entries: vec![types::Bss {
-                    compatibility: wlan_common::scan::Compatibility::expect_some(
+                    compatibility: wlan_common::scan::Compatible::expect_ok(
                         mutual_security_protocols_1,
                     ),
                     bss_description: bss_desc_1.clone().into(),
@@ -1199,7 +1193,7 @@ mod tests {
                     security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                     compatibility: types::Compatibility::Supported,
                     entries: vec![types::Bss {
-                        compatibility: wlan_common::scan::Compatibility::expect_some(
+                        compatibility: wlan_common::scan::Compatible::expect_ok(
                             mutual_security_protocols,
                         ),
                         bss_description: bss_desc.clone().into(),
@@ -1211,7 +1205,7 @@ mod tests {
                     security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                     compatibility: types::Compatibility::Supported,
                     entries: vec![types::Bss {
-                        compatibility: wlan_common::scan::Compatibility::expect_some(
+                        compatibility: wlan_common::scan::Compatible::expect_ok(
                             mutual_security_protocols,
                         ),
                         bss_description: bss_desc.clone().into(),
@@ -1228,7 +1222,7 @@ mod tests {
                     security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                     compatibility: types::Compatibility::Supported,
                     entries: vec![types::Bss {
-                        compatibility: wlan_common::scan::Compatibility::expect_some(
+                        compatibility: wlan_common::scan::Compatible::expect_ok(
                             mutual_security_protocols,
                         ),
                         bss_description: bss_desc.clone().into(),
@@ -1246,7 +1240,7 @@ mod tests {
                     security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                     compatibility: types::Compatibility::Supported,
                     entries: vec![types::Bss {
-                        compatibility: wlan_common::scan::Compatibility::expect_some(
+                        compatibility: wlan_common::scan::Compatible::expect_ok(
                             mutual_security_protocols,
                         ),
                         bss_description: bss_desc.clone().into(),
@@ -1258,7 +1252,7 @@ mod tests {
                     security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                     compatibility: types::Compatibility::Supported,
                     entries: vec![types::Bss {
-                        compatibility: wlan_common::scan::Compatibility::expect_some(
+                        compatibility: wlan_common::scan::Compatible::expect_ok(
                             mutual_security_protocols,
                         ),
                         bss_description: bss_desc.clone().into(),
@@ -1270,7 +1264,7 @@ mod tests {
                     security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                     compatibility: types::Compatibility::Supported,
                     entries: vec![types::Bss {
-                        compatibility: wlan_common::scan::Compatibility::expect_some(
+                        compatibility: wlan_common::scan::Compatible::expect_ok(
                             mutual_security_protocols,
                         ),
                         bss_description: bss_desc.clone().into(),
@@ -1434,7 +1428,7 @@ mod tests {
                 security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                 compatibility: types::Compatibility::Supported,
                 entries: vec![types::Bss {
-                    compatibility: wlan_common::scan::Compatibility::expect_some(
+                    compatibility: wlan_common::scan::Compatible::expect_ok(
                         mutual_security_protocols_1,
                     ),
                     bssid: bssid_1,
@@ -1452,7 +1446,7 @@ mod tests {
                 security_type_detailed: types::SecurityTypeDetailed::Wpa1,
                 compatibility: types::Compatibility::Supported,
                 entries: vec![types::Bss {
-                    compatibility: wlan_common::scan::Compatibility::expect_some(
+                    compatibility: wlan_common::scan::Compatible::expect_ok(
                         mutual_security_protocols_2,
                     ),
                     bssid: bssid_2,
@@ -1477,9 +1471,7 @@ mod tests {
         // An additional directed active scan should be made for the selected network
         let bss_desc1_active = random_fidl_bss_description!();
         let new_bss = types::Bss {
-            compatibility: wlan_common::scan::Compatibility::expect_some(
-                mutual_security_protocols_1,
-            ),
+            compatibility: wlan_common::scan::Compatible::expect_ok(mutual_security_protocols_1),
             bssid: bssid_1,
             bss_description: bss_desc1_active.clone().into(),
             ..generate_random_bss()
@@ -1603,9 +1595,7 @@ mod tests {
         let bss_desc_1 = random_fidl_bss_description!();
         let scanned_bss = types::Bss {
             // This network is WPA3, but should still match against the desired WPA2 network
-            compatibility: wlan_common::scan::Compatibility::expect_some(
-                mutual_security_protocols_1,
-            ),
+            compatibility: wlan_common::scan::Compatible::expect_ok(mutual_security_protocols_1),
             bss_description: bss_desc_1.clone().into(),
             // Observation should be unknown, since we didn't try a passive scan.
             observation: types::ScanObservation::Unknown,

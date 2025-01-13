@@ -323,7 +323,7 @@ mod tests {
     use rand::Rng;
     use std::pin::pin;
     use test_case::test_case;
-    use wlan_common::scan::read_vmo;
+    use wlan_common::scan::{self, Incompatible};
     use wlan_common::{assert_variant, random_bss_description};
     use wlan_rsn::auth;
     use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
@@ -479,7 +479,7 @@ mod tests {
 
         // Verify scan results
         assert_variant!(exec.run_until_stalled(&mut result_fut), Poll::Ready(Ok(vmo)) => {
-            assert_eq!(scan_result_list, read_vmo(vmo).expect("failed to read VMO"));
+            assert_eq!(scan_result_list, scan::read_vmo(vmo).expect("failed to read VMO"));
         })
     }
 
@@ -579,15 +579,13 @@ mod tests {
         // TODO(https://fxbug.dev/42164451): Merge this with a similar function in wlancfg.
         wlan_common::scan::ScanResult {
             compatibility: match rng.gen_range(0..4) {
-                0 => wlan_common::scan::Compatibility::expect_some([SecurityDescriptor::OPEN]),
-                1 => wlan_common::scan::Compatibility::expect_some([
-                    SecurityDescriptor::WPA2_PERSONAL,
-                ]),
-                2 => wlan_common::scan::Compatibility::expect_some([
+                0 => wlan_common::scan::Compatible::expect_ok([SecurityDescriptor::OPEN]),
+                1 => wlan_common::scan::Compatible::expect_ok([SecurityDescriptor::WPA2_PERSONAL]),
+                2 => wlan_common::scan::Compatible::expect_ok([
                     SecurityDescriptor::WPA2_PERSONAL,
                     SecurityDescriptor::WPA3_PERSONAL,
                 ]),
-                _ => None,
+                _ => Incompatible::unknown(),
             },
             timestamp: zx::MonotonicInstant::from_nanos(rng.gen()),
             bss_description: random_bss_description!(),

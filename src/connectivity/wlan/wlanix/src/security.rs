@@ -5,11 +5,11 @@
 //! TODO(https://fxbug.dev/42084621): Types and functions in this file are taken from wlancfg. Dedupe later.
 
 use ieee80211::Bssid;
-use log::{error, warn};
+use log::warn;
 use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::convert::TryFrom;
-use wlan_common::scan::Compatibility;
+use wlan_common::scan::Compatible;
 use wlan_common::security::wep::WepKey;
 use wlan_common::security::wpa::credential::Passphrase;
 use wlan_common::security::wpa::WpaDescriptor;
@@ -32,17 +32,10 @@ impl Credential {
 
 pub fn get_authenticator(
     bssid: Bssid,
-    compatibility: Option<Compatibility>,
+    compatible: Compatible,
     credential: &Credential,
 ) -> Option<SecurityAuthenticator> {
-    let mutual_security_protocols = match compatibility.as_ref() {
-        Some(compatibility) => compatibility.mutual_security_protocols().clone(),
-        None => {
-            error!("BSS ({:?}) lacks compatibility information", bssid.clone());
-            return None;
-        }
-    };
-
+    let mutual_security_protocols = compatible.mutual_security_protocols().clone();
     match select_authentication_method(mutual_security_protocols.clone(), credential) {
         Some(authenticator) => Some(authenticator),
         None => {
