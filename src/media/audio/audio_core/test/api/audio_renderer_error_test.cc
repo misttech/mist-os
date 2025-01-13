@@ -337,6 +337,31 @@ TEST_F(AudioRendererFormatUsageErrorTest, SetUsageAfterOperatingShouldDisconnect
   ExpectDisconnect(audio_renderer());
 }
 
+// Once the format has been set, SetUsage2 may no longer be called any time thereafter.
+TEST_F(AudioRendererFormatUsageErrorTest, SetUsage2AfterFormatShouldDisconnect) {
+  audio_renderer()->SetPcmStreamType(kTestStreamType);
+  audio_renderer()->SetUsage2(AudioRenderUsage2::COMMUNICATION);
+
+  ExpectDisconnect(audio_renderer());
+}
+
+// ... this restriction is not lifted even after all packets have been returned.
+TEST_F(AudioRendererFormatUsageErrorTest, SetUsage2AfterOperatingShouldDisconnect) {
+  audio_renderer()->SetPcmStreamType(kTestStreamType);
+  CreateAndAddPayloadBuffer(0);
+  audio_renderer()->PlayNoReply(fuchsia::media::NO_TIMESTAMP, 0);
+
+  audio_renderer()->SendPacket(kTestPacket, AddCallback("SendPacket"));
+  ExpectCallbacks();  // Send a packet and allow it to drain out.
+
+  audio_renderer()->Pause(AddCallback("Pause"));
+  ExpectCallbacks();
+
+  audio_renderer()->SetUsage2(AudioRenderUsage2::BACKGROUND);
+
+  ExpectDisconnect(audio_renderer());
+}
+
 TEST_F(AudioRendererFormatUsageErrorTest, SetPcmStreamTypeWhileOperatingShouldDisconnect) {
   audio_renderer()->SetPcmStreamType(kTestStreamType);
   CreateAndAddPayloadBuffer(0);

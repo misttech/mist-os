@@ -561,6 +561,24 @@ TEST_F(AudioRendererFormatUsageTest, SetUsageBeforeFormat) {
   ExpectConnected();  // Demonstrate we haven't disconnected
 }
 
+// A renderer stream's usage can be changed any time before the format is set.
+TEST_F(AudioRendererFormatUsageTest, SetUsage2BeforeFormat) {
+  audio_renderer()->SetUsage2(AudioRenderUsage2::COMMUNICATION);
+
+  audio_renderer()->SetReferenceClock(zx::clock(ZX_HANDLE_INVALID));
+  audio_renderer()->SetUsage2(AudioRenderUsage2::SYSTEM_AGENT);
+
+  CreateAndAddPayloadBuffer(0);
+  audio_renderer()->SetUsage2(AudioRenderUsage2::INTERRUPTION);
+
+  audio_renderer()->GetReferenceClock(AddCallback("GetReferenceClock"));
+  audio_renderer()->SetUsage2(AudioRenderUsage2::BACKGROUND);
+  ExpectCallbacks();
+
+  audio_renderer()->SetUsage2(AudioRenderUsage2::MEDIA);
+  ExpectConnected();  // Demonstrate we haven't disconnected
+}
+
 // Before renderers are Operating, SetPcmStreamType should succeed. Test twice because of a previous
 // bug, where the first call succeeded but the second (pre-Play) caused a disconnect.
 TEST_F(AudioRendererFormatUsageTest, SetPcmStreamType) {

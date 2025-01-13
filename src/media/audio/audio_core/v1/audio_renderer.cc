@@ -95,9 +95,13 @@ void AudioRenderer::ReportStop() {
   context().audio_admin().UpdateRendererState(RenderUsageFromFidlRenderUsage(usage_), false, this);
 }
 
-void AudioRenderer::SetUsage(fuchsia::media::AudioRenderUsage _usage) {
-  auto usage = ToFidlRenderUsage2(_usage);
+void AudioRenderer::SetUsage(fuchsia::media::AudioRenderUsage usage) {
   TRACE_DURATION("audio", "AudioRenderer::SetUsage");
+  SetUsage2(ToFidlRenderUsage2(usage));
+}
+
+void AudioRenderer::SetUsage2(fuchsia::media::AudioRenderUsage2 usage) {
+  TRACE_DURATION("audio", "AudioRenderer::SetUsage2");
   if (format_) {
     FX_LOGS(ERROR) << "SetUsage called after SetPcmStreamType.";
     context().route_graph().RemoveRenderer(*this);

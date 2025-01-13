@@ -117,8 +117,13 @@ class FakeAudioRenderer : public fidl::Server<fuchsia_media::AudioRenderer> {
   }
 
   void SetUsage(SetUsageRequest& request, SetUsageCompleter::Sync& completer) override {
-    EXPECT_FALSE(set_usage_artifact_.has_value());
+    EXPECT_FALSE(set_usage_artifact_.has_value()) << fidl::ToUnderlying(*set_usage_artifact_);
     set_usage_artifact_ = request.usage();
+  }
+
+  void SetUsage2(SetUsage2Request& request, SetUsage2Completer::Sync& completer) override {
+    EXPECT_FALSE(set_usage2_artifact_.has_value()) << fidl::ToUnderlying(*set_usage2_artifact_);
+    set_usage2_artifact_ = request.usage2();
   }
 
   void SetPcmStreamType(SetPcmStreamTypeRequest& request,
@@ -149,8 +154,17 @@ class FakeAudioRenderer : public fidl::Server<fuchsia_media::AudioRenderer> {
     pause_no_reply_called_ = true;
   }
 
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_media::AudioRenderer> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) final {
+    FX_LOGS(ERROR) << "FakeAudioRenderer: AudioRenderer::handle_unknown_method(ordinal "
+                   << metadata.method_ordinal << ", "
+                   << (metadata.unknown_method_type == fidl::UnknownMethodType::kOneWay
+                           ? "OneWay)"
+                           : "TwoWay)");
+  }
+
   // Checks
-  bool WasAddPayloadBufferCalled(uint32_t id, zx_koid_t payload_buffer_koid) {
+  bool ExpectAddPayloadBufferCalled(uint32_t id, zx_koid_t payload_buffer_koid) {
     EXPECT_FALSE(add_payload_buffer_artifacts_.empty());
     if (add_payload_buffer_artifacts_.empty()) {
       return false;
@@ -164,12 +178,12 @@ class FakeAudioRenderer : public fidl::Server<fuchsia_media::AudioRenderer> {
     return result;
   }
 
-  bool WasAddPayloadBufferNotCalled() {
+  bool ExpectAddPayloadBufferNotCalled() {
     EXPECT_TRUE(add_payload_buffer_artifacts_.empty());
     return add_payload_buffer_artifacts_.empty();
   }
 
-  bool WasRemovePayloadBufferCalled(uint32_t id) {
+  bool ExpectRemovePayloadBufferCalled(uint32_t id) {
     EXPECT_FALSE(remove_payload_buffer_artifacts_.empty());
     if (remove_payload_buffer_artifacts_.empty()) {
       return false;
@@ -181,12 +195,12 @@ class FakeAudioRenderer : public fidl::Server<fuchsia_media::AudioRenderer> {
     return result;
   }
 
-  bool WasRemovePayloadBufferNotCalled() {
+  bool ExpectRemovePayloadBufferNotCalled() {
     EXPECT_TRUE(remove_payload_buffer_artifacts_.empty());
     return remove_payload_buffer_artifacts_.empty();
   }
 
-  bool WasSendPacketCalled(const fuchsia_media::StreamPacket& expected_packet) {
+  bool ExpectSendPacketCalled(const fuchsia_media::StreamPacket& expected_packet) {
     EXPECT_TRUE(send_packet_artifact_.has_value());
     if (!send_packet_artifact_.has_value()) {
       return false;
@@ -198,7 +212,7 @@ class FakeAudioRenderer : public fidl::Server<fuchsia_media::AudioRenderer> {
     return result;
   }
 
-  bool WasSendPacketNoReplyCalled(const fuchsia_media::StreamPacket& expected_packet) {
+  bool ExpectSendPacketNoReplyCalled(const fuchsia_media::StreamPacket& expected_packet) {
     EXPECT_TRUE(send_packet_no_reply_artifact_.has_value());
     if (!send_packet_no_reply_artifact_.has_value()) {
       return false;
@@ -210,45 +224,46 @@ class FakeAudioRenderer : public fidl::Server<fuchsia_media::AudioRenderer> {
     return result;
   }
 
-  bool WasEndOfStreamCalled() {
+  bool ExpectEndOfStreamCalled() {
     EXPECT_TRUE(end_of_stream_called_);
     auto result = end_of_stream_called_;
     end_of_stream_called_ = false;
     return result;
   }
 
-  bool WasDiscardAllPacketsCalled() {
+  bool ExpectDiscardAllPacketsCalled() {
     EXPECT_TRUE(discard_all_packets_called_);
     auto result = discard_all_packets_called_;
     discard_all_packets_called_ = false;
     return result;
   }
 
-  bool WasDiscardAllPacketsNoReplyCalled() {
+  bool ExpectDiscardAllPacketsNoReplyCalled() {
     EXPECT_TRUE(discard_all_packets_no_reply_called_);
     auto result = discard_all_packets_no_reply_called_;
     discard_all_packets_no_reply_called_ = false;
     return result;
   }
 
-  std::unique_ptr<FakeGainControl> WasBindGainControlCalled() {
+  std::unique_ptr<FakeGainControl> ExpectBindGainControlCalled() {
     EXPECT_TRUE(bind_gain_control_artifact_);
     return std::move(bind_gain_control_artifact_);
   }
 
-  bool WasSetUsageCalled(fuchsia_media::AudioRenderUsage expected_usage) {
-    EXPECT_TRUE(set_usage_artifact_.has_value());
-    if (!set_usage_artifact_.has_value()) {
+  bool ExpectSetUsage2Called(fuchsia_media::AudioRenderUsage2 expected_usage) {
+    EXPECT_TRUE(!set_usage_artifact_.has_value());
+    EXPECT_TRUE(set_usage2_artifact_.has_value());
+    if (!set_usage2_artifact_.has_value() || set_usage_artifact_.has_value()) {
       return false;
     }
 
-    EXPECT_EQ(expected_usage, set_usage_artifact_.value());
-    auto result = expected_usage == set_usage_artifact_.value();
-    set_usage_artifact_.reset();
+    EXPECT_EQ(expected_usage, set_usage2_artifact_.value());
+    auto result = expected_usage == set_usage2_artifact_.value();
+    set_usage2_artifact_.reset();
     return result;
   }
 
-  bool WasSetPcmStreamTypeCalled(const fuchsia_media::AudioStreamType& expected_stream_type) {
+  bool ExpectSetPcmStreamTypeCalled(const fuchsia_media::AudioStreamType& expected_stream_type) {
     EXPECT_TRUE(set_stream_type_artifact_.has_value());
     if (!set_stream_type_artifact_.has_value()) {
       return false;
@@ -260,7 +275,7 @@ class FakeAudioRenderer : public fidl::Server<fuchsia_media::AudioRenderer> {
     return result;
   }
 
-  bool WasPlayNoReplyCalled(int64_t expected_reference_time, int64_t expected_media_time) {
+  bool ExpectPlayNoReplyCalled(int64_t expected_reference_time, int64_t expected_media_time) {
     EXPECT_TRUE(play_no_reply_artifact_.has_value());
     if (!play_no_reply_artifact_.has_value()) {
       return false;
@@ -274,24 +289,26 @@ class FakeAudioRenderer : public fidl::Server<fuchsia_media::AudioRenderer> {
     return result;
   }
 
-  bool WasPauseNoReplyCalled() {
+  bool ExpectPauseNoReplyCalled() {
     EXPECT_TRUE(pause_no_reply_called_);
     auto result = pause_no_reply_called_;
     pause_no_reply_called_ = false;
     return result;
   }
 
-  bool WasNoOtherCalled() {
+  bool ExpectNoOtherCalled() {
     EXPECT_TRUE(add_payload_buffer_artifacts_.empty());
     EXPECT_TRUE(remove_payload_buffer_artifacts_.empty());
     EXPECT_FALSE(discard_all_packets_no_reply_called_);
-    EXPECT_FALSE(set_usage_artifact_);
-    EXPECT_FALSE(set_stream_type_artifact_);
+    EXPECT_FALSE(set_usage_artifact_.has_value()) << fidl::ToUnderlying(*set_usage_artifact_);
+    EXPECT_FALSE(set_usage2_artifact_.has_value()) << fidl::ToUnderlying(*set_usage2_artifact_);
+    EXPECT_FALSE(set_stream_type_artifact_.has_value());
     EXPECT_FALSE(pause_no_reply_called_);
 
     return add_payload_buffer_artifacts_.empty() && remove_payload_buffer_artifacts_.empty() &&
-           !discard_all_packets_no_reply_called_ && !set_usage_artifact_ &&
-           !set_stream_type_artifact_ && !pause_no_reply_called_;
+           !discard_all_packets_no_reply_called_ && !set_usage_artifact_.has_value() &&
+           !set_usage2_artifact_.has_value() && !set_stream_type_artifact_.has_value() &&
+           !pause_no_reply_called_;
   }
 
  private:
@@ -317,6 +334,7 @@ class FakeAudioRenderer : public fidl::Server<fuchsia_media::AudioRenderer> {
   bool discard_all_packets_no_reply_called_ = false;
   std::unique_ptr<FakeGainControl> bind_gain_control_artifact_;
   std::optional<fuchsia_media::AudioRenderUsage> set_usage_artifact_;
+  std::optional<fuchsia_media::AudioRenderUsage2> set_usage2_artifact_;
   std::optional<fuchsia_media::AudioStreamType> set_stream_type_artifact_;
   std::optional<PlayNoReplyArtifact> play_no_reply_artifact_;
   bool pause_no_reply_called_ = false;

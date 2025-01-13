@@ -96,7 +96,7 @@ void FakeAudioRenderer::GetReferenceClock(GetReferenceClockCallback callback) {
 
 void FakeAudioRenderer::SendPacket(fuchsia::media::StreamPacket packet,
                                    SendPacketCallback callback) {
-  EXPECT_TRUE(set_usage_called_);
+  EXPECT_TRUE(set_usage_called_ || set_usage2_called_);
   EXPECT_TRUE(set_pcm_stream_type_called_);
   EXPECT_TRUE(add_payload_buffer_called_);
   EXPECT_FALSE(expected_packets_iterator_ == expectations_.packets_.end());
@@ -118,7 +118,7 @@ void FakeAudioRenderer::SendPacket(fuchsia::media::StreamPacket packet,
 }
 
 void FakeAudioRenderer::SendPacketNoReply(fuchsia::media::StreamPacket packet) {
-  EXPECT_TRUE(set_usage_called_);
+  EXPECT_TRUE(set_usage_called_ || set_usage2_called_);
   EXPECT_TRUE(set_pcm_stream_type_called_);
   EXPECT_TRUE(add_payload_buffer_called_);
   EXPECT_FALSE(expected_packets_iterator_ == expectations_.packets_.end());
@@ -189,6 +189,12 @@ void FakeAudioRenderer::SetUsage(fuchsia::media::AudioRenderUsage usage) {
   EXPECT_EQ(expectations_.usage_, usage);
 
   set_usage_called_ = true;
+}
+
+void FakeAudioRenderer::SetUsage2(fuchsia::media::AudioRenderUsage2 usage) {
+  EXPECT_EQ(expectations_.usage2_, usage);
+
+  set_usage2_called_ = true;
 }
 
 }  // namespace test

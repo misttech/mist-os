@@ -62,6 +62,10 @@ class BaseRenderer : public AudioObject,
   void PlayNoReply(int64_t ref_time, int64_t med_time) final { Play(ref_time, med_time, nullptr); }
   void Pause(PauseCallback callback) final;
   void PauseNoReply() final { Pause(nullptr); }
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(ERROR) << "BaseRenderer: AudioRenderer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+  }
 
   std::shared_ptr<Clock> reference_clock() { return clock_; }
 

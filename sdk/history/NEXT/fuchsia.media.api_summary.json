@@ -1804,9 +1804,17 @@
         "request": "fuchsia.media/AudioRendererSetUsageRequest"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.media/AudioRenderer.SetUsage2",
+        "strictness": "flexible",
+        "ordinal": "2955490951032910083",
+        "direction": "one_way",
+        "request": "fuchsia.media/AudioRendererSetUsage2Request"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.media/AudioRenderer",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -1971,6 +1979,16 @@
         "kind": "struct",
         "name": "fuchsia.media/AudioRendererSetReferenceClockRequest",
         "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioRendererSetUsage2Request.usage2",
+        "ordinal": "1",
+        "type": "fuchsia.media/AudioRenderUsage2"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/AudioRendererSetUsage2Request"
     },
     {
         "kind": "struct/member",

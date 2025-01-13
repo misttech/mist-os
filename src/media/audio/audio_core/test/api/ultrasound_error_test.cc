@@ -45,6 +45,22 @@ TEST_F(UltrasoundErrorTest, RendererDoesNotSupportSetUsage) {
   Unbind(renderer);
 }
 
+TEST_F(UltrasoundErrorTest, RendererDoesNotSupportSetUsage2) {
+  CreateOutput();
+  auto renderer = CreateRenderer();
+
+  std::optional<zx_status_t> renderer_error;
+  renderer->fidl().set_error_handler([&renderer_error](auto status) { renderer_error = {status}; });
+
+  renderer->fidl()->SetUsage2(fuchsia::media::AudioRenderUsage2::INTERRUPTION);
+
+  // Now expect we get disconnected with ZX_ERR_NOT_SUPPORTED.
+  RunLoopUntil([&renderer_error] { return renderer_error.has_value(); });
+  ASSERT_TRUE(renderer_error);
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, *renderer_error);
+  Unbind(renderer);
+}
+
 TEST_F(UltrasoundErrorTest, RendererDoesNotSupportBindGainControl) {
   CreateOutput();
   auto renderer = CreateRenderer();

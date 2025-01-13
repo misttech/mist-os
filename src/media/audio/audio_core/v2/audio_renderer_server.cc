@@ -6,8 +6,11 @@
 
 #include <fidl/fuchsia.audio/cpp/fidl.h>
 #include <fidl/fuchsia.media/cpp/fidl.h>
+#include <fidl/fuchsia.media/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.media2/cpp/wire_types.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/fidl/cpp/hlcpp_conversion.h>
+#include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
@@ -233,24 +236,39 @@ void AudioRendererServer::SetReferenceClock(SetReferenceClockRequestView request
   reference_clock_ = std::move(clock);
 }
 
-void AudioRendererServer::SetUsage(SetUsageRequestView request,
-                                   SetUsageCompleter::Sync& completer) {
-  TRACE_DURATION("audio", "AudioRendererServer::SetUsage");
-
+zx_status_t AudioRendererServer::SetUsageCheck() {
   if (usage_ == RenderUsage::ULTRASOUND) {
     FX_LOGS(WARNING) << "Unsupported method SetUsage on ultrasound renderer";
     Shutdown(ZX_ERR_NOT_SUPPORTED);
-    return;
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   if (IsConfigured()) {
     FX_LOGS(WARNING) << "Usage cannot be set once configured.";
     Shutdown(ZX_ERR_BAD_STATE);
-    return;
+    return ZX_ERR_BAD_STATE;
   }
+  return ZX_OK;
+}
 
-  usage_ = media::audio::RenderUsageFromFidlRenderUsage(
-      static_cast<fuchsia::media::AudioRenderUsage2>(request->usage));
+void AudioRendererServer::SetUsage(SetUsageRequestView request,
+                                   SetUsageCompleter::Sync& completer) {
+  TRACE_DURATION("audio", "AudioRendererServer::SetUsage");
+
+  if (SetUsageCheck() == ZX_OK) {
+    usage_ = media::audio::RenderUsageFromFidlRenderUsage(
+        static_cast<fuchsia::media::AudioRenderUsage2>(static_cast<uint32_t>(request->usage)));
+  }
+}
+
+void AudioRendererServer::SetUsage2(SetUsage2RequestView request,
+                                    SetUsage2Completer::Sync& completer) {
+  TRACE_DURATION("audio", "AudioRendererServer::SetUsage2");
+
+  if (SetUsageCheck() == ZX_OK) {
+    usage_ = media::audio::RenderUsageFromFidlRenderUsage(
+        fuchsia::media::AudioRenderUsage2(static_cast<uint32_t>(request->usage2)));
+  }
 }
 
 void AudioRendererServer::SetPcmStreamType(SetPcmStreamTypeRequestView request,

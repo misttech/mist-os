@@ -189,7 +189,7 @@ class AudioRendererShim : public RendererShimImpl {
       gain()->SetGain(*initial_gain_db);
     }
 
-    fidl()->SetUsage(*FromFidlRenderUsage2(usage));
+    fidl()->SetUsage2(usage);
     if (reference_clock) {
       SetReferenceClock(fixture, *reference_clock);
     }

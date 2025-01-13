@@ -117,6 +117,9 @@ impl Renderer {
                         break;
                     }
                 }
+                fmedia::AudioRendererEvent::_UnknownEvent { .. } => {
+                    todo!("AudioRenderer UnknownEvent")
+                }
             }
         }
 

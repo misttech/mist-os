@@ -8,7 +8,9 @@
 #include <fidl/fuchsia.media/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/unified_messaging_declarations.h>
+#include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 #include <lib/media/cpp/timeline_function.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include <memory>
 
@@ -75,6 +77,11 @@ class Consumer : public fidl::Server<fuchsia_media::AudioConsumer>,
 
   // Handles errors concerning the connection to |AudioRenderer|.
   void on_fidl_error(fidl::UnbindInfo error) override;
+  void handle_unknown_event(
+      fidl::UnknownEventMetadata<fuchsia_media::AudioRenderer> metadata) override {
+    FX_LOGS(WARNING) << "Consumer: unknown event (AudioRenderer) ordinal "
+                     << metadata.event_ordinal;
+  }
 
  private:
   template <typename Protocol>

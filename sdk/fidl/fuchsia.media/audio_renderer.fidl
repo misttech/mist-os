@@ -21,7 +21,8 @@ const MAX_FRAMES_PER_RENDERER_PACKET int64 = 0x3ffff;
 /// `DiscardAllPackets` on the AudioRenderer (and ideally `Stop` before `DiscardAllPackets`), prior
 /// to reconfiguring the renderer.
 ///
-closed protocol AudioRenderer {
+@discoverable(server="platform")
+closed(removed=NEXT) open(added=NEXT) protocol AudioRenderer {
     compose StreamBufferSet;
     compose StreamSink;
 
@@ -130,10 +131,16 @@ closed protocol AudioRenderer {
 
     /// Sets the usage of the render stream. This method may not be called after
     /// `SetPcmStreamType` is called. The default usage is `MEDIA`.
-    // TODO(https://fxbug.dev/384932846): add new method with |AudioRenderUsage2|
     // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
     strict SetUsage(struct {
         usage AudioRenderUsage;
+    });
+
+    /// Sets the usage of the render stream. This method may not be called after
+    /// `SetPcmStreamType` is called. The default usage is `MEDIA`.
+    @available(added=NEXT)
+    flexible SetUsage2(struct {
+        usage2 AudioRenderUsage2;
     });
 
     /// Sets the type of the stream to be delivered by the client. Using this method implies

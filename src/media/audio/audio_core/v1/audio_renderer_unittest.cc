@@ -372,7 +372,7 @@ TEST_F(AudioRendererTestSyntheticClocks, RegistersWithRouteGraphIfHasUsageStream
 
   auto* renderer_raw = renderer_.get();
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::SYSTEM_AGENT));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::SYSTEM_AGENT);
   RunLoopUntilIdle();
   EXPECT_EQ(context().link_matrix().DestLinkCount(*renderer_raw), 0u);
 
@@ -392,7 +392,7 @@ TEST_F(AudioRendererTestSyntheticClocks, DoublePlay) {
   RunLoopUntilIdle();
 
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::COMMUNICATION));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::COMMUNICATION);
   fidl_renderer_->SetPcmStreamType(stream_type_);
   fidl_renderer_->AddPayloadBuffer(0, std::move(vmo_));
   fidl_renderer_->Play(fuchsia::media::NO_TIMESTAMP, fuchsia::media::NO_TIMESTAMP,
@@ -418,7 +418,7 @@ TEST_F(AudioRendererTestSyntheticClocks, DoublePause) {
   RunLoopUntilIdle();
 
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::COMMUNICATION));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::COMMUNICATION);
   fidl_renderer_->SetPcmStreamType(stream_type_);
   fidl_renderer_->AddPayloadBuffer(0, std::move(vmo_));
   fidl_renderer_->PlayNoReply(fuchsia::media::NO_TIMESTAMP, fuchsia::media::NO_TIMESTAMP);
@@ -458,7 +458,7 @@ TEST_F(AudioRendererTestSyntheticClocks, PauseBeforePlay) {
   RunLoopUntilIdle();
 
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::COMMUNICATION));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::COMMUNICATION);
   fidl_renderer_->SetPcmStreamType(stream_type_);
   fidl_renderer_->AddPayloadBuffer(0, std::move(vmo_));
 
@@ -476,7 +476,7 @@ TEST_F(AudioRendererTestSyntheticClocks, ReportsPlayAndPauseToPolicy) {
   RunLoopUntilIdle();
 
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::SYSTEM_AGENT));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::SYSTEM_AGENT);
   fidl_renderer_->SetPcmStreamType(stream_type_);
   fidl_renderer_->AddPayloadBuffer(0, std::move(vmo_));
 
@@ -512,7 +512,7 @@ TEST_F(AudioRendererTestSyntheticClocks, RemoveRendererDuringPlay) {
   RunLoopUntilIdle();
 
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::COMMUNICATION));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::COMMUNICATION);
   fidl_renderer_->SetPcmStreamType(stream_type_);
   fidl_renderer_->AddPayloadBuffer(0, std::move(vmo_));
   fidl_renderer_->Play(fuchsia::media::NO_TIMESTAMP, fuchsia::media::NO_TIMESTAMP,
@@ -533,7 +533,7 @@ TEST_F(AudioRendererTestSyntheticClocks, RemoveRendererDuringPlayNoReply) {
   RunLoopUntilIdle();
 
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::SYSTEM_AGENT));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::SYSTEM_AGENT);
   fidl_renderer_->SetPcmStreamType(stream_type_);
   fidl_renderer_->AddPayloadBuffer(0, std::move(vmo_));
   fidl_renderer_->PlayNoReply(fuchsia::media::NO_TIMESTAMP, fuchsia::media::NO_TIMESTAMP);
@@ -549,7 +549,7 @@ TEST_F(AudioRendererTestSyntheticClocks, RemoveRendererDuringPause) {
   RunLoopUntilIdle();
 
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::COMMUNICATION));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::COMMUNICATION);
   fidl_renderer_->SetPcmStreamType(stream_type_);
   fidl_renderer_->AddPayloadBuffer(0, std::move(vmo_));
   fidl_renderer_->PlayNoReply(fuchsia::media::NO_TIMESTAMP, fuchsia::media::NO_TIMESTAMP);
@@ -570,7 +570,7 @@ TEST_F(AudioRendererTestSyntheticClocks, RemoveRendererDuringPauseNoReply) {
   RunLoopUntilIdle();
 
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::SYSTEM_AGENT));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::SYSTEM_AGENT);
   fidl_renderer_->SetPcmStreamType(stream_type_);
   fidl_renderer_->AddPayloadBuffer(0, std::move(vmo_));
   fidl_renderer_->PlayNoReply(fuchsia::media::NO_TIMESTAMP, fuchsia::media::NO_TIMESTAMP);
@@ -587,7 +587,7 @@ TEST_F(AudioRendererTestSyntheticClocks, RemoveRendererWhileBufferLocked) {
   RunLoopUntilIdle();
 
   context().route_graph().AddRenderer(std::move(renderer_));
-  fidl_renderer_->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::SYSTEM_AGENT));
+  fidl_renderer_->SetUsage2(AudioRenderUsage2::SYSTEM_AGENT);
   fidl_renderer_->SetPcmStreamType(stream_type_);
   fidl_renderer_->AddPayloadBuffer(0, std::move(vmo_));
   fidl_renderer_->PlayNoReply(fuchsia::media::NO_TIMESTAMP, fuchsia::media::NO_TIMESTAMP);

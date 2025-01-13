@@ -76,6 +76,11 @@ class FakeAudioRenderer : public AudioObject, public fuchsia::media::AudioRender
   void BindGainControl(::fidl::InterfaceRequest<::fuchsia::media::audio::GainControl>
                            gain_control_request) override {}
   void SetUsage(fuchsia::media::AudioRenderUsage usage) override {}
+  void SetUsage2(fuchsia::media::AudioRenderUsage2 usage2) override {}
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(ERROR) << "FakeAudioRenderer: AudioRenderer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+  }
 
  private:
   zx::duration FindMinLeadTime();

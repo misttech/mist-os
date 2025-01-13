@@ -20,6 +20,7 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
     std::vector<fuchsia::media::StreamPacket> packets_;
     fuchsia::media::AudioStreamType stream_type_;
     fuchsia::media::AudioRenderUsage usage_;
+    fuchsia::media::AudioRenderUsage2 usage2_;
     bool block_completion_ = false;
     bool close_on_add_payload_buffer_ = false;
   };
@@ -39,6 +40,7 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
             .channels = 1,
             .frames_per_second = 48000}),
         .usage_ = fuchsia::media::AudioRenderUsage::BACKGROUND,
+        .usage2_ = fuchsia::media::AudioRenderUsage2::BACKGROUND,
         .block_completion_ = false,
     };
   }
@@ -102,6 +104,13 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
 
   void SetUsage(fuchsia::media::AudioRenderUsage usage) override;
 
+  void SetUsage2(fuchsia::media::AudioRenderUsage2 usage) override;
+
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
+    FX_LOGS(ERROR) << "FakeAudioRenderer: AudioRenderer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+  }
+
  private:
   fidl::Binding<fuchsia::media::AudioRenderer> binding_;
 
@@ -111,6 +120,7 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
   std::vector<fuchsia::media::StreamPacket>::const_iterator expected_packets_iterator_;
   SendPacketCallback send_packet_callback_;
   bool set_usage_called_ = false;
+  bool set_usage2_called_ = false;
   bool set_pcm_stream_type_called_ = false;
   bool add_payload_buffer_called_ = false;
   bool play_no_reply_called_ = false;

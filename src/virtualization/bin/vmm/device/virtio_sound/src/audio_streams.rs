@@ -262,7 +262,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
             fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioRendererMarker>();
         self.audio.create_audio_renderer(server_end)?;
         let fidl_proxy = client_end.into_proxy();
-        fidl_proxy.set_usage(fidl_fuchsia_media::AudioRenderUsage::Media)?;
+        fidl_proxy.set_usage2(fidl_fuchsia_media::AudioRenderUsage2::Media)?;
         fidl_proxy.set_pcm_stream_type(&params.stream_type)?;
         fidl_proxy.enable_min_lead_time_events(true)?;
         fidl_proxy.add_payload_buffer(0, payload_vmo)?;
@@ -548,9 +548,9 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                     event = job.event_stream.try_next().fuse() =>
                         match event {
                             Ok(event) => {
-                                use fidl_fuchsia_media::AudioRendererEvent::OnMinLeadTimeChanged;
+                                use fidl_fuchsia_media::AudioRendererEvent;
                                 match event {
-                                    Some(OnMinLeadTimeChanged { min_lead_time_nsec }) => {
+                                    Some(AudioRendererEvent::OnMinLeadTimeChanged { min_lead_time_nsec }) => {
                                         // Include our deadline in the lead time.
                                         // This is an upper-bound: see discussion in https://fxbug.dev/42172030.
                                         let lead_time = zx::MonotonicDuration::from_nanos(min_lead_time_nsec)
@@ -559,6 +559,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                                         throttled_log::info!("AudioRenderer lead_time {} ns", lead_time.into_nanos());
                                         job.lead_time.send(lead_time)?;
                                     },
+                                    Some(AudioRendererEvent::_UnknownEvent { .. }) => todo!("AudioRenderer: unknown event"),
                                     None => {
                                         // TODO(https://fxbug.dev/42052022): temporary for debugging
                                         throttled_log::info!("AudioRenderer lead_time FIDL connection closed by peer");

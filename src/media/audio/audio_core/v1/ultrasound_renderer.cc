@@ -119,6 +119,10 @@ void UltrasoundRenderer::SetUsage(fuchsia::media::AudioRenderUsage usage) {
   FX_LOGS(ERROR) << "Unsupported method SetUsage on ultrasound renderer";
   binding().Close(ZX_ERR_NOT_SUPPORTED);
 }
+void UltrasoundRenderer::SetUsage2(fuchsia::media::AudioRenderUsage2 usage) {
+  FX_LOGS(ERROR) << "Unsupported method SetUsage2 on ultrasound renderer";
+  binding().Close(ZX_ERR_NOT_SUPPORTED);
+}
 void UltrasoundRenderer::BindGainControl(
     fidl::InterfaceRequest<fuchsia::media::audio::GainControl> request) {
   FX_LOGS(ERROR) << "Unsupported method BindGainControl on ultrasound renderer";
