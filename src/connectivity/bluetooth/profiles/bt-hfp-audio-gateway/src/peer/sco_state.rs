@@ -18,15 +18,14 @@ use crate::sco_connector::ScoConnection;
 pub struct ScoActive {
     pub params: ValidScoConnectionParameters,
     on_closed: Shared<BoxFuture<'static, ()>>,
-    // TODO(https://fxbug.dev/332390332): Remove or explain #[allow(dead_code)].
-    #[allow(dead_code)]
-    pub pause_token: a2dp::PauseToken,
+    // Stored (but unused) here to keep A2DP in a paused state.
+    _pause_token: a2dp::PauseToken,
 }
 
 impl ScoActive {
     pub fn new(connection: &ScoConnection, pause_token: a2dp::PauseToken) -> Self {
         let on_closed = connection.on_closed().boxed().shared();
-        Self { params: connection.params.clone(), on_closed, pause_token }
+        Self { params: connection.params.clone(), on_closed, _pause_token: pause_token }
     }
 
     pub fn on_closed(&self) -> impl Future<Output = ()> + 'static {
