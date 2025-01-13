@@ -9,22 +9,24 @@ use ebpf::{
 use linux_uapi::{
     __sk_buff, bpf_func_id_BPF_FUNC_csum_update, bpf_func_id_BPF_FUNC_get_current_uid_gid,
     bpf_func_id_BPF_FUNC_get_socket_cookie, bpf_func_id_BPF_FUNC_get_socket_uid,
-    bpf_func_id_BPF_FUNC_ktime_get_boot_ns, bpf_func_id_BPF_FUNC_ktime_get_ns,
-    bpf_func_id_BPF_FUNC_l3_csum_replace, bpf_func_id_BPF_FUNC_l4_csum_replace,
-    bpf_func_id_BPF_FUNC_map_delete_elem, bpf_func_id_BPF_FUNC_map_lookup_elem,
-    bpf_func_id_BPF_FUNC_map_update_elem, bpf_func_id_BPF_FUNC_probe_read_str,
-    bpf_func_id_BPF_FUNC_redirect, bpf_func_id_BPF_FUNC_ringbuf_discard,
-    bpf_func_id_BPF_FUNC_ringbuf_reserve, bpf_func_id_BPF_FUNC_ringbuf_submit,
-    bpf_func_id_BPF_FUNC_skb_adjust_room, bpf_func_id_BPF_FUNC_skb_change_head,
-    bpf_func_id_BPF_FUNC_skb_change_proto, bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
-    bpf_func_id_BPF_FUNC_skb_pull_data, bpf_func_id_BPF_FUNC_skb_store_bytes,
-    bpf_func_id_BPF_FUNC_trace_printk, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB,
-    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT,
-    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR, bpf_prog_type_BPF_PROG_TYPE_KPROBE,
-    bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT, bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS,
-    bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER, bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT,
-    bpf_prog_type_BPF_PROG_TYPE_XDP, bpf_sock, bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t,
-    fuse_bpf_arg, fuse_bpf_args, fuse_entry_bpf_out, fuse_entry_out, xdp_md,
+    bpf_func_id_BPF_FUNC_ktime_get_boot_ns, bpf_func_id_BPF_FUNC_ktime_get_coarse_ns,
+    bpf_func_id_BPF_FUNC_ktime_get_ns, bpf_func_id_BPF_FUNC_l3_csum_replace,
+    bpf_func_id_BPF_FUNC_l4_csum_replace, bpf_func_id_BPF_FUNC_map_delete_elem,
+    bpf_func_id_BPF_FUNC_map_lookup_elem, bpf_func_id_BPF_FUNC_map_update_elem,
+    bpf_func_id_BPF_FUNC_probe_read_str, bpf_func_id_BPF_FUNC_probe_read_user,
+    bpf_func_id_BPF_FUNC_probe_read_user_str, bpf_func_id_BPF_FUNC_redirect,
+    bpf_func_id_BPF_FUNC_ringbuf_discard, bpf_func_id_BPF_FUNC_ringbuf_reserve,
+    bpf_func_id_BPF_FUNC_ringbuf_submit, bpf_func_id_BPF_FUNC_skb_adjust_room,
+    bpf_func_id_BPF_FUNC_skb_change_head, bpf_func_id_BPF_FUNC_skb_change_proto,
+    bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_skb_pull_data,
+    bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_func_id_BPF_FUNC_trace_printk,
+    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SKB, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK,
+    bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT, bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
+    bpf_prog_type_BPF_PROG_TYPE_KPROBE, bpf_prog_type_BPF_PROG_TYPE_SCHED_ACT,
+    bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER,
+    bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT, bpf_prog_type_BPF_PROG_TYPE_XDP, bpf_sock,
+    bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t, fuse_bpf_arg, fuse_bpf_args,
+    fuse_entry_bpf_out, fuse_entry_out, xdp_md,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock};
@@ -125,6 +127,46 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     name: "ktime_get_ns",
                     signature: FunctionSignature {
                         args: vec![],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelperDefinition {
+                    index: bpf_func_id_BPF_FUNC_probe_read_user,
+                    name: "probe_read_user",
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::MemoryParameter {
+                                size: MemoryParameterSize::Reference { index: 1 },
+                                input: false,
+                                output: true,
+                            },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelperDefinition {
+                    index: bpf_func_id_BPF_FUNC_probe_read_user_str,
+                    name: "probe_read_user_str",
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::MemoryParameter {
+                                size: MemoryParameterSize::Reference { index: 1 },
+                                input: false,
+                                output: true,
+                            },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
                         return_value: Type::unknown_written_scalar_value(),
                         invalidate_array_bounds: false,
                     },
@@ -267,7 +309,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                 },
             ),
             (
-                vec![ProgramType::KProbe].into(),
+                vec![ProgramType::KProbe, ProgramType::TracePoint].into(),
                 EbpfHelperDefinition {
                     index: bpf_func_id_BPF_FUNC_probe_read_str,
                     name: "probe_read_str",
@@ -444,6 +486,18 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                 EbpfHelperDefinition {
                     index: bpf_func_id_BPF_FUNC_ktime_get_boot_ns,
                     name: "ktime_get_boot_ns",
+                    signature: FunctionSignature {
+                        args: vec![],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelperDefinition {
+                    index: bpf_func_id_BPF_FUNC_ktime_get_coarse_ns,
+                    name: "ktime_get_coarse_ns",
                     signature: FunctionSignature {
                         args: vec![],
                         return_value: Type::unknown_written_scalar_value(),
