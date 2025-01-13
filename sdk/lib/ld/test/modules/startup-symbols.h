@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
+#include <vector>
+
 // This file contains symbols decls that are called directly by tests in
 // //sdk/lib/dl/test:unittests. These symbols should be provided by targets that
 // serve as startup modules for those tests.
@@ -24,7 +26,20 @@ extern "C" {
   gnu::tls_model("global-dynamic")]] extern thread_local int gStaticTlsVar;
 }
 
-[[gnu::visibility("default")]] extern int gInitFiniState;
+// This is a class interface for test modules to register that their initializer
+// and finalizer functions have run.
+class RegisterInitFini {
+ public:
+  // Test module init and fini functions call these Register* methods with a
+  // value specific to that function in the test module.
+  virtual void RegisterInit(int) = 0;
+  virtual void RegisterFini(int) = 0;
+};
+
+// Tests in //sdk/lib/dl/test/dl-load-tests-initfini.cc will set this global to
+// an instantiated object that defines the Register* methods that test modules
+// will use to register their init/fini functions.
+[[gnu::visibility("default")]] extern RegisterInitFini* gRegisterInitFini;
 
 constexpr int kStaticTlsDataValue = 16;
 

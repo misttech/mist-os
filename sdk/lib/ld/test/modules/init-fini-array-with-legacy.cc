@@ -11,36 +11,28 @@
 // DT_FINI.
 
 extern "C" [[gnu::retain]] void _init() {
-  if (gInitFiniState == 0) {
-    gInitFiniState = 201;
-  } else {
-    gInitFiniState = -201;
+  if (gRegisterInitFini) {
+    gRegisterInitFini->RegisterInit(201);
   }
 }
 
 extern "C" [[gnu::retain]] void _fini() {
-  if (gInitFiniState == 203) {
-    gInitFiniState = 204;
-  } else {
-    gInitFiniState = -204;
+  if (gRegisterInitFini) {
+    gRegisterInitFini->RegisterFini(204);
   }
 }
 
 namespace {
 
 [[gnu::constructor]] void ctor_array() {
-  if (gInitFiniState == 201) {
-    gInitFiniState = 202;
-  } else {
-    gInitFiniState = -202;
+  if (gRegisterInitFini) {
+    gRegisterInitFini->RegisterInit(202);
   }
 }
 
 [[gnu::destructor]] void dtor_array() {
-  if (gInitFiniState == 202) {
-    gInitFiniState = 203;
-  } else {
-    gInitFiniState = -203;
+  if (gRegisterInitFini) {
+    gRegisterInitFini->RegisterFini(203);
   }
 }
 

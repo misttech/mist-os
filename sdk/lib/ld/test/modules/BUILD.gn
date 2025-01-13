@@ -16,7 +16,7 @@ import("//sdk/lib/ld/testing/test_elf_object.gni")
 # or its deps to already be loaded. Therefore tests must use uniquely named test
 # files. `per_test_modules` and `per_test_executables` includes targets that
 # will have copies generated with each suffix in `per_test_suffices`.
-# `per_test_suffices` include test names in //sdk/lib/dl/test/dl-load-tests.cc.
+# `per_test_suffices` include test names in //sdk/lib/dl/test/* test files.
 per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
@@ -1727,7 +1727,7 @@ foreach(case, init_fini_array_tests) {
         prio_attr = "(${ctor.prio})"
         prio_suffix = "_${ctor.prio}"
       }
-      contents += [ "[[gnu::constructor$prio_attr]] void ctor${prio_suffix}_${ctor.value}() { Check(${ctor.value}); }" ]
+      contents += [ "[[gnu::constructor$prio_attr]] void ctor${prio_suffix}_${ctor.value}() { RegisterInit(${ctor.value}); }" ]
     }
     foreach(dtor, case.dtors) {
       if (dtor.prio == false) {
@@ -1737,7 +1737,7 @@ foreach(case, init_fini_array_tests) {
         prio_attr = "(${dtor.prio})"
         prio_suffix = "_${dtor.prio}"
       }
-      contents += [ "[[gnu::destructor$prio_attr]] void dtor${prio_suffix}_${dtor.value}() { Check(${dtor.value}); }" ]
+      contents += [ "[[gnu::destructor$prio_attr]] void dtor${prio_suffix}_${dtor.value}() { RegisterFini(${dtor.value}); }" ]
     }
   }
   target(case.type, case.name) {

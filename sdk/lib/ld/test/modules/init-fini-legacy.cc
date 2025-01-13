@@ -9,17 +9,13 @@
 // be in a certain state before it is updated.
 
 extern "C" [[gnu::retain]] void _init() {
-  if (gInitFiniState == 0) {
-    gInitFiniState = 101;
-  } else {
-    gInitFiniState = -101;
+  if (gRegisterInitFini) {
+    gRegisterInitFini->RegisterInit(101);
   }
 }
 
 extern "C" [[gnu::retain]] void _fini() {
-  if (gInitFiniState == 101) {
-    gInitFiniState = 102;
-  } else {
-    gInitFiniState = -102;
+  if (gRegisterInitFini) {
+    gRegisterInitFini->RegisterFini(102);
   }
 }

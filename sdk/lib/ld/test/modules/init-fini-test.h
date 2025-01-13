@@ -7,18 +7,19 @@
 
 #include "startup-symbols.h"
 
-// This header defines the `Check` function used by generated init-fini-*.cc
-// tests. They expect a global variable to be in a certain state before it is
-// updated.
+// This header defines the `Register*` functions called by init/fini functions
+// in generated init-fini-array-*.cc tests. These functions will "register" the
+// given identity value when an init/fini function is run.
 
-// Check that the `gInitFiniState` variable is the expected value. If it is,
-// the variable is incremented. If it isn't then `gInitFiniState` is set to the
-// negative representation of what was expected, as a debugging breadcrumb.
-inline void Check(int expected_value) {
-  if (gInitFiniState == expected_value) {
-    ++gInitFiniState;
-  } else {
-    gInitFiniState = -expected_value;
+inline void RegisterInit(int id) {
+  if (gRegisterInitFini) {
+    gRegisterInitFini->RegisterInit(id);
+  }
+}
+
+inline void RegisterFini(int id) {
+  if (gRegisterInitFini) {
+    gRegisterInitFini->RegisterFini(id);
   }
 }
 
