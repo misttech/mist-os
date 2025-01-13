@@ -80,6 +80,7 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   inspect::UintProperty total_lease_acquisitions_;
   inspect::BoolProperty wake_lease_held_;
   inspect::BoolProperty wake_lease_grabbable_;
+  inspect::UintProperty wake_lease_last_attempted_acquisition_timestamp_;
   inspect::UintProperty wake_lease_last_acquired_timestamp_;
   inspect::UintProperty wake_lease_last_refreshed_timestamp_;
 };
