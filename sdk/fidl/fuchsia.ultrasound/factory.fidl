@@ -47,7 +47,7 @@ closed protocol Factory {
     /// `fuchsia.media.AudioRenderer`, with the following differences:
     ///
     /// - `SetUsage` is disallowed. Ultrasound renderers do not have an associated
-    /// `fuchsia.media.AudioRenderUsage`.
+    /// `fuchsia.media.AudioRenderUsage2`.
     ///
     /// - `BindGainControl` is disallowed. Ultrasound renderers will always have unity gain.
     ///

@@ -9,6 +9,7 @@ using fuchsia.media.audio;
 /// An AudioRenderer's usage cannot be changed after creation.  The
 /// AudioRenderUsage is used by audio policy to dictate how audio streams
 /// interact with each other.
+// TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
 type AudioRenderUsage = strict enum {
     /// Stream is intended to be used for ambient or background sound. Streams
     /// that can be interrupted without consequence should use this.
@@ -32,6 +33,36 @@ type AudioRenderUsage = strict enum {
     COMMUNICATION = 4;
 };
 const RENDER_USAGE_COUNT uint8 = 5;
+
+/// Usage annotating the purpose of the stream being used to render audio. An AudioRenderer's
+/// usage cannot be changed after creation. The AudioRenderUsage2 value is used by audio policy
+/// to dictate how audio streams interact with each other. This enum expands the original (strict)
+/// enum |AudioRenderUsage| with additional stream types.
+@available(added=NEXT)
+type AudioRenderUsage2 = strict enum : uint32 {
+    /// Stream is intended to be used for ambient or background sound. Streams
+    /// that can be interrupted without consequence should use this.
+    BACKGROUND = 0;
+
+    /// Stream is intended to be used for normal functionality. Streams that
+    /// are part of normal functionality should use this.
+    MEDIA = 1;
+
+    /// Stream is intended to interrupt any ongoing function of the device.
+    /// Streams that are used for interruptions like notifications should use
+    /// this.
+    INTERRUPTION = 2;
+
+    /// Stream is for interaction with a system agent.  This should be used
+    /// in response to a user initiated trigger.
+    SYSTEM_AGENT = 3;
+
+    /// Stream is intended to be used for some form of real time user to user
+    /// communication. Voice/Video chat should use this.
+    COMMUNICATION = 4;
+};
+@available(added=NEXT)
+const RENDER_USAGE2_COUNT uint8 = 5;
 
 /// Usages annotating the purpose of the stream being used to capture audio. The
 /// AudioCaptureUsage is used by audio policy to dictate how audio streams
@@ -60,6 +91,12 @@ type AudioCaptureUsage = strict enum {
 };
 const CAPTURE_USAGE_COUNT uint8 = 4;
 
+/// A reasonable upper-bound for the maximum number of render or capture usages. Use this value in
+/// FIDL APIs (e.g. for max vector size), instead of RENDER_USAGE_COUNT or CAPTURE_USAGE_COUNT
+/// directly. This way, an increase in these consts will not cause an ABI-breaking change.
+@available(added=NEXT)
+const MAX_USAGE_COUNT uint8 = 8;
+
 /// The behaviors applied to streams when multiple are active.
 type Behavior = strict enum {
     /// Mix the streams.
@@ -72,8 +109,15 @@ type Behavior = strict enum {
     MUTE = 2;
 };
 
+// TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage| (and |Usage|)
 type Usage = strict union {
     1: render_usage AudioRenderUsage;
+    2: capture_usage AudioCaptureUsage;
+};
+
+@available(added=NEXT)
+type Usage2 = strict union {
+    1: render_usage AudioRenderUsage2;
     2: capture_usage AudioCaptureUsage;
 };
 
@@ -120,6 +164,8 @@ closed protocol AudioCore {
 
     /// Sets the Usage gain applied to Renderers. By default, the gain for all
     /// render usages is set to Unity (0 db).
+    // TODO(https://fxbug.dev/384932846): create new method with |AudioRenderUsage2|
+    // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
     strict SetRenderUsageGain(struct {
         usage AudioRenderUsage;
         gain_db float32;
@@ -133,6 +179,8 @@ closed protocol AudioCore {
     });
 
     /// Binds to a volume control protocol for the given usage.
+    // TODO(https://fxbug.dev/384932846): create new method with |Usage2|
+    // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
     strict BindUsageVolumeControl(resource struct {
         usage Usage;
         volume_control server_end:fuchsia.media.audio.VolumeControl;
@@ -141,6 +189,8 @@ closed protocol AudioCore {
     /// Queries the volume percentage [0, 1] that maps to a `gain_db` value for a particular
     /// `usage`. This is the same mapping as used by the VolumeControl from
     /// `BindUsageVolumeControl`.
+    // TODO(https://fxbug.dev/384932846): create new method with |Usage2|
+    // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
     strict GetVolumeFromDb(struct {
         usage Usage;
         gain_db float32;
@@ -150,6 +200,8 @@ closed protocol AudioCore {
 
     /// Queries the decibel value that maps to a volume percentage [0, 1] for a particular `usage`.
     /// This is the same mapping as used by the VolumeControl from `BindUsageVolumeControl`.
+    // TODO(https://fxbug.dev/384932846): create new method with |Usage2|
+    // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
     strict GetDbFromVolume(struct {
         usage Usage;
         volume float32;
@@ -160,6 +212,8 @@ closed protocol AudioCore {
     /// Sets how audio_core handles interactions of multiple active streams simultaneously.  If
     /// streams of Usage `active` are processing audio, and streams of Usage `affected` are as well,
     /// the Behavior specified will be applied to the streams of Usage `affected`.
+    // TODO(https://fxbug.dev/384932846): create new method with |Usage2|
+    // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
     strict SetInteraction(struct {
         active Usage;
         affected Usage;

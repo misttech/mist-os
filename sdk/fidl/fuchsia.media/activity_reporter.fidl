@@ -6,6 +6,8 @@
 library fuchsia.media;
 
 /// A protocol for monitoring the usage activity of the AudioRenderers and AudioCapturers.
+// TODO(https://fxbug.dev/384932846): add new protocol or method with |AudioRenderUsage2|
+// TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
 @discoverable
 closed protocol ActivityReporter {
     /// Notifies the client whenever there is a change in the set of active AudioRenderUsages.

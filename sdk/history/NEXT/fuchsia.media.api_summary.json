@@ -1608,6 +1608,37 @@
         "type": "uint32"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.media/AudioRenderUsage2.BACKGROUND",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/AudioRenderUsage2.COMMUNICATION",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/AudioRenderUsage2.INTERRUPTION",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/AudioRenderUsage2.MEDIA",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/AudioRenderUsage2.SYSTEM_AGENT",
+        "value": "3"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.media/AudioRenderUsage2",
+        "strictness": "strict",
+        "type": "uint32"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.media/AudioRenderer.AddPayloadBuffer",
         "strictness": "strict",
@@ -2561,6 +2592,12 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.media/MAX_USAGE_COUNT",
+        "type": "uint8",
+        "value": "8"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.media/METADATA_LABEL_ALBUM",
         "type": "string",
         "value": "fuchsia.media.album"
@@ -2962,6 +2999,12 @@
     {
         "kind": "struct",
         "name": "fuchsia.media/Property"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.media/RENDER_USAGE2_COUNT",
+        "type": "uint8",
+        "value": "5"
     },
     {
         "kind": "const",
@@ -4126,6 +4169,23 @@
     {
         "kind": "union",
         "name": "fuchsia.media/Usage",
+        "strictness": "strict"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.media/Usage2.capture_usage",
+        "ordinal": "2",
+        "type": "fuchsia.media/AudioCaptureUsage"
+    },
+    {
+        "kind": "union/member",
+        "name": "fuchsia.media/Usage2.render_usage",
+        "ordinal": "1",
+        "type": "fuchsia.media/AudioRenderUsage2"
+    },
+    {
+        "kind": "union",
+        "name": "fuchsia.media/Usage2",
         "strictness": "strict"
     },
     {
