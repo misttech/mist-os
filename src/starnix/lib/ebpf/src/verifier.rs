@@ -1461,17 +1461,18 @@ impl ComputationContext {
     }
 
     fn apply_computation(
+        context: &ComputationContext,
         op1: Type,
         op2: Type,
         alu_type: AluType,
         op: impl Fn(u64, u64) -> u64,
     ) -> Result<Type, String> {
-        let result: Type = match (alu_type, op1, op2) {
+        let result: Type = match (alu_type, op1.inner(context)?, op2.inner(context)?) {
             (
                 _,
                 Type::ScalarValue { value: value1, unknown_mask: 0, .. },
                 Type::ScalarValue { value: value2, unknown_mask: 0, .. },
-            ) => op(value1, value2).into(),
+            ) => op(*value1, *value2).into(),
             (
                 AluType::Bitwise,
                 Type::ScalarValue {
@@ -1487,7 +1488,7 @@ impl ComputationContext {
             ) => {
                 let unknown_mask = unknown_mask1 | unknown_mask2;
                 let unwritten_mask = unwritten_mask1 | unwritten_mask2;
-                let value = op(value1, value2) & !unknown_mask;
+                let value = op(*value1, *value2) & !unknown_mask;
                 Type::ScalarValue { value, unknown_mask, unwritten_mask }
             }
             (
@@ -1499,9 +1500,9 @@ impl ComputationContext {
                 },
                 Type::ScalarValue { value: value2, unknown_mask: 0, .. },
             ) => {
-                let value = op(value1, value2);
-                let unknown_mask = op(unknown_mask1, value2);
-                let unwritten_mask = op(unwritten_mask1, value2);
+                let value = op(*value1, *value2);
+                let unknown_mask = op(*unknown_mask1, *value2);
+                let unwritten_mask = op(*unwritten_mask1, *value2);
                 Type::ScalarValue { value, unknown_mask, unwritten_mask }
             }
             (
@@ -1513,9 +1514,9 @@ impl ComputationContext {
                 },
                 Type::ScalarValue { value: value2, unknown_mask: 0, .. },
             ) => {
-                let unknown_mask = unknown_mask1.overflowing_shr(value2 as u32).0;
-                let unwritten_mask = unwritten_mask1.overflowing_shr(value2 as u32).0;
-                let value = op(value1, value2) & !unknown_mask;
+                let unknown_mask = unknown_mask1.overflowing_shr(*value2 as u32).0;
+                let unwritten_mask = unwritten_mask1.overflowing_shr(*value2 as u32).0;
+                let value = op(*value1, *value2) & !unknown_mask;
                 Type::ScalarValue { value, unknown_mask, unwritten_mask }
             }
             (
@@ -1523,31 +1524,39 @@ impl ComputationContext {
                 Type::PtrToStack { offset: x },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
-                Type::PtrToStack { offset: run_on_stack_offset(x, |x| op(x, y)) }
+                Type::PtrToStack { offset: run_on_stack_offset(*x, |x| op(x, *y)) }
             }
             (
                 alu_type,
                 Type::PtrToMemory { id, offset: x, buffer_size },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
-                let offset = op(x as u64, y);
-                Type::PtrToMemory { id: id, offset: offset as i64, buffer_size: buffer_size }
+                let offset = op(*x as u64, *y);
+                Type::PtrToMemory {
+                    id: id.clone(),
+                    offset: offset as i64,
+                    buffer_size: *buffer_size,
+                }
             }
             (
                 alu_type,
                 Type::PtrToStruct { id, offset: x, descriptor },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
-                let offset = op(x as u64, y);
-                Type::PtrToStruct { id: id, offset: offset as i64, descriptor: descriptor }
+                let offset = op(*x as u64, *y);
+                Type::PtrToStruct {
+                    id: id.clone(),
+                    offset: offset as i64,
+                    descriptor: descriptor.clone(),
+                }
             }
             (
                 alu_type,
                 Type::PtrToArray { id, offset: x },
                 Type::ScalarValue { value: y, unknown_mask: 0, .. },
             ) if alu_type.is_ptr_compatible() => {
-                let offset = op(x as u64, y);
-                Type::PtrToArray { id: id, offset: offset as i64 }
+                let offset = op(*x as u64, *y);
+                Type::PtrToArray { id: id.clone(), offset: offset as i64 }
             }
             (
                 AluType::Sub,
@@ -1563,7 +1572,7 @@ impl ComputationContext {
                 AluType::Sub,
                 Type::PtrToArray { id: id1, offset: x1 },
                 Type::PtrToArray { id: id2, offset: x2 },
-            ) if id1 == id2 => Type::from(op(x1 as u64, x2 as u64)),
+            ) if id1 == id2 => Type::from(op(*x1 as u64, *x2 as u64)),
             (AluType::Sub, Type::PtrToStack { offset: x1 }, Type::PtrToStack { offset: x2 }) => {
                 Type::from(op(x1.reg(), x2.reg()))
             }
@@ -1607,7 +1616,7 @@ impl ComputationContext {
         }
         let op1 = self.reg(dst)?;
         let op2 = self.compute_source(src)?;
-        let result = Self::apply_computation(op1, op2, alu_type, op)?;
+        let result = Self::apply_computation(self, op1, op2, alu_type, op)?;
         let mut next = self.next()?;
         next.set_reg(dst, result)?;
         verification_context.states.push(next);
@@ -1644,14 +1653,14 @@ impl ComputationContext {
         dst: Register,
         offset: i16,
         src: Register,
-        op: impl FnOnce(Type, Type) -> Result<Type, String>,
+        op: impl FnOnce(&ComputationContext, Type, Type) -> Result<Type, String>,
     ) -> Result<(), String> {
         self.log_atomic_operation(op_name, verification_context, fetch, dst, offset, src);
         let addr = self.reg(dst)?;
         let value = self.reg(src)?;
         let field = Field::new(offset, width);
         let loaded_type = self.load_memory(verification_context, &addr, field)?;
-        let result = op(loaded_type.clone(), value)?;
+        let result = op(self, loaded_type.clone(), value)?;
         let mut next = self.next()?;
         next.store_memory(verification_context, &addr, field, result)?;
         if fetch {
@@ -1681,7 +1690,9 @@ impl ComputationContext {
             dst,
             offset,
             src,
-            |v1: Type, v2: Type| Self::apply_computation(v1, v2, alu_type, op),
+            |context: &ComputationContext, v1: Type, v2: Type| {
+                Self::apply_computation(context, v1, v2, alu_type, op)
+            },
         )
     }
 
@@ -3815,7 +3826,7 @@ impl BpfVisitor for ComputationContext {
             dst,
             offset,
             src,
-            |_, x| Ok(x),
+            |_, _, x| Ok(x),
         )
     }
 
