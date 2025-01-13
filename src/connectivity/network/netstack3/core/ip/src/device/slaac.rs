@@ -239,7 +239,7 @@ fn update_slaac_addr_valid_until<I: Instant>(
     valid_until: Lifetime<I>,
 ) {
     match slaac_config {
-        SlaacConfig::Static { valid_until: v } => *v = valid_until,
+        SlaacConfig::Stable { valid_until: v } => *v = valid_until,
         SlaacConfig::Temporary(TemporarySlaacConfig {
             valid_until: v,
             desync_factor: _,
@@ -277,7 +277,7 @@ pub trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
     /// from [RFC 8981 Section 3.4] for temporary addresses, for a given prefix
     /// advertised by a router.
     ///
-    /// This function updates all static and temporary SLAAC addresses for the
+    /// This function updates all stable and temporary SLAAC addresses for the
     /// given prefix and adds new ones if necessary.
     ///
     /// [RFC 4862 Section 5.5.3]: http://tools.ietf.org/html/rfc4862#section-5.5.3
@@ -324,7 +324,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
             return;
         }
 
-        let mut seen_static = false;
+        let mut seen_stable = false;
         let mut seen_temporary = false;
 
         let now = bindings_ctx.now();
@@ -338,7 +338,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                 temp_secret_key,
                 _marker,
             } = addrs_config;
-            // Apply the update to each existing address, static or temporary, for the
+            // Apply the update to each existing address, stable or temporary, for the
             // prefix.
             slaac_addrs.for_each_addr_mut(|address_entry| {
                 let slaac_type = match apply_slaac_update_to_addr(
@@ -364,7 +364,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                 // in response to a prefix update and addresses types never
                 // change after the address is added.
                 match slaac_type {
-                    SlaacType::Static => seen_static = true,
+                    SlaacType::Stable => seen_stable = true,
                     SlaacType::Temporary => seen_temporary = true,
                 }
             });
@@ -391,7 +391,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                 }
             };
 
-            let address_types_to_add = (!seen_static)
+            let address_types_to_add = (!seen_stable)
                 .then(|| {
                     // As per RFC 4862 Section 5.5.3.d,
                     //
@@ -403,7 +403,7 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                     //   and the first prefix- length bits of the prefixes are
                     //   identical), and if the Valid Lifetime is not 0, form an
                     //   address [...].
-                    SlaacType::Static
+                    SlaacType::Stable
                 })
                 .into_iter()
                 .chain((!seen_temporary).then(|| {
@@ -514,8 +514,8 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
                 );
                 temporary_config
             }
-            SlaacConfig::Static { .. } => {
-                // TODO(https://fxbug.dev/42148800): Re-generate static
+            SlaacConfig::Stable { .. } => {
+                // TODO(https://fxbug.dev/42148800): Re-generate stable
                 // addresses if we're not using hardware-derived IIDs.
                 return;
             }
@@ -640,7 +640,7 @@ fn apply_slaac_update_to_addr<D: DeviceIdentifier, BC: SlaacBindingsContext<D>>(
         }
     }
     let (valid_for, entry_valid_until, preferred_for_and_regen_at) = match slaac_config {
-        SlaacConfig::Static { valid_until: entry_valid_until } => (
+        SlaacConfig::Stable { valid_until: entry_valid_until } => (
             ValidLifetimeBound::FromPrefix(valid_lifetime),
             *entry_valid_until,
             addr_preferred_lifetime.map(|p| (p, None)),
@@ -1128,14 +1128,14 @@ pub struct SlaacConfigurationUpdate {
 
 #[derive(PartialEq, Eq)]
 enum SlaacType {
-    Static,
+    Stable,
     Temporary,
 }
 
 impl core::fmt::Debug for SlaacType {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            SlaacType::Static => f.write_str("static"),
+            SlaacType::Stable => f.write_str("stable"),
             SlaacType::Temporary => f.write_str("temporary"),
         }
     }
@@ -1144,7 +1144,7 @@ impl core::fmt::Debug for SlaacType {
 impl<'a, Instant> From<&'a SlaacConfig<Instant>> for SlaacType {
     fn from(slaac_config: &'a SlaacConfig<Instant>) -> Self {
         match slaac_config {
-            SlaacConfig::Static { .. } => SlaacType::Static,
+            SlaacConfig::Stable { .. } => SlaacType::Stable,
             SlaacConfig::Temporary { .. } => SlaacType::Temporary,
         }
     }
@@ -1306,8 +1306,8 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext<CC::DeviceId>, CC: S
         let TemporarySlaacConfig { creation_time, desync_factor, valid_until, dad_counter: _ } =
             match entry.config.inner {
                 SlaacConfig::Temporary(temporary_config) => temporary_config,
-                SlaacConfig::Static { valid_until: _ } => unreachable!(
-                    "can't regenerate a temporary address for {:?}, which is static",
+                SlaacConfig::Stable { valid_until: _ } => unreachable!(
+                    "can't regenerate a temporary address for {:?}, which is stable",
                     addr_subnet
                 ),
             };
@@ -1369,14 +1369,14 @@ fn regenerate_temporary_slaac_addr<BC: SlaacBindingsContext<CC::DeviceId>, CC: S
 
 #[derive(Copy, Clone, Debug)]
 enum SlaacInitConfig {
-    Static,
+    Stable,
     Temporary { dad_count: u8 },
 }
 
 impl SlaacInitConfig {
     fn new(slaac_type: SlaacType) -> Self {
         match slaac_type {
-            SlaacType::Static => Self::Static,
+            SlaacType::Stable => Self::Stable,
             SlaacType::Temporary => Self::Temporary { dad_count: 0 },
         }
     }
@@ -1422,7 +1422,7 @@ fn has_iana_allowed_iid(address: Ipv6Addr) -> bool {
 /// Panics if a valid IPv6 unicast address cannot be formed with the provided
 /// prefix and interface identifier, or if the prefix length is not a multiple
 /// of 8 bits.
-fn generate_global_static_address(
+fn generate_global_stable_address(
     prefix: &Subnet<Ipv6Addr>,
     iid: &[u8],
 ) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
@@ -1519,7 +1519,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
     let SlaacState { timers } = slaac_state;
 
     let (valid_until, preferred_and_regen, slaac_config, mut addresses) = match slaac_config {
-        SlaacInitConfig::Static => {
+        SlaacInitConfig::Stable => {
             if !enable_stable_addresses {
                 trace!("stable SLAAC addresses are disabled on device {:?}", device_id);
                 return;
@@ -1529,11 +1529,11 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
             (
                 valid_until,
                 prefix_preferred_for.map(|p| PreferredForAndRegenAt(p, None)),
-                SlaacConfig::Static { valid_until },
+                SlaacConfig::Stable { valid_until },
                 // Generate the global address as defined by RFC 4862 section 5.5.3.d.
                 //
                 // TODO(https://fxbug.dev/42148800): Support regenerating address.
-                either::Either::Left(core::iter::once(generate_global_static_address(
+                either::Either::Left(core::iter::once(generate_global_stable_address(
                     &subnet,
                     &iid[..],
                 ))),
@@ -2092,7 +2092,7 @@ mod tests {
             0 => PreferredLifetime::Deprecated,
             secs => PreferredLifetime::preferred_until(now + Duration::from_secs(secs.into())),
         };
-        let inner = SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) };
+        let inner = SlaacConfig::Stable { valid_until: Lifetime::Finite(valid_until) };
         let entry = SlaacAddressEntry {
             addr_sub,
             config: Ipv6AddrSlaacConfig { inner, preferred_lifetime },
@@ -2186,7 +2186,7 @@ mod tests {
         let entry = SlaacAddressEntry {
             addr_sub,
             config: Ipv6AddrSlaacConfig {
-                inner: SlaacConfig::Static { valid_until: Lifetime::Finite(valid_until) },
+                inner: SlaacConfig::Stable { valid_until: Lifetime::Finite(valid_until) },
                 preferred_lifetime: PreferredLifetime::preferred_until(valid_until),
             },
         };
@@ -2379,7 +2379,7 @@ mod tests {
         let entry = SlaacAddressEntry {
             addr_sub,
             config: Ipv6AddrSlaacConfig {
-                inner: SlaacConfig::Static { valid_until },
+                inner: SlaacConfig::Stable { valid_until },
                 preferred_lifetime: PreferredLifetime::maybe_preferred_for(now, ndp_pl),
             },
         };
@@ -2415,7 +2415,7 @@ mod tests {
         }
         let entry = SlaacAddressEntry {
             config: Ipv6AddrSlaacConfig {
-                inner: SlaacConfig::Static { valid_until },
+                inner: SlaacConfig::Stable { valid_until },
                 preferred_lifetime: PreferredLifetime::maybe_preferred_for(now, ndp_pl),
             },
             ..entry

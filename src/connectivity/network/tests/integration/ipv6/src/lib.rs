@@ -1587,7 +1587,7 @@ async fn slaac_addrs_report_lifetimes<N: Netstack>(name: &str) {
         }
     }
 
-    // Extract the initial addresses. We expect one static and one temporary
+    // Extract the initial addresses. We expect one stable and one temporary
     // address.
     const EXPECTED_ADDRS: usize = 2;
     let mut addrs = fnet_interfaces_ext::wait_interface_with_id(

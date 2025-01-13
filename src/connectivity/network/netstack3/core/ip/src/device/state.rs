@@ -1071,11 +1071,11 @@ impl<Inst: Instant> Inspectable for Ipv4AddressState<Inst> {
 }
 
 /// Configuration for an IPv6 address assigned via SLAAC that varies based on
-/// whether the address is static or temporary
+/// whether the address is stable or temporary.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SlaacConfig<Instant> {
-    /// The address is static.
-    Static {
+    /// The address is a stable address.
+    Stable {
         /// The lifetime of the address.
         valid_until: Lifetime<Instant>,
     },
@@ -1089,7 +1089,7 @@ impl<Instant: Copy> SlaacConfig<Instant> {
     /// The lifetime for which the address is valid.
     pub fn valid_until(&self) -> Lifetime<Instant> {
         match self {
-            SlaacConfig::Static { valid_until } => *valid_until,
+            SlaacConfig::Stable { valid_until } => *valid_until,
             SlaacConfig::Temporary(TemporarySlaacConfig {
                 valid_until,
                 desync_factor: _,
@@ -1119,7 +1119,7 @@ impl<Instant> Default for Ipv6AddrConfig<Instant> {
 /// The common configuration for a SLAAC-assigned IPv6 address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Ipv6AddrSlaacConfig<Instant> {
-    /// The inner slaac config, tracking static and temporary behavior.
+    /// The inner slaac config, tracking stable and temporary behavior.
     pub inner: SlaacConfig<Instant>,
     /// The address' preferred lifetime.
     pub preferred_lifetime: PreferredLifetime<Instant>,
@@ -1156,7 +1156,7 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
     ///
     /// [RFC 4862 Section 5.3]: https://tools.ietf.org/html/rfc4862#section-5.3
     pub(crate) const SLAAC_LINK_LOCAL: Self = Self::Slaac(Ipv6AddrSlaacConfig {
-        inner: SlaacConfig::Static { valid_until: Lifetime::Infinite },
+        inner: SlaacConfig::Stable { valid_until: Lifetime::Infinite },
         preferred_lifetime: PreferredLifetime::Preferred(Lifetime::Infinite),
     });
 
@@ -1189,7 +1189,7 @@ impl<Instant: Copy> Ipv6AddrConfig<Instant> {
     pub fn is_temporary(&self) -> bool {
         match self {
             Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, .. }) => match inner {
-                SlaacConfig::Static { .. } => false,
+                SlaacConfig::Stable { .. } => false,
                 SlaacConfig::Temporary(_) => true,
             },
             Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { temporary, .. }) => *temporary,
@@ -1223,7 +1223,7 @@ impl<Inst: Instant> Inspectable for Ipv6AddressState<Inst> {
                 Ipv6AddrConfig::Manual(Ipv6AddrManualConfig { .. }) => false,
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig { inner, preferred_lifetime: _ }) => {
                     match inner {
-                        SlaacConfig::Static { valid_until: _ } => {}
+                        SlaacConfig::Stable { valid_until: _ } => {}
                         SlaacConfig::Temporary(TemporarySlaacConfig {
                             valid_until: _,
                             desync_factor,
@@ -1358,7 +1358,7 @@ mod tests {
                     added_extra_transmits_after_detecting_looped_back_ns: false,
                 },
                 Ipv6AddrConfig::Slaac(Ipv6AddrSlaacConfig {
-                    inner: SlaacConfig::Static { valid_until },
+                    inner: SlaacConfig::Stable { valid_until },
                     preferred_lifetime: PreferredLifetime::Preferred(Lifetime::Infinite),
                 }),
             ))

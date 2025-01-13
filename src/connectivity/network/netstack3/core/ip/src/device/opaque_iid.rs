@@ -202,7 +202,7 @@ impl OpaqueIid {
 #[allow(missing_docs)]
 pub enum OpaqueIidNonce {
     // TODO(https://fxbug.dev/42148800): Remove cfg(test) when this is used
-    // to generate static opaque identifiers.
+    // to generate stable opaque identifiers.
     #[cfg(test)]
     DadCounter(u8),
     Random(u64),
