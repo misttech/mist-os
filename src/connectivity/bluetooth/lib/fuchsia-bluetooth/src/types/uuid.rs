@@ -13,7 +13,7 @@ use {fidl_fuchsia_bluetooth as fidl, fidl_fuchsia_bluetooth_bredr as fidlbredr};
 use crate::error::Error;
 use crate::inspect::ToProperty;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Uuid(uuid::Uuid);
 
 #[derive(Copy, Clone, Debug, PartialEq)]
