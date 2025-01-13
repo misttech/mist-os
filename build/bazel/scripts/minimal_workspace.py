@@ -26,6 +26,7 @@ import sys
 from pathlib import Path
 from typing import Any, Sequence
 
+import remote_services_utils
 import update_workspace
 
 _THIS_SCRIPT = Path(__file__)
@@ -88,11 +89,7 @@ def main(argv: Sequence[str]) -> int:
 
     logs_dir = topdir / "logs"
 
-    build_config = update_workspace.generate_fuchsia_build_config(
-        str(fuchsia_dir)
-    )
-
-    host_tag = build_config["host_tag"]
+    host_tag = update_workspace.get_host_tag()
     host_tag_alt = host_tag.replace("-", "_")
 
     workspace_dir = topdir / "workspace"
@@ -158,8 +155,15 @@ def main(argv: Sequence[str]) -> int:
         _SCRIPT_DIR / "expect_pwd.txt",
     )
 
+    # Generate remote_services.bazelrc
+    remote_services_utils.generate_remote_services_bazelrc(
+        fuchsia_dir=fuchsia_dir,
+        output_path=workspace_dir / "remote_services.bazelrc",
+        download_outputs="all",  # does not matter here.
+    )
+
     # Generate the content of .bazelrc
-    templates_dir = fuchsia_dir / "build" / "bazel" / "templates"
+    fuchsia_dir / "build" / "bazel" / "templates"
 
     def expand_template_file(template_file: Path, **kwargs: Any) -> str:
         return template_file.read_text().format(**kwargs)
@@ -169,16 +173,10 @@ def main(argv: Sequence[str]) -> int:
     bazelrc_content += """
 build --platforms=//build/bazel/platforms:{default_platform}
 build --host_platform=//build/bazel/platforms:{host_platform}
+import remote_services.bazelrc
 """.format(
         default_platform="common",  # see build/bazel/platforms/BUILD.bazel
         host_platform=host_tag_alt,
-    )
-    bazelrc_content += expand_template_file(
-        templates_dir / "template.remote_services.bazelrc",
-        **update_workspace.remote_services_bazelrc_format_args(
-            build_config=build_config,
-            remote_download_outputs="all",  # doesn't matter for minimal test build
-        ),
     )
 
     bazelrc_dest = workspace_dir / ".bazelrc"

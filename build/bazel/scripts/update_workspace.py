@@ -190,89 +190,6 @@ def get_fx_build_dir(fuchsia_dir: str) -> str | None:
         return os.path.join(fuchsia_dir, build_dir)
 
 
-def _cfg_values_to_dict(values_text: str) -> dict[str, str]:
-    """Parse comma-separated key=value pairs into a dictionary."""
-    values = {}
-    for var in values_text.split(","):
-        k, _, v = var.partition("=")
-        values[k] = v
-    return values
-
-
-def get_reclient_config(fuchsia_dir: str) -> dict[str, str]:
-    """Return reclient configuration."""
-    rewrapper_config_path = os.path.join(
-        fuchsia_dir, "build", "rbe", "fuchsia-rewrapper.cfg"
-    )
-    reproxy_config_path = os.path.join(
-        fuchsia_dir, "build", "rbe", "fuchsia-reproxy.cfg"
-    )
-
-    instance_prefix = "instance="
-    platform_prefix = "platform="
-
-    platform_values = {}
-    with open(rewrapper_config_path) as f:
-        for line in f:
-            line = line.strip()
-            values: dict[str, str] = {}
-            if line.startswith(platform_prefix):
-                # After "platform=", expect comma-separated key=value pairs.
-                platform_values = _cfg_values_to_dict(
-                    line.removeprefix(platform_prefix)
-                )
-
-    container_image = platform_values.get("container-image")
-    gce_machine_type = platform_values.get("gceMachineType", "")
-
-    instance_name = None
-    with open(reproxy_config_path) as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith(instance_prefix):
-                instance_name = line[len(instance_prefix) :]
-
-    if not instance_name:
-        print(
-            "ERROR: Missing instance name from %s" % reproxy_config_path,
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    if not container_image:
-        print(
-            "ERROR: Missing container image name from %s"
-            % rewrapper_config_path,
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    return {
-        "instance_name": instance_name,
-        "container_image": container_image,
-        "gce_machine_type": gce_machine_type,
-    }
-
-
-def generate_fuchsia_build_config(fuchsia_dir: str) -> dict[str, str]:
-    """Generate a dictionary containing build configuration information."""
-    rbe_config = get_reclient_config(fuchsia_dir)
-    host_os = get_host_platform()
-    host_arch = get_host_arch()
-    host_tag = get_host_tag()
-
-    rbe_instance_name = rbe_config.get("instance_name", "")
-    rbe_project = rbe_instance_name.split("/")[1]
-    return {
-        "host_os": host_os,
-        "host_arch": host_arch,
-        "host_tag": host_tag,
-        "rbe_instance_name": rbe_instance_name,
-        "rbe_container_image": rbe_config.get("container_image", ""),
-        "rbe_gce_machine_type": rbe_config.get("gce_machine_type", ""),
-        "rbe_project": rbe_project,
-    }
-
-
 def content_hash_all_files(paths: list[str]) -> str:
     fstate = compute_content_hash.FileState()
     for path in paths:
@@ -515,24 +432,6 @@ def dot_bazelrc_format_args(
     }
 
 
-def remote_services_bazelrc_format_args(
-    build_config: dict[str, str],
-    remote_download_outputs: str,
-) -> dict[str, str]:
-    """Returns a dictionary of .format args for expanding template.remote_services.bazelrc.
-
-    Args:
-      build_config: dictionary containing remote execution configurations
-        from generate_fuchsia_build_config().
-      remote_download_outputs: bazel option --remote_download_outputs
-    """
-    return {
-        "remote_instance_name": build_config["rbe_instance_name"],
-        "rbe_project": build_config["rbe_project"],
-        "remote_download_outputs": remote_download_outputs,
-    }
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
@@ -561,16 +460,6 @@ def main() -> int:
         "--use-bzlmod",
         action="store_true",
         help="Use BzlMod to generate external repositories.",
-    )
-    parser.add_argument(
-        "--remote_download_outputs",
-        help="Option to forward to bazel --remote_download_outputs",
-        type=str,
-        default="toplevel",
-    )
-    parser.add_argument(
-        "--clang_dir",
-        help="Path to clang toolchain directory. Defaults to {fuchsia_dir}/prebuilt/third_party/clang/{host_tag}",
     )
     parser.add_argument(
         "--verbose", action="count", default=1, help="Increase verbosity"
@@ -639,9 +528,7 @@ def main() -> int:
 
     logs_dir = os.path.join(topdir, "logs")
 
-    build_config = generate_fuchsia_build_config(fuchsia_dir)
-
-    host_tag = build_config["host_tag"]
+    host_tag = get_host_tag()
     host_tag_alt = host_tag.replace("-", "_")
 
     ninja_binary = os.path.join(
@@ -803,20 +690,6 @@ def main() -> int:
         platform_mappings_content,
     )
 
-    # Generate the remote_services.bazelrc file.
-    generated.add_file(
-        os.path.join(
-            "workspace", "fuchsia_build_generated", "remote_services.bazelrc"
-        ),
-        expand_template_file(
-            "template.remote_services.bazelrc",
-            **remote_services_bazelrc_format_args(
-                build_config=build_config,
-                remote_download_outputs=args.remote_download_outputs,
-            ),
-        ),
-    )
-
     # Generate the content of .bazelrc
     bazelrc_content = expand_template_file(
         "template.bazelrc",
@@ -852,7 +725,6 @@ common --enable_bzlmod=false
         python_prebuilt_dir=os.path.relpath(python_prebuilt_dir, topdir),
         output_base=os.path.relpath(output_base_dir, topdir),
         output_user_root=os.path.relpath(output_user_root, topdir),
-        rbe_project=build_config["rbe_project"],
     )
     generated.add_file("bazel", bazel_launcher_content, executable=True)
 

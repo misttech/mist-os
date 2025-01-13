@@ -251,7 +251,11 @@ if (current_toolchain == default_toolchain) {
       final = {
         # after considering top-level overrides
         bazel_enable = enable_bazel_remote_rbe
+
+        # LINT.IfChange
         bazel_download_outputs = bazel_rbe_download_outputs
+
+        # LINT.ThenChange(//build/regenerator.py)
         cxx_download_objects = cxx_rbe_download_obj_files
         cxx_enable = cxx_rbe_enable
         cxx_exec_strategy = cxx_rbe_exec_strategy

@@ -15,7 +15,6 @@ import("//build/config/clang/clang.gni")
 import("//build/images/vbmeta.gni")
 import("//build/info/info.gni")
 import("//build/product.gni")
-import("//build/toolchain/rbe.gni")
 import("//src/connectivity/policy/netcfg/delegated_network_provisioning.gni")
 
 assert(
@@ -56,7 +55,6 @@ action("generate_main_workspace") {
     # The script expands these templates
     "//build/bazel/templates/template.bazel.sh",
     "//build/bazel/templates/template.bazelrc",
-    "//build/bazel/templates/template.remote_services.bazelrc",
     "//build/bazel/templates/template.platform_mappings",
 
     # The script reads this configuration file
@@ -90,7 +88,6 @@ action("generate_main_workspace") {
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/args.json",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/git",
     "${bazel_main_top_dir}/workspace/fuchsia_build_generated/jiri_snapshot.xml",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/remote_services.bazelrc",
 
     # Other files.
     "${bazel_main_top_dir}/workspace/platform_mappings",
@@ -100,17 +97,12 @@ action("generate_main_workspace") {
   ]
 
   args = [
-    # rebased_clang_prefix points to bin under clang root.
-    "--clang_dir",
-    get_path_info(rebased_clang_prefix, "dir"),
     "--gn_output_dir",
     rebase_path(root_build_dir, root_build_dir),
     "--target_arch",
     target_cpu,
     "--depfile",
     rebase_path(depfile, root_build_dir),
-    "--remote_download_outputs",
-    bazel_rbe_download_outputs,
   ]
 
   # The generated wrapper includes the absolute path of the Ninja output

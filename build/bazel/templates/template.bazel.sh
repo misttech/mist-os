@@ -12,7 +12,7 @@ readonly _OUTPUT_USER_ROOT="${{_SCRIPT_DIR}}/{output_user_root}"
 readonly _LOG_DIR="${{_SCRIPT_DIR}}/{logs_dir}"
 readonly _BAZEL_BIN="${{_SCRIPT_DIR}}/{bazel_bin_path}"
 readonly _PYTHON_PREBUILT_DIR="${{_SCRIPT_DIR}}/{python_prebuilt_dir}"
-readonly _REMOTE_SERVICES_BAZELRC="${{_WORKSPACE_DIR}}/fuchsia_build_generated/remote_services.bazelrc"
+readonly _REMOTE_SERVICES_BAZELRC="${{_SCRIPT_DIR}}/{ninja_output_dir}/regenerator_outputs/remote_services.bazelrc"
 
 # Exported explicitly to be used by repository rules to reference the
 # Ninja output directory and binary.
@@ -75,7 +75,6 @@ do
       [[ "${{BAZEL_resultstore_socket_path-NOT_SET}}" == "NOT_SET" ]] ||
         proxy_overrides+=( "--bes_proxy=unix://$BAZEL_resultstore_socket_path" )
         # Note: go/fxbtx uses project=rbe-fuchsia-prod
-        # (currently configured: rbe_project={rbe_project})
         siblings_link_template="http://go/fxbtx/"
       ;;
     --config=remote | --config=remote_cache_only)  # Remote build execution service
