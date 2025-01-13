@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context, Result};
 use bytes::{Bytes, BytesMut};
 use camino::{Utf8Path, Utf8PathBuf};
 use futures::{stream, Stream, TryStreamExt as _};
 use std::cmp::min;
+use std::fs::{copy, create_dir_all};
 use std::io;
+use std::path::Path;
 use std::task::Poll;
+use walkdir::WalkDir;
 
 /// Read files in chunks of this size off the local storage.
 // Note: this is internally public to allow repository tests to check they work across chunks.
@@ -109,6 +113,26 @@ pub(super) fn file_stream(
 
         Poll::Ready(Some(Ok(chunk)))
     })
+}
+
+pub fn copy_dir(from: &Path, to: &Path) -> Result<()> {
+    let walker = WalkDir::new(from);
+    for entry in walker.into_iter() {
+        let entry = entry?;
+        let to_path = to.join(entry.path().strip_prefix(from)?);
+        if entry.metadata()?.is_dir() {
+            if to_path.exists() {
+                continue;
+            } else {
+                create_dir_all(&to_path).with_context(|| format!("creating {to_path:?}"))?;
+            }
+        } else {
+            copy(entry.path(), &to_path)
+                .with_context(|| format!("copying {:?} to {:?}", entry.path(), to_path))?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

@@ -1868,8 +1868,12 @@ mod test {
         let mut repositories = vec![];
         for repo_name in ["fuchsia.com", "example.com"] {
             let metadata_path = pb_dir.join(repo_name);
-            fuchsia_repo::test_utils::make_repo_dir(metadata_path.as_ref(), blobs_dir.as_ref())
-                .await;
+            fuchsia_repo::test_utils::make_repo_dir(
+                metadata_path.as_ref(),
+                blobs_dir.as_ref(),
+                None,
+            )
+            .await;
             repositories.push(sdk_metadata::Repository {
                 name: repo_name.into(),
                 metadata_path,

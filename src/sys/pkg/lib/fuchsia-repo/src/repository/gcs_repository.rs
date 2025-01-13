@@ -386,7 +386,7 @@ mod tests {
             std::fs::create_dir(&metadata_repo_path).unwrap();
             std::fs::create_dir(&blob_repo_path).unwrap();
 
-            make_repo_dir(blob_repo_path.as_std_path(), blob_repo_path.as_std_path()).await;
+            make_repo_dir(blob_repo_path.as_std_path(), blob_repo_path.as_std_path(), None).await;
             let remote_repo =
                 FileSystemRepository::new(metadata_repo_path.clone(), blob_repo_path.clone());
 
