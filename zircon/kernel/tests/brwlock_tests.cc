@@ -116,7 +116,7 @@ class BrwLockTest {
     auto join = [](Thread* t, const char* description) -> zx_status_t {
       constexpr int64_t kTimeoutMs = 5000;
       while (true) {
-        Deadline deadline = Deadline::after(zx_duration_from_msec(kTimeoutMs));
+        Deadline deadline = Deadline::after_mono(zx_duration_from_msec(kTimeoutMs));
         zx_status_t status = t->Join(nullptr, deadline.when());
         if (status != ZX_ERR_TIMED_OUT) {
           return status;

@@ -248,8 +248,8 @@ void RamMappableCrashlog::UpdateUptimeLocked() {
     ram_crashlog_stow(crashlog_buffer_.data(), crashlog_buffer_.size(), nullptr, 0,
                       ZirconCrashReason::Unknown, current_boot_time());
 
-    Deadline next_update_time =
-        Deadline::after(kDefaultUpdateInterval, {kDefaultUpdateInterval / 2, TIMER_SLACK_CENTER});
+    Deadline next_update_time = Deadline::after_mono(
+        kDefaultUpdateInterval, {kDefaultUpdateInterval / 2, TIMER_SLACK_CENTER});
     uptime_updater_timer_.Set(
         next_update_time,
         [](Timer*, zx_instant_mono_t now, void* arg) {

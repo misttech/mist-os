@@ -68,7 +68,7 @@ bool TestCallbackFiresOnRootJobDeath() {
   RootJobObserver observer{root_job, nullptr, [&root_job_killed]() { root_job_killed.Signal(); }};
 
   // Shouldn't be signalled yet.
-  EXPECT_EQ(root_job_killed.Wait(Deadline::after(ZX_MSEC(1))), ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(root_job_killed.Wait(Deadline::after_mono(ZX_MSEC(1))), ZX_ERR_TIMED_OUT);
 
   // Kill the root job.
   ASSERT_TRUE(root_job->Kill(1));

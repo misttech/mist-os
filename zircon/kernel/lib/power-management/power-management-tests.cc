@@ -230,7 +230,7 @@ bool SchedulerFlushesPendingControlRequests() {
 
   // Requesting the same power level as the current power level should be ignored.
   scheduler.RequestPowerLevelForTesting(kMaxPowerLevel);
-  EXPECT_EQ(controller->Wait(Deadline::after(zx_duration_from_sec(1))), ZX_ERR_TIMED_OUT);
+  EXPECT_EQ(controller->Wait(Deadline::after_mono(zx_duration_from_sec(1))), ZX_ERR_TIMED_OUT);
 
   END_TEST;
 }

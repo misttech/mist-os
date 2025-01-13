@@ -62,7 +62,7 @@ static void cmd_ppb_stats_on() {
     auto stats_thread = [](void* arg) -> int {
       while (true) {
         cmd_ppb_stats();
-        zx_status_t status = ppb_stats_thread_stop_event.Wait(Deadline::after(ZX_SEC(1)));
+        zx_status_t status = ppb_stats_thread_stop_event.Wait(Deadline::after_mono(ZX_SEC(1)));
         if (status == ZX_OK) {
           return 0;
         }

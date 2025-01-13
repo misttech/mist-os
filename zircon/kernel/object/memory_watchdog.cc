@@ -86,7 +86,7 @@ void HandleOnOomReboot() {
 
   printf("memory-pressure: pausing for %ums after OOM mem signal\n", gBootOptions->oom_timeout_ms);
   zx_status_t status =
-      HaltToken::Get().WaitForAck(Deadline::after(ZX_MSEC(gBootOptions->oom_timeout_ms)));
+      HaltToken::Get().WaitForAck(Deadline::after_mono(ZX_MSEC(gBootOptions->oom_timeout_ms)));
 
   switch (status) {
     case ZX_OK:

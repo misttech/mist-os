@@ -635,7 +635,7 @@ void PageQueues::LruThread() {
   uint64_t pending_target_gen = UINT64_MAX;
   while (!shutdown_threads_.load(ktl::memory_order_relaxed)) {
     zx_status_t wait_status =
-        lru_event_.Wait(Deadline::after(ZX_SEC(kLruNeedsProcessingPollSeconds)));
+        lru_event_.Wait(Deadline::after_mono(ZX_SEC(kLruNeedsProcessingPollSeconds)));
 
     uint64_t target_gen;
     bool needs_processing = false;
@@ -705,7 +705,7 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
     // inform the user if we have waited multiples of the expected maximum aging interval, since
     // that implies we are starting to lose the requested fidelity of age information.
     int64_t timeouts = 0;
-    while (mru_semaphore_.Wait(Deadline::after(max_mru_rotate_time_, TimerSlack::none())) ==
+    while (mru_semaphore_.Wait(Deadline::after_mono(max_mru_rotate_time_, TimerSlack::none())) ==
            ZX_ERR_TIMED_OUT) {
       timeouts++;
       printf("[pq] WARNING: Waited %" PRIi64 " seconds for LRU thread, MRU semaphore %" PRIi64

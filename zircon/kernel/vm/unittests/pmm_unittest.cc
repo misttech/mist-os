@@ -535,7 +535,7 @@ static bool pmm_node_low_mem_alloc_failure_test() {
   // Waiting for an allocation should block, although to only try with a very small timeout to not
   // make this test take too long.
   EXPECT_EQ(ZX_ERR_TIMED_OUT,
-            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after(ZX_MSEC(10))));
+            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after_mono(ZX_MSEC(10))));
 
   // Free the list.
   node.node().FreeList(&list);
@@ -566,7 +566,7 @@ static bool pmm_node_low_mem_alloc_failure_test() {
   result = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT);
   EXPECT_EQ(result.status_value(), ZX_ERR_SHOULD_WAIT);
   EXPECT_EQ(ZX_ERR_TIMED_OUT,
-            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after(ZX_MSEC(10))));
+            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after_mono(ZX_MSEC(10))));
 
   node.node().FreeList(&list);
 
@@ -588,7 +588,7 @@ static bool pmm_node_explicit_should_wait_test() {
   // Waiting for an allocation should block, although to only try with a very small timeout to not
   // make this test take too long.
   EXPECT_EQ(ZX_ERR_TIMED_OUT,
-            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after(ZX_MSEC(10))));
+            node.node().WaitTillShouldRetrySingleAlloc(Deadline::after_mono(ZX_MSEC(10))));
 
   // A regular allocation should work.
   result = node.node().AllocPage(0);

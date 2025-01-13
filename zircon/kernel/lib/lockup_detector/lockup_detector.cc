@@ -379,8 +379,9 @@ void CriticalSectionLockupChecker::PerformCheck(LockupDetectorState& state, cpu_
 // Return an absolute deadline |duration| nanoseconds from now with a jitter of +/- |percent|%.
 Deadline DeadlineWithJitterAfter(zx_duration_t duration, uint32_t percent) {
   DEBUG_ASSERT(percent <= 100);
-  const zx_duration_t delta = affine::Ratio{(rand() / 100) * percent, RAND_MAX}.Scale(duration);
-  return Deadline::after(zx_duration_add_duration(duration, delta));
+  const zx_duration_mono_t delta =
+      affine::Ratio{(rand() / 100) * percent, RAND_MAX}.Scale(duration);
+  return Deadline::after_mono(zx_duration_add_duration(duration, delta));
 }
 
 // Record that the current CPU is still alive by having it update its last
@@ -450,7 +451,8 @@ void DoHeartbeatAndCheckPeerCpus(Timer* timer, zx_time_t now_mono, void* arg) {
 
   // If heartbeats are still enabled for this core, schedule the next check.
   if (checker_state.heartbeat.active.load()) {
-    timer->Set(Deadline::after(HeartbeatLockupChecker::period()), DoHeartbeatAndCheckPeerCpus, arg);
+    timer->Set(Deadline::after_mono(HeartbeatLockupChecker::period()), DoHeartbeatAndCheckPeerCpus,
+               arg);
   }
 }
 

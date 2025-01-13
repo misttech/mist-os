@@ -312,7 +312,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_instant_boot_t resu
   // Suspend all of the active CPUs besides the boot CPU.
   dprintf(INFO, "Suspending non-boot CPUs...\n");
 
-  const Deadline suspend_timeout_at = Deadline::after(ZX_MIN(1));
+  const Deadline suspend_timeout_at = Deadline::after_mono(ZX_MIN(1));
   cpu_mask_t cpus_to_suspend = cpus_active_before_suspend;
   while (cpus_to_suspend != 0) {
     const cpu_num_t cpu_id = highest_cpu_set(cpus_to_suspend);
@@ -409,7 +409,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_instant_boot_t resu
   // Resume all non-boot CPUs that were successfully suspended.
   dprintf(INFO, "Resuming non-boot CPUs...\n");
 
-  const Deadline resume_timeout_at = Deadline::after(ZX_MIN(1));
+  const Deadline resume_timeout_at = Deadline::after_mono(ZX_MIN(1));
   cpu_mask_t cpus_to_resume = cpus_active_before_suspend ^ cpus_to_suspend;
   while (cpus_to_resume != 0) {
     const cpu_num_t cpu_id = highest_cpu_set(cpus_to_resume);

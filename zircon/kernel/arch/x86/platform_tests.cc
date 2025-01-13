@@ -426,7 +426,7 @@ bool test_nmi_spam() {
   }
 
   constexpr zx_duration_mono_t kDuration = ZX_MSEC(100);
-  const Deadline deadline = Deadline::after(kDuration);
+  const Deadline deadline = Deadline::after_mono(kDuration);
   do {
     apic_send_mask_ipi(X86_INT_NMI, Scheduler::PeekActiveMask(), DELIVERY_MODE_NMI);
   } while (current_mono_time() < deadline.when());

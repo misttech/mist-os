@@ -319,7 +319,7 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event) {
     if (gBootOptions->userpager_overtime_wait_seconds == 0) {
       return Deadline::infinite();
     } else {
-      return Deadline::after(ZX_SEC(gBootOptions->userpager_overtime_wait_seconds));
+      return Deadline::after_mono(ZX_SEC(gBootOptions->userpager_overtime_wait_seconds));
     }
   };
   zx_status_t result;

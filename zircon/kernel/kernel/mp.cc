@@ -425,7 +425,7 @@ static void mp_all_cpu_startup_sync_hook(unsigned int rl) {
   // environments, but not bad enough to panic the system and send it into a
   // boot-loop.
   constexpr zx_duration_mono_t kCpuStartupTimeout = ZX_SEC(30);
-  zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::after(kCpuStartupTimeout));
+  zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::after_mono(kCpuStartupTimeout));
   if (status != ZX_OK) {
     const auto online_mask = mp_get_online_mask();
     KERNEL_OOPS(

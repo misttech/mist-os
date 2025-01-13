@@ -509,7 +509,7 @@ bool TestThread::BlockOnWaitQueue(WaitQueue* wq, zx::duration relative_timeout) 
   op_ = [wq, relative_timeout]() TA_EXCL(chainlock_transaction_token) {
     Deadline timeout = (relative_timeout == zx::duration::infinite())
                            ? Deadline::infinite()
-                           : Deadline::after(relative_timeout.get());
+                           : Deadline::after_mono(relative_timeout.get());
 
     const auto do_transaction = [&]() TA_REQ(
                                     chainlock_transaction_token,
@@ -548,7 +548,7 @@ bool TestThread::BlockOnOwnedWaitQueue(OwnedWaitQueue* owned_wq, TestThread* own
 
     Deadline timeout = (relative_timeout == zx::duration::infinite())
                            ? Deadline::infinite()
-                           : Deadline::after(relative_timeout.get());
+                           : Deadline::after_mono(relative_timeout.get());
 
     owned_wq->BlockAndAssignOwner(timeout, owner_thrd, ResourceOwnership::Normal,
                                   Interruptible::Yes);
@@ -602,7 +602,7 @@ bool TestThread::Reset(bool explicit_kill) {
       constexpr zx_duration_mono_t timeout = ZX_MSEC(500);
       ASSERT(thread_ != nullptr);
       int ret_code;
-      const Deadline join_deadline = Deadline::after(timeout);
+      const Deadline join_deadline = Deadline::after_mono(timeout);
       zx_status_t res = thread_->Join(&ret_code, join_deadline.when());
       if (res == ZX_ERR_TIMED_OUT) {
         printf("Timed out while joining thread %p, retrying with infinite timeout\n", thread_);

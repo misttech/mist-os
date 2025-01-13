@@ -43,7 +43,7 @@ static int timer_do_one_thread(void* arg) {
   Event event;
   Timer timer;
 
-  const Deadline deadline = Deadline::after(ZX_MSEC(10));
+  const Deadline deadline = Deadline::after_mono(ZX_MSEC(10));
   timer.Set(deadline, timer_diag_cb, &event);
   event.Wait();
 
@@ -231,7 +231,7 @@ static int timer_stress_worker(void* void_arg) {
     {
       InterruptDisableGuard block_interrupts;
       cpu_num_t timer_cpu = arch_curr_cpu_num();
-      const Deadline deadline = Deadline::after(timer_duration);
+      const Deadline deadline = Deadline::after_mono(timer_duration);
       t.Set(deadline, timer_stress_cb, void_arg);
       Thread::Current::Get()->SetCpuAffinity(~cpu_num_to_mask(timer_cpu));
       DEBUG_ASSERT(arch_curr_cpu_num() != timer_cpu);
@@ -316,7 +316,7 @@ static bool cancel_before_deadline() {
   BEGIN_TEST;
   timer_args arg{};
   Timer t;
-  const Deadline deadline = Deadline::after(ZX_HOUR(5));
+  const Deadline deadline = Deadline::after_mono(ZX_HOUR(5));
   t.Set(deadline, timer_cb, &arg);
   ASSERT_TRUE(t.Cancel());
   ASSERT_FALSE(arg.timer_fired.load());
@@ -360,7 +360,7 @@ static bool cancel_from_callback() {
 static void timer_set_cb(Timer* t, zx_instant_mono_t now, void* void_arg) {
   timer_args* arg = reinterpret_cast<timer_args*>(void_arg);
   if (arg->remaining.fetch_sub(1) >= 1) {
-    const Deadline deadline = Deadline::after(ZX_USEC(10));
+    const Deadline deadline = Deadline::after_mono(ZX_USEC(10));
     t->Set(deadline, timer_set_cb, void_arg);
   }
 }
@@ -421,7 +421,7 @@ static bool trylock_or_cancel_canceled() {
   interrupt_saved_state_t int_state = arch_interrupt_save();
 
   cpu_num_t timer_cpu = arch_curr_cpu_num();
-  const Deadline deadline = Deadline::after(ZX_USEC(100));
+  const Deadline deadline = Deadline::after_mono(ZX_USEC(100));
   t.Set(deadline, timer_trylock_cb, &arg);
 
   // The timer is set to run on timer_cpu, switch to a different CPU, acquire the spinlock then
@@ -474,7 +474,7 @@ static bool trylock_or_cancel_get_lock() {
   interrupt_saved_state_t int_state = arch_interrupt_save();
 
   cpu_num_t timer_cpu = arch_curr_cpu_num();
-  const Deadline deadline = Deadline::after(ZX_USEC(100));
+  const Deadline deadline = Deadline::after_mono(ZX_USEC(100));
   t.Set(deadline, timer_trylock_cb, &arg);
   // The timer is set to run on timer_cpu, switch to a different CPU, acquire the spinlock then
   // signal the callback to proceed.
@@ -552,8 +552,8 @@ static bool deadline_after() {
   // Test to make sure that a relative timeout which is an infinite amount of
   // time from now produces an infinite deadline.
   for (const auto& slack : kSlackModes) {
-    Deadline deadline = slack.has_value() ? Deadline::after(ZX_TIME_INFINITE, slack.value())
-                                          : Deadline::after(ZX_TIME_INFINITE);
+    Deadline deadline = slack.has_value() ? Deadline::after_mono(ZX_TIME_INFINITE, slack.value())
+                                          : Deadline::after_mono(ZX_TIME_INFINITE);
     ASSERT_EQ(ZX_TIME_INFINITE, deadline.when());
 
     // Default slack should be "none"
@@ -568,8 +568,8 @@ static bool deadline_after() {
   for (const auto& slack : kSlackModes) {
     constexpr zx_duration_mono_t kTimeout = ZX_MSEC(10);
     zx_instant_mono_t before = zx_time_add_duration(current_mono_time(), kTimeout);
-    Deadline deadline =
-        slack.has_value() ? Deadline::after(kTimeout, slack.value()) : Deadline::after(kTimeout);
+    Deadline deadline = slack.has_value() ? Deadline::after_mono(kTimeout, slack.value())
+                                          : Deadline::after_mono(kTimeout);
     zx_instant_mono_t after = zx_time_add_duration(current_mono_time(), kTimeout);
     ASSERT_LE(before, deadline.when());
     ASSERT_GE(after, deadline.when());

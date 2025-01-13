@@ -643,7 +643,7 @@ bool migrate_stress_test() {
 
     // Wait for it to finish.
     int ret;
-    zx_status_t result = thread.thread->Join(&ret, Deadline::after(ZX_SEC(5)).when());
+    zx_status_t result = thread.thread->Join(&ret, Deadline::after_mono(ZX_SEC(5)).when());
     if (result != ZX_OK) {
       // If the thread has not completed in 5 seconds, it is likely that the
       // thread has hung for an unknown reason.
@@ -725,7 +725,7 @@ bool set_migrate_fn_stress_test() {
 
     // Wait for it to finish.
     int ret;
-    zx_status_t result = thread.thread->Join(&ret, Deadline::after(ZX_SEC(5)).when());
+    zx_status_t result = thread.thread->Join(&ret, Deadline::after_mono(ZX_SEC(5)).when());
     if (result != ZX_OK) {
       // If the thread has not completed in 5 seconds, it is likely that the
       // thread has hung for an unknown reason.
