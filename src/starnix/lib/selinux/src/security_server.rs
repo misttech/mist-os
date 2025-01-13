@@ -516,6 +516,43 @@ impl SecurityServer {
             status_publisher.set_status(new_value);
         }
     }
+
+    /// Returns the [`SecurityId`] with which an object of type `file_class` created by `source_sid`
+    /// under a parent object with `target_sid`, should be labeled.
+    /// If `name` is specified then named transition rules will be taken into account. Named
+    /// transitions are currently only applied for "anon_inode" instances.
+    pub fn compute_new_file_sid_with_name(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        file_class: FileClass,
+        name: Option<NullessByteStr<'_>>,
+    ) -> Result<SecurityId, anyhow::Error> {
+        let mut locked_state = self.state.lock();
+        let active_policy = match &mut locked_state.active_policy {
+            Some(active_policy) => active_policy,
+            None => {
+                return Err(anyhow::anyhow!("no policy loaded")).context("computing new file sid")
+            }
+        };
+
+        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
+        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
+
+        // TODO(http://b/334968228): check that transitions are allowed.
+        let new_file_context = active_policy.parsed.new_file_security_context(
+            source_context,
+            target_context,
+            &file_class,
+            name,
+        );
+
+        active_policy
+            .sid_table
+            .security_context_to_sid(&new_file_context)
+            .map_err(anyhow::Error::from)
+            .context("computing new file security context from policy")
+    }
 }
 
 impl Query for SecurityServer {
@@ -534,29 +571,7 @@ impl Query for SecurityServer {
         target_sid: SecurityId,
         file_class: FileClass,
     ) -> Result<SecurityId, anyhow::Error> {
-        let mut locked_state = self.state.lock();
-        let active_policy = match &mut locked_state.active_policy {
-            Some(active_policy) => active_policy,
-            None => {
-                return Err(anyhow::anyhow!("no policy loaded")).context("computing new file sid")
-            }
-        };
-
-        let source_context = active_policy.sid_table.sid_to_security_context(source_sid);
-        let target_context = active_policy.sid_table.sid_to_security_context(target_sid);
-
-        // TODO(http://b/334968228): check that transitions are allowed.
-        let new_file_context = active_policy.parsed.new_file_security_context(
-            source_context,
-            target_context,
-            &file_class,
-        );
-
-        active_policy
-            .sid_table
-            .security_context_to_sid(&new_file_context)
-            .map_err(anyhow::Error::from)
-            .context("computing new file security context from policy")
+        self.compute_new_file_sid_with_name(source_sid, target_sid, file_class, None)
     }
 }
 
@@ -948,6 +963,71 @@ mod tests {
 
         // User copied from source, high security level from target, role and type as default.
         assert_eq!(computed_context, b"user_u:object_r:file_t:s1:c0");
+    }
+
+    #[test]
+    fn compute_new_file_sid_with_name() {
+        let security_server = SecurityServer::new();
+        let policy_bytes =
+            include_bytes!("../testdata/composite_policies/compiled/type_transition_policy.pp")
+                .to_vec();
+        security_server.load_policy(policy_bytes).expect("binary policy loads");
+
+        let source_sid = security_server
+            .security_context_to_sid(b"source_u:source_r:source_t:s0".into())
+            .expect("creating SID from security context should succeed");
+        let target_sid = security_server
+            .security_context_to_sid(b"target_u:object_r:target_t:s0".into())
+            .expect("creating SID from security context should succeed");
+
+        const SPECIAL_FILE_NAME: &[u8] = b"special_file";
+        let computed_sid = security_server
+            .compute_new_file_sid_with_name(
+                source_sid,
+                target_sid,
+                FileClass::File,
+                Some(SPECIAL_FILE_NAME.into()),
+            )
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(computed_sid)
+            .expect("computed sid associated with context");
+
+        // New domain should be derived from the filename-specific rule.
+        assert_eq!(computed_context, b"source_u:object_r:special_transition_t:s0");
+
+        let computed_sid = security_server
+            .compute_new_file_sid_with_name(
+                source_sid,
+                target_sid,
+                FileClass::Character,
+                Some(SPECIAL_FILE_NAME.into()),
+            )
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(computed_sid)
+            .expect("computed sid associated with context");
+
+        // New domain should be copied from the target, because the class does not match either the
+        // filename-specific nor generic type transition rules.
+        assert_eq!(computed_context, b"source_u:object_r:target_t:s0");
+
+        const OTHER_FILE_NAME: &[u8] = b"other_file";
+        let computed_sid = security_server
+            .compute_new_file_sid_with_name(
+                source_sid,
+                target_sid,
+                FileClass::File,
+                Some(OTHER_FILE_NAME.into()),
+            )
+            .expect("new sid computed");
+        let computed_context = security_server
+            .sid_to_security_context(computed_sid)
+            .expect("computed sid associated with context");
+
+        // New domain should be derived from the non-filename-specific rule, because the filename
+        // does not match.
+        assert_eq!(computed_context, b"source_u:object_r:transition_t:s0");
     }
 
     #[test]

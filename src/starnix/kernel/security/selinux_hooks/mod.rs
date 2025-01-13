@@ -533,13 +533,20 @@ pub(super) fn fs_node_init_on_create(
 /// Called to label file nodes not linked in any filesystem's directory structure, e.g. sockets,
 /// usereventfds, etc.
 pub(super) fn fs_node_init_anon(
-    _security_server: &SecurityServer,
+    security_server: &SecurityServer,
     current_task: &CurrentTask,
     new_node: &FsNode,
-    _node_type: &str,
+    node_type: &str,
 ) {
-    track_stub!(TODO("https://fxbug.dev/364568735"), "Apply labeling rules to anon_inodes");
-    let sid = current_task.security_state.lock().current_sid;
+    let task_sid = current_task.security_state.lock().current_sid;
+    let sid = security_server
+        .compute_new_file_sid_with_name(
+            task_sid,
+            task_sid,
+            FileClass::AnonFsNode,
+            Some(node_type.into()),
+        )
+        .expect("Compute label for anon_inode");
     let mut state = new_node.security_state.lock();
     state.class = FileClass::AnonFsNode;
     state.label = FsNodeLabel::SecurityId { sid };

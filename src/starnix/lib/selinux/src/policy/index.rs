@@ -130,17 +130,25 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
         })
     }
 
+    /// Returns the [`SecurityContext`] with which to label a new file of the specified `class`,
+    /// based on the supplied `source` and `target` contexts and the policy-defined transition
+    /// rules. This is equivalent to calling `new_security_context()` directly, with the appropriate
+    /// "default" values specified for the role, type and security levels.
+    /// If `name` is non-empty then matching filename-dependent type transitions will be used, if
+    /// available, in preference to non-named ones.
     pub fn new_file_security_context(
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
         class: &crate::FileClass,
+        name: Option<NullessByteStr<'_>>,
     ) -> SecurityContext {
         let object_class = crate::ObjectClass::from(class.clone());
         self.new_security_context(
             source,
             target,
             &object_class,
+            name,
             // The SELinux notebook states the role component defaults to the object_r role.
             self.cached_object_r_role,
             // The SELinux notebook states the type component defaults to the type of the parent
@@ -172,11 +180,15 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     ///     - otherwise, if the policy contains a default_range for `class`, use that default range
     ///     - lastly, if the policy does not contain either, use the `default_low_level` -
     ///       `default_high_level` range.
+    ///
+    /// For file-like `class`es a non-empty `name` may be included, in which case `type_transition`
+    /// rules dependent on the target name will be taken into account.
     pub fn new_security_context(
         &self,
         source: &SecurityContext,
         target: &SecurityContext,
         class: &crate::ObjectClass,
+        name: Option<NullessByteStr<'_>>,
         default_role: RoleId,
         default_type: TypeId,
         default_low_level: &SecurityLevel,
@@ -203,7 +215,20 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                     },
                 };
 
-            let type_ =
+            // If a `name` was specified for the new object then check for a matching name-dependent
+            // type-transition rule in the policy.
+            let type_with_name = name.and_then(|name| {
+                self.type_transition_new_type_with_name(
+                    source.type_(),
+                    target.type_(),
+                    policy_class,
+                    name,
+                )
+            });
+
+            // If no `name` was supplied, or no rule matched it, then search the access vector for
+            // matching (name-independent) type-transition rules.
+            let type_ = type_with_name.unwrap_or_else(|| {
                 match self.type_transition_new_type(source.type_(), target.type_(), policy_class) {
                     Some(new_type) => new_type,
                     None => match class_defaults.type_() {
@@ -211,7 +236,8 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                         ClassDefault::Target => target.type_(),
                         _ => default_type,
                     },
-                };
+                }
+            });
 
             let (low_level, high_level) =
                 match self.range_transition_new_range(source.type_(), target.type_(), policy_class)
@@ -432,6 +458,25 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                     && access_vector.target_class() == class.id()
             })
             .map(|x| x.new_type().unwrap())
+    }
+
+    fn type_transition_new_type_with_name(
+        &self,
+        source_type: TypeId,
+        target_type: TypeId,
+        class: &Class<PS>,
+        name: NullessByteStr<'_>,
+    ) -> Option<TypeId> {
+        let entry = self.parsed_policy.filename_transitions().iter().find(|transition| {
+            transition.target_type() == target_type
+                && transition.target_class() == class.id()
+                && transition.name_bytes() == name.as_bytes()
+        })?;
+        entry
+            .outputs()
+            .iter()
+            .find(|entry| entry.has_source_type(source_type))
+            .map(|x| x.out_type())
     }
 
     fn range_transition_new_range(

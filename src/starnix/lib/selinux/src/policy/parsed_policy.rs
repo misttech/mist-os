@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::arrays::{
-    AccessVectors, ConditionalNodes, Context, DeprecatedFilenameTransitions,
+    AccessVectors, ConditionalNodes, Context, DeprecatedFilenameTransitions, FilenameTransition,
     FilenameTransitionList, FilenameTransitions, FsUses, GenericFsContexts, IPv6Nodes,
     InfinitiBandEndPorts, InfinitiBandPartitionKeys, InitialSids, NamedContextPairs, Nodes, Ports,
     RangeTransitions, RoleAllow, RoleAllows, RoleTransition, RoleTransitions, SimpleArray,
@@ -408,6 +408,13 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     pub(super) fn access_vectors(&self) -> &AccessVectors<PS> {
         &self.access_vectors.data
+    }
+
+    pub(super) fn filename_transitions(&self) -> &[FilenameTransition<PS>] {
+        match &self.filename_transition_list {
+            FilenameTransitionList::PolicyVersionGeq33(list) => &list.data,
+            _ => &[],
+        }
     }
 }
 
