@@ -4485,10 +4485,35 @@
         "request": "fuchsia.media/UsageReporterWatchRequest"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.media/UsageReporter.Watch2",
+        "strictness": "strict",
+        "ordinal": "5351337146313444584",
+        "direction": "one_way",
+        "request": "fuchsia.media/UsageReporterWatch2Request"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.media/UsageReporter",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/UsageReporterWatch2Request.usage2",
+        "ordinal": "1",
+        "type": "fuchsia.media/Usage2"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/UsageReporterWatch2Request.usage_watcher2",
+        "ordinal": "2",
+        "type": "client_end:fuchsia.media/UsageWatcher2"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/UsageReporterWatch2Request",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",
@@ -4555,6 +4580,36 @@
         "name": "fuchsia.media/UsageWatcher",
         "openness": "closed",
         "transport": "channel"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.media/UsageWatcher2.OnStateChanged2",
+        "strictness": "strict",
+        "ordinal": "6333956045859308605",
+        "direction": "two_way",
+        "request": "fuchsia.media/UsageWatcher2OnStateChanged2Request"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.media/UsageWatcher2",
+        "openness": "closed",
+        "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/UsageWatcher2OnStateChanged2Request.state",
+        "ordinal": "2",
+        "type": "fuchsia.media/UsageState"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/UsageWatcher2OnStateChanged2Request.usage2",
+        "ordinal": "1",
+        "type": "fuchsia.media/Usage2"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/UsageWatcher2OnStateChanged2Request"
     },
     {
         "kind": "struct/member",
