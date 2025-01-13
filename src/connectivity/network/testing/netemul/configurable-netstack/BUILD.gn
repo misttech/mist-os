@@ -12,6 +12,7 @@ netstack2_visibility = [
   "//src/connectivity/network/tests/external_network:*",
   "//src/connectivity/network/tests/getifaddrs:*",
   "//src/connectivity/network/tests/multi_nic:*",
+  "//src/connectivity/weave/tests/weave_ip_forward:*",
 ]
 
 rustc_binary("bin") {
