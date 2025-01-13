@@ -2147,6 +2147,17 @@ void VmObjectPaged::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) 
   }
 }
 
+void VmObjectPaged::ForwardRangeChangeUpdateLocked(uint64_t offset, uint64_t len,
+                                                   RangeChangeOp op) {
+  canary_.Assert();
+
+  // Call RangeChangeUpdateLocked on the owner of the CowPages.
+  AssertHeld(cow_pages_locked()->get_paged_backlink_locked()->lock_ref());
+  if (auto cow_range = GetCowRange(offset, len)) {
+    cow_pages_locked()->get_paged_backlink_locked()->RangeChangeUpdateLocked(*cow_range, op);
+  }
+}
+
 zx_status_t VmObjectPaged::LockRange(uint64_t offset, uint64_t len,
                                      zx_vmo_lock_state_t* lock_state_out) {
   if (!is_discardable()) {

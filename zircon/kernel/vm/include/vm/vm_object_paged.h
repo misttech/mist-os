@@ -344,6 +344,12 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // Apply the specified operation to all mappings in the given range.
   void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
 
+  // Apply the specified operation to all mappings in the given range, forwarded to the original
+  // owner of the VmCowPages. In the case of references and slices, this ensures that all VMOs in
+  // the reference list of the original, cloned VMO are included.
+  void ForwardRangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeChangeOp op)
+      TA_REQ(lock());
+
   // This is exposed so that VmCowPages can call it. It is used to update the VmCowPages object
   // that this VMO points to for its operations. When updating it must be set to a non-null
   // reference, and any mappings or pin operations must remain equivalently valid.

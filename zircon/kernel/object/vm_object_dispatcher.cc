@@ -363,7 +363,16 @@ zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
     return status;
   }
 
-  op.CommitLocked();
+  // Ensure pages between min(stream size, old stream size) and the end of the VMO are unmapped
+  // before before committing new content size.
+  VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(vmo_.get());
+  DEBUG_ASSERT(paged);
+  {
+    Guard<CriticalMutex> vmo_guard{paged->lock()};
+    paged->ForwardRangeChangeUpdateLocked(zero_start, vmo_size - zero_start,
+                                          VmCowPages::RangeChangeOp::Unmap);
+    op.CommitLocked();
+  }
   return ZX_OK;
 }
 
