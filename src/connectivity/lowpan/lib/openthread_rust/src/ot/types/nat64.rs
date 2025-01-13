@@ -49,7 +49,12 @@ impl_ot_castable!(Ip4Cidr, otIp4Cidr);
 
 impl Debug for Ip4Cidr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "IpAddr:{:?}, PrefixLength:{}", self.get_address_bytes(), self.get_length())
+        write!(
+            f,
+            "IpAddr:{}, PrefixLength:{}",
+            std::net::Ipv4Addr::from(self.get_address_bytes()),
+            self.get_length()
+        )
     }
 }
 

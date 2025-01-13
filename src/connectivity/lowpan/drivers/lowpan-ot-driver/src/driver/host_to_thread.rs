@@ -144,8 +144,9 @@ where
                 .ignore_already_exists()
                 .or_else(move |err| {
                     warn!(
-                        "OpenThread refused to add unicast address {:?}, will remove from netstack. (Error: {:?})",
-                        netif_addr,
+                        "OpenThread refused to add unicast address {} with prefix length {}, will remove from netstack. (Error: {:?})",
+                        std::net::Ipv6Addr::from(subnet.addr),
+                        subnet.prefix_len,
                         err
                     );
                     self.net_if.remove_address_from_spinel_subnet(&subnet).ignore_not_found()
