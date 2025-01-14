@@ -46,8 +46,8 @@ use syncio::zxio::{
     ZXIO_OBJECT_TYPE_STREAM_SOCKET, ZXIO_OBJECT_TYPE_SYNCHRONOUS_DATAGRAM_SOCKET,
 };
 use syncio::{
-    zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator,
-    XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
+    zxio_fsverity_descriptor_t, zxio_node_attr_has_t, zxio_node_attributes_t, AllocateMode,
+    DirentIterator, XattrSetMode, Zxio, ZxioDirent, ZxioOpenOptions, ZXIO_ROOT_HASH_LENGTH,
 };
 use zx::{HandleBased, Status};
 use {
@@ -783,7 +783,7 @@ impl FsNodeOps for RemoteNode {
     fn allocate(
         &self,
         locked: &mut Locked<'_, FileOpsCore>,
-        guard: &AppendLockGuard<'_>,
+        _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
         mode: FallocMode,
@@ -793,14 +793,9 @@ impl FsNodeOps for RemoteNode {
         match mode {
             FallocMode::Allocate { keep_size: false } => {
                 node.fail_if_locked(locked, current_task)?;
-                let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
-                let info_size = {
-                    let info = node.fetch_and_refresh_info(locked, current_task)?;
-                    info.size as u64
-                };
-                if info_size < allocate_size {
-                    self.truncate(locked, guard, node, current_task, allocate_size)?;
-                }
+                self.zxio
+                    .allocate(offset, length, AllocateMode::empty())
+                    .map_err(|status| from_status_like_fdio!(status))?;
                 Ok(())
             }
             _ => error!(EINVAL),
@@ -2392,7 +2387,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    async fn test_allocate_workaround() {
+    async fn test_allocate() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
         fixture.root().clone(server.into()).expect("clone failed");

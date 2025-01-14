@@ -479,7 +479,6 @@ impl File for FxFile {
         self.handle.store_handle().remove_extended_attribute(name).await.map_err(map_to_status)
     }
 
-    #[cfg(test)]
     async fn allocate(
         &self,
         offset: u64,
