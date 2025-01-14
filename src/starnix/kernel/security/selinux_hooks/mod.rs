@@ -148,20 +148,18 @@ pub fn file_permission(
     mut permission_flags: PermissionFlags,
 ) -> Result<(), Errno> {
     let current_sid = current_task.security_state.lock().current_sid;
-    let file_class = file.node().security_state.lock().class;
 
     if file.flags().contains(OpenFlags::APPEND) {
         permission_flags |= PermissionFlags::APPEND;
     }
 
     has_file_permissions(&security_server.as_permission_check(), current_sid, file, &[])?;
-    todo_has_fs_node_permissions(
-        TODO_DENY!("https://fxbug.dev/385121365", "Enforce file_permission() checks"),
-        &security_server.as_permission_check(),
-        current_sid,
-        file.node(),
-        &permissions_from_flags(permission_flags, file_class),
-    )
+
+    track_stub!(
+        TODO("https://fxbug.dev/385121365"),
+        "Implement & enforce file_permission() checks"
+    );
+    Ok(())
 }
 
 /// Returns the relative path from the root of the file system containing this `DirEntry`.
