@@ -64,11 +64,11 @@ cc_source_library://pkg/component_outgoing_cpp
 cc_source_library://pkg/driver_component_cpp
 cc_source_library://pkg/driver_devfs_cpp
 cc_source_library://pkg/driver_fake_bti_cpp
+cc_source_library://pkg/driver_fake_object_cpp
 cc_source_library://pkg/driver_fake_platform_device_cpp (unstable)
 cc_source_library://pkg/driver_fake_resource_cpp (unstable)
 cc_source_library://pkg/driver_incoming_cpp
 cc_source_library://pkg/driver_logging_cpp
-cc_source_library://pkg/driver_fake_object_cpp
 cc_source_library://pkg/driver_metadata_cpp (unstable)
 cc_source_library://pkg/driver_node_cpp
 cc_source_library://pkg/driver_outgoing_cpp
@@ -266,6 +266,7 @@ fidl_library://fidl/fuchsia.hardware.light
 fidl_library://fidl/fuchsia.hardware.mailbox (unstable)
 fidl_library://fidl/fuchsia.hardware.network
 fidl_library://fidl/fuchsia.hardware.network.driver (unstable)
+fidl_library://fidl/fuchsia.hardware.nfc (unstable)
 fidl_library://fidl/fuchsia.hardware.pci
 fidl_library://fidl/fuchsia.hardware.pin
 fidl_library://fidl/fuchsia.hardware.pinimpl
