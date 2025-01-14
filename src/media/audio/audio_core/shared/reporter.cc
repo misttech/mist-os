@@ -572,7 +572,8 @@ std::string UsageBehaviorToString(fuchsia::media::Behavior behavior) {
     case fuchsia::media::Behavior::MUTE:
       return "MUTE";
     default:
-      FX_CHECK(false) << "Invalid fuchsia::media::Behavior: " << static_cast<int>(behavior);
+      FX_DCHECK(false) << "Invalid fuchsia::media::Behavior: " << static_cast<int>(behavior);
+      return "unknown";
   }
 }
 }  // namespace
@@ -1025,7 +1026,7 @@ class Reporter::RendererImpl : public Reporter::Renderer {
     timestamp_underflows_->StopSession(stop_time);
   }
 
-  void SetUsage(RenderUsage usage) override { usage_.Set(RenderUsageToString(usage)); }
+  void SetUsage(RenderUsage usage) override { usage_.Set(ToString(usage)); }
   void SetFormat(const Format& format) override { client_port_.SetFormat(format); }
 
   void SetGain(float gain_db) override { client_port_.SetGain(gain_db); }
@@ -1134,7 +1135,7 @@ class Reporter::CapturerImpl : public Reporter::Capturer {
   void StartSession(zx::time start_time) override { overflows_->StartSession(start_time); }
   void StopSession(zx::time stop_time) override { overflows_->StopSession(stop_time); }
 
-  void SetUsage(CaptureUsage usage) override { usage_.Set(CaptureUsageToString(usage)); }
+  void SetUsage(CaptureUsage usage) override { usage_.Set(ToString(usage)); }
   void SetFormat(const Format& format) override { client_port_.SetFormat(format); }
 
   void SetGain(float gain_db) override { client_port_.SetGain(gain_db); }

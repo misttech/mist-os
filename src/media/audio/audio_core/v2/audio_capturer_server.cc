@@ -140,8 +140,7 @@ void AudioCapturerServer::SetUsage(SetUsageRequestView request,
     return;
   }
 
-  usage_ = media::audio::CaptureUsageFromFidlCaptureUsage(
-      static_cast<fuchsia::media::AudioCaptureUsage>(request->usage));
+  usage_ = media::audio::ToCaptureUsage(request->usage);
 }
 
 void AudioCapturerServer::SetPcmStreamType(SetPcmStreamTypeRequestView request,
@@ -268,8 +267,8 @@ void AudioCapturerServer::RemovePayloadBuffer(RemovePayloadBufferRequestView req
   Shutdown(ZX_ERR_NOT_SUPPORTED);
 }
 
-// TODO(https://fxbug.dev/42181009): implement: need to create a fuchsia.media.audio.GainControl server that
-// forwards to stream_gain_control_client_
+// TODO(https://fxbug.dev/42181009): implement: need to create a fuchsia.media.audio.GainControl
+// server that forwards to stream_gain_control_client_
 void AudioCapturerServer::BindGainControl(BindGainControlRequestView request,
                                           BindGainControlCompleter::Sync& completer) {
   FX_LOGS(ERROR) << "BindGainControl not implemented";
@@ -463,16 +462,17 @@ void AudioCapturerServer::DiscardAllPacketsInternal(
   stream_sink_server_->DiscardPackets();
 }
 
-// TODO(https://fxbug.dev/42181009): at most one start or stop command can be pending; if one is already
-// pending, cancel it before sending the new start command
+// TODO(https://fxbug.dev/42181009): at most one start or stop command can be pending; if one is
+// already pending, cancel it before sending the new start command
 void AudioCapturerServer::Start() {
   // Start the ConsumerNode at "now". To ensure that packets are timestamped with the reference time
   // at which they were captured, pick an explicit start time `T=now` and call Graph.Start with the
   // correspondence pair `(ReferenceTime=T, PacketTimestamp=T)`.
   //
-  // TODO(https://fxbug.dev/42181009): once the mixer service populates `Packet.capture_timestamp`, this will
-  // be unnecessary. Instead, we can start at `(RealTime=ASAP, PacketTimestamp=<anything>)`. Our
-  // `stream_sink_server_` will use `Packet.capture_timestamp` and will ignore `Packet.timestamp`.
+  // TODO(https://fxbug.dev/42181009): once the mixer service populates `Packet.capture_timestamp`,
+  // this will be unnecessary. Instead, we can start at `(RealTime=ASAP,
+  // PacketTimestamp=<anything>)`. Our `stream_sink_server_` will use `Packet.capture_timestamp` and
+  // will ignore `Packet.timestamp`.
   zx_time_t now;
   if (auto status = reference_clock_.read(&now); status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Unexpected failure to read reference_clock_";
@@ -498,8 +498,8 @@ void AudioCapturerServer::Start() {
       });
 }
 
-// TODO(https://fxbug.dev/42181009): at most one start or stop command can be pending; if one is already
-// pending, cancel it before sending the new stop command
+// TODO(https://fxbug.dev/42181009): at most one start or stop command can be pending; if one is
+// already pending, cancel it before sending the new stop command
 void AudioCapturerServer::Stop() {
   fidl::Arena<> arena;
   (*graph_client_)
@@ -570,7 +570,8 @@ void AudioCapturerServer::OnShutdown(fidl::UnbindInfo info) {
   graph_client_ = nullptr;
   stream_gain_control_client_ = std::nullopt;
 
-  // TODO(https://fxbug.dev/42181009): send OnWillClose event from the StreamSinkServer before shutting down
+  // TODO(https://fxbug.dev/42181009): send OnWillClose event from the StreamSinkServer before
+  // shutting down
   if (stream_sink_server_) {
     stream_sink_server_->Shutdown();
     stream_sink_server_ = nullptr;
@@ -723,8 +724,8 @@ void AudioCapturerServer::MaybeSetFullyCreated() {
     on_fully_created_(shared_from_this());
   }
 
-  // TODO(https://fxbug.dev/42181009): after implementing RouteGraph, this is where we should add this capturer
-  // to the RouteGroup.
+  // TODO(https://fxbug.dev/42181009): after implementing RouteGraph, this is where we should add
+  // this capturer to the RouteGroup.
 
   // Flush all queued tasks.
   for (auto& fn : queued_tasks_) {

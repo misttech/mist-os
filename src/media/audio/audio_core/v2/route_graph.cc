@@ -13,9 +13,7 @@ namespace media_audio {
 namespace {
 
 using ::media::audio::CaptureUsage;
-using ::media::audio::CaptureUsageFromFidlCaptureUsage;
 using ::media::audio::RenderUsage;
-using ::media::audio::RenderUsageFromFidlRenderUsage;
 using ::media::audio::VolumeCurve;
 
 template <class InfoT, class PipelineT>

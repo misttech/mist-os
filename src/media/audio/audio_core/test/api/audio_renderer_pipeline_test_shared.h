@@ -208,9 +208,9 @@ class AudioRendererGainLimitsTest
     // Set usage gain/mute.
     if (tc.media_mute) {
       fuchsia::media::audio::VolumeControlPtr volume_control;
-      audio_core_->BindUsageVolumeControl2(
-          fuchsia::media::Usage2::WithRenderUsage((fuchsia::media::AudioRenderUsage2::MEDIA)),
-          volume_control.NewRequest());
+      audio_core_->BindUsageVolumeControl2(fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(
+                                               fuchsia::media::AudioRenderUsage2::MEDIA)),
+                                           volume_control.NewRequest());
       volume_control->SetMute(true);
     } else {
       audio_core_->SetRenderUsageGain2(fuchsia::media::AudioRenderUsage2::MEDIA, tc.media_gain_db);

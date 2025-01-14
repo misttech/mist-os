@@ -12,8 +12,9 @@
 
 namespace media::audio {
 
-const auto kMediaUsage =
-    fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA);
+using fuchsia::media::AudioRenderUsage2;
+
+const auto kMediaUsage = ToFidlUsage2(RenderUsage::MEDIA);
 const auto kMutedState = fuchsia::media::UsageState::WithMuted({});
 const auto kUnadjustedState = fuchsia::media::UsageState::WithUnadjusted({});
 const auto kActivateCallback = true;
@@ -40,17 +41,17 @@ inline std::ostream& operator<<(std::ostream& out, const fuchsia::media::Usage2&
   if (usage.is_render_usage()) {
     out << "Render::";
     switch (usage.render_usage()) {
-      case fuchsia::media::AudioRenderUsage2::ACCESSIBILITY:
+      case AudioRenderUsage2::ACCESSIBILITY:
         return (out << "ACCESSIBILITY");
-      case fuchsia::media::AudioRenderUsage2::BACKGROUND:
+      case AudioRenderUsage2::BACKGROUND:
         return (out << "BACKGROUND");
-      case fuchsia::media::AudioRenderUsage2::COMMUNICATION:
+      case AudioRenderUsage2::COMMUNICATION:
         return (out << "COMMUNICATION");
-      case fuchsia::media::AudioRenderUsage2::INTERRUPTION:
+      case AudioRenderUsage2::INTERRUPTION:
         return (out << "INTERRUPTION");
-      case fuchsia::media::AudioRenderUsage2::MEDIA:
+      case AudioRenderUsage2::MEDIA:
         return (out << "MEDIA");
-      case fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT:
+      case AudioRenderUsage2::SYSTEM_AGENT:
         return (out << "SYSTEM_AGENT");
       default:
         return (out << "UNKNOWN");
@@ -130,7 +131,7 @@ class UsageReporterImplTest : public gtest::TestLoopFixture {
       fuchsia::media::Usage2 usage, bool activate_callback) {
     fidl::InterfaceHandle<fuchsia::media::UsageWatcher> state_watcher_handle;
     auto request = state_watcher_handle.NewRequest();
-    auto usage1 = FromFidlUsage2(usage);
+    auto usage1 = ToFidlUsageTry(usage);
     if (usage1.has_value()) {
       usage_reporter_->Watch(std::move(usage1.value()), std::move(state_watcher_handle));
     }

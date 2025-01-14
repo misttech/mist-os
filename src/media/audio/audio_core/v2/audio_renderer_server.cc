@@ -256,8 +256,7 @@ void AudioRendererServer::SetUsage(SetUsageRequestView request,
   TRACE_DURATION("audio", "AudioRendererServer::SetUsage");
 
   if (SetUsageCheck() == ZX_OK) {
-    usage_ = media::audio::RenderUsageFromFidlRenderUsage(
-        static_cast<fuchsia::media::AudioRenderUsage2>(static_cast<uint32_t>(request->usage)));
+    usage_ = media::audio::ToRenderUsage(request->usage);
   }
 }
 
@@ -266,8 +265,7 @@ void AudioRendererServer::SetUsage2(SetUsage2RequestView request,
   TRACE_DURATION("audio", "AudioRendererServer::SetUsage2");
 
   if (SetUsageCheck() == ZX_OK) {
-    usage_ = media::audio::RenderUsageFromFidlRenderUsage(
-        fuchsia::media::AudioRenderUsage2(static_cast<uint32_t>(request->usage2)));
+    usage_ = media::audio::ToRenderUsage(request->usage2);
   }
 }
 

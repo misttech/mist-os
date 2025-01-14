@@ -80,7 +80,7 @@ void UsageReporterImpl::ReportPolicyAction(fuchsia::media::Usage2 usage,
   }
 
   {
-    auto usage1 = FromFidlUsage2(usage);
+    auto usage1 = ToFidlUsageTry(usage);
     if (!usage1.has_value()) {
       return;
     }
@@ -104,17 +104,17 @@ void UsageReporterImpl::ReportPolicyAction(fuchsia::media::Usage2 usage,
 
 UsageReporterImpl::WatcherSet& UsageReporterImpl::watcher_set(const fuchsia::media::Usage2& usage) {
   if (usage.is_render_usage()) {
-    return render_usage_watchers_[fidl::ToUnderlying(usage.render_usage())];
+    return render_usage_watchers_[ToIndex(usage.render_usage())];
   }
-  return capture_usage_watchers_[fidl::ToUnderlying(usage.capture_usage())];
+  return capture_usage_watchers_[ToIndex(usage.capture_usage())];
 }
 
 UsageReporterImpl::WatcherSet2& UsageReporterImpl::watcher_set2(
     const fuchsia::media::Usage2& usage) {
   if (usage.is_render_usage()) {
-    return render_usage2_watchers_[fidl::ToUnderlying(usage.render_usage())];
+    return render_usage2_watchers_[ToIndex(usage.render_usage())];
   }
-  return capture_usage2_watchers_[fidl::ToUnderlying(usage.capture_usage())];
+  return capture_usage2_watchers_[ToIndex(usage.capture_usage())];
 }
 
 }  // namespace media::audio

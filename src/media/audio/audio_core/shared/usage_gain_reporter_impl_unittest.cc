@@ -15,6 +15,8 @@
 namespace media::audio {
 namespace {
 
+using fuchsia::media::AudioRenderUsage2;
+
 const std::string DEVICE_ID_STRING = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const audio_stream_unique_id_t DEVICE_ID_AUDIO_STREAM =
     DeviceUniqueIdFromString(DEVICE_ID_STRING).take_value();
@@ -83,7 +85,7 @@ class UsageGainReporterTest : public gtest::TestLoopFixture {
                          /* independent_volume_control=*/true, PipelineConfig::Default(),
                          /*driver_gain_db=*/0.0, /*software_gain_db=*/0.0)})
                 .Build()),
-        usage_(fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA)) {}
+        usage_(ToFidlUsage2(RenderUsage::MEDIA)) {}
 
   enum class ListenerType : uint8_t { kOld, kNew };
 
@@ -98,7 +100,7 @@ class UsageGainReporterTest : public gtest::TestLoopFixture {
     auto fake_gain_listener = std::make_unique<FakeGainListener>();
 
     if (lt == ListenerType::kOld) {
-      under_test()->RegisterListener(device_id, fidl::Clone(*FromFidlUsage2(usage())),
+      under_test()->RegisterListener(device_id, fidl::Clone(*ToFidlUsageTry(usage())),
                                      fake_gain_listener->NewBinding());
     } else {
       under_test()->RegisterListener2(device_id, fidl::Clone(usage()),
@@ -163,8 +165,7 @@ class UsageGainReporterTest : public gtest::TestLoopFixture {
     fake_listener = nullptr;
 
     // Verify we removed the listener from StreamVolumeManager. If we did not, this will crash.
-    stream_volume_manager()->SetUsageGain(
-        fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA), 0.42f);
+    stream_volume_manager()->SetUsageGain(ToFidlUsage2(RenderUsage::MEDIA), 0.42f);
   }
 
   size_t NumListeners() { return under_test()->listeners_.size(); }

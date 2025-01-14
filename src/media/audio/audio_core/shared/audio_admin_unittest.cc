@@ -19,7 +19,6 @@ using RenderActivity = media::audio::AudioAdmin::ActivityDispatcher::RenderActiv
 using fuchsia::media::AudioCaptureUsage;
 using fuchsia::media::AudioRenderUsage2;
 using fuchsia::media::Usage2;
-using std::move;
 
 // Note we purposely use some strange values here to ensure we're not falling back to any default
 // or hard-coded logic for values.
@@ -130,8 +129,7 @@ TEST_F(AudioAdminTest, OnlyUpdateVolumeOnPolicyChange) {
 
   // Media should duck when a Communication stream is active.
   admin.SetInteraction(Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
-                       Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                       fuchsia::media::Behavior::MUTE);
+                       ToFidlUsage2(RenderUsage::MEDIA), fuchsia::media::Behavior::MUTE);
 
   // Create active media stream; activation triggers initial policy application (volume update).
   admin.UpdateRendererState(RenderUsage::MEDIA, true, &r1);
@@ -166,27 +164,25 @@ TEST_F(AudioAdminTest, TwoRenderersWithNoInteractions) {
 
   // Set an inintial stream volume.
   const float kStreamGain = 1.0;
-  stream_volume_manager.SetUsageGain(Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                                     kStreamGain);
-  stream_volume_manager.SetUsageGain(Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                                     kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(RenderUsage::MEDIA), kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(RenderUsage::COMMUNICATION), kStreamGain);
 
   // Start playing a MEDIA stream and check for 'no gain adjustment'.
   admin.UpdateRendererState(RenderUsage::MEDIA, true, &r1);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)));
+                ToFidlUsage2(RenderUsage::MEDIA)));
 
   // Now play a COMMUNICATIONS stream and also check for 'no gain adjustment'.
   admin.UpdateRendererState(RenderUsage::COMMUNICATION, true, &r2);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)));
+                ToFidlUsage2(RenderUsage::MEDIA)));
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION)));
+                ToFidlUsage2(RenderUsage::COMMUNICATION)));
 }
 
 TEST_F(AudioAdminTest, TwoRenderersWithDuck) {
@@ -199,43 +195,40 @@ TEST_F(AudioAdminTest, TwoRenderersWithDuck) {
   test::NullAudioRenderer r1, r2;
 
   // Media should duck when a Communication stream is active.
-  admin.SetInteraction(Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                       Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
+  admin.SetInteraction(ToFidlUsage2(RenderUsage::COMMUNICATION), ToFidlUsage2(RenderUsage::MEDIA),
                        fuchsia::media::Behavior::DUCK);
 
   // Set an inintial stream volume.
   const float kStreamGain = 1.0;
-  stream_volume_manager.SetUsageGain(Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                                     kStreamGain);
-  stream_volume_manager.SetUsageGain(Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                                     kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(RenderUsage::MEDIA), kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(RenderUsage::COMMUNICATION), kStreamGain);
 
   // create media active stream.
   admin.UpdateRendererState(RenderUsage::MEDIA, true, &r1);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)));
+                ToFidlUsage2(RenderUsage::MEDIA)));
 
   // communication renderer becomes active; media should duck.
   admin.UpdateRendererState(RenderUsage::COMMUNICATION, true, &r2);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kDuckGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)));
+                ToFidlUsage2(RenderUsage::MEDIA)));
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION)));
+                ToFidlUsage2(RenderUsage::COMMUNICATION)));
 
   // All Communication streams become inactive; ducking should stop.
   admin.UpdateRendererState(RenderUsage::COMMUNICATION, false, &r2);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)));
+                ToFidlUsage2(RenderUsage::MEDIA)));
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION)));
+                ToFidlUsage2(RenderUsage::COMMUNICATION)));
 }
 
 TEST_F(AudioAdminTest, CapturerDucksRenderer) {
@@ -250,14 +243,11 @@ TEST_F(AudioAdminTest, CapturerDucksRenderer) {
 
   // Set an inintial stream volume.
   const float kStreamGain = 1.0;
-  stream_volume_manager.SetUsageGain(Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                                     kStreamGain);
-  stream_volume_manager.SetUsageGain(Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
-                                     kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(RenderUsage::MEDIA), kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(CaptureUsage::COMMUNICATION), kStreamGain);
 
   // Media should duck when a Communication stream is active.
-  admin.SetInteraction(Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
-                       Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
+  admin.SetInteraction(ToFidlUsage2(CaptureUsage::COMMUNICATION), ToFidlUsage2(RenderUsage::MEDIA),
                        fuchsia::media::Behavior::DUCK);
 
   // Create active media stream.
@@ -265,27 +255,27 @@ TEST_F(AudioAdminTest, CapturerDucksRenderer) {
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)));
+                ToFidlUsage2(RenderUsage::MEDIA)));
 
   // Create active Communication capturer; media output should duck.
   admin.UpdateCapturerState(CaptureUsage::COMMUNICATION, true, &c1);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kDuckGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)));
+                ToFidlUsage2(RenderUsage::MEDIA)));
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION)));
+                ToFidlUsage2(CaptureUsage::COMMUNICATION)));
 
   // Comm becomes inactive; ducking should stop.
   admin.UpdateCapturerState(CaptureUsage::COMMUNICATION, false, &c1);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA)));
+                ToFidlUsage2(RenderUsage::MEDIA)));
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION)));
+                ToFidlUsage2(CaptureUsage::COMMUNICATION)));
 }
 
 TEST_F(AudioAdminTest, RendererDucksCapturer) {
@@ -299,47 +289,44 @@ TEST_F(AudioAdminTest, RendererDucksCapturer) {
   test::NullAudioCapturer c1;
 
   const float kStreamGain = 1.0;
-  stream_volume_manager.SetUsageGain(Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                                     kStreamGain);
-  stream_volume_manager.SetUsageGain(Usage2::WithCaptureUsage(AudioCaptureUsage::FOREGROUND),
-                                     kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(RenderUsage::COMMUNICATION), kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(CaptureUsage::FOREGROUND), kStreamGain);
 
   // Foreground capturer should duck when communication renderers are active.
-  admin.SetInteraction(Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                       Usage2::WithCaptureUsage(AudioCaptureUsage::FOREGROUND),
-                       fuchsia::media::Behavior::DUCK);
+  admin.SetInteraction(ToFidlUsage2(RenderUsage::COMMUNICATION),
+                       ToFidlUsage2(CaptureUsage::FOREGROUND), fuchsia::media::Behavior::DUCK);
 
   // Create active capturer stream.
   admin.UpdateCapturerState(CaptureUsage::FOREGROUND, true, &c1);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithCaptureUsage(AudioCaptureUsage::FOREGROUND)));
+                ToFidlUsage2(CaptureUsage::FOREGROUND)));
 
   // Create active Communication renderer; foreground capturer should duck.
   admin.UpdateRendererState(RenderUsage::COMMUNICATION, true, &r1);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kDuckGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithCaptureUsage(AudioCaptureUsage::FOREGROUND)));
+                ToFidlUsage2(CaptureUsage::FOREGROUND)));
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION)));
+                ToFidlUsage2(RenderUsage::COMMUNICATION)));
 
   // Comm becomes inactive; ducking should stop.
   admin.UpdateRendererState(RenderUsage::COMMUNICATION, false, &r1);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithCaptureUsage(AudioCaptureUsage::FOREGROUND)));
+                ToFidlUsage2(CaptureUsage::FOREGROUND)));
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION)));
+                ToFidlUsage2(RenderUsage::COMMUNICATION)));
 }
 
 TEST_F(AudioAdminTest, PolicyActionsReported) {
   auto test_policy_action = [this](auto expected_action) {
-    const auto target_usage = Usage2::WithCaptureUsage(AudioCaptureUsage::FOREGROUND);
+    const auto target_usage = ToFidlUsage2(CaptureUsage::FOREGROUND);
     fuchsia::media::Behavior policy_action_taken;
     // Record any actions taken on our target_usage (AudioCaptureUsage::FOREGROUND)
     MockPolicyActionReporter policy_action_reporter(
@@ -358,14 +345,12 @@ TEST_F(AudioAdminTest, PolicyActionsReported) {
     test::NullAudioCapturer c1;
 
     const float kStreamGain = 1.0;
-    stream_volume_manager.SetUsageGain(Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                                       kStreamGain);
-    stream_volume_manager.SetUsageGain(Usage2::WithCaptureUsage(AudioCaptureUsage::FOREGROUND),
-                                       kStreamGain);
+    stream_volume_manager.SetUsageGain(ToFidlUsage2(RenderUsage::COMMUNICATION), kStreamGain);
+    stream_volume_manager.SetUsageGain(ToFidlUsage2(CaptureUsage::FOREGROUND), kStreamGain);
 
     // Foreground capturer should duck when communication renderers are active.
-    admin.SetInteraction(Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                         Usage2::WithCaptureUsage(AudioCaptureUsage::FOREGROUND), expected_action);
+    admin.SetInteraction(ToFidlUsage2(RenderUsage::COMMUNICATION),
+                         ToFidlUsage2(CaptureUsage::FOREGROUND), expected_action);
 
     // Create active capturer stream.
     admin.UpdateCapturerState(CaptureUsage::FOREGROUND, true, &c1);
@@ -487,50 +472,45 @@ TEST_F(AudioAdminTest, PriorityActionsApplied) {
   test::NullAudioCapturer c1;
 
   // Interruption should duck when SystemAgent(render) is active.
-  admin.SetInteraction(Usage2::WithRenderUsage(AudioRenderUsage2::SYSTEM_AGENT),
-                       Usage2::WithRenderUsage(AudioRenderUsage2::INTERRUPTION),
-                       fuchsia::media::Behavior::DUCK);
+  admin.SetInteraction(ToFidlUsage2(RenderUsage::SYSTEM_AGENT),
+                       ToFidlUsage2(RenderUsage::INTERRUPTION), fuchsia::media::Behavior::DUCK);
 
   // Communication(render) should duck when SystemAgent(render) is active.
-  admin.SetInteraction(Usage2::WithRenderUsage(AudioRenderUsage2::SYSTEM_AGENT),
-                       Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                       fuchsia::media::Behavior::DUCK);
+  admin.SetInteraction(ToFidlUsage2(RenderUsage::SYSTEM_AGENT),
+                       ToFidlUsage2(RenderUsage::COMMUNICATION), fuchsia::media::Behavior::DUCK);
 
   // Communication(render) should mute when SystemAgent(capture) is active.
-  admin.SetInteraction(Usage2::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
-                       Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                       fuchsia::media::Behavior::MUTE);
+  admin.SetInteraction(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT),
+                       ToFidlUsage2(RenderUsage::COMMUNICATION), fuchsia::media::Behavior::MUTE);
 
   // Set an initial stream volume.
   const float kStreamGain = 1.0;
-  stream_volume_manager.SetUsageGain(Usage2::WithRenderUsage(AudioRenderUsage2::INTERRUPTION),
-                                     kStreamGain);
-  stream_volume_manager.SetUsageGain(Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION),
-                                     kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(RenderUsage::INTERRUPTION), kStreamGain);
+  stream_volume_manager.SetUsageGain(ToFidlUsage2(RenderUsage::COMMUNICATION), kStreamGain);
 
   // Create Interruption active stream.
   admin.UpdateRendererState(RenderUsage::INTERRUPTION, true, &r1);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::INTERRUPTION)));
+                ToFidlUsage2(RenderUsage::INTERRUPTION)));
 
   // Create Communication active stream.
   admin.UpdateRendererState(RenderUsage::COMMUNICATION, true, &r2);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION)));
+                ToFidlUsage2(RenderUsage::COMMUNICATION)));
 
   // SystemAgent capturer becomes active; Interruption should not change, Communication should mute.
   admin.UpdateCapturerState(CaptureUsage::SYSTEM_AGENT, true, &c1);
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kNoneGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::INTERRUPTION)));
+                ToFidlUsage2(RenderUsage::INTERRUPTION)));
   EXPECT_EQ(kStreamGain + kMuteGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION)));
+                ToFidlUsage2(RenderUsage::COMMUNICATION)));
 
   // SystemAgent renderer becomes active; Interruption should duck, Communication should remain
   // muted.
@@ -538,10 +518,10 @@ TEST_F(AudioAdminTest, PriorityActionsApplied) {
   RunLoopUntilIdle();
   EXPECT_EQ(kStreamGain + kDuckGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::INTERRUPTION)));
+                ToFidlUsage2(RenderUsage::INTERRUPTION)));
   EXPECT_EQ(kStreamGain + kMuteGain,
             stream_volume_manager.GetUsageGainSettings().GetAdjustedUsageGain(
-                Usage2::WithRenderUsage(AudioRenderUsage2::COMMUNICATION)));
+                ToFidlUsage2(RenderUsage::COMMUNICATION)));
 }
 
 class ActiveStreamCountReporterTest : public AudioAdminTest {
@@ -556,7 +536,7 @@ class ActiveStreamCountReporterTest : public AudioAdminTest {
     auto render_counts = mock_active_stream_count_reporter_.render_stream_counts();
     for (auto usage_index = 0u; usage_index < kStreamRenderUsageCount; ++usage_index) {
       EXPECT_EQ(render_counts[usage_index], expected_counts[usage_index])
-          << "Comparison failed for " << RenderUsageToString(kRenderUsages[usage_index]);
+          << "Comparison failed for " << ToString(kRenderUsages[usage_index]);
     }
   }
 
@@ -565,7 +545,7 @@ class ActiveStreamCountReporterTest : public AudioAdminTest {
     auto capture_counts = mock_active_stream_count_reporter_.capture_stream_counts();
     for (auto usage_index = 0u; usage_index < kStreamCaptureUsageCount; ++usage_index) {
       EXPECT_EQ(capture_counts[usage_index], expected_counts[usage_index])
-          << "Comparison failed for " << CaptureUsageToString(kCaptureUsages[usage_index]);
+          << "Comparison failed for " << ToString(kCaptureUsages[usage_index]);
     }
   }
 

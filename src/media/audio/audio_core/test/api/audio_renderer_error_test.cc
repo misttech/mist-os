@@ -315,7 +315,7 @@ class AudioRendererFormatUsageErrorTest : public AudioRendererFormatUsageTest {}
 // Once the format has been set, SetUsage may no longer be called any time thereafter.
 TEST_F(AudioRendererFormatUsageErrorTest, SetUsageAfterFormatShouldDisconnect) {
   audio_renderer()->SetPcmStreamType(kTestStreamType);
-  audio_renderer()->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::COMMUNICATION));
+  audio_renderer()->SetUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::COMMUNICATION));
 
   ExpectDisconnect(audio_renderer());
 }
@@ -332,7 +332,7 @@ TEST_F(AudioRendererFormatUsageErrorTest, SetUsageAfterOperatingShouldDisconnect
   audio_renderer()->Pause(AddCallback("Pause"));
   ExpectCallbacks();
 
-  audio_renderer()->SetUsage(*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND));
+  audio_renderer()->SetUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::BACKGROUND));
 
   ExpectDisconnect(audio_renderer());
 }

@@ -23,7 +23,7 @@ std::vector<AudioRenderUsage> ActivityToRenderUsageVector(
 
   for (uint8_t i = 0u; i < fuchsia::media::RENDER_USAGE_COUNT; i++) {
     if (activity[i]) {
-      usage_vector.push_back(static_cast<AudioRenderUsage>(i));
+      usage_vector.push_back(AudioRenderUsage(i));
     }
   }
   return usage_vector;
@@ -36,7 +36,7 @@ std::vector<AudioRenderUsage2> ActivityToRenderUsage2Vector(
 
   for (uint8_t i = 0u; i < fuchsia::media::RENDER_USAGE2_COUNT; i++) {
     if (activity[i]) {
-      usage_vector.push_back(static_cast<AudioRenderUsage2>(i));
+      usage_vector.push_back(AudioRenderUsage2(i));
     }
   }
   return usage_vector;
@@ -49,7 +49,7 @@ std::vector<AudioCaptureUsage> ActivityToCaptureUsageVector(
 
   for (uint8_t i = 0u; i < fuchsia::media::CAPTURE_USAGE_COUNT; i++) {
     if (activity[i]) {
-      usage_vector.push_back(static_cast<AudioCaptureUsage>(i));
+      usage_vector.push_back(AudioCaptureUsage(i));
     }
   }
   return usage_vector;

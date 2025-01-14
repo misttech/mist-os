@@ -24,7 +24,7 @@ AudioCapturer::AudioCapturer(fuchsia::media::AudioCapturerConfiguration configur
   } else {
     context->volume_manager().AddStream(this);
     if (configuration.input().has_usage()) {
-      usage_ = CaptureUsageFromFidlCaptureUsage(configuration.input().usage());
+      usage_ = ToCaptureUsage(configuration.input().usage());
     }
   }
   reporter().SetUsage(usage_);
@@ -154,7 +154,7 @@ void AudioCapturer::BindGainControl(
 
 void AudioCapturer::SetUsage(fuchsia::media::AudioCaptureUsage usage) {
   TRACE_DURATION("audio", "AudioCapturer::SetUsage");
-  if (usage_ == CaptureUsageFromFidlCaptureUsage(usage)) {
+  if (usage_ == ToCaptureUsage(usage)) {
     return;
   }
   if (loopback_) {
@@ -167,7 +167,7 @@ void AudioCapturer::SetUsage(fuchsia::media::AudioCaptureUsage usage) {
     context().audio_admin().UpdateCapturerState(usage_, false, this);
   }
 
-  usage_ = CaptureUsageFromFidlCaptureUsage(usage);
+  usage_ = ToCaptureUsage(usage);
   reporter().SetUsage(usage_);
   context().volume_manager().NotifyStreamChanged(this);
   SetRoutingProfile(StateIsRoutable(state));
@@ -182,7 +182,7 @@ fuchsia::media::Usage2 AudioCapturer::GetStreamUsage() const {
   // capturers with the StreamVolumeManager since those capturers do not have a compatible usage.
   FX_CHECK(!loopback_);
   fuchsia::media::Usage2 usage;
-  usage.set_capture_usage(FidlCaptureUsageFromCaptureUsage(usage_).value());
+  usage.set_capture_usage(ToFidlCaptureUsage(usage_));
   return usage;
 }
 

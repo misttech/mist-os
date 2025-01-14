@@ -32,7 +32,7 @@ void IdlePolicy::OnActiveRenderCountChanged(RenderUsage usage, uint32_t count) {
     return;
   }
   if constexpr (kLogIdlePolicyCounts) {
-    FX_LOGS(INFO) << __FUNCTION__ << "(" << RenderUsageToString(usage) << ", " << count << ")";
+    FX_LOGS(INFO) << __FUNCTION__ << "(" << ToString(usage) << ", " << count << ")";
   }
 
   const RoutingScope scope = (usage == RenderUsage::ULTRASOUND ? kUltrasonicOnly : kAudibleOnly);

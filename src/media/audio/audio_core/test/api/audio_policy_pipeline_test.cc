@@ -196,8 +196,8 @@ void AudioAdminTest::ExpectPacketContains(const std::string& label,
 TEST_F(AudioAdminTest, SingleRenderStream) {
   // Setup a policy rule that MEDIA being active will not affect a BACKGROUND capture.
   audio_core_->ResetInteractions();
-  audio_core_->SetInteraction2(Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                               Usage2::WithCaptureUsage(AudioCaptureUsage::BACKGROUND),
+  audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::MEDIA),
+                               ToFidlUsage2(CaptureUsage::BACKGROUND),
                                fuchsia::media::Behavior::NONE);
 
   auto renderer = SetUpRenderer(AudioRenderUsage2::MEDIA, kPlaybackData1);
@@ -256,8 +256,8 @@ TEST_F(AudioAdminTest, SingleRenderStream) {
 TEST_F(AudioAdminTest, RenderMuteCapture) {
   // Setup a policy rule that MEDIA being active will mute a BACKGROUND capture.
   audio_core_->ResetInteractions();
-  audio_core_->SetInteraction2(Usage2::WithRenderUsage(AudioRenderUsage2::SYSTEM_AGENT),
-                               Usage2::WithCaptureUsage(AudioCaptureUsage::BACKGROUND),
+  audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::SYSTEM_AGENT),
+                               ToFidlUsage2(CaptureUsage::BACKGROUND),
                                fuchsia::media::Behavior::MUTE);
 
   auto renderer = SetUpRenderer(AudioRenderUsage2::SYSTEM_AGENT, kPlaybackData1);
@@ -318,8 +318,8 @@ TEST_F(AudioAdminTest, RenderMuteCapture) {
 void AudioAdminTest::TestCaptureMuteRender(bool set_usage_to_disable) {
   // Setup a policy rule that MEDIA being active will mute a BACKGROUND capture.
   audio_core_->ResetInteractions();
-  audio_core_->SetInteraction2(Usage2::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
-                               Usage2::WithRenderUsage(AudioRenderUsage2::BACKGROUND),
+  audio_core_->SetInteraction2(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT),
+                               ToFidlUsage2(RenderUsage::BACKGROUND),
                                fuchsia::media::Behavior::MUTE);
 
   auto renderer = SetUpRenderer(AudioRenderUsage2::BACKGROUND, kPlaybackData1);
@@ -393,8 +393,8 @@ TEST_F(AudioAdminTest, CaptureDoesntMuteRenderAfterSetUsage) { TestCaptureMuteRe
 TEST_F(AudioAdminTest, DualRenderStreamMix) {
   // Setup expected behavior from policy for this test
   audio_core_->ResetInteractions();
-  audio_core_->SetInteraction2(Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                               Usage2::WithCaptureUsage(AudioCaptureUsage::BACKGROUND),
+  audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::MEDIA),
+                               ToFidlUsage2(CaptureUsage::BACKGROUND),
                                fuchsia::media::Behavior::NONE);
 
   auto renderer1 = SetUpRenderer(AudioRenderUsage2::MEDIA, kPlaybackData1);
@@ -462,16 +462,15 @@ TEST_F(AudioAdminTest, DualRenderStreamMix) {
 TEST_F(AudioAdminTest, DualRenderStreamDucking) {
   // Setup expected behavior from policy for this test
   audio_core_->ResetInteractions();
-  audio_core_->SetInteraction2(Usage2::WithRenderUsage(AudioRenderUsage2::INTERRUPTION),
-                               Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                               fuchsia::media::Behavior::DUCK);
+  audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::INTERRUPTION),
+                               ToFidlUsage2(RenderUsage::MEDIA), fuchsia::media::Behavior::DUCK);
 
-  audio_core_->SetInteraction2(Usage2::WithRenderUsage(AudioRenderUsage2::INTERRUPTION),
-                               Usage2::WithRenderUsage(AudioRenderUsage2::BACKGROUND),
+  audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::INTERRUPTION),
+                               ToFidlUsage2(RenderUsage::BACKGROUND),
                                fuchsia::media::Behavior::NONE);
 
-  audio_core_->SetInteraction2(Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                               Usage2::WithRenderUsage(AudioRenderUsage2::BACKGROUND),
+  audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::MEDIA),
+                               ToFidlUsage2(RenderUsage::BACKGROUND),
                                fuchsia::media::Behavior::NONE);
 
   auto renderer1 = SetUpRenderer(AudioRenderUsage2::MEDIA, kPlaybackData1);
@@ -539,8 +538,8 @@ TEST_F(AudioAdminTest, DualRenderStreamDucking) {
 TEST_F(AudioAdminTest, DualRenderStreamMute) {
   // Setup expected behavior from policy for this test
   audio_core_->ResetInteractions();
-  audio_core_->SetInteraction2(Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                               Usage2::WithRenderUsage(AudioRenderUsage2::BACKGROUND),
+  audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::MEDIA),
+                               ToFidlUsage2(RenderUsage::BACKGROUND),
                                fuchsia::media::Behavior::MUTE);
 
   auto renderer1 = SetUpRenderer(AudioRenderUsage2::MEDIA, kPlaybackData1);
@@ -608,8 +607,8 @@ TEST_F(AudioAdminTest, DualRenderStreamMute) {
 TEST_F(AudioAdminTest, DualCaptureStreamNone) {
   // Setup expected behavior from policy for this test
   audio_core_->ResetInteractions();
-  audio_core_->SetInteraction2(Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-                               Usage2::WithCaptureUsage(AudioCaptureUsage::BACKGROUND),
+  audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::MEDIA),
+                               ToFidlUsage2(CaptureUsage::BACKGROUND),
                                fuchsia::media::Behavior::NONE);
 
   auto renderer = SetUpRenderer(AudioRenderUsage2::MEDIA, kPlaybackData1);
@@ -682,8 +681,8 @@ TEST_F(AudioAdminTest, DualCaptureStreamNone) {
 TEST_F(AudioAdminTest, DISABLED_DualCaptureStreamMute) {
   // Setup expected behavior from policy for this test
   audio_core_->ResetInteractions();
-  audio_core_->SetInteraction2(Usage2::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
-                               Usage2::WithCaptureUsage(AudioCaptureUsage::BACKGROUND),
+  audio_core_->SetInteraction2(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT),
+                               ToFidlUsage2(CaptureUsage::BACKGROUND),
                                fuchsia::media::Behavior::MUTE);
 
   auto renderer = SetUpRenderer(AudioRenderUsage2::MEDIA, kPlaybackData1);

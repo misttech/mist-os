@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/lib/processing/gain.h"
 
 namespace media::audio {
@@ -20,66 +21,51 @@ TEST(UsageGainSettingsTest, RenderUsageGainPersists) {
   UsageGainSettings under_test;
 
   const auto test_usage = [&under_test](auto render_usage) {
-    under_test.SetUsageGain(fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage)),
-                            kArbitraryGainValue);
-    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(
-                        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage))),
+    under_test.SetUsageGain(ToFidlUsage2(render_usage), kArbitraryGainValue);
+    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(ToFidlUsage2(render_usage)),
                     kArbitraryGainValue);
 
-    under_test.SetUsageGainAdjustment(
-        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage)),
-        kArbitraryGainAdjustment);
-    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(
-                        fuchsia::media::Usage2::WithRenderUsage(std::move(render_usage))),
+    under_test.SetUsageGainAdjustment(ToFidlUsage2(render_usage), kArbitraryGainAdjustment);
+    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(ToFidlUsage2(render_usage)),
                     kArbitraryGainValue + kArbitraryGainAdjustment);
   };
 
-  test_usage(fuchsia::media::AudioRenderUsage2::MEDIA);
-  test_usage(fuchsia::media::AudioRenderUsage2::COMMUNICATION);
+  test_usage(RenderUsage::MEDIA);
+  test_usage(RenderUsage::COMMUNICATION);
 }
 
 TEST(UsageGainSettingsTest, RenderUsageGainPersistsComponents) {
   UsageGainSettings under_test;
 
   const auto test_usage = [&under_test](auto render_usage) {
-    under_test.SetUsageGain(fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage)),
-                            kArbitraryGainValue);
-    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(
-                        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage))),
+    under_test.SetUsageGain(ToFidlUsage2(render_usage), kArbitraryGainValue);
+    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(ToFidlUsage2(render_usage)),
                     kArbitraryGainValue);
 
-    under_test.SetUsageGainAdjustment(
-        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage)),
-        kArbitraryGainAdjustment);
-    EXPECT_FLOAT_EQ(under_test.GetUnadjustedUsageGain(
-                        fuchsia::media::Usage2::WithRenderUsage(std::move(render_usage))),
+    under_test.SetUsageGainAdjustment(ToFidlUsage2(render_usage), kArbitraryGainAdjustment);
+    EXPECT_FLOAT_EQ(under_test.GetUnadjustedUsageGain(ToFidlUsage2(render_usage)),
                     kArbitraryGainValue);
   };
 
-  test_usage(fuchsia::media::AudioRenderUsage2::MEDIA);
-  test_usage(fuchsia::media::AudioRenderUsage2::COMMUNICATION);
+  test_usage(RenderUsage::MEDIA);
+  test_usage(RenderUsage::COMMUNICATION);
 }
 
 TEST(UsageGainSettingsTest, RenderUsageGainAdjustmentPersists) {
   UsageGainSettings under_test;
 
   const auto test_usage = [&under_test](auto render_usage) {
-    under_test.SetUsageGain(fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage)),
-                            kArbitraryGainValue);
-    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(
-                        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage))),
+    under_test.SetUsageGain(ToFidlUsage2(render_usage), kArbitraryGainValue);
+    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(ToFidlUsage2(render_usage)),
                     kArbitraryGainValue);
 
-    under_test.SetUsageGainAdjustment(
-        fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage)),
-        kArbitraryGainAdjustment);
-    EXPECT_FLOAT_EQ(under_test.GetUsageGainAdjustment(
-                        fuchsia::media::Usage2::WithRenderUsage(std::move(render_usage))),
+    under_test.SetUsageGainAdjustment(ToFidlUsage2(render_usage), kArbitraryGainAdjustment);
+    EXPECT_FLOAT_EQ(under_test.GetUsageGainAdjustment(ToFidlUsage2(render_usage)),
                     kArbitraryGainAdjustment);
   };
 
-  test_usage(fuchsia::media::AudioRenderUsage2::MEDIA);
-  test_usage(fuchsia::media::AudioRenderUsage2::COMMUNICATION);
+  test_usage(RenderUsage::MEDIA);
+  test_usage(RenderUsage::COMMUNICATION);
 }
 
 TEST(UsageGainSettingsTest, CaptureUsageGainPersists) {
@@ -149,8 +135,7 @@ TEST(UsageGainSettingsTest, CaptureUsageGainAdjustmentPersists) {
 }
 
 TEST(UsageGainSettingsTest, UsageGainCannotExceedUnity) {
-  const auto usage =
-      fuchsia::media::Usage2::WithRenderUsage(fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT);
+  const auto usage = ToFidlUsage2(RenderUsage::SYSTEM_AGENT);
   UsageGainSettings under_test;
   under_test.SetUsageGain(fidl::Clone(usage), 10.0f);
 
@@ -161,19 +146,16 @@ TEST(UsageVolumeSettingsTest, RenderUsageVolumePersists) {
   UsageVolumeSettings under_test;
 
   const auto test_usage = [&under_test](auto render_usage) {
-    under_test.SetUsageVolume(fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage)),
-                              kArbitraryVolumeValue);
-    EXPECT_FLOAT_EQ(
-        under_test.GetUsageVolume(fuchsia::media::Usage2::WithRenderUsage(std::move(render_usage))),
-        kArbitraryVolumeValue);
+    under_test.SetUsageVolume(ToFidlUsage2(render_usage), kArbitraryVolumeValue);
+    EXPECT_FLOAT_EQ(under_test.GetUsageVolume(ToFidlUsage2(render_usage)), kArbitraryVolumeValue);
   };
 
-  test_usage(fuchsia::media::AudioRenderUsage2::ACCESSIBILITY);
-  test_usage(fuchsia::media::AudioRenderUsage2::BACKGROUND);
-  test_usage(fuchsia::media::AudioRenderUsage2::MEDIA);
-  test_usage(fuchsia::media::AudioRenderUsage2::INTERRUPTION);
-  test_usage(fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT);
-  test_usage(fuchsia::media::AudioRenderUsage2::COMMUNICATION);
+  test_usage(RenderUsage::ACCESSIBILITY);
+  test_usage(RenderUsage::BACKGROUND);
+  test_usage(RenderUsage::MEDIA);
+  test_usage(RenderUsage::INTERRUPTION);
+  test_usage(RenderUsage::SYSTEM_AGENT);
+  test_usage(RenderUsage::COMMUNICATION);
 }
 
 TEST(UsageVolumeSettingsTest, CaptureUsageVolumePersists) {

@@ -8,6 +8,8 @@
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fidl/cpp/enum.h>
 
+#include "src/media/audio/audio_core/shared/stream_usage.h"
+
 namespace media::audio::test {
 // Examples of invalid configs.
 
@@ -187,21 +189,21 @@ constexpr char capture_capture[] = R"JSON(
 
 // Some static asserts that document the values we used to generate the JSON blob below with. If
 // these fail we'll want to update the corresponding test data.
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::BACKGROUND) == 0);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::MEDIA) == 1);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::INTERRUPTION) == 2);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT) == 3);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::COMMUNICATION) == 4);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioRenderUsage2::ACCESSIBILITY) == 5);
+static_assert(ToIndex(fuchsia::media::AudioRenderUsage2::BACKGROUND) == 0);
+static_assert(ToIndex(fuchsia::media::AudioRenderUsage2::MEDIA) == 1);
+static_assert(ToIndex(fuchsia::media::AudioRenderUsage2::INTERRUPTION) == 2);
+static_assert(ToIndex(fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT) == 3);
+static_assert(ToIndex(fuchsia::media::AudioRenderUsage2::COMMUNICATION) == 4);
+static_assert(ToIndex(fuchsia::media::AudioRenderUsage2::ACCESSIBILITY) == 5);
 static_assert(fuchsia::media::RENDER_USAGE2_COUNT == 6);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::BACKGROUND) == 0);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::FOREGROUND) == 1);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT) == 2);
-static_assert(fidl::ToUnderlying(fuchsia::media::AudioCaptureUsage::COMMUNICATION) == 3);
+static_assert(ToIndex(fuchsia::media::AudioCaptureUsage::BACKGROUND) == 0);
+static_assert(ToIndex(fuchsia::media::AudioCaptureUsage::FOREGROUND) == 1);
+static_assert(ToIndex(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT) == 2);
+static_assert(ToIndex(fuchsia::media::AudioCaptureUsage::COMMUNICATION) == 3);
 static_assert(fuchsia::media::CAPTURE_USAGE_COUNT == 4);
-static_assert(fidl::ToUnderlying(fuchsia::media::Behavior::NONE) == 0);
-static_assert(fidl::ToUnderlying(fuchsia::media::Behavior::DUCK) == 1);
-static_assert(fidl::ToUnderlying(fuchsia::media::Behavior::MUTE) == 2);
+static_assert(ToIndex(fuchsia::media::Behavior::NONE) == 0);
+static_assert(ToIndex(fuchsia::media::Behavior::DUCK) == 1);
+static_assert(ToIndex(fuchsia::media::Behavior::MUTE) == 2);
 
 constexpr char contains_all_usages_and_behaviors[] = R"JSON(
     {

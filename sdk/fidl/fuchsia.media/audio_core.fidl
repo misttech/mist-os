@@ -39,7 +39,7 @@ const RENDER_USAGE_COUNT uint8 = 5;
 /// to dictate how audio streams interact with each other. This enum expands the original (strict)
 /// enum |AudioRenderUsage| with additional stream types.
 @available(added=NEXT)
-type AudioRenderUsage2 = strict enum : uint32 {
+type AudioRenderUsage2 = flexible enum : uint32 {
     /// Stream is intended to be used for ambient or background sound. Streams
     /// that can be interrupted without consequence should use this.
     BACKGROUND = 0;
@@ -102,7 +102,19 @@ const CAPTURE_USAGE_COUNT uint8 = 4;
 const MAX_USAGE_COUNT uint8 = 8;
 
 /// The behaviors applied to streams when multiple are active.
+@available(replaced=NEXT)
 type Behavior = strict enum {
+    /// Mix the streams.
+    NONE = 0;
+
+    /// Apply a gain to duck the volume of one of the streams. (-14.0db)
+    DUCK = 1;
+
+    /// Apply a gain to mute one of the streams. (-160.0db)
+    MUTE = 2;
+};
+@available(added=NEXT)
+type Behavior = flexible enum : uint32 {
     /// Mix the streams.
     NONE = 0;
 
@@ -120,7 +132,7 @@ type Usage = strict union {
 };
 
 @available(added=NEXT)
-type Usage2 = strict union {
+type Usage2 = flexible union {
     1: render_usage AudioRenderUsage2;
     2: capture_usage AudioCaptureUsage;
 };
@@ -161,7 +173,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     // By default, reading and writing device settings files is enabled. This
     // method (which has impact across the entire audio subsystem) allows a test
     // client to temporarily disable, then later enable, that reading/writing.
-    @available(deprecated=15)
+    @available(deprecated=15, removed=NEXT)
     strict EnableDeviceSettings(struct {
         enabled bool;
     });
@@ -277,6 +289,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
 };
 
 // Placeholder for routing policies.
+@available(deprecated=NEXT)
 type AudioOutputRoutingPolicy = strict enum {
     // AudioRenderers are always connected to all audio outputs which currently
     // in the plugged state (eg; have a connector attached to them)

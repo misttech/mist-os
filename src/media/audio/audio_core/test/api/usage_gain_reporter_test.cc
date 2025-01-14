@@ -68,7 +68,7 @@ class UsageGainReporterTest : public HermeticAudioTest {
   std::unique_ptr<Controller> CreateControllerWithRenderUsage(
       fuchsia::media::AudioRenderUsage2 render_usage) {
     std::unique_ptr<media::audio::test::UsageGainReporterTest::Controller> c;
-    auto usage1 = fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(render_usage));
+    auto usage1 = fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(render_usage));
     auto usage = fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage));
     c = std::make_unique<Controller>(this);
     audio_core_->BindUsageVolumeControl2(std::move(usage), c->volume_control.NewRequest());

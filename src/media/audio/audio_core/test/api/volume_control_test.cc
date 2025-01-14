@@ -90,9 +90,8 @@ TEST_F(VolumeControlTest, RoutedCorrectly) {
 
 TEST_F(VolumeControlTest, FailToConnectToCaptureUsageVolume) {
   fuchsia::media::audio::VolumeControlPtr client;
-  audio_core_->BindUsageVolumeControl2(
-      fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
-      client.NewRequest());
+  audio_core_->BindUsageVolumeControl2(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT),
+                                       client.NewRequest());
   AddErrorHandler(client, "VolumeControl");
 
   ExpectError(client, ZX_ERR_NOT_SUPPORTED);
@@ -103,26 +102,26 @@ TEST_F(VolumeControlTest, VolumeCurveLookups) {
   float db_lookup = 0.0f;
   float volume_lookup = 0.0f;
   audio_core_->GetDbFromVolume(
-      fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)), 0.0f,
+      fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::MEDIA)), 0.0f,
       AddCallback("GetDbFromVolume", [&db_lookup](float db) { db_lookup = db; }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, -160.0f);
 
   audio_core_->GetDbFromVolume(
-      fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)), 1.0f,
+      fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::MEDIA)), 1.0f,
       AddCallback("GetDbFromVolume", [&db_lookup](float db) { db_lookup = db; }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, 0.0f);
 
   audio_core_->GetVolumeFromDb(
-      fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)),
+      fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::MEDIA)),
       -160.0f,
       AddCallback("GetVolumeFromDb", [&volume_lookup](float volume) { volume_lookup = volume; }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 0.0f);
 
   audio_core_->GetVolumeFromDb(
-      fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(AudioRenderUsage2::MEDIA)), 0.0f,
+      fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::MEDIA)), 0.0f,
       AddCallback("GetVolumeFromDb", [&volume_lookup](float volume) { volume_lookup = volume; }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 1.0f);
@@ -133,25 +132,25 @@ TEST_F(VolumeControlTest, Volume2CurveLookups) {
   float db_lookup = 0.0f;
   float volume_lookup = 0.0f;
   audio_core_->GetDbFromVolume2(
-      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA), 0.0f,
+      ToFidlUsage2(RenderUsage::MEDIA), 0.0f,
       AddCallback("GetDbFromVolume2", [&db_lookup](float db) { db_lookup = db; }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, -160.0f);
 
   audio_core_->GetDbFromVolume2(
-      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA), 1.0f,
+      ToFidlUsage2(RenderUsage::MEDIA), 1.0f,
       AddCallback("GetDbFromVolume2", [&db_lookup](float db) { db_lookup = db; }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, 0.0f);
 
   audio_core_->GetVolumeFromDb2(
-      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA), -160.0f,
+      ToFidlUsage2(RenderUsage::MEDIA), -160.0f,
       AddCallback("GetVolumeFromDb2", [&volume_lookup](float volume) { volume_lookup = volume; }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 0.0f);
 
   audio_core_->GetVolumeFromDb2(
-      fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA), 0.0f,
+      ToFidlUsage2(RenderUsage::MEDIA), 0.0f,
       AddCallback("GetVolumeFromDb2", [&volume_lookup](float volume) { volume_lookup = volume; }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 1.0f);

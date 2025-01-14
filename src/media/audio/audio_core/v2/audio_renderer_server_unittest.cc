@@ -170,8 +170,7 @@ TEST(AudioRendererServerTest, ErrorUltrasoundForbidsSetUsage) {
       .usage = RenderUsage::ULTRASOUND,
       .format = kFormat,
   });
-  std::ignore = (*h.renderer_client)
-                    ->SetUsage(static_cast<fuchsia_media::AudioRenderUsage>(RenderUsage::MEDIA));
+  std::ignore = (*h.renderer_client)->SetUsage(fuchsia_media::AudioRenderUsage::kMedia);
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.renderer_close_status, ZX_ERR_NOT_SUPPORTED);
 }
@@ -181,8 +180,7 @@ TEST(AudioRendererServerTest, ErrorUltrasoundForbidsSetUsage2) {
       .usage = RenderUsage::ULTRASOUND,
       .format = kFormat,
   });
-  std::ignore = (*h.renderer_client)
-                    ->SetUsage2(static_cast<fuchsia_media::AudioRenderUsage2>(RenderUsage::MEDIA));
+  std::ignore = (*h.renderer_client)->SetUsage2(fuchsia_media::AudioRenderUsage2::kBackground);
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.renderer_close_status, ZX_ERR_NOT_SUPPORTED);
 }
@@ -316,9 +314,7 @@ TEST(AudioRendererServerTest, ConfigureWithExplicitCalls) {
   ASSERT_EQ((*h.renderer_client)->SetPtsUnits(1, 2).status(), ZX_OK);
   ASSERT_EQ((*h.renderer_client)->SetPtsContinuityThreshold(0.2f).status(), ZX_OK);
   ASSERT_EQ((*h.renderer_client)->SetReferenceClock(std::move(clock)).status(), ZX_OK);
-  ASSERT_EQ((*h.renderer_client)
-                ->SetUsage2(static_cast<fuchsia_media::AudioRenderUsage2>(RenderUsage::BACKGROUND))
-                .status(),
+  ASSERT_EQ((*h.renderer_client)->SetUsage2(fuchsia_media::AudioRenderUsage2::kBackground).status(),
             ZX_OK);
 
   const Format kExpectedFormat =

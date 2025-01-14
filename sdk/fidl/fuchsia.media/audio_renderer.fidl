@@ -132,6 +132,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioRenderer {
     /// Sets the usage of the render stream. This method may not be called after
     /// `SetPcmStreamType` is called. The default usage is `MEDIA`.
     // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
+    @available(deprecated=NEXT, note="Use SetUsage2 and AudioRenderUsage2")
     strict SetUsage(struct {
         usage AudioRenderUsage;
     });

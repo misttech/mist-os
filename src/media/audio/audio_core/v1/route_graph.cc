@@ -15,7 +15,8 @@
 namespace media::audio {
 namespace {
 
-// TODO(https://fxbug.dev/42132729): Remove this workaround. Just 64000 would still support the range needed.
+// TODO(https://fxbug.dev/42132729): Remove this workaround. Just 64000 would still support the
+// range needed.
 constexpr int32_t kMinUltrasoundRate = 96000;
 
 bool DeviceConfigurationSupportsUsage(AudioDevice* device, StreamUsage usage) {
@@ -379,14 +380,12 @@ RouteGraph::Target RouteGraph::TargetForUsage(const StreamUsage& usage) const {
 std::unordered_set<AudioDevice*> RouteGraph::TargetsForRenderUsage(const RenderUsage& usage) {
   auto target = targets_[HashStreamUsage(StreamUsage::WithRenderUsage(usage))];
   if (!target.is_linkable()) {
-    FX_LOGS(ERROR) << __FUNCTION__ << " (" << RenderUsageToString(usage)
-                   << ") target is not linkable";
+    FX_LOGS(ERROR) << __FUNCTION__ << " (" << ToString(usage) << ") target is not linkable";
     return {};
   }
 
   if constexpr (kLogIdlePolicyCounts) {
-    FX_LOGS(INFO) << __FUNCTION__ << " (" << RenderUsageToString(usage) << ") returning "
-                  << target.device;
+    FX_LOGS(INFO) << __FUNCTION__ << " (" << ToString(usage) << ") returning " << target.device;
   }
   return {target.device};
 }

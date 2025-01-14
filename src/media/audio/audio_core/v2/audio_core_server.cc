@@ -20,7 +20,6 @@ namespace media_audio {
 namespace {
 
 using ::media::audio::CaptureUsage;
-using ::media::audio::CaptureUsageFromFidlCaptureUsage;
 using ::media::audio::RenderUsage;
 
 }  // namespace
@@ -94,7 +93,7 @@ void AudioCoreServer::CreateAudioCapturerWithConfiguration(
     usage = CaptureUsage::LOOPBACK;
   } else {
     auto& input = request->configuration.input();
-    usage = input.has_usage() ? static_cast<CaptureUsage>(input.usage()) : CaptureUsage::FOREGROUND;
+    usage = input.has_usage() ? CaptureUsage(input.usage()) : CaptureUsage::FOREGROUND;
   }
 
   creator_->CreateCapturer(std::move(request->audio_capturer_request), usage,
@@ -105,15 +104,13 @@ void AudioCoreServer::SetRenderUsageGain(SetRenderUsageGainRequestView request,
                                          SetRenderUsageGainCompleter::Sync& completer) {
   TRACE_DURATION("audio", "AudioCoreServer::SetRenderUsageGain");
 
-  SetRenderUsageGainBase(static_cast<fuchsia::media::AudioRenderUsage2>(request->usage),
-                         request->gain_db);
+  SetRenderUsageGainBase(media::audio::ToFidlRenderUsage2(request->usage), request->gain_db);
 }
 
 void AudioCoreServer::SetRenderUsageGain2(SetRenderUsageGain2RequestView request,
                                           SetRenderUsageGain2Completer::Sync& completer) {
   TRACE_DURATION("audio", "AudioCoreServer::SetRenderUsageGain2");
-  SetRenderUsageGainBase(static_cast<fuchsia::media::AudioRenderUsage2>(request->usage),
-                         request->gain_db);
+  SetRenderUsageGainBase(fidl::NaturalToHLCPP(fidl::ToNatural(request->usage)), request->gain_db);
 }
 
 void AudioCoreServer::SetRenderUsageGainBase(const fuchsia::media::AudioRenderUsage2& usage,
@@ -127,8 +124,7 @@ void AudioCoreServer::SetCaptureUsageGain(SetCaptureUsageGainRequestView request
   TRACE_DURATION("audio", "AudioCoreServer::SetCaptureUsageGain");
 
   stream_volume_manager_->SetUsageGain(
-      fuchsia::media::Usage2::WithCaptureUsage(
-          static_cast<fuchsia::media::AudioCaptureUsage>(request->usage)),
+      fuchsia::media::Usage2::WithCaptureUsage(fuchsia::media::AudioCaptureUsage(request->usage)),
       request->gain_db);
 }
 
@@ -164,11 +160,10 @@ void AudioCoreServer::GetVolumeFromDb(GetVolumeFromDbRequestView request,
   TRACE_DURATION("audio", "AudioCoreServer::GetVolumeFromDb");
 
   float volume;
-  auto volume_curve = request->usage.is_render_usage()
-                          ? route_graph_->VolumeCurveForUsage(
-                                static_cast<RenderUsage>(request->usage.render_usage()))
-                          : route_graph_->VolumeCurveForUsage(
-                                static_cast<CaptureUsage>(request->usage.capture_usage()));
+  auto volume_curve =
+      request->usage.is_render_usage()
+          ? route_graph_->VolumeCurveForUsage(RenderUsage(request->usage.render_usage()))
+          : route_graph_->VolumeCurveForUsage(CaptureUsage(request->usage.capture_usage()));
   if (volume_curve) {
     volume = volume_curve->DbToVolume(request->gain_db);
   } else {
@@ -183,9 +178,9 @@ void AudioCoreServer::GetVolumeFromDb2(GetVolumeFromDb2RequestView request,
   float volume;
   auto volume_curve = request->usage.is_render_usage()
                           ? route_graph_->VolumeCurveForUsage(
-                                static_cast<RenderUsage>(request->usage.render_usage()))
+                                media::audio::ToRenderUsage(request->usage.render_usage()))
                           : route_graph_->VolumeCurveForUsage(
-                                static_cast<CaptureUsage>(request->usage.capture_usage()));
+                                media::audio::ToCaptureUsage(request->usage.capture_usage()));
   if (volume_curve) {
     volume = volume_curve->DbToVolume(request->gain_db);
   } else {
@@ -199,11 +194,10 @@ void AudioCoreServer::GetDbFromVolume(GetDbFromVolumeRequestView request,
   TRACE_DURATION("audio", "AudioCoreServer::GetDbFromVolume");
 
   float db;
-  auto volume_curve = request->usage.is_render_usage()
-                          ? route_graph_->VolumeCurveForUsage(
-                                static_cast<RenderUsage>(request->usage.render_usage()))
-                          : route_graph_->VolumeCurveForUsage(
-                                static_cast<CaptureUsage>(request->usage.capture_usage()));
+  auto volume_curve =
+      request->usage.is_render_usage()
+          ? route_graph_->VolumeCurveForUsage(RenderUsage(request->usage.render_usage()))
+          : route_graph_->VolumeCurveForUsage(CaptureUsage(request->usage.capture_usage()));
   if (volume_curve) {
     db = volume_curve->VolumeToDb(request->volume);
   } else {
@@ -218,9 +212,9 @@ void AudioCoreServer::GetDbFromVolume2(GetDbFromVolume2RequestView request,
   float db;
   auto volume_curve = request->usage.is_render_usage()
                           ? route_graph_->VolumeCurveForUsage(
-                                static_cast<RenderUsage>(request->usage.render_usage()))
+                                media::audio::ToRenderUsage(request->usage.render_usage()))
                           : route_graph_->VolumeCurveForUsage(
-                                static_cast<CaptureUsage>(request->usage.capture_usage()));
+                                media::audio::ToCaptureUsage(request->usage.capture_usage()));
   if (volume_curve) {
     db = volume_curve->VolumeToDb(request->volume);
   } else {
@@ -235,7 +229,7 @@ void AudioCoreServer::SetInteraction(SetInteractionRequestView request,
   audio_admin_->SetInteraction(
       media::audio::ToFidlUsage2(fidl::NaturalToHLCPP(fidl::ToNatural(request->active))),
       media::audio::ToFidlUsage2(fidl::NaturalToHLCPP(fidl::ToNatural(request->affected))),
-      static_cast<fuchsia::media::Behavior>(request->behavior));
+      fidl::NaturalToHLCPP(fidl::ToNatural(request->behavior)));
 }
 
 void AudioCoreServer::SetInteraction2(SetInteraction2RequestView request,
@@ -243,7 +237,7 @@ void AudioCoreServer::SetInteraction2(SetInteraction2RequestView request,
   TRACE_DURATION("audio", "AudioCoreServer::SetInteraction2");
   audio_admin_->SetInteraction(fidl::NaturalToHLCPP(fidl::ToNatural(request->active)),
                                fidl::NaturalToHLCPP(fidl::ToNatural(request->affected)),
-                               static_cast<fuchsia::media::Behavior>(request->behavior));
+                               fidl::NaturalToHLCPP(fidl::ToNatural(request->behavior)));
 }
 
 void AudioCoreServer::ResetInteractions(ResetInteractionsCompleter::Sync& completer) {

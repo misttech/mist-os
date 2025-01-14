@@ -9,10 +9,9 @@
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 
-using AudioCaptureUsage = fuchsia::media::AudioCaptureUsage;
-using AudioRenderUsage = fuchsia::media::AudioRenderUsage;
-using AudioRenderUsage2 = fuchsia::media::AudioRenderUsage2;
-using AudioSampleFormat = fuchsia::media::AudioSampleFormat;
+using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioRenderUsage2;
+using fuchsia::media::AudioSampleFormat;
 
 namespace media::audio::test {
 
@@ -104,7 +103,7 @@ class UsageReporterTest : public HermeticAudioTest {
     if constexpr (std::is_same_v<T, Controller>) {
       fuchsia::media::Usage usage;
       if constexpr (std::is_same_v<U, fuchsia::media::AudioRenderUsage2>) {
-        usage = fuchsia::media::Usage::WithRenderUsage(*FromFidlRenderUsage2(u));
+        usage = fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(u));
       } else if constexpr (std::is_same_v<U, fuchsia::media::AudioCaptureUsage>) {
         usage = fuchsia::media::Usage::WithCaptureUsage(fidl::Clone(u));
       }
@@ -176,10 +175,8 @@ class UsageReporterTest : public HermeticAudioTest {
         }));
 
     // Duck MEDIA when SYSTEM_AGENT is active.
-    audio_core_->SetInteraction2(
-        fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::SYSTEM_AGENT),
-        fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-        fuchsia::media::Behavior::DUCK);
+    audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::SYSTEM_AGENT),
+                                 ToFidlUsage2(RenderUsage::MEDIA), fuchsia::media::Behavior::DUCK);
 
     StartRendererWithUsage(AudioRenderUsage2::SYSTEM_AGENT);
     ExpectCallbacks();
@@ -206,10 +203,8 @@ class UsageReporterTest : public HermeticAudioTest {
         }));
 
     // Mute MEDIA when SYSTEM_AGENT is active.
-    audio_core_->SetInteraction2(
-        fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::SYSTEM_AGENT),
-        fuchsia::media::Usage2::WithRenderUsage(AudioRenderUsage2::MEDIA),
-        fuchsia::media::Behavior::MUTE);
+    audio_core_->SetInteraction2(ToFidlUsage2(RenderUsage::SYSTEM_AGENT),
+                                 ToFidlUsage2(RenderUsage::MEDIA), fuchsia::media::Behavior::MUTE);
 
     StartRendererWithUsage(AudioRenderUsage2::SYSTEM_AGENT);
     ExpectCallbacks();
@@ -255,10 +250,9 @@ class UsageReporterTest : public HermeticAudioTest {
         }));
 
     // Duck COMMUNICATION when SYSTEM_AGENT is active.
-    audio_core_->SetInteraction2(
-        fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
-        fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
-        fuchsia::media::Behavior::DUCK);
+    audio_core_->SetInteraction2(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT),
+                                 ToFidlUsage2(CaptureUsage::COMMUNICATION),
+                                 fuchsia::media::Behavior::DUCK);
 
     StartCapturerWithUsage(AudioCaptureUsage::SYSTEM_AGENT);
     ExpectCallbacks();
@@ -284,10 +278,9 @@ class UsageReporterTest : public HermeticAudioTest {
         }));
 
     // Mute COMMUNICATION when SYSTEM_AGENT is active.
-    audio_core_->SetInteraction2(
-        fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage::SYSTEM_AGENT),
-        fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
-        fuchsia::media::Behavior::MUTE);
+    audio_core_->SetInteraction2(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT),
+                                 ToFidlUsage2(CaptureUsage::COMMUNICATION),
+                                 fuchsia::media::Behavior::MUTE);
 
     StartCapturerWithUsage(AudioCaptureUsage::SYSTEM_AGENT);
     ExpectCallbacks();

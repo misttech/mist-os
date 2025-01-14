@@ -144,10 +144,10 @@ class AudioAdmin {
   class PolicyRules {
    public:
     int ToIndex(fuchsia::media::AudioCaptureUsage usage) {
-      return fidl::ToUnderlying(usage) + fuchsia::media::RENDER_USAGE2_COUNT;
+      return media::audio::ToIndex(usage) + fuchsia::media::RENDER_USAGE2_COUNT;
     }
 
-    int ToIndex(fuchsia::media::AudioRenderUsage2 usage) { return fidl::ToUnderlying(usage); }
+    int ToIndex(fuchsia::media::AudioRenderUsage2 usage) { return media::audio::ToIndex(usage); }
 
     template <typename T, typename U>
     void SetRule(T source, U target, fuchsia::media::Behavior policy) {

@@ -966,14 +966,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.media/AudioCore.EnableDeviceSettings",
-        "strictness": "strict",
-        "ordinal": "4688381460273863486",
-        "direction": "one_way",
-        "request": "fuchsia.media/AudioCoreEnableDeviceSettingsRequest"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.media/AudioCore.GetDbFromVolume",
         "strictness": "strict",
         "ordinal": "4507799933006023642",
@@ -1152,16 +1144,6 @@
         "kind": "struct",
         "name": "fuchsia.media/AudioCoreCreateAudioRendererRequest",
         "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.media/AudioCoreEnableDeviceSettingsRequest.enabled",
-        "ordinal": "1",
-        "type": "bool"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.media/AudioCoreEnableDeviceSettingsRequest"
     },
     {
         "kind": "struct/member",
@@ -1807,7 +1789,7 @@
     {
         "kind": "enum",
         "name": "fuchsia.media/AudioRenderUsage2",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint32"
     },
     {
@@ -2249,7 +2231,7 @@
     {
         "kind": "enum",
         "name": "fuchsia.media/Behavior",
-        "strictness": "strict",
+        "strictness": "flexible",
         "type": "uint32"
     },
     {
@@ -4376,7 +4358,7 @@
     {
         "kind": "union",
         "name": "fuchsia.media/Usage2",
-        "strictness": "strict"
+        "strictness": "flexible"
     },
     {
         "kind": "protocol/member",

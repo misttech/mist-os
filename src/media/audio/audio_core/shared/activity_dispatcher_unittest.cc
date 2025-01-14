@@ -126,7 +126,7 @@ class ActivityDispatcherTest : public gtest::TestLoopFixture {
 
   template <>
   RenderUsageVector SingleVector<RenderUsageVector>() {
-    return {*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND)};
+    return {*ToFidlRenderUsageTry(AudioRenderUsage2::BACKGROUND)};
   }
   template <>
   RenderUsage2Vector SingleVector<RenderUsage2Vector>() {
@@ -144,8 +144,8 @@ class ActivityDispatcherTest : public gtest::TestLoopFixture {
 
   template <>
   RenderUsageVector MultiVector<RenderUsageVector>() {
-    return {*FromFidlRenderUsage2(AudioRenderUsage2::BACKGROUND),
-            *FromFidlRenderUsage2(AudioRenderUsage2::SYSTEM_AGENT)};
+    return {*ToFidlRenderUsageTry(AudioRenderUsage2::BACKGROUND),
+            *ToFidlRenderUsageTry(AudioRenderUsage2::SYSTEM_AGENT)};
   }
   template <>
   RenderUsage2Vector MultiVector<RenderUsage2Vector>() {

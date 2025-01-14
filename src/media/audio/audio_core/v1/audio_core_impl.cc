@@ -130,8 +130,7 @@ void AudioCoreImpl::GetDbFromVolume2(fuchsia::media::Usage2 usage, float volume,
 }
 
 float AudioCoreImpl::GetDbFromVolumeBase(const fuchsia::media::Usage2& usage, float volume) {
-  auto loudness_transform =
-      context_.route_graph().LoudnessTransformForUsage(StreamUsageFromFidlUsage(usage));
+  auto loudness_transform = context_.route_graph().LoudnessTransformForUsage(ToStreamUsage(usage));
   if (loudness_transform) {
     return loudness_transform->Evaluate<1>({VolumeValue{volume}});
   }
@@ -149,8 +148,7 @@ void AudioCoreImpl::GetVolumeFromDb2(fuchsia::media::Usage2 usage, float gain_db
 }
 
 float AudioCoreImpl::GetVolumeFromDbBase(const fuchsia::media::Usage2& usage, float gain_db) {
-  auto loudness_transform =
-      context_.route_graph().LoudnessTransformForUsage(StreamUsageFromFidlUsage(usage));
+  auto loudness_transform = context_.route_graph().LoudnessTransformForUsage(ToStreamUsage(usage));
   if (loudness_transform) {
     return loudness_transform->Evaluate<1>({GainToVolumeValue{gain_db}});
   }

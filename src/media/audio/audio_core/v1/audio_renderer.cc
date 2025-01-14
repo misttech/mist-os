@@ -48,7 +48,7 @@ AudioRenderer::AudioRenderer(
     : BaseRenderer(std::move(audio_renderer_request), context),
       mix_profile_period_(context->process_config().mix_profile_config().period) {
   context->volume_manager().AddStream(this);
-  reporter().SetUsage(RenderUsageFromFidlRenderUsage(usage_));
+  reporter().SetUsage(ToRenderUsage(usage_));
 
   if constexpr (kLogRendererCtorDtorCalls) {
     FX_LOGS(INFO) << __FUNCTION__ << " (" << this << ") *****";
@@ -57,8 +57,7 @@ AudioRenderer::AudioRenderer(
 
 AudioRenderer::~AudioRenderer() {
   if constexpr (kLogRendererCtorDtorCalls) {
-    FX_LOGS(INFO) << __FUNCTION__ << " (" << this
-                  << ") usage:" << RenderUsageToString(RenderUsageFromFidlRenderUsage(usage_))
+    FX_LOGS(INFO) << __FUNCTION__ << " (" << this << ") usage:" << ToString(ToRenderUsage(usage_))
                   << " *****";
   }
 
@@ -87,12 +86,12 @@ void AudioRenderer::OnLinkAdded() {
 
 void AudioRenderer::ReportStart() {
   BaseRenderer::ReportStart();
-  context().audio_admin().UpdateRendererState(RenderUsageFromFidlRenderUsage(usage_), true, this);
+  context().audio_admin().UpdateRendererState(ToRenderUsage(usage_), true, this);
 }
 
 void AudioRenderer::ReportStop() {
   BaseRenderer::ReportStop();
-  context().audio_admin().UpdateRendererState(RenderUsageFromFidlRenderUsage(usage_), false, this);
+  context().audio_admin().UpdateRendererState(ToRenderUsage(usage_), false, this);
 }
 
 void AudioRenderer::SetUsage(fuchsia::media::AudioRenderUsage usage) {
@@ -107,12 +106,12 @@ void AudioRenderer::SetUsage2(fuchsia::media::AudioRenderUsage2 usage) {
     context().route_graph().RemoveRenderer(*this);
     return;
   }
-  reporter().SetUsage(RenderUsageFromFidlRenderUsage(usage));
+  reporter().SetUsage(ToRenderUsage(usage));
 
   if constexpr (kLogAudioRendererSetUsageCalls) {
     FX_LOGS(INFO) << __FUNCTION__ << " (" << this << ") changed from "
-                  << RenderUsageToString(RenderUsageFromFidlRenderUsage(usage_)) << " to "
-                  << RenderUsageToString(RenderUsageFromFidlRenderUsage(usage)) << " *****";
+                  << ToString(ToRenderUsage(usage_)) << " to " << ToString(ToRenderUsage(usage))
+                  << " *****";
   }
 
   usage_ = usage;

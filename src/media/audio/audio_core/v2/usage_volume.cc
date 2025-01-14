@@ -28,8 +28,8 @@ void UsageVolume::Create(Args args) {
   auto clock = ReferenceClock::FromMonotonic();
   const std::string usage_name =
       args.device_name + (args.usage.is_render_usage()
-                              ? media::audio::RenderUsageToString(args.usage.render_usage())
-                              : media::audio::CaptureUsageToString(args.usage.capture_usage()));
+                              ? media::audio::ToString(args.usage.render_usage())
+                              : media::audio::ToString(args.usage.capture_usage()));
 
   // The GainControl objects are constructed asynchronously.
   auto state = std::make_shared<ConstructorState>(ConstructorState{});
@@ -112,14 +112,11 @@ UsageVolume::~UsageVolume() {
 
 fuchsia::media::Usage2 UsageVolume::GetStreamUsage() const {
   if (usage_.is_render_usage()) {
-    auto out = media::audio::FidlRenderUsageFromRenderUsage(usage_.render_usage());
-    FX_CHECK(out);
-    return fuchsia::media::Usage2::WithRenderUsage(std::move(*out));
-  } else {
-    auto out = media::audio::FidlCaptureUsageFromCaptureUsage(usage_.capture_usage());
-    FX_CHECK(out);
-    return fuchsia::media::Usage2::WithCaptureUsage(std::move(*out));
+    auto out = media::audio::ToFidlRenderUsage2(usage_.render_usage());
+    return fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(out));
   }
+  auto out = media::audio::ToFidlCaptureUsage(usage_.capture_usage());
+  return fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(out));
 }
 
 void UsageVolume::RealizeVolume(VolumeCommand command) {

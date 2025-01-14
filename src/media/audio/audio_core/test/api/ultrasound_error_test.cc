@@ -36,7 +36,7 @@ TEST_F(UltrasoundErrorTest, RendererDoesNotSupportSetUsage) {
   std::optional<zx_status_t> renderer_error;
   renderer->fidl().set_error_handler([&renderer_error](auto status) { renderer_error = {status}; });
 
-  renderer->fidl()->SetUsage(*FromFidlRenderUsage2(fuchsia::media::AudioRenderUsage2::MEDIA));
+  renderer->fidl()->SetUsage(*ToFidlRenderUsageTry(fuchsia::media::AudioRenderUsage2::MEDIA));
 
   // Now expect we get disconnected with ZX_ERR_NOT_SUPPORTED.
   RunLoopUntil([&renderer_error] { return renderer_error.has_value(); });

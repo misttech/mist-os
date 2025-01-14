@@ -132,7 +132,7 @@ void AudioAdmin::ApplyNewPolicies(const RendererPolicies& new_renderer_policies,
   TRACE_DURATION("audio", "AudioAdmin::ApplyNewPolicies");
   std::lock_guard<fit::thread_checker> lock(fidl_thread_checker_);
   for (int i = 0; i < fuchsia::media::RENDER_USAGE2_COUNT; ++i) {
-    auto usage = static_cast<AudioRenderUsage2>(i);
+    auto usage = AudioRenderUsage2(i);
     switch (new_renderer_policies[i]) {
       case fuchsia::media::Behavior::NONE:
         SetUsageNone(usage);
@@ -146,7 +146,7 @@ void AudioAdmin::ApplyNewPolicies(const RendererPolicies& new_renderer_policies,
     }
   }
   for (int i = 0; i < fuchsia::media::CAPTURE_USAGE_COUNT; ++i) {
-    auto usage = static_cast<AudioCaptureUsage>(i);
+    auto usage = AudioCaptureUsage(i);
     switch (new_capturer_policies[i]) {
       case fuchsia::media::Behavior::NONE:
         SetUsageNone(usage);
@@ -175,12 +175,12 @@ void AudioAdmin::UpdatePolicy() {
   auto set_new_policies = [this, &new_renderer_policies, &new_capturer_policies](auto active) {
     std::lock_guard<fit::thread_checker> lock(fidl_thread_checker_);
     for (int i = 0; i < fuchsia::media::RENDER_USAGE2_COUNT; ++i) {
-      auto affected = static_cast<AudioRenderUsage2>(i);
+      auto affected = AudioRenderUsage2(i);
       new_renderer_policies[i] =
           std::max(new_renderer_policies[i], active_rules_.GetPolicy(active, affected));
     }
     for (int i = 0; i < fuchsia::media::CAPTURE_USAGE_COUNT; ++i) {
-      auto affected = static_cast<AudioCaptureUsage>(i);
+      auto affected = AudioCaptureUsage(i);
       new_capturer_policies[i] =
           std::max(new_capturer_policies[i], active_rules_.GetPolicy(active, affected));
     }
@@ -190,14 +190,14 @@ void AudioAdmin::UpdatePolicy() {
   std::vector<Usage2> active_usages;
   for (int i = 0; i < fuchsia::media::RENDER_USAGE2_COUNT; ++i) {
     if (IsActive(static_cast<RenderUsage>(i))) {
-      active_usages.push_back(Usage2::WithRenderUsage(static_cast<AudioRenderUsage2>(i)));
-      set_new_policies(static_cast<AudioRenderUsage2>(i));
+      active_usages.push_back(Usage2::WithRenderUsage(AudioRenderUsage2(i)));
+      set_new_policies(AudioRenderUsage2(i));
     }
   }
   for (int i = 0; i < fuchsia::media::CAPTURE_USAGE_COUNT; ++i) {
     if (IsActive(static_cast<CaptureUsage>(i))) {
-      active_usages.push_back(Usage2::WithCaptureUsage(static_cast<AudioCaptureUsage>(i)));
-      set_new_policies(static_cast<AudioCaptureUsage>(i));
+      active_usages.push_back(Usage2::WithCaptureUsage(AudioCaptureUsage(i)));
+      set_new_policies(AudioCaptureUsage(i));
     }
   }
   ApplyNewPolicies(new_renderer_policies, new_capturer_policies);
@@ -260,15 +260,14 @@ void AudioAdmin::UpdateRendererState(RenderUsage usage, bool active,
     if (active) {
       auto result = active_streams_playback_[usage_index].insert(renderer);
       if (!result.second) {
-        FX_LOGS(ERROR) << "Renderer " << renderer
-                       << " NOT inserted:  " << RenderUsageToString(usage)
+        FX_LOGS(ERROR) << "Renderer " << renderer << " NOT inserted:  " << ToString(usage)
                        << "; prevented by renderer " << *(result.first);
       }
     } else {
       if (!active_streams_playback_[usage_index].erase(renderer)) {
         // Unrecognized renderer, or it was already destroyed. This is generally a logic error.
         FX_LOGS(ERROR) << "Unrecognized renderer " << renderer
-                       << " NOT removed :  " << RenderUsageToString(usage);
+                       << " NOT removed :  " << ToString(usage);
       }
     }
 
@@ -288,13 +287,12 @@ void AudioAdmin::UpdateCapturerState(CaptureUsage usage, bool active,
     if (active) {
       auto result = active_streams_capture_[usage_index].insert(capturer);
       if (!result.second) {
-        FX_LOGS(ERROR) << "Capturer " << capturer
-                       << " NOT inserted: " << CaptureUsageToString(usage);
+        FX_LOGS(ERROR) << "Capturer " << capturer << " NOT inserted: " << ToString(usage);
       }
     } else {
       if (!active_streams_capture_[usage_index].erase(capturer)) {
         FX_LOGS(ERROR) << "Unrecognized capturer " << capturer
-                       << " NOT removed:  " << CaptureUsageToString(usage);
+                       << " NOT removed:  " << ToString(usage);
       }
     }
 
@@ -306,25 +304,25 @@ void AudioAdmin::UpdateCapturerState(CaptureUsage usage, bool active,
 
 void AudioAdmin::PolicyRules::ResetInteractions() {
   TRACE_DURATION("audio", "AudioAdmin::ResetInteractions");
-  for (int ac = 0; ac < fuchsia::media::RENDER_USAGE2_COUNT; ac++) {
-    auto active = static_cast<AudioRenderUsage2>(ac);
+  for (int act = 0; act < fuchsia::media::RENDER_USAGE2_COUNT; act++) {
+    auto active = AudioRenderUsage2(act);
     for (int aff = 0; aff < fuchsia::media::RENDER_USAGE2_COUNT; aff++) {
-      auto affected = static_cast<AudioRenderUsage2>(aff);
+      auto affected = AudioRenderUsage2(aff);
       SetRule(active, affected, fuchsia::media::Behavior::NONE);
     }
     for (int aff = 0; aff < fuchsia::media::CAPTURE_USAGE_COUNT; aff++) {
-      auto affected = static_cast<AudioCaptureUsage>(aff);
+      auto affected = AudioCaptureUsage(aff);
       SetRule(active, affected, fuchsia::media::Behavior::NONE);
     }
   }
-  for (int ac = 0; ac < fuchsia::media::CAPTURE_USAGE_COUNT; ac++) {
-    auto active = static_cast<AudioCaptureUsage>(ac);
+  for (int act = 0; act < fuchsia::media::CAPTURE_USAGE_COUNT; act++) {
+    auto active = AudioCaptureUsage(act);
     for (int aff = 0; aff < fuchsia::media::RENDER_USAGE2_COUNT; aff++) {
-      auto affected = static_cast<AudioRenderUsage2>(aff);
+      auto affected = AudioRenderUsage2(aff);
       SetRule(active, affected, fuchsia::media::Behavior::NONE);
     }
     for (int aff = 0; aff < fuchsia::media::CAPTURE_USAGE_COUNT; aff++) {
-      auto affected = static_cast<AudioCaptureUsage>(aff);
+      auto affected = AudioCaptureUsage(aff);
       SetRule(active, affected, fuchsia::media::Behavior::NONE);
     }
   }
