@@ -26,11 +26,8 @@ power_manager_deps = [
   "system_power_mode_config/parser",
   "thermal_config/parser",
   "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
-  "//sdk/fidl/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_rust",
-  "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_rust",
   "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
   "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_rust",
-  "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
   "//sdk/fidl/fuchsia.power.clientlevel:fuchsia.power.clientlevel_rust",
   "//sdk/fidl/fuchsia.power.manager.debug:fuchsia.power.manager.debug_rust",
@@ -78,7 +75,6 @@ power_manager_sources = [
   "src/debug_service.rs",
   "src/error.rs",
   "src/input_settings_handler.rs",
-  "src/lid_shutdown.rs",
   "src/main.rs",
   "src/message.rs",
   "src/node.rs",
@@ -192,11 +188,6 @@ node_config("base") {
   output = "base_node_config.json5"
 }
 
-node_config("chromebook") {
-  source = "node_config/chromebook_node_config.json5"
-  output = "chromebook_node_config.json5"
-}
-
 node_config("nelson") {
   source = "node_config/nelson_node_config.json5"
   output = "nelson_node_config.json5"
@@ -218,7 +209,6 @@ fuchsia_unittest_package("power-manager-tests") {
     ":astro",
     ":base",
     ":bin_test",
-    ":chromebook",
     ":nelson",
     ":sherlock",
     ":vim3_devicetree",

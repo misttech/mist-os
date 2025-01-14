@@ -15,7 +15,7 @@ use {fuchsia_async as fasync, serde_json as json};
 
 // nodes
 use crate::{
-    activity_handler, crash_report_handler, debug_service, input_settings_handler, lid_shutdown,
+    activity_handler, crash_report_handler, debug_service, input_settings_handler,
     platform_metrics, shutdown_watcher, system_power_mode_handler, system_profile_handler,
     system_shutdown_handler, temperature_handler, thermal_load_driver, thermal_policy,
     thermal_shutdown, thermal_state_handler,
@@ -149,9 +149,6 @@ impl PowerManager {
                     &self.nodes,
                 )
                 .build(node_futures)?
-            }
-            "LidShutdown" => {
-                lid_shutdown::LidShutdownBuilder::new_from_json(json_data, &self.nodes).build()?
             }
             "PlatformMetrics" => {
                 platform_metrics::PlatformMetricsBuilder::new_from_json(json_data, &self.nodes)
