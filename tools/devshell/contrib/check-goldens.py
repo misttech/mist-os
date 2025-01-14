@@ -76,7 +76,7 @@ def main():
             if "comparison_manifest" in entry:
                 manifests.append(entry["comparison_manifest"])
         if manifests:
-            subprocess.check_call(["fx", "build"] + manifests)
+            subprocess.check_call(["fx", "build", "--"] + manifests)
 
     # Reload `entries`, as the JSON file may have been regenerated.
     with open(golden_files_json) as f:
@@ -112,7 +112,7 @@ def main():
     if args.list:
         print("\n".join(matches))
     elif stamps:
-        subprocess.check_call(["fx", "build"] + stamps)
+        subprocess.check_call(["fx", "build", "--"] + stamps)
 
 
 if __name__ == "__main__":
