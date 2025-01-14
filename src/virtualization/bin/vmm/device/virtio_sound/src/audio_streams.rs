@@ -621,7 +621,7 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
             fidl::endpoints::create_endpoints::<fidl_fuchsia_media::AudioCapturerMarker>();
         self.audio.create_audio_capturer(server_end, false /* not loopback */)?;
         let fidl_proxy = client_end.into_proxy();
-        fidl_proxy.set_usage(fidl_fuchsia_media::AudioCaptureUsage::Foreground)?;
+        fidl_proxy.set_usage2(fidl_fuchsia_media::AudioCaptureUsage2::Foreground)?;
         fidl_proxy.set_pcm_stream_type(&params.stream_type)?;
         fidl_proxy.add_payload_buffer(0, payload_vmo)?;
 

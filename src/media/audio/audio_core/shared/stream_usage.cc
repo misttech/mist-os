@@ -128,7 +128,7 @@ AudioCaptureUsage2 ToFidlCaptureUsage2(const fuchsia_media::AudioCaptureUsage& u
 AudioCaptureUsage2 ToFidlCaptureUsage2(const fuchsia_media::AudioCaptureUsage2& usage) {
   return AudioCaptureUsage2(fidl::ToUnderlying(usage));
 }
-fuchsia::media::AudioCaptureUsage2 ToFidlCaptureUsage2(CaptureUsage usage) {
+AudioCaptureUsage2 ToFidlCaptureUsage2(CaptureUsage usage) {
   auto underlying = static_cast<std::underlying_type_t<CaptureUsage>>(usage);
   return {AudioCaptureUsage2(underlying)};
 }
@@ -171,6 +171,97 @@ fuchsia::media::Usage2 ToFidlUsage2(CaptureUsage usage) {
   auto underlying = static_cast<std::underlying_type_t<CaptureUsage>>(usage);
   FX_CHECK(underlying < fuchsia::media::CAPTURE_USAGE_COUNT);
   return fuchsia::media::Usage2::WithCaptureUsage(AudioCaptureUsage2(underlying));
+}
+
+// Logging for FIDL Usage and UsageState unions.
+std::ostream& operator<<(std::ostream& out, const fuchsia::media::Usage& usage) {
+  out << "Usage: ";
+  if (usage.is_capture_usage()) {
+    out << "Capture::";
+    switch (usage.capture_usage()) {
+      case AudioCaptureUsage::BACKGROUND:
+        return (out << "BACKGROUND");
+      case AudioCaptureUsage::COMMUNICATION:
+        return (out << "COMMUNICATION");
+      case AudioCaptureUsage::FOREGROUND:
+        return (out << "Foreground");
+      case AudioCaptureUsage::SYSTEM_AGENT:
+        return (out << "SYSTEM_AGENT");
+      default:
+        return (out << "UNKNOWN");
+    }
+  }
+  if (usage.is_render_usage()) {
+    out << "Render::";
+    switch (usage.render_usage()) {
+      case AudioRenderUsage::BACKGROUND:
+        return (out << "BACKGROUND");
+      case AudioRenderUsage::COMMUNICATION:
+        return (out << "COMMUNICATION");
+      case AudioRenderUsage::INTERRUPTION:
+        return (out << "INTERRUPTION");
+      case AudioRenderUsage::MEDIA:
+        return (out << "MEDIA");
+      case AudioRenderUsage::SYSTEM_AGENT:
+        return (out << "SYSTEM_AGENT");
+      default:
+        return (out << "UNKNOWN");
+    }
+  }
+  return (out << "Unknown Usage type");
+}
+
+std::ostream& operator<<(std::ostream& out, const fuchsia::media::Usage2& usage) {
+  out << "Usage2: ";
+  if (usage.is_capture_usage()) {
+    out << "Capture::";
+    switch (usage.capture_usage()) {
+      case AudioCaptureUsage2::BACKGROUND:
+        return (out << "BACKGROUND");
+      case AudioCaptureUsage2::COMMUNICATION:
+        return (out << "COMMUNICATION");
+      case AudioCaptureUsage2::FOREGROUND:
+        return (out << "FOREGROUND");
+      case AudioCaptureUsage2::SYSTEM_AGENT:
+        return (out << "SYSTEM_AGENT");
+      default:
+        return (out << "UNKNOWN");
+    }
+  }
+
+  if (usage.is_render_usage()) {
+    out << "Render::";
+    switch (usage.render_usage()) {
+      case AudioRenderUsage2::ACCESSIBILITY:
+        return (out << "ACCESSIBILITY");
+      case AudioRenderUsage2::BACKGROUND:
+        return (out << "BACKGROUND");
+      case AudioRenderUsage2::COMMUNICATION:
+        return (out << "COMMUNICATION");
+      case AudioRenderUsage2::INTERRUPTION:
+        return (out << "INTERRUPTION");
+      case AudioRenderUsage2::MEDIA:
+        return (out << "MEDIA");
+      case AudioRenderUsage2::SYSTEM_AGENT:
+        return (out << "SYSTEM_AGENT");
+      default:
+        return (out << "UNKNOWN");
+    }
+  }
+  return (out << "INVALID TYPE");
+}
+
+std::ostream& operator<<(std::ostream& out, const fuchsia::media::UsageState& state) {
+  if (state.is_unadjusted()) {
+    return (out << "UNADJUSTED");
+  }
+  if (state.is_ducked()) {
+    return (out << "DUCKED");
+  }
+  if (state.is_muted()) {
+    return (out << "MUTED");
+  }
+  return (out << "Unknown Usage state");
 }
 
 }  // namespace media::audio

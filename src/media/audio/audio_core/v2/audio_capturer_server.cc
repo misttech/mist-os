@@ -11,8 +11,6 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
-#include "src/media/audio/audio_core/shared/mixer/gain.h"
-
 namespace media_audio {
 
 namespace {
@@ -127,6 +125,17 @@ void AudioCapturerServer::SetReferenceClock(SetReferenceClockRequestView request
 void AudioCapturerServer::SetUsage(SetUsageRequestView request,
                                    SetUsageCompleter::Sync& completer) {
   TRACE_DURATION("audio", "AudioCapturerServer::SetUsage");
+  SetUsageBase(fuchsia::media::AudioCaptureUsage2(static_cast<uint32_t>(request->usage)));
+}
+
+void AudioCapturerServer::SetUsage2(SetUsage2RequestView request,
+                                    SetUsage2Completer::Sync& completer) {
+  TRACE_DURATION("audio", "AudioCapturerServer::SetUsage2");
+  SetUsageBase(fuchsia::media::AudioCaptureUsage2(static_cast<uint32_t>(request->usage)));
+}
+
+void AudioCapturerServer::SetUsageBase(fuchsia::media::AudioCaptureUsage2 usage) {
+  TRACE_DURATION("audio", "AudioCapturerServer::SetUsageBase");
 
   if (usage_ == CaptureUsage::ULTRASOUND || usage_ == CaptureUsage::LOOPBACK) {
     FX_LOGS(WARNING) << "Unsupported method SetUsage on ultrasound or loopback capturer";
@@ -140,7 +149,7 @@ void AudioCapturerServer::SetUsage(SetUsageRequestView request,
     return;
   }
 
-  usage_ = media::audio::ToCaptureUsage(request->usage);
+  usage_ = media::audio::ToCaptureUsage(usage);
 }
 
 void AudioCapturerServer::SetPcmStreamType(SetPcmStreamTypeRequestView request,
@@ -166,7 +175,7 @@ void AudioCapturerServer::SetPcmStreamType(SetPcmStreamTypeRequestView request,
     return;
   }
 
-  format_ = std::move(format_result.value());
+  format_ = format_result.value();
 
   // TODO(https://fxbug.dev/42181009): call reporter
   // reporter_->SetFormat(*format_);

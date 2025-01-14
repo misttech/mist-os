@@ -127,6 +127,22 @@ TEST_F(UltrasoundErrorTest, CapturerDoesNotSupportSetUsage) {
   Unbind(capturer);
 }
 
+TEST_F(UltrasoundErrorTest, CapturerDoesNotSupportSetUsage2) {
+  CreateInput();
+  auto capturer = CreateCapturer();
+
+  std::optional<zx_status_t> capturer_error;
+  capturer->fidl().set_error_handler([&capturer_error](auto status) { capturer_error = {status}; });
+
+  capturer->fidl()->SetUsage2(fuchsia::media::AudioCaptureUsage2::SYSTEM_AGENT);
+
+  // Now expect we get disconnected with ZX_ERR_NOT_SUPPORTED.
+  RunLoopUntil([&capturer_error] { return capturer_error.has_value(); });
+  ASSERT_TRUE(capturer_error);
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, *capturer_error);
+  Unbind(capturer);
+}
+
 TEST_F(UltrasoundErrorTest, CapturerDoesNotSupportBindGainControl) {
   CreateInput();
   auto capturer = CreateCapturer();

@@ -171,7 +171,7 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
   // CaptureAt is tracked separately, by the Packet type.
   enum class Method : uint8_t {
     AddPayloadBuffer,
-    SetUsage,
+    SetUsage2,
     SetPcmStreamType,
     Disconnect,
   };
@@ -225,9 +225,9 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
     calls_.push_back({.method = Method::AddPayloadBuffer, .payload_buffer_size = size});
     ASSERT_EQ(ZX_OK, payload_mapper_.Map(payload_buffer));
   }
-  void SetUsage(fuchsia::media::AudioCaptureUsage usage) override {
-    EXPECT_EQ(usage, fuchsia::media::AudioCaptureUsage::FOREGROUND);
-    calls_.push_back({.method = Method::SetUsage});
+  void SetUsage2(fuchsia::media::AudioCaptureUsage2 usage) override {
+    EXPECT_EQ(usage, fuchsia::media::AudioCaptureUsage2::FOREGROUND);
+    calls_.push_back({.method = Method::SetUsage2});
   }
   void SetPcmStreamType(fuchsia::media::AudioStreamType type) override {
     calls_.push_back({.method = Method::SetPcmStreamType, .stream_type = type});
@@ -242,6 +242,7 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
     });
   }
 
+  void SetUsage(fuchsia::media::AudioCaptureUsage usage) override { UNEXPECTED_METHOD_CALL; }
   void RemovePayloadBuffer(uint32_t id) override { UNEXPECTED_METHOD_CALL; }
   void ReleasePacket(fuchsia::media::StreamPacket packet) override { UNEXPECTED_METHOD_CALL; }
   void DiscardAllPackets(DiscardAllPacketsCallback callback) override { UNEXPECTED_METHOD_CALL; }
@@ -256,6 +257,11 @@ class FakeAudioCapturer : public fuchsia::media::AudioCapturer {
   void GetReferenceClock(GetReferenceClockCallback callback) override { UNEXPECTED_METHOD_CALL; }
   void SetReferenceClock(::zx::clock ref_clock) override { UNEXPECTED_METHOD_CALL; }
   void GetStreamType(GetStreamTypeCallback callback) override { UNEXPECTED_METHOD_CALL; }
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) final {
+    FX_LOGS(ERROR) << "FakeAudioCapturer: AudioCapturer::handle_unknown_method(ordinal " << ordinal
+                   << ", method_has_response " << method_has_response << ")";
+    UNEXPECTED_METHOD_CALL;
+  }
 
  private:
   fidl::Binding<fuchsia::media::AudioCapturer> binding_;
@@ -1701,7 +1707,7 @@ void VirtioSoundTestBase<true>::TestPcmInputSetParamsAndPrepare(
   auto capturer = get_audio_capturer(0);
   ASSERT_TRUE(capturer) << "device did not call CreateAudioCapturer?";
   auto calls = WaitForCalls(*capturer, {
-                                           FakeAudioCapturer::Method::SetUsage,
+                                           FakeAudioCapturer::Method::SetUsage2,
                                            FakeAudioCapturer::Method::SetPcmStreamType,
                                            FakeAudioCapturer::Method::AddPayloadBuffer,
                                        });
@@ -1783,7 +1789,7 @@ void VirtioSoundTestBase<true>::TestPcmInputStateTraversal(size_t capturer_id) {
   auto capturer = get_audio_capturer(capturer_id);
   ASSERT_TRUE(capturer) << "device did not call CreateAudioCapturer?";
   auto calls = WaitForCalls(*capturer, {
-                                           FakeAudioCapturer::Method::SetUsage,
+                                           FakeAudioCapturer::Method::SetUsage2,
                                            FakeAudioCapturer::Method::SetPcmStreamType,
                                            FakeAudioCapturer::Method::AddPayloadBuffer,
                                        });
@@ -1876,7 +1882,7 @@ TEST_F(VirtioSoundTest, PcmInputTransitionPrepareRelease) {
   auto capturer = get_audio_capturer(0);
   ASSERT_TRUE(capturer) << "device did not call CreateAudioCapturer?";
   auto calls = WaitForCalls(*capturer, {
-                                           FakeAudioCapturer::Method::SetUsage,
+                                           FakeAudioCapturer::Method::SetUsage2,
                                            FakeAudioCapturer::Method::SetPcmStreamType,
                                            FakeAudioCapturer::Method::AddPayloadBuffer,
                                        });

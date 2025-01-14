@@ -509,6 +509,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.media/AudioCapturer.SetUsage2",
+        "strictness": "flexible",
+        "ordinal": "8823644935569946667",
+        "direction": "one_way",
+        "request": "fuchsia.media/AudioCapturerSetUsage2Request"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.media/AudioCapturer.StartAsyncCapture",
         "strictness": "strict",
         "ordinal": "8604318107245205414",
@@ -532,7 +540,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.media/AudioCapturer",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {
@@ -636,6 +644,16 @@
         "kind": "struct",
         "name": "fuchsia.media/AudioCapturerSetReferenceClockRequest",
         "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/AudioCapturerSetUsage2Request.usage",
+        "ordinal": "1",
+        "type": "fuchsia.media/AudioCaptureUsage2"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/AudioCapturerSetUsage2Request"
     },
     {
         "kind": "struct/member",
@@ -2749,6 +2767,12 @@
         "name": "fuchsia.media/InputAudioCapturerConfiguration.usage",
         "ordinal": "1",
         "type": "fuchsia.media/AudioCaptureUsage"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.media/InputAudioCapturerConfiguration.usage2",
+        "ordinal": "2",
+        "type": "fuchsia.media/AudioCaptureUsage2"
     },
     {
         "kind": "table",

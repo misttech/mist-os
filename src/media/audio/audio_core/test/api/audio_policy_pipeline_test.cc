@@ -59,10 +59,9 @@ class AudioAdminTest : public HermeticAudioTest {
 
   AudioCapturerShim<kSampleFormat>* SetUpCapturer(
       fuchsia::media::AudioCapturerConfiguration configuration);
-  AudioCapturerShim<kSampleFormat>* SetUpCapturer(AudioCaptureUsage2 _usage) {
+  AudioCapturerShim<kSampleFormat>* SetUpCapturer(AudioCaptureUsage2 usage) {
     fuchsia::media::InputAudioCapturerConfiguration input;
-    auto usage = media::audio::ToFidlCaptureUsageTry(_usage);
-    input.set_usage(*usage);
+    input.set_usage2(usage);
     return SetUpCapturer(fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input)));
   }
   AudioCapturerShim<kSampleFormat>* SetUpLoopbackCapturer() {
@@ -330,7 +329,7 @@ void AudioAdminTest::TestCaptureMuteRender(bool set_usage_to_disable) {
   // Immediately start this capturer so that it impacts policy.
   capturer->fidl()->StartAsyncCapture(10);
   if (set_usage_to_disable) {
-    capturer->fidl()->SetUsage(*ToFidlCaptureUsageTry(AudioCaptureUsage2::BACKGROUND));
+    capturer->fidl()->SetUsage2(AudioCaptureUsage2::BACKGROUND);
   }
 
   renderer->fidl()->SendPacketNoReply({

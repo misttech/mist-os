@@ -358,6 +358,11 @@ fuchsia::media::Usage2 ToFidlUsage2(const fuchsia_media::Usage& usage);
 fuchsia::media::Usage2 ToFidlUsage2(RenderUsage u);
 fuchsia::media::Usage2 ToFidlUsage2(CaptureUsage u);
 
+// Logging for FIDL Usage and UsageState unions.
+std::ostream& operator<<(std::ostream& out, const fuchsia::media::Usage& usage);
+std::ostream& operator<<(std::ostream& out, const fuchsia::media::Usage2& usage);
+std::ostream& operator<<(std::ostream& out, const fuchsia::media::UsageState& state);
+
 }  // namespace media::audio
 
 #endif  // SRC_MEDIA_AUDIO_AUDIO_CORE_SHARED_STREAM_USAGE_H_

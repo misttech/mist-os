@@ -47,7 +47,7 @@ class AudioAdmin {
     using RenderActivity = std::bitset<fuchsia::media::RENDER_USAGE2_COUNT>;
     virtual void OnRenderActivityChanged(RenderActivity activity) = 0;
 
-    using CaptureActivity = std::bitset<fuchsia::media::CAPTURE_USAGE_COUNT>;
+    using CaptureActivity = std::bitset<fuchsia::media::CAPTURE_USAGE2_COUNT>;
     virtual void OnCaptureActivityChanged(CaptureActivity activity) = 0;
   };
 

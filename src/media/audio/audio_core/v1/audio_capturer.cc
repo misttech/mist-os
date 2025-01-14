@@ -23,7 +23,9 @@ AudioCapturer::AudioCapturer(fuchsia::media::AudioCapturerConfiguration configur
     usage_ = CaptureUsage::LOOPBACK;
   } else {
     context->volume_manager().AddStream(this);
-    if (configuration.input().has_usage()) {
+    if (configuration.input().has_usage2()) {
+      usage_ = ToCaptureUsage(configuration.input().usage2());
+    } else if (configuration.input().has_usage()) {
       usage_ = ToCaptureUsage(configuration.input().usage());
     }
   }
@@ -154,6 +156,11 @@ void AudioCapturer::BindGainControl(
 
 void AudioCapturer::SetUsage(fuchsia::media::AudioCaptureUsage usage) {
   TRACE_DURATION("audio", "AudioCapturer::SetUsage");
+  SetUsage2(ToFidlCaptureUsage2(usage));
+}
+
+void AudioCapturer::SetUsage2(fuchsia::media::AudioCaptureUsage2 usage) {
+  TRACE_DURATION("audio", "AudioCapturer::SetUsage2");
   if (usage_ == ToCaptureUsage(usage)) {
     return;
   }

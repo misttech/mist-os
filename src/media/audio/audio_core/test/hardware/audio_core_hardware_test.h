@@ -20,8 +20,8 @@ class AudioCoreHardwareTest : public TestFixture {
   static constexpr float kUsageGainDb = 0.0f;
   static constexpr float kDeviceGainDb = 0.0f;
 
-  static constexpr fuchsia::media::AudioCaptureUsage kUsage =
-      fuchsia::media::AudioCaptureUsage::FOREGROUND;
+  static constexpr fuchsia::media::AudioCaptureUsage2 kUsage =
+      fuchsia::media::AudioCaptureUsage2::FOREGROUND;
 
   static constexpr fuchsia::media::AudioGainValidFlags kSetGainFlags =
       fuchsia::media::AudioGainValidFlags::GAIN_VALID &

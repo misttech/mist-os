@@ -46,6 +46,7 @@ class AudioCapturer : public BaseCapturer,
   void SetPcmStreamType(fuchsia::media::AudioStreamType stream_type) final;
   void BindGainControl(fidl::InterfaceRequest<fuchsia::media::audio::GainControl> request) final;
   void SetUsage(fuchsia::media::AudioCaptureUsage usage) final;
+  void SetUsage2(fuchsia::media::AudioCaptureUsage2 usage) final;
 
   // |fuchsia::media::audio::GainControl|
   void SetGain(float gain_db) final;

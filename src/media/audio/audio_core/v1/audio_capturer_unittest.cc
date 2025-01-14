@@ -38,7 +38,7 @@ class AudioCapturerTest : public testing::ThreadingModelFixture {
 
     auto format = Format::Create(stream_type_).take_value();
     fuchsia::media::InputAudioCapturerConfiguration input_configuration;
-    input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+    input_configuration.set_usage2(fuchsia::media::AudioCaptureUsage2::BACKGROUND);
     auto capturer = AudioCapturer::Create(
         fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)),
         {format}, fidl_capturer_.NewRequest(), &context());
@@ -56,7 +56,9 @@ class AudioCapturerTest : public testing::ThreadingModelFixture {
     // will not work since the rest of this class is destructed before the loop and its
     // queued functions are. Here, we ensure the error handler runs before this class' destructors
     // run.
-    { auto r = std::move(fidl_capturer_); }
+    {
+      auto r = std::move(fidl_capturer_);
+    }
     RunLoopUntilIdle();
 
     testing::ThreadingModelFixture::TearDown();
@@ -169,7 +171,9 @@ class AudioCapturerBadFormatTest : public testing::ThreadingModelFixture {
     // Dropping the channel queues a reference to the Capturer through its error handler, which
     // won't work since the rest of the class is destructed before the loop and its queued
     // functions. Here, we ensure the error handler runs before this class' destructors run.
-    { auto r = std::move(fidl_capturer_); }
+    {
+      auto r = std::move(fidl_capturer_);
+    }
     RunLoopUntilIdle();
 
     testing::ThreadingModelFixture::TearDown();
@@ -188,7 +192,7 @@ class AudioCapturerBadFormatTest : public testing::ThreadingModelFixture {
 // If given a malformed format (channels == 0), an AudioCapturer should disconnect.
 TEST_F(AudioCapturerBadFormatTest, ChannelsTooLowShouldDisconnect) {
   fuchsia::media::InputAudioCapturerConfiguration input_configuration;
-  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  input_configuration.set_usage2(fuchsia::media::AudioCaptureUsage2::BACKGROUND);
   std::optional<Format> format;
   auto capturer = AudioCapturer::Create(
       fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,
@@ -208,7 +212,7 @@ TEST_F(AudioCapturerBadFormatTest, ChannelsTooLowShouldDisconnect) {
 // AudioCapturers are limited to a maximum channel count of 4.
 TEST_F(AudioCapturerBadFormatTest, ChannelsTooHighShouldDisconnect) {
   fuchsia::media::InputAudioCapturerConfiguration input_configuration;
-  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  input_configuration.set_usage2(fuchsia::media::AudioCaptureUsage2::BACKGROUND);
   std::optional<Format> format;
   auto capturer = AudioCapturer::Create(
       fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,
@@ -228,7 +232,7 @@ TEST_F(AudioCapturerBadFormatTest, ChannelsTooHighShouldDisconnect) {
 // AudioCapturers are limited to a minimum frame rate of 1000 Hz.
 TEST_F(AudioCapturerBadFormatTest, FrameRateTooLowShouldDisconnect) {
   fuchsia::media::InputAudioCapturerConfiguration input_configuration;
-  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  input_configuration.set_usage2(fuchsia::media::AudioCaptureUsage2::BACKGROUND);
   std::optional<Format> format;
   auto capturer = AudioCapturer::Create(
       fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,
@@ -248,7 +252,7 @@ TEST_F(AudioCapturerBadFormatTest, FrameRateTooLowShouldDisconnect) {
 // AudioCapturers are limited to a maximum frame rate of 192000 Hz.
 TEST_F(AudioCapturerBadFormatTest, FrameRateTooHighShouldDisconnect) {
   fuchsia::media::InputAudioCapturerConfiguration input_configuration;
-  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  input_configuration.set_usage2(fuchsia::media::AudioCaptureUsage2::BACKGROUND);
   std::optional<Format> format;
   auto capturer = AudioCapturer::Create(
       fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,
@@ -268,7 +272,7 @@ TEST_F(AudioCapturerBadFormatTest, FrameRateTooHighShouldDisconnect) {
 // AudioCapturers cannot call SetPcmStreamType whiole a payload buffer has been added.
 TEST_F(AudioCapturerBadFormatTest, SetFormatAfterAddPayloadBufferShouldDisconnect) {
   fuchsia::media::InputAudioCapturerConfiguration input_configuration;
-  input_configuration.set_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
+  input_configuration.set_usage2(fuchsia::media::AudioCaptureUsage2::BACKGROUND);
   std::optional<Format> format;
   auto capturer = AudioCapturer::Create(
       fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input_configuration)), format,

@@ -78,6 +78,7 @@ class AudioCapturerServer
   void SetReferenceClock(SetReferenceClockRequestView request,
                          SetReferenceClockCompleter::Sync& completer) final;
   void SetUsage(SetUsageRequestView request, SetUsageCompleter::Sync& completer) final;
+  void SetUsage2(SetUsage2RequestView request, SetUsage2Completer::Sync& completer) final;
 
   // Must be called exactly once, after the above and before the below.
   // For ULTRASOUND capturers, this cannot be called at all.
@@ -110,9 +111,17 @@ class AudioCapturerServer
 
   void GetReferenceClock(GetReferenceClockCompleter::Sync& completer) final;
   void GetStreamType(GetStreamTypeCompleter::Sync& completer) final;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_media::AudioCapturer> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) final {
+    FX_LOGS(ERROR) << "AudioCapturerServer: AudioCapturer::handle_unknown_method(ordinal "
+                   << metadata.method_ordinal << ", "
+                   << (metadata.unknown_method_type == fidl::UnknownMethodType::kOneWay
+                           ? "OneWay)"
+                           : "TwoWay)");
+  }
 
  private:
-  static inline constexpr std::string_view kClassName = "AudioCapturerServer";
+  static constexpr std::string_view kClassName = "AudioCapturerServer";
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
@@ -125,6 +134,7 @@ class AudioCapturerServer
   void ReleasePacketInternal(fuchsia_media::wire::StreamPacket packet);
   void DiscardAllPacketsInternal(std::optional<DiscardAllPacketsCompleter::Async> completer);
 
+  void SetUsageBase(fuchsia::media::AudioCaptureUsage2 usage);
   void Start();
   void Stop();
   void SendPacket(fuchsia_media::wire::StreamPacket packet, zx::duration overflow,

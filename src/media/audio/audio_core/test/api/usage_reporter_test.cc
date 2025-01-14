@@ -128,11 +128,10 @@ class UsageReporterTest : public HermeticAudioTest {
     r->fidl()->PlayNoReply(0, 0);
   }
 
-  void StartCapturerWithUsage(AudioCaptureUsage2 _usage) {
+  void StartCapturerWithUsage(AudioCaptureUsage2 usage) {
     auto format = Format::Create<AudioSampleFormat::SIGNED_16>(1, 8000).value();  // arbitrary
     fuchsia::media::InputAudioCapturerConfiguration cfg;
-    auto usage = ToFidlCaptureUsageTry(_usage);
-    cfg.set_usage(*usage);
+    cfg.set_usage2(usage);
     auto c = CreateAudioCapturer(
         format, 1024, fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(cfg)));
     c->fidl()->StartAsyncCapture(1024);
@@ -165,7 +164,9 @@ class UsageReporterTest : public HermeticAudioTest {
 
     // The initial callback happens immediately.
     auto c = CreateController<T>(AudioRenderUsage2::MEDIA);
-    c->fake_watcher.SetNextHandler(AddCallback("OnStateChanged InitialCall"));
+    c->fake_watcher.SetNextHandler(
+        AddCallback("OnStateChanged InitialCall",
+                    [](fuchsia::media::Usage2 usage, fuchsia::media::UsageState state) {}));
     ExpectCallbacks();
 
     c->fake_watcher.SetNextHandler(AddCallback(
@@ -193,7 +194,9 @@ class UsageReporterTest : public HermeticAudioTest {
 
     // The initial callback happens immediately.
     auto c = CreateController<T>(AudioRenderUsage2::MEDIA);
-    c->fake_watcher.SetNextHandler(AddCallback("OnStateChanged InitialCall"));
+    c->fake_watcher.SetNextHandler(
+        AddCallback("OnStateChanged InitialCall",
+                    [](fuchsia::media::Usage2 usage, fuchsia::media::UsageState state) {}));
     ExpectCallbacks();
 
     c->fake_watcher.SetNextHandler(AddCallback(
@@ -219,9 +222,9 @@ class UsageReporterTest : public HermeticAudioTest {
     fuchsia::media::Usage2 last_usage;
     fuchsia::media::UsageState last_state;
 
-    auto c = CreateController<T>(AudioCaptureUsage2::COMMUNICATION);
+    auto c = CreateController<T>(AudioCaptureUsage2::FOREGROUND);
     c->fake_watcher.SetNextHandler(AddCallback(
-        "OnStateChanged",
+        "OnStateChanged InitialCall",
         [&last_usage, &last_state](fuchsia::media::Usage2 usage, fuchsia::media::UsageState state) {
           last_usage = std::move(usage);
           last_state = std::move(state);
@@ -231,35 +234,7 @@ class UsageReporterTest : public HermeticAudioTest {
     ExpectCallbacks();
     EXPECT_TRUE(last_state.is_unadjusted());
     EXPECT_TRUE(last_usage.is_capture_usage());
-    EXPECT_EQ(last_usage.capture_usage(), AudioCaptureUsage2::COMMUNICATION);
-  }
-
-  template <typename T>
-  void TestCaptureMuted() {
-    fuchsia::media::Usage2 last_usage;
-    fuchsia::media::UsageState last_state;
-
-    // The initial callback happens immediately.
-    auto c = CreateController<T>(AudioCaptureUsage2::COMMUNICATION);
-    c->fake_watcher.SetNextHandler(AddCallback("OnStateChanged InitialCall"));
-    ExpectCallbacks();
-    c->fake_watcher.SetNextHandler(AddCallback(
-        "OnStateChanged",
-        [&last_usage, &last_state](fuchsia::media::Usage2 usage, fuchsia::media::UsageState state) {
-          last_usage = std::move(usage);
-          last_state = std::move(state);
-        }));
-
-    // Duck COMMUNICATION when SYSTEM_AGENT is active.
-    audio_core_->SetInteraction2(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT),
-                                 ToFidlUsage2(CaptureUsage::COMMUNICATION),
-                                 fuchsia::media::Behavior::DUCK);
-
-    StartCapturerWithUsage(AudioCaptureUsage2::SYSTEM_AGENT);
-    ExpectCallbacks();
-    EXPECT_TRUE(last_state.is_ducked());
-    EXPECT_TRUE(last_usage.is_capture_usage());
-    EXPECT_EQ(last_usage.capture_usage(), AudioCaptureUsage2::COMMUNICATION);
+    EXPECT_EQ(last_usage.capture_usage(), AudioCaptureUsage2::FOREGROUND);
   }
 
   template <typename T>
@@ -268,8 +243,10 @@ class UsageReporterTest : public HermeticAudioTest {
     fuchsia::media::UsageState last_state;
 
     // The initial callback happens immediately.
-    auto c = CreateController<T>(AudioCaptureUsage2::COMMUNICATION);
-    c->fake_watcher.SetNextHandler(AddCallback("OnStateChanged InitialCall"));
+    auto c = CreateController<T>(AudioCaptureUsage2::FOREGROUND);
+    c->fake_watcher.SetNextHandler(
+        AddCallback("OnStateChanged InitialCall",
+                    [](fuchsia::media::Usage2 usage, fuchsia::media::UsageState state) {}));
     ExpectCallbacks();
     c->fake_watcher.SetNextHandler(AddCallback(
         "OnStateChanged",
@@ -278,16 +255,46 @@ class UsageReporterTest : public HermeticAudioTest {
           last_state = std::move(state);
         }));
 
-    // Mute COMMUNICATION when SYSTEM_AGENT is active.
+    // Duck FOREGROUND when SYSTEM_AGENT is active.
     audio_core_->SetInteraction2(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT),
-                                 ToFidlUsage2(CaptureUsage::COMMUNICATION),
+                                 ToFidlUsage2(CaptureUsage::FOREGROUND),
+                                 fuchsia::media::Behavior::DUCK);
+
+    StartCapturerWithUsage(AudioCaptureUsage2::SYSTEM_AGENT);
+    ExpectCallbacks();
+    EXPECT_TRUE(last_state.is_ducked()) << (last_state.is_muted() ? "Muted" : "Unadjusted");
+    EXPECT_TRUE(last_usage.is_capture_usage());
+    EXPECT_EQ(ToIndex(last_usage.capture_usage()), ToIndex(AudioCaptureUsage2::FOREGROUND));
+  }
+
+  template <typename T>
+  void TestCaptureMuted() {
+    fuchsia::media::Usage2 last_usage;
+    fuchsia::media::UsageState last_state;
+
+    // The initial callback happens immediately.
+    auto c = CreateController<T>(AudioCaptureUsage2::FOREGROUND);
+    c->fake_watcher.SetNextHandler(
+        AddCallback("OnStateChanged InitialCall",
+                    [](fuchsia::media::Usage2 usage, fuchsia::media::UsageState state) {}));
+    ExpectCallbacks();
+    c->fake_watcher.SetNextHandler(AddCallback(
+        "OnStateChanged",
+        [&last_usage, &last_state](fuchsia::media::Usage2 usage, fuchsia::media::UsageState state) {
+          last_usage = std::move(usage);
+          last_state = std::move(state);
+        }));
+
+    // Mute FOREGROUND when SYSTEM_AGENT is active.
+    audio_core_->SetInteraction2(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT),
+                                 ToFidlUsage2(CaptureUsage::FOREGROUND),
                                  fuchsia::media::Behavior::MUTE);
 
     StartCapturerWithUsage(AudioCaptureUsage2::SYSTEM_AGENT);
     ExpectCallbacks();
-    EXPECT_TRUE(last_state.is_muted());
+    EXPECT_TRUE(last_state.is_muted()) << (last_state.is_ducked() ? "Ducked" : "Unadjusted");
     EXPECT_TRUE(last_usage.is_capture_usage());
-    EXPECT_EQ(last_usage.capture_usage(), AudioCaptureUsage2::COMMUNICATION);
+    EXPECT_EQ(ToIndex(last_usage.capture_usage()), ToIndex(AudioCaptureUsage2::FOREGROUND));
   }
 };
 

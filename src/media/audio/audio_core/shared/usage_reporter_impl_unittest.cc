@@ -20,60 +20,6 @@ const auto kUnadjustedState = fuchsia::media::UsageState::WithUnadjusted({});
 const auto kActivateCallback = true;
 const auto kDeactivateCallback = false;
 
-namespace {
-inline std::ostream& operator<<(std::ostream& out, const fuchsia::media::Usage2& usage) {
-  if (usage.is_capture_usage()) {
-    out << "Capture::";
-    switch (usage.capture_usage()) {
-      case fuchsia::media::AudioCaptureUsage2::BACKGROUND:
-        return (out << "BACKGROUND");
-      case fuchsia::media::AudioCaptureUsage2::COMMUNICATION:
-        return (out << "COMMUNICATION");
-      case fuchsia::media::AudioCaptureUsage2::FOREGROUND:
-        return (out << "FOREGROUND");
-      case fuchsia::media::AudioCaptureUsage2::SYSTEM_AGENT:
-        return (out << "SYSTEM_AGENT");
-      default:
-        return (out << "UNKNOWN");
-    }
-  }
-
-  if (usage.is_render_usage()) {
-    out << "Render::";
-    switch (usage.render_usage()) {
-      case AudioRenderUsage2::ACCESSIBILITY:
-        return (out << "ACCESSIBILITY");
-      case AudioRenderUsage2::BACKGROUND:
-        return (out << "BACKGROUND");
-      case AudioRenderUsage2::COMMUNICATION:
-        return (out << "COMMUNICATION");
-      case AudioRenderUsage2::INTERRUPTION:
-        return (out << "INTERRUPTION");
-      case AudioRenderUsage2::MEDIA:
-        return (out << "MEDIA");
-      case AudioRenderUsage2::SYSTEM_AGENT:
-        return (out << "SYSTEM_AGENT");
-      default:
-        return (out << "UNKNOWN");
-    }
-  }
-  return (out << "INVALID TYPE");
-}
-
-inline std::ostream& operator<<(std::ostream& out, const fuchsia::media::UsageState& state) {
-  if (state.is_ducked()) {
-    return (out << "DUCKED");
-  }
-  if (state.is_muted()) {
-    return (out << "MUTED");
-  }
-  if (state.is_unadjusted()) {
-    return (out << "UNADJUSTED");
-  }
-  return (out << "UNKNOWN STATE");
-}
-}  // namespace
-
 class FakeUsageWatcher : public fuchsia::media::UsageWatcher {
  public:
   explicit FakeUsageWatcher(bool activate_callback) : activate_callback_(activate_callback) {}

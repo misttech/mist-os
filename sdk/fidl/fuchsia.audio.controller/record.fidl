@@ -28,7 +28,7 @@ open protocol Recorder {
                     /// The usage of the audio stream.
                     ///
                     /// Required.
-                    1: usage fuchsia.media.AudioCaptureUsage;
+                    1: usage fuchsia.media.AudioCaptureUsage2;
 
                     /// The reference clock type used by the stream.
                     ///

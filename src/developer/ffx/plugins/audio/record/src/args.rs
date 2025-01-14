@@ -36,7 +36,7 @@ pub struct RecordCommand {
         Accepted values: BACKGROUND, FOREGROUND, SYSTEM-AGENT, COMMUNICATION, ULTRASOUND, \
         or LOOPBACK. Default: COMMUNICATION.",
         from_str_fn(str_to_usage),
-        default = "AudioCaptureUsageExtended::Communication(fmedia::AudioCaptureUsage::Communication)"
+        default = "AudioCaptureUsageExtended::Communication(fmedia::AudioCaptureUsage2::Communication)"
     )]
     pub usage: AudioCaptureUsageExtended,
 
@@ -73,10 +73,10 @@ pub struct RecordCommand {
 
 #[derive(Debug, PartialEq)]
 pub enum AudioCaptureUsageExtended {
-    Background(fmedia::AudioCaptureUsage),
-    Foreground(fmedia::AudioCaptureUsage),
-    SystemAgent(fmedia::AudioCaptureUsage),
-    Communication(fmedia::AudioCaptureUsage),
+    Background(fmedia::AudioCaptureUsage2),
+    Foreground(fmedia::AudioCaptureUsage2),
+    SystemAgent(fmedia::AudioCaptureUsage2),
+    Communication(fmedia::AudioCaptureUsage2),
     Ultrasound,
     Loopback,
 }
@@ -84,16 +84,16 @@ pub enum AudioCaptureUsageExtended {
 fn str_to_usage(src: &str) -> Result<AudioCaptureUsageExtended, String> {
     match src.to_uppercase().as_str() {
         "BACKGROUND" => {
-            Ok(AudioCaptureUsageExtended::Background(fmedia::AudioCaptureUsage::Background))
+            Ok(AudioCaptureUsageExtended::Background(fmedia::AudioCaptureUsage2::Background))
         }
         "FOREGROUND" => {
-            Ok(AudioCaptureUsageExtended::Foreground(fmedia::AudioCaptureUsage::Foreground))
+            Ok(AudioCaptureUsageExtended::Foreground(fmedia::AudioCaptureUsage2::Foreground))
         }
         "SYSTEM-AGENT" => {
-            Ok(AudioCaptureUsageExtended::SystemAgent(fmedia::AudioCaptureUsage::SystemAgent))
+            Ok(AudioCaptureUsageExtended::SystemAgent(fmedia::AudioCaptureUsage2::SystemAgent))
         }
         "COMMUNICATION" => {
-            Ok(AudioCaptureUsageExtended::Communication(fmedia::AudioCaptureUsage::Communication))
+            Ok(AudioCaptureUsageExtended::Communication(fmedia::AudioCaptureUsage2::Communication))
         }
         "ULTRASOUND" => Ok(AudioCaptureUsageExtended::Ultrasound),
         "LOOPBACK" => Ok(AudioCaptureUsageExtended::Loopback),

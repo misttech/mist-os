@@ -92,7 +92,13 @@ void AudioCoreServer::CreateAudioCapturerWithConfiguration(
     usage = CaptureUsage::LOOPBACK;
   } else {
     auto& input = request->configuration.input();
-    usage = input.has_usage() ? CaptureUsage(input.usage()) : CaptureUsage::FOREGROUND;
+    if (input.has_usage2()) {
+      usage = media::audio::ToCaptureUsage(input.usage2());
+    } else if (input.has_usage()) {
+      usage = media::audio::ToCaptureUsage(input.usage());
+    } else {
+      usage = CaptureUsage::FOREGROUND;
+    }
   }
 
   creator_->CreateCapturer(std::move(request->audio_capturer_request), usage,
