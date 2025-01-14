@@ -338,6 +338,15 @@
                     "/bootstrap/test_manager",
                 ],
             },
+            {
+                source_moniker: "/bootstrap/devfs-with-pkg",
+                source: "component",
+                source_name: "dev-topological",
+                capability: "directory",
+                target_monikers: [
+                    "/core/testing/storage-tests:**",
+                ],
+            },
         ],
         debug_registration_policy: [
             {

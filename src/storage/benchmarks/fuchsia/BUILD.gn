@@ -159,7 +159,7 @@ fuchsia_component_perf_test("storage_benchmarks") {
   expected_metric_names_filepath =
       "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.storage.txt"
   results_path_test_arg = "--output-fuchsiaperf"
-  test_type = "device"
+  test_type = "storage"
 
   # We don't enable this test on Astro because of the potential for it to cause extra flash wear
   # on that device type.

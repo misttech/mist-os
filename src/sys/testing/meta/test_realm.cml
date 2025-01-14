@@ -25,6 +25,7 @@
         "//src/sys/testing/meta/runners/starnix-test-runner.shard.cml",
         "//src/sys/testing/meta/runners/stress-test-runner.shard.cml",
         "//src/sys/testing/meta/starnix-tests.shard.cml",
+        "//src/sys/testing/meta/storage-tests.shard.cml",
         "//src/sys/testing/meta/system-tests.shard.cml",
         "//src/sys/testing/meta/test-arch-tests.shard.cml",
         "//src/testing/system-validation/meta/system_validation_test_realm.shard.cml",
