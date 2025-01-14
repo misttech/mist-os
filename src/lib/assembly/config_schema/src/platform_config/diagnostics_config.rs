@@ -155,7 +155,7 @@ pub struct MemoryMonitorConfig {
 
 // LINT.IfChange
 /// The initial log interest that a component should receive upon starting up.
-#[derive(Debug, Deserialize, PartialEq, JsonSchema)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ComponentInitialInterest {
     /// The URL or moniker for the component which should receive the initial interest.
@@ -163,16 +163,13 @@ pub struct ComponentInitialInterest {
     /// The log severity the initial interest should specify.
     pub log_severity: Severity,
 }
-// LINT.ThenChange(/src/diagnostics/archivist/src/logs/repository.rs)
 
-impl Serialize for ComponentInitialInterest {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(format!("{}:{}", self.component, self.log_severity).as_str())
+impl ComponentInitialInterest {
+    pub fn for_structured_config(&self) -> String {
+        format!("{}:{}", self.component, self.log_severity)
     }
 }
+// LINT.ThenChange(/src/diagnostics/archivist/src/logs/repository.rs)
 
 #[derive(Debug, PartialEq, JsonSchema)]
 pub enum UrlOrMoniker {
@@ -188,6 +185,17 @@ impl std::fmt::Display for UrlOrMoniker {
             Self::Url(u) => write!(f, "{}", u),
             Self::Moniker(m) => write!(f, "{}", m),
         }
+    }
+}
+
+impl Serialize for UrlOrMoniker {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(match self {
+            Self::Url(s) | Self::Moniker(s) => s.as_str(),
+        })
     }
 }
 
@@ -373,7 +381,7 @@ mod tests {
                 log_severity: Severity::Debug,
             })
             .unwrap(),
-            "\"fuchsia-boot:///driver_host#meta/driver_host.cm:DEBUG\""
+            r#"{"component":"fuchsia-boot:///driver_host#meta/driver_host.cm","log_severity":"DEBUG"}"#,
         );
         assert_eq!(
             serde_json::to_string(&ComponentInitialInterest {
@@ -381,7 +389,30 @@ mod tests {
                 log_severity: Severity::Fatal,
             })
             .unwrap(),
-            "\"/bootstrap/driver_manager:FATAL\"",
+            r#"{"component":"/bootstrap/driver_manager","log_severity":"FATAL"}"#,
         );
+    }
+
+    #[test]
+    fn serialize_deserialize_component_log_initial_interest() {
+        let original = ComponentInitialInterest {
+            component: UrlOrMoniker::Url(
+                "fuchsia-boot:///driver_host#meta/driver_host.cm".to_string(),
+            ),
+            log_severity: Severity::Debug,
+        };
+        let serialized = serde_json::to_string(&original).expect("serialize interest");
+        let deserialized: ComponentInitialInterest =
+            serde_json::from_str(&serialized).expect("deserialize interest");
+        assert_eq!(deserialized, original);
+
+        let original = ComponentInitialInterest {
+            component: UrlOrMoniker::Moniker("/bootstrap/driver_manager".to_string()),
+            log_severity: Severity::Fatal,
+        };
+        let serialized = serde_json::to_string(&original).expect("serialize interest");
+        let deserialized: ComponentInitialInterest =
+            serde_json::from_str(&serialized).expect("deserialize interest");
+        assert_eq!(deserialized, original);
     }
 }
