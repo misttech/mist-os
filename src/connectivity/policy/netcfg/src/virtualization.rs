@@ -304,7 +304,8 @@ impl<B: BridgeHandler> Bridge<B> {
         port_class: fnet_interfaces_ext::PortClass,
     ) -> bool {
         let device_class = match port_class {
-            fnet_interfaces_ext::PortClass::Loopback => None,
+            fnet_interfaces_ext::PortClass::Loopback
+            | fnet_interfaces_ext::PortClass::Blackhole => None,
             fnet_interfaces_ext::PortClass::Virtual => Some(DeviceClass::Virtual),
             fnet_interfaces_ext::PortClass::Ethernet => Some(DeviceClass::Ethernet),
             fnet_interfaces_ext::PortClass::WlanClient => Some(DeviceClass::WlanClient),

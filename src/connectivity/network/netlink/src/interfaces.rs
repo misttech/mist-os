@@ -1227,6 +1227,7 @@ pub(crate) enum NetlinkLinkMessageConversionError {
 fn port_class_to_link_type(port_class: fnet_interfaces_ext::PortClass) -> u16 {
     match port_class {
         fnet_interfaces_ext::PortClass::Loopback => ARPHRD_LOOPBACK,
+        fnet_interfaces_ext::PortClass::Blackhole => ARPHRD_VOID,
         fnet_interfaces_ext::PortClass::Ethernet
         | fnet_interfaces_ext::PortClass::Bridge
         | fnet_interfaces_ext::PortClass::WlanClient

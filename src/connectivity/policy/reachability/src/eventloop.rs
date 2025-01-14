@@ -538,9 +538,9 @@ impl EventLoop {
         >,
     ) -> bool {
         return match port_class {
-            fnet_interfaces_ext::PortClass::Loopback | fnet_interfaces_ext::PortClass::Lowpan => {
-                false
-            }
+            fnet_interfaces_ext::PortClass::Loopback
+            | fnet_interfaces_ext::PortClass::Blackhole
+            | fnet_interfaces_ext::PortClass::Lowpan => false,
             fnet_interfaces_ext::PortClass::Virtual
             | fnet_interfaces_ext::PortClass::Ethernet
             | fnet_interfaces_ext::PortClass::WlanClient

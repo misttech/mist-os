@@ -501,7 +501,10 @@ impl DeviceClassMatcher<fidl_fuchsia_net_interfaces::PortClass> for LoopbackInfo
             fidl_fuchsia_net_interfaces::PortClass::Loopback(
                 fidl_fuchsia_net_interfaces::Empty {},
             ) => true,
-            fidl_fuchsia_net_interfaces::PortClass::Device(_) => false,
+            fidl_fuchsia_net_interfaces::PortClass::Blackhole(
+                fidl_fuchsia_net_interfaces::Empty {},
+            )
+            | fidl_fuchsia_net_interfaces::PortClass::Device(_) => false,
             fidl_fuchsia_net_interfaces::PortClass::__SourceBreaking { unknown_ordinal } => {
                 panic!("unknown device class ordinal {unknown_ordinal:?}")
             }
@@ -527,6 +530,9 @@ impl StaticNetdeviceInfo {
     fn device_class_matches(&self, port_class: &fidl_fuchsia_net_interfaces::PortClass) -> bool {
         match port_class {
             fidl_fuchsia_net_interfaces::PortClass::Loopback(
+                fidl_fuchsia_net_interfaces::Empty {},
+            )
+            | fidl_fuchsia_net_interfaces::PortClass::Blackhole(
                 fidl_fuchsia_net_interfaces::Empty {},
             ) => false,
             fidl_fuchsia_net_interfaces::PortClass::Device(port_class) => {

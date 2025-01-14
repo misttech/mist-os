@@ -42,6 +42,7 @@ pub enum PortClass {
     Ppp,
     Bridge,
     Lowpan,
+    Blackhole,
 }
 
 impl PortClass {
@@ -50,6 +51,7 @@ impl PortClass {
         match self {
             PortClass::Loopback => true,
             PortClass::Virtual
+            | PortClass::Blackhole
             | PortClass::Ethernet
             | PortClass::WlanClient
             | PortClass::WlanAp
@@ -90,6 +92,9 @@ impl TryFrom<fnet_interfaces::PortClass> for PortClass {
     fn try_from(port_class: fnet_interfaces::PortClass) -> Result<Self, Self::Error> {
         match port_class {
             fnet_interfaces::PortClass::Loopback(fnet_interfaces::Empty) => Ok(PortClass::Loopback),
+            fnet_interfaces::PortClass::Blackhole(fnet_interfaces::Empty) => {
+                Ok(PortClass::Blackhole)
+            }
             fnet_interfaces::PortClass::Device(port_class) => {
                 PortClass::try_from(port_class).map_err(UnknownPortClassError::HardwareNetwork)
             }
@@ -106,6 +111,7 @@ impl From<PortClass> for fnet_interfaces::PortClass {
     fn from(port_class: PortClass) -> Self {
         match port_class {
             PortClass::Loopback => fnet_interfaces::PortClass::Loopback(fnet_interfaces::Empty),
+            PortClass::Blackhole => fnet_interfaces::PortClass::Blackhole(fnet_interfaces::Empty),
             PortClass::Virtual => {
                 fnet_interfaces::PortClass::Device(fhardware_network::PortClass::Virtual)
             }

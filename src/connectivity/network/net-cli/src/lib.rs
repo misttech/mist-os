@@ -196,6 +196,7 @@ fn write_tabulated_interfaces_info<
                 "device class",
                 match device_class {
                     ser::DeviceClass::Loopback => "loopback",
+                    ser::DeviceClass::Blackhole => "blackhole",
                     ser::DeviceClass::Virtual => "virtual",
                     ser::DeviceClass::Ethernet => "ethernet",
                     ser::DeviceClass::WlanClient => "wlan-client",
