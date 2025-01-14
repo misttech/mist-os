@@ -7,19 +7,13 @@
 
 #include "startup-symbols.h"
 
-// This header defines the `Register*` functions called by init/fini functions
-// in generated init-fini-array-*.cc tests. These functions will "register" the
+// This header defines the `Callback` wrapper called by init/fini functions
+// in generated init-fini-array-*.cc tests. The Callback is called with the
 // given identity value when an init/fini function is run.
 
-inline void RegisterInit(int id) {
-  if (gRegisterInitFini) {
-    gRegisterInitFini->RegisterInit(id);
-  }
-}
-
-inline void RegisterFini(int id) {
-  if (gRegisterInitFini) {
-    gRegisterInitFini->RegisterFini(id);
+inline void Callback(int id) {
+  if (gTestCallback) {
+    gTestCallback->Callback(id);
   }
 }
 

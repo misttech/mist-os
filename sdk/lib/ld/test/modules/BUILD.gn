@@ -1844,7 +1844,7 @@ foreach(case, init_fini_array_tests) {
         prio_attr = "(${ctor.prio})"
         prio_suffix = "_${ctor.prio}"
       }
-      contents += [ "[[gnu::constructor$prio_attr]] void ctor${prio_suffix}_${ctor.value}() { RegisterInit(${ctor.value}); }" ]
+      contents += [ "[[gnu::constructor$prio_attr]] void ctor${prio_suffix}_${ctor.value}() { Callback(${ctor.value}); }" ]
     }
     foreach(dtor, case.dtors) {
       if (dtor.prio == false) {
@@ -1854,7 +1854,7 @@ foreach(case, init_fini_array_tests) {
         prio_attr = "(${dtor.prio})"
         prio_suffix = "_${dtor.prio}"
       }
-      contents += [ "[[gnu::destructor$prio_attr]] void dtor${prio_suffix}_${dtor.value}() { RegisterFini(${dtor.value}); }" ]
+      contents += [ "[[gnu::destructor$prio_attr]] void dtor${prio_suffix}_${dtor.value}() { Callback(${dtor.value}); }" ]
     }
   }
   target(case.type, case.name) {

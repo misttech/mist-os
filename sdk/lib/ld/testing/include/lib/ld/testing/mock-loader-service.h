@@ -70,7 +70,7 @@ class MockLoaderService {
 
   std::unique_ptr<::testing::StrictMock<MockServer>> mock_server_;
   fidl::ClientEnd<fuchsia_ldsvc::Loader> mock_client_;
-  // Passing this same same object in `.InSequence(sequence_)` on every
+  // Passing this same object in `.InSequence(sequence_)` on every
   // `EXPECT_CALL(...)` enforces that the fuchsia.ldsvc.Loader requests are
   // made in the order that Expect* functions are called, without interfering
   // with other mock objects as ::testing::InSequence would.

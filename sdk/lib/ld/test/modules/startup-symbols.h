@@ -26,20 +26,18 @@ extern "C" {
   gnu::tls_model("global-dynamic")]] extern thread_local int gStaticTlsVar;
 }
 
-// This is a class interface for test modules to register that their initializer
-// and finalizer functions have run.
-class RegisterInitFini {
+// This class interface that can be called by test modules to execute a Callback
+// method defined by tests in //sdk/lib/dl/test/dl-load-tests-initfini.cc
+class TestCallback {
  public:
-  // Test module init and fini functions call these Register* methods with a
-  // value specific to that function in the test module.
-  virtual void RegisterInit(int) = 0;
-  virtual void RegisterFini(int) = 0;
+  // This method takes an identity value for code in test modules to pass to
+  // signify the code in that module as run.
+  virtual void Callback(int) = 0;
 };
 
-// Tests in //sdk/lib/dl/test/dl-load-tests-initfini.cc will set this global to
-// an instantiated object that defines the Register* methods that test modules
-// will use to register their init/fini functions.
-[[gnu::visibility("default")]] extern RegisterInitFini* gRegisterInitFini;
+// Tests set this global to an instantiated object that defines the Callback
+// method.
+[[gnu::visibility("default")]] extern TestCallback* gTestCallback;
 
 constexpr int kStaticTlsDataValue = 16;
 

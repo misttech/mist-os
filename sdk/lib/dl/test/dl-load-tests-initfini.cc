@@ -10,52 +10,46 @@ namespace {
 using dl::testing::DlTests;
 TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
 
-// This is used to check that module initializers and finalizers are run in a
-// specific order. Init and fini functions call RegisterInit and RegisterFini to
-// add a value to a collection that gets checked by CheckInit and CheckFini in
-// tests. This class is derived from the RegisterInitFini class defined in
-// //sdk/lib/ld/test/modules/startup-symbols.h.
-class InitFiniCheck : public RegisterInitFini {
+// This is used to check that module initializers and finalizers call the
+// Callback function in a specific order.
+class MockTestCallback : public TestCallback {
  public:
-  virtual ~InitFiniCheck() {
-    // Expect the test to have validated all registered init/fini values before
-    // it ends.
-    EXPECT_TRUE(actual_init_.empty());
-    EXPECT_TRUE(actual_fini_.empty());
+  MOCK_METHOD(void, Callback, (int), (override));
 
-    // Make sure tests reset this pointer to NULL. If a module didn't get
-    // unloaded (either because dlcose didn't unload it or because dlclose was
-    // never called), its finalizers will still be run at exit; setting this
-    // global back to NULL will prevent those finalizers from accessing the
-    // GC-ed instance.
-    EXPECT_FALSE(gRegisterInitFini);
+  // Expect the Callback function was called in the same order as
+  // `expected_callbacks`.
+  void ExpectCallbacks(std::initializer_list<int> expected_callbacks) {
+    for (int i : expected_callbacks) {
+      EXPECT_CALL(*this, Callback(i)).InSequence(sequence_);
+    }
   }
-
-  // Expect that the init values that have been registered so far are in the
-  // given expected order.
-  void CheckInit(std::vector<int> expected) {
-    EXPECT_EQ(expected, actual_init_);
-    // Clear state for the next CheckInit call.
-    actual_init_.clear();
-  }
-
-  // Similar to CheckFini, check that fini values are registered in the
-  // expected order.
-  void CheckFini(std::vector<int> expected) {
-    EXPECT_EQ(expected, actual_fini_);
-    actual_fini_.clear();
-  }
-
-  // These functions are called by test module code to register a specific value
-  // that should be checked by the test.
-  void RegisterInit(int id) override { actual_init_.push_back(id); }
-
-  void RegisterFini(int id) override { actual_fini_.push_back(id); }
 
  private:
-  std::vector<int> actual_init_;
-  std::vector<int> actual_fini_;
+  // The sequence object specific to this mock class object will only validate
+  // the `EXPECT_CALL(...)`s of this mock instance.
+  ::testing::Sequence sequence_;
 };
+
+// Sets the test module's gTestCallback to the given mock and runs the provided
+// function under the context of the mock instance.
+void RunWithMock(::testing::StrictMock<MockTestCallback> &mock, fit::function<void()> &run) {
+  gTestCallback = &mock;
+  run();
+  gTestCallback = nullptr;
+}
+
+// Instantiate a MockTestCallback and prime it with an ordered list of expected
+// callback values before running the given function. `RunWithMock` will run
+// the callable function that should elicit the expected callbacks to run. The
+// MockTestCallback will fail if the expected callbacks were not completed or
+// called in order.
+void RunWithExpectedTestCallbacks(fit::function<void()> run,
+                                  std::initializer_list<int> expected_callbacks) {
+  ::testing::StrictMock<MockTestCallback> mock;
+  mock.ExpectCallbacks(expected_callbacks);
+  ASSERT_FALSE(gTestCallback);
+  RunWithMock(mock, run);
+}
 
 // dlopen a module whose initializers and finalizers are decoded by legacy
 // DT_INIT and DT_FINI sections. These functions will call a callback with a
@@ -63,24 +57,21 @@ class InitFiniCheck : public RegisterInitFini {
 TYPED_TEST(DlTests, InitFiniLegacy) {
   const std::string kFile = "init-fini-legacy.so";
 
-  InitFiniCheck init_fini_check{};
-  gRegisterInitFini = &init_fini_check;
+  auto test = [&] {
+    this->ExpectRootModule(kFile);
 
-  this->ExpectRootModule(kFile);
+    auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(open.is_ok()) << open.error_value();
+    EXPECT_TRUE(open.value()) << open.error_value();
 
-  auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(open.is_ok()) << open.error_value();
-  EXPECT_TRUE(open.value()) << open.error_value();
-
-  init_fini_check.CheckInit({101});
-
-  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+    ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+  };
 
   if (TestFixture::kDlCloseCanRunFinalizers) {
-    init_fini_check.CheckFini({102});
+    RunWithExpectedTestCallbacks(test, {101, 102});
+  } else {
+    RunWithExpectedTestCallbacks(test, {101});
   }
-
-  gRegisterInitFini = nullptr;
 }
 
 // Similar to InitFiniLegacy test, except dlopen a module whose initializers and
@@ -90,28 +81,22 @@ TYPED_TEST(DlTests, InitFiniLegacy) {
 TYPED_TEST(DlTests, InitFiniArray) {
   const std::string kFile = "init-fini-array.so";
 
-  InitFiniCheck init_fini_check;
-  gRegisterInitFini = &init_fini_check;
+  auto test = [&] {
+    this->ExpectRootModule(kFile);
 
-  this->ExpectRootModule(kFile);
+    auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(open.is_ok()) << open.error_value();
+    EXPECT_TRUE(open.value()) << open.error_value();
 
-  auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(open.is_ok()) << open.error_value();
-  EXPECT_TRUE(open.value()) << open.error_value();
+    ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+  };
 
-  // Expect the three ctors to have run in the order expected by the functions
-  // in init-fini-array.cc
-  init_fini_check.CheckInit({0, 1, 2});
-
-  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
-
-  // Expect the three dtors to have run in the order expected by the functions
-  // in init-fini-array.cc
+  // Expect the three ctors to have run and three dtors to have run.
   if (TestFixture::kDlCloseCanRunFinalizers) {
-    init_fini_check.CheckFini({3, 4, 5});
+    RunWithExpectedTestCallbacks(test, {0, 1, 2, 3, 4, 5});
+  } else {
+    RunWithExpectedTestCallbacks(test, {0, 1, 2});
   }
-
-  gRegisterInitFini = nullptr;
 }
 
 // Test that dlopen will run initializers and finalizers of a module with
@@ -149,25 +134,22 @@ TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
   const std::string kBDepFile = "libinit-fini-array-b-dep.so";
   const std::string kCFile = "libinit-fini-array-c.so";
 
-  InitFiniCheck init_fini_check;
-  gRegisterInitFini = &init_fini_check;
+  auto test = [&] {
+    this->ExpectRootModule(kFile);
+    this->Needed({kAFile, kBFile, kCFile, kADepFile, kBDepFile});
 
-  this->ExpectRootModule(kFile);
-  this->Needed({kAFile, kBFile, kCFile, kADepFile, kBDepFile});
+    auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(open.is_ok()) << open.error_value();
+    EXPECT_TRUE(open.value()) << open.error_value();
 
-  auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(open.is_ok()) << open.error_value();
-  EXPECT_TRUE(open.value()) << open.error_value();
-
-  init_fini_check.CheckInit({0, 1, 2, 3, 4, 5});
-
-  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+    ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+  };
 
   if (TestFixture::kDlCloseCanRunFinalizers) {
-    init_fini_check.CheckFini({6, 7, 8, 9, 10, 11});
+    RunWithExpectedTestCallbacks(test, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11});
+  } else {
+    RunWithExpectedTestCallbacks(test, {0, 1, 2, 3, 4, 5});
   }
-
-  gRegisterInitFini = nullptr;
 }
 
 // dlopen a module with a mix of DT_INIT/DT_FINI and DT_INIT_ARRAY and
@@ -175,24 +157,21 @@ TYPED_TEST(DlTests, InitFiniArrayWithDeps) {
 TYPED_TEST(DlTests, InitFiniArrayWithLegacy) {
   const std::string kFile = "init-fini-array-with-legacy.so";
 
-  InitFiniCheck init_fini_check;
-  gRegisterInitFini = &init_fini_check;
+  auto test = [&] {
+    this->ExpectRootModule(kFile);
 
-  this->ExpectRootModule(kFile);
+    auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(open.is_ok()) << open.error_value();
+    EXPECT_TRUE(open.value()) << open.error_value();
 
-  auto open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(open.is_ok()) << open.error_value();
-  EXPECT_TRUE(open.value()) << open.error_value();
-
-  init_fini_check.CheckInit({201, 202});
-
-  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+    ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+  };
 
   if (TestFixture::kDlCloseCanRunFinalizers) {
-    init_fini_check.CheckFini({203, 204});
+    RunWithExpectedTestCallbacks(test, {201, 202, 203, 204});
+  } else {
+    RunWithExpectedTestCallbacks(test, {201, 202});
   }
-
-  gRegisterInitFini = nullptr;
 }
 
 // Test that dlopen will only run initializers of modules when they are first
@@ -236,57 +215,62 @@ TYPED_TEST(DlTests, InitFiniArrayWithLoadedDeps) {
   const std::string kBDepFile = "libinit-fini-array-with-loaded-deps-b-dep.so";
   const std::string kCDepFile = "libinit-fini-array-with-loaded-deps-c.so";
 
-  InitFiniCheck init_fini_check;
-  gRegisterInitFini = &init_fini_check;
+  void *dep_a_handle = nullptr;
+  auto dep_a_open_test = [&] {
+    this->Needed({kAFile, kADepFile});
+    auto dep_a_open = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(dep_a_open.is_ok()) << dep_a_open.error_value();
+    EXPECT_TRUE(dep_a_open.value()) << dep_a_open.error_value();
+    dep_a_handle = dep_a_open.value();
+  };
 
-  this->Needed({kAFile, kADepFile});
-  auto dep_a_open = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(dep_a_open.is_ok()) << dep_a_open.error_value();
-  EXPECT_TRUE(dep_a_open.value()) << dep_a_open.error_value();
-
-  init_fini_check.CheckInit({0, 1});
+  RunWithExpectedTestCallbacks(dep_a_open_test, {0, 1});
 
   // Don't expect another dlopen on dep-a will run initializers.
-  auto second_dep_a_open = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(second_dep_a_open.is_ok()) << second_dep_a_open.error_value();
-  EXPECT_TRUE(second_dep_a_open.value()) << second_dep_a_open.error_value();
+  void *second_dep_a_handle = nullptr;
+  auto second_dep_a_open_test = [&] {
+    auto second_dep_a_open = this->DlOpen(kAFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(second_dep_a_open.is_ok()) << second_dep_a_open.error_value();
+    EXPECT_TRUE(second_dep_a_open.value()) << second_dep_a_open.error_value();
+    second_dep_a_handle = second_dep_a_open.value();
+  };
 
-  init_fini_check.CheckInit({});
+  RunWithExpectedTestCallbacks(second_dep_a_open_test, {});
 
-  this->Needed({kCDepFile});
-  auto c_open = this->DlOpen(kCDepFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(c_open.is_ok()) << c_open.error_value();
-  EXPECT_TRUE(c_open.value()) << c_open.error_value();
+  void *c_handle = nullptr;
+  auto c_open_test = [&] {
+    this->Needed({kCDepFile});
+    auto c_open = this->DlOpen(kCDepFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(c_open.is_ok()) << c_open.error_value();
+    EXPECT_TRUE(c_open.value()) << c_open.error_value();
+    c_handle = c_open.value();
+  };
 
-  init_fini_check.CheckInit({2});
+  RunWithExpectedTestCallbacks(c_open_test, {2});
 
-  this->ExpectRootModule(kFile);
-  this->Needed({kBFile, kBDepFile});
+  void *root_handle = nullptr;
+  auto root_open_test = [&] {
+    this->ExpectRootModule(kFile);
+    this->Needed({kBFile, kBDepFile});
 
-  // This will only run initializers on the modules that are loaded by this call.
-  auto root_open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
-  ASSERT_TRUE(root_open.is_ok()) << root_open.error_value();
-  EXPECT_TRUE(root_open.value()) << root_open.error_value();
+    // This will only run initializers on the modules that are loaded by this call.
+    auto root_open = this->DlOpen(kFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+    ASSERT_TRUE(root_open.is_ok()) << root_open.error_value();
+    EXPECT_TRUE(root_open.value()) << root_open.error_value();
+    root_handle = root_open.value();
+  };
 
-  init_fini_check.CheckInit({3, 4, 5});
+  RunWithExpectedTestCallbacks(root_open_test, {3, 4, 5});
 
   // Don't expect these dlclose calls on dep-a will run any finalizers.
-  ASSERT_TRUE(this->DlClose(dep_a_open.value()).is_ok());
+  RunWithExpectedTestCallbacks([&] { ASSERT_TRUE(this->DlClose(dep_a_handle).is_ok()); }, {});
 
-  init_fini_check.CheckFini({});
+  RunWithExpectedTestCallbacks([&] { ASSERT_TRUE(this->DlClose(second_dep_a_handle).is_ok()); },
+                               {});
 
-  ASSERT_TRUE(this->DlClose(second_dep_a_open.value()).is_ok());
+  RunWithExpectedTestCallbacks([&] { ASSERT_TRUE(this->DlClose(c_handle).is_ok()); }, {});
 
-  init_fini_check.CheckFini({});
-
-  ASSERT_TRUE(this->DlClose(c_open.value()).is_ok());
-
-  init_fini_check.CheckFini({});
-
-  // After this dlclose, all references are dropped and all finalizers should
-  // run.
-  ASSERT_TRUE(this->DlClose(root_open.value()).is_ok());
-
+  auto close_root_test = [&] { ASSERT_TRUE(this->DlClose(root_handle).is_ok()); };
   if (TestFixture::kDlCloseCanRunFinalizers) {
     // TODO(https://fxbug.dev/385377689): In older versions of glibc, destructor
     // order can be re-sorted in dlclose. Remove this detection when our x86-64
@@ -296,13 +280,13 @@ TYPED_TEST(DlTests, InitFiniArrayWithLoadedDeps) {
     ASSERT_GT(res, 0lu);
     ASSERT_LE(res, sizeof(version));
     if (!strcmp(version, "glibc 2.31")) {
-      init_fini_check.CheckFini({6, 9, 7, 8, 10, 11});
+      RunWithExpectedTestCallbacks(close_root_test, {6, 9, 7, 8, 10, 11});
     } else {
-      init_fini_check.CheckFini({6, 7, 8, 9, 10, 11});
+      RunWithExpectedTestCallbacks(close_root_test, {6, 7, 8, 9, 10, 11});
     }
+  } else {
+    RunWithExpectedTestCallbacks(close_root_test, {});
   }
-
-  gRegisterInitFini = nullptr;
 }
 
 }  // namespace

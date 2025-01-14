@@ -11,28 +11,28 @@
 // DT_FINI.
 
 extern "C" [[gnu::retain]] void _init() {
-  if (gRegisterInitFini) {
-    gRegisterInitFini->RegisterInit(201);
+  if (gTestCallback) {
+    gTestCallback->Callback(201);
   }
 }
 
 extern "C" [[gnu::retain]] void _fini() {
-  if (gRegisterInitFini) {
-    gRegisterInitFini->RegisterFini(204);
+  if (gTestCallback) {
+    gTestCallback->Callback(204);
   }
 }
 
 namespace {
 
 [[gnu::constructor]] void ctor_array() {
-  if (gRegisterInitFini) {
-    gRegisterInitFini->RegisterInit(202);
+  if (gTestCallback) {
+    gTestCallback->Callback(202);
   }
 }
 
 [[gnu::destructor]] void dtor_array() {
-  if (gRegisterInitFini) {
-    gRegisterInitFini->RegisterFini(203);
+  if (gTestCallback) {
+    gTestCallback->Callback(203);
   }
 }
 

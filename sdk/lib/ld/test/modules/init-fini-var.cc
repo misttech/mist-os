@@ -7,4 +7,4 @@
 // This is a startup module that initializes this global variable, which will be
 // accessed by init/fini functions of test modules and are checked for
 // correctness in libdl tests.
-RegisterInitFini* gRegisterInitFini;
+TestCallback* gTestCallback;
