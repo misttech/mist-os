@@ -171,7 +171,7 @@ size_checker_input = {
         "memory_sampler",
         "memory_pressure_signaler",
       ]
-      limit = 2621440  # 2.5 MiB
+      limit = 2519040  # 2.4 MiB
       creep_limit = 102400  # 100 KiB
     },
     {
@@ -234,9 +234,8 @@ size_checker_input = {
         "httpsdate-time-source",
         "httpsdate-time-source-pull",
         "timekeeper",
-        "timekeeper",
       ]
-      limit = 2904064  # 2.77 MiB
+      limit = 3006464  # 2.87 MiB
       creep_limit = 24576  # 24.0 KiB
     },
     {
