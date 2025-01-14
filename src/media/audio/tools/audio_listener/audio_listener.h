@@ -79,8 +79,8 @@ class UsageWatcherImpl : public fuchsia::media::UsageWatcher2 {
 
  private:
   // |fuchsia::media::UsageWatcher2|
-  void OnStateChanged2(fuchsia::media::Usage2 usage, fuchsia::media::UsageState usage_state,
-                       OnStateChanged2Callback callback) override;
+  void OnStateChanged(fuchsia::media::Usage2 usage, fuchsia::media::UsageState usage_state,
+                      OnStateChangedCallback callback) override;
 
   AudioListener* parent_;
   fidl::Binding<fuchsia::media::UsageWatcher2> binding_;
@@ -109,7 +109,7 @@ class AudioListener {
   void WatchRenderActivity();
   void WatchCaptureActivity();
   void OnRenderActivity(const std::vector<fuchsia::media::AudioRenderUsage2>& render_usages);
-  void OnCaptureActivity(const std::vector<fuchsia::media::AudioCaptureUsage>& capture_usages);
+  void OnCaptureActivity(const std::vector<fuchsia::media::AudioCaptureUsage2>& capture_usages);
   void DisplayUsageActivity();
 
   void WatchUsageStates();

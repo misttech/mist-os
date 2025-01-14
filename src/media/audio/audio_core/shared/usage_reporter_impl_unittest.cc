@@ -53,8 +53,8 @@ class FakeUsageWatcher2 : public fuchsia::media::UsageWatcher2 {
   const fuchsia::media::UsageState& last_usage_state() const { return last_usage_state_; }
 
  private:
-  void OnStateChanged2(fuchsia::media::Usage2 usage, fuchsia::media::UsageState usage_state,
-                       OnStateChanged2Callback callback) override {
+  void OnStateChanged(fuchsia::media::Usage2 usage, fuchsia::media::UsageState usage_state,
+                      OnStateChangedCallback callback) override {
     FX_LOGS(INFO) << __func__ << "(usage " << usage << ", state " << usage_state << ")";
     last_usage_ = std::move(usage);
     last_usage_state_ = std::move(usage_state);

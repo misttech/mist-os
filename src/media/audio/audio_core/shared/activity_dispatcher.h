@@ -9,8 +9,6 @@
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/function.h>
 
-#include <bitset>
-
 #include "src/media/audio/audio_core/shared/audio_admin.h"
 
 namespace media::audio {

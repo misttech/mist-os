@@ -38,7 +38,7 @@ void UsageReporterImpl::Watch2(
   int current_id = next_watcher_id_++;
   watcher.set_error_handler(
       [&set, current_id](zx_status_t status) { set.watchers.erase(current_id); });
-  watcher->OnStateChanged2(fidl::Clone(usage), fidl::Clone(set.cached_state), [current_id, &set]() {
+  watcher->OnStateChanged(fidl::Clone(usage), fidl::Clone(set.cached_state), [current_id, &set]() {
     --set.watchers[current_id].outstanding_ack_count;
   });
 
@@ -72,8 +72,8 @@ void UsageReporterImpl::ReportPolicyAction(fuchsia::media::Usage2 usage,
         it = set2.watchers.erase(it);
       } else {
         ++it->second.outstanding_ack_count;
-        it->second.watcher_ptr->OnStateChanged2(fidl::Clone(usage), fidl::Clone(state),
-                                                [it]() { --it->second.outstanding_ack_count; });
+        it->second.watcher_ptr->OnStateChanged(fidl::Clone(usage), fidl::Clone(state),
+                                               [it]() { --it->second.outstanding_ack_count; });
         ++it;
       }
     }

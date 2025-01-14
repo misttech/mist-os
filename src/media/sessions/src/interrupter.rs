@@ -58,10 +58,10 @@ impl Stream for Interrupter {
             _ => return Poll::Pending,
         };
 
-        let (usage2, state) = match next_report.map_err(anyhow::Error::from).and_then(
-            |UsageWatcher2Request::OnStateChanged2 { usage2, state, responder }| {
+        let (usage, state) = match next_report.map_err(anyhow::Error::from).and_then(
+            |UsageWatcher2Request::OnStateChanged { usage, state, responder }| {
                 responder.send()?;
-                Ok((usage2, state))
+                Ok((usage, state))
             },
         ) {
             Ok(state_change) => state_change,
@@ -71,7 +71,7 @@ impl Stream for Interrupter {
             }
         };
 
-        let render_usage2 = match usage2 {
+        let render_usage = match usage {
             Usage2::RenderUsage(usage) => usage,
             _ => {
                 warn!(
@@ -94,7 +94,7 @@ impl Stream for Interrupter {
             }
         };
 
-        Poll::Ready(Some(Interruption { usage: render_usage2, stage }))
+        Poll::Ready(Some(Interruption { usage: render_usage, stage }))
     }
 }
 
@@ -144,7 +144,7 @@ mod test {
         assert_matches!(usage, Usage2::RenderUsage(AudioRenderUsage2::Media));
         let media_watcher = media_watcher.into_proxy();
         let media_send_fut =
-            media_watcher.on_state_changed2(&usage, &UsageState::Muted(UsageStateMuted::default()));
+            media_watcher.on_state_changed(&usage, &UsageState::Muted(UsageStateMuted::default()));
 
         let (send, interruption) = future::join(media_send_fut, interrupter.next()).await;
         send.expect("Sending mute event to interrupter");
@@ -164,7 +164,7 @@ mod test {
         assert_matches!(usage, Usage2::RenderUsage(AudioRenderUsage2::Background));
         let background_watcher = background_watcher.into_proxy();
         let background_send_fut = background_watcher
-            .on_state_changed2(&usage, &UsageState::Unadjusted(UsageStateUnadjusted::default()));
+            .on_state_changed(&usage, &UsageState::Unadjusted(UsageStateUnadjusted::default()));
 
         let (send, interruption) = future::join(background_send_fut, interrupter.next()).await;
         send.expect("Sending unmute event to interrupter");
@@ -194,7 +194,7 @@ mod test {
         let watcher = watcher.into_proxy();
 
         let send_fut =
-            watcher.on_state_changed2(&usage, &UsageState::Muted(UsageStateMuted::default()));
+            watcher.on_state_changed(&usage, &UsageState::Muted(UsageStateMuted::default()));
 
         let (send, interruption) = future::join(send_fut, interrupter.next()).await;
         send.expect("Sending mute event to interrupter");
@@ -204,7 +204,7 @@ mod test {
         );
 
         let send_fut = watcher
-            .on_state_changed2(&usage, &UsageState::Unadjusted(UsageStateUnadjusted::default()));
+            .on_state_changed(&usage, &UsageState::Unadjusted(UsageStateUnadjusted::default()));
 
         let (send, interruption) = future::join(send_fut, interrupter.next()).await;
         send.expect("Sending unmute event to interrupter");

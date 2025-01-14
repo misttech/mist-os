@@ -19,6 +19,7 @@ executable("bin") {
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl:fxl_cli",
+    "//src/media/audio/lib/logging:cli",
   ]
 }
 

@@ -13,6 +13,7 @@ namespace media::audio {
 namespace {
 
 using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioCaptureUsage2;
 using fuchsia::media::AudioRenderUsage;
 using fuchsia::media::AudioRenderUsage2;
 
@@ -55,6 +56,19 @@ std::vector<AudioCaptureUsage> ActivityToCaptureUsageVector(
   return usage_vector;
 }
 
+std::vector<AudioCaptureUsage2> ActivityToCaptureUsage2Vector(
+    const ActivityDispatcherImpl::CaptureActivity& activity) {
+  std::vector<AudioCaptureUsage2> usage_vector;
+  usage_vector.reserve(activity.count());
+
+  for (uint8_t i = 0u; i < fuchsia::media::CAPTURE_USAGE2_COUNT; i++) {
+    if (activity[i]) {
+      usage_vector.push_back(AudioCaptureUsage2(i));
+    }
+  }
+  return usage_vector;
+}
+
 }  // namespace
 
 class ActivityDispatcherImpl::ActivityReporterImpl : public fuchsia::media::ActivityReporter {
@@ -82,6 +96,7 @@ class ActivityDispatcherImpl::ActivityReporterImpl : public fuchsia::media::Acti
   void WatchRenderActivity(WatchRenderActivityCallback callback) override;
   void WatchCaptureActivity(WatchCaptureActivityCallback callback) override;
   void WatchRenderActivity2(WatchRenderActivity2Callback callback) override;
+  void WatchCaptureActivity2(WatchCaptureActivity2Callback callback) override;
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {
     FX_LOGS(ERROR) << "ActivityReporterImpl: ActivityReporter::handle_unknown_method(ordinal "
                    << ordinal << ", method_has_response " << method_has_response << ")";
@@ -90,6 +105,7 @@ class ActivityDispatcherImpl::ActivityReporterImpl : public fuchsia::media::Acti
   void MaybeSendRenderActivity();
   void MaybeSendCaptureActivity();
   void MaybeSendRenderActivity2();
+  void MaybeSendCaptureActivity2();
 
   const RenderActivity& last_known_render_activity_;
   const CaptureActivity& last_known_capture_activity_;
@@ -105,6 +121,7 @@ class ActivityDispatcherImpl::ActivityReporterImpl : public fuchsia::media::Acti
   WatchRenderActivityCallback waiting_render_activity_callback_;
   WatchCaptureActivityCallback waiting_capture_activity_callback_;
   WatchRenderActivity2Callback waiting_render_activity_2_callback_;
+  WatchCaptureActivity2Callback waiting_capture_activity_2_callback_;
 
   // Called when the client has more than one hanging get in flight for a single interface.
   fit::callback<void(ActivityReporterImpl*)> on_client_error_;
@@ -123,18 +140,6 @@ ActivityDispatcherImpl::ActivityReporterImpl::ActivityReporterImpl(
 
 ActivityDispatcherImpl::ActivityReporterImpl::~ActivityReporterImpl() = default;
 
-// The set of active Render usages has changed. Check whether we should immediately respond.
-void ActivityDispatcherImpl::ActivityReporterImpl::OnRenderActivityChanged() {
-  MaybeSendRenderActivity();
-  MaybeSendRenderActivity2();
-}
-
-void ActivityDispatcherImpl::ActivityReporterImpl::OnCaptureActivityChanged() {
-  MaybeSendCaptureActivity();
-}
-
-void ActivityDispatcherImpl::ActivityReporterImpl::OnClientError() { on_client_error_(this); }
-
 void ActivityDispatcherImpl::Bind(
     fidl::InterfaceRequest<fuchsia::media::ActivityReporter> request) {
   constexpr auto kEpitaphValue = ZX_ERR_PEER_CLOSED;
@@ -150,7 +155,20 @@ ActivityDispatcherImpl::GetFidlRequestHandler() {
   return fit::bind_member<&ActivityDispatcherImpl::Bind>(this);
 }
 
+void ActivityDispatcherImpl::ActivityReporterImpl::OnClientError() { on_client_error_(this); }
+
 // All methods below are mirrored for Render and Capture.
+
+// The set of active Render usages has changed. Check whether we should immediately respond.
+void ActivityDispatcherImpl::ActivityReporterImpl::OnRenderActivityChanged() {
+  MaybeSendRenderActivity();
+  MaybeSendRenderActivity2();
+}
+
+void ActivityDispatcherImpl::ActivityReporterImpl::OnCaptureActivityChanged() {
+  MaybeSendCaptureActivity();
+  MaybeSendCaptureActivity2();
+}
 
 // If there is more than one hanging get in flight, disconnect the client.
 // Otherwise, save the callback and check whether we should immediately respond.
@@ -187,6 +205,17 @@ void ActivityDispatcherImpl::ActivityReporterImpl::WatchRenderActivity2(
   MaybeSendRenderActivity2();
 }
 
+void ActivityDispatcherImpl::ActivityReporterImpl::WatchCaptureActivity2(
+    WatchCaptureActivity2Callback callback) {
+  if (waiting_capture_activity_2_callback_) {
+    OnClientError();
+    return;
+  }
+
+  waiting_capture_activity_2_callback_ = std::move(callback);
+  MaybeSendCaptureActivity2();
+}
+
 // If no request in flight, just return. If no change since last request, just return.
 // If there IS a change, or if this is the first request, then we will respond: convert bitmask of
 // activities into vector of usages and invoke the callback.
@@ -198,8 +227,11 @@ void ActivityDispatcherImpl::ActivityReporterImpl::MaybeSendRenderActivity() {
     return;
   }
 
+  // We only do this for Render (not Capture), as AudioRenderUsage2 contains additional value(s)
+  // not found in AudioRenderUsage; the legacy WatchRenderActivity method should not return them.
   auto last_known_legacy_render_activity = last_known_render_activity_;
   last_known_legacy_render_activity &= kLegacyRenderActivityBitmask;
+
   if (last_sent_render_activity_.has_value() &&
       (last_sent_render_activity_.value() == last_known_legacy_render_activity)) {
     return;
@@ -211,6 +243,9 @@ void ActivityDispatcherImpl::ActivityReporterImpl::MaybeSendRenderActivity() {
   callback(ActivityToRenderUsageVector(last_known_legacy_render_activity));
 }
 
+// If no request in flight, just return. If no change since last request, just return.
+// If there IS a change, or if this is the first request, then we will respond: convert bitmask of
+// activities into vector of usages and invoke the callback.
 void ActivityDispatcherImpl::ActivityReporterImpl::MaybeSendCaptureActivity() {
   if (!waiting_capture_activity_callback_) {
     return;
@@ -227,6 +262,10 @@ void ActivityDispatcherImpl::ActivityReporterImpl::MaybeSendCaptureActivity() {
   callback(ActivityToCaptureUsageVector(last_known_capture_activity_));
 }
 
+// If no request in flight, just return. If no change since last request, just return.
+// If there IS a change, or if this is the first request, then we will respond: convert bitmask of
+// activities into vector of usages and invoke the callback.
+//
 // Identical to MaybeSendRenderActivity, except (1) we don't mask off the non-legacy usages,
 // and (2) when invoking the callback, we wrap the response vector in a fidl::Result.
 // For method WatchRenderActivity2, all usages trigger a change and all usages are returned.
@@ -243,7 +282,29 @@ void ActivityDispatcherImpl::ActivityReporterImpl::MaybeSendRenderActivity2() {
   auto callback = std::move(waiting_render_activity_2_callback_);
   waiting_render_activity_2_callback_ = nullptr;
   last_sent_render_activity_2_ = last_known_render_activity_;
-  callback(ActivityToRenderUsage2Vector(last_known_render_activity_));
+  callback(fpromise::ok(ActivityToRenderUsage2Vector(last_known_render_activity_)));
+}
+
+// If no request in flight, just return. If no change since last request, just return.
+// If there IS a change, or if this is the first request, then we will respond: convert bitmask of
+// activities into vector of usages and invoke the callback.
+//
+// Identical to MaybeSendCaptureActivity, except when invoking the callback, we wrap the response
+// vector in a fidl::Result.
+void ActivityDispatcherImpl::ActivityReporterImpl::MaybeSendCaptureActivity2() {
+  if (!waiting_capture_activity_2_callback_) {
+    return;
+  }
+
+  if (last_sent_capture_activity_2_.has_value() &&
+      (last_sent_capture_activity_2_.value() == last_known_capture_activity_)) {
+    return;
+  }
+
+  auto callback = std::move(waiting_capture_activity_2_callback_);
+  waiting_capture_activity_2_callback_ = nullptr;
+  last_sent_capture_activity_2_ = last_known_capture_activity_;
+  callback(fpromise::ok(ActivityToCaptureUsage2Vector(last_known_capture_activity_)));
 }
 
 // The set of active Render usages has changed. Notify all connected ActivityReporter clients.

@@ -149,15 +149,13 @@ impl TestService {
                 let mut new_usage_watchers_sink = new_usage_watchers_sink.clone();
                 tasks.push(fasync::Task::local(async move {
                     while let Some(Ok(UsageReporterRequest::Watch2 {
-                        usage2,
-                        usage_watcher2,
-                        ..
+                        usage, usage_watcher, ..
                     })) = request_stream.next().await
                     {
-                        match usage2 {
-                            Usage2::RenderUsage(usage2) => {
+                        match usage {
+                            Usage2::RenderUsage(usage) => {
                                 new_usage_watchers_sink
-                                    .send((usage2, usage_watcher2.into_proxy()))
+                                    .send((usage, usage_watcher.into_proxy()))
                                     .await
                                     .expect("Forwarding new UsageWatcher from service under test");
                             }
@@ -199,7 +197,7 @@ impl TestService {
     async fn start_interruption(&mut self, usage: AudioRenderUsage2) {
         if let Some(watcher) = self.usage_watchers.get(&usage) {
             watcher
-                .on_state_changed2(
+                .on_state_changed(
                     &Usage2::RenderUsage(usage),
                     &UsageState::Muted(UsageStateMuted::default()),
                 )
@@ -213,7 +211,7 @@ impl TestService {
     async fn stop_interruption(&mut self, usage: AudioRenderUsage2) {
         if let Some(watcher) = self.usage_watchers.get(&usage) {
             watcher
-                .on_state_changed2(
+                .on_state_changed(
                     &Usage2::RenderUsage(usage),
                     &UsageState::Unadjusted(UsageStateUnadjusted::default()),
                 )

@@ -4,13 +4,13 @@
 
 #include <fuchsia/media/cpp/fidl.h>
 
-#include <cmath>
-
 #include <gmock/gmock.h>
 
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 
+using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioCaptureUsage2;
 using fuchsia::media::AudioRenderUsage;
 using fuchsia::media::AudioRenderUsage2;
 using fuchsia::media::AudioSampleFormat;
@@ -110,9 +110,11 @@ TEST_F(ActivityReporterTest, AddAndRemoveRenderActivity2) {
     received_callback = false;
     active_usages2.clear();
     activity_reporter()->WatchRenderActivity2(AddCallbackUnordered(
-        name, [&received_callback, &active_usages2](std::vector<AudioRenderUsage2> usages) {
+        name, [&received_callback, &active_usages2](
+                  fuchsia::media::ActivityReporter_WatchRenderActivity2_Result result) {
+          ASSERT_TRUE(result.is_response()) << "WatchRenderActivity2 returned kFrameworkErr";
           received_callback = true;
-          active_usages2 = std::move(usages);
+          active_usages2 = std::move(result.response().active_usages);
         }));
   };
 
@@ -173,9 +175,11 @@ TEST_F(ActivityReporterTest, AddAndRemoveRenderActivityCombined) {
     received_callback2 = false;
     active_usages2.clear();
     activity_reporter()->WatchRenderActivity2(AddCallbackUnordered(
-        name, [&received_callback2, &active_usages2](std::vector<AudioRenderUsage2> usages) {
+        name, [&received_callback2, &active_usages2](
+                  fuchsia::media::ActivityReporter_WatchRenderActivity2_Result result) {
+          ASSERT_TRUE(result.is_response()) << "WatchRenderActivity2 returned kFrameworkErr";
           received_callback2 = true;
-          active_usages2 = std::move(usages);
+          active_usages2 = std::move(result.response().active_usages);
         }));
   };
 
@@ -237,17 +241,6 @@ TEST_F(ActivityReporterTest, AddAndRemoveRenderActivityCombined) {
   Unbind(inter_rend);
 }
 
-TEST_F(ActivityReporterTest, DisconnectOnMultipleConcurrentCaptureCalls) {
-  activity_reporter()->WatchCaptureActivity(AddCallback("WatchCaptureActivity"));
-  ExpectCallbacks();
-
-  activity_reporter()->WatchCaptureActivity(
-      AddUnexpectedCallback("WatchCaptureActivity Unexpected1"));
-  activity_reporter()->WatchCaptureActivity(
-      AddUnexpectedCallback("WatchCaptureActivity Unexpected2"));
-  ExpectDisconnect(activity_reporter());
-}
-
 TEST_F(ActivityReporterTest, DisconnectOnMultipleConcurrentRenderCalls) {
   activity_reporter()->WatchRenderActivity(AddCallback("WatchRenderActivity"));
   ExpectCallbacks();
@@ -259,6 +252,17 @@ TEST_F(ActivityReporterTest, DisconnectOnMultipleConcurrentRenderCalls) {
   ExpectDisconnect(activity_reporter());
 }
 
+TEST_F(ActivityReporterTest, DisconnectOnMultipleConcurrentCaptureCalls) {
+  activity_reporter()->WatchCaptureActivity(AddCallback("WatchCaptureActivity"));
+  ExpectCallbacks();
+
+  activity_reporter()->WatchCaptureActivity(
+      AddUnexpectedCallback("WatchCaptureActivity Unexpected1"));
+  activity_reporter()->WatchCaptureActivity(
+      AddUnexpectedCallback("WatchCaptureActivity Unexpected2"));
+  ExpectDisconnect(activity_reporter());
+}
+
 TEST_F(ActivityReporterTest, DisconnectOnMultipleConcurrentRender2) {
   activity_reporter()->WatchRenderActivity2(AddCallback("WatchRenderActivity2"));
   ExpectCallbacks();
@@ -267,6 +271,17 @@ TEST_F(ActivityReporterTest, DisconnectOnMultipleConcurrentRender2) {
       AddUnexpectedCallback("WatchRenderActivity2 Unexpected1"));
   activity_reporter()->WatchRenderActivity2(
       AddUnexpectedCallback("WatchRenderActivity2 Unexpected2"));
+  ExpectDisconnect(activity_reporter());
+}
+
+TEST_F(ActivityReporterTest, DisconnectOnMultipleConcurrentCapture2) {
+  activity_reporter()->WatchCaptureActivity2(AddCallback("WatchCaptureActivity2"));
+  ExpectCallbacks();
+
+  activity_reporter()->WatchCaptureActivity2(
+      AddUnexpectedCallback("WatchCaptureActivity2 Unexpected1"));
+  activity_reporter()->WatchCaptureActivity2(
+      AddUnexpectedCallback("WatchCaptureActivity2 Unexpected2"));
   ExpectDisconnect(activity_reporter());
 }
 

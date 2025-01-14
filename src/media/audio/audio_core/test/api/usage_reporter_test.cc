@@ -60,8 +60,8 @@ class FakeUsageWatcher2 : public fuchsia::media::UsageWatcher2 {
   void SetNextHandler(Handler h) { next_handler_ = std::move(h); }
 
  private:
-  void OnStateChanged2(fuchsia::media::Usage2 usage, fuchsia::media::UsageState usage_state,
-                       OnStateChanged2Callback callback) override {
+  void OnStateChanged(fuchsia::media::Usage2 usage, fuchsia::media::UsageState usage_state,
+                      OnStateChangedCallback callback) override {
     if (next_handler_) {
       next_handler_(std::move(usage), std::move(usage_state));
       next_handler_ = nullptr;
