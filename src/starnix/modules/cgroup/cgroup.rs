@@ -39,12 +39,6 @@ const EVENTS_FILE: &str = "cgroup.events";
 
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
-    /// Name of the cgroup.
-    fn name(&self) -> &FsStr;
-
-    /// Parent cgroup. Root cgroup should return `Ok(None)`.
-    fn parent(&self) -> Result<Option<Arc<dyn CgroupOps>>, Errno>;
-
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
     fn add_process(&self, pid: pid_t, thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno>;
 
@@ -154,14 +148,6 @@ impl CgroupRoot {
 }
 
 impl CgroupOps for CgroupRoot {
-    fn name(&self) -> &FsStr {
-        "".into()
-    }
-
-    fn parent(&self) -> Result<Option<Arc<dyn CgroupOps>>, Errno> {
-        Ok(None)
-    }
-
     fn add_process(&self, pid: pid_t, _thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno> {
         let mut pid_table = self.pid_table.lock();
         match pid_table.entry(pid) {
@@ -186,10 +172,8 @@ impl CgroupOps for CgroupRoot {
         name: &FsStr,
     ) -> Result<CgroupHandle, Errno> {
         let mut children = self.children.lock();
-        children.insert_child(
-            name.into(),
-            Cgroup::new(current_task, fs, name, &self.weak_self, self.weak_self.clone()),
-        )
+        children
+            .insert_child(name.into(), Cgroup::new(current_task, fs, name, &self.weak_self, None))
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
@@ -376,8 +360,9 @@ pub struct Cgroup {
     /// Name of the cgroup.
     name: FsString,
 
-    /// Weak reference of its parent cgroup.
-    parent: Weak<dyn CgroupOps>,
+    /// Weak reference to its parent cgroup, `None` if direct descendent of the root cgroup.
+    /// This field is useful in implementing features that only apply to non-root cgroups.
+    parent: Option<Weak<Cgroup>>,
 
     /// Internal state of the Cgroup.
     state: Mutex<CgroupState>,
@@ -394,12 +379,12 @@ pub type CgroupHandle = Arc<Cgroup>;
 
 /// Returns the path from the root to this `cgroup`.
 #[allow(dead_code)]
-pub fn path_from_root(cgroup: Arc<dyn CgroupOps>) -> Result<FsString, Errno> {
+pub fn path_from_root(cgroup: CgroupHandle) -> Result<FsString, Errno> {
     let mut path = PathBuilder::new();
-    let mut current = cgroup.clone();
-    while let Some(p) = current.parent()? {
-        path.prepend_element(current.name());
-        current = p.clone();
+    let mut current = Some(cgroup);
+    while let Some(cgroup) = current {
+        path.prepend_element(cgroup.name());
+        current = cgroup.parent()?;
     }
     Ok(path.build_absolute())
 }
@@ -410,7 +395,7 @@ impl Cgroup {
         fs: &FileSystemHandle,
         name: &FsStr,
         root: &Weak<CgroupRoot>,
-        parent: Weak<dyn CgroupOps>,
+        parent: Option<Weak<Cgroup>>,
     ) -> CgroupHandle {
         Arc::new_cyclic(|weak| {
             let weak_ops = weak.clone() as Weak<dyn CgroupOps>;
@@ -463,8 +448,18 @@ impl Cgroup {
         })
     }
 
+    fn name(&self) -> &FsStr {
+        self.name.as_ref()
+    }
+
     fn root(&self) -> Result<Arc<CgroupRoot>, Errno> {
         self.root.upgrade().ok_or_else(|| errno!(ENODEV))
+    }
+
+    /// Returns the upgraded parent cgroup, or `Ok(None)` if cgroup is a direct desendent of root.
+    /// Errors if parent node is no longer around.
+    fn parent(&self) -> Result<Option<CgroupHandle>, Errno> {
+        self.parent.as_ref().map(|weak| weak.upgrade().ok_or_else(|| errno!(ENODEV))).transpose()
     }
 
     fn add_process_internal(
@@ -505,14 +500,6 @@ impl Cgroup {
 }
 
 impl CgroupOps for Cgroup {
-    fn name(&self) -> &FsStr {
-        self.name.as_ref()
-    }
-
-    fn parent(&self) -> Result<Option<Arc<dyn CgroupOps>>, Errno> {
-        Ok(Some(self.parent.upgrade().ok_or_else(|| errno!(ENODEV))?))
-    }
-
     fn add_process(&self, pid: pid_t, thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno> {
         let root = self.root()?;
         let mut pid_table = root.pid_table.lock();
@@ -554,7 +541,7 @@ impl CgroupOps for Cgroup {
         }
         state.children.insert_child(
             name.into(),
-            Cgroup::new(current_task, fs, name, &self.root, self.weak_self.clone()),
+            Cgroup::new(current_task, fs, name, &self.root, Some(self.weak_self.clone())),
         )
     }
 
@@ -889,8 +876,5 @@ mod test {
 
         assert_eq!(path_from_root(test_cgroup), Ok("/test".into()));
         assert_eq!(path_from_root(child_cgroup), Ok("/test/child".into()));
-
-        // Test with root cgroup
-        assert_eq!(path_from_root(root), Ok("/".into()));
     }
 }
