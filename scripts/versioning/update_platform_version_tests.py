@@ -19,7 +19,7 @@ FAKE_VERSION_HISTORY_FILE_CONTENT = """{
         "api_levels": {
             "1" : {
                 "abi_revision": "0x0000000000000001",
-                "status": "supported"
+                "phase": "supported"
             }
         }
     },
@@ -70,11 +70,11 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
                         "api_levels": {
                             "1": {
                                 "abi_revision": "0x0000000000000001",
-                                "status": "supported",
+                                "phase": "supported",
                             },
                             "2": {
                                 "abi_revision": "0x0000000001234ABC",
-                                "status": "supported",
+                                "phase": "supported",
                             },
                         },
                     },
@@ -111,11 +111,11 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
                         "api_levels": {
                             "1": {
                                 "abi_revision": "0x0000000000000001",
-                                "status": "supported",
+                                "phase": "supported",
                             },
                             "2": {
                                 "abi_revision": "0x0000000004321CBA",
-                                "status": "supported",
+                                "phase": "supported",
                             },
                         },
                     },
