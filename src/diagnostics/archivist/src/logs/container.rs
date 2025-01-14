@@ -267,6 +267,7 @@ impl LogsArtifactsContainer {
                             hanging_gets.push(responder);
                         }
                         Err(e) => error!(identity:% = self.identity, e:%; "error handling log sink"),
+                        Ok(LogSinkRequest::_UnknownMethod { .. }) => {}
                     }
                 }
                 _ = interest_changed => {}

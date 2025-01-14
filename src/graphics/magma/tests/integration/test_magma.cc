@@ -124,6 +124,14 @@ class FakeLogSink : public fidl::WireServer<fuchsia_logger::LogSink> {
     loop_.Quit();
   }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_logger::LogSink> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    fprintf(stderr, "Unexpected method\n");
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+#endif
+
  private:
   async::Loop& loop_;
 };

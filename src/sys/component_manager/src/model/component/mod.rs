@@ -2503,6 +2503,7 @@ pub mod tests {
                             // It's expected that the log publisher calls this, but it's not
                             // necessary to implement it.
                         }
+                        flogger::LogSinkRequest::_UnknownMethod { .. } => unimplemented!(),
                     }
                 }
             }

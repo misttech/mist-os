@@ -92,6 +92,7 @@ async fn demux_fidl(
             LogSinkRequest::ConnectStructured { socket, control_handle: _ } => {
                 log_socket = Some(socket);
             }
+            LogSinkRequest::_UnknownMethod { .. } => unreachable!(),
         }
         match (log_socket, interest_listener) {
             (Some(socket), Some(listener)) => {

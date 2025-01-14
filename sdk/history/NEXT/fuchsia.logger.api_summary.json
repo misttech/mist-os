@@ -323,7 +323,7 @@
     {
         "kind": "protocol",
         "name": "fuchsia.logger/LogSink",
-        "openness": "closed",
+        "openness": "open",
         "transport": "channel"
     },
     {

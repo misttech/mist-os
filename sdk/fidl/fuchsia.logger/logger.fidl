@@ -128,7 +128,7 @@ type InterestChangeError = strict enum : uint32 {
 
 /// Drains a program's logs.
 @discoverable(server="platform")
-closed protocol LogSink {
+closed(removed=NEXT) open(added=NEXT) protocol LogSink {
     /// Send this socket to be drained.
     ///
     /// See [wire_format.h](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/syslog/include/lib/syslog/wire_format.h)

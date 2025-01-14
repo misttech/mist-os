@@ -1411,6 +1411,9 @@ mod tests {
                                     // this is expected but asserting it was received is flakey because
                                     // it's sent at some point after the scoped logger is created
                                 }
+                                LogSinkRequest::_UnknownMethod { .. } => {
+                                    panic!("Unexpected unknown method")
+                                }
                             }
                         }
                     }

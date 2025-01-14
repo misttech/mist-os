@@ -392,6 +392,9 @@ mod tests {
                         LogSinkRequest::WaitForInterestChange { .. } => {
                             // we expect this request to come but asserting on it is flakey
                         }
+                        LogSinkRequest::_UnknownMethod { .. } => {
+                            panic!("Unexpected unknown method")
+                        }
                     }
                 }
             }
