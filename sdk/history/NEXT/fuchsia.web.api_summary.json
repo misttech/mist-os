@@ -1140,6 +1140,12 @@
         "type": "fuchsia.media/AudioRenderUsage"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.web/FrameMediaSettings.renderer_usage2",
+        "ordinal": "3",
+        "type": "fuchsia.media/AudioRenderUsage2"
+    },
+    {
         "kind": "table",
         "name": "fuchsia.web/FrameMediaSettings"
     },
