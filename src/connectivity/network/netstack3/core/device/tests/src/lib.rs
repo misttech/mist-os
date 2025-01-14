@@ -14,6 +14,7 @@
 extern crate fakealloc as alloc;
 
 mod base;
+mod blackhole;
 mod ethernet;
 mod loopback;
 mod pure_ip;

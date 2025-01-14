@@ -17,8 +17,8 @@ use net_types::ethernet::Mac;
 use net_types::ip::{IpAddr, Mtu};
 use net_types::{SpecifiedAddr, UnicastAddr};
 use netstack3_core::device::{
-    BatchSize, DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceProvider,
-    DeviceSendFrameError, EthernetLinkDevice, LoopbackDeviceId, PureIpDevice, WeakDeviceId,
+    BatchSize, DeviceClassMatcher, DeviceId, DeviceIdAndNameMatcher, DeviceSendFrameError,
+    EthernetLinkDevice, LoopbackDeviceId, PureIpDevice, WeakDeviceId,
 };
 use netstack3_core::sync::{Mutex as CoreMutex, RwLock as CoreRwLock};
 use netstack3_core::types::WorkQueueReport;
@@ -120,6 +120,7 @@ pub(crate) enum OwnedDeviceSpecificInfo {
     Loopback(LoopbackInfo),
     Ethernet(EthernetInfo),
     PureIp(PureIpDeviceInfo),
+    Blackhole(BlackholeDeviceInfo),
 }
 
 impl From<LoopbackInfo> for OwnedDeviceSpecificInfo {
@@ -140,18 +141,26 @@ impl From<PureIpDeviceInfo> for OwnedDeviceSpecificInfo {
     }
 }
 
+impl From<BlackholeDeviceInfo> for OwnedDeviceSpecificInfo {
+    fn from(info: BlackholeDeviceInfo) -> Self {
+        Self::Blackhole(info)
+    }
+}
+
 /// Borrowed device specific information.
 #[derive(Debug)]
 pub(crate) enum DeviceSpecificInfo<'a> {
     Loopback(&'a LoopbackInfo),
     Ethernet(&'a EthernetInfo),
     PureIp(&'a PureIpDeviceInfo),
+    Blackhole(&'a BlackholeDeviceInfo),
 }
 
 impl DeviceSpecificInfo<'_> {
     pub(crate) fn static_common_info(&self) -> &StaticCommonInfo {
         match self {
             Self::Loopback(i) => &i.static_common_info,
+            Self::Blackhole(i) => &i.common_info,
             Self::Ethernet(i) => &i.common_info,
             Self::PureIp(i) => &i.common_info,
         }
@@ -160,6 +169,7 @@ impl DeviceSpecificInfo<'_> {
     pub(crate) fn with_common_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
         match self {
             Self::Loopback(i) => i.with_dynamic_info(cb),
+            Self::Blackhole(i) => i.with_dynamic_info(cb),
             Self::Ethernet(i) => i.with_dynamic_info(|dynamic| cb(&dynamic.netdevice.common_info)),
             Self::PureIp(i) => i.with_dynamic_info(|dynamic| cb(&dynamic.common_info)),
         }
@@ -171,6 +181,7 @@ impl DeviceSpecificInfo<'_> {
     ) -> O {
         match self {
             Self::Loopback(i) => i.with_dynamic_info_mut(cb),
+            Self::Blackhole(i) => i.with_dynamic_info_mut(cb),
             Self::Ethernet(i) => {
                 i.with_dynamic_info_mut(|dynamic| cb(&mut dynamic.netdevice.common_info))
             }
@@ -345,16 +356,19 @@ pub(crate) async fn tx_task(
             DeviceSpecificInfo::Loopback(_) => {
                 unimplemented!("tx task is not supported for loopback devices")
             }
+            DeviceSpecificInfo::Blackhole(_) => {
+                unimplemented!("tx task is not supported for blackhole devices")
+            }
             DeviceSpecificInfo::Ethernet(EthernetInfo { netdevice, .. })
             | DeviceSpecificInfo::PureIp(PureIpDeviceInfo { netdevice, .. }) => {
                 // Attempt to preallocate buffers to handle the queue.
-                let queue_len = netstack3_core::for_any_device_id!(
-                    DeviceId,
-                    DeviceProvider,
-                    D,
-                    &device_id,
-                    id => ctx.api().transmit_queue::<D>().count(id)
-                );
+                let queue_len = match &device_id {
+                    DeviceId::Ethernet(id) => {
+                        ctx.api().transmit_queue::<EthernetLinkDevice>().count(id)
+                    }
+                    DeviceId::PureIp(id) => ctx.api().transmit_queue::<PureIpDevice>().count(id),
+                    DeviceId::Loopback(_) | DeviceId::Blackhole(_) => unreachable!(),
+                };
 
                 match queue_len {
                     Some(queue_len) => {
@@ -384,6 +398,9 @@ pub(crate) async fn tx_task(
         let r = match &device_id {
             DeviceId::Loopback(_) => {
                 unimplemented!("tx task is not supported for loopback devices")
+            }
+            DeviceId::Blackhole(_) => {
+                unimplemented!("tx task is not supported for blackhole devices")
             }
             DeviceId::Ethernet(id) => ctx
                 .api()
@@ -613,6 +630,43 @@ impl PureIpDeviceInfo {
 impl DeviceClassMatcher<fidl_fuchsia_net_interfaces::PortClass> for PureIpDeviceInfo {
     fn device_class_matches(&self, device_class: &fidl_fuchsia_net_interfaces::PortClass) -> bool {
         self.netdevice.device_class_matches(device_class)
+    }
+}
+
+/// Blackhole device information.
+#[derive(Debug)]
+pub(crate) struct BlackholeDeviceInfo {
+    pub(crate) dynamic_common_info: CoreRwLock<DynamicCommonInfo>,
+    pub(crate) common_info: StaticCommonInfo,
+}
+
+impl BlackholeDeviceInfo {
+    pub(crate) fn with_dynamic_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
+        cb(self.dynamic_common_info.read().deref())
+    }
+
+    pub(crate) fn with_dynamic_info_mut<O, F: FnOnce(&mut DynamicCommonInfo) -> O>(
+        &self,
+        cb: F,
+    ) -> O {
+        cb(self.dynamic_common_info.write().deref_mut())
+    }
+}
+
+impl DeviceClassMatcher<fidl_fuchsia_net_interfaces::PortClass> for BlackholeDeviceInfo {
+    fn device_class_matches(&self, port_class: &fidl_fuchsia_net_interfaces::PortClass) -> bool {
+        match port_class {
+            fidl_fuchsia_net_interfaces::PortClass::Blackhole(
+                fidl_fuchsia_net_interfaces::Empty {},
+            ) => true,
+            fidl_fuchsia_net_interfaces::PortClass::Loopback(
+                fidl_fuchsia_net_interfaces::Empty {},
+            )
+            | fidl_fuchsia_net_interfaces::PortClass::Device(_)
+            | fidl_fuchsia_net_interfaces::PortClass::__SourceBreaking { unknown_ordinal: _ } => {
+                false
+            }
+        }
     }
 }
 

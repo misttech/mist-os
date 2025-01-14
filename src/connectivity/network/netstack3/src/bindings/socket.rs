@@ -248,6 +248,10 @@ fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
             let FromDynamicInfo { admin_enabled } = common_info.into();
             Flags { physical_up: true, admin_enabled: admin_enabled, loopback: true }
         }),
+        DeviceSpecificInfo::Blackhole(info) => info.with_dynamic_info(|common_info| {
+            let FromDynamicInfo { admin_enabled } = common_info.into();
+            Flags { physical_up: true, admin_enabled: admin_enabled, loopback: false }
+        }),
         DeviceSpecificInfo::PureIp(info) => {
             info.with_dynamic_info(|DynamicNetdeviceInfo { common_info, phy_up }| {
                 let FromDynamicInfo { admin_enabled } = common_info.into();

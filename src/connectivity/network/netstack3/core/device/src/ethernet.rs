@@ -798,20 +798,20 @@ impl LinkDevice for EthernetLinkDevice {
 }
 
 impl DeviceStateSpec for EthernetLinkDevice {
-    type Link<BT: DeviceLayerTypes> = EthernetDeviceState<BT>;
+    type State<BT: DeviceLayerTypes> = EthernetDeviceState<BT>;
     type External<BT: DeviceLayerTypes> = BT::EthernetDeviceState;
     type CreationProperties = EthernetCreationProperties;
     type Counters = EthernetDeviceCounters;
     type TimerId<D: WeakDeviceIdentifier> = EthernetTimerId<D>;
 
-    fn new_link_state<
+    fn new_device_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
         BC: DeviceLayerTypes + TimerContext,
     >(
         bindings_ctx: &mut BC,
         self_id: CC::WeakDeviceId,
         EthernetCreationProperties { mac, max_frame_size }: Self::CreationProperties,
-    ) -> Self::Link<BC> {
+    ) -> Self::State<BC> {
         let ipv4_arp = Mutex::new(ArpState::new::<_, NestedIntoCoreTimerCtx<CC, _>>(
             bindings_ctx,
             self_id.clone(),

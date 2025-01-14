@@ -425,6 +425,10 @@ impl<'a> RequestHandler<'a> {
                     data,
                 )
             }
+            DeviceId::Blackhole(_) => {
+                // Just drop the packet.
+                Ok(())
+            }
         };
         result.map_err(|e| e.into_errno())
     }
@@ -606,6 +610,7 @@ fn iface_type(device: &DeviceId<BindingsCtx>) -> fppacket::HardwareType {
         DeviceId::Ethernet(_) => fppacket::HardwareType::Ethernet,
         DeviceId::Loopback(_) => fppacket::HardwareType::Loopback,
         DeviceId::PureIp(_) => fppacket::HardwareType::NetworkOnly,
+        DeviceId::Blackhole(_) => fppacket::HardwareType::NetworkOnly,
     }
 }
 
@@ -628,6 +633,10 @@ impl TryIntoFidlWithContext<fppacket::InterfaceProperties> for WeakDeviceId<Bind
             }
             DeviceId::PureIp(_) => {
                 // Pure IP devices don't support link-layer addressing.
+                fppacket::HardwareAddress::None(fppacket::Empty)
+            }
+            DeviceId::Blackhole(_) => {
+                // Blackhole devices don't support link-layer addressing.
                 fppacket::HardwareAddress::None(fppacket::Empty)
             }
         };

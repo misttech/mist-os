@@ -94,7 +94,7 @@ pub struct DynamicPureIpDeviceState {
 impl Device for PureIpDevice {}
 
 impl DeviceStateSpec for PureIpDevice {
-    type Link<BT: DeviceLayerTypes> = PureIpDeviceState;
+    type State<BT: DeviceLayerTypes> = PureIpDeviceState;
     type External<BT: DeviceLayerTypes> = BT::PureIpDeviceState;
     type CreationProperties = PureIpDeviceCreationProperties;
     type Counters = PureIpDeviceCounters;
@@ -102,14 +102,14 @@ impl DeviceStateSpec for PureIpDevice {
     const DEBUG_TYPE: &'static str = "PureIP";
     type TimerId<D: WeakDeviceIdentifier> = Never;
 
-    fn new_link_state<
+    fn new_device_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
         BC: DeviceLayerTypes + TimerContext,
     >(
         _bindings_ctx: &mut BC,
         _self_id: CC::WeakDeviceId,
         PureIpDeviceCreationProperties { mtu }: Self::CreationProperties,
-    ) -> Self::Link<BC> {
+    ) -> Self::State<BC> {
         PureIpDeviceState {
             dynamic_state: RwLock::new(DynamicPureIpDeviceState { mtu }),
             tx_queue: Default::default(),

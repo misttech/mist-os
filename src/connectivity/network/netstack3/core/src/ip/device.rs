@@ -483,8 +483,8 @@ impl<
             DeviceId::Ethernet(id) => {
                 nud::confirm_reachable::<I, _, _, _>(self, bindings_ctx, id, neighbor)
             }
-            // NUD is not supported on Loopback or pure IP devices.
-            DeviceId::Loopback(_) | DeviceId::PureIp(_) => {}
+            // NUD is not supported on Loopback, pure IP, or blackhole devices.
+            DeviceId::Loopback(_) | DeviceId::PureIp(_) | DeviceId::Blackhole(_) => {}
         }
     }
 }

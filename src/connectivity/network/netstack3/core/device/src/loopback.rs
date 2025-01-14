@@ -71,20 +71,20 @@ pub enum LoopbackDevice {}
 impl Device for LoopbackDevice {}
 
 impl DeviceStateSpec for LoopbackDevice {
-    type Link<BT: DeviceLayerTypes> = LoopbackDeviceState<WeakDeviceId<BT>>;
+    type State<BT: DeviceLayerTypes> = LoopbackDeviceState<WeakDeviceId<BT>>;
     type External<BT: DeviceLayerTypes> = BT::LoopbackDeviceState;
     type CreationProperties = LoopbackCreationProperties;
     type Counters = EthernetDeviceCounters;
     type TimerId<D: WeakDeviceIdentifier> = Never;
 
-    fn new_link_state<
+    fn new_device_state<
         CC: CoreTimerContext<Self::TimerId<CC::WeakDeviceId>, BC> + DeviceIdContext<Self>,
         BC: DeviceLayerTypes + TimerContext,
     >(
         _bindings_ctx: &mut BC,
         _self_id: CC::WeakDeviceId,
         LoopbackCreationProperties { mtu }: Self::CreationProperties,
-    ) -> Self::Link<BC> {
+    ) -> Self::State<BC> {
         LoopbackDeviceState {
             counters: Default::default(),
             mtu,

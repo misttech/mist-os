@@ -824,6 +824,7 @@ mod testutil {
         type EthernetDeviceState = ();
         type LoopbackDeviceState = ();
         type PureIpDeviceState = ();
+        type BlackholeDeviceState = ();
         type DeviceIdentifier = MonotonicIdentifier;
     }
 

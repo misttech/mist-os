@@ -1351,6 +1351,7 @@ impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId<Self>> for FakeBindingsCt
 impl DeviceLayerStateTypes for FakeBindingsCtx {
     type LoopbackDeviceState = ();
     type EthernetDeviceState = ();
+    type BlackholeDeviceState = ();
     type PureIpDeviceState = ();
     type DeviceIdentifier = MonotonicIdentifier;
 }

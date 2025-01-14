@@ -16,9 +16,9 @@ use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpVersion, Ipv4, Ipv6, Ipv6Addr, Mtu, Subnet};
 use net_types::UnicastAddr;
 use netstack3_core::device::{
-    DeviceProvider, EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice,
-    EthernetWeakDeviceId, MaxEthernetFrameSize, PureIpDevice, PureIpDeviceCreationProperties,
-    PureIpDeviceId, PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId, RecvEthernetFrameMeta,
+    EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
+    MaxEthernetFrameSize, PureIpDevice, PureIpDeviceCreationProperties, PureIpDeviceId,
+    PureIpDeviceReceiveFrameMetadata, PureIpWeakDeviceId, RecvEthernetFrameMeta,
 };
 use netstack3_core::ip::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
@@ -567,12 +567,26 @@ impl DeviceHandler {
             };
 
             let tx_task = TxTask::new(ctx.clone(), core_id.downgrade(), tx_watcher);
-            netstack3_core::for_any_device_id!(DeviceId, DeviceProvider, D, &core_id, device => {
-                ctx.api().transmit_queue::<D>().set_configuration(
-                    device,
-                    netstack3_core::device::TransmitQueueConfiguration::Fifo,
-                );
-            });
+            match &core_id {
+                DeviceId::PureIp(device) => {
+                    ctx.api().transmit_queue::<PureIpDevice>().set_configuration(
+                        device,
+                        netstack3_core::device::TransmitQueueConfiguration::Fifo,
+                    );
+                }
+                DeviceId::Ethernet(device) => {
+                    ctx.api().transmit_queue::<EthernetLinkDevice>().set_configuration(
+                        device,
+                        netstack3_core::device::TransmitQueueConfiguration::Fifo,
+                    );
+                }
+                DeviceId::Loopback(device) => {
+                    unreachable!("loopback device should not be backed by netdevice: {device:?}")
+                }
+                DeviceId::Blackhole(device) => {
+                    unreachable!("blackhole device should not be backed by netdevice: {device:?}")
+                }
+            }
             add_initial_routes(ctx.bindings_ctx(), &core_id).await;
 
             let ip_config = IpDeviceConfigurationUpdate {

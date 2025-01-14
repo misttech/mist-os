@@ -16,6 +16,7 @@ mod internal {
     pub(super) mod api;
     pub(super) mod arp;
     pub(super) mod base;
+    pub(super) mod blackhole;
     pub(super) mod config;
     pub(super) mod ethernet;
     pub(super) mod id;
@@ -24,6 +25,14 @@ mod internal {
     pub(super) mod queue;
     pub(super) mod socket;
     pub(super) mod state;
+}
+
+/// Blackhole devices.
+pub mod blackhole {
+    pub use crate::internal::base::BlackholeDeviceCounters;
+    pub use crate::internal::blackhole::{
+        BlackholeDevice, BlackholeDeviceId, BlackholePrimaryDeviceId, BlackholeWeakDeviceId,
+    };
 }
 
 /// Ethernet devices.

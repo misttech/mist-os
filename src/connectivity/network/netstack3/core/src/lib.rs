@@ -34,6 +34,7 @@ pub mod device {
     #[path = "."]
     pub(crate) mod integration {
         mod base;
+        mod blackhole;
         mod ethernet;
         mod loopback;
         mod pure_ip;
@@ -47,6 +48,7 @@ pub mod device {
 
     // Re-exported types.
     pub use netstack3_base::DeviceNameMatcher;
+    pub use netstack3_device::blackhole::{BlackholeDevice, BlackholeDeviceId};
     pub use netstack3_device::ethernet::{
         EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
         MaxEthernetFrameSize, RecvEthernetFrameMeta,

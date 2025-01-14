@@ -40,6 +40,7 @@ fn handle_get_port(
         core_id.as_ref().ok_or(zx::Status::NOT_FOUND).map(|core_id| core_id.external_state());
     let port_handler = port_handler.as_ref().map_err(Clone::clone).and_then(|state| match state {
         DeviceSpecificInfo::Loopback(_) => Err(zx::Status::NOT_SUPPORTED),
+        DeviceSpecificInfo::Blackhole(_) => Err(zx::Status::NOT_SUPPORTED),
         DeviceSpecificInfo::Ethernet(info) => Ok(&info.netdevice.handler),
         DeviceSpecificInfo::PureIp(info) => Ok(&info.netdevice.handler),
     });

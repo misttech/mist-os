@@ -65,9 +65,9 @@ use {
 };
 
 use devices::{
-    BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
-    DynamicEthernetInfo, DynamicNetdeviceInfo, EthernetInfo, LoopbackInfo, PureIpDeviceInfo,
-    StaticCommonInfo, StaticNetdeviceInfo, TxTaskState,
+    BindingId, BlackholeDeviceInfo, DeviceIdAndName, DeviceSpecificInfo, Devices,
+    DynamicCommonInfo, DynamicEthernetInfo, DynamicNetdeviceInfo, EthernetInfo, LoopbackInfo,
+    PureIpDeviceInfo, StaticCommonInfo, StaticNetdeviceInfo, TxTaskState,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
@@ -254,6 +254,7 @@ impl DeviceIdExt for DeviceId<BindingsCtx> {
         match self {
             DeviceId::Ethernet(d) => DeviceSpecificInfo::Ethernet(d.external_state()),
             DeviceId::Loopback(d) => DeviceSpecificInfo::Loopback(d.external_state()),
+            DeviceId::Blackhole(d) => DeviceSpecificInfo::Blackhole(d.external_state()),
             DeviceId::PureIp(d) => DeviceSpecificInfo::PureIp(d.external_state()),
         }
     }
@@ -503,6 +504,7 @@ impl DeviceLayerStateTypes for BindingsCtx {
     type EthernetDeviceState = EthernetInfo;
     type PureIpDeviceState = PureIpDeviceInfo;
     type DeviceIdentifier = DeviceIdAndName;
+    type BlackholeDeviceState = BlackholeDeviceInfo;
 }
 
 impl ReceiveQueueBindingsContext<LoopbackDeviceId<Self>> for BindingsCtx {
@@ -517,6 +519,7 @@ impl<D: DeviceIdExt> TransmitQueueBindingsContext<D> for BindingsCtx {
     fn wake_tx_task(&mut self, device: &D) {
         let netdevice = match device.external_state() {
             DeviceSpecificInfo::Loopback(_) => panic!("loopback does not support tx tasks"),
+            DeviceSpecificInfo::Blackhole(_) => panic!("blackhole does not support tx tasks"),
             DeviceSpecificInfo::Ethernet(EthernetInfo { netdevice, .. }) => netdevice,
             DeviceSpecificInfo::PureIp(PureIpDeviceInfo { netdevice, .. }) => netdevice,
         };

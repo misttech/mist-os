@@ -144,6 +144,7 @@ where
     };
     let remote_mac = match &device {
         DeviceId::Loopback(_device) => None,
+        DeviceId::Blackhole(_device) => None,
         DeviceId::Ethernet(device) => {
             if let Some(addr) = next_hop_addr {
                 Some(resolve_ethernet_link_addr(&mut ctx, device, &addr).await?)

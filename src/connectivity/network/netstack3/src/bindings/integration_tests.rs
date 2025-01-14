@@ -947,7 +947,7 @@ async fn test_neighbor_table_inspect() {
             .get_core_id(bindings_id)
             .and_then(|d| match d {
                 DeviceId::Ethernet(e) => Some(e),
-                DeviceId::Loopback(_) | DeviceId::PureIp(_) => None,
+                DeviceId::Loopback(_) | DeviceId::PureIp(_) | DeviceId::Blackhole(_) => None,
             })
             .expect("get_core_id failed");
         let v4_neigh_addr = net_ip_v4!("192.168.0.1");

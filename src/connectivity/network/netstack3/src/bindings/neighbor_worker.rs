@@ -525,8 +525,10 @@ fn get_ethernet_id(ctx: &Ctx, interface: u64) -> Result<EthernetDeviceId<Binding
         .ok_or(zx::Status::NOT_FOUND)?
     {
         DeviceId::Ethernet(e) => Ok(e),
-        // NUD is not supported for Loopback or pure IP devices.
-        DeviceId::Loopback(_) | DeviceId::PureIp(_) => Err(zx::Status::NOT_SUPPORTED),
+        // NUD is not supported for Loopback, pure IP, or blackhole devices.
+        DeviceId::Loopback(_) | DeviceId::PureIp(_) | DeviceId::Blackhole(_) => {
+            Err(zx::Status::NOT_SUPPORTED)
+        }
     }
 }
 

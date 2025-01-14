@@ -69,8 +69,8 @@ use {
 };
 
 use crate::bindings::devices::{
-    self, EthernetInfo, LoopbackInfo, OwnedDeviceSpecificInfo, PureIpDeviceInfo, StaticCommonInfo,
-    TxTask, TxTaskError,
+    self, BlackholeDeviceInfo, EthernetInfo, LoopbackInfo, OwnedDeviceSpecificInfo,
+    PureIpDeviceInfo, StaticCommonInfo, TxTask, TxTaskError,
 };
 use crate::bindings::routes::admin::RouteSet;
 use crate::bindings::routes::{self};
@@ -757,6 +757,12 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 // Allow the loopback interface to be removed as part of clean
                 // shutdown, but emit a warning about it.
                 warn!("loopback interface was removed");
+                return;
+            }
+            OwnedDeviceSpecificInfo::Blackhole(BlackholeDeviceInfo {
+                common_info: _,
+                dynamic_common_info: _,
+            }) => {
                 return;
             }
             OwnedDeviceSpecificInfo::Ethernet(EthernetInfo { netdevice, .. })
@@ -1931,10 +1937,11 @@ mod enabled {
         pub(super) async fn set_admin_enabled(&self, enabled: bool) -> bool {
             let Self { id, ctx } = self;
             let mut ctx = ctx.lock().await;
-            enum Info<A, B, C> {
+            enum Info<A, B, C, D> {
                 Loopback(A),
                 Ethernet(B),
                 PureIp(C),
+                Blackhole(D),
             }
 
             let core_id = ctx.bindings_ctx().devices.get_core_id(*id).expect("device not present");
@@ -1957,9 +1964,14 @@ mod enabled {
                         common_info: _,
                         dynamic_info,
                     }) => (Info::PureIp(dynamic_info.write()), Some(&netdevice.handler)),
+                    devices::DeviceSpecificInfo::Blackhole(devices::BlackholeDeviceInfo {
+                        common_info: _,
+                        dynamic_common_info,
+                    }) => (Info::Blackhole(dynamic_common_info.write()), None),
                 };
                 let common_info = match info {
                     Info::Loopback(ref mut common_info) => common_info.deref_mut(),
+                    Info::Blackhole(ref mut common_info) => common_info.deref_mut(),
                     Info::Ethernet(ref mut dynamic) => &mut dynamic.netdevice.common_info,
                     Info::PureIp(ref mut dynamic) => &mut dynamic.common_info,
                 };
@@ -2009,7 +2021,8 @@ mod enabled {
                 devices::DeviceSpecificInfo::Ethernet(i) => {
                     i.with_dynamic_info_mut(|i| std::mem::replace(&mut i.netdevice.phy_up, online))
                 }
-                i @ devices::DeviceSpecificInfo::Loopback(_) => {
+                i @ (devices::DeviceSpecificInfo::Loopback(_)
+                | devices::DeviceSpecificInfo::Blackhole(_)) => {
                     unreachable!("unexpected device info {:?} for interface {}", i, *id)
                 }
                 devices::DeviceSpecificInfo::PureIp(i) => {
@@ -2061,6 +2074,9 @@ mod enabled {
                      }| *phy_up && common_info.admin_enabled,
                 ),
                 DeviceSpecificInfo::Loopback(i) => {
+                    i.with_dynamic_info(|common_info| common_info.admin_enabled)
+                }
+                DeviceSpecificInfo::Blackhole(i) => {
                     i.with_dynamic_info(|common_info| common_info.admin_enabled)
                 }
                 DeviceSpecificInfo::PureIp(i) => {
