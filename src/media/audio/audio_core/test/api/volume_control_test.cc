@@ -5,8 +5,6 @@
 #include <fuchsia/media/audio/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
 
-#include <cmath>
-
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 
@@ -102,56 +100,72 @@ TEST_F(VolumeControlTest, VolumeCurveLookups) {
   float db_lookup = 0.0f;
   float volume_lookup = 0.0f;
   audio_core_->GetDbFromVolume(
-      fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::MEDIA)), 0.0f,
+      *ToFidlUsageTry(AudioRenderUsage2::MEDIA), 0.0f,
       AddCallback("GetDbFromVolume", [&db_lookup](float db) { db_lookup = db; }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, -160.0f);
 
   audio_core_->GetDbFromVolume(
-      fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::MEDIA)), 1.0f,
+      *ToFidlUsageTry(AudioRenderUsage2::MEDIA), 1.0f,
       AddCallback("GetDbFromVolume", [&db_lookup](float db) { db_lookup = db; }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, 0.0f);
 
   audio_core_->GetVolumeFromDb(
-      fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::MEDIA)),
-      -160.0f,
+      *ToFidlUsageTry(AudioRenderUsage2::MEDIA), -160.0f,
       AddCallback("GetVolumeFromDb", [&volume_lookup](float volume) { volume_lookup = volume; }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 0.0f);
 
   audio_core_->GetVolumeFromDb(
-      fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(AudioRenderUsage2::MEDIA)), 0.0f,
+      *ToFidlUsageTry(AudioRenderUsage2::MEDIA), 0.0f,
       AddCallback("GetVolumeFromDb", [&volume_lookup](float volume) { volume_lookup = volume; }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 1.0f);
 }
 
 TEST_F(VolumeControlTest, Volume2CurveLookups) {
-  // Test audio_core instance will have default volume curve, just check the ends.
+  // Test audio_core instance will have the default volume curve, so just check the ends.
+  // Volume 0.0 corresponds to MUTED (-160.0 dB), volume 1.0 corresponds to UNITY (0.0 dB).
   float db_lookup = 0.0f;
-  float volume_lookup = 0.0f;
   audio_core_->GetDbFromVolume2(
       ToFidlUsage2(RenderUsage::MEDIA), 0.0f,
-      AddCallback("GetDbFromVolume2", [&db_lookup](float db) { db_lookup = db; }));
+      AddCallback("GetDbFromVolume2",
+                  [&db_lookup](fuchsia::media::AudioCore_GetDbFromVolume2_Result result) {
+                    ASSERT_TRUE(result.is_response());
+                    db_lookup = result.response().gain_db;
+                  }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, -160.0f);
 
   audio_core_->GetDbFromVolume2(
       ToFidlUsage2(RenderUsage::MEDIA), 1.0f,
-      AddCallback("GetDbFromVolume2", [&db_lookup](float db) { db_lookup = db; }));
+      AddCallback("GetDbFromVolume2",
+                  [&db_lookup](fuchsia::media::AudioCore_GetDbFromVolume2_Result result) {
+                    ASSERT_TRUE(result.is_response());
+                    db_lookup = result.response().gain_db;
+                  }));
   ExpectCallbacks();
   EXPECT_EQ(db_lookup, 0.0f);
 
+  float volume_lookup = 1.0f;
   audio_core_->GetVolumeFromDb2(
       ToFidlUsage2(RenderUsage::MEDIA), -160.0f,
-      AddCallback("GetVolumeFromDb2", [&volume_lookup](float volume) { volume_lookup = volume; }));
+      AddCallback("GetVolumeFromDb2",
+                  [&volume_lookup](fuchsia::media::AudioCore_GetVolumeFromDb2_Result result) {
+                    ASSERT_TRUE(result.is_response());
+                    volume_lookup = result.response().volume;
+                  }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 0.0f);
 
   audio_core_->GetVolumeFromDb2(
       ToFidlUsage2(RenderUsage::MEDIA), 0.0f,
-      AddCallback("GetVolumeFromDb2", [&volume_lookup](float volume) { volume_lookup = volume; }));
+      AddCallback("GetVolumeFromDb2",
+                  [&volume_lookup](fuchsia::media::AudioCore_GetVolumeFromDb2_Result result) {
+                    ASSERT_TRUE(result.is_response());
+                    volume_lookup = result.response().volume;
+                  }));
   ExpectCallbacks();
   EXPECT_EQ(volume_lookup, 1.0f);
 }

@@ -14,6 +14,9 @@
 
 namespace media::audio::test {
 
+using fuchsia::media::AudioCaptureUsage2;
+using fuchsia::media::AudioRenderUsage2;
+
 namespace {
 class FakeGainListener : public fuchsia::media::UsageGainListener {
  public:
@@ -65,8 +68,7 @@ class UsageGainReporterTest : public HermeticAudioTest {
     FakeGainListener fake_listener;
   };
 
-  std::unique_ptr<Controller> CreateControllerWithRenderUsage(
-      fuchsia::media::AudioRenderUsage2 render_usage) {
+  std::unique_ptr<Controller> CreateControllerWithRenderUsage(AudioRenderUsage2 render_usage) {
     std::unique_ptr<media::audio::test::UsageGainReporterTest::Controller> c;
     auto usage1 = fuchsia::media::Usage::WithRenderUsage(*ToFidlRenderUsageTry(render_usage));
     auto usage = fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage));
@@ -82,8 +84,7 @@ class UsageGainReporterTest : public HermeticAudioTest {
     return c;
   }
 
-  std::unique_ptr<Controller> CreateControllerWithRenderUsage2(
-      fuchsia::media::AudioRenderUsage2 render_usage) {
+  std::unique_ptr<Controller> CreateControllerWithRenderUsage2(AudioRenderUsage2 render_usage) {
     std::unique_ptr<media::audio::test::UsageGainReporterTest::Controller> c;
     auto usage = fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(render_usage));
     c = std::make_unique<Controller>(this);
@@ -113,6 +114,19 @@ class UsageGainReporterTest : public HermeticAudioTest {
     return c;
   }
 
+  std::unique_ptr<Controller> CreateControllerWithCaptureUsage2(AudioCaptureUsage2 capture_usage) {
+    std::unique_ptr<media::audio::test::UsageGainReporterTest::Controller> c;
+    auto usage = fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage));
+    c = std::make_unique<Controller>(this);
+
+    realm().Connect(c->gain_reporter.NewRequest());
+    AddErrorHandler(c->gain_reporter, "GainReporter");
+    c->gain_reporter->RegisterListener2(device_id_string_, std::move(usage),
+                                        c->fake_listener.NewBinding());
+
+    return c;
+  }
+
   // The device ID is arbitrary.
   const std::string device_id_string_ = "ff000000000000000000000000000000";
   const audio_stream_unique_id_t device_id_array_ = {{
@@ -122,7 +136,7 @@ class UsageGainReporterTest : public HermeticAudioTest {
 };
 
 TEST_F(UsageGainReporterTest, SetVolumeAndMute) {
-  auto c = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA);
+  auto c = CreateControllerWithRenderUsage(AudioRenderUsage2::MEDIA);
 
   // The initial callback happens immediately.
   c->fake_listener.SetNextHandler(AddCallback("OnGainMuteChanged InitialCall"));
@@ -172,7 +186,7 @@ TEST_F(UsageGainReporterTest, SetVolumeAndMute) {
 }
 
 TEST_F(UsageGainReporterTest, SetVolumeAndMute2) {
-  auto c = CreateControllerWithRenderUsage2(fuchsia::media::AudioRenderUsage2::MEDIA);
+  auto c = CreateControllerWithRenderUsage2(AudioRenderUsage2::MEDIA);
 
   // The initial callback happens immediately.
   c->fake_listener.SetNextHandler(AddCallback("OnGainMuteChanged InitialCall"));
@@ -222,8 +236,8 @@ TEST_F(UsageGainReporterTest, SetVolumeAndMute2) {
 }
 
 TEST_F(UsageGainReporterTest, RoutedCorrectly) {
-  auto c1 = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage2::MEDIA);
-  auto c2 = CreateControllerWithRenderUsage(fuchsia::media::AudioRenderUsage2::BACKGROUND);
+  auto c1 = CreateControllerWithRenderUsage(AudioRenderUsage2::MEDIA);
+  auto c2 = CreateControllerWithRenderUsage(AudioRenderUsage2::BACKGROUND);
 
   // The initial callbacks happen immediately.
   c1->fake_listener.SetNextHandler(AddCallbackUnordered("OnGainMuteChanged1 InitialCall"));
@@ -244,8 +258,8 @@ TEST_F(UsageGainReporterTest, RoutedCorrectly) {
 }
 
 TEST_F(UsageGainReporterTest, RoutedCorrectly2) {
-  auto c1 = CreateControllerWithRenderUsage2(fuchsia::media::AudioRenderUsage2::MEDIA);
-  auto c2 = CreateControllerWithRenderUsage2(fuchsia::media::AudioRenderUsage2::BACKGROUND);
+  auto c1 = CreateControllerWithRenderUsage2(AudioRenderUsage2::MEDIA);
+  auto c2 = CreateControllerWithRenderUsage2(AudioRenderUsage2::BACKGROUND);
 
   // The initial callbacks happen immediately.
   c1->fake_listener.SetNextHandler(AddCallbackUnordered("OnGainMuteChanged1 InitialCall"));
@@ -286,7 +300,7 @@ TEST_F(UsageGainReporterTest, SetCaptureUsageGain) {
   };
 
   capture_usage_gain_db = -60.0f;
-  set_callback("SetCaptureUsageGain1");
+  set_callback("SetCaptureUsageGain-1");
   audio_core_->SetCaptureUsageGain(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT,
                                    capture_usage_gain_db);
   ExpectCallbacks();
@@ -294,9 +308,44 @@ TEST_F(UsageGainReporterTest, SetCaptureUsageGain) {
   EXPECT_FLOAT_EQ(last_gain_db, capture_usage_gain_db);
 
   capture_usage_gain_db = -20.0f;
-  set_callback("SetCaptureUsageGain2");
+  set_callback("SetCaptureUsageGain-2");
   audio_core_->SetCaptureUsageGain(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT,
                                    capture_usage_gain_db);
+  ExpectCallbacks();
+  EXPECT_FALSE(last_muted);
+  EXPECT_FLOAT_EQ(last_gain_db, capture_usage_gain_db);
+}
+
+TEST_F(UsageGainReporterTest, SetCaptureUsageGain2) {
+  auto c = CreateControllerWithCaptureUsage2(AudioCaptureUsage2::SYSTEM_AGENT);
+
+  // The initial callback happens immediately.
+  c->fake_listener.SetNextHandler(AddCallback("OnGainMuteChanged InitialCall"));
+  ExpectCallbacks();
+
+  bool last_muted;
+  float last_gain_db, capture_usage_gain_db;
+  auto set_callback = [this, &c, &last_muted, &last_gain_db](const std::string& last_action) {
+    last_muted = true;
+    last_gain_db = kTooHighGainDb;
+    c->fake_listener.SetNextHandler(
+        AddCallback("OnGainMuteChanged after " + last_action,
+                    [&last_muted, &last_gain_db](bool muted, float gain_db) {
+                      last_muted = muted;
+                      last_gain_db = gain_db;
+                    }));
+  };
+
+  capture_usage_gain_db = -60.0f;
+  set_callback("SetCaptureUsageGain2-1");
+  audio_core_->SetCaptureUsageGain2(AudioCaptureUsage2::SYSTEM_AGENT, capture_usage_gain_db);
+  ExpectCallbacks();
+  EXPECT_FALSE(last_muted);
+  EXPECT_FLOAT_EQ(last_gain_db, capture_usage_gain_db);
+
+  capture_usage_gain_db = -20.0f;
+  set_callback("SetCaptureUsageGain2-2");
+  audio_core_->SetCaptureUsageGain2(AudioCaptureUsage2::SYSTEM_AGENT, capture_usage_gain_db);
   ExpectCallbacks();
   EXPECT_FALSE(last_muted);
   EXPECT_FLOAT_EQ(last_gain_db, capture_usage_gain_db);

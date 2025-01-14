@@ -216,14 +216,23 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
 
     /// Sets the gain for this render usage. By default, all render usages are set to Unity (0 db).
     @available(added=NEXT)
-    strict SetRenderUsageGain2(struct {
+    flexible SetRenderUsageGain2(struct {
         usage AudioRenderUsage2;
         gain_db float32;
     });
 
     /// Sets gain for this capture usage. By default, all capture usages are set to Unity (0 db).
+    // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioCaptureUsage|
+    @available(deprecated=NEXT, note="Use SetCaptureUsageGain2 and AudioCaptureUsage2")
     strict SetCaptureUsageGain(struct {
         usage AudioCaptureUsage;
+        gain_db float32;
+    });
+
+    /// Sets gain for this capture usage. By default, all capture usages are set to Unity (0 db).
+    @available(added=NEXT)
+    flexible SetCaptureUsageGain2(struct {
+        usage AudioCaptureUsage2;
         gain_db float32;
     });
 
@@ -237,7 +246,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
 
     /// Binds to a volume control protocol for the given usage.
     @available(added=NEXT)
-    strict BindUsageVolumeControl2(resource struct {
+    flexible BindUsageVolumeControl2(resource struct {
         usage Usage2;
         volume_control server_end:fuchsia.media.audio.VolumeControl;
     });
@@ -258,7 +267,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     /// `usage`. This is the same mapping as used by the VolumeControl from
     /// `BindUsageVolumeControl`.
     @available(added=NEXT)
-    strict GetVolumeFromDb2(struct {
+    flexible GetVolumeFromDb2(struct {
         usage Usage2;
         gain_db float32;
     }) -> (struct {
@@ -279,7 +288,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     /// Queries the decibel value that maps to a volume percentage [0, 1] for a particular `usage`.
     /// This is the same mapping as used by the VolumeControl from `BindUsageVolumeControl`.
     @available(added=NEXT)
-    strict GetDbFromVolume2(struct {
+    flexible GetDbFromVolume2(struct {
         usage Usage2;
         volume float32;
     }) -> (struct {
@@ -301,7 +310,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     /// streams of Usage `active` are processing audio, and streams of Usage `affected` are as well,
     /// the Behavior specified will be applied to the streams of Usage `affected`.
     @available(added=NEXT)
-    strict SetInteraction2(struct {
+    flexible SetInteraction2(struct {
         active Usage2;
         affected Usage2;
         behavior Behavior;

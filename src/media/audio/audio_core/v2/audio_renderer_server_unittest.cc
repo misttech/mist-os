@@ -180,7 +180,7 @@ TEST(AudioRendererServerTest, ErrorUltrasoundForbidsSetUsage2) {
       .usage = RenderUsage::ULTRASOUND,
       .format = kFormat,
   });
-  std::ignore = (*h.renderer_client)->SetUsage2(fuchsia_media::AudioRenderUsage2::kBackground);
+  std::ignore = (*h.renderer_client)->SetUsage2(fuchsia_media::AudioRenderUsage2::kMedia);
   h.loop.RunUntilIdle();
   EXPECT_EQ(h.renderer_close_status, ZX_ERR_NOT_SUPPORTED);
 }

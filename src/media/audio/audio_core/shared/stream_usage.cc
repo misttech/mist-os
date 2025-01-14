@@ -146,6 +146,13 @@ std::optional<fuchsia::media::Usage> ToFidlUsageTry(const fuchsia::media::Usage2
   }
   return {};
 }
+std::optional<fuchsia::media::Usage> ToFidlUsageTry(
+    const fuchsia::media::AudioRenderUsage2& usage2) {
+  if (auto index = ToIndex(usage2); index < fuchsia::media::RENDER_USAGE_COUNT) {
+    return fuchsia::media::Usage::WithRenderUsage(AudioRenderUsage(index));
+  }
+  return {};
+}
 
 // Usage2
 fuchsia::media::Usage2 ToFidlUsage2(const fuchsia::media::Usage& usage) {

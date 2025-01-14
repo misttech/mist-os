@@ -43,6 +43,7 @@ class AudioCoreImpl final : public fuchsia::media::AudioCore {
   void SetRenderUsageGain(fuchsia::media::AudioRenderUsage usage, float gain_db) final;
   void SetRenderUsageGain2(fuchsia::media::AudioRenderUsage2 usage, float gain_db) final;
   void SetCaptureUsageGain(fuchsia::media::AudioCaptureUsage usage, float gain_db) final;
+  void SetCaptureUsageGain2(fuchsia::media::AudioCaptureUsage2 usage, float gain_db) final;
   void BindUsageVolumeControl(
       fuchsia::media::Usage usage,
       fidl::InterfaceRequest<fuchsia::media::audio::VolumeControl> volume_control) final;

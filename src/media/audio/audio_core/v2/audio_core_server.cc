@@ -133,6 +133,15 @@ void AudioCoreServer::SetCaptureUsageGain(SetCaptureUsageGainRequestView request
       request->gain_db);
 }
 
+void AudioCoreServer::SetCaptureUsageGain2(SetCaptureUsageGain2RequestView request,
+                                           SetCaptureUsageGain2Completer::Sync& completer) {
+  TRACE_DURATION("audio", "AudioCoreServer::SetCaptureUsageGain2");
+
+  auto usage = fuchsia::media::Usage2::WithCaptureUsage(
+      fuchsia::media::AudioCaptureUsage2(static_cast<uint32_t>(request->usage)));
+  stream_volume_manager_->SetUsageGain(std::move(usage), request->gain_db);
+}
+
 void AudioCoreServer::BindUsageVolumeControl(BindUsageVolumeControlRequestView request,
                                              BindUsageVolumeControlCompleter::Sync& completer) {
   TRACE_DURATION("audio", "AudioCoreServer::BindUsageVolumeControl");

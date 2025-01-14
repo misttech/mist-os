@@ -76,6 +76,11 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
     FX_NOTIMPLEMENTED();
   }
 
+  void SetCaptureUsageGain2(SetCaptureUsageGain2Request&,
+                            SetCaptureUsageGain2Completer::Sync&) override {
+    FX_NOTIMPLEMENTED();
+  }
+
   void BindUsageVolumeControl(BindUsageVolumeControlRequest&,
                               BindUsageVolumeControlCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();

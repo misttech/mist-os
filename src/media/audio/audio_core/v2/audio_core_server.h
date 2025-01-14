@@ -65,6 +65,8 @@ class AudioCoreServer
 
   void SetCaptureUsageGain(SetCaptureUsageGainRequestView request,
                            SetCaptureUsageGainCompleter::Sync& completer) final;
+  void SetCaptureUsageGain2(SetCaptureUsageGain2RequestView request,
+                            SetCaptureUsageGain2Completer::Sync& completer) final;
 
   void BindUsageVolumeControl(BindUsageVolumeControlRequestView request,
                               BindUsageVolumeControlCompleter::Sync& completer) final;

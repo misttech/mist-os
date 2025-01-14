@@ -351,6 +351,8 @@ fuchsia::media::AudioCaptureUsage2 ToFidlCaptureUsage2(CaptureUsage usage);
 
 // Usage
 std::optional<fuchsia::media::Usage> ToFidlUsageTry(const fuchsia::media::Usage2& usage2);
+std::optional<fuchsia::media::Usage> ToFidlUsageTry(
+    const fuchsia::media::AudioRenderUsage2& usage2);
 
 // Usage2
 fuchsia::media::Usage2 ToFidlUsage2(const fuchsia::media::Usage& usage);
