@@ -40,7 +40,8 @@ const EVENTS_FILE: &str = "cgroup.events";
 /// Common operations of all cgroups.
 pub trait CgroupOps: Send + Sync + 'static {
     /// Add a process to a cgroup. Errors if the cgroup has been deleted.
-    fn add_process(&self, pid: pid_t, thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno>;
+    fn add_process(&self, pid: pid_t, thread_group: &TempRef<'_, ThreadGroup>)
+        -> Result<(), Errno>;
 
     /// Create a new sub-cgroup as a child of this cgroup. Errors if the cgroup is deleted, or a
     /// child with `name` already exists.
@@ -148,7 +149,11 @@ impl CgroupRoot {
 }
 
 impl CgroupOps for CgroupRoot {
-    fn add_process(&self, pid: pid_t, _thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno> {
+    fn add_process(
+        &self,
+        pid: pid_t,
+        _thread_group: &TempRef<'_, ThreadGroup>,
+    ) -> Result<(), Errno> {
         let mut pid_table = self.pid_table.lock();
         match pid_table.entry(pid) {
             hash_map::Entry::Occupied(entry) => {
@@ -322,22 +327,6 @@ impl CgroupState {
         });
     }
 
-    fn freeze_process(&self, pid: pid_t) -> Result<(), Errno> {
-        // Only freeze a process when the freezer is in frozen state.
-        if self.freezer_state != FreezerState::Frozen {
-            return error!(EINVAL);
-        }
-
-        let thread_group = self
-            .processes
-            .get(&pid)
-            .ok_or_else(|| errno!(ENOENT))?
-            .upgrade()
-            .ok_or_else(|| errno!(ENOENT))?;
-
-        self.freeze_thread_group(&thread_group)
-    }
-
     fn freeze_thread_group(&self, thread_group: &ThreadGroup) -> Result<(), Errno> {
         // Create static-lifetime TempRefs of Tasks so that we avoid don't hold the ThreadGroup
         // lock while iterating and sending the signal.
@@ -465,17 +454,17 @@ impl Cgroup {
     fn add_process_internal(
         &self,
         pid: pid_t,
-        thread_group: WeakRef<ThreadGroup>,
+        thread_group: &TempRef<'_, ThreadGroup>,
     ) -> Result<(), Errno> {
         let mut state = self.state.lock();
         if state.deleted {
             return error!(ENOENT);
         }
-        state.processes.insert(pid, thread_group);
+        state.processes.insert(pid, WeakRef::from(thread_group));
 
         // Check if the cgroup is frozen. If so, freeze the new process.
         if state.freezer_state == FreezerState::Frozen {
-            state.freeze_process(pid)?;
+            state.freeze_thread_group(&thread_group)?;
         }
 
         Ok(())
@@ -500,7 +489,11 @@ impl Cgroup {
 }
 
 impl CgroupOps for Cgroup {
-    fn add_process(&self, pid: pid_t, thread_group: WeakRef<ThreadGroup>) -> Result<(), Errno> {
+    fn add_process(
+        &self,
+        pid: pid_t,
+        thread_group: &TempRef<'_, ThreadGroup>,
+    ) -> Result<(), Errno> {
         let root = self.root()?;
         let mut pid_table = root.pid_table.lock();
         match pid_table.entry(pid) {
@@ -812,13 +805,9 @@ impl FileOps for ControlGroupFile {
         let pid = pid_string.trim().parse::<pid_t>().map_err(|_| errno!(ENOENT))?;
 
         // Check if the pid is a valid task.
-        let thread_group = {
-            let kernel_pids = current_task.kernel().pids.read();
-            let Some(ProcessEntryRef::Process(ref thread_group)) = kernel_pids.get_process(pid)
-            else {
-                return error!(EINVAL);
-            };
-            WeakRef::from(thread_group)
+        let kernel_pids = current_task.kernel().pids.read();
+        let Some(ProcessEntryRef::Process(ref thread_group)) = kernel_pids.get_process(pid) else {
+            return error!(EINVAL);
         };
 
         self.cgroup()?.add_process(pid, thread_group)?;
