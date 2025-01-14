@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 
 use assert_matches::assert_matches;
 use net_types::ethernet::Mac;
-use net_types::ip::{Ipv6, Ipv6Addr, Subnet};
+use net_types::ip::{Ipv6, Ipv6Addr, Mtu, Subnet};
 use net_types::{LinkLocalAddress as _, NonMappedAddr, Witness as _};
 use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
 use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
@@ -20,6 +20,8 @@ use netstack3_base::testutil::{TestAddrs, TestIpExt as _};
 use netstack3_base::{FrameDestination, InstantContext as _};
 use netstack3_core::device::{EthernetCreationProperties, EthernetLinkDevice};
 use netstack3_core::testutil::{CtxPairExt as _, FakeCtx, DEFAULT_INTERFACE_METRIC};
+use netstack3_device::loopback::{LoopbackCreationProperties, LoopbackDevice};
+use netstack3_device::pure_ip::{PureIpDevice, PureIpDeviceCreationProperties};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::testutil::with_assigned_ipv6_addr_subnets;
 use netstack3_ip::device::{
@@ -223,4 +225,58 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
     });
     assert_matches!(addrs[..], []);
     ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+}
+
+#[test]
+fn no_link_local_address_for_interfaces_with_no_link_layer_addressing() {
+    let mut ctx = FakeCtx::default();
+
+    let loopback = ctx
+        .core_api()
+        .device::<LoopbackDevice>()
+        .add_device_with_default_state(
+            LoopbackCreationProperties { mtu: Mtu::new(u16::MAX.into()) },
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+    let pure_ip = ctx
+        .core_api()
+        .device::<PureIpDevice>()
+        .add_device_with_default_state(
+            PureIpDeviceCreationProperties { mtu: Mtu::new(u16::MAX.into()) },
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+
+    // Enable IP and stable SLAAC addresses so a link-local address will be
+    // generated if supported by the type of interface.
+    let mut enable_and_assert_no_addrs = |device_id| {
+        let _: Ipv6DeviceConfigurationUpdate = ctx
+            .core_api()
+            .device_ip::<Ipv6>()
+            .update_configuration(
+                &device_id,
+                Ipv6DeviceConfigurationUpdate {
+                    ip_config: IpDeviceConfigurationUpdate {
+                        ip_enabled: Some(true),
+                        ..Default::default()
+                    },
+                    slaac_config: SlaacConfigurationUpdate {
+                        enable_stable_addresses: Some(true),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let addrs = with_assigned_ipv6_addr_subnets(&mut ctx.core_ctx(), &device_id, |addrs| {
+            addrs.collect::<Vec<_>>()
+        });
+        assert_matches!(addrs[..], []);
+        ctx.bindings_ctx.timer_ctx().assert_no_timers_installed();
+    };
+
+    enable_and_assert_no_addrs(loopback);
+    enable_and_assert_no_addrs(pure_ip);
 }

@@ -16,7 +16,7 @@ use core::time::Duration;
 
 use assert_matches::assert_matches;
 use log::{debug, error, trace};
-use net_types::ip::{AddrSubnet, IpAddress, Ipv6, Ipv6Addr, Subnet};
+use net_types::ip::{AddrSubnet, Ip as _, IpAddress, Ipv6, Ipv6Addr, Subnet};
 use net_types::Witness as _;
 use netstack3_base::{
     AnyDevice, CoreTimerContext, Counter, CounterContext, DeviceIdContext, DeviceIdentifier,
@@ -291,6 +291,9 @@ pub trait SlaacHandler<BC: InstantContext>: DeviceIdContext<AnyDevice> {
         valid_lifetime: Option<NonZeroNdpLifetime>,
     );
 
+    /// Generates a link-local SLAAC address for the given interface.
+    fn generate_link_local_address(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId);
+
     /// Handles SLAAC specific aspects of address removal.
     ///
     /// Must only be called after the address is removed from the interface.
@@ -434,6 +437,47 @@ impl<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<BC>> SlaacHandler<
                     temp_secret_key,
                 );
             }
+        });
+    }
+
+    fn generate_link_local_address(&mut self, bindings_ctx: &mut BC, device_id: &Self::DeviceId) {
+        let now = bindings_ctx.now();
+        self.with_slaac_addrs_mut_and_configs(device_id, |addrs_config, slaac_state| {
+            let SlaacAddrsMutAndConfig {
+                addrs,
+                config,
+                dad_transmits,
+                retrans_timer,
+                interface_identifier,
+                temp_secret_key,
+                _marker,
+            } = addrs_config;
+
+            // Configure a link-local address via SLAAC.
+            //
+            // Per [RFC 4862 Section 5.3]: "A link-local address has an infinite preferred
+            // and valid lifetime; it is never timed out."
+            //
+            // [RFC 4862 Section 5.3]: https://tools.ietf.org/html/rfc4862#section-5.3
+            let link_local_subnet =
+                Subnet::new(Ipv6::LINK_LOCAL_UNICAST_SUBNET.network(), REQUIRED_PREFIX_BITS)
+                    .expect("link local subnet should be valid");
+            add_slaac_addr_sub::<_, CC>(
+                addrs,
+                slaac_state,
+                bindings_ctx,
+                device_id,
+                now,
+                SlaacInitConfig::new(SlaacType::Stable),
+                NonZeroNdpLifetime::Infinite,       /* valid_lifetime */
+                Some(NonZeroNdpLifetime::Infinite), /* preferred_lifetime */
+                &link_local_subnet,
+                config,
+                dad_transmits,
+                retrans_timer,
+                interface_identifier,
+                temp_secret_key,
+            );
         });
     }
 
@@ -1408,7 +1452,7 @@ fn has_iana_allowed_iid(address: Ipv6Addr) -> bool {
     }
 }
 
-/// Generate an IPv6 Global Address as defined by RFC 4862 section 5.5.3.d.
+/// Generate a stable IPv6 Address as defined by RFC 4862 section 5.5.3.d.
 ///
 /// The generated address will be of the format:
 ///
@@ -1422,12 +1466,15 @@ fn has_iana_allowed_iid(address: Ipv6Addr) -> bool {
 /// Panics if a valid IPv6 unicast address cannot be formed with the provided
 /// prefix and interface identifier, or if the prefix length is not a multiple
 /// of 8 bits.
-fn generate_global_stable_address(
+fn generate_stable_address(
     prefix: &Subnet<Ipv6Addr>,
     iid: &[u8],
 ) -> AddrSubnet<Ipv6Addr, Ipv6DeviceAddr> {
     if prefix.prefix() % 8 != 0 {
-        unimplemented!("generate_global_address: not implemented for when prefix length is not a multiple of 8 bits");
+        unimplemented!(
+            "generate_stable_address: not implemented for when prefix length is not a multiple of \
+            8 bits"
+        );
     }
 
     let prefix_len = prefix.prefix() / u8::try_from(u8::BITS).unwrap();
@@ -1435,6 +1482,8 @@ fn generate_global_stable_address(
     assert_eq!(usize::from(Ipv6Addr::BYTES - prefix_len), iid.len());
 
     let mut address = prefix.network().ipv6_bytes();
+
+    // TODO(https://fxbug.dev/42148800): Generate stable addresses with opaque IIDs.
     address[prefix_len.into()..].copy_from_slice(&iid);
 
     let address = AddrSubnet::new(Ipv6Addr::from(address), prefix.prefix()).unwrap();
@@ -1533,10 +1582,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
                 // Generate the global address as defined by RFC 4862 section 5.5.3.d.
                 //
                 // TODO(https://fxbug.dev/42148800): Support regenerating address.
-                either::Either::Left(core::iter::once(generate_global_stable_address(
-                    &subnet,
-                    &iid[..],
-                ))),
+                either::Either::Left(core::iter::once(generate_stable_address(&subnet, &iid[..]))),
             )
         }
         SlaacInitConfig::Temporary { dad_count } => {

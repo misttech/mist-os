@@ -1208,7 +1208,11 @@ pub trait IpDeviceSendContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 
 fn enable_ipv6_device_with_config<
     BC: IpDeviceBindingsContext<Ipv6, CC::DeviceId>,
-    CC: Ipv6DeviceContext<BC> + GmpHandler<Ipv6, BC> + RsHandler<BC> + DadHandler<Ipv6, BC>,
+    CC: Ipv6DeviceContext<BC>
+        + GmpHandler<Ipv6, BC>
+        + RsHandler<BC>
+        + DadHandler<Ipv6, BC>
+        + SlaacHandler<BC>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1248,38 +1252,10 @@ fn enable_ipv6_device_with_config<
             );
         });
 
-    // TODO(https://fxbug.dev/42148800): Generate link-local address with opaque
-    // IIDs.
-    if config.slaac_config.enable_stable_addresses {
-        if let Some(iid) = core_ctx.get_eui64_iid(device_id) {
-            let link_local_addr_sub = {
-                let mut addr = [0; 16];
-                addr[0..2].copy_from_slice(&[0xfe, 0x80]);
-                addr[(Ipv6::UNICAST_INTERFACE_IDENTIFIER_BITS / 8) as usize..]
-                    .copy_from_slice(&iid);
-
-                AddrSubnet::new(
-                    Ipv6Addr::from(addr),
-                    Ipv6Addr::BYTES * 8 - Ipv6::UNICAST_INTERFACE_IDENTIFIER_BITS,
-                )
-                .expect("valid link-local address")
-            };
-
-            match add_ip_addr_subnet_with_config(
-                core_ctx,
-                bindings_ctx,
-                device_id,
-                link_local_addr_sub,
-                Ipv6AddrConfig::SLAAC_LINK_LOCAL,
-                config,
-            ) {
-                Ok(_) => {}
-                Err(ExistsError) => {
-                    // The address may have been added by admin action so it is safe
-                    // to swallow the exists error.
-                }
-            }
-        }
+    // Only generate a link-local address if the device supports link-layer
+    // addressing.
+    if core_ctx.get_link_layer_addr_bytes(device_id).is_some() {
+        SlaacHandler::generate_link_local_address(core_ctx, bindings_ctx, device_id);
     }
 
     RsHandler::start_router_solicitation(core_ctx, bindings_ctx, device_id);
