@@ -229,21 +229,32 @@ async fn try_ssh_cmd_cleanup(mut cmd: Child) -> Result<()> {
     Ok(())
 }
 
+/// This config value must be set to true to use FDomain as a remoting protocol.
+const FDOMAIN_CONFIG_KEY: &str = "ssh.allow_fdomain";
+
 impl TargetConnector for SshConnector {
     const CONNECTION_TYPE: &'static str = "ssh";
 
     async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
-        let fdomain = match self.connect_fdomain().await {
-            Ok(f) => Some(f),
-            Err(FDomainConnectionError::NotSupported) => None,
-            Err(FDomainConnectionError::ConnectionError(other)) => {
-                // Eventually we should just return the error here, making
-                // FDomain authoritative about whether the device is
-                // connectable. For now we'll fall through because it's less
-                // likely to cause breakages prior to migration.
-                tracing::warn!("Connecting with FDomain encountered error {other:?}");
-                None
+        let allow_fdomain = self
+            .env_context
+            .get(FDOMAIN_CONFIG_KEY)
+            .unwrap_or_else(|_| self.env_context.is_strict());
+        let fdomain = if allow_fdomain {
+            match self.connect_fdomain().await {
+                Ok(f) => Some(f),
+                Err(FDomainConnectionError::NotSupported) => None,
+                Err(FDomainConnectionError::ConnectionError(other)) => {
+                    // Eventually we should just return the error here, making
+                    // FDomain authoritative about whether the device is
+                    // connectable. For now we'll fall through because it's less
+                    // likely to cause breakages prior to migration.
+                    tracing::warn!("Connecting with FDomain encountered error {other:?}");
+                    None
+                }
             }
+        } else {
+            None
         };
         let overnet = self.connect_overnet().await;
 
