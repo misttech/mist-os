@@ -14,7 +14,7 @@ use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle};
 use fxfs::object_store::allocator::{Allocator, Reservation, ReservationOwner};
 use fxfs::object_store::transaction::{
-    lock_keys, LockKey, Options, Transaction, TRANSACTION_METADATA_MAX_AMOUNT,
+    lock_keys, LockKey, Options, Transaction, WriteGuard, TRANSACTION_METADATA_MAX_AMOUNT,
 };
 use fxfs::object_store::{DataObjectHandle, ObjectStore, RangeType, StoreObjectHandle, Timestamp};
 use fxfs::range::RangeExt;
@@ -69,8 +69,11 @@ enum PendingShrink {
     None,
 
     /// The file needs to be shrunk during the next flush. After shrinking the file, the file may
-    /// then also need to be trimmed.
-    ShrinkTo(u64),
+    /// then also need to be trimmed. We also stash whether or not we need to update the
+    /// has_overwrite_extents metadata flag during the shrink, because we get rid of the in-memory
+    /// tracking of the overwrite extents immediately but we can't update the on-disk metadata
+    /// until the next flush.
+    ShrinkTo(u64, Option<bool>),
 
     /// The file needs to be trimmed during the next flush.
     NeedsTrim,
@@ -588,27 +591,15 @@ impl PagedObjectHandle {
         Ok(())
     }
 
-    async fn flush_impl(&self) -> Result<(), Error> {
-        if !self.needs_flush() {
-            return Ok(());
-        }
-
-        let store = self.handle.store();
-        let fs = store.filesystem();
-        // If the VMO is shrunk between getting the VMO's size and calling query_dirty_ranges or
-        // reading the cached data then the flush could fail. This lock is held to prevent the file
-        // from shrinking while it's being flushed.
-        // NB: FxFile.open_count_sub_one_and_maybe_flush relies on this lock being taken to make
-        // sure any flushes are done before it adds a file tombstone if the file is going to be
-        // purged. If this lock key changes, it should change there as well.
-        let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-        let _truncate_guard = fs.lock_manager().write_lock(keys).await;
-
+    async fn flush_locked<'a>(&self, _truncate_guard: &WriteGuard<'a>) -> Result<(), Error> {
         self.handle.owner().pager().page_in_barrier().await;
 
         let pending_shrink = self.inner.lock().unwrap().pending_shrink;
-        if let PendingShrink::ShrinkTo(size) = pending_shrink {
-            let needs_trim = self.shrink_file(size).await.context("Failed to shrink file")?;
+        if let PendingShrink::ShrinkTo(size, update_has_overwrite_extents) = pending_shrink {
+            let needs_trim = self
+                .shrink_file(size, update_has_overwrite_extents)
+                .await
+                .context("Failed to shrink file")?;
             self.inner.lock().unwrap().pending_shrink =
                 if needs_trim { PendingShrink::NeedsTrim } else { PendingShrink::None };
         }
@@ -696,6 +687,25 @@ impl PagedObjectHandle {
         Ok(())
     }
 
+    async fn flush_impl(&self) -> Result<(), Error> {
+        if !self.needs_flush() {
+            return Ok(());
+        }
+
+        let store = self.handle.store();
+        let fs = store.filesystem();
+        // If the VMO is shrunk between getting the VMO's size and calling query_dirty_ranges or
+        // reading the cached data then the flush could fail. This lock is held to prevent the file
+        // from shrinking while it's being flushed.
+        // NB: FxFile.open_count_sub_one_and_maybe_flush relies on this lock being taken to make
+        // sure any flushes are done before it adds a file tombstone if the file is going to be
+        // purged. If this lock key changes, it should change there as well.
+        let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
+        let truncate_guard = fs.lock_manager().write_lock(keys).await;
+
+        self.flush_locked(&truncate_guard).await
+    }
+
     pub async fn flush(&self) -> Result<(), Error> {
         match self.flush_impl().await {
             Ok(()) => Ok(()),
@@ -707,10 +717,15 @@ impl PagedObjectHandle {
     }
 
     /// Returns true if the file still needs to be trimmed.
-    async fn shrink_file(&self, new_size: u64) -> Result<bool, Error> {
+    async fn shrink_file(
+        &self,
+        new_size: u64,
+        update_has_overwrite_extents: Option<bool>,
+    ) -> Result<bool, Error> {
         let mut transaction = self.new_transaction(None).await?;
 
-        let needs_trim = self.handle.shrink(&mut transaction, new_size).await?.0;
+        let needs_trim =
+            self.handle.shrink(&mut transaction, new_size, update_has_overwrite_extents).await?.0;
 
         let (mtime, crtime) = {
             let mut inner = self.inner.lock().unwrap();
@@ -744,6 +759,19 @@ impl PagedObjectHandle {
         let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = fs.lock_manager().write_lock(keys).await;
 
+        // mark_dirty uses the in-memory tracking of overwrite ranges to decide if it needs to
+        // reserve pages or not, so we make sure we update that tracking first thing so we start
+        // reserving pages past this size.
+        //
+        // NB: set_stream_size is pretty unlikely to fail in this scenario (our handle is good, it
+        // has the correct rights, we are shrinking so we won't hit any limits), but if it does,
+        // this breaks the fallocate contract - all the ranges past this size (rounded up to block
+        // size) will be treated as CoW ranges and will start reserving new space. Unfortunately
+        // doing it the other way around is worse - there is a potential for mark_dirty calls to
+        // come in between set_stream_size and locking inner, and if those pages are in the
+        // previously allocated range they won't have reservations for them.
+        let update_has_overwrite_extents = self.handle.truncate_overwrite_ranges(new_size)?;
+
         let vmo = self.vmo.temp_clone();
         // This unblock is to break an executor ordering deadlock situation. Vmo::set_stream_size()
         // may trigger a blocking call back into Fxfs on the same executor via the kernel. If all
@@ -755,11 +783,16 @@ impl PagedObjectHandle {
         let mut inner = self.inner.lock().unwrap();
         if new_size < previous_content_size {
             inner.pending_shrink = match inner.pending_shrink {
-                PendingShrink::None => PendingShrink::ShrinkTo(new_size),
-                PendingShrink::ShrinkTo(size) => {
-                    PendingShrink::ShrinkTo(std::cmp::min(size, new_size))
+                PendingShrink::None => {
+                    PendingShrink::ShrinkTo(new_size, update_has_overwrite_extents)
                 }
-                PendingShrink::NeedsTrim => PendingShrink::ShrinkTo(new_size),
+                PendingShrink::ShrinkTo(size, previous_update) => {
+                    let update = update_has_overwrite_extents.or(previous_update);
+                    PendingShrink::ShrinkTo(std::cmp::min(size, new_size), update)
+                }
+                PendingShrink::NeedsTrim => {
+                    PendingShrink::ShrinkTo(new_size, update_has_overwrite_extents)
+                }
             }
         }
 
@@ -894,12 +927,23 @@ impl PagedObjectHandle {
         if range.start == range.end {
             return Err(anyhow!(FxfsError::InvalidArgs));
         }
-        // Flushing relies on the allocated ranges to determine flush batching, so we grab the same
-        // lock as flushing to make sure they are mutually exclusive.
+
+        // We want to make sure that flushing, truncate, and allocate are all mutually exclusive,
+        // so they all grab the same truncate lock.
         let store = self.store();
         let fs = store.filesystem();
         let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
-        let _flush_guard = fs.lock_manager().write_lock(keys).await;
+        let flush_guard = fs.lock_manager().write_lock(keys).await;
+
+        // There are potentially pending shrink operations. We don't particularly care about the
+        // performance of allocate, just correctness, so we flush while holding the truncate lock
+        // the whole time to make sure the ordering of those operations is correct. Clearing most
+        // of the pending write reservations that might overlap with allocated range is a nice side
+        // effect, but it's not really required.
+        self.flush_locked(&flush_guard)
+            .await
+            .inspect_err(|error| error!(error:?; "Failed to flush in allocate"))?;
+
         // Allocate extends the file if the range is beyond the current file size, so update the
         // stream size in that case as well.
         if self.vmo.get_stream_size()? < range.end {
@@ -3080,6 +3124,66 @@ mod tests {
             assert_eq!(contents.len(), data.len());
             assert_eq!(&contents, &data);
         }
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_write_to_previously_allocated_range_between_flushes() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let contents = vec![1; 42007];
+        fuchsia_fs::file::write(&file, &contents).await.unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.allocate(4125, 29053, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        file.resize(22932).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let contents = vec![1; 7963];
+        file.write_at(&contents, 22066).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        let contents = vec![1; 2697];
+        file.write_at(&contents, 61919).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_truncate_then_allocate_between_syncs() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let contents = vec![1; 4096];
+        fuchsia_fs::file::write(&file, &contents).await.unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.resize(0).await.unwrap().map_err(zx::Status::from_raw).unwrap();
+        file.allocate(0, 4096, fio::AllocateMode::empty())
+            .await
+            .unwrap()
+            .map_err(zx::Status::from_raw)
+            .unwrap();
+        file.sync().await.unwrap().map_err(zx::Status::from_raw).unwrap();
 
         fixture.close().await;
     }

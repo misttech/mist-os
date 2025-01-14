@@ -1094,22 +1094,26 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.handle.update_allocated_size(transaction, allocated, deallocated).await
     }
 
-    pub async fn shrink<'a>(
-        &'a self,
-        transaction: &mut Transaction<'a>,
-        size: u64,
-    ) -> Result<NeedsTrim, Error> {
-        let needs_trim = self.handle.shrink(transaction, self.attribute_id(), size).await?;
-        let update_has_overwrite_extents = if self
+    pub fn truncate_overwrite_ranges(&self, size: u64) -> Result<Option<bool>, Error> {
+        if self
             .overwrite_ranges
             .truncate(round_up(size, self.block_size()).ok_or(FxfsError::TooBig)?)
         {
             // This returns true if there were ranges, but this truncate removed them all, which
             // indicates that we need to flip the has_overwrite_extents metadata flag to false.
-            Some(false)
+            Ok(Some(false))
         } else {
-            None
-        };
+            Ok(None)
+        }
+    }
+
+    pub async fn shrink<'a>(
+        &'a self,
+        transaction: &mut Transaction<'a>,
+        size: u64,
+        update_has_overwrite_extents: Option<bool>,
+    ) -> Result<NeedsTrim, Error> {
+        let needs_trim = self.handle.shrink(transaction, self.attribute_id(), size).await?;
         self.txn_update_size(transaction, size, update_has_overwrite_extents).await?;
         Ok(needs_trim)
     }
@@ -1432,7 +1436,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             return Ok(());
         }
         if size < old_size {
-            if self.shrink(&mut transaction, size).await?.0 {
+            let update_has_overwrite_ranges = self.truncate_overwrite_ranges(size)?;
+            if self.shrink(&mut transaction, size, update_has_overwrite_ranges).await?.0 {
                 // The file needs to be trimmed.
                 transaction.commit_and_continue().await?;
                 let store = self.store();
