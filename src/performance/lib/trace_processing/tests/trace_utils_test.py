@@ -10,6 +10,10 @@ from typing import List
 import test_utils
 from trace_processing import trace_metrics, trace_model, trace_time, trace_utils
 
+# Boilerplate-busting constants:
+U = trace_metrics.Unit
+TCR = trace_metrics.TestCaseResult
+
 
 class TraceUtilsTest(unittest.TestCase):
     """Trace utils tests"""
@@ -191,23 +195,24 @@ class TraceUtilsTest(unittest.TestCase):
         )
 
     def test_standard_metrics_set(self) -> None:
-        values: list[float] = [0, 10]
-        unit = trace_metrics.Unit.milliseconds
+        values: list[float] = [0.0, 10.0]
+        unit = U.milliseconds
 
         results = trace_utils.standard_metrics_set(
             values=values, label_prefix="Foo", unit=unit
         )
+        p_format_str = "{}, {}th percentile"
         self.maxDiff = None
         self.assertEqual(
             results,
             [
-                trace_metrics.TestCaseResult("FooP5", unit, [0.5]),
-                trace_metrics.TestCaseResult("FooP25", unit, [2.5]),
-                trace_metrics.TestCaseResult("FooP50", unit, [5.0]),
-                trace_metrics.TestCaseResult("FooP75", unit, [7.5]),
-                trace_metrics.TestCaseResult("FooP95", unit, [9.5]),
-                trace_metrics.TestCaseResult("FooMin", unit, [0.0]),
-                trace_metrics.TestCaseResult("FooMax", unit, [10.0]),
-                trace_metrics.TestCaseResult("FooAverage", unit, [5.0]),
+                TCR("FooP5", unit, [0.5], p_format_str.format("Foo", 5)),
+                TCR("FooP25", unit, [2.5], p_format_str.format("Foo", 25)),
+                TCR("FooP50", unit, [5.0], p_format_str.format("Foo", 50)),
+                TCR("FooP75", unit, [7.5], p_format_str.format("Foo", 75)),
+                TCR("FooP95", unit, [9.5], p_format_str.format("Foo", 95)),
+                TCR("FooMin", unit, [0.0], "Foo, minimum"),
+                TCR("FooMax", unit, [10.0], "Foo, maximum"),
+                TCR("FooAverage", unit, [5.0], "Foo, mean"),
             ],
         )

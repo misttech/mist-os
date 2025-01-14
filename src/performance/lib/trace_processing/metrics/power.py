@@ -18,7 +18,7 @@ _SAG = "system-activity-governor"
 
 
 @dataclasses.dataclass
-class PowerMetricSample:
+class _Sample:
     """A sample of collected power metrics.
 
     Args:
@@ -45,7 +45,7 @@ def _running_avg(avg: float, value: float, count: int) -> float:
 
 
 @dataclasses.dataclass
-class AggregatePowerMetrics:
+class _AggregateMetrics:
     """Aggregate power metrics representation.
 
     Represents aggregated metrics over a number of power metrics samples.
@@ -62,7 +62,10 @@ class AggregatePowerMetrics:
     mean_power: float = 0
     min_power: float | None = None
 
-    def process_sample(self, sample: PowerMetricSample) -> None:
+    DESCRIPTION_BASE = "Power usage sampled during test"
+    """Stable format for descriptions of aggregate metrics."""
+
+    def process_sample(self, sample: _Sample) -> None:
         """Process a sample of power metrics.
 
         Args:
@@ -88,31 +91,46 @@ class AggregatePowerMetrics:
         """Returns true if no samples have been processed yet."""
         return self.max_power is None or self.min_power is None
 
+    def _build_expl(self, condition: str, aggregate: str) -> str:
+        """Builds a properly formatted explanation for a given power metric."""
+        if not condition:
+            return f"{_AggregateMetrics.DESCRIPTION_BASE}, {aggregate}"
+        return f"{_AggregateMetrics.DESCRIPTION_BASE} {condition}, {aggregate}"
+
     def to_fuchsiaperf_results(
-        self, tag: str = ""
+        self, tag: str, condition: str
     ) -> list[trace_metrics.TestCaseResult]:
         """Converts Power metrics to fuchsiaperf JSON object.
+
+        Args:
+            tag: a descriptive word to add to the end of metric names, e.g. "suspend"
+            condition: a descriptive string to add to the explanatory text used for these metrics,
+                       e.g. "while device is suspended"
 
         Returns:
           List of JSON object.
         """
         assert self.min_power is not None and self.max_power is not None
+        suffix = f"_{tag}" if tag else ""
         results: list[trace_metrics.TestCaseResult] = [
             trace_metrics.TestCaseResult(
-                label="MinPower" + tag,
+                label="MinPower" + suffix,
                 unit=trace_metrics.Unit.watts,
                 values=[self.min_power],
+                doc=self._build_expl(condition, "minimum"),
             ),
             # TODO(cmasone): Add MedianPower metrics
             trace_metrics.TestCaseResult(
-                label="MeanPower" + tag,
+                label="MeanPower" + suffix,
                 unit=trace_metrics.Unit.watts,
                 values=[self.mean_power],
+                doc=self._build_expl(condition, "mean"),
             ),
             trace_metrics.TestCaseResult(
-                label="MaxPower" + tag,
+                label="MaxPower" + suffix,
                 unit=trace_metrics.Unit.watts,
                 values=[self.max_power],
+                doc=self._build_expl(condition, "maximum"),
             ),
         ]
         return results
@@ -177,14 +195,14 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
         ]
         _LOGGER.info(f"Identified suspend windows: {suspend_windows}")
 
-        power_metrics = AggregatePowerMetrics()
-        running_power_metrics = AggregatePowerMetrics()
-        suspend_power_metrics = AggregatePowerMetrics()
+        power_metrics = _AggregateMetrics()
+        running_power_metrics = _AggregateMetrics()
+        suspend_power_metrics = _AggregateMetrics()
         for me in metrics_events:
             # These args are set in _append_power_data()
             # found in //src/tests/end_to_end/power/power_test_utils.py
             if "Voltage" in me.args and "Current" in me.args:
-                sample = PowerMetricSample(
+                sample = _Sample(
                     timestamp=me.start.to_epoch_delta().to_nanoseconds(),
                     voltage=float(me.args["Voltage"]),
                     current=float(me.args["Current"]),
@@ -205,16 +223,20 @@ class PowerMetricsProcessor(trace_metrics.MetricsProcessor):
             )
             return []
 
-        results = power_metrics.to_fuchsiaperf_results()
+        results = power_metrics.to_fuchsiaperf_results("", "")
 
         # If the system was suspended, also report suspended and non-suspended
         # (running) power metrics.
         if not suspend_power_metrics.is_empty:
             results.extend(
-                suspend_power_metrics.to_fuchsiaperf_results(tag="_suspend")
+                suspend_power_metrics.to_fuchsiaperf_results(
+                    "suspend", "while device is suspended"
+                )
             )
             results.extend(
-                running_power_metrics.to_fuchsiaperf_results(tag="_running")
+                running_power_metrics.to_fuchsiaperf_results(
+                    "running", "while device is awake"
+                )
             )
 
         return results

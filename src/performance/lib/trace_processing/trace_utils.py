@@ -322,15 +322,29 @@ def standard_metrics_set(
             f"{label_prefix}P{p}",
             unit,
             [percentile(values, p)],
+            f"{label_prefix}, {p}th percentile",
         )
         for p in percentiles
     ]
 
     results += [
-        trace_metrics.TestCaseResult(f"{label_prefix}Min", unit, [min(values)]),
-        trace_metrics.TestCaseResult(f"{label_prefix}Max", unit, [max(values)]),
         trace_metrics.TestCaseResult(
-            f"{label_prefix}Average", unit, [statistics.mean(values)]
+            f"{label_prefix}Min",
+            unit,
+            [min(values)],
+            f"{label_prefix}, minimum",
+        ),
+        trace_metrics.TestCaseResult(
+            f"{label_prefix}Max",
+            unit,
+            [max(values)],
+            f"{label_prefix}, maximum",
+        ),
+        trace_metrics.TestCaseResult(
+            f"{label_prefix}Average",
+            unit,
+            [statistics.mean(values)],
+            f"{label_prefix}, mean",
         ),
     ]
 
