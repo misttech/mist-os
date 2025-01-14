@@ -23,6 +23,7 @@ group("tests") {
     ":component-manager-status-tests",
     ":diagnostics-kcounter-inspect-tests",
     ":diagnostics-persistence-inspect-tests",
+    ":drivers-exist-tests",
     ":fshost-metrics-tests",
     ":legacy-metrics-tests",
     ":log_settings_min_severity",
@@ -125,6 +126,22 @@ fuchsia_unittest_package("component-manager-status-tests") {
 
 fuchsia_unittest_package("component-manager-cpu-stats-tests") {
   manifest = "meta/component_manager_cpu_stats_tests.cml"
+  test_type = "system"
+
+  test_specs = {
+    environments = [
+      emu_env,
+      {
+        dimensions = {
+          device_type = "Astro"
+        }
+      },
+    ]
+  }
+}
+
+fuchsia_unittest_package("drivers-exist-tests") {
+  manifest = "meta/drivers_exist.cml"
   test_type = "system"
 
   test_specs = {
