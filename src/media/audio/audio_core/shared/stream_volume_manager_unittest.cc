@@ -12,7 +12,7 @@
 namespace media::audio {
 namespace {
 
-using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioCaptureUsage2;
 using fuchsia::media::AudioRenderUsage2;
 
 class MockStreamVolume : public StreamVolume {

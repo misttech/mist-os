@@ -62,25 +62,26 @@ std::optional<fuchsia::media::AudioRenderUsage2> JsonToRenderUsage(const rapidjs
   return std::nullopt;
 }
 
-std::optional<fuchsia::media::AudioCaptureUsage> JsonToCaptureUsage(const rapidjson::Value& usage) {
-  static_assert(fuchsia::media::CAPTURE_USAGE_COUNT == 4,
+std::optional<fuchsia::media::AudioCaptureUsage2> JsonToCaptureUsage(
+    const rapidjson::Value& usage) {
+  static_assert(fuchsia::media::CAPTURE_USAGE2_COUNT == 4,
                 "New Capture Usage(s) added to fidl without updating config loader");
 
   auto rule_str = usage.GetString();
 
   if (!strcmp(rule_str, "BACKGROUND")) {
-    return fuchsia::media::AudioCaptureUsage::BACKGROUND;
+    return fuchsia::media::AudioCaptureUsage2::BACKGROUND;
   }
   if (!strcmp(rule_str, "COMMUNICATION")) {
-    return fuchsia::media::AudioCaptureUsage::COMMUNICATION;
+    return fuchsia::media::AudioCaptureUsage2::COMMUNICATION;
   }
   if (!strcmp(rule_str, "FOREGROUND")) {
-    return fuchsia::media::AudioCaptureUsage::FOREGROUND;
+    return fuchsia::media::AudioCaptureUsage2::FOREGROUND;
   }
   if (!strcmp(rule_str, "SYSTEM_AGENT")) {
-    return fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT;
+    return fuchsia::media::AudioCaptureUsage2::SYSTEM_AGENT;
   }
-  FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioCaptureUsage.";
+  FX_LOGS(ERROR) << usage.GetString() << " not a valid AudioCaptureUsage2.";
 
   return std::nullopt;
 }

@@ -15,7 +15,7 @@
 
 namespace media::audio {
 
-using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioCaptureUsage2;
 using fuchsia::media::AudioRenderUsage2;
 using fuchsia::media::Usage2;
 
@@ -82,7 +82,7 @@ void AudioAdmin::SetUsageNone(AudioRenderUsage2 usage) {
                                              fuchsia::media::Behavior::NONE);
 }
 
-void AudioAdmin::SetUsageNone(AudioCaptureUsage usage) {
+void AudioAdmin::SetUsageNone(AudioCaptureUsage2 usage) {
   TRACE_DURATION("audio", "AudioAdmin::SetUsageNone(Capture)");
   std::lock_guard<fit::thread_checker> lock(fidl_thread_checker_);
   stream_volume_manager_.SetUsageGainAdjustment(Usage2::WithCaptureUsage(fidl::Clone(usage)),
@@ -100,7 +100,7 @@ void AudioAdmin::SetUsageMute(AudioRenderUsage2 usage) {
                                              fuchsia::media::Behavior::MUTE);
 }
 
-void AudioAdmin::SetUsageMute(AudioCaptureUsage usage) {
+void AudioAdmin::SetUsageMute(AudioCaptureUsage2 usage) {
   TRACE_DURATION("audio", "AudioAdmin::SetUsageMute(Capture)");
   std::lock_guard<fit::thread_checker> lock(fidl_thread_checker_);
   stream_volume_manager_.SetUsageGainAdjustment(Usage2::WithCaptureUsage(fidl::Clone(usage)),
@@ -118,7 +118,7 @@ void AudioAdmin::SetUsageDuck(AudioRenderUsage2 usage) {
                                              fuchsia::media::Behavior::DUCK);
 }
 
-void AudioAdmin::SetUsageDuck(AudioCaptureUsage usage) {
+void AudioAdmin::SetUsageDuck(AudioCaptureUsage2 usage) {
   TRACE_DURATION("audio", "AudioAdmin::SetUsageDuck(Capture)");
   std::lock_guard<fit::thread_checker> lock(fidl_thread_checker_);
   stream_volume_manager_.SetUsageGainAdjustment(Usage2::WithCaptureUsage(fidl::Clone(usage)),
@@ -145,8 +145,8 @@ void AudioAdmin::ApplyNewPolicies(const RendererPolicies& new_renderer_policies,
         break;
     }
   }
-  for (int i = 0; i < fuchsia::media::CAPTURE_USAGE_COUNT; ++i) {
-    auto usage = AudioCaptureUsage(i);
+  for (int i = 0; i < fuchsia::media::CAPTURE_USAGE2_COUNT; ++i) {
+    auto usage = AudioCaptureUsage2(i);
     switch (new_capturer_policies[i]) {
       case fuchsia::media::Behavior::NONE:
         SetUsageNone(usage);
@@ -179,8 +179,8 @@ void AudioAdmin::UpdatePolicy() {
       new_renderer_policies[i] =
           std::max(new_renderer_policies[i], active_rules_.GetPolicy(active, affected));
     }
-    for (int i = 0; i < fuchsia::media::CAPTURE_USAGE_COUNT; ++i) {
-      auto affected = AudioCaptureUsage(i);
+    for (int i = 0; i < fuchsia::media::CAPTURE_USAGE2_COUNT; ++i) {
+      auto affected = AudioCaptureUsage2(i);
       new_capturer_policies[i] =
           std::max(new_capturer_policies[i], active_rules_.GetPolicy(active, affected));
     }
@@ -194,10 +194,10 @@ void AudioAdmin::UpdatePolicy() {
       set_new_policies(AudioRenderUsage2(i));
     }
   }
-  for (int i = 0; i < fuchsia::media::CAPTURE_USAGE_COUNT; ++i) {
+  for (int i = 0; i < fuchsia::media::CAPTURE_USAGE2_COUNT; ++i) {
     if (IsActive(static_cast<CaptureUsage>(i))) {
-      active_usages.push_back(Usage2::WithCaptureUsage(AudioCaptureUsage(i)));
-      set_new_policies(AudioCaptureUsage(i));
+      active_usages.push_back(Usage2::WithCaptureUsage(AudioCaptureUsage2(i)));
+      set_new_policies(AudioCaptureUsage2(i));
     }
   }
   ApplyNewPolicies(new_renderer_policies, new_capturer_policies);
@@ -226,7 +226,7 @@ void AudioAdmin::UpdateCaptureActivity() {
   std::lock_guard<fit::thread_checker> lock(fidl_thread_checker_);
 
   ActivityDispatcher::CaptureActivity capture_activity;
-  for (int i = 0; i < fuchsia::media::CAPTURE_USAGE_COUNT; i++) {
+  for (int i = 0; i < fuchsia::media::CAPTURE_USAGE2_COUNT; i++) {
     if (IsActive(kCaptureUsages[i])) {
       capture_activity.set(i);
     }
@@ -304,25 +304,25 @@ void AudioAdmin::UpdateCapturerState(CaptureUsage usage, bool active,
 
 void AudioAdmin::PolicyRules::ResetInteractions() {
   TRACE_DURATION("audio", "AudioAdmin::ResetInteractions");
-  for (int act = 0; act < fuchsia::media::RENDER_USAGE2_COUNT; act++) {
-    auto active = AudioRenderUsage2(act);
+  for (int ac = 0; ac < fuchsia::media::RENDER_USAGE2_COUNT; ac++) {
+    auto active = AudioRenderUsage2(ac);
     for (int aff = 0; aff < fuchsia::media::RENDER_USAGE2_COUNT; aff++) {
       auto affected = AudioRenderUsage2(aff);
       SetRule(active, affected, fuchsia::media::Behavior::NONE);
     }
-    for (int aff = 0; aff < fuchsia::media::CAPTURE_USAGE_COUNT; aff++) {
-      auto affected = AudioCaptureUsage(aff);
+    for (int aff = 0; aff < fuchsia::media::CAPTURE_USAGE2_COUNT; aff++) {
+      auto affected = AudioCaptureUsage2(aff);
       SetRule(active, affected, fuchsia::media::Behavior::NONE);
     }
   }
-  for (int act = 0; act < fuchsia::media::CAPTURE_USAGE_COUNT; act++) {
-    auto active = AudioCaptureUsage(act);
+  for (int ac = 0; ac < fuchsia::media::CAPTURE_USAGE2_COUNT; ac++) {
+    auto active = AudioCaptureUsage2(ac);
     for (int aff = 0; aff < fuchsia::media::RENDER_USAGE2_COUNT; aff++) {
       auto affected = AudioRenderUsage2(aff);
       SetRule(active, affected, fuchsia::media::Behavior::NONE);
     }
-    for (int aff = 0; aff < fuchsia::media::CAPTURE_USAGE_COUNT; aff++) {
-      auto affected = AudioCaptureUsage(aff);
+    for (int aff = 0; aff < fuchsia::media::CAPTURE_USAGE2_COUNT; aff++) {
+      auto affected = AudioCaptureUsage2(aff);
       SetRule(active, affected, fuchsia::media::Behavior::NONE);
     }
   }

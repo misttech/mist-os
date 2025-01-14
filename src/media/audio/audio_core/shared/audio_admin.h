@@ -95,7 +95,7 @@ class AudioAdmin {
   using RendererPolicies =
       std::array<fuchsia::media::Behavior, fuchsia::media::RENDER_USAGE2_COUNT>;
   using CapturerPolicies =
-      std::array<fuchsia::media::Behavior, fuchsia::media::CAPTURE_USAGE_COUNT>;
+      std::array<fuchsia::media::Behavior, fuchsia::media::CAPTURE_USAGE2_COUNT>;
 
   std::unordered_set<fuchsia::media::AudioRenderer*>* active_streams_playback() {
     return active_streams_playback_;
@@ -130,20 +130,20 @@ class AudioAdmin {
 
   // Helpers to make the control of streams cleaner.
   void SetUsageNone(fuchsia::media::AudioRenderUsage2 usage);
-  void SetUsageNone(fuchsia::media::AudioCaptureUsage usage);
+  void SetUsageNone(fuchsia::media::AudioCaptureUsage2 usage);
 
   void SetUsageMute(fuchsia::media::AudioRenderUsage2 usage);
-  void SetUsageMute(fuchsia::media::AudioCaptureUsage usage);
+  void SetUsageMute(fuchsia::media::AudioCaptureUsage2 usage);
 
   void SetUsageDuck(fuchsia::media::AudioRenderUsage2 usage);
-  void SetUsageDuck(fuchsia::media::AudioCaptureUsage usage);
+  void SetUsageDuck(fuchsia::media::AudioCaptureUsage2 usage);
 
   void ApplyNewPolicies(const RendererPolicies& new_renderer_policies,
                         const CapturerPolicies& new_capturer_policies);
 
   class PolicyRules {
    public:
-    int ToIndex(fuchsia::media::AudioCaptureUsage usage) {
+    int ToIndex(fuchsia::media::AudioCaptureUsage2 usage) {
       return media::audio::ToIndex(usage) + fuchsia::media::RENDER_USAGE2_COUNT;
     }
 
@@ -165,8 +165,9 @@ class AudioAdmin {
 
    private:
     fuchsia::media::Behavior
-        active_affected_[fuchsia::media::RENDER_USAGE2_COUNT + fuchsia::media::CAPTURE_USAGE_COUNT]
-                        [fuchsia::media::RENDER_USAGE2_COUNT + fuchsia::media::CAPTURE_USAGE_COUNT];
+        active_affected_[fuchsia::media::RENDER_USAGE2_COUNT + fuchsia::media::CAPTURE_USAGE2_COUNT]
+                        [fuchsia::media::RENDER_USAGE2_COUNT +
+                         fuchsia::media::CAPTURE_USAGE2_COUNT];
   };
   PolicyRules active_rules_ FXL_GUARDED_BY(fidl_thread_checker_);
 

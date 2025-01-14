@@ -10,7 +10,7 @@
 #include "src/media/audio/audio_core/shared/stream_usage.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 
-using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioCaptureUsage2;
 using fuchsia::media::AudioRenderUsage2;
 
 namespace media::audio::test {

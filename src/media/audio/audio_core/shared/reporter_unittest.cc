@@ -17,7 +17,7 @@
 namespace media::audio {
 namespace {
 
-using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioCaptureUsage2;
 using fuchsia::media::AudioRenderUsage2;
 using ::inspect::testing::BoolIs;
 using ::inspect::testing::ChildrenMatch;
@@ -1218,7 +1218,8 @@ TEST_F(ReporterTest, AudioPolicyMetrics) {
   // Structures to hold active usages and usage behaviors.
   std::vector<fuchsia::media::Usage2> active_usages;
   std::array<fuchsia::media::Behavior, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_behaviors;
-  std::array<fuchsia::media::Behavior, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_behaviors;
+  std::array<fuchsia::media::Behavior, fuchsia::media::CAPTURE_USAGE2_COUNT>
+      capture_usage_behaviors;
   render_usage_behaviors.fill(fuchsia::media::Behavior::NONE);
   capture_usage_behaviors.fill(fuchsia::media::Behavior::NONE);
 
@@ -1242,8 +1243,7 @@ TEST_F(ReporterTest, AudioPolicyMetrics) {
 
   // Expect active RenderUsage::MEDIA and CaptureUsage::SYSTEM_AGENT to be logged, with DUCK applied
   // to MEDIA.
-  active_usages.push_back(
-      fuchsia::media::Usage2::WithCaptureUsage((fidl::Clone(AudioCaptureUsage::SYSTEM_AGENT))));
+  active_usages.push_back(ToFidlUsage2(CaptureUsage::SYSTEM_AGENT));
   render_usage_behaviors[static_cast<int>(AudioRenderUsage2::MEDIA)] =
       fuchsia::media::Behavior::DUCK;
   under_test_.UpdateActiveUsagePolicy(active_usages, render_usage_behaviors,

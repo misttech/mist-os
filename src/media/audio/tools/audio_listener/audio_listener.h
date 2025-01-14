@@ -135,7 +135,7 @@ class AudioListener {
   fuchsia::media::UsageReporterPtr usage_reporter_;
   // UsageWatchers are stored in alphabetical order of their usage.
   std::unique_ptr<UsageWatcherImpl> render_usage_watchers_[fuchsia::media::RENDER_USAGE2_COUNT];
-  std::unique_ptr<UsageWatcherImpl> capture_usage_watchers_[fuchsia::media::CAPTURE_USAGE_COUNT];
+  std::unique_ptr<UsageWatcherImpl> capture_usage_watchers_[fuchsia::media::CAPTURE_USAGE2_COUNT];
 
   fuchsia::media::AudioCorePtr audio_core_;
   // VolumeControls, volumes and mutes are stored in alphabetical order of their usage.
@@ -149,7 +149,7 @@ class AudioListener {
   std::unique_ptr<UsageGainListenerImpl>
       render_usage_gain_listeners_[fuchsia::media::RENDER_USAGE2_COUNT];
   std::unique_ptr<UsageGainListenerImpl>
-      capture_usage_gain_listeners_[fuchsia::media::CAPTURE_USAGE_COUNT];
+      capture_usage_gain_listeners_[fuchsia::media::CAPTURE_USAGE2_COUNT];
 
   DisplayMode display_mode_ = DisplayMode::UsageActive;
 };

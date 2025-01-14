@@ -372,6 +372,32 @@
         "type": "uint32"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.media/AudioCaptureUsage2.BACKGROUND",
+        "value": "0"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/AudioCaptureUsage2.COMMUNICATION",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/AudioCaptureUsage2.FOREGROUND",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.media/AudioCaptureUsage2.SYSTEM_AGENT",
+        "value": "2"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.media/AudioCaptureUsage2",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
         "kind": "protocol/member",
         "name": "fuchsia.media/AudioCapturer.AddPayloadBuffer",
         "strictness": "strict",
@@ -2233,6 +2259,12 @@
         "name": "fuchsia.media/Behavior",
         "strictness": "flexible",
         "type": "uint32"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.media/CAPTURE_USAGE2_COUNT",
+        "type": "uint8",
+        "value": "4"
     },
     {
         "kind": "const",
@@ -4347,7 +4379,7 @@
         "kind": "union/member",
         "name": "fuchsia.media/Usage2.capture_usage",
         "ordinal": "2",
-        "type": "fuchsia.media/AudioCaptureUsage"
+        "type": "fuchsia.media/AudioCaptureUsage2"
     },
     {
         "kind": "union/member",

@@ -11,7 +11,7 @@
 namespace media::audio {
 namespace {
 
-using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioCaptureUsage2;
 using fuchsia::media::AudioRenderUsage2;
 using fuchsia::media::Usage2;
 
@@ -39,7 +39,7 @@ StreamVolumeManager::StreamVolumeManager(async_dispatcher_t* fidl_dispatcher)
           VolumeSettingImpl(ToFidlUsage2(RenderUsage::COMMUNICATION), this),
           VolumeSettingImpl(ToFidlUsage2(RenderUsage::ACCESSIBILITY), this),
       },
-      // These must be listed in the order of the fuchsia::media::AudioCaptureUsage enum.
+      // These must be listed in the order of the fuchsia::media::AudioCaptureUsage2 enum.
       capture_usage_volume_setting_impls_{
           VolumeSettingImpl(ToFidlUsage2(CaptureUsage::BACKGROUND), this),
           VolumeSettingImpl(ToFidlUsage2(CaptureUsage::FOREGROUND), this),
@@ -65,19 +65,19 @@ StreamVolumeManager::StreamVolumeManager(async_dispatcher_t* fidl_dispatcher)
               &render_usage_volume_setting_impls_[ToIndex(AudioRenderUsage2::ACCESSIBILITY)],
               fidl_dispatcher),
       },
-      // These must be listed in the order of the fuchsia::media::AudioCaptureUsage enum.
+      // These must be listed in the order of the fuchsia::media::AudioCaptureUsage2 enum.
       capture_usage_volume_controls_{
           VolumeControl(
-              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage::BACKGROUND)],
+              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage2::BACKGROUND)],
               fidl_dispatcher),
           VolumeControl(
-              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage::FOREGROUND)],
+              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage2::FOREGROUND)],
               fidl_dispatcher),
           VolumeControl(
-              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage::SYSTEM_AGENT)],
+              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage2::SYSTEM_AGENT)],
               fidl_dispatcher),
           VolumeControl(
-              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage::COMMUNICATION)],
+              &capture_usage_volume_setting_impls_[ToIndex(AudioCaptureUsage2::COMMUNICATION)],
               fidl_dispatcher),
       } {
   FX_DCHECK(fidl_dispatcher);
@@ -89,10 +89,10 @@ StreamVolumeManager::StreamVolumeManager(async_dispatcher_t* fidl_dispatcher)
   static_assert(ToIndex(AudioRenderUsage2::COMMUNICATION) == 4);
   static_assert(ToIndex(AudioRenderUsage2::ACCESSIBILITY) == 5);
 
-  static_assert(ToIndex(AudioCaptureUsage::BACKGROUND) == 0);
-  static_assert(ToIndex(AudioCaptureUsage::FOREGROUND) == 1);
-  static_assert(ToIndex(AudioCaptureUsage::SYSTEM_AGENT) == 2);
-  static_assert(ToIndex(AudioCaptureUsage::COMMUNICATION) == 3);
+  static_assert(ToIndex(AudioCaptureUsage2::BACKGROUND) == 0);
+  static_assert(ToIndex(AudioCaptureUsage2::FOREGROUND) == 1);
+  static_assert(ToIndex(AudioCaptureUsage2::SYSTEM_AGENT) == 2);
+  static_assert(ToIndex(AudioCaptureUsage2::COMMUNICATION) == 3);
 }
 
 const UsageGainSettings& StreamVolumeManager::GetUsageGainSettings() const {

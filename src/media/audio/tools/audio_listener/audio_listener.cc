@@ -21,7 +21,7 @@ constexpr char kClearEol[] = "\x1b[K";
 constexpr char kHideCursor[] = "\x1b[?25l";
 constexpr char kShowCursor[] = "\x1b[?25h";
 
-// This should reflect the order of the fuchsia::media::AudioCaptureUsage enum's underlying values.
+// This should reflect the order of the fuchsia::media::AudioCaptureUsage2 enum's underlying values.
 constexpr std::array<uint8_t, fuchsia::media::CAPTURE_USAGE_COUNT> kAlphaIndexForCaptureUsage = {
     0,  // BACKGROUND
     2,  // FOREGROUND
@@ -38,7 +38,7 @@ constexpr std::array<uint8_t, fuchsia::media::RENDER_USAGE2_COUNT> kAlphaIndexFo
     2,  // COMMUNICATION
     0,  // ACCESSIBILITY
 };
-uint8_t CaptureUsageToAlphaIndex(fuchsia::media::AudioCaptureUsage capture_usage) {
+uint8_t CaptureUsageToAlphaIndex(fuchsia::media::AudioCaptureUsage2 capture_usage) {
   return kAlphaIndexForCaptureUsage[static_cast<uint8_t>(capture_usage)];
 }
 uint8_t RenderUsageToAlphaIndex(fuchsia::media::AudioRenderUsage2 render_usage) {
@@ -55,12 +55,12 @@ const std::pair<fuchsia::media::AudioRenderUsage2, std::string>
         {fuchsia::media::AudioRenderUsage2::MEDIA, "Media "},
         {fuchsia::media::AudioRenderUsage2::SYSTEM_AGENT, "SysAgt"},
 };
-const std::pair<fuchsia::media::AudioCaptureUsage, std::string>
-    kCaptureUsages[fuchsia::media::CAPTURE_USAGE_COUNT] = {
-        {fuchsia::media::AudioCaptureUsage::BACKGROUND, "Backgd"},
-        {fuchsia::media::AudioCaptureUsage::COMMUNICATION, "Comm  "},
-        {fuchsia::media::AudioCaptureUsage::FOREGROUND, "Foregd"},
-        {fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT, "SysAgt"},
+const std::pair<fuchsia::media::AudioCaptureUsage2, std::string>
+    kCaptureUsages[fuchsia::media::CAPTURE_USAGE2_COUNT] = {
+        {fuchsia::media::AudioCaptureUsage2::BACKGROUND, "Backgd"},
+        {fuchsia::media::AudioCaptureUsage2::COMMUNICATION, "Comm  "},
+        {fuchsia::media::AudioCaptureUsage2::FOREGROUND, "Foregd"},
+        {fuchsia::media::AudioCaptureUsage2::SYSTEM_AGENT, "SysAgt"},
 };
 constexpr const char* kBlankUsageName = "      ";
 
@@ -73,7 +73,7 @@ UsageGainListenerImpl::UsageGainListenerImpl(AudioListener* parent, std::string 
       device_str_(std::move(device_str)),
       usage_(std::move(usage)) {
   if (usage_.is_capture_usage()) {
-    usage_str_ = "AudioCaptureUsage::" +
+    usage_str_ = "AudioCaptureUsage2::" +
                  kCaptureUsages[CaptureUsageToAlphaIndex(usage_.capture_usage())].second;
   } else {
     usage_str_ = "AudioRenderUsage2::" +
@@ -98,7 +98,7 @@ void UsageGainListenerImpl::OnGainMuteChanged(bool muted, float gain_dbfs,
 UsageWatcherImpl::UsageWatcherImpl(AudioListener* parent, fuchsia::media::Usage2 usage)
     : parent_(parent), binding_(this), usage_(std::move(usage)) {
   if (usage_.is_capture_usage()) {
-    usage_str_ = "AudioCaptureUsage::" +
+    usage_str_ = "AudioCaptureUsage2::" +
                  kCaptureUsages[CaptureUsageToAlphaIndex(usage_.capture_usage())].second;
   } else {
     usage_str_ = "AudioRenderUsage2::" +
@@ -228,7 +228,8 @@ void AudioListener::OnCaptureActivity(
   }
   // Then set the usages 'active' that are contained in the capture_usages vector
   for (auto capture_usage : capture_usages) {
-    capture_usage_watchers_[CaptureUsageToAlphaIndex(capture_usage)]->set_active();
+    auto capture_usage2 = fuchsia::media::AudioCaptureUsage2(fidl::ToUnderlying(capture_usage));
+    capture_usage_watchers_[CaptureUsageToAlphaIndex(capture_usage2)]->set_active();
   }
   RefreshDisplay();
   WatchCaptureActivity();
@@ -432,7 +433,6 @@ void AudioListener::HandleKeystroke() {
     case 'q':
     case 'Q':
       quit_callback_();
-      std::cout << kShowCursor << "\n\n";
       return;
     default:
       break;
@@ -522,5 +522,6 @@ int main(int argc, const char** argv) {
   audio_listener.Run();
 
   loop.Run();
+  std::cout << media::kShowCursor << "\n\n";
   return 0;
 }

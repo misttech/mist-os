@@ -25,13 +25,13 @@ inline std::ostream& operator<<(std::ostream& out, const fuchsia::media::Usage2&
   if (usage.is_capture_usage()) {
     out << "Capture::";
     switch (usage.capture_usage()) {
-      case fuchsia::media::AudioCaptureUsage::BACKGROUND:
+      case fuchsia::media::AudioCaptureUsage2::BACKGROUND:
         return (out << "BACKGROUND");
-      case fuchsia::media::AudioCaptureUsage::COMMUNICATION:
+      case fuchsia::media::AudioCaptureUsage2::COMMUNICATION:
         return (out << "COMMUNICATION");
-      case fuchsia::media::AudioCaptureUsage::FOREGROUND:
+      case fuchsia::media::AudioCaptureUsage2::FOREGROUND:
         return (out << "FOREGROUND");
-      case fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT:
+      case fuchsia::media::AudioCaptureUsage2::SYSTEM_AGENT:
         return (out << "SYSTEM_AGENT");
       default:
         return (out << "UNKNOWN");

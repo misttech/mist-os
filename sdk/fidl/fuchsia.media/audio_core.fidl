@@ -71,6 +71,7 @@ const RENDER_USAGE2_COUNT uint8 = 6;
 /// Usages annotating the purpose of the stream being used to capture audio. The
 /// AudioCaptureUsage is used by audio policy to dictate how audio streams
 /// interact with each other.
+// TODO(https://fxbug.dev/384934089): deprecate and remove |AudioCaptureUsage|
 type AudioCaptureUsage = strict enum {
     /// Stream is used to capture audio while in the background. These streams
     /// may be active at any the time and are considered privileged.
@@ -95,8 +96,35 @@ type AudioCaptureUsage = strict enum {
 };
 const CAPTURE_USAGE_COUNT uint8 = 4;
 
+/// Usages annotating the purpose of the stream being used to capture audio. The
+/// AudioCaptureUsage is used by audio policy to dictate how audio streams
+/// interact with each other.
+@available(added=NEXT)
+type AudioCaptureUsage2 = flexible enum : uint32 {
+    /// Stream is used to capture audio while in the background. These streams may be active at
+    /// any the time and are considered privileged.
+    /// Example: Listening for Hotwords
+    BACKGROUND = 0;
+
+    /// Stream is intended to be used for normal capture functionality. Streams that are used for
+    /// audio capture while the stream creator is in the foreground should use this.
+    /// Example: Voice Recorder
+    FOREGROUND = 1;
+
+    /// Stream is for interaction with a system agent. This should only be used once a user has
+    /// signalled their intent to have the interaction with an interested party.
+    /// Examples: Assistant, Siri, Alexa
+    SYSTEM_AGENT = 2;
+
+    /// Stream is intended to be used for some form of real time user to user communication.
+    /// Voice/Video chat should use this.
+    COMMUNICATION = 3;
+};
+@available(added=NEXT)
+const CAPTURE_USAGE2_COUNT uint8 = 4;
+
 /// A reasonable upper-bound for the maximum number of render or capture usages. Use this value in
-/// FIDL APIs (e.g. for max vector size), instead of RENDER_USAGE2_COUNT or CAPTURE_USAGE_COUNT
+/// FIDL APIs (e.g. for max vector size), instead of RENDER_USAGE2_COUNT or CAPTURE_USAGE2_COUNT
 /// directly. This way, an increase in these consts will not cause an ABI-breaking change.
 @available(added=NEXT)
 const MAX_USAGE_COUNT uint8 = 8;
@@ -134,7 +162,7 @@ type Usage = strict union {
 @available(added=NEXT)
 type Usage2 = flexible union {
     1: render_usage AudioRenderUsage2;
-    2: capture_usage AudioCaptureUsage;
+    2: capture_usage AudioCaptureUsage2;
 };
 
 @discoverable(server="platform")

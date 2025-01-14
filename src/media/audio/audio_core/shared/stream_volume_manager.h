@@ -97,10 +97,10 @@ class StreamVolumeManager {
 
   std::array<VolumeSettingImpl, fuchsia::media::RENDER_USAGE2_COUNT>
       render_usage_volume_setting_impls_;
-  std::array<VolumeSettingImpl, fuchsia::media::CAPTURE_USAGE_COUNT>
+  std::array<VolumeSettingImpl, fuchsia::media::CAPTURE_USAGE2_COUNT>
       capture_usage_volume_setting_impls_;
   std::array<VolumeControl, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_volume_controls_;
-  std::array<VolumeControl, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_volume_controls_;
+  std::array<VolumeControl, fuchsia::media::CAPTURE_USAGE2_COUNT> capture_usage_volume_controls_;
   std::unordered_set<StreamVolume*> stream_volumes_;
   UsageGainSettings usage_gain_settings_;
   UsageVolumeSettings usage_volume_settings_;

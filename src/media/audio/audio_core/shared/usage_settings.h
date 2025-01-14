@@ -36,10 +36,10 @@ class UsageGainSettings {
   // TODO(https://fxbug.dev/42111800): Determine whether mute must be tracked here
 
   std::array<float, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_gain_ = {};
-  std::array<float, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_gain_ = {};
+  std::array<float, fuchsia::media::CAPTURE_USAGE2_COUNT> capture_usage_gain_ = {};
 
   std::array<float, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_gain_adjustment_ = {};
-  std::array<float, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_gain_adjustment_ = {};
+  std::array<float, fuchsia::media::CAPTURE_USAGE2_COUNT> capture_usage_gain_adjustment_ = {};
 };
 
 // Usage2 loudness settings in volume units.
@@ -54,7 +54,7 @@ class UsageVolumeSettings {
 
  private:
   std::array<float, fuchsia::media::RENDER_USAGE2_COUNT> render_usage_volume_;
-  std::array<float, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_volume_;
+  std::array<float, fuchsia::media::CAPTURE_USAGE2_COUNT> capture_usage_volume_;
 };
 
 }  // namespace media::audio

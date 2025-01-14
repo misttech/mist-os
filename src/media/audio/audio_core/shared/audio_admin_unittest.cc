@@ -16,7 +16,7 @@ namespace {
 
 using CaptureActivity = media::audio::AudioAdmin::ActivityDispatcher::CaptureActivity;
 using RenderActivity = media::audio::AudioAdmin::ActivityDispatcher::RenderActivity;
-using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioCaptureUsage2;
 using fuchsia::media::AudioRenderUsage2;
 using fuchsia::media::Usage2;
 
@@ -96,7 +96,7 @@ class MockStreamVolume : public StreamVolume {
  public:
   explicit MockStreamVolume(AudioRenderUsage2 usage)
       : usage_(Usage2::WithRenderUsage(fidl::Clone(usage))) {}
-  explicit MockStreamVolume(AudioCaptureUsage usage)
+  explicit MockStreamVolume(AudioCaptureUsage2 usage)
       : usage_(Usage2::WithCaptureUsage(fidl::Clone(usage))) {}
 
   // |StreamVolume|
@@ -128,8 +128,8 @@ TEST_F(AudioAdminTest, OnlyUpdateVolumeOnPolicyChange) {
   test::NullAudioCapturer c2;
 
   // Media should duck when a Communication stream is active.
-  admin.SetInteraction(Usage2::WithCaptureUsage(AudioCaptureUsage::COMMUNICATION),
-                       ToFidlUsage2(RenderUsage::MEDIA), fuchsia::media::Behavior::MUTE);
+  admin.SetInteraction(ToFidlUsage2(CaptureUsage::COMMUNICATION), ToFidlUsage2(RenderUsage::MEDIA),
+                       fuchsia::media::Behavior::MUTE);
 
   // Create active media stream; activation triggers initial policy application (volume update).
   admin.UpdateRendererState(RenderUsage::MEDIA, true, &r1);
@@ -328,7 +328,7 @@ TEST_F(AudioAdminTest, PolicyActionsReported) {
   auto test_policy_action = [this](auto expected_action) {
     const auto target_usage = ToFidlUsage2(CaptureUsage::FOREGROUND);
     fuchsia::media::Behavior policy_action_taken;
-    // Record any actions taken on our target_usage (AudioCaptureUsage::FOREGROUND)
+    // Record any actions taken on our target_usage (AudioCaptureUsage2::FOREGROUND)
     MockPolicyActionReporter policy_action_reporter(
         [&policy_action_taken, &target_usage](auto usage, auto action) {
           if (fidl::Equals(usage, target_usage)) {
@@ -426,8 +426,8 @@ TEST_F(AudioAdminTest, CaptureActivityDispatched) {
 
     // Trigger the initial activity by registering AudioCapturers.
     // ActivityReporter covers the FIDL usages, so we test only those
-    std::array<test::NullAudioCapturer, fuchsia::media::CAPTURE_USAGE_COUNT> rs;
-    for (int i = 0; i < fuchsia::media::CAPTURE_USAGE_COUNT; i++) {
+    std::array<test::NullAudioCapturer, fuchsia::media::CAPTURE_USAGE2_COUNT> rs;
+    for (int i = 0; i < fuchsia::media::CAPTURE_USAGE2_COUNT; i++) {
       if (initial_activity[i]) {
         admin.UpdateCapturerState(static_cast<CaptureUsage>(i), true, &rs[i]);
       }
@@ -450,9 +450,9 @@ TEST_F(AudioAdminTest, CaptureActivityDispatched) {
 
   // Check all of the possible state transitions from each possible activity.
   int possible_activities_count =
-      static_cast<int>(std::pow(2, fuchsia::media::CAPTURE_USAGE_COUNT));
+      static_cast<int>(std::pow(2, fuchsia::media::CAPTURE_USAGE2_COUNT));
   for (int i = 0; i < possible_activities_count; i++) {
-    for (int j = 0; j < fuchsia::media::CAPTURE_USAGE_COUNT; j++) {
+    for (int j = 0; j < fuchsia::media::CAPTURE_USAGE2_COUNT; j++) {
       auto initial_activity = static_cast<CaptureActivity>(i);
       auto changed_usage = static_cast<CaptureUsage>(j);
       test_dispatch_action(initial_activity, changed_usage);

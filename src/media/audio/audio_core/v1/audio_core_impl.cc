@@ -98,7 +98,7 @@ void AudioCoreImpl::SetCaptureUsageGain(fuchsia::media::AudioCaptureUsage captur
                                         float gain_db) {
   TRACE_DURATION("audio", "AudioCoreImpl::SetCaptureUsageGain");
   context_.volume_manager().SetUsageGain(
-      fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage)), gain_db);
+      fuchsia::media::Usage2::WithCaptureUsage(ToFidlCaptureUsage2(capture_usage)), gain_db);
 }
 
 void AudioCoreImpl::BindUsageVolumeControl(

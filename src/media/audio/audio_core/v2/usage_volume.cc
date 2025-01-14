@@ -115,7 +115,7 @@ fuchsia::media::Usage2 UsageVolume::GetStreamUsage() const {
     auto out = media::audio::ToFidlRenderUsage2(usage_.render_usage());
     return fuchsia::media::Usage2::WithRenderUsage(fidl::Clone(out));
   }
-  auto out = media::audio::ToFidlCaptureUsage(usage_.capture_usage());
+  auto out = media::audio::ToFidlCaptureUsage2(usage_.capture_usage());
   return fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(out));
 }
 

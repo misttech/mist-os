@@ -29,7 +29,7 @@ const int kRingBufferBytes = kRingBufferFrames * kFormat.bytes_per_frame();
 constexpr auto kPlayLeadTimeTolerance = zx::msec(30);
 }  // namespace
 
-using fuchsia::media::AudioCaptureUsage;
+using fuchsia::media::AudioCaptureUsage2;
 using fuchsia::media::AudioRenderUsage2;
 using fuchsia::media::Usage2;
 
@@ -59,9 +59,10 @@ class AudioAdminTest : public HermeticAudioTest {
 
   AudioCapturerShim<kSampleFormat>* SetUpCapturer(
       fuchsia::media::AudioCapturerConfiguration configuration);
-  AudioCapturerShim<kSampleFormat>* SetUpCapturer(AudioCaptureUsage usage) {
+  AudioCapturerShim<kSampleFormat>* SetUpCapturer(AudioCaptureUsage2 _usage) {
     fuchsia::media::InputAudioCapturerConfiguration input;
-    input.set_usage(usage);
+    auto usage = media::audio::ToFidlCaptureUsageTry(_usage);
+    input.set_usage(*usage);
     return SetUpCapturer(fuchsia::media::AudioCapturerConfiguration::WithInput(std::move(input)));
   }
   AudioCapturerShim<kSampleFormat>* SetUpLoopbackCapturer() {
@@ -261,7 +262,7 @@ TEST_F(AudioAdminTest, RenderMuteCapture) {
                                fuchsia::media::Behavior::MUTE);
 
   auto renderer = SetUpRenderer(AudioRenderUsage2::SYSTEM_AGENT, kPlaybackData1);
-  auto capturer = SetUpCapturer(AudioCaptureUsage::BACKGROUND);
+  auto capturer = SetUpCapturer(AudioCaptureUsage2::BACKGROUND);
 
   renderer->fidl()->SendPacketNoReply({
       .payload_offset = 0,
@@ -323,13 +324,13 @@ void AudioAdminTest::TestCaptureMuteRender(bool set_usage_to_disable) {
                                fuchsia::media::Behavior::MUTE);
 
   auto renderer = SetUpRenderer(AudioRenderUsage2::BACKGROUND, kPlaybackData1);
-  auto capturer = SetUpCapturer(AudioCaptureUsage::SYSTEM_AGENT);
+  auto capturer = SetUpCapturer(AudioCaptureUsage2::SYSTEM_AGENT);
   auto loopback_capturer = SetUpLoopbackCapturer();
 
   // Immediately start this capturer so that it impacts policy.
   capturer->fidl()->StartAsyncCapture(10);
   if (set_usage_to_disable) {
-    capturer->fidl()->SetUsage(AudioCaptureUsage::BACKGROUND);
+    capturer->fidl()->SetUsage(*ToFidlCaptureUsageTry(AudioCaptureUsage2::BACKGROUND));
   }
 
   renderer->fidl()->SendPacketNoReply({
@@ -612,8 +613,8 @@ TEST_F(AudioAdminTest, DualCaptureStreamNone) {
                                fuchsia::media::Behavior::NONE);
 
   auto renderer = SetUpRenderer(AudioRenderUsage2::MEDIA, kPlaybackData1);
-  auto capturer1 = SetUpCapturer(AudioCaptureUsage::BACKGROUND);
-  auto capturer2 = SetUpCapturer(AudioCaptureUsage::BACKGROUND);
+  auto capturer1 = SetUpCapturer(AudioCaptureUsage2::BACKGROUND);
+  auto capturer2 = SetUpCapturer(AudioCaptureUsage2::BACKGROUND);
 
   renderer->fidl()->SendPacketNoReply({
       .payload_offset = 0,
@@ -686,8 +687,8 @@ TEST_F(AudioAdminTest, DISABLED_DualCaptureStreamMute) {
                                fuchsia::media::Behavior::MUTE);
 
   auto renderer = SetUpRenderer(AudioRenderUsage2::MEDIA, kPlaybackData1);
-  auto capturer1 = SetUpCapturer(AudioCaptureUsage::SYSTEM_AGENT);
-  auto capturer2 = SetUpCapturer(AudioCaptureUsage::BACKGROUND);
+  auto capturer1 = SetUpCapturer(AudioCaptureUsage2::SYSTEM_AGENT);
+  auto capturer2 = SetUpCapturer(AudioCaptureUsage2::BACKGROUND);
 
   // Add a callback for when we get our captured packet.
   std::optional<AudioBuffer<kSampleFormat>> captured1;

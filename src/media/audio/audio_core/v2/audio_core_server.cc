@@ -12,7 +12,6 @@
 #include <lib/trace/event.h>
 
 #include "src/media/audio/audio_core/shared/policy_loader.h"
-#include "src/media/audio/audio_core/shared/profile_acquirer.h"
 #include "src/media/audio/lib/format2/format.h"
 
 namespace media_audio {
@@ -124,7 +123,7 @@ void AudioCoreServer::SetCaptureUsageGain(SetCaptureUsageGainRequestView request
   TRACE_DURATION("audio", "AudioCoreServer::SetCaptureUsageGain");
 
   stream_volume_manager_->SetUsageGain(
-      fuchsia::media::Usage2::WithCaptureUsage(fuchsia::media::AudioCaptureUsage(request->usage)),
+      fuchsia::media::Usage2::WithCaptureUsage(media::audio::ToFidlCaptureUsage2(request->usage)),
       request->gain_db);
 }
 

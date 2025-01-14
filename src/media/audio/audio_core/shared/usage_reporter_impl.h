@@ -57,9 +57,9 @@ class UsageReporterImpl : public AudioAdmin::PolicyActionReporter,
 
   fidl::BindingSet<fuchsia::media::UsageReporter, UsageReporterImpl*> bindings_;
   std::array<WatcherSet, fuchsia::media::RENDER_USAGE_COUNT> render_usage_watchers_;
-  std::array<WatcherSet, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage_watchers_;
+  std::array<WatcherSet, fuchsia::media::CAPTURE_USAGE2_COUNT> capture_usage_watchers_;
   std::array<WatcherSet2, fuchsia::media::RENDER_USAGE2_COUNT> render_usage2_watchers_;
-  std::array<WatcherSet2, fuchsia::media::CAPTURE_USAGE_COUNT> capture_usage2_watchers_;
+  std::array<WatcherSet2, fuchsia::media::CAPTURE_USAGE2_COUNT> capture_usage2_watchers_;
   int next_watcher_id_ = 0;
 
   // Maximum number of states that can go un-acked before a watcher is disconnected

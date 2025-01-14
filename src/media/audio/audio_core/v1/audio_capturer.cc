@@ -182,7 +182,7 @@ fuchsia::media::Usage2 AudioCapturer::GetStreamUsage() const {
   // capturers with the StreamVolumeManager since those capturers do not have a compatible usage.
   FX_CHECK(!loopback_);
   fuchsia::media::Usage2 usage;
-  usage.set_capture_usage(ToFidlCaptureUsage(usage_));
+  usage.set_capture_usage(ToFidlCaptureUsage2(usage_));
   return usage;
 }
 

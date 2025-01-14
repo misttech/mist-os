@@ -12,6 +12,8 @@
 namespace media::audio {
 namespace {
 
+using fuchsia::media::AudioRenderUsage2;
+
 constexpr float kArbitraryGainValue = -45.0f;
 constexpr float kArbitraryGainAdjustment = -2.0f;
 
@@ -72,66 +74,51 @@ TEST(UsageGainSettingsTest, CaptureUsageGainPersists) {
   UsageGainSettings under_test;
 
   const auto test_usage = [&under_test](auto capture_usage) {
-    under_test.SetUsageGain(fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage)),
-                            kArbitraryGainValue);
-    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(
-                        fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage))),
+    under_test.SetUsageGain(ToFidlUsage2(capture_usage), kArbitraryGainValue);
+    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(ToFidlUsage2(capture_usage)),
                     kArbitraryGainValue);
 
-    under_test.SetUsageGainAdjustment(
-        fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage)),
-        kArbitraryGainAdjustment);
-    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(
-                        fuchsia::media::Usage2::WithCaptureUsage(std::move(capture_usage))),
+    under_test.SetUsageGainAdjustment(ToFidlUsage2(capture_usage), kArbitraryGainAdjustment);
+    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(ToFidlUsage2(capture_usage)),
                     kArbitraryGainValue + kArbitraryGainAdjustment);
   };
 
-  test_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
-  test_usage(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT);
+  test_usage(CaptureUsage::BACKGROUND);
+  test_usage(CaptureUsage::SYSTEM_AGENT);
 }
 
 TEST(UsageGainSettingsTest, CaptureUsageGainPersistsComponents) {
   UsageGainSettings under_test;
 
   const auto test_usage = [&under_test](auto capture_usage) {
-    under_test.SetUsageGain(fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage)),
-                            kArbitraryGainValue);
-    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(
-                        fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage))),
+    under_test.SetUsageGain(ToFidlUsage2(capture_usage), kArbitraryGainValue);
+    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(ToFidlUsage2(capture_usage)),
                     kArbitraryGainValue);
 
-    under_test.SetUsageGainAdjustment(
-        fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage)),
-        kArbitraryGainAdjustment);
-    EXPECT_FLOAT_EQ(under_test.GetUnadjustedUsageGain(
-                        fuchsia::media::Usage2::WithCaptureUsage(std::move(capture_usage))),
+    under_test.SetUsageGainAdjustment(ToFidlUsage2(capture_usage), kArbitraryGainAdjustment);
+    EXPECT_FLOAT_EQ(under_test.GetUnadjustedUsageGain(ToFidlUsage2(capture_usage)),
                     kArbitraryGainValue);
   };
 
-  test_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
-  test_usage(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT);
+  test_usage(CaptureUsage::BACKGROUND);
+  test_usage(CaptureUsage::SYSTEM_AGENT);
 }
 
 TEST(UsageGainSettingsTest, CaptureUsageGainAdjustmentPersists) {
   UsageGainSettings under_test;
 
   const auto test_usage = [&under_test](auto capture_usage) {
-    under_test.SetUsageGain(fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage)),
-                            kArbitraryGainValue);
-    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(
-                        fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage))),
+    under_test.SetUsageGain(ToFidlUsage2(capture_usage), kArbitraryGainValue);
+    EXPECT_FLOAT_EQ(under_test.GetAdjustedUsageGain(ToFidlUsage2(capture_usage)),
                     kArbitraryGainValue);
 
-    under_test.SetUsageGainAdjustment(
-        fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage)),
-        kArbitraryGainAdjustment);
-    EXPECT_FLOAT_EQ(under_test.GetUsageGainAdjustment(
-                        fuchsia::media::Usage2::WithCaptureUsage(std::move(capture_usage))),
+    under_test.SetUsageGainAdjustment(ToFidlUsage2(capture_usage), kArbitraryGainAdjustment);
+    EXPECT_FLOAT_EQ(under_test.GetUsageGainAdjustment(ToFidlUsage2(capture_usage)),
                     kArbitraryGainAdjustment);
   };
 
-  test_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
-  test_usage(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT);
+  test_usage(CaptureUsage::BACKGROUND);
+  test_usage(CaptureUsage::SYSTEM_AGENT);
 }
 
 TEST(UsageGainSettingsTest, UsageGainCannotExceedUnity) {
@@ -152,38 +139,34 @@ TEST(UsageVolumeSettingsTest, RenderUsageVolumePersists) {
 
   test_usage(RenderUsage::ACCESSIBILITY);
   test_usage(RenderUsage::BACKGROUND);
-  test_usage(RenderUsage::MEDIA);
-  test_usage(RenderUsage::INTERRUPTION);
-  test_usage(RenderUsage::SYSTEM_AGENT);
   test_usage(RenderUsage::COMMUNICATION);
+  test_usage(RenderUsage::INTERRUPTION);
+  test_usage(RenderUsage::MEDIA);
+  test_usage(RenderUsage::SYSTEM_AGENT);
 }
 
 TEST(UsageVolumeSettingsTest, CaptureUsageVolumePersists) {
   UsageVolumeSettings under_test;
 
   const auto test_usage = [&under_test](auto capture_usage) {
-    under_test.SetUsageVolume(fuchsia::media::Usage2::WithCaptureUsage(fidl::Clone(capture_usage)),
-                              kArbitraryVolumeValue);
-    EXPECT_FLOAT_EQ(under_test.GetUsageVolume(
-                        fuchsia::media::Usage2::WithCaptureUsage(std::move(capture_usage))),
-                    kArbitraryVolumeValue);
+    under_test.SetUsageVolume(ToFidlUsage2(capture_usage), kArbitraryVolumeValue);
+    EXPECT_FLOAT_EQ(under_test.GetUsageVolume(ToFidlUsage2(capture_usage)), kArbitraryVolumeValue);
   };
 
-  test_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
-  test_usage(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT);
+  test_usage(CaptureUsage::BACKGROUND);
+  test_usage(CaptureUsage::SYSTEM_AGENT);
 }
 
 TEST(UsageVolumeSettingsTest, DefaultVolumeIsMax) {
   UsageVolumeSettings under_test;
 
   const auto test_usage = [&under_test](auto capture_usage) {
-    EXPECT_FLOAT_EQ(under_test.GetUsageVolume(
-                        fuchsia::media::Usage2::WithCaptureUsage(std::move(capture_usage))),
+    EXPECT_FLOAT_EQ(under_test.GetUsageVolume(ToFidlUsage2(capture_usage)),
                     fuchsia::media::audio::MAX_VOLUME);
   };
 
-  test_usage(fuchsia::media::AudioCaptureUsage::BACKGROUND);
-  test_usage(fuchsia::media::AudioCaptureUsage::SYSTEM_AGENT);
+  test_usage(CaptureUsage::BACKGROUND);
+  test_usage(CaptureUsage::SYSTEM_AGENT);
 }
 
 }  // namespace
