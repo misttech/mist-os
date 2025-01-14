@@ -230,7 +230,7 @@ impl SystemShutdownHandler {
                             let _ = responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()));
                         }
                         fpowercontrol::AdminRequest::Reboot { reason, responder } => {
-                            // TODO(https://fxbug.dev/385312336): Delete this
+                            // TODO(https://fxbug.dev/385742868): Delete this
                             // implementation once the `Reboot` method is
                             // removed from the FIDL API. For now, translate
                             // the request to the new API.
