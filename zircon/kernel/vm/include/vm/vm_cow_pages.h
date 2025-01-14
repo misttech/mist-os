@@ -568,18 +568,7 @@ class VmCowPages final : public VmHierarchyBase,
   // VMO_FRUGAL_VALIDATION
   bool DebugValidateVmoPageBorrowingLocked() const TA_REQ(lock());
 
-  // Different operations that RangeChangeUpdate* can perform against any VmMappings that are found.
-  enum class RangeChangeOp {
-    Unmap,
-    // Specialized case of Unmap where the caller is stating that it knows that any pages that might
-    // need to be unmapped are all read instances of the shared zero page.
-    UnmapZeroPage,
-    RemoveWrite,
-    // Unpin is not a 'real' operation in that it does not cause any actions, and is simply used as
-    // a mechanism to allow the VmCowPages to trigger a search for any kernel mappings that are
-    // still referencing an unpinned page.
-    DebugUnpin,
-  };
+  using RangeChangeOp = VmObject::RangeChangeOp;
   // Apply the specified operation to all mappings in the given range. This is applied to all
   // descendants within the range.
   void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());

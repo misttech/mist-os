@@ -745,6 +745,23 @@ class VmObject : public VmHierarchyBase,
   // Detaches the underlying page source, if present. Can be called multiple times.
   virtual void DetachSource() {}
 
+  // Different operations that RangeChangeUpdate* can perform against any VmMappings that are found.
+  enum class RangeChangeOp {
+    Unmap,
+    // Specialized case of Unmap where the caller is stating that it knows that any pages that might
+    // need to be unmapped are all read instances of the shared zero page.
+    UnmapZeroPage,
+    RemoveWrite,
+    // Unpin is not a 'real' operation in that it does not cause any actions, and is simply used as
+    // a mechanism to allow the VmCowPages to trigger a search for any kernel mappings that are
+    // still referencing an unpinned page.
+    DebugUnpin,
+  };
+  // Apply the specified operation to all mappings in the given range. The provided offset and len
+  // must both be page aligned.
+  void RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, RangeChangeOp op)
+      TA_REQ(lock());
+
  protected:
   enum class VMOType : bool {
     Paged = true,

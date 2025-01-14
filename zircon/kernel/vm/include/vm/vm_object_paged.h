@@ -340,7 +340,6 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     return nullptr;
   }
 
-  using RangeChangeOp = VmCowPages::RangeChangeOp;
   // Apply the specified operation to all mappings in the given range.
   void RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) TA_REQ(lock());
 

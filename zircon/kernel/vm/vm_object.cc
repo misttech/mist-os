@@ -326,6 +326,28 @@ zx_status_t VmObject::GetPageBlocking(uint64_t offset, uint pf_flags, list_node*
   return status;
 }
 
+void VmObject::RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, RangeChangeOp op) {
+  canary_.Assert();
+  DEBUG_ASSERT(len != 0);
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+
+  for (auto& m : mapping_list_) {
+    m.assert_object_lock();
+    if (op == RangeChangeOp::Unmap) {
+      m.AspaceUnmapLockedObject(offset, len, false);
+    } else if (op == RangeChangeOp::UnmapZeroPage) {
+      m.AspaceUnmapLockedObject(offset, len, true);
+    } else if (op == RangeChangeOp::RemoveWrite) {
+      m.AspaceRemoveWriteLockedObject(offset, len);
+    } else if (op == RangeChangeOp::DebugUnpin) {
+      m.AspaceDebugUnpinLockedObject(offset, len);
+    } else {
+      panic("Unknown RangeChangeOp %d\n", static_cast<int>(op));
+    }
+  }
+}
+
 VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
     : hierarchy_state_ptr_(ktl::move(state)) {}
 

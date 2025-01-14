@@ -2119,21 +2119,7 @@ void VmObjectPaged::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) 
                    &aligned_len)) {
     // Found the intersection in cow space, convert back to object space.
     aligned_offset -= cow_range_.offset;
-
-    for (auto& m : mapping_list_) {
-      m.assert_object_lock();
-      if (op == RangeChangeOp::Unmap) {
-        m.AspaceUnmapLockedObject(aligned_offset, aligned_len, false);
-      } else if (op == RangeChangeOp::UnmapZeroPage) {
-        m.AspaceUnmapLockedObject(aligned_offset, aligned_len, true);
-      } else if (op == RangeChangeOp::RemoveWrite) {
-        m.AspaceRemoveWriteLockedObject(aligned_offset, aligned_len);
-      } else if (op == RangeChangeOp::DebugUnpin) {
-        m.AspaceDebugUnpinLockedObject(aligned_offset, aligned_len);
-      } else {
-        panic("Unknown RangeChangeOp %d\n", static_cast<int>(op));
-      }
-    }
+    RangeChangeUpdateMappingsLocked(aligned_offset, aligned_len, op);
   }
 
   // Propagate the change to reference children as well. This is done regardless of intersection as
