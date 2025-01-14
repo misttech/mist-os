@@ -15,7 +15,8 @@ use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signa
 use super::parser::ParseStrategy;
 use super::symbols::{
     find_class_by_name, find_class_permission_by_name, Category, Class, Classes, CommonSymbol,
-    CommonSymbols, ConditionalBoolean, Permission, Role, Sensitivity, SymbolList, Type, User,
+    CommonSymbols, ConditionalBoolean, MlsLevel, Permission, Role, Sensitivity, SymbolList, Type,
+    User,
 };
 use super::{
     AccessDecision, AccessVector, CategoryId, Parse, RoleId, SensitivityId, TypeId, UserId,
@@ -416,6 +417,32 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             _ => &[],
         }
     }
+
+    // Validate an MLS range statement against sets of defined sensitivity and category
+    // IDs:
+    // - Verify that all sensitivity and category IDs referenced in the MLS levels are
+    //   defined.
+    // - TODO: https://fxbug.dev/329221265 - Verify that the range is internally consistent;
+    //   i.e., the high level (if any) dominates the low level.
+    fn validate_mls_range(
+        &self,
+        low_level: &MlsLevel<PS>,
+        high_level: &Option<MlsLevel<PS>>,
+        sensitivity_ids: &HashSet<SensitivityId>,
+        category_ids: &HashSet<CategoryId>,
+    ) -> Result<(), anyhow::Error> {
+        validate_id(sensitivity_ids, low_level.sensitivity(), "sensitivity")?;
+        for id in low_level.category_ids() {
+            validate_id(category_ids, id, "category")?;
+        }
+        if let Some(high) = high_level {
+            validate_id(sensitivity_ids, high.sensitivity(), "sensitivity")?;
+            for id in high.category_ids() {
+                validate_id(category_ids, id, "category")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl<PS: ParseStrategy> ParsedPolicy<PS>
@@ -787,30 +814,32 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         let type_ids: HashSet<TypeId> = self.types.data.iter().map(|x| x.id()).collect();
         let sensitivity_ids: HashSet<SensitivityId> =
             self.sensitivities.data.iter().map(|x| x.id()).collect();
-        let _category_ids: HashSet<CategoryId> =
+        let category_ids: HashSet<CategoryId> =
             self.categories.data.iter().map(|x| x.id()).collect();
 
-        // Validate that users use only defined sensitivities.
-        // TODO(b/329221265): Validate category Ids in MlsRanges.
+        // Validate that users use only defined sensitivities and categories.
         for user in &self.users.data {
-            let range = user.mls_range();
-            validate_id(&sensitivity_ids, range.low().sensitivity(), "sensitivity")?;
-            if let Some(high) = range.high() {
-                validate_id(&sensitivity_ids, high.sensitivity(), "sensitivity")?;
-            }
+            self.validate_mls_range(
+                user.mls_range().low(),
+                user.mls_range().high(),
+                &sensitivity_ids,
+                &category_ids,
+            )?;
         }
 
         // Validate that initial contexts use only defined user, role, type, etc Ids.
-        // TODO(b/329221265): Validate category Ids in MlsRanges.
+        // Check that all sensitivity and category IDs are defined.
         for initial_sid in &self.initial_sids.data {
             let context = initial_sid.context();
             validate_id(&user_ids, context.user_id(), "user")?;
             validate_id(&role_ids, context.role_id(), "role")?;
             validate_id(&type_ids, context.type_id(), "type")?;
-            validate_id(&sensitivity_ids, context.low_level().sensitivity(), "sensitivity")?;
-            if let Some(high) = context.high_level() {
-                validate_id(&sensitivity_ids, high.sensitivity(), "sensitivity")?;
-            }
+            self.validate_mls_range(
+                context.low_level(),
+                context.high_level(),
+                &sensitivity_ids,
+                &category_ids,
+            )?;
         }
 
         // Validate that contexts specified in filesystem labeling rules only use
@@ -820,10 +849,12 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
             validate_id(&user_ids, context.user_id(), "user")?;
             validate_id(&role_ids, context.role_id(), "role")?;
             validate_id(&type_ids, context.type_id(), "type")?;
-            validate_id(&sensitivity_ids, context.low_level().sensitivity(), "sensitivity")?;
-            if let Some(high) = context.high_level() {
-                validate_id(&sensitivity_ids, high.sensitivity(), "sensitivity")?;
-            }
+            self.validate_mls_range(
+                context.low_level(),
+                context.high_level(),
+                &sensitivity_ids,
+                &category_ids,
+            )?;
         }
 
         // Validate that roles output by role- transitions & allows are defined.

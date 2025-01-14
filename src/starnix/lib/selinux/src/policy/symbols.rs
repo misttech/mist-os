@@ -1304,6 +1304,12 @@ impl<PS: ParseStrategy> MlsLevel<PS> {
     pub fn categories(&self) -> &ExtensibleBitmap<PS> {
         &self.categories
     }
+
+    pub fn category_ids(&self) -> impl Iterator<Item = CategoryId> + use<'_, PS> {
+        self.categories.spans().flat_map(|span| {
+            (span.low..=span.high).map(|i| CategoryId(NonZeroU32::new(i + 1).unwrap()))
+        })
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for MlsLevel<PS>
@@ -1627,5 +1633,42 @@ impl Validate for CategoryMetadata {
     fn validate(&self) -> Result<(), Self::Error> {
         NonZeroU32::new(self.id.get()).ok_or(ValidateError::NonOptionalIdIsZero)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::{parse_policy_by_reference, CategoryId, SensitivityId, UserId};
+
+    use std::num::NonZeroU32;
+
+    #[test]
+    fn mls_levels_for_user_context() {
+        const TEST_POLICY: &[u8] = include_bytes! {"../../testdata/micro_policies/multiple_levels_and_categories_policy.pp"};
+        let policy = parse_policy_by_reference(TEST_POLICY).unwrap().validate().unwrap();
+        let parsed_policy = policy.0.parsed_policy();
+
+        let user = parsed_policy.user(UserId(NonZeroU32::new(1).expect("user with id 1")));
+        let mls_range = user.mls_range();
+        let low_level = mls_range.low();
+        let high_level = mls_range.high().as_ref().expect("user 1 has a high mls level");
+
+        assert_eq!(low_level.sensitivity(), SensitivityId(NonZeroU32::new(1).unwrap()));
+        assert_eq!(
+            low_level.category_ids().collect::<Vec<_>>(),
+            vec![CategoryId(NonZeroU32::new(1).unwrap())]
+        );
+
+        assert_eq!(high_level.sensitivity(), SensitivityId(NonZeroU32::new(2).unwrap()));
+        assert_eq!(
+            high_level.category_ids().collect::<Vec<_>>(),
+            vec![
+                CategoryId(NonZeroU32::new(1).unwrap()),
+                CategoryId(NonZeroU32::new(2).unwrap()),
+                CategoryId(NonZeroU32::new(3).unwrap()),
+                CategoryId(NonZeroU32::new(4).unwrap()),
+                CategoryId(NonZeroU32::new(5).unwrap()),
+            ]
+        );
     }
 }
