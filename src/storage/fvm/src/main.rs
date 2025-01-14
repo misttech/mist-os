@@ -37,6 +37,7 @@ use std::fmt::Formatter;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 use vfs::directory::entry_container::Directory;
@@ -780,12 +781,50 @@ impl IoTrait for WriteFromMem<'_> {
     }
 }
 
+struct MountedVolumeInner {
+    pub scope: ExecutionScope,
+    pub block_server: BlockServer<SessionManager<PartitionInterface>>,
+    pub shutdown: AtomicBool,
+}
+
+#[derive(Clone)]
+struct MountedVolume(Arc<MountedVolumeInner>);
+
+impl Deref for MountedVolume {
+    type Target = Arc<MountedVolumeInner>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl MountedVolume {
+    pub fn new(block_server: BlockServer<SessionManager<PartitionInterface>>) -> Self {
+        Self(Arc::new(MountedVolumeInner {
+            scope: ExecutionScope::new(),
+            block_server,
+            shutdown: AtomicBool::new(false),
+        }))
+    }
+}
+
+impl BlockConnector for MountedVolume {
+    fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
+        let (client, stream) = fidl::endpoints::create_request_stream();
+        let this = self.clone();
+        self.scope.spawn(async move {
+            let _ = this.block_server.handle_requests(stream).await;
+        });
+        Ok(client)
+    }
+}
+
 /// Serves a multi-filesystem component that uses the FVM format.
 struct Component {
     export_dir: Arc<vfs::directory::immutable::Simple>,
     scope: ExecutionScope,
     fvm: Mutex<Option<Arc<Fvm>>>,
-    mounted: Mutex<HashMap<u16, Arc<BlockServer<SessionManager<PartitionInterface>>>>>,
+    mounted: Mutex<HashMap<u16, MountedVolume>>,
     volumes_directory: Arc<vfs::directory::immutable::Simple>,
 }
 
@@ -1012,10 +1051,10 @@ impl Component {
             None
         };
 
-        let block_server = Arc::new(BlockServer::new(
+        let block_server = BlockServer::new(
             fvm.block_size(),
             Arc::new(PartitionInterface { partition_index, partition_info, key, fvm: fvm.clone() }),
-        ));
+        );
 
         let server_end = server_end.into_channel();
 
@@ -1054,23 +1093,8 @@ impl Component {
                 }
             }
 
-            struct Server(ExecutionScope, Arc<BlockServer<SessionManager<PartitionInterface>>>);
-
-            impl BlockConnector for Server {
-                fn connect_volume(&self) -> Result<ClientEnd<fvolume::VolumeMarker>, Error> {
-                    let (client, stream) = fidl::endpoints::create_request_stream();
-                    let block_server = self.1.clone();
-                    self.0.spawn(async move {
-                        let _ = block_server.handle_requests(stream).await;
-                    });
-                    Ok(client)
-                }
-            }
-
-            let mut fs = Filesystem::new(
-                Server(self.scope.clone(), block_server.clone()),
-                ComponentName(caps[1].to_string()),
-            );
+            let volume = MountedVolume::new(block_server);
+            let mut fs = Filesystem::new(volume.clone(), ComponentName(caps[1].to_string()));
 
             if format {
                 fs.format().await?;
@@ -1080,7 +1104,7 @@ impl Component {
             // For now, just leak the mounted filesystem.
             let exposed_dir = fs.serve().await?.take_exposed_dir();
 
-            self.mounted.lock().unwrap().insert(partition_index, block_server);
+            self.mounted.lock().unwrap().insert(partition_index, volume);
 
             let _ = exposed_dir.open3(
                 ".",
@@ -1108,15 +1132,18 @@ impl Component {
                 }),
             )?;
 
-            self.mounted.lock().unwrap().insert(partition_index, block_server.clone());
+            let volume = MountedVolume::new(block_server);
+            let volume_clone = volume.clone();
+            let volume_scope = volume.scope.clone();
+            self.mounted.lock().unwrap().insert(partition_index, volume);
 
             // Unmount when the last connection is closed (i.e. when `scope` terminates).
-            let scope = ExecutionScope::new();
-            let scope_clone = scope.clone();
             let this = self.clone();
             fasync::Task::spawn(async move {
-                scope_clone.wait().await;
-                this.mounted.lock().unwrap().remove(&partition_index);
+                volume_clone.scope.wait().await;
+                if !volume_clone.shutdown.swap(true, Ordering::Relaxed) {
+                    this.mounted.lock().unwrap().remove(&partition_index);
+                }
             })
             .detach();
 
@@ -1125,7 +1152,7 @@ impl Component {
                 | fio::PERM_WRITABLE
                 | fio::PERM_EXECUTABLE;
             ObjectRequest::new(flags, &fio::Options::default(), server_end)
-                .handle(|request| outgoing_dir.open3(scope, Path::dot(), flags, request));
+                .handle(|request| outgoing_dir.open3(volume_scope, Path::dot(), flags, request));
         }
 
         Ok(())
@@ -1137,7 +1164,7 @@ impl Component {
         requests: fvolume::VolumeRequestStream,
     ) -> Result<(), Error> {
         let partition = self.mounted.lock().unwrap()[&partition_index].clone();
-        partition.handle_requests(requests).await
+        partition.block_server.handle_requests(requests).await
     }
 
     async fn handle_create_volume(
@@ -1188,10 +1215,14 @@ impl Component {
         else {
             bail!(zx::Status::NOT_FOUND);
         };
-        ensure!(
-            !self.mounted.lock().unwrap().contains_key(&partition_index),
-            zx::Status::ALREADY_BOUND
-        );
+        let volume = self.mounted.lock().unwrap().get(&partition_index).cloned();
+        if let Some(volume) = volume {
+            volume.scope.shutdown();
+            volume.scope.wait().await;
+            if !volume.shutdown.swap(true, Ordering::Relaxed) {
+                self.mounted.lock().unwrap().remove(&partition_index);
+            }
+        }
         let mut new_metadata = inner.metadata.clone();
         let mut removed_slices = 0u64;
         for slice_entry in &mut new_metadata.allocations {
@@ -2052,16 +2083,6 @@ mod tests {
             Err(zx::sys::ZX_ERR_NO_SPACE)
         );
 
-        // Should fail because the volume is mounted.
-        assert_eq!(
-            volumes_proxy.remove("foo").await.expect("remove failed (FIDL)"),
-            Err(zx::sys::ZX_ERR_ALREADY_BOUND)
-        );
-
-        let fixture = Fixture::from_fake_server(fixture.take_fake_server()).await;
-        let volumes_proxy =
-            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
-
         volumes_proxy.remove("foo").await.expect("remove failed (FIDL)").expect("remove failed");
 
         // Creating should now succeed.
@@ -2126,15 +2147,12 @@ mod tests {
                 .expect("create failed (FIDL)")
                 .expect("create failed");
 
-            // Should fail because the volume is mounted.
-            assert_eq!(
-                volumes_proxy.remove("foo").await.expect("remove failed (FIDL)"),
-                Err(zx::sys::ZX_ERR_ALREADY_BOUND)
-            );
+            volumes_proxy
+                .remove("foo")
+                .await
+                .expect("remove failed (FIDL)")
+                .expect("remove failed");
         }
-
-        // Should succeed after dropping the volume's outgoing directory.
-        volumes_proxy.remove("foo").await.expect("remove failed (FIDL)").expect("remove failed");
 
         let expected = HashSet::from(["blobfs".to_string(), "data".to_string()]);
         let volumes_dir =
@@ -2780,5 +2798,55 @@ mod tests {
         client.read_at(MutableBufferSlice::Memory(&mut read), 0).await.unwrap();
 
         assert_eq!(&read, &data);
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_unmount_volume_race() {
+        let fixture = Fixture::new(SLICE_SIZE).await;
+
+        let volumes_proxy =
+            connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+
+        for _ in 0..100 {
+            let (dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+            let volumes_proxy = volumes_proxy.clone();
+            volumes_proxy
+                .create(
+                    "foo",
+                    dir_server_end,
+                    CreateOptions { type_guid: Some([1; 16]), ..CreateOptions::default() },
+                    MountOptions::default(),
+                )
+                .await
+                .expect("create failed (FIDL)")
+                .expect("create failed");
+
+            // Drop the volume in one thread, remove it explicitly in the other.  Neither branch
+            // should ever fail, regardless of who wins the race.
+            futures::join! {
+                async move {
+                    std::mem::drop(dir_proxy);
+                },
+                async move {
+                    volumes_proxy
+                        .remove("foo").await.expect("remove failed (FIDL)").expect("remove failed");
+                },
+            };
+
+            let expected = HashSet::from(["blobfs".to_string(), "data".to_string()]);
+            let volumes_dir = open_directory(&fixture.outgoing_dir, "volumes", fio::Flags::empty())
+                .await
+                .unwrap();
+            assert_eq!(
+                &readdir(&volumes_dir)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|d| d.name)
+                    .collect::<HashSet<_>>(),
+                &expected,
+            );
+        }
     }
 }
