@@ -502,7 +502,7 @@ async fn run_single_suite_for_suite_runner(
             debug_data_sender,
             &diagnostics,
             &suite_realm,
-            true, // Use DebugAgent
+            use_debug_agent_for_runs(&options),
         )
         .await
         {
@@ -600,7 +600,7 @@ pub(crate) async fn run_single_suite(
             debug_data_sender,
             &diagnostics,
             &suite_realm,
-            true, // Use DebugAgent
+            use_debug_agent_for_runs(&options),
         )
         .await
         {
@@ -670,6 +670,20 @@ where
         }
     }
     (serial_suites, parallel_suites)
+}
+
+// Determine whether debug_agent should be used for test runs.
+fn use_debug_agent_for_runs(options: &ftest_manager::RunOptions) -> bool {
+    match options.no_exception_channel {
+        Some(true) => {
+            // Do not use debug_agent when the option is set to true.
+            false
+        }
+        Some(false) | None => {
+            // Use debug_agent when the option is set to false or not specified.
+            true
+        }
+    }
 }
 
 #[cfg(test)]
