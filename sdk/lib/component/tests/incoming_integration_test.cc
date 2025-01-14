@@ -5,6 +5,7 @@
 #include <fidl/fidl.service.test/cpp/fidl.h>
 #include <fidl/fidl.service.test/cpp/wire_test_base.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/tests/echo_server.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fidl/cpp/string.h>
 #include <lib/fit/function.h>
@@ -23,51 +24,32 @@ namespace {
 
 using namespace component_testing;
 
-class LocalEchoServer : public fidl::testing::WireTestBase<::fidl_service_test::Echo>,
-                        public LocalCppComponent {
+class LocalEchoServer : public LocalCppComponent {
  public:
-  explicit LocalEchoServer(async_dispatcher_t* dispatcher, bool* called)
+  explicit LocalEchoServer(async_dispatcher_t* dispatcher, unsigned int* called)
       : dispatcher_(dispatcher), called_(called) {}
 
   void OnStart() override {
+    servers_.emplace("default", dispatcher_, called_);
     ASSERT_EQ(outgoing()
-                  ->AddUnmanagedProtocol<fidl_service_test::Echo>(
-                      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure))
+                  ->AddUnmanagedProtocol<fidl_service_test::Echo>(servers_.back().CreateHandler())
                   .status_value(),
               ZX_OK);
     {
+      servers_.emplace("default", dispatcher_, called_);
       auto result = outgoing()->AddService<fidl_service_test::EchoService>(
           fidl_service_test::EchoService::InstanceHandler({
-              .foo = bindings_.CreateHandler(this, dispatcher_,
-                                            std::mem_fn(&LocalEchoServer::OnFidlClosed)),
-              .bar = bindings_.CreateHandler(this, dispatcher_,
-                                            std::mem_fn(&LocalEchoServer::OnFidlClosed)),
+              .foo = servers_.back().CreateHandler(),
+              .bar = servers_.back().CreateHandler(),
           }));
       ASSERT_EQ(result.status_value(), ZX_OK);
     }
   }
 
-  void OnFidlClosed(fidl::UnbindInfo info) {
-    if (info.is_user_initiated() || info.is_peer_closed()) {
-      return;
-    }
-    FX_LOGS(ERROR) << "LocalEchoServer server error: " << info;
-  }
-
-  void EchoString(EchoStringRequestView request, EchoStringCompleter::Sync& completer) override {
-    *called_ = true;
-    completer.Reply(request->value);
-  }
-
-  bool WasCalled() const { return *called_; }
-
-  virtual void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
-  }
-
  private:
   async_dispatcher_t* dispatcher_;
-  bool* called_;
-  fidl::ServerBindingGroup<fidl_service_test::Echo> bindings_;
+  unsigned int* called_;
+  std::queue<EchoCommon> servers_;
 };
 
 class IncomingTest : public gtest::RealLoopFixture {};
@@ -77,7 +59,7 @@ TEST_F(IncomingTest, ConnectsToProtocolInNamespace) {
 
   realm_builder.AddChild("echo_client", "#meta/echo_client.cm",
                          ChildOptions{.startup_mode = StartupMode::EAGER});
-  bool called = false;
+  unsigned int called = 0;
   realm_builder.AddLocalChild("echo_server", [dispatcher = dispatcher(), called_ptr = &called]() {
     return std::make_unique<LocalEchoServer>(dispatcher, called_ptr);
   });
@@ -94,7 +76,7 @@ TEST_F(IncomingTest, ConnectsToProtocolInNamespace) {
     RunLoopUntil([&]() { return complete; });
   });
 
-  RunLoopUntil([&called]() { return called; });
+  RunLoopUntil([&called]() { return called > 0; });
 }
 
 TEST_F(IncomingTest, ConnectsToServiceInNamespace) {
@@ -102,7 +84,7 @@ TEST_F(IncomingTest, ConnectsToServiceInNamespace) {
 
   realm_builder.AddChild("echo_client", "#meta/echo_service_client.cm",
                          ChildOptions{.startup_mode = StartupMode::EAGER});
-  bool called = false;
+  unsigned int called = 0;
   realm_builder.AddLocalChild("echo_server", [dispatcher = dispatcher(), called_ptr = &called]() {
     return std::make_unique<LocalEchoServer>(dispatcher, called_ptr);
   });
@@ -119,7 +101,7 @@ TEST_F(IncomingTest, ConnectsToServiceInNamespace) {
     RunLoopUntil([&]() { return complete; });
   });
 
-  RunLoopUntil([&called]() { return called; });
+  RunLoopUntil([&called]() { return called > 0; });
 }
 
 }  // namespace
