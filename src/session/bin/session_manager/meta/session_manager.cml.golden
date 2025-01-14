@@ -44,6 +44,10 @@
             protocol: "fuchsia.web.Debug",
             path: "/svc_from_session/fuchsia.web.Debug",
         },
+        {
+            protocol: "fuchsia.session.window.Manager",
+            path: "/svc_from_session/fuchsia.session.window.Manager",
+        },
     ],
     use: [
         {
@@ -568,6 +572,7 @@
             protocol: [
                 "fuchsia.element.GraphicalPresenter",
                 "fuchsia.element.Manager",
+                "fuchsia.session.window.Manager",
                 "fuchsia.web.Debug",
             ],
             from: "self",
