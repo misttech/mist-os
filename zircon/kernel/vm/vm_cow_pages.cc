@@ -3051,7 +3051,7 @@ bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
     FindInitialPageContentLocked(page_offset, &content);
     if (!content.cursor.current()) {
       // Parent doesn't have a page either, so would also read as zero, assuming no page source.
-      return GetRootPageSourceLocked() == nullptr;
+      return !is_root_source_user_pager_backed_locked();
     }
   }
   // Content either locally or in our parent, assume it is non-zero and return false.
