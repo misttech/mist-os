@@ -7,10 +7,10 @@ library fuchsia.hardware.hrtimer;
 using zx;
 using fuchsia.power.system;
 
-/// Maximum count of timers supported by this protocol, arbitrary,
+/// Maximum count of timers supported by this protocol, arbitrary.
 const MAX_COUNT_TIMERS uint32 = 64;
 
-/// Maximum count of resolutions supported by a given timer, arbitrary,
+/// Maximum count of resolutions supported by a given timer, arbitrary.
 const MAX_COUNT_RESOLUTIONS uint32 = 64;
 
 /// Errors that this driver may return.
@@ -57,6 +57,17 @@ type TimerProperties = table {
     ///
     /// This is the maximum amount of time that can be set in terms of ticks when a timer is
     /// started. The maximum range in actual time (e.g. nanoseconds) depends on the resolution used.
+    ///
+    /// NOTE: The value reported here does not need to be identical to what
+    /// the hardware actually supports. The driver MAY provide the support for
+    /// the reported `max_ticks` that is greater than the largest value of ticks
+    /// that can be put into the device's hardware register. The driver supports
+    /// a greater value of `max_ticks` by re-programming the hardware counter multiple times
+    /// with its maximum supported interval, with an interrupt generated after
+    /// each re-programming. If you want as few re-programmings (and interrupts)
+    /// to happen as possible, as may be the case when using the hrtimer in a power-aware
+    /// context, select the coarsest available resolution from [supported_resolutions].
+    /// This will ensure the longest possible wall-clock time passes without a re-program.
     ///
     /// Required.
     3: max_ticks uint64;
