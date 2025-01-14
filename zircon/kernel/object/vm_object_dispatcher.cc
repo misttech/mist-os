@@ -186,6 +186,15 @@ zx_status_t VmObjectDispatcher::Write(
 zx_status_t VmObjectDispatcher::SetSize(uint64_t size) {
   canary_.Assert();
 
+  // No stream size management for physical or contiguous VMOs.
+  if (!vmo()->is_paged() || vmo()->is_contiguous()) {
+    DEBUG_ASSERT(!vmo_->is_resizable());
+    return ZX_ERR_UNAVAILABLE;
+  }
+
+  // TODO(https://fxbug.dev/341218975) SetSize should only change stream size to maintain invariant
+  // that stream size isn't larger than VMO size.
+
   auto csm = content_size_manager();
   if (csm.is_error()) {
     return csm.status_value();
@@ -295,6 +304,11 @@ zx_info_vmo_t VmObjectDispatcher::GetVmoInfo(zx_rights_t rights) {
 zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
   canary_.Assert();
 
+  // Set stream size is not supported for physical or contiguous VMOs.
+  if (vmo_->is_contiguous() || !vmo_->is_paged()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
   auto csm = content_size_manager();
   if (csm.is_error()) {
     return csm.status_value();
@@ -320,6 +334,11 @@ zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
 
 zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
   canary_.Assert();
+
+  // Set stream size is not supported for physical or contiguous VMOs.
+  if (vmo_->is_contiguous() || !vmo_->is_paged()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   auto csm = content_size_manager();
   if (csm.is_error()) {
@@ -379,8 +398,13 @@ zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
 uint64_t VmObjectDispatcher::GetContentSize() const {
   canary_.Assert();
 
-  // Retrieving the stream size needs to be a non-fallible operation, so we avoid allocating one if
-  // it doesn't exist, since the allocation could fail.
+  // Stream size is always reported as 0 for physical & contiguous VMOs.
+  if (vmo_->is_contiguous() || !vmo_->is_paged()) {
+    return 0;
+  }
+
+  // Retrieving the stream size needs to be a non-fallible operation, so we avoid allocating one
+  // if it doesn't exist, since the allocation could fail.
   ContentSizeManager* csm;
   {
     Guard<CriticalMutex> guard{get_lock()};
@@ -583,6 +607,8 @@ zx_status_t VmObjectDispatcher::CreateChild(uint32_t options, uint64_t offset, u
 zx::result<fbl::RefPtr<ContentSizeManager>> VmObjectDispatcher::content_size_manager() {
   Guard<CriticalMutex> guard{get_lock()};
   if (unlikely(!content_size_mgr_)) {
+    // content_size_manager should never be called on physical or contiguous VMOs.
+    DEBUG_ASSERT(vmo_->is_paged() && !vmo_->is_contiguous());
     auto result = ContentSizeManager::Create(vmo_->size());
     if (result.is_error()) {
       return result.take_error();
