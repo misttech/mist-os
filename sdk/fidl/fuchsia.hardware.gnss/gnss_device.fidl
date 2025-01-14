@@ -1,0 +1,94 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+/// Protocols and types related to GNSS locations.
+@available(added=HEAD)
+library fuchsia.hardware.gnss;
+
+using fuchsia.gnss.types;
+
+/// Errors returned in case of failures.
+type Error = flexible enum {
+
+    /// Modem is offline.
+    MODEM_OFFLINE = 1;
+
+    /// GNSS is disabled.
+    GNSS_DISABLED = 2;
+
+    /// Timeout occurred while waiting for an action.
+    TIMEOUT = 3;
+
+    /// No cached fix available.
+    NO_FIX_AVAILABLE = 4;
+
+    /// Failed due to driver issue,
+    INTERNAL_ERROR = 5;
+
+    /// Active location session is ongoing.
+    ACTIVE_SESSION_ONGOING = 6;
+
+    /// All required parameters are not available.
+    MISSING_PARAMETERS = 7;
+};
+
+/// Device protocol used to connect to a GPS device.
+///
+/// The GNSS (Global Navigation Satellite System) interface provides access to
+/// location data obtained from GNSS receivers.
+@discoverable
+open protocol Device {
+    /// Enable GNSS device and reset to initial status.
+    /// Calling this while GNSS device already enabled is a no-op.
+    ///
+    /// ## Errors
+    ///
+    /// Returns MODEM_OFFLINE if modem is offline.
+    /// Returns INTERNAL_ERROR incase of any other driver issue.
+    flexible Enable() -> () error Error;
+
+    /// Disable GNSS device and reset to initial status.
+    /// Clears any cached fix available
+    /// Calling this while GNSS device already enabled is a no-op.
+    ///
+    /// ## Errors
+    ///
+    /// Returns `INTERNAL_ERROR` incase of any driver issue.
+    flexible Disable() -> () error Error;
+
+    /// Get a single shot time-limited position fix with a
+    /// specified accuracy.
+    ///
+    /// ## Errors
+    ///
+    /// Returns `GNSS_DISABLED` if GNSS is disabled.
+    /// Returns `MISSING_PARAMETERS` if all required fix parameters
+    ///         are not provided in the request.
+    /// Returns `TIMEOUT` if time out occurred before obtaining a location
+    ///         of desired accuracy.
+    /// Returns `ACTIVE_SESSION_ONGOING` if an active session is ongoing.
+    /// Returns `INTERNAL_ERROR` incase of any other driver issue.
+    flexible GetSingleShotFix(struct {
+        /// Parameters for fix request.
+        params fuchsia.gnss.types.FixParams;
+    }) -> (struct {
+        /// GNSS location
+        location fuchsia.gnss.types.Location;
+    }) error Error;
+
+    /// Return location obtained in the most recent successful session.
+    ///
+    /// ## Errors
+    ///
+    /// Returns `GNSS_DISABLED` if GNSS is disabled.
+    /// Returns `NO_FIX_AVAILABLE` if no fix is available.
+    flexible GetLastFix() -> (struct {
+        /// GNSS location
+        location fuchsia.gnss.types.Location;
+    }) error Error;
+};
+
+service Service {
+    device client_end:Device;
+};
