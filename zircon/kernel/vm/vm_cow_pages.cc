@@ -1944,8 +1944,7 @@ void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_lengt
     offset += cur->parent_offset_;
     cur = parent;
   }
-  *out = {cur->page_list_.LookupMutableCursor(offset), cur, offset,
-          max_owner_length + this_offset};
+  *out = {cur->page_list_.LookupMutableCursor(offset), cur, offset, max_owner_length + this_offset};
 }
 
 void VmCowPages::FindInitialPageContentLocked(uint64_t offset, PageLookup* out) {
