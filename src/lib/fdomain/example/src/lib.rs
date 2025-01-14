@@ -48,8 +48,7 @@ async fn run_echo_launcher_server(
                 // communication channel ourselves
                 echo::EchoLauncherRequest::GetEcho { echo_prefix, responder } => {
                     println!("Got non pipelined request");
-                    let (client_end, server_end) =
-                        client.create_endpoints::<echo::EchoMarker>().await?;
+                    let (client_end, server_end) = client.create_endpoints::<echo::EchoMarker>();
                     responder.send(client_end)?;
                     (echo_prefix, server_end)
                 }
@@ -100,7 +99,7 @@ async fn test_clients_with_server(client: &Arc<Client>, server: Channel) -> anyh
 
     // Create a future that obtains an Echo protocol using the pipelined GetEcho
     // method
-    let (proxy, server_end) = client.create_proxy::<echo::EchoMarker>().await?;
+    let (proxy, server_end) = client.create_proxy::<echo::EchoMarker>();
     echo_launcher.get_echo_pipelined("pipelined", server_end)?;
     // We can make a request to the server right after sending the pipelined request
     let pipelined_fut =
@@ -122,8 +121,7 @@ async fn server_is_fdomain() {
 
     fuchsia_async::Task::spawn(fut).detach();
 
-    let (client_end, server_end) =
-        client.create_endpoints::<echo::EchoLauncherMarker>().await.unwrap();
+    let (client_end, server_end) = client.create_endpoints::<echo::EchoLauncherMarker>();
     let server_fut = run_server(&client, server_end);
     let client_fut = test_clients_with_server(&client, client_end.into_channel());
     match futures::future::select(pin!(server_fut), pin!(client_fut)).await {
@@ -153,7 +151,7 @@ async fn server_is_fidl_in_ns() {
     let namespace = client.namespace().await.unwrap();
     let namespace =
         fdomain_client::fidl::ClientEnd::<fio::DirectoryMarker>::new(namespace).into_proxy();
-    let (echo_client, echo_server) = client.create_channel().await.unwrap();
+    let (echo_client, echo_server) = client.create_channel();
     namespace
         .open3("echo", fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), echo_server)
         .unwrap();

@@ -94,7 +94,7 @@ where
     P: DiscoverableProtocolMarker,
 {
     let protocol_name = P::PROTOCOL_NAME;
-    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>().await?;
+    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>();
     // time this so that we can use an appropriately shorter timeout for the attempt
     // to connect by the backup (if there is one)
     let start_time = Instant::now();
@@ -112,7 +112,7 @@ where
     let (toolbox_res, proxy) = if toolbox_res.is_ok() {
         (toolbox_res, proxy)
     } else {
-        let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>().await?;
+        let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>();
         let toolbox_took = Instant::now() - start_time;
         let timeout = dur.saturating_sub(toolbox_took);
         (
@@ -146,7 +146,7 @@ where
     // try to connect to the moniker given instead, but don't double
     // up the timeout.
     let timeout = dur.saturating_sub(toolbox_took);
-    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>().await?;
+    let (proxy, server_end) = rcs_proxy.client()?.create_proxy::<P>();
     let moniker_res = crate::open_with_timeout::<P>(
         timeout,
         &backup,

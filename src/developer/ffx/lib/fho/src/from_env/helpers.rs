@@ -90,12 +90,8 @@ where
     P: FProxy + 'static,
     P::Protocol: FDiscoverableProtocolMarker,
 {
-    let (proxy, server_end) = rcs
-        .client()
-        .map_err(|e| crate::Error::Unexpected(e.into()))?
-        .create_proxy::<P::Protocol>()
-        .await
-        .unwrap();
+    let (proxy, server_end) =
+        rcs.client().map_err(|e| crate::Error::Unexpected(e.into()))?.create_proxy::<P::Protocol>();
     rcs_fdomain::open_with_timeout::<P::Protocol>(
         timeout,
         moniker,

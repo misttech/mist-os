@@ -118,10 +118,7 @@ impl Connection {
             }
         };
 
-        let (proxy, server_end) = fdomain
-            .create_proxy::<FDRemoteControlMarker>()
-            .await
-            .map_err(|e| ConnectionError::InternalError(e.into()))?;
+        let (proxy, server_end) = fdomain.create_proxy::<FDRemoteControlMarker>();
         let ns = fdomain.namespace().await.map_err(|e| ConnectionError::InternalError(e.into()))?;
         let ns = fio::DirectoryProxy::new(ns);
         ns.open3(

@@ -95,7 +95,7 @@ impl FaultInjector {
 async fn socket() {
     let (client, _) = TestFDomain::new_client();
 
-    let (a, b) = client.create_stream_socket().await.unwrap();
+    let (a, b) = client.create_stream_socket();
     let test_str = b"Feral Cats Move In Mysterious Ways";
 
     a.write_all(test_str).await.unwrap();
@@ -113,8 +113,8 @@ async fn socket() {
 async fn channel() {
     let (client, _) = TestFDomain::new_client();
 
-    let (a, b) = client.create_channel().await.unwrap();
-    let (c, d) = client.create_stream_socket().await.unwrap();
+    let (a, b) = client.create_channel();
+    let (c, d) = client.create_stream_socket();
     let test_str_1 = b"Feral Cats Move In Mysterious Ways";
     let test_str_2 = b"Joyous Throbbing! Jubilant Pulsing!";
 
@@ -156,7 +156,7 @@ async fn channel() {
 async fn socket_async() {
     let (client, fault_injector) = TestFDomain::new_client();
 
-    let (a, b) = client.create_stream_socket().await.unwrap();
+    let (a, b) = client.create_stream_socket();
     let test_str_a = b"Feral Cats Move In Mysterious Ways";
     let test_str_b = b"Almost all of our feelings were programmed in to us.";
 
@@ -224,7 +224,7 @@ async fn socket_async() {
 async fn channel_async() {
     let (client, fault_injector) = TestFDomain::new_client();
 
-    let (a, b) = client.create_channel().await.unwrap();
+    let (a, b) = client.create_channel();
     let test_str_a = b"Feral Cats Move In Mysterious Ways";
     let test_str_b = b"Almost all of our feelings were programmed in to us.";
 
@@ -286,7 +286,7 @@ async fn channel_async() {
 async fn bad_tx() {
     let (client, fault_injector) = TestFDomain::new_client();
 
-    let (a, b) = client.create_channel().await.unwrap();
+    let (a, b) = client.create_channel();
     let test_str_a = b"Feral Cats Move In Mysterious Ways";
     a.write(test_str_a, Vec::new()).await.unwrap();
     fault_injector.send_garbage(b"*splot*");

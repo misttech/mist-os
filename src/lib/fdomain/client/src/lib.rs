@@ -400,10 +400,8 @@ impl ClientInner {
             let Some(tx_id) = NonZeroU32::new(header.tx_id) else {
                 if let Err(e) = self.process_event(header, data) {
                     self.transport = Transport::Error(e);
-                    continue;
-                } else {
-                    return Ok(());
                 }
+                continue;
             };
 
             let tx = self.transactions.remove(&tx_id).ok_or(::fidl::Error::InvalidResponseTxid)?;
@@ -571,102 +569,127 @@ impl Client {
     }
 
     /// Create a new channel in the connected FDomain.
-    pub async fn create_channel(self: &Arc<Self>) -> Result<(Channel, Channel), Error> {
+    pub fn create_channel(self: &Arc<Self>) -> (Channel, Channel) {
         let id_a = self.new_hid();
         let id_b = self.new_hid();
-        self.transaction(
+        let fut = self.transaction(
             ordinals::CREATE_CHANNEL,
             proto::ChannelCreateChannelRequest { handles: [id_a, id_b] },
             Responder::CreateChannel,
-        )
-        .await?;
-        Ok((
+        );
+
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = fut.await {
+                log::debug!("FDomain channel creation failed: {e}");
+            }
+        })
+        .detach();
+
+        (
             Channel(Handle { id: id_a.id, client: Arc::downgrade(self) }),
             Channel(Handle { id: id_b.id, client: Arc::downgrade(self) }),
-        ))
+        )
     }
 
     /// Creates client and server endpoints connected to by a channel.
-    pub async fn create_endpoints<F: crate::fidl::ProtocolMarker>(
+    pub fn create_endpoints<F: crate::fidl::ProtocolMarker>(
         self: &Arc<Self>,
-    ) -> Result<(crate::fidl::ClientEnd<F>, crate::fidl::ServerEnd<F>), Error> {
-        let (client, server) = self.create_channel().await?;
+    ) -> (crate::fidl::ClientEnd<F>, crate::fidl::ServerEnd<F>) {
+        let (client, server) = self.create_channel();
         let client_end = crate::fidl::ClientEnd::<F>::new(client);
         let server_end = crate::fidl::ServerEnd::new(server);
-        Ok((client_end, server_end))
+        (client_end, server_end)
     }
 
     /// Creates a client proxy and a server endpoint connected by a channel.
-    pub async fn create_proxy<F: crate::fidl::ProtocolMarker>(
+    pub fn create_proxy<F: crate::fidl::ProtocolMarker>(
         self: &Arc<Self>,
-    ) -> Result<(F::Proxy, crate::fidl::ServerEnd<F>), Error> {
-        let (client_end, server_end) = self.create_endpoints::<F>().await?;
-        Ok((client_end.into_proxy(), server_end))
+    ) -> (F::Proxy, crate::fidl::ServerEnd<F>) {
+        let (client_end, server_end) = self.create_endpoints::<F>();
+        (client_end.into_proxy(), server_end)
     }
 
     /// Creates a client proxy and a server request stream connected by a channel.
-    pub async fn create_proxy_and_stream<F: crate::fidl::ProtocolMarker>(
+    pub fn create_proxy_and_stream<F: crate::fidl::ProtocolMarker>(
         self: &Arc<Self>,
-    ) -> Result<(F::Proxy, F::RequestStream), Error> {
-        let (client_end, server_end) = self.create_endpoints::<F>().await?;
-        Ok((client_end.into_proxy(), server_end.into_stream()))
+    ) -> (F::Proxy, F::RequestStream) {
+        let (client_end, server_end) = self.create_endpoints::<F>();
+        (client_end.into_proxy(), server_end.into_stream())
     }
 
     /// Create a new socket in the connected FDomain.
-    async fn create_socket(
-        self: &Arc<Self>,
-        options: proto::SocketType,
-    ) -> Result<(Socket, Socket), Error> {
+    fn create_socket(self: &Arc<Self>, options: proto::SocketType) -> (Socket, Socket) {
         let id_a = self.new_hid();
         let id_b = self.new_hid();
-        self.transaction(
+        let fut = self.transaction(
             ordinals::CREATE_SOCKET,
             proto::SocketCreateSocketRequest { handles: [id_a, id_b], options },
             Responder::CreateSocket,
-        )
-        .await?;
-        Ok((
+        );
+
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = fut.await {
+                log::debug!("FDomain socket creation failed: {e}");
+            }
+        })
+        .detach();
+
+        (
             Socket(Handle { id: id_a.id, client: Arc::downgrade(self) }),
             Socket(Handle { id: id_b.id, client: Arc::downgrade(self) }),
-        ))
+        )
     }
 
     /// Create a new streaming socket in the connected FDomain.
-    pub async fn create_stream_socket(self: &Arc<Self>) -> Result<(Socket, Socket), Error> {
-        self.create_socket(proto::SocketType::Stream).await
+    pub fn create_stream_socket(self: &Arc<Self>) -> (Socket, Socket) {
+        self.create_socket(proto::SocketType::Stream)
     }
 
     /// Create a new datagram socket in the connected FDomain.
-    pub async fn create_datagram_socket(self: &Arc<Self>) -> Result<(Socket, Socket), Error> {
-        self.create_socket(proto::SocketType::Datagram).await
+    pub fn create_datagram_socket(self: &Arc<Self>) -> (Socket, Socket) {
+        self.create_socket(proto::SocketType::Datagram)
     }
 
     /// Create a new event pair in the connected FDomain.
-    pub async fn create_event_pair(self: &Arc<Self>) -> Result<(EventPair, EventPair), Error> {
+    pub fn create_event_pair(self: &Arc<Self>) -> (EventPair, EventPair) {
         let id_a = self.new_hid();
         let id_b = self.new_hid();
-        self.transaction(
+        let fut = self.transaction(
             ordinals::CREATE_EVENT_PAIR,
             proto::EventPairCreateEventPairRequest { handles: [id_a, id_b] },
             Responder::CreateEventPair,
-        )
-        .await?;
-        Ok((
+        );
+
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = fut.await {
+                log::debug!("FDomain event pair creation failed: {e}");
+            }
+        })
+        .detach();
+
+        (
             EventPair(Handle { id: id_a.id, client: Arc::downgrade(self) }),
             EventPair(Handle { id: id_b.id, client: Arc::downgrade(self) }),
-        ))
+        )
     }
 
     /// Create a new event handle in the connected FDomain.
-    pub async fn create_event(self: &Arc<Self>) -> Result<Event, Error> {
+    pub fn create_event(self: &Arc<Self>) -> Event {
         let id = self.new_hid();
-        self.transaction(
+        let fut = self.transaction(
             ordinals::CREATE_EVENT,
             proto::EventCreateEventRequest { handle: id },
             Responder::CreateEvent,
-        )
-        .await?;
-        Ok(Event(Handle { id: id.id, client: Arc::downgrade(self) }))
+        );
+
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = fut.await {
+                log::debug!("FDomain event creation failed: {e}");
+            }
+        })
+        .detach();
+
+        Event(Handle { id: id.id, client: Arc::downgrade(self) })
     }
 
     /// Allocate a new HID, which should be suitable for use with the connected FDomain.

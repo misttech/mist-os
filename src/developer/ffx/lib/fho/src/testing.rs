@@ -206,7 +206,7 @@ pub async fn fake_proxy_f<T: fdomain_client::fidl::Proxy>(
     mut handle_request: impl FnMut(fdomain_client::fidl::Request<T::Protocol>) + 'static,
 ) -> T {
     use futures::TryStreamExt;
-    let (proxy, mut stream) = client.create_proxy_and_stream::<T::Protocol>().await.unwrap();
+    let (proxy, mut stream) = client.create_proxy_and_stream::<T::Protocol>();
     fuchsia_async::Task::local(async move {
         // Capture the client so it doesn't go out of scope
         let _client = client;

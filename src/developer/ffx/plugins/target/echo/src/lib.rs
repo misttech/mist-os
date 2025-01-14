@@ -129,8 +129,7 @@ mod test {
 
     async fn setup_fake_service(client: Arc<fdomain_client::Client>) -> RemoteControlProxy {
         use futures::TryStreamExt;
-        let (proxy, mut stream) =
-            client.create_proxy_and_stream::<RemoteControlMarker>().await.unwrap();
+        let (proxy, mut stream) = client.create_proxy_and_stream::<RemoteControlMarker>();
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {

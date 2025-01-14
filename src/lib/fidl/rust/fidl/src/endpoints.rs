@@ -121,44 +121,38 @@ pub struct ZirconClient;
 
 impl ZirconClient {
     /// Equivalent to [`EventPair::create`]
-    pub async fn create_event_pair(
-        &self,
-    ) -> Result<(crate::EventPair, crate::EventPair), Infallible> {
-        Ok(crate::EventPair::create())
+    pub fn create_event_pair(&self) -> (crate::EventPair, crate::EventPair) {
+        crate::EventPair::create()
     }
 
     /// Equivalent to [`Event::create`]
-    pub async fn create_event(&self) -> Result<crate::Event, Infallible> {
-        Ok(crate::Event::create())
+    pub fn create_event(&self) -> crate::Event {
+        crate::Event::create()
     }
 
     /// Equivalent to [`Socket::create_stream`]
-    pub async fn create_stream_socket(&self) -> Result<(crate::Socket, crate::Socket), Infallible> {
-        Ok(crate::Socket::create_stream())
+    pub fn create_stream_socket(&self) -> (crate::Socket, crate::Socket) {
+        crate::Socket::create_stream()
     }
 
     /// Equivalent to [`Socket::create_datagram`]
-    pub async fn create_datagram_socket(
-        &self,
-    ) -> Result<(crate::Socket, crate::Socket), Infallible> {
-        Ok(crate::Socket::create_datagram())
+    pub fn create_datagram_socket(&self) -> (crate::Socket, crate::Socket) {
+        crate::Socket::create_datagram()
     }
 
     /// Equivalent to [`Channel::create`]
-    pub async fn create_channel(&self) -> Result<(Channel, Channel), Infallible> {
-        Ok(Channel::create())
+    pub fn create_channel(&self) -> (Channel, Channel) {
+        Channel::create()
     }
 
     /// Equivalent to the module level [`create_endpoints`]
-    pub async fn create_endpoints<T: ProtocolMarker>(
-        &self,
-    ) -> Result<(ClientEnd<T>, ServerEnd<T>), Infallible> {
-        Ok(create_endpoints::<T>())
+    pub fn create_endpoints<T: ProtocolMarker>(&self) -> (ClientEnd<T>, ServerEnd<T>) {
+        create_endpoints::<T>()
     }
 
     /// Equivalent to the module level [`create_proxy`]
-    pub async fn create_proxy<T: ProtocolMarker>(&self) -> Result<(T::Proxy, ServerEnd<T>), Error> {
-        Ok(create_proxy::<T>())
+    pub fn create_proxy<T: ProtocolMarker>(&self) -> (T::Proxy, ServerEnd<T>) {
+        create_proxy::<T>()
     }
 }
 
