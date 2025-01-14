@@ -19,7 +19,8 @@
 namespace fake_object {
 
 // This class is a fake Object base class that's provided to build fake
-// derived object types from //zircon/system/ulib/zx/include/lib/zx/object.h.
+// derived object types from
+// https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/zircon/system/ulib/zx/include/lib/zx/object.h.
 //
 // The library provides strong symbols for the following zx::Object syscalls so that they
 // can be dispatched by the linker to virtual methods within the implemented Object:
@@ -32,10 +33,12 @@ namespace fake_object {
 // - zx_object_signal_peer()
 // - zx_object_wait_one()
 // - zx_object_wait_async()
+// See https://fuchsia.dev/reference/syscalls for more information on syscalls.
 //
 // To use this library, create a derived class that inherits from FakeObject. The derived
-// class can override the virtual methods associated with the syscall. For instance, if the
-// class wants to implement zx_object_get_info(), it should override get_info().
+// class can override the virtual methods associated with the syscall. Each virtual method
+// maps to a syscall by appending zx_object_ to the function name. For example,
+// the get_info() function in FakeObject maps to the zx_object_get_info() syscall.
 //
 // All objects derived from the FakeObject class need to be added to the FakeHandleTable singleton
 // after they're instantiated. For example, say FakeBti is a derived class from FakeObject. After
@@ -50,10 +53,14 @@ class FakeObject {
   FakeObject() = delete;
   explicit FakeObject(zx_obj_type_t type) : type_(type) {}
 
+  FakeObject(const FakeObject&) = delete;
+  FakeObject& operator=(const FakeObject&) = delete;
+
   // For each object-related syscall we stub out a fake-specific version that
   // can be overridden and implemented by the derived fake objects. These functions
   // don't follow the C++ style guide since they need match the zx::Object class function
-  // names defined in //zircon/system/ulib/zx/include/lib/zx/object.h.
+  // names defined in
+  // https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/zircon/system/ulib/zx/include/lib/zx/object.h.
   virtual zx_status_t get_child(zx_handle_t /* handle */, uint64_t /* koid */,
                                 zx_rights_t /* rights */, zx_handle_t* /* out */) {
     return ZX_ERR_NOT_SUPPORTED;

@@ -47,6 +47,7 @@ _partner_idk_source_sets_list = [
   "//sdk/lib/driver/component/cpp",
   "//sdk/lib/driver/node/cpp",
   "//sdk/lib/driver/devfs/cpp",
+  "//sdk/lib/driver/fake-object/cpp",
   "//sdk/lib/driver/incoming/cpp",
   "//sdk/lib/driver/logging/cpp",
   "//sdk/lib/driver/outgoing/cpp",
@@ -116,7 +117,6 @@ _partner_idk_unstable_source_sets_list = [
   # keep-sorted: begin
   "//src/lib/memory_barriers:memory_barriers",
   "//sdk/lib/driver/fake-bti/cpp",
-  "//sdk/lib/driver/fake-object/cpp",
   "//sdk/lib/driver/fake-platform-device/cpp",
   "//sdk/lib/driver/fake-resource/cpp",
   "//sdk/lib/driver/metadata/cpp",

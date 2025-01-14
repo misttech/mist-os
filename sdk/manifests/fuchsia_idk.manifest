@@ -64,11 +64,11 @@ cc_source_library://pkg/component_outgoing_cpp
 cc_source_library://pkg/driver_component_cpp
 cc_source_library://pkg/driver_devfs_cpp
 cc_source_library://pkg/driver_fake_bti_cpp (unstable)
-cc_source_library://pkg/driver_fake_object_cpp (unstable)
 cc_source_library://pkg/driver_fake_platform_device_cpp (unstable)
 cc_source_library://pkg/driver_fake_resource_cpp (unstable)
 cc_source_library://pkg/driver_incoming_cpp
 cc_source_library://pkg/driver_logging_cpp
+cc_source_library://pkg/driver_fake_object_cpp
 cc_source_library://pkg/driver_metadata_cpp (unstable)
 cc_source_library://pkg/driver_node_cpp
 cc_source_library://pkg/driver_outgoing_cpp
