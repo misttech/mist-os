@@ -59,6 +59,8 @@ _partner_idk_source_sets_list = [
   "//sdk/lib/driver/runtime/testing/cpp",
   "//sdk/lib/driver/symbols",
   "//sdk/lib/driver/testing/cpp",
+  "//sdk/lib/driver/fake-bti/cpp",
+  "//sdk/lib/driver/fake-object/cpp",
   "//sdk/lib/driver/testing/cpp:scoped_global_logger",
   "//sdk/lib/fidl_base",
   "//sdk/lib/fidl_driver:fidl_driver_natural",
@@ -116,7 +118,6 @@ _partner_idk_source_sets_list = [
 _partner_idk_unstable_source_sets_list = [
   # keep-sorted: begin
   "//src/lib/memory_barriers:memory_barriers",
-  "//sdk/lib/driver/fake-bti/cpp",
   "//sdk/lib/driver/fake-platform-device/cpp",
   "//sdk/lib/driver/fake-resource/cpp",
   "//sdk/lib/driver/metadata/cpp",

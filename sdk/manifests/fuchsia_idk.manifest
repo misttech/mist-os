@@ -63,7 +63,7 @@ cc_source_library://pkg/component_incoming_cpp
 cc_source_library://pkg/component_outgoing_cpp
 cc_source_library://pkg/driver_component_cpp
 cc_source_library://pkg/driver_devfs_cpp
-cc_source_library://pkg/driver_fake_bti_cpp (unstable)
+cc_source_library://pkg/driver_fake_bti_cpp
 cc_source_library://pkg/driver_fake_platform_device_cpp (unstable)
 cc_source_library://pkg/driver_fake_resource_cpp (unstable)
 cc_source_library://pkg/driver_incoming_cpp
