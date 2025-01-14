@@ -665,6 +665,8 @@ pub enum DeviceTag {
     /// The block device containing the partition table in which the Fuchsia system resides.
     SystemPartitionTable,
 
-    /// The Fxblob device that isn't the ramdisk.
-    FxblobOnRecovery,
+    /// The non-ramdisk block device in which the Fuchsia system resides (which is either an FVM
+    /// instance, or an Fxblob instance).  Only set on recovery (and volumes within the container
+    /// will not be bound).
+    SystemContainerOnRecovery,
 }

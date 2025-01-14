@@ -10,7 +10,7 @@ use crate::device::constants::{
 use crate::device::{BlockDevice, Device, DeviceTag};
 use crate::environment::{Environment, FilesystemLauncher, ServeFilesystemStatus};
 use crate::{debug_log, fxblob};
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, ensure, Context, Error};
 use device_watcher::recursive_wait_and_open;
 use fidl::endpoints::{Proxy, RequestStream, ServerEnd};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
@@ -129,12 +129,12 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
 async fn wipe_storage(
     environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
-    ramdisk_prefix: Option<String>,
     launcher: &FilesystemLauncher,
     matcher_lock: &Arc<Mutex<HashSet<String>>>,
     blobfs_root: Option<ServerEnd<DirectoryMarker>>,
     blob_creator: Option<ServerEnd<fidl_fuchsia_fxfs::BlobCreatorMarker>>,
 ) -> Result<(), Error> {
+    ensure!(config.ramdisk_image, "wipe_storage called in a non-Recovery build");
     if config.fxfs_blob {
         // For fxblob, we skip several of the arguments that the fvm one needs. For config and
         // launcher, there currently aren't any options that modify how fxblob works, so we don't
@@ -143,7 +143,7 @@ async fn wipe_storage(
         // devices that we need to mark as accounted for for the block watcher.
         wipe_storage_fxblob(environment, blobfs_root, blob_creator).await
     } else {
-        wipe_storage_fvm(config, ramdisk_prefix, launcher, matcher_lock, blobfs_root).await
+        wipe_storage_fvm(config, environment, launcher, matcher_lock, blobfs_root).await
     }
 }
 
@@ -156,9 +156,9 @@ async fn wipe_storage_fxblob(
 
     let registered_devices = environment.lock().await.registered_devices().clone();
     let block_connector = registered_devices
-        .get_block_connector(DeviceTag::FxblobOnRecovery)
+        .get_block_connector(DeviceTag::SystemContainerOnRecovery)
         .map_err(|error| {
-            log::error!(error:?; "shred_data_volume: unable to get block connector");
+            log::error!(error:?; "wipe_storage: unable to get block connector");
             zx::Status::NOT_FOUND
         })
         .on_timeout(FIND_PARTITION_DURATION, || {
@@ -225,32 +225,37 @@ fn initialize_fvm(fvm_slice_size: u64, device: &BlockProxy) -> Result<(), Error>
 
 async fn wipe_storage_fvm(
     config: &fshost_config::Config,
-    ramdisk_prefix: Option<String>,
+    environment: &Arc<Mutex<dyn Environment>>,
     launcher: &FilesystemLauncher,
     matcher_lock: &Arc<Mutex<HashSet<String>>>,
     blobfs_root: Option<ServerEnd<DirectoryMarker>>,
 ) -> Result<(), Error> {
-    log::info!("Searching for block device with FVM");
+    log::info!("Searching for FVM block device");
+    let registered_devices = environment.lock().await.registered_devices().clone();
+    let _ = registered_devices
+        .get_block_connector(DeviceTag::SystemContainerOnRecovery)
+        .map_err(|error| {
+            log::error!(error:?; "wipe_storage: unable to get block connector");
+            zx::Status::NOT_FOUND
+        })
+        .on_timeout(FIND_PARTITION_DURATION, || {
+            log::error!("Failed to find FVM within timeout");
+            Err(zx::Status::NOT_FOUND)
+        })
+        .await?;
+    // TODO(https://fxbug.dev/339491886): Support storage-host based systems.
+    let fvm_path =
+        registered_devices.get_topological_path(DeviceTag::SystemContainerOnRecovery).unwrap();
+
+    // Ensure that the matcher doesn't pick up devices while we're reformatting.
     let mut ignored_paths = matcher_lock.lock().await;
-
-    let fvm_matcher = PartitionMatcher {
-        type_guids: Some(vec![constants::FVM_TYPE_GUID, constants::FVM_LEGACY_TYPE_GUID]),
-        ignore_prefix: ramdisk_prefix,
-        ..Default::default()
-    };
-
-    let fvm_controller =
-        find_partition(fvm_matcher, FIND_PARTITION_DURATION).await.context("Failed to find FVM")?;
-    let fvm_path = fvm_controller
-        .get_topological_path()
-        .await
-        .context("fvm get_topo_path transport error")?
-        .map_err(zx::Status::from_raw)
-        .context("fvm get_topo_path returned error")?;
 
     log::info!(device_path:? = fvm_path; "Wiping storage");
     log::info!("Unbinding child drivers (FVM/zxcrypt).");
 
+    let fvm_controller = fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(
+        format!("{}/device_controller", &fvm_path),
+    )?;
     fvm_controller.unbind_children().await?.map_err(zx::Status::from_raw)?;
 
     log::info!(slice_size = config.fvm_slice_size; "Initializing FVM");
@@ -493,7 +498,7 @@ async fn shred_data_volume(
             // We find the device via our own matcher.
             let registered_devices = environment.lock().await.registered_devices().clone();
             let block_connector = registered_devices
-                .get_block_connector(DeviceTag::FxblobOnRecovery)
+                .get_block_connector(DeviceTag::SystemContainerOnRecovery)
                 .map_err(|error| {
                     log::error!(error:?; "shred_data_volume: unable to get block connector");
                     zx::Status::NOT_FOUND
@@ -530,6 +535,7 @@ async fn shred_data_volume(
                     })?
             }
         } else {
+            // TODO(https://fxbug.dev/339491886): Support storage-host based systems.
             let partition_controller = find_data_partition(ramdisk_prefix).await.map_err(|e| {
                 log::error!("shred_data_volume: unable to find partition: {e:?}");
                 zx::Status::NOT_FOUND
@@ -729,7 +735,6 @@ pub fn fshost_admin(
                             match wipe_storage(
                                 &env,
                                 &config,
-                                ramdisk_prefix.clone(),
                                 &launcher,
                                 &matcher_lock,
                                 blobfs_root,

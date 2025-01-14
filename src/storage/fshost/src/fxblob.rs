@@ -60,7 +60,8 @@ pub fn ota_health_check_service() -> Arc<service::Service> {
 
 const FIND_PARTITION_DURATION: MonotonicDuration = MonotonicDuration::from_seconds(10);
 
-/// Mounts (or formats) the data volume in Fxblob.  Assumes the partition is already formatted.
+/// Mounts (or formats) the data volume in Fxblob.  Assumes the partition is already formatted, but
+/// is *not* yet mounted.
 pub async fn mount_or_format_data(
     environment: &Arc<Mutex<dyn Environment>>,
     launcher: &FilesystemLauncher,
@@ -68,7 +69,7 @@ pub async fn mount_or_format_data(
     // Find the device via our own matcher.
     let registered_devices = environment.lock().await.registered_devices().clone();
     let block_connector = registered_devices
-        .get_block_connector(DeviceTag::FxblobOnRecovery)
+        .get_block_connector(DeviceTag::SystemContainerOnRecovery)
         .on_timeout(FIND_PARTITION_DURATION, || {
             Err(anyhow!("timed out waiting for fxfs partition"))
         })
