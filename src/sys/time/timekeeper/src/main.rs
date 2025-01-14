@@ -201,6 +201,7 @@ fn koid_of(c: &UtcClock) -> u64 {
 
 #[fuchsia::main(logging_tags=["time", "timekeeper"])]
 async fn main() -> Result<()> {
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
     let config: Arc<Config> =
         Arc::new(timekeeper_config::Config::take_from_startup_handle().into());
 
@@ -331,6 +332,7 @@ async fn main() -> Result<()> {
             let time_test_mutex = time_test_mutex.clone();
             let allow_update_rtc = allow_update_rtc.clone();
             let timer_loop = timer_loop.clone();
+            fuchsia_trace::instant!(c"timekeeper", c"request", fuchsia_trace::Scope::Process);
             async move {
                 match request {
                     Rpcs::TimeTest(stream) => {

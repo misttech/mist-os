@@ -50,6 +50,8 @@ timekeeper_deps = [
   "//src/lib/fuchsia-fs",
   "//src/lib/fuchsia-runtime",
   "//src/lib/fuchsia-sync",
+  "//src/lib/trace/rust:trace",
+  "//src/lib/trace/rust:trace-provider",
   "//src/sys/time/lib/inspect-writable",
   "//src/sys/time/lib/time-util",
   "//src/sys/time/lib/time_metrics_registry",

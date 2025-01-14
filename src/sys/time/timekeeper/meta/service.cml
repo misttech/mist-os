@@ -7,6 +7,7 @@
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
         "syslog/offer.shard.cml",
+        "trace/client.shard.cml",
     ],
     program: {
         runner: "elf",
