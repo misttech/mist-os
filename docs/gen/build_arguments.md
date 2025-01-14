@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8725858112977789441"`
+**Current value for `target_cpu = "arm64"`:** `"8725812805601934321"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8725858112977789441"`
+**Current value for `target_cpu = "riscv64"`:** `"8725812805601934321"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8725858112977789441"`
+**Current value for `target_cpu = "x64"`:** `"8725812805601934321"`
 
 From //out/not-default/args.gn:10
 
@@ -4528,7 +4528,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"ZYWVoLo8XHwkRcwBUtl83-8E559gSwiuYrDOsvNULggC"`
+**Current value (from the default):** `"j8u_IMpx7yTtlhEolDhx8ZTq_UCvWK8zrIgo_5ofducC"`
 
 From //build/rust/config.gni:42
 
