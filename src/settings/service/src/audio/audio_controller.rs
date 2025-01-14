@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use super::AudioInfoLoader;
-use crate::audio::types::{AudioInfo, AudioStream, AudioStreamType, SetAudioStream};
+use crate::audio::types::{
+    AudioInfo, AudioStream, AudioStreamType, SetAudioStream, AUDIO_STREAM_TYPE_COUNT,
+};
 use crate::audio::{create_default_modified_counters, ModifiedCounters, StreamVolumeControl};
 use crate::base::SettingType;
 use crate::handler::base::Request;
@@ -109,8 +111,9 @@ impl VolumeController {
     async fn get_streams_array_from_map(
         &self,
         stream_map: &HashMap<AudioStreamType, StreamVolumeControl>,
-    ) -> [AudioStream; 5] {
-        let mut streams: [AudioStream; 5] = self.audio_info_loader.default_value().streams;
+    ) -> [AudioStream; AUDIO_STREAM_TYPE_COUNT] {
+        let mut streams: [AudioStream; AUDIO_STREAM_TYPE_COUNT] =
+            self.audio_info_loader.default_value().streams;
         for stream in &mut streams {
             if let Some(volume_control) = stream_map.get(&stream.stream_type) {
                 *stream = volume_control.stored_stream;

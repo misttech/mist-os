@@ -10,10 +10,12 @@ use crate::mock_sound_player_service::{
 };
 use anyhow::Error;
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_media::{AudioCoreMarker, AudioRenderUsage};
+use fidl_fuchsia_media::{AudioCoreMarker, AudioRenderUsage, AudioRenderUsage2};
 use fidl_fuchsia_media_sessions2::{DiscoveryMarker, SessionsWatcherProxy};
 use fidl_fuchsia_media_sounds::PlayerMarker;
-use fidl_fuchsia_settings::{AudioMarker, AudioProxy, AudioSettings, AudioStreamSettings};
+use fidl_fuchsia_settings::{
+    AudioMarker, AudioProxy, AudioSettings2, AudioStreamSettings, AudioStreamSettings2,
+};
 use fidl_fuchsia_ui_policy::DeviceListenerRegistryMarker;
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
@@ -35,6 +37,25 @@ pub const DEFAULT_VOLUME_LEVEL: f32 = 0.5;
 pub const DEFAULT_VOLUME_MUTED: bool = false;
 
 const COMPONENT_URL: &str = "#meta/setui_service.cm";
+
+pub fn to_audio_stream_settings2(settings: AudioStreamSettings) -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(render_usage2_for_render_usage(settings.stream.unwrap())),
+        source: settings.source,
+        user_volume: settings.user_volume,
+        ..Default::default()
+    }
+}
+
+fn render_usage2_for_render_usage(render_usage: AudioRenderUsage) -> AudioRenderUsage2 {
+    match render_usage {
+        AudioRenderUsage::Background => AudioRenderUsage2::Background,
+        AudioRenderUsage::Communication => AudioRenderUsage2::Communication,
+        AudioRenderUsage::Interruption => AudioRenderUsage2::Interruption,
+        AudioRenderUsage::Media => AudioRenderUsage2::Media,
+        AudioRenderUsage::SystemAgent => AudioRenderUsage2::SystemAgent,
+    }
+}
 
 pub struct VolumeChangeEarconsTest {
     /// The test realm the integration tests will use.
@@ -299,7 +320,7 @@ impl VolumeChangeEarconsTest {
     // Creates a listener to notify when a sound is played.
     pub async fn create_sound_played_listener(&self) -> SoundEventReceiver {
         let (sound_played_sender, sound_played_receiver) =
-            futures::channel::mpsc::channel::<(u32, AudioRenderUsage)>(0);
+            futures::channel::mpsc::channel::<(u32, AudioRenderUsage2)>(0);
         self.sound_played_listeners.lock().await.push(sound_played_sender);
 
         sound_played_receiver
@@ -308,34 +329,35 @@ impl VolumeChangeEarconsTest {
     pub async fn verify_earcon(
         receiver: &mut SoundEventReceiver,
         id: u32,
-        usage: AudioRenderUsage,
+        usage: AudioRenderUsage2,
     ) {
         assert_eq!(receiver.next().await.unwrap(), (id, usage));
     }
 
-    pub async fn set_volume(&self, streams: Vec<AudioStreamSettings>) {
-        let mut audio_settings = AudioSettings::default();
+    pub async fn set_volumes(&self, streams: Vec<AudioStreamSettings2>) {
+        let mut audio_settings = AudioSettings2::default();
         audio_settings.streams = Some(streams);
         self.audio_proxy
-            .set(&audio_settings)
+            .set2(&audio_settings)
             .await
-            .expect("set completed")
-            .expect("set successful");
+            .expect("set2 completed")
+            .expect("set2 successful");
     }
 
     // Verifies that the settings for the given target_usage matches the expected_settings when
-    // a watch is performed on the proxy.
+    // a watch2() is performed on the proxy.
     pub async fn verify_volume(
         &self,
-        target_usage: AudioRenderUsage,
-        expected_settings: AudioStreamSettings,
+        usage2: AudioRenderUsage2,
+        expected_settings: AudioStreamSettings2,
     ) {
-        let audio_settings = self.audio_proxy.watch().await.expect("watch complete");
+        let audio_settings = self.audio_proxy.watch2().await.expect("watch2 complete");
         let target_stream_res = audio_settings.streams.expect("streams exist");
         let target_stream = target_stream_res
             .iter()
-            .find(|stream| stream.stream == Some(target_usage))
+            .find(|stream| stream.stream == Some(usage2))
             .expect("stream found");
+
         assert_eq!(target_stream, &expected_settings);
     }
 

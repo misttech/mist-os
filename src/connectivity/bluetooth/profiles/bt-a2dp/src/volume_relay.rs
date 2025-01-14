@@ -75,18 +75,18 @@ struct AvrcpVolume(u8);
 impl AvrcpVolume {
     /// Convert from a settings volume between 0.0 and 1.0 to a volume that can be sent
     /// through AVRCP (0 to 127 as per the spec)
-    fn from_media_volume(value: settings::AudioSettings) -> Result<Self, anyhow::Error> {
+    fn from_media_volume(value: settings::AudioSettings2) -> Result<Self, anyhow::Error> {
         let streams =
-            value.streams.ok_or_else(|| format_err!("No streams in the AudioSettings"))?;
+            value.streams.ok_or_else(|| format_err!("No streams in the AudioSettings2"))?;
 
         // Find the media stream volume
         let volume =
-            match streams.iter().find(|&s| s.stream == Some(media::AudioRenderUsage::Media)) {
+            match streams.iter().find(|&s| s.stream == Some(media::AudioRenderUsage2::Media)) {
                 None => Err(format_err!("Couldn't find Media stream in settings")),
-                Some(settings::AudioStreamSettings { user_volume: None, .. }) => {
+                Some(settings::AudioStreamSettings2 { user_volume: None, .. }) => {
                     Err(format_err!("Volume not included in Media stream settings"))
                 }
-                Some(settings::AudioStreamSettings { user_volume: Some(vol), .. }) => Ok(vol),
+                Some(settings::AudioStreamSettings2 { user_volume: Some(vol), .. }) => Ok(vol),
             };
         let level = match volume? {
             settings::Volume { muted: Some(true), .. } => 0.0,
@@ -97,11 +97,11 @@ impl AvrcpVolume {
         Ok(AvrcpVolume((level * 127.0) as u8))
     }
 
-    /// Get an AudioSettings struct that can be sent to the Settings service to set the volume
+    /// Get an AudioSettings2 struct that can be sent to the Settings service to set the volume
     /// to the same level as this.  Converts from native AVRCP (0-127) to settings 0.0 - 1.0
     /// ranges.
-    fn as_audio_settings(&self, stream: media::AudioRenderUsage) -> settings::AudioSettings {
-        let settings = settings::AudioStreamSettings {
+    fn as_audio_settings(&self, stream: media::AudioRenderUsage2) -> settings::AudioSettings2 {
+        let settings = settings::AudioStreamSettings2 {
             stream: Some(stream),
             source: Some(settings::AudioStreamSettingSource::User),
             user_volume: Some(settings::Volume {
@@ -111,7 +111,7 @@ impl AvrcpVolume {
             }),
             ..Default::default()
         };
-        settings::AudioSettings { streams: Some(vec![settings]), ..Default::default() }
+        settings::AudioSettings2 { streams: Some(vec![settings]), ..Default::default() }
     }
 }
 
@@ -150,12 +150,12 @@ impl VolumeRelay {
 
         let audio_proxy_clone = audio.clone();
         let mut audio_watch_stream =
-            HangingGetStream::new(audio_proxy_clone, settings::AudioProxy::watch);
+            HangingGetStream::new(audio_proxy_clone, settings::AudioProxy::watch2);
 
         // Wait for the first update from the settings app.
         let mut current_volume = match audio_watch_stream.next().await {
             None => return Err(format_err!("Volume watch response stream ended")),
-            Some(Err(e)) => return Err(format_err!("FIDL error polling audio watch: {:?}", e)),
+            Some(Err(e)) => return Err(format_err!("FIDL error polling audio watch2: {:?}", e)),
             Some(Ok(settings)) => match AvrcpVolume::from_media_volume(settings) {
                 Err(e) => return Err(format_err!("Can't get initial volume: {:?}", e)),
                 Ok(vol) => vol.0,
@@ -215,9 +215,9 @@ impl VolumeRelay {
                                 }
                             }
 
-                            let settings = AvrcpVolume(requested_volume).as_audio_settings(media::AudioRenderUsage::Media);
+                            let settings = AvrcpVolume(requested_volume).as_audio_settings(media::AudioRenderUsage2::Media);
                             trace!("AVRCP Setting system volume to {} -> {:?}", requested_volume, settings);
-                            if let Err(e) = audio.set(&settings).await {
+                            if let Err(e) = audio.set2(&settings).await {
                                 warn!("Couldn't set media volume: {:?}", e);
                                 let _ = responder.send(current_volume);
                                 continue;
@@ -353,28 +353,28 @@ mod tests {
         (settings_requests, avrcp_requests, stop_sender, relay_fut)
     }
 
-    /// Expects a Watch() call to the `audio_request_stream`.  Returns the handler to respond to
-    /// the watch call, or panics if that doesn't happen.
+    /// Expects a Watch2() call to the `audio_request_stream`.  Returns the handler to respond to
+    /// the watch2 call, or panics if that doesn't happen.
     #[track_caller]
-    fn expect_audio_watch(
+    fn expect_audio_watch2(
         exec: &mut fasync::TestExecutor,
         audio_request_stream: &mut settings::AudioRequestStream,
-    ) -> settings::AudioWatchResponder {
+    ) -> settings::AudioWatch2Responder {
         let watch_request_fut = audio_request_stream.select_next_some();
         let mut watch_request_fut = pin!(watch_request_fut);
 
         match exec.run_until_stalled(&mut watch_request_fut).expect("should be ready") {
-            Ok(settings::AudioRequest::Watch { responder }) => responder,
-            x => panic!("Expected an Audio Watch Request, got {:?}", x),
+            Ok(settings::AudioRequest::Watch2 { responder }) => responder,
+            x => panic!("Expected an Audio Watch2 Request, got {:?}", x),
         }
     }
 
     #[track_caller]
-    fn respond_to_audio_watch(responder: settings::AudioWatchResponder, level: f32) {
+    fn respond_to_audio_watch2(responder: settings::AudioWatch2Responder, level: f32) {
         responder
-            .send(&settings::AudioSettings {
-                streams: Some(vec![settings::AudioStreamSettings {
-                    stream: Some(media::AudioRenderUsage::Media),
+            .send(&settings::AudioSettings2 {
+                streams: Some(vec![settings::AudioStreamSettings2 {
+                    stream: Some(media::AudioRenderUsage2::Media),
                     user_volume: Some(settings::Volume {
                         level: Some(level),
                         ..Default::default()
@@ -394,7 +394,7 @@ mod tests {
         mut exec: &mut fasync::TestExecutor,
         mut avrcp_request_stream: avrcp::PeerManagerRequestStream,
         audio_request_stream: &mut settings::AudioRequestStream,
-    ) -> (avrcp::AbsoluteVolumeHandlerProxy, settings::AudioWatchResponder)
+    ) -> (avrcp::AbsoluteVolumeHandlerProxy, settings::AudioWatch2Responder)
     where
         <T as Future>::Output: Debug,
     {
@@ -412,11 +412,11 @@ mod tests {
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
-        let audio_watch_responder = expect_audio_watch(&mut exec, audio_request_stream);
-        respond_to_audio_watch(audio_watch_responder, INITIAL_MEDIA_VOLUME);
+        let audio_watch_responder = expect_audio_watch2(&mut exec, audio_request_stream);
+        respond_to_audio_watch2(audio_watch_responder, INITIAL_MEDIA_VOLUME);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
-        let audio_watch_responder = expect_audio_watch(&mut exec, audio_request_stream);
+        let audio_watch_responder = expect_audio_watch2(&mut exec, audio_request_stream);
 
         (handler.into_proxy(), audio_watch_responder)
     }
@@ -489,7 +489,7 @@ mod tests {
         exec.run_until_stalled(&mut volume_set_fut).expect_pending("should be pending");
 
         match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
-            Ok(settings::AudioRequest::Set { settings, responder }) => {
+            Ok(settings::AudioRequest::Set2 { settings, responder }) => {
                 assert!(
                     settings.streams.as_ref().unwrap()[0]
                         .user_volume
@@ -507,7 +507,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // When a new volume happens as a result, it's returned.
-        respond_to_audio_watch(watch_responder, 0.7);
+        respond_to_audio_watch2(watch_responder, 0.7);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -542,7 +542,7 @@ mod tests {
 
         let mut requested_audio_settings_vol: f32;
         match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
-            Ok(settings::AudioRequest::Set { settings, responder }) => {
+            Ok(settings::AudioRequest::Set2 { settings, responder }) => {
                 requested_audio_settings_vol = settings.streams.as_ref().unwrap()[0]
                     .user_volume
                     .as_ref()
@@ -581,7 +581,7 @@ mod tests {
         let mut request_fut = pin!(request_fut);
 
         match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
-            Ok(settings::AudioRequest::Set { settings, responder }) => {
+            Ok(settings::AudioRequest::Set2 { settings, responder }) => {
                 // We should have adjusted the volume value to be larger for the second request.
                 let new_requested = settings.streams.as_ref().unwrap()[0]
                     .user_volume
@@ -622,7 +622,7 @@ mod tests {
         let mut request_fut = pin!(request_fut);
 
         match exec.run_until_stalled(&mut request_fut).expect("should be ready") {
-            Ok(settings::AudioRequest::Set { settings, responder }) => {
+            Ok(settings::AudioRequest::Set2 { settings, responder }) => {
                 // We should have adjusted the volume value again.
                 let new_requested = settings.streams.as_ref().unwrap()[0]
                     .user_volume
@@ -639,7 +639,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // When a new volume happens as a result, it's returned.
-        respond_to_audio_watch(watch_responder, 0.82);
+        respond_to_audio_watch2(watch_responder, 0.82);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -698,7 +698,7 @@ mod tests {
         // When a new volume happens as a result, it's returned.
         const CHANGED_MEDIA_VOLUME: f32 = 0.9;
         const CHANGED_AVRCP_VOLUME: u8 = 114; // 0.9 audio settings volume as AVRCP volume.
-        respond_to_audio_watch(watch_responder, CHANGED_MEDIA_VOLUME);
+        respond_to_audio_watch2(watch_responder, CHANGED_MEDIA_VOLUME);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -707,7 +707,7 @@ mod tests {
             Ok(CHANGED_AVRCP_VOLUME)
         );
 
-        let _watch_responder = expect_audio_watch(&mut exec, &mut settings_requests);
+        let _watch_responder = expect_audio_watch2(&mut exec, &mut settings_requests);
     }
 
     /// Tests the behavior of the VolumeRelay when multiple requests for OnVolumeChanged
@@ -757,7 +757,7 @@ mod tests {
         // Respond with a new volume.
         const CHANGED_MEDIA_VOLUME: f32 = 0.9;
         const CHANGED_AVRCP_VOLUME: u8 = 114; // 0.9 audio settings volume as AVRCP volume.
-        respond_to_audio_watch(watch_responder, CHANGED_MEDIA_VOLUME);
+        respond_to_audio_watch2(watch_responder, CHANGED_MEDIA_VOLUME);
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
@@ -771,6 +771,6 @@ mod tests {
             Ok(CHANGED_AVRCP_VOLUME)
         );
 
-        let _watch_responder = expect_audio_watch(&mut exec, &mut settings_requests);
+        let _watch_responder = expect_audio_watch2(&mut exec, &mut settings_requests);
     }
 }

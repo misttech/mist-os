@@ -20,7 +20,7 @@
       "optionality": "optional",
       "long": "--stream",
       "short": "t",
-      "description": "which stream should be modified. Valid options are background, media, interruption, system_agent, and communication",
+      "description": "which stream should be modified. Valid options are background, media, interruption, system_agent, communication and accessibility.",
       "hidden": false
     },
     {

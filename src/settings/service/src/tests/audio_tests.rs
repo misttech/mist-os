@@ -16,7 +16,7 @@ use crate::tests::test_failure_utils::create_test_env_with_failures_and_config;
 use crate::EnvironmentBuilder;
 use assert_matches::assert_matches;
 use fidl::Error::ClientChannelClosed;
-use fidl_fuchsia_media::AudioRenderUsage;
+use fidl_fuchsia_media::{AudioRenderUsage, AudioRenderUsage2};
 use fidl_fuchsia_settings::*;
 use fuchsia_component::server::ProtocolConnector;
 use fuchsia_inspect::component;
@@ -33,7 +33,19 @@ const CHANGED_VOLUME_MUTED: bool = true;
 
 fn changed_media_stream_settings() -> AudioStreamSettings {
     AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Media),
+        stream: Some(AudioRenderUsage::Media),
+        source: Some(AudioStreamSettingSource::User),
+        user_volume: Some(Volume {
+            level: Some(CHANGED_VOLUME_LEVEL),
+            muted: Some(CHANGED_VOLUME_MUTED),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+fn changed_media_stream_settings2() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(AudioRenderUsage2::Media),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL),
@@ -85,6 +97,15 @@ fn get_default_stream(stream_type: AudioStreamType, info: AudioInfo) -> AudioStr
 
 // Verifies that a stream equal to |stream| is inside of |settings|.
 fn verify_audio_stream(settings: &AudioSettings, stream: AudioStreamSettings) {
+    let _ = settings
+        .streams
+        .as_ref()
+        .expect("audio settings contain streams")
+        .iter()
+        .find(|x| **x == stream)
+        .expect("contains stream");
+}
+fn verify_audio_stream2(settings: &AudioSettings2, stream: AudioStreamSettings2) {
     let _ = settings
         .streams
         .as_ref()
@@ -149,27 +170,8 @@ async fn test_volume_restore() {
         .is_ok());
 
     let stored_info =
-        fake_services.audio_core.lock().await.get_level_and_mute(AudioRenderUsage::Media).unwrap();
+        fake_services.audio_core.lock().await.get_level_and_mute(AudioRenderUsage2::Media).unwrap();
     assert_eq!(stored_info, expected_info);
-}
-
-// Ensure that we won't crash if audio core fails.
-#[fuchsia::test(allow_stalls = false)]
-async fn test_bringup_without_audio_core() {
-    let mut default_settings = default_audio_info();
-    let default_info = load_default_audio_info(&mut default_settings);
-    let service_registry = ServiceRegistry::create();
-
-    let (connector, _) = create_environment(service_registry, default_settings).await;
-
-    // At this point we should not crash.
-    let audio_proxy = connector.connect_to_protocol::<AudioMarker>().unwrap();
-
-    let settings = audio_proxy.watch().await.expect("watch completed");
-    verify_audio_stream(
-        &settings,
-        AudioStreamSettings::from(get_default_stream(AudioStreamType::Media, default_info)),
-    );
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -210,6 +212,12 @@ async fn test_persisted_values_applied_at_start() {
                 user_volume_level: 0.8,
                 user_volume_muted: false,
             },
+            AudioStream {
+                stream_type: AudioStreamType::Accessibility,
+                source: AudioSettingSource::User,
+                user_volume_level: 0.9,
+                user_volume_muted: false,
+            },
         ],
         modified_counters: Some(create_default_modified_counters()),
     };
@@ -227,24 +235,67 @@ async fn test_persisted_values_applied_at_start() {
 
     let audio_proxy = env.connect_to_protocol::<AudioMarker>().unwrap();
 
-    let settings = audio_proxy.watch().await.expect("watch completed");
+    let settings = audio_proxy.watch2().await.expect("watch2 completed");
 
-    // Check that the stored values were returned from watch() and applied to the audio core
-    // service.
+    // Check that stored values were returned by watch2() and applied to the audio core service.
     for stream in test_audio_info.streams.iter() {
-        verify_audio_stream(&settings, AudioStreamSettings::from(*stream));
+        verify_audio_stream2(&settings, AudioStreamSettings2::from(*stream));
         assert_eq!(
             (stream.user_volume_level, stream.user_volume_muted),
             fake_services
                 .audio_core
                 .lock()
                 .await
-                .get_level_and_mute(AudioRenderUsage::from(stream.stream_type))
+                .get_level_and_mute(AudioRenderUsage2::from(stream.stream_type))
                 .unwrap()
         );
     }
 }
 
+//
+// Each test listed below is performed both with Watch/Set methods, and with Watch2/Set2 methods.
+//
+
+// Ensure watch() won't crash if audio core fails.
+#[fuchsia::test(allow_stalls = false)]
+async fn test_watch_without_audio_core() {
+    let mut default_settings = default_audio_info();
+    let default_info = load_default_audio_info(&mut default_settings);
+    let service_registry = ServiceRegistry::create();
+
+    let (connector, _) = create_environment(service_registry, default_settings).await;
+
+    // At this point we should not crash.
+    let audio_proxy = connector.connect_to_protocol::<AudioMarker>().unwrap();
+
+    let settings = audio_proxy.watch().await.expect("watch completed");
+    verify_audio_stream(
+        &settings,
+        AudioStreamSettings::try_from(get_default_stream(AudioStreamType::Media, default_info))
+            .unwrap(),
+    );
+}
+
+// Ensure watch2() won't crash if audio core fails.
+#[fuchsia::test(allow_stalls = false)]
+async fn test_watch2_without_audio_core() {
+    let mut default_settings = default_audio_info();
+    let default_info = load_default_audio_info(&mut default_settings);
+    let service_registry = ServiceRegistry::create();
+
+    let (connector, _) = create_environment(service_registry, default_settings).await;
+
+    // At this point we should not crash.
+    let audio_proxy = connector.connect_to_protocol::<AudioMarker>().unwrap();
+
+    let settings = audio_proxy.watch2().await.expect("watch2 completed");
+    verify_audio_stream2(
+        &settings,
+        AudioStreamSettings2::from(get_default_stream(AudioStreamType::Media, default_info)),
+    );
+}
+
+// Ensure that we can handle an AudioCore channel closure, triggered by a watch() call.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_channel_failure_watch() {
     let audio_proxy =
@@ -253,7 +304,16 @@ async fn test_channel_failure_watch() {
     assert_matches!(result, Err(ClientChannelClosed { status: Status::UNAVAILABLE, .. }));
 }
 
-// Tests that a set call for a stream that isn't in the audio settings fails.
+// Ensure that we can handle an AudioCore channel closure, triggered by a watch2() call.
+#[fuchsia::test(allow_stalls = false)]
+async fn test_channel_failure_watch2() {
+    let audio_proxy =
+        create_audio_test_env_with_failures(Rc::new(InMemoryStorageFactory::new())).await;
+    let result = audio_proxy.watch2().await;
+    assert_matches!(result, Err(ClientChannelClosed { status: Status::UNAVAILABLE, .. }));
+}
+
+// set() and set2() calls for stream types not in our settings should fail but remain connected.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_invalid_stream_fails() {
     let mut default_settings = default_audio_info();
@@ -266,9 +326,16 @@ async fn test_invalid_stream_fails() {
             .build();
     service_registry.lock().await.register_service(audio_core_service_handle.clone());
 
-    // AudioInfo has to have 5 streams, but make them all the same stream type so that we can
-    // perform a set call with a stream that isn't in the AudioInfo.
-    let counters: HashMap<_, _> = [(AudioStreamType::Background, 0)].into();
+    // The AudioInfo settings must have 6 streams, but include a duplicate of the Background stream
+    // type so that we can perform a set call with a Media stream that isn't in the AudioInfo.
+    let counters: HashMap<_, _> = [
+        (AudioStreamType::Background, 0),
+        (AudioStreamType::Interruption, 0),
+        (AudioStreamType::SystemAgent, 0),
+        (AudioStreamType::Communication, 0),
+        (AudioStreamType::Accessibility, 0),
+    ]
+    .into();
 
     let test_audio_info = AudioInfo {
         streams: [
@@ -285,19 +352,25 @@ async fn test_invalid_stream_fails() {
                 user_volume_muted: true,
             },
             AudioStream {
-                stream_type: AudioStreamType::Background,
+                stream_type: AudioStreamType::Interruption,
                 source: AudioSettingSource::User,
                 user_volume_level: 0.5,
                 user_volume_muted: true,
             },
             AudioStream {
-                stream_type: AudioStreamType::Background,
+                stream_type: AudioStreamType::SystemAgent,
                 source: AudioSettingSource::User,
                 user_volume_level: 0.5,
                 user_volume_muted: true,
             },
             AudioStream {
-                stream_type: AudioStreamType::Background,
+                stream_type: AudioStreamType::Communication,
+                source: AudioSettingSource::User,
+                user_volume_level: 0.5,
+                user_volume_muted: true,
+            },
+            AudioStream {
+                stream_type: AudioStreamType::Accessibility,
                 source: AudioSettingSource::User,
                 user_volume_level: 0.5,
                 user_volume_muted: true,
@@ -321,7 +394,7 @@ async fn test_invalid_stream_fails() {
     let audio_proxy = env.connect_to_protocol::<AudioMarker>().unwrap();
     let _ = audio_proxy.watch().await.expect("watch completed");
 
-    // Make a set call with the media stream, which isn't present and should fail.
+    // Call set() to change the volume of the media stream, which isn't present and should fail.
     let audio_settings = AudioSettings {
         streams: Some(vec![changed_media_stream_settings()]),
         ..Default::default()
@@ -331,4 +404,15 @@ async fn test_invalid_stream_fails() {
         .await
         .expect("set completed")
         .expect_err("set should fail");
+
+    // Call set2() to change the volume of the media stream, which isn't present and should fail.
+    let audio_settings = AudioSettings2 {
+        streams: Some(vec![changed_media_stream_settings2()]),
+        ..Default::default()
+    };
+    let _ = audio_proxy
+        .set2(&audio_settings)
+        .await
+        .expect("set2 completed")
+        .expect_err("set2 should fail");
 }

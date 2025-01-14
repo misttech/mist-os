@@ -4,7 +4,9 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
-use fidl_fuchsia_settings::{AudioSettings, AudioStreamSettingSource, AudioStreamSettings, Volume};
+use fidl_fuchsia_settings::{
+    AudioSettings2, AudioStreamSettingSource, AudioStreamSettings2, Volume,
+};
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq, Clone, Copy)]
@@ -13,9 +15,9 @@ use fidl_fuchsia_settings::{AudioSettings, AudioStreamSettingSource, AudioStream
 pub struct Audio {
     // AudioStreams
     /// which stream should be modified. Valid options are background, media, interruption,
-    /// system_agent, and communication
+    /// system_agent, communication and accessibility.
     #[argh(option, short = 't', from_str_fn(str_to_audio_stream))]
-    pub stream: Option<fidl_fuchsia_media::AudioRenderUsage>,
+    pub stream: Option<fidl_fuchsia_media::AudioRenderUsage2>,
 
     /// which source is changing the stream. Valid options are user, system, and
     /// system_with_feedback
@@ -32,14 +34,15 @@ pub struct Audio {
     pub volume_muted: Option<bool>,
 }
 
-fn str_to_audio_stream(src: &str) -> Result<fidl_fuchsia_media::AudioRenderUsage, String> {
+fn str_to_audio_stream(src: &str) -> Result<fidl_fuchsia_media::AudioRenderUsage2, String> {
     match src.to_lowercase().as_str() {
-        "background" | "b" => Ok(fidl_fuchsia_media::AudioRenderUsage::Background),
-        "communication" | "c" => Ok(fidl_fuchsia_media::AudioRenderUsage::Communication),
-        "interruption" | "i" => Ok(fidl_fuchsia_media::AudioRenderUsage::Interruption),
-        "media" | "m" => Ok(fidl_fuchsia_media::AudioRenderUsage::Media),
+        "accessibility" | "a" | "a11y" => Ok(fidl_fuchsia_media::AudioRenderUsage2::Accessibility),
+        "background" | "b" => Ok(fidl_fuchsia_media::AudioRenderUsage2::Background),
+        "communication" | "c" => Ok(fidl_fuchsia_media::AudioRenderUsage2::Communication),
+        "interruption" | "i" => Ok(fidl_fuchsia_media::AudioRenderUsage2::Interruption),
+        "media" | "m" => Ok(fidl_fuchsia_media::AudioRenderUsage2::Media),
         "system_agent" | "systemagent" | "system agent" | "s" => {
-            Ok(fidl_fuchsia_media::AudioRenderUsage::SystemAgent)
+            Ok(fidl_fuchsia_media::AudioRenderUsage2::SystemAgent)
         }
         _ => Err(String::from("Couldn't parse audio stream type")),
     }
@@ -58,20 +61,20 @@ fn str_to_audio_source(
     }
 }
 
-impl TryFrom<Audio> for AudioSettings {
+impl TryFrom<Audio> for AudioSettings2 {
     type Error = &'static str;
 
     fn try_from(src: Audio) -> Result<Self, Self::Error> {
         let volume = Volume { level: src.level, muted: src.volume_muted, ..Default::default() };
-        let stream_settings = AudioStreamSettings {
+        let stream_settings = AudioStreamSettings2 {
             stream: src.stream,
             source: src.source,
             user_volume: if volume == Volume::default() { None } else { Some(volume) },
             ..Default::default()
         };
 
-        let result = AudioSettings {
-            streams: if stream_settings == AudioStreamSettings::default() {
+        let result = AudioSettings2 {
+            streams: if stream_settings == AudioStreamSettings2::default() {
                 None
             } else {
                 Some(vec![stream_settings])
@@ -81,7 +84,7 @@ impl TryFrom<Audio> for AudioSettings {
 
         // TODO(https://fxbug.dev/42129871): Clean up this logic once we have a detailed error return
         // from the FIDL.
-        if result == AudioSettings::default() {
+        if result == AudioSettings2::default() {
             // A Watch call request.
             return Ok(result);
         } else if src.stream.is_none() {

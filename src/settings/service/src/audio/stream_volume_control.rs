@@ -10,7 +10,7 @@ use crate::handler::setting_handler::ControllerError;
 use crate::service_context::{ExternalServiceEvent, ExternalServiceProxy};
 use crate::{call, clock, trace, trace_guard};
 use fidl::endpoints::create_proxy;
-use fidl_fuchsia_media::{AudioRenderUsage, Usage};
+use fidl_fuchsia_media::Usage2;
 use fidl_fuchsia_media_audio::VolumeControlProxy;
 use futures::channel::oneshot::Sender;
 use futures::TryStreamExt;
@@ -139,14 +139,15 @@ impl StreamVolumeControl {
 
         let (vol_control_proxy, server_end) = create_proxy();
         let stream_type = self.stored_stream.stream_type;
-        let usage = Usage::RenderUsage(AudioRenderUsage::from(stream_type));
+        let usage = Usage2::RenderUsage(stream_type.into());
 
         let guard = trace_guard!(id, c"bind usage volume control");
-        if let Err(e) = call!(self.audio_service => bind_usage_volume_control(&usage, server_end)) {
+        if let Err(e) = call!(self.audio_service => bind_usage_volume_control2(&usage, server_end))
+        {
             return Err(ControllerError::ExternalFailure(
                 SettingType::Audio,
                 CONTROLLER_ERROR_DEPENDENCY.into(),
-                format!("bind_usage_volume_control for audio_core {usage:?}").into(),
+                format!("bind_usage_volume_control2 for audio_core {usage:?}").into(),
                 format!("{e:?}").into(),
             ));
         }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::audio::audio_default_settings::AudioInfoLoader;
+use crate::audio::audio_default_settings::{create_default_audio_stream, AudioInfoLoader};
 use crate::audio::{create_default_modified_counters, ModifiedCounters};
 use anyhow::{anyhow, Error};
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,30 @@ pub enum AudioStreamType {
     Interruption,
     SystemAgent,
     Communication,
+    Accessibility,
+}
+
+pub(crate) const AUDIO_STREAM_TYPE_COUNT: usize = 6;
+pub const LEGACY_AUDIO_STREAM_TYPE_COUNT: usize = 5;
+
+impl AudioStreamType {
+    /// Legacy stream types are the subset of AudioStreamType values which correspond to values in
+    /// |fuchsia.media.AudioRenderUsage|. FIDL tables |AudioSettings| and |AudioStreamSettings|,
+    /// and FIDL methods |Set| and |Watch|, are limited to these stream types.
+    ///
+    /// |fuchsia.media.AudioRenderUsage2| contains all the |AudioRenderUsage| values, and more.
+    /// |AudioStreamType| is based on |AudioRenderUsage2|, and |AudioRenderUsage2| is used with
+    /// tables |AudioSettings2| and |AudioStreamSettings2|, and with methods |Set2| and |Watch2|.
+    pub fn is_legacy(&self) -> bool {
+        match *self {
+            AudioStreamType::Background
+            | AudioStreamType::Communication
+            | AudioStreamType::Interruption
+            | AudioStreamType::Media
+            | AudioStreamType::SystemAgent => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
@@ -73,7 +97,7 @@ impl From<AudioStream> for SetAudioStream {
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct AudioInfo {
-    pub streams: [AudioStream; 5],
+    pub streams: [AudioStream; AUDIO_STREAM_TYPE_COUNT],
     pub modified_counters: Option<ModifiedCounters>,
 }
 
@@ -82,13 +106,49 @@ impl DeviceStorageCompatible for AudioInfo {
     const KEY: &'static str = "audio_info";
 
     fn try_deserialize_from(value: &str) -> Result<Self, Error> {
-        Self::extract(value).or_else(|_| AudioInfoV2::try_deserialize_from(value).map(Self::from))
+        Self::extract(value).or_else(|_| AudioInfoV3::try_deserialize_from(value).map(Self::from))
     }
 }
 
 ////////////////////////////////////////////////////////////////
 /// Past versions of AudioInfo.
 ////////////////////////////////////////////////////////////////
+
+/// The following struct should never be modified. It represents an old
+/// version of the audio settings.
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
+pub struct AudioInfoV3 {
+    pub streams: [AudioStream; LEGACY_AUDIO_STREAM_TYPE_COUNT],
+    pub modified_counters: Option<ModifiedCounters>,
+}
+
+impl AudioInfoV3 {
+    pub(super) fn try_deserialize_from(value: &str) -> Result<Self, Error> {
+        serde_json::from_str(value)
+            .map_err(|e| anyhow!("could not deserialize: {e:?}"))
+            .or_else(|_| AudioInfoV2::try_deserialize_from(value).map(Self::from))
+    }
+
+    #[cfg(test)]
+    pub(super) fn default_value(default_setting: AudioInfo) -> Self {
+        AudioInfoV3 {
+            streams: default_setting.streams[0..LEGACY_AUDIO_STREAM_TYPE_COUNT].try_into().unwrap(),
+            modified_counters: None,
+        }
+    }
+}
+
+impl From<AudioInfoV3> for AudioInfo {
+    fn from(v3: AudioInfoV3) -> AudioInfo {
+        let mut stream_vec = v3.streams.to_vec();
+        stream_vec.push(create_default_audio_stream(AudioStreamType::Accessibility));
+
+        AudioInfo {
+            streams: stream_vec.try_into().unwrap(),
+            modified_counters: v3.modified_counters,
+        }
+    }
+}
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct AudioInputInfo {
@@ -99,7 +159,7 @@ pub struct AudioInputInfo {
 /// version of the audio settings.
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct AudioInfoV2 {
-    pub streams: [AudioStream; 5],
+    pub streams: [AudioStream; LEGACY_AUDIO_STREAM_TYPE_COUNT],
     pub input: AudioInputInfo,
     pub modified_counters: Option<ModifiedCounters>,
 }
@@ -114,16 +174,16 @@ impl AudioInfoV2 {
     #[cfg(test)]
     pub(super) fn default_value(default_setting: AudioInfo) -> Self {
         AudioInfoV2 {
-            streams: default_setting.streams,
+            streams: default_setting.streams[0..LEGACY_AUDIO_STREAM_TYPE_COUNT].try_into().unwrap(),
             input: AudioInputInfo { mic_mute: false },
             modified_counters: None,
         }
     }
 }
 
-impl From<AudioInfoV2> for AudioInfo {
-    fn from(v2: AudioInfoV2) -> AudioInfo {
-        AudioInfo { streams: v2.streams, modified_counters: v2.modified_counters }
+impl From<AudioInfoV2> for AudioInfoV3 {
+    fn from(v2: AudioInfoV2) -> AudioInfoV3 {
+        AudioInfoV3 { streams: v2.streams, modified_counters: v2.modified_counters }
     }
 }
 
@@ -131,7 +191,7 @@ impl From<AudioInfoV2> for AudioInfo {
 /// version of the audio settings.
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct AudioInfoV1 {
-    pub streams: [AudioStream; 5],
+    pub streams: [AudioStream; LEGACY_AUDIO_STREAM_TYPE_COUNT],
     pub input: AudioInputInfo,
     pub modified_timestamps: Option<HashMap<AudioStreamType, String>>,
 }
@@ -146,7 +206,7 @@ impl AudioInfoV1 {
     #[cfg(test)]
     pub(super) fn default_value(default_setting: AudioInfo) -> Self {
         AudioInfoV1 {
-            streams: default_setting.streams,
+            streams: default_setting.streams[0..LEGACY_AUDIO_STREAM_TYPE_COUNT].try_into().unwrap(),
             input: AudioInputInfo { mic_mute: false },
             modified_timestamps: None,
         }

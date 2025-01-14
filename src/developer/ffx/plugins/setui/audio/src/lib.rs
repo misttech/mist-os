@@ -6,7 +6,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use ffx_setui_audio_args::Audio;
 use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_settings::{AudioProxy, AudioSettings};
+use fidl_fuchsia_settings::{AudioProxy, AudioSettings2};
 use utils::{handle_mixed_result, Either, WatchOrSetResult};
 
 #[derive(FfxTool)]
@@ -38,12 +38,12 @@ pub async fn run_command<W: std::io::Write>(
 }
 
 async fn command(proxy: AudioProxy, audio: Audio) -> WatchOrSetResult {
-    let settings = AudioSettings::try_from(audio).expect("Iuput arguments have errors");
+    let settings = AudioSettings2::try_from(audio).expect("Input arguments have errors");
 
-    if settings == AudioSettings::default() {
-        Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch())))
+    if settings == AudioSettings2::default() {
+        Ok(Either::Watch(utils::watch_to_stream(proxy, |p| p.watch2())))
     } else {
-        Ok(Either::Set(if let Err(err) = proxy.set(&settings).await? {
+        Ok(Either::Set(if let Err(err) = proxy.set2(&settings).await? {
             format!("{:?}", err)
         } else {
             format!("Successfully set Audio to {:?}", audio)
@@ -54,23 +54,32 @@ async fn command(proxy: AudioProxy, audio: Audio) -> WatchOrSetResult {
 #[cfg(test)]
 mod test {
     use super::*;
-    use fidl_fuchsia_media::AudioRenderUsage;
+    use fidl_fuchsia_media::AudioRenderUsage2;
     use fidl_fuchsia_settings::AudioRequest;
     use test_case::test_case;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_command() {
         let proxy = fho::testing::fake_proxy(move |req| match req {
-            AudioRequest::Set { responder, .. } => {
-                let _ = responder.send(Ok(()));
+            AudioRequest::Set { .. } => {
+                panic!("Unexpected call to set");
             }
             AudioRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
             }
+            AudioRequest::Set2 { responder, .. } => {
+                let _ = responder.send(Ok(()));
+            }
+            AudioRequest::Watch2 { .. } => {
+                panic!("Unexpected call to watch2");
+            }
+            AudioRequest::_UnknownMethod { .. } => {
+                panic!("Unexpected call to unknown method");
+            }
         });
 
         let audio = Audio {
-            stream: Some(AudioRenderUsage::Background),
+            stream: Some(AudioRenderUsage2::Background),
             source: Some(fidl_fuchsia_settings::AudioStreamSettingSource::User),
             level: Some(0.5),
             volume_muted: Some(false),
@@ -81,7 +90,7 @@ mod test {
 
     #[test_case(
         Audio {
-            stream: Some(AudioRenderUsage::Media),
+            stream: Some(AudioRenderUsage2::Media),
             source: Some(fidl_fuchsia_settings::AudioStreamSettingSource::User),
             level: Some(0.6),
             volume_muted: Some(false),
@@ -90,7 +99,7 @@ mod test {
     )]
     #[test_case(
         Audio {
-            stream: Some(AudioRenderUsage::Background),
+            stream: Some(AudioRenderUsage2::Background),
             source: Some(fidl_fuchsia_settings::AudioStreamSettingSource::User),
             level: Some(0.1),
             volume_muted: Some(false),
@@ -100,11 +109,20 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn validate_audio_set_output(expected_audio: Audio) -> Result<()> {
         let proxy = fho::testing::fake_proxy(move |req| match req {
-            AudioRequest::Set { responder, .. } => {
-                let _ = responder.send(Ok(()));
+            AudioRequest::Set { .. } => {
+                panic!("Unexpected call to set");
             }
             AudioRequest::Watch { .. } => {
                 panic!("Unexpected call to watch");
+            }
+            AudioRequest::Set2 { responder, .. } => {
+                let _ = responder.send(Ok(()));
+            }
+            AudioRequest::Watch2 { .. } => {
+                panic!("Unexpected call to watch2");
+            }
+            AudioRequest::_UnknownMethod { .. } => {
+                panic!("Unexpected call to unknown method");
             }
         });
 
@@ -124,7 +142,7 @@ mod test {
     )]
     #[test_case(
         Audio {
-            stream: Some(AudioRenderUsage::Background),
+            stream: Some(AudioRenderUsage2::Background),
             source: Some(fidl_fuchsia_settings::AudioStreamSettingSource::User),
             level: Some(0.1),
             volume_muted: Some(false),
@@ -137,10 +155,19 @@ mod test {
             AudioRequest::Set { .. } => {
                 panic!("Unexpected call to set");
             }
-            AudioRequest::Watch { responder } => {
+            AudioRequest::Watch { .. } => {
+                panic!("Unexpected call to watch");
+            }
+            AudioRequest::Set2 { .. } => {
+                panic!("Unexpected call to set2");
+            }
+            AudioRequest::Watch2 { responder } => {
                 let _ = responder.send(
-                    &AudioSettings::try_from(expected_audio).expect("Invalid input arguments"),
+                    &AudioSettings2::try_from(expected_audio).expect("Invalid input arguments"),
                 );
+            }
+            AudioRequest::_UnknownMethod { .. } => {
+                panic!("Unexpected call to unknown method");
             }
         });
 
@@ -152,7 +179,7 @@ mod test {
             output,
             format!(
                 "{:#?}",
-                AudioSettings::try_from(expected_audio).expect("Invalid input arguments")
+                AudioSettings2::try_from(expected_audio).expect("Invalid input arguments")
             )
         );
         Ok(())

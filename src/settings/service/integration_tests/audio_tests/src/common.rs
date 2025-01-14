@@ -5,9 +5,12 @@
 use crate::mock_audio_core_service::audio_core_service_mock;
 use anyhow::{format_err, Error};
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_media::{AudioCoreMarker, AudioRenderUsage};
+use fidl_fuchsia_media::{
+    AudioCoreMarker, AudioRenderUsage, AudioRenderUsage2, RENDER_USAGE2_COUNT,
+};
 use fidl_fuchsia_settings::{
-    AudioMarker, AudioProxy, AudioStreamSettingSource, AudioStreamSettings, Volume,
+    AudioMarker, AudioProxy, AudioStreamSettingSource, AudioStreamSettings, AudioStreamSettings2,
+    Volume,
 };
 use fuchsia_component_test::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
@@ -21,22 +24,33 @@ use std::sync::Arc;
 pub(crate) const DEFAULT_VOLUME_LEVEL: f32 = 0.5;
 pub(crate) const DEFAULT_VOLUME_MUTED: bool = false;
 
+#[cfg(test)]
 pub(crate) fn default_media_stream_settings() -> AudioStreamSettings {
-    create_default_audio_stream(AudioRenderUsage::Media)
+    AudioStreamSettings {
+        stream: Some(AudioRenderUsage::Media),
+        source: Some(AudioStreamSettingSource::User),
+        user_volume: Some(Volume {
+            level: Some(DEFAULT_VOLUME_LEVEL),
+            muted: Some(DEFAULT_VOLUME_MUTED),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
 }
 
-fn default_streams() -> [AudioStreamSettings; 5] {
+fn default_streams2() -> [AudioStreamSettings2; RENDER_USAGE2_COUNT as usize] {
     [
-        create_default_audio_stream(AudioRenderUsage::Background),
-        create_default_audio_stream(AudioRenderUsage::Media),
-        create_default_audio_stream(AudioRenderUsage::Interruption),
-        create_default_audio_stream(AudioRenderUsage::SystemAgent),
-        create_default_audio_stream(AudioRenderUsage::Communication),
+        create_default_audio_stream2(AudioRenderUsage2::Background),
+        create_default_audio_stream2(AudioRenderUsage2::Media),
+        create_default_audio_stream2(AudioRenderUsage2::Interruption),
+        create_default_audio_stream2(AudioRenderUsage2::SystemAgent),
+        create_default_audio_stream2(AudioRenderUsage2::Communication),
+        create_default_audio_stream2(AudioRenderUsage2::Accessibility),
     ]
 }
 
-fn create_default_audio_stream(usage: AudioRenderUsage) -> AudioStreamSettings {
-    AudioStreamSettings {
+fn create_default_audio_stream2(usage: AudioRenderUsage2) -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
         stream: Some(usage),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
@@ -51,8 +65,8 @@ fn create_default_audio_stream(usage: AudioRenderUsage) -> AudioStreamSettings {
 /// Info about an incoming request emitted by the audio core mock whenever it receives a request.
 #[derive(PartialEq, Debug)]
 pub(crate) enum AudioCoreRequest {
-    SetVolume(AudioRenderUsage, f32),
-    SetMute(AudioRenderUsage, bool),
+    SetVolume(AudioRenderUsage2, f32),
+    SetMute(AudioRenderUsage2, bool),
 }
 
 const COMPONENT_URL: &str = "#meta/setui_service.cm";
@@ -74,7 +88,7 @@ impl AudioTest {
     }
 
     pub(crate) async fn create_and_init(
-        usages_to_report: &[AudioRenderUsage],
+        usages_to_report: &[AudioRenderUsage2],
     ) -> Result<Self, anyhow::Error> {
         // Setup the request channel used by the audio core mock. On startup
         // the service will generate 2 events per audio render usage, we'll
@@ -112,7 +126,7 @@ impl AudioTest {
     /// will not have `AudioCoreRequest` sent when processed.
     async fn create_realm(
         audio_core_request_sender: Sender<AudioCoreRequest>,
-        usages_to_report: &[AudioRenderUsage],
+        usages_to_report: &[AudioRenderUsage2],
     ) -> Result<RealmInstance, Error> {
         let builder = RealmBuilder::new().await?;
         // Add setui_service as child of the realm builder.
@@ -128,8 +142,8 @@ impl AudioTest {
         utils::create_realm_basic(&info).await?;
 
         // Add mock audio core service.
-        let mut streams = HashMap::<AudioRenderUsage, (f32, bool)>::new();
-        for stream in default_streams() {
+        let mut streams = HashMap::<AudioRenderUsage2, (f32, bool)>::new();
+        for stream in default_streams2() {
             let _ = streams.insert(
                 stream.stream.expect("stream usage specified"),
                 (
@@ -236,7 +250,7 @@ impl AudioTest {
     /// them out of the receiver queue.
     async fn wait_for_initial_audio_requests(
         &mut self,
-        audio_renderer_usages: &[AudioRenderUsage],
+        audio_renderer_usages: &[AudioRenderUsage2],
     ) -> Result<(), anyhow::Error> {
         let expected_requests: Vec<_> = audio_renderer_usages
             .iter()

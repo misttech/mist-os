@@ -14,6 +14,7 @@ use crate::agent::earcons::sound_ids::{VOLUME_CHANGED_SOUND_ID, VOLUME_MAX_SOUND
 use crate::agent::earcons::utils::{connect_to_sound_player, play_sound};
 use crate::audio::types::{
     AudioInfo, AudioSettingSource, AudioStream, AudioStreamType, SetAudioStream,
+    AUDIO_STREAM_TYPE_COUNT,
 };
 use crate::audio::{create_default_modified_counters, ModifiedCounters};
 use crate::base::{SettingInfo, SettingType};
@@ -111,7 +112,7 @@ impl VolumeChangeHandler {
     /// they were changed.
     fn calculate_changed_streams(
         &mut self,
-        all_streams: [AudioStream; 5],
+        all_streams: [AudioStream; AUDIO_STREAM_TYPE_COUNT],
         new_modified_counters: ModifiedCounters,
     ) -> Vec<AudioStream> {
         let mut changed_stream_types = HashSet::new();
@@ -298,10 +299,10 @@ mod tests {
     use super::*;
 
     fn fake_values() -> (
-        [AudioStream; 5], // fake_streams
-        ModifiedCounters, // old_counters
-        ModifiedCounters, // new_counters
-        Vec<AudioStream>, // expected_changed_streams
+        [AudioStream; AUDIO_STREAM_TYPE_COUNT], // fake_streams
+        ModifiedCounters,                       // old_counters
+        ModifiedCounters,                       // new_counters
+        Vec<AudioStream>,                       // expected_changed_streams
     ) {
         let config_logger =
             Rc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
@@ -318,11 +319,13 @@ mod tests {
             (AudioStreamType::Interruption, 0),
             (AudioStreamType::SystemAgent, 2),
             (AudioStreamType::Communication, 3),
+            (AudioStreamType::Accessibility, 4),
         ]
         .iter()
         .cloned()
         .collect();
-        let expected_changed_streams = [fake_streams[1], fake_streams[3], fake_streams[4]].to_vec();
+        let expected_changed_streams =
+            [fake_streams[1], fake_streams[3], fake_streams[4], fake_streams[5]].to_vec();
         (fake_streams, old_timestamps, new_timestamps, expected_changed_streams)
     }
 

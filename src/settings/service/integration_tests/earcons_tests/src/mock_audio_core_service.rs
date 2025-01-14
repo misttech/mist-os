@@ -23,7 +23,7 @@ pub(crate) async fn audio_core_service_mock(
                     // Support future expansion of FIDL.
                     #[allow(unreachable_patterns)]
                     match req {
-                        fidl_fuchsia_media::AudioCoreRequest::BindUsageVolumeControl {
+                        fidl_fuchsia_media::AudioCoreRequest::BindUsageVolumeControl2 {
                             usage: _,
                             volume_control,
                             control_handle: _,

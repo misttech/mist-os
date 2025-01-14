@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
-use fidl_fuchsia_media::AudioRenderUsage;
+use fidl_fuchsia_media::AudioRenderUsage2;
 use fidl_fuchsia_media_sounds::{PlayerRequest, PlayerRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
@@ -19,11 +19,11 @@ const DURATION: i64 = 1000000000;
 
 /// Send tuple of sound id and usage, refer to src/settings/service/src/agent/earcons/sound_ids.rs
 /// for sound ids.
-pub type SoundEventSender = Sender<(u32, AudioRenderUsage)>;
+pub type SoundEventSender = Sender<(u32, AudioRenderUsage2)>;
 
 /// Receives tuple sound id and usage for earcon played. Id refers to
 /// src/settings/service/src/agent/earcons/sound_ids.rs.
-pub type SoundEventReceiver = Receiver<(u32, AudioRenderUsage)>;
+pub type SoundEventReceiver = Receiver<(u32, AudioRenderUsage2)>;
 
 pub async fn sound_player_service_mock(
     handles: LocalComponentHandles,
@@ -42,7 +42,7 @@ pub async fn sound_player_service_mock(
                             let _ = play_counts.lock().await.insert(id, 0);
                             responder.send(Ok(DURATION)).unwrap();
                         }
-                        PlayerRequest::PlaySound { id, usage, responder } => {
+                        PlayerRequest::PlaySound2 { id, usage, responder } => {
                             if let Entry::Occupied(mut count) = play_counts.lock().await.entry(id) {
                                 *count.get_mut() += 1;
                             }

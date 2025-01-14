@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::audio::types::{AudioInfo, AudioSettingSource, AudioStream, AudioStreamType};
+use crate::audio::types::{
+    AudioInfo, AudioSettingSource, AudioStream, AudioStreamType, AUDIO_STREAM_TYPE_COUNT,
+};
 use crate::base::SettingInfo;
 use crate::config::default_settings::DefaultSetting;
 use crate::inspect::config_logger::InspectConfigLogger;
@@ -14,12 +16,13 @@ use std::sync::Mutex;
 const DEFAULT_VOLUME_LEVEL: f32 = 0.5;
 const DEFAULT_VOLUME_MUTED: bool = false;
 
-const DEFAULT_STREAMS: [AudioStream; 5] = [
+const DEFAULT_STREAMS: [AudioStream; AUDIO_STREAM_TYPE_COUNT] = [
     create_default_audio_stream(AudioStreamType::Background),
     create_default_audio_stream(AudioStreamType::Media),
     create_default_audio_stream(AudioStreamType::Interruption),
     create_default_audio_stream(AudioStreamType::SystemAgent),
     create_default_audio_stream(AudioStreamType::Communication),
+    create_default_audio_stream(AudioStreamType::Accessibility),
 ];
 
 const DEFAULT_AUDIO_INFO: AudioInfo =
@@ -37,6 +40,7 @@ pub(crate) fn create_default_modified_counters() -> ModifiedCounters {
         AudioStreamType::Interruption,
         AudioStreamType::SystemAgent,
         AudioStreamType::Communication,
+        AudioStreamType::Accessibility,
     ])
     .map(|stream_type| (stream_type, 0))
     .collect()
@@ -104,7 +108,7 @@ mod tests {
     use fuchsia_async::TestExecutor;
     use fuchsia_inspect::component;
 
-    use crate::audio::types::{AudioInfoV1, AudioInfoV2};
+    use crate::audio::types::{AudioInfoV1, AudioInfoV2, AudioInfoV3};
     use crate::tests::helpers::move_executor_forward_and_get;
     use settings_storage::device_storage::DeviceStorageCompatible;
 
@@ -140,6 +144,12 @@ mod tests {
                 user_volume_level: 0.4,
                 user_volume_muted: false,
             },
+            AudioStream {
+                stream_type: AudioStreamType::Accessibility,
+                source: AudioSettingSource::User,
+                user_volume_level: 0.35,
+                user_volume_muted: false,
+            },
         ],
         modified_counters: None,
     };
@@ -163,69 +173,125 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_audio_config() {
-        let mut settings = make_default_settings();
-        let settings = load_default_settings(&mut settings);
-        assert_eq!(CONFIG_AUDIO_INFO, settings);
+        let mut default_settings = make_default_settings();
+        let current_from_storage = load_default_settings(&mut default_settings);
+        // Ensure that settings are read from storage.
+        assert_eq!(CONFIG_AUDIO_INFO, current_from_storage);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_audio_info_migration_v1_to_v2() {
         let mut default_settings = make_default_settings();
-        let mut v1 = AudioInfoV1::default_value(load_default_settings(&mut default_settings));
-        let updated_mic_mute_val = !v1.input.mic_mute;
-        v1.input.mic_mute = updated_mic_mute_val;
+        let mut v1_settings =
+            AudioInfoV1::default_value(load_default_settings(&mut default_settings));
+        let updated_mic_mute_val = !v1_settings.input.mic_mute;
+        v1_settings.input.mic_mute = updated_mic_mute_val;
+        v1_settings.streams[0].user_volume_level = 0.9;
+        v1_settings.streams[0].user_volume_muted = false;
 
-        let serialized_v1 = serde_json::to_string(&v1).expect("default should serialize");
-
-        let v2 = AudioInfoV2::try_deserialize_from(&serialized_v1)
+        let serialized_v1 = serde_json::to_string(&v1_settings).expect("default should serialize");
+        let v2_from_v1 = AudioInfoV2::try_deserialize_from(&serialized_v1)
             .expect("deserialization should succeed");
 
-        assert_eq!(v2.input.mic_mute, updated_mic_mute_val);
+        // Ensure that changes made in v1 are migrated to v2.
+        assert_eq!(v2_from_v1.input.mic_mute, updated_mic_mute_val);
+        assert_eq!(v2_from_v1.streams[0].user_volume_level, 0.9);
+        assert_eq!(v2_from_v1.streams[0].user_volume_muted, false);
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_audio_info_migration_v2_to_v3() {
+        let mut default_settings = make_default_settings();
+        let mut v2_settings =
+            AudioInfoV1::default_value(load_default_settings(&mut default_settings));
+        v2_settings.streams[0].user_volume_level = 0.9;
+        v2_settings.streams[0].user_volume_muted = false;
+
+        let serialized_v2 = serde_json::to_string(&v2_settings).expect("default should serialize");
+        let v3_from_v2 = AudioInfoV3::try_deserialize_from(&serialized_v2)
+            .expect("deserialization should succeed");
+
+        // Ensure that changes made in v2 are migrated to v3.
+        assert_eq!(v3_from_v2.streams[0].user_volume_level, 0.9);
+        assert_eq!(v3_from_v2.streams[0].user_volume_muted, false);
+    }
+
+    #[fuchsia::test]
+    fn test_audio_info_migration_v3_to_current() {
+        let mut executor = TestExecutor::new_with_fake_time();
+        let mut default_settings = make_default_settings();
+        let current_defaults = load_default_settings(&mut default_settings);
+
+        let mut v3_settings = move_executor_forward_and_get(
+            &mut executor,
+            async { AudioInfoV3::default_value(current_defaults) },
+            "Unable to get V3 default value",
+        );
+        v3_settings.streams[0].user_volume_level = 0.9;
+        v3_settings.streams[0].user_volume_muted = false;
+
+        let serialized_v3 = serde_json::to_string(&v3_settings).expect("default should serialize");
+        let current_from_v3 = AudioInfo::try_deserialize_from(&serialized_v3)
+            .expect("deserialization should succeed");
+
+        // Ensure that changes made in v3 are migrated to current.
+        assert_eq!(current_from_v3.streams[0].user_volume_level, 0.9);
+        assert_eq!(current_from_v3.streams[0].user_volume_muted, false);
+        // Ensure that migrating from v3 picks up a default for the new stream type.
+        assert_eq!(current_from_v3.streams[5], DEFAULT_AUDIO_INFO.streams[5]);
     }
 
     #[fuchsia::test]
     fn test_audio_info_migration_v2_to_current() {
         let mut executor = TestExecutor::new_with_fake_time();
         let mut default_settings = make_default_settings();
-        let settings = load_default_settings(&mut default_settings);
+        let current_defaults = load_default_settings(&mut default_settings);
 
-        let mut v2 = move_executor_forward_and_get(
+        let mut v2_settings = move_executor_forward_and_get(
             &mut executor,
-            async { AudioInfoV2::default_value(settings) },
+            async { AudioInfoV2::default_value(current_defaults) },
             "Unable to get V2 default value",
         );
-        let updated_mic_mute_val = !v2.input.mic_mute;
-        v2.input.mic_mute = updated_mic_mute_val;
+        let updated_mic_mute_val = !v2_settings.input.mic_mute;
+        v2_settings.input.mic_mute = updated_mic_mute_val;
+        v2_settings.streams[0].user_volume_level = 0.9;
+        v2_settings.streams[0].user_volume_muted = false;
 
-        let serialized_v2 = serde_json::to_string(&v2).expect("default should serialize");
-
-        let current = AudioInfo::try_deserialize_from(&serialized_v2)
+        let serialized_v2 = serde_json::to_string(&v2_settings).expect("default should serialize");
+        let current_from_v2 = AudioInfo::try_deserialize_from(&serialized_v2)
             .expect("deserialization should succeed");
 
-        let loader = AudioInfoLoader::new(default_settings);
-        assert_eq!(current, loader.default_value());
+        // Ensure that changes made in v2 are migrated to current.
+        assert_eq!(current_from_v2.streams[0].user_volume_level, 0.9);
+        assert_eq!(current_from_v2.streams[0].user_volume_muted, false);
+        // Ensure that migrating from v2 picks up a default for the new stream type.
+        assert_eq!(current_from_v2.streams[5], DEFAULT_AUDIO_INFO.streams[5]);
     }
 
     #[fuchsia::test]
     fn test_audio_info_migration_v1_to_current() {
         let mut executor = TestExecutor::new_with_fake_time();
         let mut default_settings = make_default_settings();
-        let settings = load_default_settings(&mut default_settings);
+        let current_defaults = load_default_settings(&mut default_settings);
 
-        let mut v1 = move_executor_forward_and_get(
+        let mut v1_settings = move_executor_forward_and_get(
             &mut executor,
-            async { AudioInfoV1::default_value(settings) },
+            async { AudioInfoV1::default_value(current_defaults) },
             "Unable to get V1 default value",
         );
-        let updated_mic_mute_val = !v1.input.mic_mute;
-        v1.input.mic_mute = updated_mic_mute_val;
+        let updated_mic_mute_val = !v1_settings.input.mic_mute;
+        v1_settings.input.mic_mute = updated_mic_mute_val;
+        v1_settings.streams[0].user_volume_level = 0.9;
+        v1_settings.streams[0].user_volume_muted = false;
 
-        let serialized_v1 = serde_json::to_string(&v1).expect("default should serialize");
-
-        let current = AudioInfo::try_deserialize_from(&serialized_v1)
+        let serialized_v1 = serde_json::to_string(&v1_settings).expect("default should serialize");
+        let current_from_v1 = AudioInfo::try_deserialize_from(&serialized_v1)
             .expect("deserialization should succeed");
 
-        let loader = AudioInfoLoader::new(default_settings);
-        assert_eq!(current, loader.default_value());
+        // Ensure that changes made in v1 are migrated to current.
+        assert_eq!(current_from_v1.streams[0].user_volume_level, 0.9);
+        assert_eq!(current_from_v1.streams[0].user_volume_muted, false);
+        // Ensure that migrating from v1 picks up a default for the new stream type.
+        assert_eq!(current_from_v1.streams[5], DEFAULT_AUDIO_INFO.streams[5]);
     }
 }

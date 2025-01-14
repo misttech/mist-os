@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::common::AudioCoreRequest;
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_media::{AudioCoreRequestStream, AudioRenderUsage, Usage};
+use fidl_fuchsia_media::{AudioCoreRequestStream, AudioRenderUsage2, Usage2};
 use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_component_test::LocalComponentHandles;
@@ -19,9 +19,9 @@ use futures::{SinkExt, StreamExt, TryStreamExt};
 pub(crate) async fn audio_core_service_mock(
     handles: LocalComponentHandles,
     // TODO(https://fxbug.dev/42056542): replace with Arc<Mutex<...>>
-    audio_streams: Arc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
+    audio_streams: Arc<RwLock<HashMap<AudioRenderUsage2, (f32, bool)>>>,
     audio_core_request_sender: Sender<AudioCoreRequest>,
-    usages_to_report: Vec<AudioRenderUsage>,
+    usages_to_report: Vec<AudioRenderUsage2>,
 ) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     let _: &mut ServiceFsDir<'_, _> =
@@ -34,14 +34,14 @@ pub(crate) async fn audio_core_service_mock(
                     // Support future expansion of FIDL.
                     #[allow(unreachable_patterns)]
                     match req {
-                        fidl_fuchsia_media::AudioCoreRequest::BindUsageVolumeControl {
-                            usage: Usage::RenderUsage(render_usage),
+                        fidl_fuchsia_media::AudioCoreRequest::BindUsageVolumeControl2 {
+                            usage: Usage2::RenderUsage(render_usage2),
                             volume_control,
                             control_handle: _,
                         } => {
                             process_volume_control_stream(
                                 volume_control,
-                                render_usage,
+                                render_usage2,
                                 streams_clone.clone(),
                                 audio_core_request_sender.clone(),
                                 usages_to_report.clone(),
@@ -59,8 +59,8 @@ pub(crate) async fn audio_core_service_mock(
 }
 
 pub(crate) fn get_level_and_mute(
-    usage: AudioRenderUsage,
-    streams: &RwLock<HashMap<AudioRenderUsage, (f32, bool)>>,
+    usage: AudioRenderUsage2,
+    streams: &RwLock<HashMap<AudioRenderUsage2, (f32, bool)>>,
 ) -> Option<(f32, bool)> {
     if let Some((level, muted)) = (*streams.read()).get(&usage) {
         return Some((*level, *muted));
@@ -70,10 +70,10 @@ pub(crate) fn get_level_and_mute(
 
 fn process_volume_control_stream(
     volume_control: ServerEnd<fidl_fuchsia_media_audio::VolumeControlMarker>,
-    render_usage: AudioRenderUsage,
-    streams: Arc<RwLock<HashMap<AudioRenderUsage, (f32, bool)>>>,
+    render_usage: AudioRenderUsage2,
+    streams: Arc<RwLock<HashMap<AudioRenderUsage2, (f32, bool)>>>,
     audio_core_request_sender: Sender<AudioCoreRequest>,
-    usages_to_report: Vec<AudioRenderUsage>,
+    usages_to_report: Vec<AudioRenderUsage2>,
 ) {
     let mut stream = volume_control.into_stream();
     let mut audio_core_request_sender = audio_core_request_sender.clone();
@@ -87,7 +87,7 @@ fn process_volume_control_stream(
                     control_handle,
                 } => {
                     let (_level, muted) =
-                        get_level_and_mute(render_usage, &streams).expect("stream in map");
+                        get_level_and_mute(render_usage, &streams).expect("stream in map (volume)");
                     let _ = (*streams.write()).insert(render_usage, (volume, muted));
 
                     control_handle
@@ -106,7 +106,7 @@ fn process_volume_control_stream(
                     control_handle,
                 } => {
                     let (level, _muted) =
-                        get_level_and_mute(render_usage, &streams).expect("stream in map");
+                        get_level_and_mute(render_usage, &streams).expect("stream in map (mute)");
                     let _ = (*streams.write()).insert(render_usage, (level, mute));
 
                     control_handle
@@ -117,7 +117,7 @@ fn process_volume_control_stream(
                         audio_core_request_sender
                             .send(AudioCoreRequest::SetMute(render_usage, mute))
                             .await
-                            .expect("send SetVolume succeeds");
+                            .expect("send SetVolumeMute succeeds");
                     }
                 }
                 _ => {}

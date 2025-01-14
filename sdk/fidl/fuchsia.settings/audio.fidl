@@ -10,20 +10,42 @@ using fuchsia.media;
 /// Supported SettingsEpitaph enums:
 /// REQUEST_NOT_SUPPORTED, INTERNAL_SERVICE_ERROR, PERSISTENT_STORAGE_ERROR
 @discoverable(server="platform")
-closed protocol Audio {
+closed(removed=NEXT) open(added=NEXT) protocol Audio {
     /// Gets the current [AudioSettings]. Returns immediately on first call;
     /// subsequent calls return when the value changes.
     ///
     /// If this call fails, it is considered a fatal error and the channel
     /// will be closed.
+    @available(
+            deprecated=NEXT,
+            note="Use Watch2, Set2, AudioSettings2, AudioStreamSettings2 and AudioRenderUsage2")
     strict Watch() -> (struct {
         settings AudioSettings;
     });
 
+    /// Gets the current [AudioSettings2]. Returns immediately on first call;
+    /// subsequent calls return when the value changes.
+    ///
+    /// If this call fails, it is considered a fatal error and the channel will be closed.
+    @available(added=NEXT)
+    flexible Watch2() -> (struct {
+        settings AudioSettings2;
+    });
+
     /// Sets audio settings. Any field not explicitly set in the table performs a
     /// no-op, and will not make any changes.
+    @available(
+            deprecated=NEXT,
+            note="Use Watch2, Set2, AudioSettings2, AudioStreamSettings2 and AudioRenderUsage2")
     strict Set(struct {
         settings AudioSettings;
+    }) -> () error Error;
+
+    /// Sets audio settings. Only table fields that are set will lead to any changes; otherwise
+    /// existing settings are unchanged.
+    @available(added=NEXT)
+    flexible Set2(struct {
+        settings AudioSettings2;
     }) -> () error Error;
 };
 
@@ -55,6 +77,9 @@ type Volume = table {
     2: muted bool;
 };
 
+@available(
+        deprecated=NEXT,
+        note="Use Watch2, Set2, AudioSettings2, AudioStreamSettings2 and AudioRenderUsage2")
 type AudioStreamSettings = table {
     /// The audio stream which the settings are applying to.
     1: stream fuchsia.media.AudioRenderUsage;
@@ -67,13 +92,36 @@ type AudioStreamSettings = table {
     3: user_volume Volume;
 };
 
+@available(added=NEXT)
+type AudioStreamSettings2 = table {
+    /// The audio stream which the settings are applying to.
+    1: stream fuchsia.media.AudioRenderUsage2;
+
+    /// The volume of `stream` is set according to the volume settings from `source`.
+    2: source AudioStreamSettingSource;
+
+    /// User level volume setting. If the `source` is USER, then the volume is set to
+    /// `user_volume`.
+    3: user_volume Volume;
+};
+
+@available(
+        deprecated=NEXT,
+        note="Use Watch2, Set2, AudioSettings2, AudioStreamSettings2 and AudioRenderUsage2")
 type AudioSettings = table {
-    /// Contains the volume setting for all audio stream settings. There should only be
-    /// one AudioStreamSettings for each fuchsia.media.AudioRenderUsage.
+    /// Contains the volume setting for 'legacy' audio stream settings (those in AudioRenderUsage).
+    /// There should only be one AudioStreamSettings for each fuchsia.media.AudioRenderUsage.
     1: streams vector<AudioStreamSettings>:5;
 
     @available(deprecated=8, removed=9)
     2: input AudioInput;
+};
+
+@available(added=NEXT)
+type AudioSettings2 = table {
+    /// Contains the volume setting for all audio stream settings. There should only be
+    /// one AudioStreamSettings for each fuchsia.media.AudioRenderUsage2.
+    1: streams vector<AudioStreamSettings2>:fuchsia.media.MAX_USAGE_COUNT;
 };
 
 @available(deprecated=8, removed=9)

@@ -6,7 +6,7 @@ use crate::event::Publisher;
 use crate::service_context::{ExternalServiceProxy, ServiceContext};
 use anyhow::{anyhow, Context as _, Error};
 use fidl::endpoints::Proxy as _;
-use fidl_fuchsia_media::AudioRenderUsage;
+use fidl_fuchsia_media::AudioRenderUsage2;
 use fidl_fuchsia_media_sounds::{PlayerMarker, PlayerProxy};
 use futures::lock::Mutex;
 use std::collections::HashSet;
@@ -73,7 +73,7 @@ pub(super) async fn play_sound<'a>(
     // for the previous sound to finish to send another request.
     fasync::Task::local(async move {
         if let Err(e) =
-            call_async!(sound_player_proxy => play_sound(id, AudioRenderUsage::Background)).await
+            call_async!(sound_player_proxy => play_sound2(id, AudioRenderUsage2::Background)).await
         {
             log::error!("[earcons] Unable to Play sound from Player: {}", e);
         };

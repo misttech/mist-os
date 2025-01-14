@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use common::{VolumeChangeEarconsTest, DEFAULT_VOLUME_LEVEL, DEFAULT_VOLUME_MUTED};
-use fidl_fuchsia_media::AudioRenderUsage;
-use fidl_fuchsia_settings::{AudioStreamSettingSource, AudioStreamSettings, Volume};
+use fidl_fuchsia_media::AudioRenderUsage2;
+use fidl_fuchsia_settings::{AudioStreamSettingSource, AudioStreamSettings2, Volume};
 use futures::StreamExt;
 
 /// A volume level of 0.7, which is different from the default of 0.5;
@@ -13,9 +13,9 @@ const CHANGED_VOLUME_LEVEL: f32 = DEFAULT_VOLUME_LEVEL + 0.2;
 /// A mute state of true, which is different from the default of false.
 const CHANGED_VOLUME_MUTED: bool = !DEFAULT_VOLUME_MUTED;
 
-fn changed_media_stream_settings() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(AudioRenderUsage::Media),
+fn changed_media_stream_settings() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(AudioRenderUsage2::Media),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL),
@@ -28,9 +28,9 @@ fn changed_media_stream_settings() -> AudioStreamSettings {
 
 // Stream settings when background is changed to match Media.
 
-fn changed_media_background_stream_settings() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(AudioRenderUsage::Background),
+fn changed_media_background_stream_settings() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(AudioRenderUsage2::Background),
         source: Some(AudioStreamSettingSource::System),
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL),
@@ -48,9 +48,9 @@ const CHANGED_VOLUME_UNMUTED: bool = false;
 const MAX_VOLUME_EARCON_ID: u32 = 0;
 const VOLUME_EARCON_ID: u32 = 1;
 
-fn changed_media_stream_settings_max() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Media),
+fn changed_media_stream_settings_max() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Media),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
@@ -63,9 +63,9 @@ fn changed_media_stream_settings_max() -> AudioStreamSettings {
 
 // Stream settings when background is changed to match Media for max volume.
 
-fn changed_media_background_stream_settings_max() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Background),
+fn changed_media_background_stream_settings_max() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Background),
         source: Some(AudioStreamSettingSource::System),
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
@@ -76,9 +76,9 @@ fn changed_media_background_stream_settings_max() -> AudioStreamSettings {
     }
 }
 
-fn changed_media_stream_settings_system() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Media),
+fn changed_media_stream_settings_system() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Media),
         source: Some(AudioStreamSettingSource::System),
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL_2),
@@ -89,9 +89,9 @@ fn changed_media_stream_settings_system() -> AudioStreamSettings {
     }
 }
 
-fn changed_media_stream_settings_system_with_feedback() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Media),
+fn changed_media_stream_settings_system_with_feedback() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Media),
         source: Some(AudioStreamSettingSource::SystemWithFeedback),
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL_2),
@@ -102,9 +102,9 @@ fn changed_media_stream_settings_system_with_feedback() -> AudioStreamSettings {
     }
 }
 
-fn changed_interruption_stream_settings_max() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Interruption),
+fn changed_interruption_stream_settings_max() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Interruption),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
@@ -117,9 +117,9 @@ fn changed_interruption_stream_settings_max() -> AudioStreamSettings {
 
 // Stream settings when background is changed to match Interruption for max volume.
 
-fn changed_interruption_background_stream_settings_max() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Background),
+fn changed_interruption_background_stream_settings_max() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Background),
         source: Some(AudioStreamSettingSource::System),
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
@@ -130,9 +130,9 @@ fn changed_interruption_background_stream_settings_max() -> AudioStreamSettings 
     }
 }
 
-fn changed_interruption_stream_settings() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Interruption),
+fn changed_interruption_stream_settings() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Interruption),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL_2),
@@ -145,9 +145,9 @@ fn changed_interruption_stream_settings() -> AudioStreamSettings {
 
 // Stream settings when background is changed to match Interruption.
 
-fn changed_interruption_background_stream_settings() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Background),
+fn changed_interruption_background_stream_settings() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Background),
         source: Some(AudioStreamSettingSource::System),
         user_volume: Some(Volume {
             level: Some(CHANGED_VOLUME_LEVEL_2),
@@ -158,9 +158,9 @@ fn changed_interruption_background_stream_settings() -> AudioStreamSettings {
     }
 }
 
-fn changed_communication_stream_settings_max() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::Communication),
+fn changed_communication_stream_settings_max() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Communication),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
@@ -171,9 +171,22 @@ fn changed_communication_stream_settings_max() -> AudioStreamSettings {
     }
 }
 
-fn changed_system_agent_stream_settings_max() -> AudioStreamSettings {
-    AudioStreamSettings {
-        stream: Some(fidl_fuchsia_media::AudioRenderUsage::SystemAgent),
+fn changed_system_agent_stream_settings_max() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::SystemAgent),
+        source: Some(AudioStreamSettingSource::User),
+        user_volume: Some(Volume {
+            level: Some(MAX_VOLUME_LEVEL),
+            muted: Some(CHANGED_VOLUME_UNMUTED),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }
+}
+
+fn changed_accessibility_stream_settings_max() -> AudioStreamSettings2 {
+    AudioStreamSettings2 {
+        stream: Some(fidl_fuchsia_media::AudioRenderUsage2::Accessibility),
         source: Some(AudioStreamSettingSource::User),
         user_volume: Some(Volume {
             level: Some(MAX_VOLUME_LEVEL),
@@ -197,20 +210,20 @@ async fn test_media_sounds() {
     let mut sound_event_receiver = test_instance.create_sound_played_listener().await;
 
     // Test that the volume-changed sound gets played on the soundplayer for media.
-    test_instance.set_volume(vec![changed_media_stream_settings()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
     // Test that the volume-max sound gets played on the soundplayer for media.
-    test_instance.set_volume(vec![changed_media_stream_settings_max()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings_max()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         MAX_VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
@@ -230,13 +243,13 @@ async fn test_media_sounds_system_source() {
     // check the sound player fake that the sound has been played.
     let mut sound_event_receiver = test_instance.create_sound_played_listener().await;
 
-    test_instance.set_volume(vec![changed_media_stream_settings_system()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings_system()]).await;
 
     // There should be no next sound event to receive, this is expected to panic.
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
@@ -256,11 +269,11 @@ async fn test_media_sounds_system_with_feedback_source() {
     let mut sound_event_receiver = test_instance.create_sound_played_listener().await;
 
     // Test that the volume-changed sound gets played on the soundplayer for media.
-    test_instance.set_volume(vec![changed_media_stream_settings_system_with_feedback()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings_system_with_feedback()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
@@ -280,20 +293,20 @@ async fn test_interruption_sounds() {
     let mut sound_event_receiver = test_instance.create_sound_played_listener().await;
 
     // Test that the volume-changed sound gets played on the soundplayer for interruption.
-    test_instance.set_volume(vec![changed_interruption_stream_settings()]).await;
+    test_instance.set_volumes(vec![changed_interruption_stream_settings()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
     // Test that the volume-max sound gets played on the soundplayer for interruption.
-    test_instance.set_volume(vec![changed_interruption_stream_settings_max()]).await;
+    test_instance.set_volumes(vec![changed_interruption_stream_settings_max()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         MAX_VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
@@ -313,20 +326,20 @@ async fn test_max_volume_sound_on_sw_change() {
     let mut sound_event_receiver = test_instance.create_sound_played_listener().await;
 
     // The max volume sound should play the first time it is set to max volume.
-    test_instance.set_volume(vec![changed_media_stream_settings_max()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings_max()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         MAX_VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
     // The max volume sound should play again if it was already at max volume.
-    test_instance.set_volume(vec![changed_media_stream_settings_max()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings_max()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         MAX_VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
@@ -343,7 +356,8 @@ async fn test_earcons_on_multiple_channel_change() {
     let mut sound_event_receiver = test_instance.create_sound_played_listener().await;
     // Set volume to max on multiple channels.
     test_instance
-        .set_volume(vec![
+        .set_volumes(vec![
+            changed_accessibility_stream_settings_max(),
             changed_communication_stream_settings_max(),
             changed_system_agent_stream_settings_max(),
             changed_media_stream_settings_max(),
@@ -353,17 +367,17 @@ async fn test_earcons_on_multiple_channel_change() {
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         MAX_VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
     // Playing sound right after ensures that only 1 max sound was in the
     // pipeline.
-    test_instance.set_volume(vec![changed_media_stream_settings()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings()]).await;
     VolumeChangeEarconsTest::verify_earcon(
         &mut sound_event_receiver,
         VOLUME_EARCON_ID,
-        AudioRenderUsage::Background,
+        AudioRenderUsage2::Background,
     )
     .await;
 
@@ -380,16 +394,19 @@ async fn test_media_background_matching() {
 
     let mut sound_event_receiver = test_instance.create_sound_played_listener().await;
 
-    test_instance.set_volume(vec![changed_media_stream_settings()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings()]).await;
     let _ = sound_event_receiver.next().await.unwrap();
     test_instance
-        .verify_volume(AudioRenderUsage::Background, changed_media_background_stream_settings())
+        .verify_volume(AudioRenderUsage2::Background, changed_media_background_stream_settings())
         .await;
 
-    test_instance.set_volume(vec![changed_media_stream_settings_max()]).await;
+    test_instance.set_volumes(vec![changed_media_stream_settings_max()]).await;
     let _ = sound_event_receiver.next().await.unwrap();
     test_instance
-        .verify_volume(AudioRenderUsage::Background, changed_media_background_stream_settings_max())
+        .verify_volume(
+            AudioRenderUsage2::Background,
+            changed_media_background_stream_settings_max(),
+        )
         .await;
 
     let _ = test_instance.destroy().await;
@@ -407,21 +424,21 @@ async fn test_interruption_background_matching() {
 
     // Test that the volume-changed sound gets played on the soundplayer for interruption
     // and the volume is matched on the background.
-    test_instance.set_volume(vec![changed_interruption_stream_settings()]).await;
+    test_instance.set_volumes(vec![changed_interruption_stream_settings()]).await;
     let _ = sound_event_receiver.next().await.unwrap();
     test_instance
         .verify_volume(
-            AudioRenderUsage::Background,
+            AudioRenderUsage2::Background,
             changed_interruption_background_stream_settings(),
         )
         .await;
 
     // Test that the volume-max sound gets played on the soundplayer for interruption.
-    test_instance.set_volume(vec![changed_interruption_stream_settings_max()]).await;
+    test_instance.set_volumes(vec![changed_interruption_stream_settings_max()]).await;
     let _ = sound_event_receiver.next().await.unwrap();
     test_instance
         .verify_volume(
-            AudioRenderUsage::Background,
+            AudioRenderUsage2::Background,
             changed_interruption_background_stream_settings_max(),
         )
         .await;
