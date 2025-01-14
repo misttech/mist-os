@@ -51,44 +51,42 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
         std::make_unique<FakeAudioRenderer>(dispatcher_, std::move(request.audio_out_request()));
   }
 
-  void CreateAudioCapturer(CreateAudioCapturerRequest& request,
-                           CreateAudioCapturerCompleter::Sync& completer) override {
+  void CreateAudioCapturer(CreateAudioCapturerRequest&,
+                           CreateAudioCapturerCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
   void CreateAudioCapturerWithConfiguration(
-      CreateAudioCapturerWithConfigurationRequest& request,
-      CreateAudioCapturerWithConfigurationCompleter::Sync& completer) override {
+      CreateAudioCapturerWithConfigurationRequest&,
+      CreateAudioCapturerWithConfigurationCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void SetRenderUsageGain(SetRenderUsageGainRequest& request,
-                          SetRenderUsageGainCompleter::Sync& completer) override {
+  void SetRenderUsageGain(SetRenderUsageGainRequest&, SetRenderUsageGainCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void SetRenderUsageGain2(SetRenderUsageGain2Request& request,
-                           SetRenderUsageGain2Completer::Sync& completer) override {
+  void SetRenderUsageGain2(SetRenderUsageGain2Request&,
+                           SetRenderUsageGain2Completer::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void SetCaptureUsageGain(SetCaptureUsageGainRequest& request,
-                           SetCaptureUsageGainCompleter::Sync& completer) override {
+  void SetCaptureUsageGain(SetCaptureUsageGainRequest&,
+                           SetCaptureUsageGainCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void BindUsageVolumeControl(BindUsageVolumeControlRequest& request,
-                              BindUsageVolumeControlCompleter::Sync& completer) override {
+  void BindUsageVolumeControl(BindUsageVolumeControlRequest&,
+                              BindUsageVolumeControlCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void BindUsageVolumeControl2(BindUsageVolumeControl2Request& request,
-                               BindUsageVolumeControl2Completer::Sync& completer) override {
+  void BindUsageVolumeControl2(BindUsageVolumeControl2Request&,
+                               BindUsageVolumeControl2Completer::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void GetDbFromVolume(GetDbFromVolumeRequest& request,
-                       GetDbFromVolumeCompleter::Sync& completer) override {
+  void GetDbFromVolume(GetDbFromVolumeRequest&, GetDbFromVolumeCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
@@ -99,34 +97,28 @@ class FakeAudioCore final : public fidl::Server<fuchsia_media::AudioCore> {
         std::move(request.usage()), request.volume(), completer.ToAsync());
   }
 
-  void GetVolumeFromDb(GetVolumeFromDbRequest& request,
-                       GetVolumeFromDbCompleter::Sync& completer) override {
+  void GetVolumeFromDb(GetVolumeFromDbRequest&, GetVolumeFromDbCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void GetVolumeFromDb2(GetVolumeFromDb2Request& request,
-                        GetVolumeFromDb2Completer::Sync& completer) override {
+  void GetVolumeFromDb2(GetVolumeFromDb2Request&, GetVolumeFromDb2Completer::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void SetInteraction(SetInteractionRequest& request,
-                      SetInteractionCompleter::Sync& completer) override {
+  void SetInteraction(SetInteractionRequest&, SetInteractionCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void SetInteraction2(SetInteraction2Request& request,
-                       SetInteraction2Completer::Sync& completer) override {
+  void SetInteraction2(SetInteraction2Request&, SetInteraction2Completer::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 
-  void ResetInteractions(ResetInteractionsCompleter::Sync& completer) override {
-    FX_NOTIMPLEMENTED();
-  }
+  void ResetInteractions(ResetInteractionsCompleter::Sync&) override { FX_NOTIMPLEMENTED(); }
 
-  void LoadDefaults(LoadDefaultsCompleter::Sync& completer) override { FX_NOTIMPLEMENTED(); }
+  void LoadDefaults(LoadDefaultsCompleter::Sync&) override { FX_NOTIMPLEMENTED(); }
 
-  void EnableDeviceSettings(EnableDeviceSettingsRequest& request,
-                            EnableDeviceSettingsCompleter::Sync& completer) override {
+  void EnableDeviceSettings(EnableDeviceSettingsRequest&,
+                            EnableDeviceSettingsCompleter::Sync&) override {
     FX_NOTIMPLEMENTED();
   }
 

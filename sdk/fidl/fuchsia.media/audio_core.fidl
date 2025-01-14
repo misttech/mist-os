@@ -6,7 +6,7 @@ library fuchsia.media;
 using fuchsia.media.audio;
 
 /// Usage annotating the purpose of the stream being used to render audio.
-/// An AudioRenderer's usage cannot be changed after creation.  The
+/// An AudioRenderer's usage cannot be changed after creation. The
 /// AudioRenderUsage is used by audio policy to dictate how audio streams
 /// interact with each other.
 // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
@@ -24,7 +24,7 @@ type AudioRenderUsage = strict enum {
     /// this.
     INTERRUPTION = 2;
 
-    /// Stream is for interaction with a system agent.  This should be used
+    /// Stream is for interaction with a system agent. This should be used
     /// in response to a user initiated trigger.
     SYSTEM_AGENT = 3;
 
@@ -53,7 +53,7 @@ type AudioRenderUsage2 = strict enum : uint32 {
     /// this.
     INTERRUPTION = 2;
 
-    /// Stream is for interaction with a system agent.  This should be used
+    /// Stream is for interaction with a system agent. This should be used
     /// in response to a user initiated trigger.
     SYSTEM_AGENT = 3;
 
@@ -72,7 +72,7 @@ const RENDER_USAGE2_COUNT uint8 = 6;
 /// AudioCaptureUsage is used by audio policy to dictate how audio streams
 /// interact with each other.
 type AudioCaptureUsage = strict enum {
-    /// Stream is used to capture audio while in the background.  These streams
+    /// Stream is used to capture audio while in the background. These streams
     /// may be active at any the time and are considered privileged.
     /// Example: Listening for Hotwords
     BACKGROUND = 0;
@@ -83,7 +83,7 @@ type AudioCaptureUsage = strict enum {
     /// Example: Voice Recorder
     FOREGROUND = 1;
 
-    /// Stream is for interaction with a system agent.  This should only be used
+    /// Stream is for interaction with a system agent. This should only be used
     /// once a user has signalled their intent to have the interaction with an
     /// interested party.
     /// Examples: Assistant, Siri, Alexa
@@ -96,7 +96,7 @@ type AudioCaptureUsage = strict enum {
 const CAPTURE_USAGE_COUNT uint8 = 4;
 
 /// A reasonable upper-bound for the maximum number of render or capture usages. Use this value in
-/// FIDL APIs (e.g. for max vector size), instead of RENDER_USAGE_COUNT or CAPTURE_USAGE_COUNT
+/// FIDL APIs (e.g. for max vector size), instead of RENDER_USAGE2_COUNT or CAPTURE_USAGE_COUNT
 /// directly. This way, an increase in these consts will not cause an ABI-breaking change.
 @available(added=NEXT)
 const MAX_USAGE_COUNT uint8 = 8;
@@ -166,8 +166,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
         enabled bool;
     });
 
-    /// Sets the Usage gain applied to Renderers. By default, the gain for all
-    /// render usages is set to Unity (0 db).
+    /// Sets the gain for this render usage. By default, all render usages are set to Unity (0 db).
     // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
     @available(deprecated=NEXT, note="Use SetRenderUsageGain2 and AudioRenderUsage2")
     strict SetRenderUsageGain(struct {
@@ -175,16 +174,14 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
         gain_db float32;
     });
 
-    /// Sets the Usage gain applied to Renderers. By default, the gain for all
-    /// render usages is set to Unity (0 db).
+    /// Sets the gain for this render usage. By default, all render usages are set to Unity (0 db).
     @available(added=NEXT)
     strict SetRenderUsageGain2(struct {
         usage AudioRenderUsage2;
         gain_db float32;
     });
 
-    /// Sets the Usage gain applied to Capturers. By default, the gain for all
-    /// capture usages is set to Unity (0 db).
+    /// Sets gain for this capture usage. By default, all capture usages are set to Unity (0 db).
     strict SetCaptureUsageGain(struct {
         usage AudioCaptureUsage;
         gain_db float32;
@@ -249,7 +246,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
         gain_db float32;
     });
 
-    /// Sets how audio_core handles interactions of multiple active streams simultaneously.  If
+    /// Sets how audio_core handles interactions of multiple active streams simultaneously. If
     /// streams of Usage `active` are processing audio, and streams of Usage `affected` are as well,
     /// the Behavior specified will be applied to the streams of Usage `affected`.
     // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
@@ -260,7 +257,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
         behavior Behavior;
     });
 
-    /// Sets how audio_core handles interactions of multiple active streams simultaneously.  If
+    /// Sets how audio_core handles interactions of multiple active streams simultaneously. If
     /// streams of Usage `active` are processing audio, and streams of Usage `affected` are as well,
     /// the Behavior specified will be applied to the streams of Usage `affected`.
     @available(added=NEXT)
@@ -271,10 +268,10 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     });
 
     /// Re-initializes the set of rules that are currently governing the interaction of streams in
-    /// audio_core.  The default behavior is 'NONE'.
+    /// audio_core. The default behavior is 'NONE'.
     strict ResetInteractions();
 
-    /// Re-loads the platform policy configuration.  Falls back to a default config if the platform
+    /// Re-loads the platform policy configuration. Falls back to a default config if the platform
     /// does not provide a config.
     strict LoadDefaults();
 };

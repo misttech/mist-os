@@ -31,7 +31,7 @@ namespace media::audio::test {
 
 // Additional restrictions on the allowed sequence of API calls:
 // SetReferenceClock may only be called once for a given AudioRenderer.
-// SetUsage and SetReferenceClock may only be called before SetPcmStreamType.
+// SetUsage2 and SetReferenceClock may only be called before SetPcmStreamType.
 // SetPcmStreamType, AddPayloadBuffer/RemovePayloadBuffer may only be called when not Operating.
 // A renderer must be Configured/Operating before calling SendPacket, Play, Pause.
 
@@ -173,7 +173,7 @@ class AudioRendererLeadTimeTest : public AudioRendererTest {};
 class AudioRendererPtsTest : public AudioRendererTest {};
 
 // Thin wrapper around AudioRendererTest for test case grouping only.
-// This group validates AudioRenderer's implementation of SetUsage and SetPcmStreamType.
+// This group validates AudioRenderer's implementation of SetUsage2 and SetPcmStreamType.
 class AudioRendererFormatUsageTest : public AudioRendererTest {};
 
 // Thin wrapper around AudioRendererTest for test case grouping only.

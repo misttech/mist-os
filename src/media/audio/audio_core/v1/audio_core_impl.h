@@ -53,9 +53,9 @@ class AudioCoreImpl final : public fuchsia::media::AudioCore {
                        GetDbFromVolumeCallback callback) final;
   void GetDbFromVolume2(fuchsia::media::Usage2 usage, float volume,
                         GetDbFromVolume2Callback callback) final;
-  void GetVolumeFromDb(fuchsia::media::Usage usage, float db,
+  void GetVolumeFromDb(fuchsia::media::Usage usage, float gain_db,
                        GetVolumeFromDbCallback callback) final;
-  void GetVolumeFromDb2(fuchsia::media::Usage2 usage, float db,
+  void GetVolumeFromDb2(fuchsia::media::Usage2 usage, float gain_db,
                         GetVolumeFromDb2Callback callback) final;
   void SetInteraction(fuchsia::media::Usage active, fuchsia::media::Usage affected,
                       fuchsia::media::Behavior behavior) final;

@@ -54,26 +54,7 @@ impl Renderer {
                     proxy.set_reference_clock(reference_clock)?;
                 }
 
-                if let Some(usage2) = renderer_config.usage2 {
-                    proxy.set_usage2(usage2)?;
-                } else if let Some(usage) = renderer_config.usage {
-                    let usage2 = match usage {
-                        fmedia::AudioRenderUsage::Background => {
-                            fmedia::AudioRenderUsage2::Background
-                        }
-                        fmedia::AudioRenderUsage::Communication => {
-                            fmedia::AudioRenderUsage2::Communication
-                        }
-                        fmedia::AudioRenderUsage::Interruption => {
-                            fmedia::AudioRenderUsage2::Interruption
-                        }
-                        fmedia::AudioRenderUsage::Media => fmedia::AudioRenderUsage2::Media,
-                        fmedia::AudioRenderUsage::SystemAgent => {
-                            fmedia::AudioRenderUsage2::SystemAgent
-                        }
-                    };
-                    proxy.set_usage2(usage2)?;
-                }
+                renderer_config.usage.and_then(|usage| proxy.set_usage2(usage).ok());
 
                 proxy.set_pcm_stream_type(&fmedia::AudioStreamType::from(format))?;
 

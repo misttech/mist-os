@@ -114,7 +114,7 @@ class FakeAudioRenderer : public fuchsia::media::AudioRenderer {
   Expectations expectations_;
   std::vector<fuchsia::media::StreamPacket>::const_iterator expected_packets_iterator_;
   SendPacketCallback send_packet_callback_;
-  bool set_usage_called_ = false;
+  bool set_usage2_called_ = false;
   bool set_pcm_stream_type_called_ = false;
   bool add_payload_buffer_called_ = false;
   bool play_no_reply_called_ = false;

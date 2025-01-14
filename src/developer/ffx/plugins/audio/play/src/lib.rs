@@ -64,7 +64,7 @@ async fn play_impl(
         | AudioRenderUsageExtended::Media(usage)
         | AudioRenderUsageExtended::SystemAgent(usage) => {
             fac::RendererConfig::StandardRenderer(fac::StandardRendererConfig {
-                usage2: Some(usage),
+                usage: Some(usage),
                 clock: Some(command.clock),
                 ..Default::default()
             })
