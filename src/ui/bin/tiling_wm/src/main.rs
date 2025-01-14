@@ -263,6 +263,19 @@ impl TilingWm {
                 }
                 Ok(())
             }
+            MessageInternal::WindowManagerCycle { responder } => {
+                self.cycle_tiles()?;
+                self.flatland
+                    .present(ui_comp::PresentArgs {
+                        requested_presentation_time: Some(0),
+                        ..Default::default()
+                    })
+                    .context("WindowManagerSetOrder present")?;
+                if let Err(e) = responder.send() {
+                    error!("Failed to send response for WindowManager Manager.Cycle(): {}", e);
+                }
+                Ok(())
+            }
             _ => Ok(()),
         }
     }
@@ -380,6 +393,10 @@ impl TilingWm {
         };
         self.tile_order.insert(new_position, tile_id);
         self.layout_tiles()
+    }
+
+    fn cycle_tiles(&mut self) -> Result<(), Error> {
+        self.set_tile_order(0, self.tile_order.len() - 1)
     }
 
     fn list_views(&mut self) -> Vec<window::ListedView> {
@@ -657,8 +674,10 @@ fn handle_window_manager_request(
                 })
                 .expect("Failed to send MessageInternal.");
         }
-        window::ManagerRequest::Cycle { responder: _responder } => {
-            unimplemented!()
+        window::ManagerRequest::Cycle { responder } => {
+            internal_sender
+                .unbounded_send(MessageInternal::WindowManagerCycle { responder })
+                .expect("Failed to send MessageInternal");
         }
         window::ManagerRequest::Focus { position: _position, responder: _responder } => {
             unimplemented!()
