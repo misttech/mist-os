@@ -74,8 +74,8 @@ rustc_binary("starnix_kernel_bin") {
 
   disable_rustdoc = false
 
-  if (target_cpu == "riscv64") {
-    # At least for riscv64, remote linking requires machine
+  if (target_cpu == "riscv64" || is_lto_variant) {
+    # At least for riscv64 and LTO, remote linking requires machines
     # with more memory, particularly in the linking phase.
     _concurrent_jobs = concurrent_jobs.rust_highmem
     configs += _concurrent_jobs.configs
