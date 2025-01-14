@@ -568,9 +568,18 @@ impl WriteInspect for types::ScannedCandidate {
             rssi: self.bss.signal.rssi_dbm,
             score: scoring_functions::score_bss_scanned_candidate(self.clone()),
             security_type_saved: self.saved_security_type_to_string(),
-            security_type_scanned: format!("{}", wlan_common::bss::Protection::from(self.security_type_detailed)),
+            security_type_scanned: format!(
+                "{}",
+                wlan_common::bss::Protection::from(self.security_type_detailed),
+            ),
             channel: format!("{}", self.bss.channel),
             compatible: self.bss.is_compatible(),
+            incompatibility: self.bss
+                .compatibility
+                .as_ref()
+                .err()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| String::from("none")),
             recent_failure_count: self.recent_failure_count(),
             saved_network_has_ever_connected: self.saved_network_info.has_ever_connected,
         });
