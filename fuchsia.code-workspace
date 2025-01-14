@@ -134,7 +134,8 @@
     // Dart
     //
 
-    "dart.sdkPath": "${workspaceFolder}/prebuilt/third_party/dart/linux-x64",
+    "[linux].dart.sdkPath": "${workspaceFolder}/prebuilt/third_party/dart/linux-x64",
+    "[mac].dart.sdkPath": "${workspaceFolder}/prebuilt/third_party/dart/mac-arm64",
 
     ////////
     // Rust
@@ -148,8 +149,12 @@
     "rust-analyzer.server.path": "${workspaceFolder}/prebuilt/third_party/rust-analyzer/rust-analyzer",
 
     // Use Fuchsia's config and vendored rustfmt.
-    "rust-analyzer.rustfmt.overrideCommand": [
+    "[linux].rust-analyzer.rustfmt.overrideCommand": [
       "${workspaceFolder}/prebuilt/third_party/rust/linux-x64/bin/rustfmt",
+      "--config-path=${workspaceFolder}/rustfmt.toml"
+    ],
+    "[mac].rust-analyzer.rustfmt.overrideCommand": [
+      "${workspaceFolder}/prebuilt/third_party/rust/mac-arm64/bin/rustfmt",
       "--config-path=${workspaceFolder}/rustfmt.toml"
     ],
 
@@ -176,7 +181,8 @@
         "--background-index",
         "--header-insertion=never"
     ],
-    "clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/linux-x64/bin/clangd",
+    "[linux].clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/linux-x64/bin/clangd",
+    "[mac].clangd.path": "${workspaceFolder}/prebuilt/third_party/clang/mac-arm64/bin/clangd",
 
     // Formats C/C++ include guards to match Fuchsia style.
     "C/C++ Include Guard.Comment Style": "Line",
@@ -187,7 +193,8 @@
     ////////
     // Go
 
-    "go.goroot": "${workspaceFolder}/prebuilt/third_party/go/linux-x64",
+    "[linux].go.goroot": "${workspaceFolder}/prebuilt/third_party/go/linux-x64",
+    "[mac].go.goroot": "${workspaceFolder}/prebuilt/third_party/go/mac-arm64",
 
     "gopls": {
       // Restrict directories that gopls will search in, otherwise it can fail
