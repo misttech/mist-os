@@ -39,7 +39,7 @@ namespace sysmem2 = fuchsia_sysmem2;
 
 namespace display_coordinator {
 
-class IntegrationTest : public TestBase, public testing::WithParamInterface<bool> {
+class IntegrationTest : public TestBase {
  public:
   // Returns -1 if no display exists with the given ID.
   int64_t DisplayLayerCount(display::DisplayId id) {
