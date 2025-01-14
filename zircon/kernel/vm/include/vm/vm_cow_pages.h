@@ -1290,27 +1290,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   void DropChildLocked(VmCowPages* c) TA_REQ(lock());
 
-  // Types for an additional linked list over the VmCowPages for use when doing a
-  // RangeChangeUpdate.
-  //
-  // To avoid unbounded stack growth we need to reserve the memory to exist on a
-  // RangeChange list in our object so that we can have a flat iteration over a
-  // work list. RangeChangeLists should only be used by the RangeChangeUpdate
-  // code.
-  using RangeChangeNodeState = fbl::SinglyLinkedListNodeState<VmCowPages*>;
-  struct RangeChangeTraits {
-    static RangeChangeNodeState& node_state(VmCowPages& cow) { return cow.range_change_state_; }
-  };
-  using RangeChangeList =
-      fbl::SinglyLinkedListCustomTraits<VmCowPages*, VmCowPages::RangeChangeTraits>;
-  friend struct RangeChangeTraits;
-
-  // Given an initial list of VmCowPages performs RangeChangeUpdate on it until the list is empty.
-  static void RangeChangeUpdateListLocked(RangeChangeList* list, RangeChangeOp op);
-
-  void RangeChangeUpdateFromParentLocked(uint64_t offset, uint64_t len, RangeChangeList* list)
-      TA_REQ(lock());
-
   // Helper to check whether the requested range for LockRangeLocked() / TryLockRangeLocked() /
   // UnlockRangeLocked() is valid.
   bool IsLockRangeValidLocked(VmCowRange range) const TA_REQ(lock());
@@ -1430,9 +1409,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // a tree of pages
   VmPageList page_list_ TA_GUARDED(lock());
-
-  RangeChangeNodeState range_change_state_;
-  VmCowRange range_change_range_ TA_GUARDED(lock());
 
   // Reference back to a VmObjectPaged, which should be valid at all times after creation until the
   // VmObjectPaged has been destroyed, unless this is a hidden node. We use this in places where we
