@@ -243,6 +243,13 @@ impl TilingWm {
 
                 Ok(())
             }
+            MessageInternal::WindowManagerListViews { responder } => {
+                let views = self.list_views();
+                if let Err(e) = responder.send(&views) {
+                    error!("Failed to send response for WindowManager Manager.List(): {}", e);
+                }
+                Ok(())
+            }
             MessageInternal::WindowManagerSetOrder { old_position, new_position, responder } => {
                 self.set_tile_order(old_position, new_position)?;
                 self.flatland
@@ -373,6 +380,15 @@ impl TilingWm {
         };
         self.tile_order.insert(new_position, tile_id);
         self.layout_tiles()
+    }
+
+    fn list_views(&mut self) -> Vec<window::ListedView> {
+        let mut list = vec![];
+        for (pos, TileId(id)) in self.tile_order.iter().enumerate() {
+            let view = window::ListedView { position: pos as u64, id: id.to_string() };
+            list.push(view);
+        }
+        list
     }
 
     fn layout_tiles(&mut self) -> Result<(), Error> {
@@ -627,8 +643,10 @@ fn handle_window_manager_request(
     internal_sender: UnboundedSender<MessageInternal>,
 ) -> UnboundedSender<MessageInternal> {
     match request {
-        window::ManagerRequest::List { responder: _responder } => {
-            unimplemented!()
+        window::ManagerRequest::List { responder } => {
+            internal_sender
+                .unbounded_send(MessageInternal::WindowManagerListViews { responder })
+                .expect("Failed to send MessageInternal.");
         }
         window::ManagerRequest::SetOrder { old_position, new_position, responder } => {
             internal_sender
