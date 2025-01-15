@@ -250,5 +250,8 @@ config("profile-use") {
     # TODO(https://fxbug.dev/336358027): Suppress the following warning in PGO
     # optimized build: "Function control flow change detected (hash mismatch)"
     cflags += [ "-Wno-backend-plugin" ]
+
+    rustflags =
+        [ "-Cprofile-use=" + rebase_path(pgo_profile_path, root_build_dir) ]
   }
 }
