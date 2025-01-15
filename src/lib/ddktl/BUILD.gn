@@ -240,7 +240,6 @@ source_set("ddktl") {
     "//src/devices/tests/fidl-bindlib-generation/parent-driver:*",
     "//src/devices/tests/fidl-service:*",
     "//src/devices/tests/isolateddevmgr:*",
-    "//src/devices/tests/mock-device:*",
     "//src/devices/tests/multibind-composite-test/drivers:*",
     "//src/devices/tests/node-group-test/drivers:*",
     "//src/devices/tests/nonbindable:*",

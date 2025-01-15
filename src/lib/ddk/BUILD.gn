@@ -252,7 +252,6 @@ static_library("ddk") {
     "//src/devices/tests/driver-transport:*",
     "//src/devices/tests/fidl-service:*",
     "//src/devices/tests/isolateddevmgr:*",
-    "//src/devices/tests/mock-device:*",
     "//src/devices/tests/sysdev:*",
     "//src/devices/tests/v2/compat:*",
     "//src/devices/tests/v2/compat-globals:*",
