@@ -102,7 +102,10 @@ fuchsia_component_manifest("sdmmc-manifest") {
 }
 
 fuchsia_driver_component("sdmmc") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/block:drivers",
+  ]
   cm_label = ":sdmmc-manifest"
   deps = [
     ":sdmmc-bind",

@@ -47,7 +47,10 @@ fuchsia_cc_driver("clock-driver") {
 }
 
 fuchsia_driver_component("clock") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/clock:drivers",
+  ]
   component_name = "clock"
   deps = [
     ":clock-bind",

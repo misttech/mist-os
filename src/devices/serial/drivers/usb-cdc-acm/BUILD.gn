@@ -44,7 +44,10 @@ fuchsia_cc_driver("usb-cdc-acm-driver") {
 }
 
 fuchsia_driver_component("usb-cdc-acm") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/serial:drivers",
+  ]
   info = "meta/usb-cdc-acm-info.json"
   component_name = "usb-cdc-acm"
   deps = [ ":usb-cdc-acm-driver" ]

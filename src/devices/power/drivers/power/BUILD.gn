@@ -48,7 +48,11 @@ fuchsia_cc_driver("power-driver") {
 }
 
 fuchsia_driver_component("power") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/bus/drivers/platform/test:*",
+    "//src/devices/power:drivers",
+  ]
   info = "meta/power-info.json"
   component_name = "power"
   deps = [ ":power-driver" ]

@@ -70,7 +70,13 @@ fuchsia_cc_driver("zxcrypt-driver") {
 }
 
 fuchsia_driver_component("zxcrypt") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/block:drivers",
+    "//src/recovery/factory_reset:*",
+    "//src/security/lib/zxcrypt/tests:*",
+    "//src/storage/testing:storage_drivers",
+  ]
   component_name = "zxcrypt"
   deps = [ ":zxcrypt-driver" ]
   info = "meta/zxcrypt-info.json"

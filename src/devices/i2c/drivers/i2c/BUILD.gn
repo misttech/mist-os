@@ -42,7 +42,10 @@ fuchsia_cc_driver("i2c-driver") {
 }
 
 fuchsia_driver_component("i2c") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/i2c:drivers",
+  ]
   component_name = "i2c"
   deps = [ ":i2c-driver" ]
   info = "meta/i2c-info.json"

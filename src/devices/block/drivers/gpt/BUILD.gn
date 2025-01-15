@@ -53,7 +53,14 @@ fuchsia_cc_driver("gpt-driver") {
 }
 
 fuchsia_driver_component("gpt") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/bringup/bin/device-name-provider/tests:*",
+    "//src/bringup/bin/netsvc:*",
+    "//src/devices/block:drivers",
+    "//src/storage/lib/paver/test:*",
+    "//src/storage/testing:storage_drivers",
+  ]
   component_name = "gpt"
   deps = [ ":gpt-driver" ]
   info = "meta/gpt-info.json"

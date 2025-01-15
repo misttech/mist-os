@@ -63,7 +63,16 @@ fuchsia_cc_driver("platform-bus-driver") {
 }
 
 fuchsia_driver_component("platform-bus") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//examples/drivers/driver_test_realm/hermetic/rust:*",
+    "//sdk/lib/driver_test_realm/tests:*",
+    "//src/devices/bus:drivers",
+    "//src/devices/bus/drivers/platform/test/power-integration-test:*",
+    "//src/devices/tests/driver-multiname-test:*",
+    "//src/power/fake-powersource:*",
+    "//src/starnix/tests/diagnostics/suspend_inspect/testing/suspend_driver_realm_proxy:*",
+  ]
   cm_label = ":manifest"
   deps = [ ":platform-bus-driver" ]
   info = "meta/platform-bus-info.json"

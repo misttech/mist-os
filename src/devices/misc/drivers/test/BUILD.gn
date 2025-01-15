@@ -39,7 +39,17 @@ fuchsia_cc_driver("test-driver") {
 }
 
 fuchsia_driver_component("test") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//sdk/lib/driver_test_realm/tests:*",
+    "//src/connectivity/bluetooth/testing/bt-test-harness:*",
+    "//src/connectivity/bluetooth/tests/bt-manifest-integration-tests:*",
+    "//src/devices/block/drivers/ftl/tests:ftl-integration",
+    "//src/devices/misc:drivers",
+    "//src/devices/misc/drivers/test:*",
+    "//src/devices/tests/bind-fail-test:*",
+    "//src/devices/tests/ddk-metadata-test:*",
+  ]
   component_name = "test"
   deps = [ ":test-driver" ]
   info = "meta/test-info.json"

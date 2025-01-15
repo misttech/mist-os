@@ -24,7 +24,12 @@ fuchsia_cc_driver("sysdev-driver") {
 }
 
 fuchsia_driver_component("sysdev") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/connectivity/bluetooth/testing/bt-test-harness:*",
+    "//src/devices/block/drivers/ftl/tests:ftl-integration",
+    "//src/devices/tests:drivers",
+  ]
   component_name = "sysdev"
   deps = [ ":sysdev-driver" ]
   info = "meta/sysdev-info.json"

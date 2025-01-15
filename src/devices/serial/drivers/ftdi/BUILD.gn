@@ -62,7 +62,11 @@ fuchsia_cc_driver("ftdi-driver") {
 }
 
 fuchsia_driver_component("ftdi") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/serial:drivers",
+    "//src/devices/serial/drivers/ftdi/test:*",
+  ]
   info = "meta/ftdi-info.json"
   component_name = "ftdi"
   deps = [ ":ftdi-driver" ]

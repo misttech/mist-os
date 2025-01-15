@@ -22,7 +22,12 @@ fuchsia_cc_driver("serial-driver") {
 }
 
 fuchsia_driver_component("serial") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/serial:drivers",
+    "//src/devices/serial/drivers/ftdi/test:*",
+    "//src/devices/serial/drivers/usb-cdc-acm:*",
+  ]
   info = "meta/serial-info.json"
   component_name = "serial"
   deps = [ ":serial-driver" ]

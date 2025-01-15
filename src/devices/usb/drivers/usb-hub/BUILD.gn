@@ -50,7 +50,10 @@ fuchsia_cc_driver("usb-hub-driver") {
 }
 
 fuchsia_driver_component("usb-hub") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/devices/usb:drivers",
+  ]
   info = "meta/usb-hub-info.json"
   component_name = "usb-hub"
   deps = [ ":usb-hub-driver" ]

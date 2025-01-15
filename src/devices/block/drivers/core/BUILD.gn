@@ -21,7 +21,23 @@ fuchsia_cc_driver("core-driver") {
 }
 
 fuchsia_driver_component("core") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/bringup/bin/device-name-provider/tests:*",
+    "//src/bringup/bin/netsvc:*",
+    "//src/devices/block:drivers",
+    "//src/devices/block/drivers/block-verity:*",
+    "//src/devices/block/drivers/core:core",
+    "//src/devices/block/drivers/ftl/tests:ftl-integration",
+    "//src/devices/block/drivers/usb-mass-storage:ums-integration",
+    "//src/devices/block/drivers/zxcrypt:*",
+    "//src/recovery/factory_reset:*",
+    "//src/security/lib/zxcrypt/tests:*",
+    "//src/storage/fvm:fvm-integration",
+    "//src/storage/fvm/driver/test:*",
+    "//src/storage/lib/paver/test:*",
+    "//src/storage/testing:storage_drivers",
+  ]
   component_name = "block.core"
   deps = [ ":core-driver" ]
   info = "meta/core-info.json"
