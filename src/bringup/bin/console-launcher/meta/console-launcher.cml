@@ -182,6 +182,10 @@
             availability: "optional",
         },
         {
+            service: "fuchsia.hardware.nfc.Service",
+            availability: "optional",
+        },
+        {
             service: "fuchsia.gpu.magma.Service",
             availability: "optional",
         },

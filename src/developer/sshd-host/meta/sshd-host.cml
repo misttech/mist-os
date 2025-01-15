@@ -327,5 +327,10 @@
             from: "parent",
             to: "#shell",
         },
+        {
+            service: "fuchsia.hardware.nfc.Service",
+            from: "parent",
+            to: "#shell",
+        },
     ],
 }

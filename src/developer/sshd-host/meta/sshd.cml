@@ -331,5 +331,6 @@
             ],
         },
         { service: "fuchsia.hardware.spmi.DebugService" },
+        { service: "fuchsia.hardware.nfc.Service" },
     ],
 }

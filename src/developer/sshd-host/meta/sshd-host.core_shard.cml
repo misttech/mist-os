@@ -566,6 +566,11 @@
             from: "parent",
             to: "#sshd-host",
         },
+        {
+            service: "fuchsia.hardware.nfc.Service",
+            from: "parent",
+            to: "#sshd-host",
+        },
 
         // Suspend Control
         {

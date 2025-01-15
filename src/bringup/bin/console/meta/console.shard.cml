@@ -257,6 +257,11 @@
             to: "#console-launcher",
         },
         {
+            service: "fuchsia.hardware.nfc.Service",
+            from: "#boot-drivers",
+            to: "#console-launcher",
+        },
+        {
             service: "fuchsia.gpu.magma.Service",
             from: "#boot-drivers",
             to: "#console-launcher",
