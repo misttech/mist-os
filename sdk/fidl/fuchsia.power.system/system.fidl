@@ -170,12 +170,23 @@ open protocol ActivityGovernorListener {
     /// requires a full system resume.
     /// The server is expected to respond once it has performed the operations
     /// required to keep the system awake, if needed.
+    ///
+    /// SAG does not block on the response to this method, so the listener may
+    /// safely call ActivityGovernor.AcquireWakeLease or
+    /// ActivityGovernor.TakeApplicationActivityLease. In particular, it is not
+    /// affected by https://fxbug.dev/389163722.
     strict OnResume() -> ();
 
     /// Called before the activity governor initiates a system suspension.
     ///
     /// The server is expected to respond once it has performed the operations
     /// it needs to prepare itself for suspend, if any.
+    ///
+    /// It is not safe for this method to call ActivityGovernor.AcquireWakeLease
+    /// or ActivityGovernor.TakeApplicationActivityLease, or to perform any
+    /// other action that blocks on raising Execution State above its Inactive
+    /// level. Doing so will currently result in a deadlock. This constraint
+    /// will be removed; see https://fxbug.dev/389163722.
     flexible OnSuspendStarted() -> ();
 
     /// Called when the activity governor detects a suspend failure.
@@ -183,6 +194,11 @@ open protocol ActivityGovernorListener {
     /// The server is expected to respond to this notification. The activity
     /// governor will not attempt to suspend again until it receives the
     /// respond.
+    ///
+    /// SAG does not block on the response to this method, so the listener may
+    /// safely call ActivityGovernor.AcquireWakeLease or
+    /// ActivityGovernor.TakeApplicationActivityLease. In particular, it is not
+    /// affected by https://fxbug.dev/389163722.
     flexible OnSuspendFail() -> ();
 };
 
