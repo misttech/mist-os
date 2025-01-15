@@ -10,6 +10,7 @@ load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION",
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 
 # buildifier: disable=module-docstring
+load("@bazel_skylib//lib:paths.bzl", "paths")
 load(
     ":providers.bzl",
     "FuchsiaAssembledPackageInfo",
@@ -52,7 +53,7 @@ def _create_pkg_detail(dep, relative = None):
 
     # Relativize the path if necessary.
     if relative:
-        package_manifest_path = package_manifest_path.removeprefix(relative + "/")
+        package_manifest_path = paths.relativize(package_manifest_path, relative)
 
     # If we have configs, return them.
     if configs:

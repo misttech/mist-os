@@ -4,6 +4,8 @@
 
 """Utility functions used by multiple bazel rules and macros."""
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
+
 # A dictionary to be expanded inside a ctx.actions.run() or
 # ctx.actions.run_shell() call to specify that the corresponding
 # action should only run locally.
@@ -157,7 +159,7 @@ def replace_labels_with_files(json_dict, target_to_string_map, relative = None):
             label = string_to_target_map.get(value)
             label_files = label.files.to_list()
             if relative:
-                dictionary[key] = label_files[0].path.removeprefix(relative + "/")
+                dictionary[key] = paths.relativize(label_files[0].path, relative)
             else:
                 dictionary[key] = label_files[0].path
 
