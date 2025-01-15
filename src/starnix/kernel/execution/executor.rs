@@ -236,7 +236,7 @@ fn run_task(
         state,
         profiling_guard,
         error_context,
-        exit_status: Ok(ExitStatus::Exit(0)),
+        exit_status: Err(errno!(ENOEXEC).into()),
     };
 
     unsafe {

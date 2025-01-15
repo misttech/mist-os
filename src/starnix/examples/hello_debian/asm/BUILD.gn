@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//src/starnix/build/starnix_linux_executable.gni")
+import("//src/starnix/tests/environments.gni")
 
 starnix_linux_arch32_executable("bin32") {
   output_name = "hello_debian32_asm"
@@ -85,6 +86,9 @@ fuchsia_test_package("starnix_hello_debian32_asm_integration_test") {
     "//src/starnix/kernel:starnix_kernel_package",
     "//src/starnix/containers/debian:debian_package",
   ]
+  test_specs = {
+    environments = arch32_envs
+  }
 }
 
 group("tests") {
