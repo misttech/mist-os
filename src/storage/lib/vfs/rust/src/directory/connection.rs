@@ -11,7 +11,6 @@ use crate::execution_scope::{yield_to_executor, ExecutionScope};
 use crate::node::OpenNode;
 use crate::object_request::Representation;
 use crate::path::Path;
-use crate::protocols::ToFlags as _;
 
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
@@ -266,7 +265,8 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fio::DirectoryRequest::GetFlags2 { responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+                trace::duration!(c"storage", c"Directory::GetFlags2");
+                responder.send(Ok(fio::Flags::from(&self.options)))?;
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fio::DirectoryRequest::SetFlags2 { flags: _, responder } => {
@@ -295,7 +295,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
     }
 
     fn handle_clone(&mut self, object: fidl::Channel) {
-        let flags = self.options.rights.to_flags() | fio::Flags::PROTOCOL_DIRECTORY;
+        let flags = fio::Flags::from(&self.options);
         ObjectRequest::new(flags, &Default::default(), object).handle(|req| {
             self.directory.clone().open3(self.scope.clone(), Path::dot(), flags, req)
         });

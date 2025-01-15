@@ -32,6 +32,13 @@ pub struct NodeOptions {
     pub rights: fio::Operations,
 }
 
+impl From<&NodeOptions> for fio::Flags {
+    fn from(options: &NodeOptions) -> Self {
+        // There is 1:1 mapping between `fio::Operations` and `fio::Flags`.
+        fio::Flags::PROTOCOL_NODE | fio::Flags::from_bits_truncate(options.rights.bits())
+    }
+}
+
 /// All nodes must implement this trait.
 pub trait Node: GetEntryInfo + IntoAny + Send + Sync + 'static {
     /// Returns node attributes (io2).
@@ -234,7 +241,7 @@ impl<N: Node> Connection<N> {
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fio::NodeRequest::GetFlags2 { responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+                responder.send(Ok(fio::Flags::from(&self.options)))?;
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fio::NodeRequest::SetFlags2 { flags: _, responder } => {

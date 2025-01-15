@@ -93,6 +93,17 @@ impl FileOptions {
     }
 }
 
+impl From<&FileOptions> for fio::Flags {
+    fn from(options: &FileOptions) -> Self {
+        // There is 1:1 mapping between `fio::Operations` and `fio::Flags`.
+        let mut flags = fio::Flags::from_bits_truncate(options.rights.bits());
+        if options.is_append {
+            flags |= fio::Flags::FILE_APPEND;
+        }
+        flags | fio::Flags::PROTOCOL_FILE
+    }
+}
+
 #[derive(Default, PartialEq)]
 pub enum SyncMode {
     /// Used when the Sync fuchsia.io method is used.

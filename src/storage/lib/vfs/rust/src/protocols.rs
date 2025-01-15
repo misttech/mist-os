@@ -266,7 +266,8 @@ impl ProtocolsExt for fio::Flags {
         // connection later.
         let mut updated_flags = *self;
         if updated_flags.contains(fio::Flags::PERM_INHERIT_WRITE) {
-            updated_flags |= fio::INHERITED_WRITE_PERMISSIONS.to_flags();
+            updated_flags |=
+                fio::Flags::from_bits_truncate(fio::INHERITED_WRITE_PERMISSIONS.bits());
         }
         if updated_flags.contains(fio::Flags::PERM_INHERIT_EXECUTE) {
             updated_flags |= fio::Flags::PERM_EXECUTE;
@@ -500,15 +501,4 @@ impl ToNodeOptions for NodeOptions {
 
 fn flags_to_rights(flags: &fio::Flags) -> fio::Rights {
     fio::Rights::from_bits_truncate(flags.bits())
-}
-
-pub trait ToFlags {
-    fn to_flags(&self) -> fio::Flags;
-}
-
-impl ToFlags for fio::Operations {
-    fn to_flags(&self) -> fio::Flags {
-        // The constants in `fio::Operations` are aligned with those in `fio::Flags`.
-        fio::Flags::from_bits_truncate(self.bits())
-    }
 }

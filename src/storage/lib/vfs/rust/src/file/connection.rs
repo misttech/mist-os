@@ -834,11 +834,19 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fio::FileRequest::GetFlags2 { responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+                trace::duration!(c"storage", c"File::GetFlags2");
+                responder.send(Ok(fio::Flags::from(&self.options)))?;
             }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            fio::FileRequest::SetFlags2 { flags: _, responder } => {
-                responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
+            fio::FileRequest::SetFlags2 { flags, responder } => {
+                trace::duration!(c"storage", c"File::SetFlags2");
+                // The only supported flag is APPEND.
+                if flags.is_empty() || flags == fio::Flags::FILE_APPEND {
+                    self.options.is_append = flags.contains(fio::Flags::FILE_APPEND);
+                    responder.send(self.file.set_flags(flags).map_err(Status::into_raw))?;
+                } else {
+                    responder.send(Err(Status::INVALID_ARGS.into_raw()))?;
+                }
             }
             fio::FileRequest::_UnknownMethod { .. } => (),
         }
