@@ -8,7 +8,7 @@ package(default_visibility = ["//visibility:public"])
 
 fuchsia_prebuilt_board_configuration(
     name = "x64",
-    files = "@gn_targets//boards/x64",
+    directory = "@gn_targets//boards/x64",
 )
 
 fuchsia_prebuilt_board_configuration(
@@ -18,12 +18,12 @@ fuchsia_prebuilt_board_configuration(
 
 fuchsia_prebuilt_board_configuration(
     name = "arm64",
-    files = "@gn_targets//boards/arm64",
+    directory = "@gn_targets//boards/arm64",
 )
 
 fuchsia_prebuilt_board_configuration(
     name = "qemu-arm64",
-    files = "@gn_targets//boards/qemu-arm64",
+    directory = "@gn_targets//boards/qemu-arm64",
 )
 
 alias(
@@ -38,7 +38,7 @@ alias(
 
 fuchsia_prebuilt_board_configuration(
     name = "riscv64",
-    files = "@gn_targets//boards/riscv64",
+    directory = "@gn_targets//boards/riscv64",
 )
 
 alias(
