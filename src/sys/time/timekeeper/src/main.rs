@@ -262,7 +262,7 @@ async fn main() -> Result<()> {
     };
 
     let allow_update_rtc =
-        Rc::new(Cell::new(rtc_testing::read_and_update_state().may_update_rtc()));
+        Rc::new(Cell::new(persistence::read_and_update_state().may_update_rtc()));
 
     let (cmd_send, cmd_rcv) = mpsc::channel(1);
 

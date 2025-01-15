@@ -56,6 +56,7 @@ timekeeper_deps = [
   "//src/sys/time/lib/time-util",
   "//src/sys/time/lib/time_metrics_registry",
   "//src/sys/time/timekeeper/alarms",
+  "//src/sys/time/timekeeper/persistence",
   "//third_party/cobalt/src/lib/client/rust:cobalt-client",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:async-trait",
@@ -63,8 +64,9 @@ timekeeper_deps = [
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:lazy_static",
   "//third_party/rust_crates:log",
-  "//third_party/rust_crates:serde",
-  "//third_party/rust_crates:serde_json",
+
+  #  "//third_party/rust_crates:serde",
+  #  "//third_party/rust_crates:serde_json",
   "//third_party/rust_crates:thiserror",
 ]
 
@@ -102,7 +104,8 @@ rustc_binary("bin") {
     "//src/lib/test_util",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:tempfile",
+
+    #"//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:test-case",
   ]
 }
