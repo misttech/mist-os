@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Result};
+use fidl_fuchsia_wlan_ieee80211::MAX_SSID_BYTE_LEN;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -11,12 +12,15 @@ use {
 pub fn convert_scan_request(
     req: fidl_mlme::ScanRequest,
 ) -> Result<fidl_fullmac::WlanFullmacImplStartScanRequest> {
-    let ssids = req
-        .ssid_list
-        .into_iter()
-        .map(|ssid| convert_ssid(&ssid))
-        .collect::<Result<Vec<fidl_ieee80211::CSsid>>>()?;
-
+    for ssid in &req.ssid_list {
+        if ssid.len() > MAX_SSID_BYTE_LEN.into() {
+            bail!(
+                "ScanRequest ssid len {} exceeds allowed meximum {}",
+                ssid.len(),
+                MAX_SSID_BYTE_LEN
+            );
+        }
+    }
     Ok(fidl_fullmac::WlanFullmacImplStartScanRequest {
         txn_id: Some(req.txn_id),
         scan_type: Some(match req.scan_type {
@@ -27,7 +31,7 @@ pub fn convert_scan_request(
         // TODO(https://fxbug.dev/301104836): Consider using None instead of Some(vec![]) for empty
         // vectors.
         channels: Some(req.channel_list),
-        ssids: Some(ssids),
+        ssids: Some(req.ssid_list),
         min_channel_time: Some(req.min_channel_time),
         max_channel_time: Some(req.max_channel_time),
         ..Default::default()
@@ -161,7 +165,7 @@ pub fn convert_start_bss_request(
         }
     }
     Ok(fidl_fullmac::WlanFullmacImplStartBssRequest {
-        ssid: Some(convert_ssid(&req.ssid[..])?),
+        ssid: Some(req.ssid),
         bss_type: Some(req.bss_type),
         beacon_period: Some(req.beacon_period as u32),
         dtim_period: Some(req.dtim_period as u32),
@@ -177,10 +181,14 @@ pub fn convert_start_bss_request(
 pub fn convert_stop_bss_request(
     req: fidl_mlme::StopRequest,
 ) -> Result<fidl_fullmac::WlanFullmacImplStopBssRequest> {
-    Ok(fidl_fullmac::WlanFullmacImplStopBssRequest {
-        ssid: Some(convert_ssid(&req.ssid[..])?),
-        ..Default::default()
-    })
+    if req.ssid.len() > MAX_SSID_BYTE_LEN.into() {
+        bail!(
+            "StopBssRequest ssid len {} exceeds allowed meximum {}",
+            req.ssid.len(),
+            MAX_SSID_BYTE_LEN
+        );
+    }
+    Ok(fidl_fullmac::WlanFullmacImplStopBssRequest { ssid: Some(req.ssid), ..Default::default() })
 }
 
 // Note: this takes a reference since |req| will be used later to convert the response.
@@ -269,20 +277,6 @@ fn convert_key_type(mlme_key_type: fidl_mlme::KeyType) -> fidl_common::WlanKeyTy
         fidl_mlme::KeyType::PeerKey => fidl_common::WlanKeyType::Peer,
         fidl_mlme::KeyType::Igtk => fidl_common::WlanKeyType::Igtk,
     }
-}
-
-/// TODO(https://fxbug.dev/353733695): Remove this once CSsid is no longer needed.
-fn convert_ssid(ssid: &[u8]) -> Result<fidl_ieee80211::CSsid> {
-    if ssid.len() > fidl_ieee80211::MAX_SSID_BYTE_LEN as usize {
-        bail!(
-            "SSID length ({}) exceeds maximum size ({})",
-            ssid.len(),
-            fidl_ieee80211::MAX_SSID_BYTE_LEN
-        );
-    }
-    let mut data = [0; fidl_ieee80211::MAX_SSID_BYTE_LEN as usize];
-    data[..ssid.len() as usize].copy_from_slice(&ssid[..]);
-    Ok(fidl_ieee80211::CSsid { len: ssid.len() as u8, data })
 }
 
 #[cfg(test)]
@@ -462,29 +456,6 @@ mod tests {
     //
     // Helper function unit tests
     //
-
-    #[test]
-    fn test_convert_ssid() {
-        let ssid = vec![1, 2, 3, 4, 5];
-        let cssid = convert_ssid(&ssid).unwrap();
-
-        assert_eq!(cssid.len as usize, ssid.len());
-        for (i, byte) in ssid.into_iter().enumerate() {
-            assert_eq!(byte, cssid.data[i]);
-        }
-
-        // The rest of cssid.data should be zerod out.
-        for byte in &cssid.data[cssid.len as usize..] {
-            assert_eq!(byte, &0u8);
-        }
-    }
-
-    #[test]
-    fn test_convert_ssid_length_too_long() {
-        let ssid = vec![42; fidl_ieee80211::MAX_SSID_BYTE_LEN as usize + 1];
-        assert!(convert_ssid(&ssid).is_err());
-    }
-
     #[test]
     fn test_convert_set_key_descriptor() {
         let mlme = fidl_mlme::SetKeyDescriptor {

@@ -19,7 +19,6 @@ constexpr wlan_common::WlanChannel kSwitchedChannel = {
 constexpr wlan_common::WlanChannel kSecondSwitchedChannel = {
     .primary = 30, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const uint16_t kDefaultCSACount = 3;
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
 class ChannelSwitchTest : public SimTest {
@@ -146,8 +145,9 @@ TEST_F(ChannelSwitchTest, SwitchBackInDiffInterval) {
 // This test verifies CSA beacons from APs which are not associated with client will not trigger
 // channel switch event in driver.
 TEST_F(ChannelSwitchTest, NotSwitchForDifferentAP) {
-  constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 14, .data = {.data_ = "Fuchsia Fake AP"}};
-  ASSERT_NE(kDefaultSsid.len, kWrongSsid.len);
+  const fuchsia_wlan_ieee80211::Ssid kWrongSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a',
+                                                   ' ', 'F', 'a', 'k', 'e', ' ', 'A'};
+  ASSERT_NE(kDefaultSsid.size(), kWrongSsid.size());
   const common::MacAddr kWrongBssid({0x12, 0x34, 0x56, 0x78, 0x9b, 0xbc});
   ASSERT_NE(kDefaultBssid, kWrongBssid);
 

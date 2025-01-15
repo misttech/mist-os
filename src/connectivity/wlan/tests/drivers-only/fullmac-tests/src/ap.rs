@@ -14,18 +14,8 @@ use wlan_common::assert_variant;
 use wlan_common::ie::rsn::rsne;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
+    fidl_fuchsia_wlan_sme as fidl_sme,
 };
-
-fn vec_to_cssid(input: &Vec<u8>) -> fidl_ieee80211::CSsid {
-    let mut cssid = fidl_ieee80211::CSsid { len: input.len() as u8, data: [0; 32] };
-
-    for i in 0..input.len() {
-        cssid.data[i] = input[i];
-    }
-
-    cssid
-}
 
 /// Many tests require a started BSS. This helper function creates and starts an AP in the test
 /// realm and returns the ApSmeProxy, FullmacDriverFixture, and GenericSmeProxy.
@@ -132,7 +122,7 @@ async fn test_start_2ghz_bss_success() {
     assert_eq!(
         fullmac_request_history[0],
         FullmacRequest::StartBss(fidl_fullmac::WlanFullmacImplStartBssRequest {
-            ssid: Some(vec_to_cssid(&sme_ap_config.ssid)),
+            ssid: Some(sme_ap_config.ssid.clone()),
             bss_type: Some(fidl_common::BssType::Infrastructure),
             beacon_period: Some(100),
             dtim_period: Some(2),
@@ -252,7 +242,7 @@ async fn test_stop_bss() {
     assert_eq!(
         fullmac_request_history[0],
         FullmacRequest::StopBss(fidl_fullmac::WlanFullmacImplStopBssRequest {
-            ssid: Some(vec_to_cssid(&DEFAULT_OPEN_AP_CONFIG.ssid)),
+            ssid: Some(DEFAULT_OPEN_AP_CONFIG.ssid.clone()),
             ..Default::default()
         })
     );

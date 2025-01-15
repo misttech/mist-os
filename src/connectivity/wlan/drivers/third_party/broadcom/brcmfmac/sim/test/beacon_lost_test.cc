@@ -19,7 +19,6 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 // Some default AP and association request values
 constexpr wlan_common::WlanChannel kDefaultChannel = {
     .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kSecondBssid({0x12, 0x34, 0x56, 0x78, 0x9b, 0xbd});
 const common::MacAddr kMadeupClient({0xde, 0xad, 0xbe, 0xef, 0x00, 0x01});
@@ -157,8 +156,9 @@ TEST_F(BeaconLostTest, WrongBeaconLossTest) {
   // Start up fake AP
   simulation::FakeAp ap1(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   ap1.EnableBeacon(zx::msec(100));
-  constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 14, .data = {.data_ = "Fuchsia Fake AP"}};
-  ASSERT_NE(kDefaultSsid.len, kWrongSsid.len);
+  const fuchsia_wlan_ieee80211::Ssid kWrongSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a',
+                                                   ' ', 'F', 'a', 'k', 'e', ' ', 'A'};
+  ASSERT_NE(kDefaultSsid.size(), kWrongSsid.size());
   env_->MoveStation(&ap1, -50, 0);
   aps_.push_back(&ap1);
   simulation::FakeAp ap2(env_.get(), kSecondBssid, kWrongSsid, kDefaultChannel);
@@ -201,8 +201,9 @@ TEST_F(BeaconLostTest, TempBeaconLossTest) {
   // Start up fake AP
   simulation::FakeAp ap1(env_.get(), kDefaultBssid, kDefaultSsid, kDefaultChannel);
   ap1.EnableBeacon(zx::msec(100));
-  constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 14, .data = {.data_ = "Fuchsia Fake AP"}};
-  ASSERT_NE(kDefaultSsid.len, kWrongSsid.len);
+  const fuchsia_wlan_ieee80211::Ssid kWrongSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a',
+                                                   ' ', 'F', 'a', 'k', 'e', ' ', 'A'};
+  ASSERT_NE(kDefaultSsid.size(), kWrongSsid.size());
   env_->MoveStation(&ap1, 0, 0);
   aps_.push_back(&ap1);
 

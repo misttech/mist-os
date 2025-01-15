@@ -146,7 +146,7 @@ void ArpTest::TxAuthandAssocReq() {
   simulation::SimAuthFrame auth_req_frame(mac, kOurMac, 1, simulation::AUTH_TYPE_OPEN,
                                           wlan_ieee80211::StatusCode::kSuccess);
   env_->Tx(auth_req_frame, tx_info, this);
-  simulation::SimAssocReqFrame assoc_req_frame(mac, kOurMac, SimInterface::kDefaultSoftApSsid);
+  simulation::SimAssocReqFrame assoc_req_frame(mac, kOurMac, kDefaultSoftApSsid);
   env_->Tx(assoc_req_frame, tx_info, this);
 }
 
@@ -245,7 +245,7 @@ TEST_F(ArpTest, ClientArpOffload) {
   ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kClient, &sim_ifc_, kOurMac), ZX_OK);
 
   // Start a fake AP
-  simulation::FakeAp ap(env_.get(), kTheirMac, SimInterface::kDefaultSoftApSsid,
+  simulation::FakeAp ap(env_.get(), kTheirMac, kDefaultSoftApSsid,
                         SimInterface::kDefaultSoftApChannel);
 
   // Associate with fake AP
@@ -283,7 +283,7 @@ TEST_F(ArpTest, SoftAPStartStopDoesNotAffectArpOl) {
   ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kClient, &sim_ifc_, kOurMac), ZX_OK);
 
   // Start a fake AP
-  simulation::FakeAp ap(env_.get(), kTheirMac, SimInterface::kDefaultSoftApSsid,
+  simulation::FakeAp ap(env_.get(), kTheirMac, kDefaultSoftApSsid,
                         SimInterface::kDefaultSoftApChannel);
 
   // Associate with fake AP
@@ -330,7 +330,7 @@ TEST_F(ArpTest, ClientArpOffloadNoSoftApFeat) {
   ASSERT_EQ(SimTest::StartInterface(wlan_common::WlanMacRole::kClient, &sim_ifc_, kOurMac), ZX_OK);
 
   // Start a fake AP
-  simulation::FakeAp ap(env_.get(), kTheirMac, SimInterface::kDefaultSoftApSsid,
+  simulation::FakeAp ap(env_.get(), kTheirMac, kDefaultSoftApSsid,
                         SimInterface::kDefaultSoftApChannel);
 
   // Associate with fake AP

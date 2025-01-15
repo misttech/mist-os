@@ -21,18 +21,14 @@ using ::testing::NotNull;
 
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {
     .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
+const fuchsia_wlan_ieee80211::Ssid kDefaultSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                                   'F', 'a', 'k', 'e', ' ', 'A', 'P'};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
 void checkChannel(const wlan_common::WlanChannel& channel) {
   EXPECT_EQ(channel.primary, kDefaultTxInfo.channel.primary);
   EXPECT_EQ(channel.cbw, kDefaultTxInfo.channel.cbw);
   EXPECT_EQ(channel.secondary80, kDefaultTxInfo.channel.secondary80);
-}
-
-void checkSsid(const wlan_ieee80211::CSsid& ssid) {
-  EXPECT_EQ(ssid.len, kDefaultSsid.len);
-  EXPECT_EQ(std::memcmp(ssid.data.data(), kDefaultSsid.data.data(), kDefaultSsid.len), 0);
 }
 
 class SimStation : public wlan::simulation::StationIfc {
@@ -68,7 +64,7 @@ class SimStation : public wlan::simulation::StationIfc {
         ASSERT_THAT(ssid_generic_ie, NotNull());
         auto ssid_ie =
             std::static_pointer_cast<simulation::SsidInformationElement>(ssid_generic_ie);
-        checkSsid(ssid_ie->ssid_);
+        EXPECT_EQ(ssid_ie->ssid_, kDefaultSsid);
         EXPECT_EQ(beacon_frame->bssid_, kDefaultBssid);
         signal_received = true;
         signal_strength = info->signal_strength;

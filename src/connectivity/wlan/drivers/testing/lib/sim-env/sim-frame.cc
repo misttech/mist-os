@@ -14,17 +14,14 @@ InformationElement::~InformationElement() = default;
 // SsidInformationElement function implementations.
 SsidInformationElement::SsidInformationElement(
     const wlan::simulation::SsidInformationElement& ssid_ie) {
-  ssid_.len = ssid_ie.ssid_.len;
-  std::memcpy(ssid_.data.data(), ssid_ie.ssid_.data.data(), ssid_.len);
+  ssid_ = ssid_ie.ssid_;
 }
 
 InformationElement::SimIeType SsidInformationElement::IeType() const { return IE_TYPE_SSID; }
 
 std::vector<uint8_t> SsidInformationElement::ToRawIe() const {
-  std::vector<uint8_t> buf = {IE_TYPE_SSID, ssid_.len};
-  for (int i = 0; i < ssid_.len; ++i) {
-    buf.push_back(ssid_.data.data()[i]);
-  }
+  std::vector<uint8_t> buf = {IE_TYPE_SSID, static_cast<uint8_t>(ssid_.size())};
+  buf.insert(buf.end(), ssid_.begin(), ssid_.end());
   return buf;
 }
 
@@ -90,7 +87,7 @@ std::shared_ptr<InformationElement> SimManagementFrame::FindIe(
   return std::shared_ptr<InformationElement>(nullptr);
 }
 
-void SimManagementFrame::AddSsidIe(const wlan_ieee80211::CSsid& ssid) {
+void SimManagementFrame::AddSsidIe(const fuchsia_wlan_ieee80211::Ssid& ssid) {
   auto ie = std::make_shared<SsidInformationElement>(ssid);
   // Ensure no IE with this IE type exists.
   AddIe(InformationElement::IE_TYPE_SSID, ie);
@@ -128,7 +125,8 @@ void SimManagementFrame::RemoveIe(InformationElement::SimIeType ie_type) {
 }
 
 /* SimBeaconFrame function implementations.*/
-SimBeaconFrame::SimBeaconFrame(const wlan_ieee80211::CSsid& ssid, const common::MacAddr& bssid)
+SimBeaconFrame::SimBeaconFrame(const fuchsia_wlan_ieee80211::Ssid& ssid,
+                               const common::MacAddr& bssid)
     : bssid_(bssid) {
   // Beacon automatically gets the SSID information element.
   AddSsidIe(ssid);
@@ -161,7 +159,7 @@ SimFrame* SimProbeReqFrame::CopyFrame() const { return new SimProbeReqFrame(*thi
 
 /* SimProbeRespFrame function implementations.*/
 SimProbeRespFrame::SimProbeRespFrame(const common::MacAddr& src, const common::MacAddr& dst,
-                                     const wlan_ieee80211::CSsid& ssid)
+                                     const fuchsia_wlan_ieee80211::Ssid& ssid)
     : SimManagementFrame(src, dst) {
   // Probe response automatically gets the SSID information element.
   AddSsidIe(ssid);

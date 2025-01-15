@@ -21,6 +21,11 @@
 
 namespace wlan::brcmfmac {
 
+fuchsia_wlan_ieee80211::Ssid Ssid(const void* ssid_data, uint8_t len) {
+  fuchsia_wlan_ieee80211::Ssid ssid(len, 0);
+  memcpy(ssid.data(), ssid_data, len);
+  return ssid;
+}
 // static
 const std::vector<uint8_t> SimInterface::kDefaultScanChannels = {
     1,  2,   3,   4,   5,   6,   7,   8,   9,   10,  11,  32,  36,  40,  44,  48,  52,  56, 60,
@@ -335,7 +340,8 @@ void SimInterface::GetMacAddr(common::MacAddr* out_macaddr) {
   memcpy(out_macaddr->byte, info.sta_addr()->data(), ETH_ALEN);
 }
 
-void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+void SimInterface::StartConnect(const common::MacAddr& bssid,
+                                const fuchsia_wlan_ieee80211::Ssid& ssid,
                                 const wlan_common::WlanChannel& channel) {
   // This should only be performed on a Client interface
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
@@ -347,9 +353,9 @@ void SimInterface::StartConnect(const common::MacAddr& bssid, const wlan_ieee802
   assoc_ctx_.bssid = bssid;
 
   assoc_ctx_.ies.clear();
-  assoc_ctx_.ies.push_back(0);         // SSID IE type ID
-  assoc_ctx_.ies.push_back(ssid.len);  // SSID IE length
-  assoc_ctx_.ies.insert(assoc_ctx_.ies.end(), ssid.data.data(), ssid.data.data() + ssid.len);
+  assoc_ctx_.ies.push_back(0);            // SSID IE type ID
+  assoc_ctx_.ies.push_back(ssid.size());  // SSID IE length
+  assoc_ctx_.ies.insert(assoc_ctx_.ies.end(), ssid.data(), ssid.data() + ssid.size());
   assoc_ctx_.channel = channel;
 
   // Send connect request
@@ -374,7 +380,7 @@ void SimInterface::AssociateWith(const simulation::FakeAp& ap, std::optional<zx:
   ZX_ASSERT(role_ == wlan_common::WlanMacRole::kClient);
 
   common::MacAddr bssid = ap.GetBssid();
-  wlan_ieee80211::CSsid ssid = ap.GetSsid();
+  fuchsia_wlan_ieee80211::Ssid ssid = ap.GetSsid();
   wlan_common::WlanChannel channel = ap.GetChannel();
 
   if (delay) {
@@ -479,7 +485,7 @@ SimInterface::ScanResultList(uint64_t txn_id) {
   return &results->second.result_list;
 }
 
-void SimInterface::StartSoftAp(const wlan_ieee80211::CSsid& ssid,
+void SimInterface::StartSoftAp(const fuchsia_wlan_ieee80211::Ssid& ssid,
                                const wlan_common::WlanChannel& channel, uint32_t beacon_period,
                                uint32_t dtim_period) {
   // This should only be performed on an AP interface
@@ -510,7 +516,7 @@ void SimInterface::StopSoftAp() {
   // Use the ssid from the last call to StartSoftAp
   builder.ssid(soft_ap_ctx_.ssid);
 
-  ZX_ASSERT(soft_ap_ctx_.ssid.data.size() == wlan_ieee80211::kMaxSsidByteLen);
+  ZX_ASSERT(soft_ap_ctx_.ssid.size());
 
   // Send request to driver
   auto result = client_.buffer(test_arena_)->StopBss(builder.Build());

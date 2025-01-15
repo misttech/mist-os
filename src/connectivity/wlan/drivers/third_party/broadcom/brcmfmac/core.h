@@ -231,7 +231,7 @@ struct brcmf_if {
   // Request for a roam attempt, populated if a roam is requested from above the driver.
   std::optional<fuchsia_wlan_fullmac::WlanFullmacImplRoamRequest> roam_req;
   // SSID of Successfully started SoftAP.
-  fuchsia_wlan_ieee80211::wire::CSsid saved_softap_ssid;
+  fuchsia_wlan_ieee80211::Ssid saved_softap_ssid;
   std::atomic<int> pend_8021x_cnt;
   sync_completion_t pend_8021x_wait;
   sync_completion_t disconnect_done;

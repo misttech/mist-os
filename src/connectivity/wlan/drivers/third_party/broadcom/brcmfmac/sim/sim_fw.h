@@ -120,7 +120,7 @@ class SimFirmware {
     bool is_active;
 
     // Optional filters
-    std::optional<wlan_ieee80211::CSsid> ssid;
+    std::optional<fuchsia_wlan_ieee80211::Ssid> ssid;
     std::optional<common::MacAddr> bssid;
 
     // Time per channel
@@ -141,7 +141,7 @@ class SimFirmware {
 
   struct AssocOpts {
     common::MacAddr bssid;
-    wlan_ieee80211::CSsid ssid;
+    fuchsia_wlan_ieee80211::Ssid ssid;
     bss_type_t bss_type;
   };
 
@@ -308,15 +308,15 @@ class SimFirmware {
   // Num of clients currently associated with the SoftAP IF
   uint16_t GetNumClients(uint16_t ifidx);
 
-  void TriggerFirmwareDisassoc(wlan_ieee80211::ReasonCode reason);
-  void TriggerFirmwareDeauth(wlan_ieee80211::ReasonCode reason);
+  void TriggerFirmwareDisassoc(wlan_ieee80211_wire::ReasonCode reason);
+  void TriggerFirmwareDeauth(wlan_ieee80211_wire::ReasonCode reason);
 
   // Allows simulation of a disassoc ind coming from an unexpected BSS.
-  void TriggerFirmwareDisassocIndFromBssid(wlan_ieee80211::ReasonCode reason,
+  void TriggerFirmwareDisassocIndFromBssid(wlan_ieee80211_wire::ReasonCode reason,
                                            const uint8_t bssid[ETH_ALEN]);
 
   // Allows simulation of a deauth ind coming from an unexpected BSS.
-  void TriggerFirmwareDeauthIndFromBssid(wlan_ieee80211::ReasonCode reason,
+  void TriggerFirmwareDeauthIndFromBssid(wlan_ieee80211_wire::ReasonCode reason,
                                          const uint8_t bssid[ETH_ALEN]);
 
   // Allow simulation to set CapabilityIovars
@@ -486,7 +486,8 @@ class SimFirmware {
   zx_status_t HandleJoinRequest(const void* value, size_t value_len);
   void HandleAssocReq(std::shared_ptr<const simulation::SimAssocReqFrame> frame);
   void HandleDisconnectForClientIF(std::shared_ptr<const simulation::SimManagementFrame> frame,
-                                   const common::MacAddr& bssid, wlan_ieee80211::ReasonCode reason);
+                                   const common::MacAddr& bssid,
+                                   wlan_ieee80211_wire::ReasonCode reason);
   void HandleAuthReq(std::shared_ptr<const simulation::SimAuthFrame> frame);
   void HandleAuthResp(std::shared_ptr<const simulation::SimAuthFrame> frame);
   void HandleReassocResp(std::shared_ptr<const simulation::SimReassocReqFrame> frame);
@@ -510,19 +511,19 @@ class SimFirmware {
   void SetAssocState(AssocState::AssocStateName state);
   void AssocClearContext();
   void AuthClearContext();
-  void AssocHandleFailure(wlan_ieee80211::StatusCode status);
+  void AssocHandleFailure(wlan_ieee80211_wire::StatusCode status);
   void AuthHandleFailure();
   void DisassocStart(brcmf_scb_val_le* scb_val);
-  void DisassocLocalClient(wlan_ieee80211::ReasonCode reason);
-  void DeauthLocalClient(wlan_ieee80211::ReasonCode reason);
-  void SetStateToDisassociated(wlan_ieee80211::ReasonCode reason, bool locally_initiated);
-  void SetStateToDeauthenticated(wlan_ieee80211::ReasonCode reason, bool locally_initiated,
+  void DisassocLocalClient(wlan_ieee80211_wire::ReasonCode reason);
+  void DeauthLocalClient(wlan_ieee80211_wire::ReasonCode reason);
+  void SetStateToDisassociated(wlan_ieee80211_wire::ReasonCode reason, bool locally_initiated);
+  void SetStateToDeauthenticated(wlan_ieee80211_wire::ReasonCode reason, bool locally_initiated,
                                  const common::MacAddr& bssid);
   // Get the Sim firmware ready for a target_bss_info iovar request.
   void SetTargetBssInfo(const brcmf_bss_info_le& bss_info, cpp20::span<uint8_t> ie_buf);
   void ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts, wlan_common::WlanChannel& channel);
   void ReassocStart();
-  void ReassocHandleFailure(wlan_ieee80211::StatusCode status);
+  void ReassocHandleFailure(wlan_ieee80211_wire::StatusCode status);
   zx_status_t ReassocToCurrentAp(std::shared_ptr<const simulation::SimReassocRespFrame> frame);
   zx_status_t ReassocToDifferentAp(std::shared_ptr<const simulation::SimReassocRespFrame> frame);
 
@@ -566,10 +567,11 @@ class SimFirmware {
 
   // Update the SAE status when firmware receives an auth frame from remote stations.
   zx_status_t RemoteUpdateExternalSaeStatus(uint16_t seq_num,
-                                            wlan_ieee80211::StatusCode status_code,
+                                            wlan_ieee80211_wire::StatusCode status_code,
                                             const uint8_t* sae_payload, size_t text_len);
   // Update the SAE status when firmware receives an auth frame from the driver.
-  zx_status_t LocalUpdateExternalSaeStatus(uint16_t seq_num, wlan_ieee80211::StatusCode status_code,
+  zx_status_t LocalUpdateExternalSaeStatus(uint16_t seq_num,
+                                           wlan_ieee80211_wire::StatusCode status_code,
                                            const uint8_t* sae_payload, size_t text_len);
 
   // Allocate a buffer for an event (brcmf_event)
@@ -603,7 +605,7 @@ class SimFirmware {
   // value "true" means it is triggered by a deauth frame, and "false" means ut's triggered by a
   // disassoc frame.
   bool FindAndRemoveClient(const common::MacAddr client_mac, bool motivation_deauth,
-                           wlan_ieee80211::ReasonCode deauth_reason);
+                           wlan_ieee80211_wire::ReasonCode deauth_reason);
   std::shared_ptr<Client> FindClient(const common::MacAddr client_mac);
   void ScheduleLinkEvent(zx::duration when, uint16_t ifidx);
   void SendAPStartLinkEvent(uint16_t ifidx);

@@ -29,6 +29,10 @@ namespace wlan_phyimpl_wire = fuchsia_wlan_phyimpl::wire;
 
 namespace wlan::brcmfmac {
 
+const fuchsia_wlan_ieee80211::Ssid kDefaultSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                                   'F', 'a', 'k', 'e', ' ', 'A', 'P'};
+const fuchsia_wlan_ieee80211::Ssid kDefaultSoftApSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                                         'F', 'a', 'k', 'e', ' ', 'A', 'P'};
 // This class represents an interface created on a simulated device, collecting all of the
 // attributes related to that interface.
 class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacImplIfc> {
@@ -47,7 +51,7 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
   };
 
   struct SoftApContext {
-    wlan_ieee80211::CSsid ssid;
+    fuchsia_wlan_ieee80211::Ssid ssid;
   };
 
   // Useful statistics about operations performed
@@ -74,10 +78,6 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
   static constexpr uint32_t kDefaultPassiveScanDwellTimeMs = 120;
 
   // SoftAP defaults
-  static constexpr wlan_ieee80211::CSsid kDefaultSoftApSsid = {.len = 10,
-                                                               .data = {
-                                                                   .data_ = "Sim_SoftAP",
-                                                               }};
   static constexpr wlan_common::WlanChannel kDefaultSoftApChannel = {
       .primary = 11, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
   static constexpr uint32_t kDefaultSoftApBeaconPeriod = 100;
@@ -146,7 +146,7 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
   // Start an assocation with a fake AP. We can use these for subsequent association events, but
   // not interleaved association events (which I doubt are terribly useful, anyway). Note that for
   // the moment only non-authenticated associations are supported.
-  void StartConnect(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+  void StartConnect(const common::MacAddr& bssid, const fuchsia_wlan_ieee80211::Ssid& ssid,
                     const wlan_common::WlanChannel& channel);
   void AssociateWith(const simulation::FakeAp& ap,
                      std::optional<zx::duration> delay = std::nullopt);
@@ -167,7 +167,7 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
       uint64_t txn_id);
 
   // SoftAP operation
-  void StartSoftAp(const wlan_ieee80211::CSsid& ssid = kDefaultSoftApSsid,
+  void StartSoftAp(const fuchsia_wlan_ieee80211::Ssid& ssid = kDefaultSoftApSsid,
                    const wlan_common::WlanChannel& channel = kDefaultSoftApChannel,
                    uint32_t beacon_period = kDefaultSoftApBeaconPeriod,
                    uint32_t dtim_period = kDefaultSoftApDtimPeriod);

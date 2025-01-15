@@ -991,14 +991,14 @@ static zx_status_t brcmf_escan_prep(
       struct brcmf_ssid_le* ssid_le =
           reinterpret_cast<struct brcmf_ssid_le*>(reinterpret_cast<char*>(params_le) + offset);
       for (uint32_t i = 0; i < n_ssids; i++, ssid_le++) {
-        if (request->ssids().data()[i].len > fuchsia_wlan_ieee80211::kMaxSsidByteLen) {
+        if (request->ssids().data()[i].count() > fuchsia_wlan_ieee80211::kMaxSsidByteLen) {
           BRCMF_ERR("SSID in scan request SSID list too long(no longer than %hhu bytes)",
                     fuchsia_wlan_ieee80211::kMaxSsidByteLen);
           return ZX_ERR_INVALID_ARGS;
         }
-        ssid_le->SSID_len = request->ssids().data()[i].len;
-        memcpy(&ssid_le->SSID, request->ssids().data()[i].data.data(),
-               request->ssids().data()[i].len);
+        ssid_le->SSID_len = request->ssids().data()[i].count();
+        memcpy(&ssid_le->SSID, request->ssids().data()[i].data(),
+               request->ssids().data()[i].count());
         if (ssid_le->SSID_len == 0) {
           BRCMF_DBG(SCAN, "%d: Broadcast scan", i);
         } else {
@@ -3715,7 +3715,7 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
 
   BRCMF_DBG(TRACE,
             "ssid: " FMT_SSID "  beacon period: %d  dtim_period: %d  channel: %d  rsne_len: %zd",
-            FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len), req->beacon_period(),
+            FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()), req->beacon_period(),
             req->dtim_period(), req->channel(), req->has_rsne() ? req->rsne().count() : 0);
 
   uint16_t chanspec = 0;
@@ -3724,8 +3724,8 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
 
   struct brcmf_ssid_le ssid_le;
   memset(&ssid_le, 0, sizeof(ssid_le));
-  memcpy(ssid_le.SSID, req->ssid().data.data(), req->ssid().len);
-  ssid_le.SSID_len = req->ssid().len;
+  memcpy(ssid_le.SSID, req->ssid().data(), req->ssid().count());
+  ssid_le.SSID_len = req->ssid().count();
 
   brcmf_enable_mpc(ifp, 0);
 
@@ -3838,7 +3838,8 @@ static fuchsia_wlan_fullmac_wire::StartResult brcmf_cfg80211_start_ap(
 
   cfg->ap_started = true;
   // Save the SSID for checking when SoftAP is stopped.
-  ifp->saved_softap_ssid = req->ssid();
+  ifp->saved_softap_ssid.resize(req->ssid().count());
+  memcpy(ifp->saved_softap_ssid.data(), req->ssid().data(), req->ssid().count());
   return fuchsia_wlan_fullmac_wire::StartResult::kSuccess;
 
 fail:
@@ -4355,7 +4356,7 @@ void brcmf_if_start_req(net_device* ndev,
   BRCMF_IFDBG(WLANIF, ndev, "Start AP request from SME. rsne_len: %zu, channel: %u",
               req->has_rsne() ? req->rsne().count() : 0, req->channel());
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()));
 #endif /* !defined(NDEBUG) */
 
   fuchsia_wlan_fullmac_wire::StartResult result_code = brcmf_cfg80211_start_ap(ndev, req);
@@ -4383,13 +4384,13 @@ void brcmf_if_stop_req(net_device* ndev,
     goto done;
   }
 #if !defined(NDEBUG)
-  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len));
+  BRCMF_DBG(WLANIF, "  ssid: " FMT_SSID, FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()));
 #endif /* !defined(NDEBUG) */
-  if ((req->ssid().len != ifp->saved_softap_ssid.len) ||
-      (memcmp(req->ssid().data.data(), ifp->saved_softap_ssid.data.data(), req->ssid().len) != 0)) {
+  if ((req->ssid().count() != ifp->saved_softap_ssid.size()) ||
+      (memcmp(req->ssid().data(), ifp->saved_softap_ssid.data(), req->ssid().count()) != 0)) {
     BRCMF_ERR("SSID does not match running SoftAP, req SSID: " FMT_SSID, " current SSID: " FMT_SSID,
-              FMT_SSID_BYTES(req->ssid().data.data(), req->ssid().len),
-              FMT_SSID_BYTES(ifp->saved_softap_ssid.data.data(), ifp->saved_softap_ssid.len));
+              FMT_SSID_BYTES(req->ssid().data(), req->ssid().count()),
+              FMT_SSID_BYTES(ifp->saved_softap_ssid.data(), ifp->saved_softap_ssid.size()));
     result_code = fuchsia_wlan_fullmac_wire::StopResult::kInternalError;
     goto done;
   }

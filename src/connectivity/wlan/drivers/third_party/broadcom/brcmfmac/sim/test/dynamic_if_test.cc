@@ -25,7 +25,6 @@ constexpr uint16_t kDefaultChanspec = 53397;
 constexpr uint16_t kTestChanspec = 0xd0a5;
 constexpr uint16_t kTest1Chanspec = 0xd095;
 constexpr simulation::WlanTxInfo kDefaultTxInfo = {.channel = kDefaultChannel};
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 const common::MacAddr kFakeMac({0xde, 0xad, 0xbe, 0xef, 0x00, 0x02});
 const char kFakeClientName[] = "fake-client-iface";
@@ -126,7 +125,7 @@ void DynamicIfTest::TxAuthAndAssocReq() {
   // Get the mac address of the SoftAP
   common::MacAddr soft_ap_mac;
   softap_ifc_.GetMacAddr(&soft_ap_mac);
-  wlan_ieee80211::CSsid ssid = {.len = 6, .data = {.data_ = "Sim_AP"}};
+  fuchsia_wlan_ieee80211::Ssid ssid = {'S', 'i', 'm', '_', 'A', 'P'};
   // Pass the auth stop for softAP iface before assoc.
   simulation::SimAuthFrame auth_req_frame(kFakeMac, soft_ap_mac, 1, simulation::AUTH_TYPE_OPEN,
                                           fuchsia_wlan_ieee80211::StatusCode::kSuccess);
@@ -888,7 +887,7 @@ TEST_F(DynamicIfTest, SetClientChanspecAfterAPStarted) {
   uint16_t chanspec;
   // Create softAP iface and start
   StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_);
-  softap_ifc_.StartSoftAp(SimInterface::kDefaultSoftApSsid, kDefaultChannel);
+  softap_ifc_.StartSoftAp(kDefaultSoftApSsid, kDefaultChannel);
 
   // The chanspec of softAP iface should be set to default one.
   chanspec = GetChanspec(true, ZX_OK);
@@ -941,8 +940,8 @@ TEST_F(DynamicIfTest, CheckSoftAPChannel) {
   client_ifc_.AssociateWith(ap_, delay);
   // Start our SoftAP
   delay += zx::msec(10);
-  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_,
-                                       SimInterface::kDefaultSoftApSsid, kDefaultChannel, 100, 100),
+  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_, kDefaultSoftApSsid,
+                                       kDefaultChannel, 100, 100),
                              delay);
 
   // Wait until SIM FW sends AP Start confirmation. This is set as a
@@ -967,12 +966,12 @@ TEST_F(DynamicIfTest, StartApIfaceTimeoutWithReqSpamAndFwIgnore) {
 
   // Make firmware ignore the start AP req.
   InjectStartAPIgnore();
-  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_,
-                                       SimInterface::kDefaultSoftApSsid, kDefaultChannel, 100, 100),
+  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_, kDefaultSoftApSsid,
+                                       kDefaultChannel, 100, 100),
                              zx::msec(10));
   // Make sure this extra request will not refresh the timer.
-  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_,
-                                       SimInterface::kDefaultSoftApSsid, kDefaultChannel, 100, 100),
+  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_, kDefaultSoftApSsid,
+                                       kDefaultChannel, 100, 100),
                              zx::msec(510));
 
   env_->ScheduleNotification(std::bind(&DynamicIfTest::VerifyStartApTimer, this), zx::msec(1011));
@@ -980,8 +979,8 @@ TEST_F(DynamicIfTest, StartApIfaceTimeoutWithReqSpamAndFwIgnore) {
   env_->ScheduleNotification(std::bind(&DynamicIfTest::DelInjectedStartAPIgnore, this),
                              zx::msec(1011));
   // Issue start AP request again.
-  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_,
-                                       SimInterface::kDefaultSoftApSsid, kDefaultChannel, 100, 100),
+  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_, kDefaultSoftApSsid,
+                                       kDefaultChannel, 100, 100),
                              zx::msec(1100));
 
   env_->Run(kTestDuration);
@@ -1002,8 +1001,8 @@ TEST_F(DynamicIfTest, RejectScanWhenApStartReqIsPending) {
   StartInterface(wlan_common::WlanMacRole::kAp, &softap_ifc_);
 
   InjectStartAPIgnore();
-  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_,
-                                       SimInterface::kDefaultSoftApSsid, kDefaultChannel, 100, 100),
+  env_->ScheduleNotification(std::bind(&SimInterface::StartSoftAp, &softap_ifc_, kDefaultSoftApSsid,
+                                       kDefaultChannel, 100, 100),
                              zx::msec(30));
   // The timeout of AP start is 1000 msec, so a scan request before zx::msec(1030) will be rejected.
   env_->ScheduleNotification(std::bind(&SimInterface::StartScan, &client_ifc_, kScanId, false,

@@ -388,10 +388,7 @@ mod handle_mlme_request_tests {
         assert_eq!(driver_req.channels, Some(vec![2]));
         assert_eq!(driver_req.min_channel_time, Some(6));
         assert_eq!(driver_req.max_channel_time, Some(7));
-
-        let driver_cssids = driver_req.ssids.as_ref().unwrap();
-        assert_eq!(driver_cssids.len(), 1);
-        assert_eq!(driver_cssids[0].data[..driver_cssids[0].len as usize], [3u8; 4][..]);
+        assert_eq!(driver_req.ssids, Some(vec![vec![3u8; 4]]));
     }
 
     #[test]
@@ -646,8 +643,7 @@ mod handle_mlme_request_tests {
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartBss { req })) => req);
 
-        assert_eq!(driver_req.ssid.as_ref().unwrap().len as usize, SSID_LEN);
-        assert_eq!(driver_req.ssid.as_ref().unwrap().data[..SSID_LEN], [1u8; SSID_LEN][..]);
+        assert_eq!(driver_req.ssid, Some(vec![1u8; SSID_LEN]));
         assert_eq!(driver_req.bss_type, Some(fidl_common::BssType::Infrastructure));
         assert_eq!(driver_req.beacon_period, Some(3));
         assert_eq!(driver_req.dtim_period, Some(4));
@@ -666,8 +662,7 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StopBss { req })) => req);
-        assert_eq!(driver_req.ssid.as_ref().unwrap().len as usize, SSID_LEN);
-        assert_eq!(driver_req.ssid.as_ref().unwrap().data[..SSID_LEN], [1u8; SSID_LEN][..]);
+        assert_eq!(driver_req.ssid, Some(vec![1u8; SSID_LEN]));
     }
 
     #[test]

@@ -25,7 +25,6 @@ namespace wlan_ieee80211 = wlan_ieee80211;
 // Some default AP and association request values
 constexpr wlan_common::WlanChannel kDefaultChannel = {
     .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 constexpr uint8_t kIes[] = {
     // SSID
     0x00, 0x0f, 'F', 'u', 'c', 'h', 's', 'i', 'a', ' ', 'F', 'a', 'k', 'e', ' ', 'A', 'P',
@@ -152,7 +151,7 @@ class ConnectTest : public SimTest {
     // appropriate MLME calls (Join => Auth => Assoc).
     simulation::WlanTxInfo tx_info = {.channel = kDefaultChannel};
     common::MacAddr bssid = kDefaultBssid;
-    wlan_ieee80211::CSsid ssid = kDefaultSsid;
+    fuchsia_wlan_ieee80211::Ssid ssid = kDefaultSsid;
     std::vector<uint8_t> ies = std::vector<uint8_t>(kIes, kIes + sizeof(kIes));
 
     // There should be one result for each association response received
@@ -729,7 +728,7 @@ TEST_F(ConnectTest, NoAps) {
   const common::MacAddr kBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
   context_.bssid = kBssid;
   context_.expected_results.push_front(wlan_ieee80211::StatusCode::kRejectedSequenceTimeout);
-  context_.ssid = {.len = 6, .data = {.data_ = "TestAP"}};
+  context_.ssid = {'T', 'e', 's', 't', 'A', 'P'};
   context_.tx_info.channel = {
       .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 
@@ -809,8 +808,9 @@ TEST_F(ConnectTest, WrongIds) {
   constexpr wlan_common::WlanChannel kWrongChannel = {
       .primary = 8, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
   ASSERT_NE(kDefaultChannel.primary, kWrongChannel.primary);
-  constexpr wlan_ieee80211::CSsid kWrongSsid = {.len = 14, .data = {.data_ = "Fuchsia Fake AP"}};
-  ASSERT_NE(kDefaultSsid.len, kWrongSsid.len);
+  const fuchsia_wlan_ieee80211::Ssid kWrongSsid = {'F', 'u', 'c', 'h', 's', 'i', 'a',
+                                                   ' ', 'F', 'a', 'k', 'e', ' ', 'A'};
+  ASSERT_NE(kDefaultSsid.size(), kWrongSsid.size());
   const common::MacAddr kWrongBssid({0x12, 0x34, 0x56, 0x78, 0x9b, 0xbc});
   ASSERT_NE(kDefaultBssid, kWrongBssid);
 

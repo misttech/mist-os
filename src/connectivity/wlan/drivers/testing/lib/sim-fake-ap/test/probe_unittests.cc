@@ -23,12 +23,14 @@ using ::testing::NotNull;
 
 constexpr simulation::WlanTxInfo kAp1TxInfo = {
     .channel = {.primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
-constexpr wlan_ieee80211::CSsid kAp1Ssid = {.len = 16, .data = {.data_ = "Fuchsia Fake AP1"}};
+const fuchsia_wlan_ieee80211::Ssid kAp1Ssid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                               'F', 'a', 'k', 'e', ' ', 'A', 'P', '1'};
 const common::MacAddr kAp1Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
 
 constexpr simulation::WlanTxInfo kAp2TxInfo = {
     .channel = {.primary = 10, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0}};
-constexpr wlan_ieee80211::CSsid kAp2Ssid = {.len = 16, .data = {.data_ = "Fuchsia Fake AP2"}};
+const fuchsia_wlan_ieee80211::Ssid kAp2Ssid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                               'F', 'a', 'k', 'e', ' ', 'A', 'P', '2'};
 const common::MacAddr kAp2Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xcc});
 
 const common::MacAddr kClientMacAddr({0x11, 0x22, 0x33, 0x44, 0xee, 0xff});
@@ -47,7 +49,7 @@ class ProbeTest : public ::testing::Test, public simulation::StationIfc {
 
   unsigned probe_resp_count_ = 0;
   std::list<common::MacAddr> bssid_resp_list_;
-  std::list<wlan_ieee80211::CSsid> ssid_resp_list_;
+  std::list<fuchsia_wlan_ieee80211::Ssid> ssid_resp_list_;
   std::list<wlan_common::WlanChannel> channel_resp_list_;
   std::list<double> sig_strength_resp_list;
 
@@ -86,9 +88,9 @@ void compareChannel(const wlan_common::WlanChannel& channel1,
   EXPECT_EQ(channel1.secondary80, channel2.secondary80);
 }
 
-void compareSsid(const wlan_ieee80211::CSsid& ssid1, const wlan_ieee80211::CSsid& ssid2) {
-  ASSERT_EQ(ssid1.len, ssid2.len);
-  EXPECT_EQ(memcmp(ssid1.data.data(), ssid2.data.data(), ssid1.len), 0);
+void compareSsid(const fuchsia_wlan_ieee80211::Ssid& ssid1,
+                 const fuchsia_wlan_ieee80211::Ssid& ssid2) {
+  EXPECT_EQ(ssid1, ssid2);
 }
 
 /* Verify that probe request which is sent to a channel with no ap active on, will not get

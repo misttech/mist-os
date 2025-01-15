@@ -18,7 +18,6 @@ namespace wlan::brcmfmac {
 constexpr wlan_common::WlanChannel kDefaultChannel = {
     .primary = 9, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
 const common::MacAddr kDefaultBssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
-constexpr wlan_ieee80211::CSsid kDefaultSsid = {.len = 15, .data = {.data_ = "Fuchsia Fake AP"}};
 
 class CrashRecoveryTest : public SimTest {
  public:
@@ -92,8 +91,7 @@ void CrashRecoveryTest::VerifyScanResult(const uint64_t scan_id, size_t min_resu
   common::MacAddr bssid(back_scan_result.bss()->bssid().data());
 
   EXPECT_EQ(bssid, kDefaultBssid);
-  EXPECT_EQ(ssid.size(), kDefaultSsid.len);
-  EXPECT_EQ(std::memcmp(ssid.data(), kDefaultSsid.data.data(), kDefaultSsid.len), 0);
+  EXPECT_EQ(ssid, kDefaultSsid);
 
   ASSERT_NE(client_ifc_.ScanResultCode(scan_id), std::nullopt);
   EXPECT_EQ(client_ifc_.ScanResultCode(scan_id).value(), expect_code);

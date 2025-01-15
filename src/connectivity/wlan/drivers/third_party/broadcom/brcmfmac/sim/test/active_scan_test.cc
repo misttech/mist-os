@@ -29,7 +29,7 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 struct ApInfo {
   explicit ApInfo(simulation::Environment* env, const common::MacAddr& bssid,
-                  const wlan_ieee80211::CSsid& ssid, const wlan_common::WlanChannel& channel)
+                  const fuchsia_wlan_ieee80211::Ssid& ssid, const wlan_common::WlanChannel& channel)
       : ap_(env, bssid, ssid, channel) {}
 
   simulation::FakeAp ap_;
@@ -65,7 +65,7 @@ class ActiveScanTest : public SimTest {
   }
   void SetUp() override;
 
-  void StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+  void StartFakeAp(const common::MacAddr& bssid, const fuchsia_wlan_ieee80211::Ssid& ssid,
                    const wlan_common::WlanChannel& channel,
                    zx::duration beacon_interval = kBeaconInterval);
 
@@ -144,7 +144,8 @@ void ActiveScanTest::SetUp() {
   client_ifc_.GetMacAddr(&sim_fw_mac_);
 }
 
-void ActiveScanTest::StartFakeAp(const common::MacAddr& bssid, const wlan_ieee80211::CSsid& ssid,
+void ActiveScanTest::StartFakeAp(const common::MacAddr& bssid,
+                                 const fuchsia_wlan_ieee80211::Ssid& ssid,
                                  const wlan_common::WlanChannel& channel,
                                  zx::duration beacon_interval) {
   auto ap_info = std::make_unique<ApInfo>(env_.get(), bssid, ssid, channel);
@@ -190,11 +191,9 @@ void ActiveScanTest::VerifyScanResults() {
         matches_seen++;
 
         // Verify SSID
-        wlan_ieee80211::CSsid ssid_info = ap_info->ap_.GetSsid();
+        fuchsia_wlan_ieee80211::Ssid ssid_info = ap_info->ap_.GetSsid();
         auto ssid = brcmf_find_ssid_in_ies(result.bss()->ies().data(), result.bss()->ies().size());
-        EXPECT_EQ(ssid.size(), ssid_info.len);
-        ASSERT_LE(ssid_info.len, ssid_info.data.size());
-        EXPECT_EQ(memcmp(ssid.data(), ssid_info.data.data(), ssid_info.len), 0);
+        EXPECT_EQ(ssid, ssid_info);
 
         // Verify channel
         wlan_common::WlanChannel channel = ap_info->ap_.GetChannel();
@@ -260,15 +259,18 @@ void ActiveScanTest::Rx(std::shared_ptr<const simulation::SimFrame> frame,
 // AP 1&2 on channel 2.
 constexpr wlan_common::WlanChannel kDefaultChannel1 = {
     .primary = 2, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_ieee80211::CSsid kAp1Ssid = {.len = 16, .data = {.data_ = "Fuchsia Fake AP1"}};
+const fuchsia_wlan_ieee80211::Ssid kAp1Ssid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                               'F', 'a', 'k', 'e', ' ', 'A', 'P', '1'};
 const common::MacAddr kAp1Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc});
-constexpr wlan_ieee80211::CSsid kAp2Ssid = {.len = 16, .data = {.data_ = "Fuchsia Fake AP2"}};
+const fuchsia_wlan_ieee80211::Ssid kAp2Ssid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                               'F', 'a', 'k', 'e', ' ', 'A', 'P', '2'};
 const common::MacAddr kAp2Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbd});
 
 // AP 3 on channel 4.
 constexpr wlan_common::WlanChannel kDefaultChannel2 = {
     .primary = 4, .cbw = wlan_common::ChannelBandwidth::kCbw20, .secondary80 = 0};
-constexpr wlan_ieee80211::CSsid kAp3Ssid = {.len = 16, .data = {.data_ = "Fuchsia Fake AP3"}};
+const fuchsia_wlan_ieee80211::Ssid kAp3Ssid = {'F', 'u', 'c', 'h', 's', 'i', 'a', ' ',
+                                               'F', 'a', 'k', 'e', ' ', 'A', 'P', '3'};
 const common::MacAddr kAp3Bssid({0x12, 0x34, 0x56, 0x78, 0x9a, 0xbe});
 
 // This test case might fail in a very low possibility because it's random.
@@ -390,21 +392,19 @@ TEST_F(ActiveScanTest, EmptyChannelList) {
 // This test is to verify brcmfmac driver will return an error when an invalid ssid list
 // is indicated in active scan test request.
 TEST_F(ActiveScanTest, SsidTooLong) {
-  constexpr zx::duration kScanStartTime = zx::sec(1);
-
   StartFakeAp(kAp1Bssid, kAp1Ssid, kDefaultChannel1);
 
-  wlan_ieee80211::CSsid invalid_scan_ssid = {
-      .len = 33,
-      .data = {.data_ = "1234567890"},
-  };
+  std::vector<uint8_t> inv_scan_ssid(33, 0);
+  memcpy(inv_scan_ssid.data(), "1234567890", 6);
+  fuchsia_wlan_ieee80211::wire::Ssid invalid_scan_ssid(test_arena_, inv_scan_ssid);
 
-  wlan_ieee80211::CSsid valid_scan_ssid = {
-      .len = 16,
-      .data = {.data_ = "Fuchsia Fake AP1"},
-  };
+  std::vector<uint8_t> scan_ssid(16, 0);
+  memcpy(scan_ssid.data(), "Fuchsia Fake AP1", 16);
+  fuchsia_wlan_ieee80211::wire::Ssid valid_scan_ssid(test_arena_, scan_ssid);
 
-  const wlan_ieee80211::CSsid ssids_list[] = {valid_scan_ssid, invalid_scan_ssid};
+  std::vector<fuchsia_wlan_ieee80211::wire::Ssid> ssids_list{};
+  ssids_list.push_back(invalid_scan_ssid);
+  ssids_list.push_back(valid_scan_ssid);
 
   // Case contains over-size ssid in ssids_list in request.
   auto builder =
@@ -414,22 +414,13 @@ TEST_F(ActiveScanTest, SsidTooLong) {
   // Keep the table entry but make the VectorView empty.
   builder.channels(
       fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(default_channels_list_), 5));
-  builder.ssids(fidl::VectorView<wlan_ieee80211::CSsid>::FromExternal(
-      const_cast<wlan_ieee80211::CSsid*>(ssids_list), 2));
+  builder.ssids(fidl::VectorView<fuchsia_wlan_ieee80211::wire::Ssid>(test_arena_, ssids_list));
   builder.min_channel_time(kDwellTimeMs);
   builder.max_channel_time(kDwellTimeMs);
   auto break_ssids_list_scan_req = builder.Build();
 
-  // Two active scans are scheduled,
-  env_->ScheduleNotification(
-      std::bind(&ActiveScanTest::StartScan, this, &break_ssids_list_scan_req), kScanStartTime);
-
-  env_->ScheduleNotification(std::bind(&ActiveScanTest::EndSimulation, this),
-                             kSimulatedClockDuration);
-  env_->Run(kSimulatedClockDuration);
-
-  VerifyScanResults();
-  EXPECT_EQ(scan_result_code_, wlan_fullmac_wire::WlanScanResult::kInvalidArgs);
+  auto result = client_ifc_.client_->StartScan(break_ssids_list_scan_req);
+  EXPECT_EQ(result.ok(), false);
 }
 
 // This test case verifies that the driver returns SHOULD_WAIT as the scan result code when firmware

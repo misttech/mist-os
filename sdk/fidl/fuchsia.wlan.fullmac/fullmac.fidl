@@ -572,7 +572,7 @@ closed protocol WlanFullmacImpl {
         /// the number of SSIDs permitted per scan request and the technical limitation
         /// in IEEE 802.11-2016 that limits the number of SSIDs in a single Probe Request
         /// frame to ieee80211.SSID_LIST_MAX SSIDs.
-        4: ssids vector<ieee80211.CSsid>:MAX;
+        4: ssids vector<ieee80211.Ssid>:MAX;
         /// Minimum amount of time in msecs spent on a channel during scan.
         5: min_channel_time uint32;
         /// Maximum amount of time in msecs spent on a channel during scan.
@@ -625,7 +625,7 @@ closed protocol WlanFullmacImpl {
         2: reason_code ieee80211.ReasonCode;
     }) -> ();
     strict StartBss(table {
-        1: ssid ieee80211.CSsid;
+        1: ssid ieee80211.Ssid;
         2: bss_type fuchsia.wlan.common.BssType;
         3: beacon_period uint32;
         4: dtim_period uint32;
@@ -634,7 +634,7 @@ closed protocol WlanFullmacImpl {
         7: vendor_ie vector<uint8>:WLAN_VIE_MAX_LEN;
     }) -> ();
     strict StopBss(table {
-        1: ssid ieee80211.CSsid;
+        1: ssid ieee80211.Ssid;
     }) -> ();
     /// Sets security keys for a connection. This is typically called after a successful key
     /// exchange.
