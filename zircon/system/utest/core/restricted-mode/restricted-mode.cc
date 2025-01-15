@@ -387,12 +387,27 @@ class RestrictedMode : public zxtest::TestWithParam<RestrictedBlobInfo> {
     auto offset = restricted_blob_info_.max_load_address;
     if (offset != 0) {
       options |= ZX_VM_OFFSET_IS_UPPER_LIMIT;
+      zx_info_vmar_t vmar_info = {};
+      ASSERT_OK(zx::vmar::root_self()->get_info(ZX_INFO_VMAR, &vmar_info, sizeof(vmar_info),
+                                                nullptr, nullptr));
+      ASSERT_GE(offset, vmar_info.base);
+      // Subtract the base from the absolute offset to get the relative offset
+      // needed for zx_vmar_map().
+      offset -= vmar_info.base;
+      // Align it to the nearest page.
+      offset -= offset % zx_system_get_page_size();
     }
 
     ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(options, offset, atomic_storage_vmo_, 0,
                                                 kAtomicStorageSize, &atomic_storage_base_));
     ASSERT_EQ(ZX_OK, zx::vmar::root_self()->map(options, offset, thread_storage_vmo_, 0,
                                                 kThreadStorageSize, &thread_storage_base_));
+    if (offset != 0) {
+      ASSERT_LT(reinterpret_cast<uint64_t>(atomic_storage_base_),
+                restricted_blob_info_.max_load_address);
+      ASSERT_LT(reinterpret_cast<uint64_t>(thread_storage_base_),
+                restricted_blob_info_.max_load_address);
+    }
   }
 
  private:
