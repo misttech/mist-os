@@ -115,7 +115,12 @@ class SdkCommonTests(unittest.TestCase):
             _atom("hello", "internal"),
             _atom("world", "public", "Kernel"),
         ]
-        self.assertEqual([*v.detect_area_violations(atoms)], [])
+        self.assertEqual(
+            [*v.detect_area_violations(atoms)],
+            [
+                "hello must specify an API area. Valid areas: ['Kernel', 'Unknown']",
+            ],
+        )
 
         atoms = [
             _atom("hello", "internal"),
@@ -124,6 +129,7 @@ class SdkCommonTests(unittest.TestCase):
         self.assertEqual(
             [*v.detect_area_violations(atoms)],
             [
+                "hello must specify an API area. Valid areas: ['Kernel', 'Unknown']",
                 "world must specify an API area. Valid areas: ['Kernel', 'Unknown']",
             ],
         )

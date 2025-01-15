@@ -8,6 +8,7 @@ fidl("fuchsia.boot") {
   # TODO(https://fxbug.dev/333907192): Promote to "partner" or
   # "partner_internal" and remove support for "internal_only_idk" in `fidl()`.
   sdk_category = "internal_only_idk"
+  sdk_area = "Kernel"
 
   sources = [
     "arguments.fidl",
