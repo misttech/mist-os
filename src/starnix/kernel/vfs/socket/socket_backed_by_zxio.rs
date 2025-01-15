@@ -22,6 +22,7 @@ use starnix_uapi::{
 };
 
 use ebpf::convert_and_verify_cbpf;
+use ebpf_api::SOCKET_FILTER_CBPF_CONFIG;
 use fidl::endpoints::DiscoverableProtocolMarker as _;
 use static_assertions::const_assert_eq;
 use std::mem::size_of;
@@ -233,8 +234,12 @@ impl ZxioBackedSocket {
             return error!(ENOTSUP);
         }
 
-        let program = convert_and_verify_cbpf(&code, ebpf_api::SK_BUF_TYPE.clone())
-            .map_err(|_| errno!(EINVAL))?;
+        let program = convert_and_verify_cbpf(
+            &code,
+            ebpf_api::SK_BUF_TYPE.clone(),
+            &SOCKET_FILTER_CBPF_CONFIG,
+        )
+        .map_err(|_| errno!(EINVAL))?;
 
         // TODO(https://fxbug.dev/377332291) Use `zxio_borrow()` to avoid cloning the handle.
         let packet_socket = fidl::endpoints::ClientEnd::<fposix_socket_packet::SocketMarker>::new(

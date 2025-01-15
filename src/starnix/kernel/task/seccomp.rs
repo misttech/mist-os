@@ -13,9 +13,10 @@ use crate::vfs::{
 };
 use bstr::ByteSlice;
 use ebpf::{
-    bpf_addressing_mode, bpf_class, convert_and_link_cbpf, BpfProgramContext, EbpfProgram,
-    MemoryId, ProgramArgument, Type,
+    bpf_addressing_mode, bpf_class, convert_and_link_cbpf, BpfProgramContext, CbpfConfig,
+    EbpfProgram, MemoryId, ProgramArgument, Type,
 };
+use ebpf_api::SECCOMP_CBPF_CONFIG;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
@@ -132,6 +133,7 @@ pub struct SeccompData(seccomp_data);
 impl BpfProgramContext for SeccompFilter {
     type RunContext<'a> = ();
     type Packet<'a> = &'a SeccompData;
+    const CBPF_CONFIG: &'static CbpfConfig = &SECCOMP_CBPF_CONFIG;
 }
 
 static SECCOMP_DATA_TYPE: LazyLock<Type> =

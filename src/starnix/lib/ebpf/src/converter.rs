@@ -24,6 +24,16 @@ const CBPF_WORD_SIZE: u32 = 4;
 // cBPF supports 16 words for scratch memory.
 const CBPF_SCRATCH_SIZE: u32 = 16;
 
+pub enum CbpfLenInstruction {
+    Static { len: i32 },
+    ContextField { offset: i16 },
+}
+
+pub struct CbpfConfig {
+    pub len: CbpfLenInstruction,
+    pub allow_msh: bool,
+}
+
 // These are accessors for bits in an BPF/EBPF instruction.
 // Instructions are encoded in one byte.  The first 3 LSB represent
 // the operation, and the other bits represent various modifiers.
@@ -76,7 +86,7 @@ fn cbpf_scratch_offset(addr: u32) -> Result<i16, EbpfError> {
     }
 }
 
-fn new_bpf_insn(code: u32, dst: Register, src: Register, offset: i16, imm: i32) -> bpf_insn {
+const fn new_bpf_insn(code: u32, dst: Register, src: Register, offset: i16, imm: i32) -> bpf_insn {
     bpf_insn {
         code: code as u8,
         _bitfield_1: linux_uapi::__BindgenBitfieldUnit::new([dst | src << 4]),
@@ -90,7 +100,7 @@ fn new_bpf_insn(code: u32, dst: Register, src: Register, offset: i16, imm: i32) 
 /// The bpf_code parameter is kept as an array for easy transfer
 /// via FFI.  This currently only allows the subset of BPF permitted
 /// by seccomp(2).
-fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
+fn cbpf_to_ebpf(bpf_code: &[sock_filter], config: &CbpfConfig) -> Result<Vec<bpf_insn>, EbpfError> {
     // There are only two BPF registers, A and X. There are 10
     // EBPF registers, numbered 0-9.  We map between the two as
     // follows:
@@ -101,16 +111,10 @@ fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
     // R1: Incoming argument pointing at the packet context (e.g. `sk_buff`). Moved to R6.
     const REG_ARG1: u8 = 1;
 
-    // R2: Packet size (see BPF_LEN). Moved to R7.
-    const REG_ARG2: u8 = 2;
-
     // R6: Pointer to the program context. Initially passed as the first argument. Implicitly
     //     used by eBPF when executing the legacy packet access instructions (`BPF_LD | BPF_ABS`
     //     and `BPF_LD | BPF_IND`).
     const REG_CONTEXT: u8 = 6;
-
-    // R7: Packet size (see `BPF_LEN`). Initially passed as the second argument.
-    const REG_PACKET_LEN: u8 = 7;
 
     // R7: Temp register used in the `BPF_MSH` implementation.
     const REG_TMP: u8 = 7;
@@ -131,7 +135,6 @@ fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
 
     // Save the arguments to registers that won't get clobbered by `BPF_LD`.
     ebpf_code.push(new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, REG_CONTEXT, REG_ARG1, 0, 0));
-    ebpf_code.push(new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, REG_PACKET_LEN, REG_ARG2, 0, 0));
 
     // Reset A to 0. This is necessary in case one of the load operation exits prematurely.
     ebpf_code.push(new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, REG_A, 0, 0, 0));
@@ -189,7 +192,7 @@ fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
                 match (size, mode, class) {
                     (BPF_H | BPF_B | BPF_W, BPF_ABS | BPF_IND, BPF_LD) => (),
                     (BPF_W, BPF_LEN | BPF_IMM | BPF_MEM, BPF_LD | BPF_LDX) => (),
-                    (BPF_B, BPF_MSH, BPF_LDX) => (),
+                    (BPF_B, BPF_MSH, BPF_LDX) if config.allow_msh => (),
                     _ => return Err(InvalidCbpfInstruction(bpf_instruction.code)),
                 };
 
@@ -230,13 +233,18 @@ fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
                         ));
                     }
                     BPF_LEN => {
-                        ebpf_code.push(new_bpf_insn(
-                            BPF_ALU64 | BPF_MOV | BPF_X,
-                            REG_A,
-                            REG_PACKET_LEN,
-                            0,
-                            0,
-                        ));
+                        ebpf_code.push(match config.len {
+                            CbpfLenInstruction::Static { len } => {
+                                new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, REG_A, 0, 0, len)
+                            }
+                            CbpfLenInstruction::ContextField { offset } => new_bpf_insn(
+                                BPF_LDX | BPF_MEM | BPF_W,
+                                REG_A,
+                                REG_CONTEXT,
+                                offset,
+                                0,
+                            ),
+                        });
                     }
                     BPF_MSH => {
                         // `BPF_MSH` loads `4 * (P[k:1] & 0xf)`, which translates to 6 instructions.
@@ -370,19 +378,15 @@ fn cbpf_to_ebpf(bpf_code: &[sock_filter]) -> Result<Vec<bpf_insn>, EbpfError> {
 pub fn convert_and_verify_cbpf(
     bpf_code: &[sock_filter],
     packet_type: Type,
+    config: &CbpfConfig,
 ) -> Result<VerifiedEbpfProgram, EbpfError> {
     let context = CallingContext {
         maps: vec![],
         helpers: HashMap::new(),
-        args: vec![
-            packet_type.clone(),
-            // Packet size (see `BPF_LEN` in cBPF). This may be different from the size of the
-            // value pointed by the first argument.
-            <usize as ProgramArgument>::get_type().clone(),
-        ],
+        args: vec![packet_type.clone()],
         packet_type: Some(packet_type),
     };
-    let ebpf_code = cbpf_to_ebpf(bpf_code)?;
+    let ebpf_code = cbpf_to_ebpf(bpf_code, config)?;
     verify_program(ebpf_code, context, &mut NullVerifierLogger)
 }
 
@@ -390,7 +394,8 @@ pub fn convert_and_verify_cbpf(
 pub fn convert_and_link_cbpf<C: BpfProgramContext>(
     bpf_code: &[sock_filter],
 ) -> Result<EbpfProgram<C>, EbpfError> {
-    let verified = convert_and_verify_cbpf(bpf_code, C::Packet::get_type().clone())?;
+    let verified =
+        convert_and_verify_cbpf(bpf_code, C::Packet::get_type().clone(), C::CBPF_CONFIG)?;
     link_program(&verified, &[], &[], HashMap::new())
 }
 
@@ -398,17 +403,22 @@ pub fn convert_and_link_cbpf<C: BpfProgramContext>(
 mod tests {
     use super::*;
 
+    pub const TEST_CONFIG: CbpfConfig =
+        CbpfConfig { len: CbpfLenInstruction::Static { len: 0 }, allow_msh: false };
+
     #[test]
     fn test_cbpf_to_ebpf() {
         // Jump to the next instruction.
         assert_eq!(
-            cbpf_to_ebpf(&vec![
-                sock_filter { code: (BPF_JMP | BPF_JA) as u16, jt: 0, jf: 0, k: 0 },
-                sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
-            ]),
+            cbpf_to_ebpf(
+                &vec![
+                    sock_filter { code: (BPF_JMP | BPF_JA) as u16, jt: 0, jf: 0, k: 0 },
+                    sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
+                ],
+                &TEST_CONFIG
+            ),
             Ok(vec![
                 new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 6, 1, 0, 0),
-                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 7, 2, 0, 0),
                 new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, 0, 0, 0, 0),
                 new_bpf_insn(BPF_JMP | BPF_JA, 0, 0, 0, 0),
                 new_bpf_insn(BPF_JMP | BPF_EXIT, 0, 0, 0, 0),
@@ -417,43 +427,49 @@ mod tests {
 
         // Jump after last instruction.
         assert_eq!(
-            cbpf_to_ebpf(&vec![
-                sock_filter { code: (BPF_JMP | BPF_JA) as u16, jt: 0, jf: 0, k: 1 },
-                sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
-            ]),
+            cbpf_to_ebpf(
+                &vec![
+                    sock_filter { code: (BPF_JMP | BPF_JA) as u16, jt: 0, jf: 0, k: 1 },
+                    sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
+                ],
+                &TEST_CONFIG
+            ),
             Err(EbpfError::InvalidCbpfJumpOffset(1)),
         );
 
         // Jump out of bounds.
         assert_eq!(
-            cbpf_to_ebpf(&vec![sock_filter {
-                code: (BPF_JMP | BPF_JA) as u16,
-                jt: 0,
-                jf: 0,
-                k: 0xffffffff
-            }]),
+            cbpf_to_ebpf(
+                &vec![sock_filter { code: (BPF_JMP | BPF_JA) as u16, jt: 0, jf: 0, k: 0xffffffff }],
+                &TEST_CONFIG
+            ),
             Err(EbpfError::InvalidCbpfJumpOffset(0xffffffff)),
         );
 
         // BPF_JNE is allowed only in eBPF.
         assert_eq!(
-            cbpf_to_ebpf(&vec![
-                sock_filter { code: (BPF_JMP | BPF_JNE) as u16, jt: 0, jf: 0, k: 0 },
-                sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
-            ]),
+            cbpf_to_ebpf(
+                &vec![
+                    sock_filter { code: (BPF_JMP | BPF_JNE) as u16, jt: 0, jf: 0, k: 0 },
+                    sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
+                ],
+                &TEST_CONFIG
+            ),
             Err(EbpfError::InvalidCbpfInstruction((BPF_JMP | BPF_JNE) as u16)),
         );
 
         // BPF_JEQ is supported in BPF.
         assert_eq!(
-            cbpf_to_ebpf(&vec![
-                sock_filter { code: (BPF_JMP | BPF_JEQ) as u16, jt: 1, jf: 0, k: 0 },
-                sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
-                sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
-            ]),
+            cbpf_to_ebpf(
+                &vec![
+                    sock_filter { code: (BPF_JMP | BPF_JEQ) as u16, jt: 1, jf: 0, k: 0 },
+                    sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
+                    sock_filter { code: (BPF_RET | BPF_A) as u16, jt: 0, jf: 0, k: 0 },
+                ],
+                &TEST_CONFIG
+            ),
             Ok(vec![
                 new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 6, 1, 0, 0),
-                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 7, 2, 0, 0),
                 new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, 0, 0, 0, 0),
                 new_bpf_insn(BPF_JMP32 | BPF_JEQ, 0, 0, 1, 0),
                 new_bpf_insn(BPF_JMP | BPF_EXIT, 0, 0, 0, 0),
@@ -463,13 +479,15 @@ mod tests {
 
         // Make sure the jump is translated correctly when the jump target produces 2 instructions.
         assert_eq!(
-            cbpf_to_ebpf(&vec![
-                sock_filter { code: (BPF_JMP | BPF_JA) as u16, jt: 0, jf: 0, k: 0 },
-                sock_filter { code: (BPF_RET | BPF_K) as u16, jt: 0, jf: 0, k: 1 },
-            ]),
+            cbpf_to_ebpf(
+                &vec![
+                    sock_filter { code: (BPF_JMP | BPF_JA) as u16, jt: 0, jf: 0, k: 0 },
+                    sock_filter { code: (BPF_RET | BPF_K) as u16, jt: 0, jf: 0, k: 1 },
+                ],
+                &TEST_CONFIG
+            ),
             Ok(vec![
                 new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 6, 1, 0, 0),
-                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 7, 2, 0, 0),
                 new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, 0, 0, 0, 0),
                 new_bpf_insn(BPF_JMP | BPF_JA, 0, 0, 0, 0),
                 new_bpf_insn(BPF_ALU | BPF_MOV | BPF_IMM, 0, 0, 0, 1),
@@ -479,15 +497,17 @@ mod tests {
 
         // BPF_MEM access.
         assert_eq!(
-            cbpf_to_ebpf(&vec![
-                sock_filter { code: (BPF_LD | BPF_MEM) as u16, jt: 0, jf: 0, k: 0 },
-                sock_filter { code: (BPF_LDX | BPF_MEM) as u16, jt: 0, jf: 0, k: 15 },
-                sock_filter { code: BPF_ST as u16, jt: 0, jf: 0, k: 0 },
-                sock_filter { code: BPF_STX as u16, jt: 0, jf: 0, k: 15 },
-            ]),
+            cbpf_to_ebpf(
+                &vec![
+                    sock_filter { code: (BPF_LD | BPF_MEM) as u16, jt: 0, jf: 0, k: 0 },
+                    sock_filter { code: (BPF_LDX | BPF_MEM) as u16, jt: 0, jf: 0, k: 15 },
+                    sock_filter { code: BPF_ST as u16, jt: 0, jf: 0, k: 0 },
+                    sock_filter { code: BPF_STX as u16, jt: 0, jf: 0, k: 15 },
+                ],
+                &TEST_CONFIG
+            ),
             Ok(vec![
                 new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 6, 1, 0, 0),
-                new_bpf_insn(BPF_ALU64 | BPF_MOV | BPF_X, 7, 2, 0, 0),
                 new_bpf_insn(BPF_ALU | BPF_MOV | BPF_K, 0, 0, 0, 0),
                 new_bpf_insn(BPF_LDX | BPF_MEM | BPF_W, 0, 10, -64, 0),
                 new_bpf_insn(BPF_LDX | BPF_MEM | BPF_W, 9, 10, -4, 0),
@@ -498,12 +518,10 @@ mod tests {
 
         // BPF_MEM access out of bounds.
         assert_eq!(
-            cbpf_to_ebpf(&vec![sock_filter {
-                code: (BPF_LD | BPF_MEM) as u16,
-                jt: 0,
-                jf: 0,
-                k: 17,
-            }]),
+            cbpf_to_ebpf(
+                &vec![sock_filter { code: (BPF_LD | BPF_MEM) as u16, jt: 0, jf: 0, k: 17 }],
+                &TEST_CONFIG
+            ),
             Err(EbpfError::InvalidCbpfScratchOffset(17)),
         );
     }

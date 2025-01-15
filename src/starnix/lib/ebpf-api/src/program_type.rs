@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use ebpf::{
-    CallingContext, EbpfError, FieldDescriptor, FieldType, FunctionSignature, MapSchema, MemoryId,
-    MemoryParameterSize, StructDescriptor, Type,
+    CallingContext, CbpfConfig, CbpfLenInstruction, EbpfError, FieldDescriptor, FieldType,
+    FunctionSignature, MapSchema, MemoryId, MemoryParameterSize, StructDescriptor, Type,
 };
 use linux_uapi::{
     __sk_buff, bpf_func_id_BPF_FUNC_csum_update, bpf_func_id_BPF_FUNC_get_current_uid_gid,
@@ -26,9 +26,10 @@ use linux_uapi::{
     bpf_prog_type_BPF_PROG_TYPE_SCHED_CLS, bpf_prog_type_BPF_PROG_TYPE_SOCKET_FILTER,
     bpf_prog_type_BPF_PROG_TYPE_TRACEPOINT, bpf_prog_type_BPF_PROG_TYPE_XDP, bpf_sock,
     bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t, fuse_bpf_arg, fuse_bpf_args,
-    fuse_entry_bpf_out, fuse_entry_out, xdp_md,
+    fuse_entry_bpf_out, fuse_entry_out, seccomp_data, xdp_md,
 };
 use std::collections::HashMap;
+use std::mem::{offset_of, size_of};
 use std::sync::{Arc, LazyLock};
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -540,8 +541,8 @@ static RING_BUFFER_RESERVATION: LazyLock<MemoryId> = LazyLock::new(MemoryId::new
 
 pub static SK_BUF_ID: LazyLock<MemoryId> = LazyLock::new(MemoryId::new);
 pub static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
-    let cb_offset = std::mem::offset_of!(__sk_buff, cb);
-    let hash_offset = std::mem::offset_of!(__sk_buff, hash);
+    let cb_offset = offset_of!(__sk_buff, cb);
+    let hash_offset = offset_of!(__sk_buff, hash);
     let data_id = MemoryId::new();
 
     ptr_to_struct_type(
@@ -551,13 +552,13 @@ pub static SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
             scalar_field(0, cb_offset),
             // `cb` is a mutable array.
             scalar_mut_field(cb_offset, hash_offset - cb_offset),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, hash)),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, napi_id)),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, tstamp)),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, gso_segs)),
-            scalar_u32_field(std::mem::offset_of!(__sk_buff, gso_size)),
-            array_start_32_field(std::mem::offset_of!(__sk_buff, data), data_id.clone()),
-            array_end_32_field(std::mem::offset_of!(__sk_buff, data_end), data_id),
+            scalar_u32_field(offset_of!(__sk_buff, hash)),
+            scalar_u32_field(offset_of!(__sk_buff, napi_id)),
+            scalar_u32_field(offset_of!(__sk_buff, tstamp)),
+            scalar_u32_field(offset_of!(__sk_buff, gso_segs)),
+            scalar_u32_field(offset_of!(__sk_buff, gso_size)),
+            array_start_32_field(offset_of!(__sk_buff, data), data_id.clone()),
+            array_end_32_field(offset_of!(__sk_buff, data_end), data_id),
         ],
     )
 });
@@ -570,11 +571,11 @@ static XDP_MD_TYPE: LazyLock<Type> = LazyLock::new(|| {
     ptr_to_struct_type(
         XDP_MD_ID.clone(),
         vec![
-            array_start_32_field(std::mem::offset_of!(xdp_md, data), data_id.clone()),
-            array_end_32_field(std::mem::offset_of!(xdp_md, data_end), data_id),
+            array_start_32_field(offset_of!(xdp_md, data), data_id.clone()),
+            array_end_32_field(offset_of!(xdp_md, data_end), data_id),
             // All fields starting from `data_meta` are readable.
             {
-                let data_meta_offset = std::mem::offset_of!(xdp_md, data_meta);
+                let data_meta_offset = offset_of!(xdp_md, data_meta);
                 scalar_field(data_meta_offset, std::mem::size_of::<xdp_md>() - data_meta_offset)
             },
         ],
@@ -604,8 +605,7 @@ static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
         BPF_FUSE_ID.clone(),
         vec![
             FieldDescriptor {
-                offset: (std::mem::offset_of!(fuse_bpf_args, out_args)
-                    + std::mem::offset_of!(fuse_bpf_arg, value)),
+                offset: (offset_of!(fuse_bpf_args, out_args) + offset_of!(fuse_bpf_arg, value)),
                 field_type: FieldType::PtrToMemory {
                     id: MemoryId::new(),
                     buffer_size: std::mem::size_of::<fuse_entry_out>(),
@@ -613,9 +613,9 @@ static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
                 },
             },
             FieldDescriptor {
-                offset: (std::mem::offset_of!(fuse_bpf_args, out_args)
+                offset: (offset_of!(fuse_bpf_args, out_args)
                     + std::mem::size_of::<fuse_bpf_arg>()
-                    + std::mem::offset_of!(fuse_bpf_arg, value)),
+                    + offset_of!(fuse_bpf_arg, value)),
                 field_type: FieldType::PtrToMemory {
                     id: MemoryId::new(),
                     buffer_size: std::mem::size_of::<fuse_entry_bpf_out>(),
@@ -742,3 +742,39 @@ impl ProgramType {
         CallingContext { maps, helpers: self.get_helpers(), args, packet_type }
     }
 }
+
+// Offset used to access auxiliary packet information in cBPF.
+pub const SKF_AD_OFF: i32 = linux_uapi::SKF_AD_OFF;
+pub const SKF_AD_PROTOCOL: i32 = linux_uapi::SKF_AD_PROTOCOL as i32;
+pub const SKF_AD_PKTTYPE: i32 = linux_uapi::SKF_AD_PKTTYPE as i32;
+pub const SKF_AD_IFINDEX: i32 = linux_uapi::SKF_AD_IFINDEX as i32;
+pub const SKF_AD_NLATTR: i32 = linux_uapi::SKF_AD_NLATTR as i32;
+pub const SKF_AD_NLATTR_NEST: i32 = linux_uapi::SKF_AD_NLATTR_NEST as i32;
+pub const SKF_AD_MARK: i32 = linux_uapi::SKF_AD_MARK as i32;
+pub const SKF_AD_QUEUE: i32 = linux_uapi::SKF_AD_QUEUE as i32;
+pub const SKF_AD_HATYPE: i32 = linux_uapi::SKF_AD_HATYPE as i32;
+pub const SKF_AD_RXHASH: i32 = linux_uapi::SKF_AD_RXHASH as i32;
+pub const SKF_AD_CPU: i32 = linux_uapi::SKF_AD_CPU as i32;
+pub const SKF_AD_ALU_XOR_X: i32 = linux_uapi::SKF_AD_ALU_XOR_X as i32;
+pub const SKF_AD_VLAN_TAG: i32 = linux_uapi::SKF_AD_VLAN_TAG as i32;
+pub const SKF_AD_VLAN_TAG_PRESENT: i32 = linux_uapi::SKF_AD_VLAN_TAG_PRESENT as i32;
+pub const SKF_AD_PAY_OFFSET: i32 = linux_uapi::SKF_AD_PAY_OFFSET as i32;
+pub const SKF_AD_RANDOM: i32 = linux_uapi::SKF_AD_RANDOM as i32;
+pub const SKF_AD_VLAN_TPID: i32 = linux_uapi::SKF_AD_VLAN_TPID as i32;
+pub const SKF_AD_MAX: i32 = linux_uapi::SKF_AD_MAX as i32;
+
+// Offset used to reference IP headers in cBPF.
+pub const SKF_NET_OFF: i32 = linux_uapi::SKF_NET_OFF;
+
+// Offset used to reference Ethernet headers in cBPF.
+pub const SKF_LL_OFF: i32 = linux_uapi::SKF_LL_OFF;
+
+pub const SECCOMP_CBPF_CONFIG: CbpfConfig = CbpfConfig {
+    len: CbpfLenInstruction::Static { len: size_of::<seccomp_data>() as i32 },
+    allow_msh: false,
+};
+
+pub const SOCKET_FILTER_CBPF_CONFIG: CbpfConfig = CbpfConfig {
+    len: CbpfLenInstruction::ContextField { offset: offset_of!(__sk_buff, len) as i16 },
+    allow_msh: true,
+};

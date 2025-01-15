@@ -3,30 +3,30 @@
 // found in the LICENSE file.
 
 use ebpf::{
-    link_program, BpfProgramContext, BpfValue, DataWidth, EbpfInstruction, EbpfProgram, Packet,
-    ProgramArgument, Type, VerifiedEbpfProgram, SKF_AD_OFF, SKF_AD_PROTOCOL, SKF_LL_OFF,
-    SKF_NET_OFF,
+    link_program, BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfInstruction, EbpfProgram,
+    Packet, ProgramArgument, Type, VerifiedEbpfProgram,
 };
-use ebpf_api::SK_BUF_TYPE;
+use ebpf_api::{
+    __sk_buff, SKF_AD_OFF, SKF_AD_PROTOCOL, SKF_LL_OFF, SKF_NET_OFF, SK_BUF_TYPE,
+    SOCKET_FILTER_CBPF_CONFIG,
+};
 use fidl_fuchsia_posix_socket_packet as fppacket;
 use netstack3_core::device_socket::Frame;
 use std::collections::HashMap;
 use zerocopy::FromBytes;
 
+// Packet buffer representation used for BPF filters.
+#[repr(C)]
 struct IpPacketForBpf<'a> {
+    // This field must be first. eBPF programs will access it directly.
+    sk_buff: __sk_buff,
+
     kind: fppacket::Kind,
     frame: Frame<&'a [u8]>,
     raw: &'a [u8],
 }
 
 impl Packet for &'_ IpPacketForBpf<'_> {
-    fn len(&self) -> usize {
-        match self.kind {
-            fppacket::Kind::Network => self.frame.into_body().len(),
-            fppacket::Kind::Link => self.raw.len(),
-        }
-    }
-
     fn load<'a>(&self, offset: i32, width: DataWidth) -> Option<BpfValue> {
         // cBPF Socket Filters use non-negative offset to access packet content.
         // Negative offsets are handler as follows as follows:
@@ -98,6 +98,7 @@ struct SocketFilterContext {}
 impl BpfProgramContext for SocketFilterContext {
     type RunContext<'a> = ();
     type Packet<'a> = &'a IpPacketForBpf<'a>;
+    const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;
 }
 
 #[derive(Debug)]
@@ -142,7 +143,18 @@ impl SocketFilterProgram {
         frame: Frame<&[u8]>,
         raw: &[u8],
     ) -> SocketFilterResult {
-        let mut packet = IpPacketForBpf { kind, frame, raw };
+        let packet_size = match kind {
+            fppacket::Kind::Network => frame.into_body().len(),
+            fppacket::Kind::Link => raw.len(),
+        };
+
+        let mut packet = IpPacketForBpf {
+            sk_buff: __sk_buff { len: packet_size.try_into().unwrap(), ..Default::default() },
+            kind,
+            frame,
+            raw,
+        };
+
         let result = self.program.run(&mut (), &mut packet);
         match result {
             0 => SocketFilterResult::Reject,
@@ -154,7 +166,8 @@ impl SocketFilterProgram {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ebpf::{Packet, SKF_AD_MAX};
+    use ebpf::Packet;
+    use ebpf_api::SKF_AD_MAX;
     use netstack3_core::device_socket::SentFrame;
     use packet::ParsablePacket;
     use packet_formats::ethernet::EthernetFrameLengthCheck;
@@ -224,6 +237,7 @@ mod tests {
     #[test]
     fn network_level_packet() {
         let packet = IpPacketForBpf {
+            sk_buff: Default::default(),
             kind: fppacket::Kind::Network,
             frame: TestData::frame(),
             raw: TestData::BUFFER,
@@ -240,6 +254,7 @@ mod tests {
     #[test]
     fn link_level_packet() {
         let packet = IpPacketForBpf {
+            sk_buff: Default::default(),
             kind: fppacket::Kind::Link,
             frame: TestData::frame(),
             raw: TestData::BUFFER,
@@ -252,6 +267,7 @@ mod tests {
     #[test]
     fn negative_offsets() {
         let packet = IpPacketForBpf {
+            sk_buff: Default::default(),
             kind: fppacket::Kind::Link,
             frame: TestData::frame(),
             raw: TestData::BUFFER,

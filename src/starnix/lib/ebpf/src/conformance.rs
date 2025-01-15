@@ -494,10 +494,6 @@ pub mod test {
     }
 
     impl Packet for TestBuffer {
-        fn len(&self) -> usize {
-            self.size
-        }
-
         fn load(&self, offset: i32, width: DataWidth) -> Option<BpfValue> {
             let TestBuffer { ptr: packet_ptr, size: packet_size } = self;
             if offset < 0 || offset as usize + width.bytes() > *packet_size {

@@ -18,11 +18,12 @@ use crate::vfs::{
     LookupContext, Message,
 };
 use ebpf::{
-    BpfProgramContext, BpfValue, DataWidth, FieldMapping, Packet, ProgramArgument, StructMapping,
-    Type,
+    BpfProgramContext, BpfValue, CbpfConfig, DataWidth, FieldMapping, Packet, ProgramArgument,
+    StructMapping, Type,
 };
 use ebpf_api::{
     get_socket_filter_helpers, ProgramType, SocketFilterContext, SK_BUF_ID, SK_BUF_TYPE,
+    SOCKET_FILTER_CBPF_CONFIG,
 };
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -990,10 +991,6 @@ struct SkBuf {
 }
 
 impl Packet for &mut SkBuf {
-    fn len(&self) -> usize {
-        self.sk_buff.len as usize
-    }
-
     fn load(&self, _offset: i32, _width: DataWidth) -> Option<BpfValue> {
         // TODO(https://fxbug.dev/385015056): Implement packet access.
         None
@@ -1039,6 +1036,7 @@ struct UnixSocketEbpfContext {}
 impl BpfProgramContext for UnixSocketEbpfContext {
     type RunContext<'a> = UnixSocketEbpfHelpersContext;
     type Packet<'a> = &'a mut SkBuf;
+    const CBPF_CONFIG: &'static CbpfConfig = &SOCKET_FILTER_CBPF_CONFIG;
 }
 
 type UnixSocketFilter = LinkedProgram<UnixSocketEbpfContext>;

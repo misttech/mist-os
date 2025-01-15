@@ -9,3 +9,5 @@ mod program_type;
 pub use helpers::*;
 pub use maps::*;
 pub use program_type::*;
+
+pub use linux_uapi::__sk_buff;

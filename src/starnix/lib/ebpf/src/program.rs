@@ -5,12 +5,13 @@
 use crate::executor::execute;
 use crate::verifier::VerifiedEbpfProgram;
 use crate::{
-    DataWidth, EbpfError, EbpfInstruction, MapSchema, MemoryId, StructAccess, Type, BPF_CALL,
-    BPF_DW, BPF_JMP, BPF_LDDW, BPF_PSEUDO_MAP_IDX, BPF_SIZE_MASK,
+    CbpfConfig, DataWidth, EbpfError, EbpfInstruction, MapSchema, MemoryId, StructAccess, Type,
+    BPF_CALL, BPF_DW, BPF_JMP, BPF_LDDW, BPF_PSEUDO_MAP_IDX, BPF_SIZE_MASK,
 };
 use derivative::Derivative;
 use std::collections::HashMap;
 use std::fmt::Formatter;
+use std::mem::size_of;
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 
 /// Trait that should be implemented for arguments passed to eBPF programs.
@@ -93,15 +94,10 @@ pub trait EbpfProgramContext {
 
 /// Trait that should be implemented by packets passed to eBPF programs.
 pub trait Packet {
-    fn len(&self) -> usize;
     fn load(&self, offset: i32, width: DataWidth) -> Option<BpfValue>;
 }
 
 impl Packet for () {
-    fn len(&self) -> usize {
-        0
-    }
-
     fn load(&self, _offset: i32, _width: DataWidth) -> Option<BpfValue> {
         None
     }
@@ -109,10 +105,6 @@ impl Packet for () {
 
 /// Simple `Packet` implementation for packets that can be accessed directly.
 impl<P: IntoBytes + Immutable> Packet for &P {
-    fn len(&self) -> usize {
-        std::mem::size_of::<P>()
-    }
-
     fn load(&self, offset: i32, width: DataWidth) -> Option<BpfValue> {
         let data = (*self).as_bytes();
         if offset < 0 || offset as usize >= data.len() {
@@ -133,11 +125,10 @@ pub trait BpfProgramContext {
     type RunContext<'a>;
     type Packet<'a>: ProgramArgument + Packet + FromBpfValue<Self::RunContext<'a>>;
 
+    const CBPF_CONFIG: &'static CbpfConfig;
+
     fn get_arg_types() -> Vec<Type> {
-        vec![
-            <Self::Packet<'_> as ProgramArgument>::get_type().clone(),
-            <usize as ProgramArgument>::get_type().clone(),
-        ]
+        vec![<Self::Packet<'_> as ProgramArgument>::get_type().clone()]
     }
 }
 
@@ -145,7 +136,7 @@ impl<T: BpfProgramContext + ?Sized> EbpfProgramContext for T {
     type RunContext<'a> = <T as BpfProgramContext>::RunContext<'a>;
     type Packet<'a> = T::Packet<'a>;
     type Arg1<'a> = T::Packet<'a>;
-    type Arg2<'a> = usize;
+    type Arg2<'a> = ();
     type Arg3<'a> = ();
     type Arg4<'a> = ();
     type Arg5<'a> = ();
@@ -154,10 +145,7 @@ impl<T: BpfProgramContext + ?Sized> EbpfProgramContext for T {
 #[derive(Clone, Copy, Debug)]
 pub struct BpfValue(u64);
 
-static_assertions::const_assert_eq!(
-    std::mem::size_of::<BpfValue>(),
-    std::mem::size_of::<*const u8>()
-);
+static_assertions::const_assert_eq!(size_of::<BpfValue>(), size_of::<*const u8>());
 
 impl Default for BpfValue {
     fn default() -> Self {
@@ -490,8 +478,7 @@ where
         run_context: &mut <C as EbpfProgramContext>::RunContext<'a>,
         packet: C::Packet<'a>,
     ) -> u64 {
-        let packet_len = packet.len();
-        self.run_with_2_arguments(run_context, packet, packet_len)
+        self.run_with_1_argument(run_context, packet)
     }
 }
 
@@ -624,13 +611,14 @@ mod test {
     use crate::api::*;
     use crate::conformance::test::parse_asm;
     use crate::{
-        convert_and_link_cbpf, verify_program, CallingContext, FieldDescriptor, FieldMapping,
-        FieldType, NullVerifierLogger, ProgramArgument, StructDescriptor, Type,
+        convert_and_link_cbpf, verify_program, CallingContext, CbpfLenInstruction, FieldDescriptor,
+        FieldMapping, FieldType, NullVerifierLogger, ProgramArgument, StructDescriptor, Type,
     };
     use linux_uapi::{
         seccomp_data, sock_filter, AUDIT_ARCH_AARCH64, AUDIT_ARCH_X86_64, SECCOMP_RET_ALLOW,
         SECCOMP_RET_TRAP,
     };
+    use std::mem::offset_of;
     use std::sync::{Arc, LazyLock};
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
@@ -655,11 +643,17 @@ mod test {
     const BPF_ST_REG: u16 = BPF_ST as u16;
     const BPF_MISC_TAX: u16 = (BPF_MISC | BPF_TAX) as u16;
 
+    pub const TEST_CBPF_CONFIG: CbpfConfig = CbpfConfig {
+        len: CbpfLenInstruction::Static { len: size_of::<seccomp_data>() as i32 },
+        allow_msh: true,
+    };
+
     struct TestProgramContext {}
 
     impl BpfProgramContext for TestProgramContext {
         type RunContext<'a> = ();
         type Packet<'a> = &'a seccomp_data;
+        const CBPF_CONFIG: &'static CbpfConfig = &TEST_CBPF_CONFIG;
     }
 
     static SECCOMP_DATA_TYPE: LazyLock<Type> =
@@ -853,6 +847,74 @@ mod test {
                 "BPF math does not work",
             )
         }
+    }
+
+    #[test]
+    fn test_static_packet_len() {
+        let test_prg = [
+            // A <- packet_len
+            sock_filter { code: (BPF_LD | BPF_LEN | BPF_W) as u16, jt: 0, jf: 0, k: 0 },
+            // ret A
+            sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
+        ];
+
+        let prg =
+            convert_and_link_cbpf::<TestProgramContext>(&test_prg).expect("Error parsing program");
+
+        let data = seccomp_data::default();
+        assert_eq!(prg.run(&mut (), &data), size_of::<seccomp_data>() as u64);
+    }
+
+    // A packet used by `test_variable_packet_len()` below to verify the case when the packet
+    // length is stored as a struct field.
+    #[repr(C)]
+    #[derive(Debug, Default, IntoBytes, Immutable, KnownLayout, FromBytes)]
+    struct VariableLengthPacket {
+        foo: u32,
+        len: i32,
+        bar: u64,
+    }
+
+    static VARIABLE_LENGTH_PACKET_TYPE: LazyLock<Type> = LazyLock::new(|| Type::PtrToMemory {
+        id: MemoryId::new(),
+        offset: 0,
+        buffer_size: size_of::<VariableLengthPacket>() as u64,
+    });
+
+    impl ProgramArgument for &'_ VariableLengthPacket {
+        fn get_type() -> &'static Type {
+            &*VARIABLE_LENGTH_PACKET_TYPE
+        }
+    }
+
+    pub const VARIABLE_LENGTH_CBPF_CONFIG: CbpfConfig = CbpfConfig {
+        len: CbpfLenInstruction::ContextField {
+            offset: offset_of!(VariableLengthPacket, len) as i16,
+        },
+        allow_msh: true,
+    };
+
+    struct VariableLengthPacketContext {}
+
+    impl BpfProgramContext for VariableLengthPacketContext {
+        type RunContext<'a> = ();
+        type Packet<'a> = &'a VariableLengthPacket;
+        const CBPF_CONFIG: &'static CbpfConfig = &VARIABLE_LENGTH_CBPF_CONFIG;
+    }
+
+    #[test]
+    fn test_variable_packet_len() {
+        let test_prg = [
+            // A <- packet_len
+            sock_filter { code: (BPF_LD | BPF_LEN | BPF_W) as u16, jt: 0, jf: 0, k: 0 },
+            // ret A
+            sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
+        ];
+
+        let prg = convert_and_link_cbpf::<VariableLengthPacketContext>(&test_prg)
+            .expect("Error parsing program");
+        let data = VariableLengthPacket { len: 42, ..VariableLengthPacket::default() };
+        assert_eq!(prg.run(&mut (), &data), data.len as u64);
     }
 
     #[repr(C)]
