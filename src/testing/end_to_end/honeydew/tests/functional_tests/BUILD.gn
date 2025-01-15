@@ -71,6 +71,7 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
   testonly = true
   public_deps = [
     "affordance_tests/test_inspect:inspect_test_ffx($host_toolchain)",
+    "affordance_tests/test_location:location_test_fc($host_toolchain)",
     "affordance_tests/test_netstack:netstack_test_fc($host_toolchain)",
     "affordance_tests/test_session:test_session_ffx",
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
@@ -87,8 +88,7 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
 
 group_with_no_dir_target_deps("workbench_x64_unstable_tests") {
   testonly = true
-  public_deps =
-      [ "affordance_tests/test_location:location_test_fc($host_toolchain)" ]
+  public_deps = []
 }
 
 # core.vim3
@@ -180,6 +180,7 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
     "fuchsia_device_tests/test_fuchsia_device:vim3_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
+    "transport_tests/test_ffx:test_ffx_on_vim3",
     "transport_tests/test_serial:serial_test($host_toolchain)",
   ]
 }
@@ -191,7 +192,6 @@ group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
     "affordance_tests/test_netstack:netstack_test_fc($host_toolchain)",
     "affordance_tests/test_rtc:rtc_test_fc($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test($host_toolchain)",
-    "transport_tests/test_ffx:test_ffx_on_vim3",
 
     # These tests fail so we explicitly comment them out here for posterity.
     # TODO(https://fxbug.dev/364744544): Fix/remove once consensus is reached.
@@ -204,7 +204,10 @@ group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
   testonly = true
   public_deps = [
     "affordance_tests/test_inspect:inspect_test_ffx($host_toolchain)",
+    "affordance_tests/test_session:test_session_ffx",
     "affordance_tests/test_ui:test_screenshot_ffx",
+    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
+    "fuchsia_device_tests/test_fuchsia_device:nelson_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_using_serial_test($host_toolchain)",
     "transport_tests/test_ffx:test_ffx_on_nelson",
   ]
@@ -215,10 +218,7 @@ group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
   public_deps = [
     "affordance_tests/test_location:location_test_fc($host_toolchain)",
     "affordance_tests/test_netstack:netstack_test_fc($host_toolchain)",
-    "affordance_tests/test_session:test_session_ffx",
     "affordance_tests/test_tracing:tracing_test_fc($host_toolchain)",
-    "auxiliary_device_tests/test_power_switch_dmc:power_switch_dmc_test($host_toolchain)",
-    "fuchsia_device_tests/test_fuchsia_device:nelson_test($host_toolchain)",
     "transport_tests/test_fastboot:fastboot_test($host_toolchain)",
     "transport_tests/test_ffx:ffx_wait_for_rcs_disconnection_test($host_toolchain)",
   ]

@@ -225,6 +225,8 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
   testonly = true
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_stable_tests",
@@ -234,9 +236,7 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
 group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_unstable_tests",
     "//src/performance/memory/attribution/monitor/tests/e2e:tests",
   ]
@@ -253,14 +253,15 @@ group("starnix_arm64_staging_tests") {
 # smart_display.nelson
 group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
   testonly = true
-  public_deps =
-      [ "honeydew/tests/functional_tests:smart_display_nelson_stable_tests" ]
+  public_deps = [
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
+    "honeydew/tests/functional_tests:smart_display_nelson_stable_tests",
+  ]
 }
 
 group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "honeydew/tests/functional_tests:smart_display_nelson_unstable_tests",
   ]
