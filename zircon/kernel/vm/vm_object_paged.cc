@@ -209,7 +209,7 @@ zx_status_t VmObjectPaged::PrefetchRangeLocked(uint64_t offset, uint64_t len,
   if (cow_range->is_empty()) {
     return ZX_OK;
   }
-  if (cow_pages_locked()->is_root_source_user_pager_backed_locked()) {
+  if (cow_pages_locked()->is_root_source_user_pager_backed()) {
     return cow_pages_locked()->ProtectRangeFromReclamationLocked(*cow_range,
                                                                  /*set_always_need=*/false,
                                                                  /*ignore_errors=*/false, guard);

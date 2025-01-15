@@ -124,26 +124,26 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // This should only be used to report to user mode whether a VMO is user-pager backed, not for any
   // other purpose.
-  bool is_root_source_user_pager_backed_locked() const TA_REQ(lock()) {
+  bool is_root_source_user_pager_backed() const {
     canary_.Assert();
     return !!(options_ & VmCowPagesOptions::kUserPagerBackedRoot);
   }
 
   // Helper function for CowPage cloning methods. Returns any options that should be passed down to
   // the child.
-  VmCowPagesOptions inheritable_options_locked() const TA_REQ(lock()) {
+  VmCowPagesOptions inheritable_options() const {
     canary_.Assert();
     return VmCowPagesOptions::kNone | (options_ & (VmCowPagesOptions::kUserPagerBackedRoot |
                                                    VmCowPagesOptions::kPreservingPageContentRoot));
   }
 
-  bool is_root_source_preserving_page_content_locked() const TA_REQ(lock()) {
+  bool is_root_source_preserving_page_content() const {
     canary_.Assert();
     return !!(options_ & VmCowPagesOptions::kPreservingPageContentRoot);
   }
 
   bool is_parent_hidden_locked() const TA_REQ(lock()) {
-    return parent_ && parent_locked().is_hidden_locked();
+    return parent_ && parent_locked().is_hidden();
   }
 
   bool is_discardable() const { return !!discardable_tracker_; }
@@ -154,8 +154,8 @@ class VmCowPages final : public VmHierarchyBase,
   }
 
   bool can_root_source_evict_locked() const TA_REQ(lock()) {
-    bool result = is_root_source_preserving_page_content_locked();
-    DEBUG_ASSERT(result == is_root_source_user_pager_backed_locked());
+    bool result = is_root_source_preserving_page_content();
+    DEBUG_ASSERT(result == is_root_source_user_pager_backed());
     return result;
   }
 
@@ -716,8 +716,8 @@ class VmCowPages final : public VmHierarchyBase,
   // execution.
   void DeadTransition(Guard<CriticalMutex>& guard) TA_REQ(lock());
 
-  bool is_hidden_locked() const TA_REQ(lock()) { return !!(options_ & VmCowPagesOptions::kHidden); }
-  bool can_decommit_zero_pages_locked() const TA_REQ(lock()) {
+  bool is_hidden() const { return !!(options_ & VmCowPagesOptions::kHidden); }
+  bool can_decommit_zero_pages() const {
     return !(options_ & VmCowPagesOptions::kCannotDecommitZeroPages);
   }
 
@@ -803,15 +803,15 @@ class VmCowPages final : public VmHierarchyBase,
       return false;
     }
 
-    bool result = is_root_source_preserving_page_content_locked();
-    DEBUG_ASSERT(result == is_root_source_user_pager_backed_locked());
+    bool result = is_root_source_preserving_page_content();
+    DEBUG_ASSERT(result == is_root_source_user_pager_backed());
 
     return result;
   }
 
   bool can_snapshot_modified_locked() const TA_REQ(lock()) {
     // Root must be pager-backed.
-    if (!is_root_source_user_pager_backed_locked()) {
+    if (!is_root_source_user_pager_backed()) {
       return false;
     }
 
@@ -1359,7 +1359,7 @@ class VmCowPages final : public VmHierarchyBase,
 
   const uint32_t pmm_alloc_flags_;
 
-  VmCowPagesOptions options_ TA_GUARDED(lock());
+  const VmCowPagesOptions options_;
 
   // length of children_list_
   uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
@@ -1574,7 +1574,7 @@ class VmCowPages::LookupCursor {
         offset_(range.offset),
         end_offset_(range.end()),
         target_preserving_page_content_(target->is_source_preserving_page_content()),
-        zero_fork_(!target_preserving_page_content_ && target->can_decommit_zero_pages_locked()) {}
+        zero_fork_(!target_preserving_page_content_ && target->can_decommit_zero_pages()) {}
 
   // Note: Some of these methods are marked __ALWAYS_INLINE as doing so has a dramatic performance
   // improvement, and is worth the increase in code size. Due to gcc limitations to mark them
