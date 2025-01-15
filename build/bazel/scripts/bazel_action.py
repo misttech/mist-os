@@ -1118,14 +1118,6 @@ def main() -> int:
     current_dir = os.getcwd()
     bazel_output_base_dir = find_bazel_output_base(args.workspace_dir)
 
-    def relative_workspace_dir(path: str) -> str:
-        """Convert path relative to the workspace root to the path relative to current directory."""
-        return os.path.relpath(
-            os.path.abspath(
-                os.path.realpath(os.path.join(args.workspace_dir, path))
-            )
-        )
-
     # LINT.IfChange
     if args.gn_targets_repository_manifest:
         force_symlink(

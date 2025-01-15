@@ -432,7 +432,7 @@ template("bazel_action") {
     }
     _manifest = ""
     if (defined(entry.manifest)) {
-      _manifest = "${_ninja_base_dir}/${entry.archive}"
+      _manifest = "${_ninja_base_dir}/${entry.manifest}"
     }
     _all_outputs += [
       {
