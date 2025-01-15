@@ -3,11 +3,9 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
-use ffx_core::ffx_command;
 use fidl_fuchsia_developer_ffx::{Action, Trigger};
 use fidl_fuchsia_tracing::BufferingMode;
 
-#[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,

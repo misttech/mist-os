@@ -20,9 +20,6 @@ macro_rules! embedded_plugin {
             };
             use $crate::FfxMain as _;
 
-            //TODO(wilkinsonclay): Clean up dependencies added by ffx templates.
-            use ffx_core as _;
-
             $crate::macro_deps::check_strict_constraints(
                 &env.ffx.global,
                 <$tool as $crate::FfxTool>::requires_target(),

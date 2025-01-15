@@ -43,6 +43,7 @@ ffx_plugin("ffx_trace") {
   args_deps = [
     "//sdk/fidl/fuchsia.tracing:fuchsia.tracing_rust",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
+    "//third_party/rust_crates:argh",
   ]
 
   test_deps = [

@@ -14,6 +14,10 @@ ffx_plugin("ffx_power_plugin") {
   ]
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 
   sdk_category = "internal"
 }

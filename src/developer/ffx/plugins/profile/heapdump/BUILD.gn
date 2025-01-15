@@ -15,6 +15,10 @@ if (is_host) {
       "snapshot:ffx_profile_heapdump_snapshot",
     ]
     args_sources = [ "src/args.rs" ]
+    args_deps = [
+      "//src/developer/ffx/core:lib",
+      "//third_party/rust_crates:argh",
+    ]
   }
 
   ffx_e2e_test("verify_ffx_profile_heapdump") {

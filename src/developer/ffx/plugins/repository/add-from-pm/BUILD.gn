@@ -9,10 +9,14 @@ ffx_plugin("ffx_repository_add_from_pm") {
   edition = "2021"
   with_unit_tests = true
 
-  args_deps =
-      [ "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve",
+    "//third_party/rust_crates:argh",
+  ]
 
   deps = [
+    "//src/developer/ffx/core:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",

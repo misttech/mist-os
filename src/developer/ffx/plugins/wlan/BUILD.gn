@@ -15,6 +15,10 @@ ffx_plugin("ffx_wlan") {
     "deprecated:ffx_wlan_deprecated",
   ]
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
   test_deps = [ "common:ffx-wlan-common_test" ]
 }
 

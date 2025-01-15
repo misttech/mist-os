@@ -13,6 +13,8 @@ ffx_plugin("ffx_setui_audio") {
   args_deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
   ]
 
   deps = [

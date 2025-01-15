@@ -19,4 +19,8 @@ ffx_plugin("ffx_scrutiny_extract") {
   non_rust_deps = [ "//src/lib/chunked-compression" ]
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }

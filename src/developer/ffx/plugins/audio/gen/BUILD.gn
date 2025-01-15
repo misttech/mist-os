@@ -12,8 +12,10 @@ ffx_plugin("ffx_audio_gen") {
   args_with_unit_tests = true
 
   args_deps = [
+    "//src/developer/ffx/core:lib",
     "//src/media/audio/lib/rust",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
   ]
 
   deps = [

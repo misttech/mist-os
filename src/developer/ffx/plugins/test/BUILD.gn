@@ -47,6 +47,7 @@ ffx_plugin("ffx_test") {
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/selectors",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
   ]
   args_sources = [ "src/args.rs" ]
 

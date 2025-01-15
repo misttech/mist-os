@@ -6,7 +6,12 @@ import("//src/developer/ffx/build/ffx_plugin.gni")
 
 ffx_plugin("ffx_net") {
   edition = "2021"
-  args_deps = [ "//src/connectivity/network/net-cli:lib" ]
+  args_deps = [
+    "//src/connectivity/network/net-cli:lib",
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
+
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",

@@ -10,7 +10,11 @@ ffx_plugin("ffx_setui_display") {
   with_unit_tests = true
   args_with_unit_tests = true
 
-  args_deps = [ "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust" ]
+  args_deps = [
+    "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",

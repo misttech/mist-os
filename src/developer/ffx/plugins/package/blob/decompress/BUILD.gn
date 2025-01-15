@@ -28,7 +28,11 @@ ffx_plugin("ffx_package_blob_decompress") {
 
   args_sources = [ "src/args.rs" ]
 
-  args_deps = [ "//third_party/rust_crates:camino" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:camino",
+  ]
 
   sources = [ "src/lib.rs" ]
 }

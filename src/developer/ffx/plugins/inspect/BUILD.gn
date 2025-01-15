@@ -61,7 +61,11 @@ ffx_plugin("ffx_inspect") {
     "//third_party/rust_crates:tempfile",
   ]
 
-  args_deps = [ "//src/diagnostics/iquery:lib" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//src/diagnostics/iquery:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }
 
 ffx_tool("ffx_inspect_tool") {

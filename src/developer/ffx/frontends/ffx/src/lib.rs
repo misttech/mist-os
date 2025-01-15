@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::Result;
-use ffx_core as _;
 use ffx_lib_args::FfxBuiltIn;
 use fho::FhoEnvironment;
 pub fn ffx_plugin_is_machine_supported() -> bool {

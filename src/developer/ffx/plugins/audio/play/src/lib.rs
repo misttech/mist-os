@@ -103,9 +103,9 @@ async fn play_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer::TestBuffers;
     use fidl_fuchsia_media as fmedia;
+    use futures::AsyncWriteExt;
     use std::fs;
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;

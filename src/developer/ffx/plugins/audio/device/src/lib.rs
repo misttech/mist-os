@@ -370,11 +370,11 @@ async fn device_set(
 mod tests {
     use super::*;
     use ffx_audio_common::tests::SINE_WAV;
-    use ffx_core::macro_deps::futures::AsyncWriteExt;
     use ffx_writer::{SimpleWriter, TestBuffer, TestBuffers};
     use fuchsia_audio::device::DevfsSelector;
     use fuchsia_audio::format::SampleType;
     use fuchsia_audio::Format;
+    use futures::AsyncWriteExt;
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
     use tempfile::TempDir;

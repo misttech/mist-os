@@ -17,4 +17,8 @@ ffx_plugin("ffx_repository_server") {
   ]
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }

@@ -26,6 +26,10 @@ if (is_host) {
       "//third_party/rust_crates:serde_json",
     ]
     args_sources = [ "src/args.rs" ]
+    args_deps = [
+      "//src/developer/ffx/core:lib",
+      "//third_party/rust_crates:argh",
+    ]
     sources = [ "src/lib.rs" ]
 
     inputs = [ "test_data/test_show_expected.txt" ]

@@ -20,6 +20,10 @@ if (is_host) {
     ]
 
     args_sources = [ "src/args.rs" ]
+    args_deps = [
+      "//src/developer/ffx/core:lib",
+      "//third_party/rust_crates:argh",
+    ]
   }
 
   ffx_tool("ffx_profile_tool") {

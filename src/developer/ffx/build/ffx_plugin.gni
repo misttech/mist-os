@@ -221,10 +221,7 @@ template("ffx_plugin") {
         args_deps += invoker.args_deps
       }
 
-      deps = args_deps + [
-               "//src/developer/ffx/core:lib",
-               "//third_party/rust_crates:argh",
-             ]
+      deps = args_deps
 
       assert(
           defined(invoker.args_sources),
@@ -261,10 +258,7 @@ template("ffx_plugin") {
       tests_deps += [ ":" + args_target_name + "_test" ]
     }
 
-    lib_deps = [
-      ":" + args_target_name,
-      "//src/developer/ffx/core:lib",
-    ]
+    lib_deps = [ ":" + args_target_name ]
 
     includes_execution = false
     if (defined(invoker.sources)) {

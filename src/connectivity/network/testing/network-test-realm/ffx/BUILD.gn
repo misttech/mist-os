@@ -12,7 +12,9 @@ ffx_plugin("ffx_net_test_realm") {
   with_unit_tests = true
   args_deps = [
     "//src/connectivity/network/testing/network-test-realm/fidl:fuchsia.net.test.realm_rust",
+    "//src/developer/ffx/core:lib",
     "//src/lib/network/fidl_fuchsia_net_ext",
+    "//third_party/rust_crates:argh",
   ]
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",

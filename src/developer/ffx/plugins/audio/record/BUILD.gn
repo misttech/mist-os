@@ -12,8 +12,10 @@ ffx_plugin("ffx_audio_record") {
   args_deps = [
     "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
+    "//src/developer/ffx/core:lib",
     "//src/media/audio/lib/rust",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
   ]
 
   deps = [

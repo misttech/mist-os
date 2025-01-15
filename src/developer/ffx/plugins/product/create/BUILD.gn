@@ -13,7 +13,11 @@ ffx_plugin("ffx_product_create") {
   sources = [ "src/lib.rs" ]
   inputs = [ "//build/sdk/meta/test_data/virtual_device.json" ]
 
-  args_deps = [ "//third_party/rust_crates:camino" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:camino",
+  ]
   deps = [
     "//build/sdk/meta:rust",
     "//src/developer/ffx/config:lib",

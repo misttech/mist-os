@@ -13,7 +13,9 @@ ffx_plugin("ffx_product_get_image_path") {
   sources = [ "src/lib.rs" ]
 
   args_deps = [
+    "//src/developer/ffx/core:lib",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
   ]
   deps = [

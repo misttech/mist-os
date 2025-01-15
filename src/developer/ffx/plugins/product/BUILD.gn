@@ -23,6 +23,10 @@ ffx_plugin("ffx_product") {
   ]
 
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }
 
 # When used in the build, this separate subtool version is used to avoid

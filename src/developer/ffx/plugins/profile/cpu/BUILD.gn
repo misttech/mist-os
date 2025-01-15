@@ -9,4 +9,8 @@ ffx_plugin("ffx_profile_cpu") {
   edition = "2021"
   plugin_deps = [ "load:ffx_cpu_load" ]
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }

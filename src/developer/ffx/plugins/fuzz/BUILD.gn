@@ -17,7 +17,11 @@ ffx_plugin("ffx_fuzz") {
     "src/reader.rs",
     "src/shell.rs",
   ]
-  args_deps = [ "shell_args" ]
+  args_deps = [
+    "shell_args",
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",

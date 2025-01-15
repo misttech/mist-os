@@ -19,6 +19,8 @@ ffx_plugin("ffx_wlan_ap") {
   ]
   args_deps = [
     "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
+    "//src/developer/ffx/core:lib",
     "//src/developer/ffx/plugins/wlan/common:ffx-wlan-common",
+    "//third_party/rust_crates:argh",
   ]
 }

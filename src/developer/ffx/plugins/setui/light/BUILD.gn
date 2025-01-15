@@ -13,6 +13,8 @@ ffx_plugin("ffx_setui_light") {
   args_deps = [
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
     "//sdk/fidl/fuchsia.ui.types:fuchsia.ui.types_rust",
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
   ]
 
   deps = [

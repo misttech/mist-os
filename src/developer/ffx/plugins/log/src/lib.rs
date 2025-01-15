@@ -18,10 +18,6 @@ use log_command::{LogProcessingResult, LogSubCommand, WatchCommand};
 use std::io::Write;
 use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
 
-// NOTE: This is required for the legacy ffx toolchain
-// which automatically adds ffx_core even though we don't use it.
-use ffx_core::{self as _};
-
 mod condition_variable;
 mod error;
 mod mutex;

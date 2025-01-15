@@ -9,4 +9,8 @@ ffx_plugin("ffx_profile_power") {
   edition = "2021"
   plugin_deps = [ "logger:ffx_power_logger" ]
   args_sources = [ "src/args.rs" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+  ]
 }

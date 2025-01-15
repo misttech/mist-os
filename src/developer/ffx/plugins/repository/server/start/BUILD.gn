@@ -11,8 +11,10 @@ ffx_plugin("ffx_repository_server_start") {
 
   args_sources = [ "src/args.rs" ]
   args_deps = [
+    "//src/developer/ffx/core:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve_args",
+    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
   ]
   sources = [

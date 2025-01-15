@@ -19,7 +19,11 @@ ffx_plugin("ffx_component_explore") {
   ]
 
   args_sources = [ "src/args.rs" ]
-  args_deps = [ "//src/sys/lib/component_debug" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//src/sys/lib/component_debug",
+    "//third_party/rust_crates:argh",
+  ]
 
   sources = [ "src/lib.rs" ]
 }

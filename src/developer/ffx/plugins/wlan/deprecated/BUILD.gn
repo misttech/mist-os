@@ -16,5 +16,9 @@ ffx_plugin("ffx_wlan_deprecated") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
-  args_deps = [ "//third_party/rust_crates:eui48" ]
+  args_deps = [
+    "//src/developer/ffx/core:lib",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:eui48",
+  ]
 }
