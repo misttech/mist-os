@@ -9,8 +9,6 @@
 
 #include <utility>
 
-#include "src/lib/testing/predicates/status.h"
-
 namespace forensics::stubs {
 
 namespace {
@@ -37,28 +35,6 @@ void SystemActivityGovernor::AcquireWakeLease(AcquireWakeLeaseRequest& request,
   });
 
   completer.Reply(fit::ok(std::move(client_token)));
-}
-
-void SystemActivityGovernor::GetPowerElements(GetPowerElementsCompleter::Sync& completer) {
-  zx::event event;
-  ASSERT_OK(zx::event::create(0, &event));
-
-  fuchsia_power_system::ExecutionState execution_state;
-  execution_state.opportunistic_dependency_token(std::move(event));
-
-  fuchsia_power_system::PowerElements elements;
-  elements.execution_state(std::move(execution_state));
-
-  completer.Reply(fidl::Response<fuchsia_power_system::ActivityGovernor::GetPowerElements>(
-      std::move(elements)));
-}
-
-void SystemActivityGovernorNoTokens::GetPowerElements(GetPowerElementsCompleter::Sync& completer) {
-  fuchsia_power_system::PowerElements elements;
-  elements.execution_state(fuchsia_power_system::ExecutionState());
-
-  completer.Reply(fidl::Response<fuchsia_power_system::ActivityGovernor::GetPowerElements>(
-      std::move(elements)));
 }
 
 }  // namespace forensics::stubs

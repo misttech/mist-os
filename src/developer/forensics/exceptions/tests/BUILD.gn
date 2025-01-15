@@ -99,7 +99,6 @@ cc_test_executable("exception_broker_unittest_exe") {
     "//src/developer/forensics/testing:gpretty_printers",
     "//src/developer/forensics/testing:gtest_with_syslog_main",
     "//src/developer/forensics/testing:unit_test_fixture",
-    "//src/developer/forensics/testing/stubs:power_broker",
     "//src/developer/forensics/testing/stubs:wake_lease",
     "//src/lib/fostr/fidl/fuchsia.exception",
     "//src/lib/fxl",

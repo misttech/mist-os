@@ -25,8 +25,6 @@ class SystemActivityGovernor : public FidlServer<fuchsia_power_system::ActivityG
   void AcquireWakeLease(AcquireWakeLeaseRequest& request,
                         AcquireWakeLeaseCompleter::Sync& completer) override;
 
-  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override;
-
   bool LeaseHeld() { return !active_wake_leases_.empty(); }
 
   static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
@@ -35,40 +33,6 @@ class SystemActivityGovernor : public FidlServer<fuchsia_power_system::ActivityG
   async_dispatcher_t* dispatcher_;
   fidl::ServerBinding<fuchsia_power_system::ActivityGovernor> binding_;
   std::unordered_map<zx_handle_t, fuchsia_power_system::LeaseToken> active_wake_leases_;
-};
-
-class SystemActivityGovernorNoPowerElements
-    : public FidlServer<fuchsia_power_system::ActivityGovernor> {
- public:
-  SystemActivityGovernorNoPowerElements(
-      fidl::ServerEnd<fuchsia_power_system::ActivityGovernor> server_end,
-      async_dispatcher_t* dispatcher)
-      : binding_(dispatcher, std::move(server_end), this,
-                 &SystemActivityGovernorNoPowerElements::OnFidlClosed) {}
-
-  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
-    completer.Reply(fidl::Response<fuchsia_power_system::ActivityGovernor::GetPowerElements>());
-  }
-
-  static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
-
- private:
-  fidl::ServerBinding<fuchsia_power_system::ActivityGovernor> binding_;
-};
-
-class SystemActivityGovernorNoTokens : public FidlServer<fuchsia_power_system::ActivityGovernor> {
- public:
-  SystemActivityGovernorNoTokens(fidl::ServerEnd<fuchsia_power_system::ActivityGovernor> server_end,
-                                 async_dispatcher_t* dispatcher)
-      : binding_(dispatcher, std::move(server_end), this,
-                 &SystemActivityGovernorNoTokens::OnFidlClosed) {}
-
-  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override;
-
-  static void OnFidlClosed(const fidl::UnbindInfo error) { FX_LOGS(ERROR) << error; }
-
- private:
-  fidl::ServerBinding<fuchsia_power_system::ActivityGovernor> binding_;
 };
 
 class SystemActivityGovernorClosesConnection
@@ -82,10 +46,6 @@ class SystemActivityGovernorClosesConnection
 
   void AcquireWakeLease(AcquireWakeLeaseRequest& request,
                         AcquireWakeLeaseCompleter::Sync& completer) override {
-    completer.Close(ZX_ERR_PEER_CLOSED);
-  }
-
-  void GetPowerElements(GetPowerElementsCompleter::Sync& completer) override {
     completer.Close(ZX_ERR_PEER_CLOSED);
   }
 
