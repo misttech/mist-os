@@ -33,6 +33,7 @@ _common_deps = [
   "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
   "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
+  "//sdk/fidl/fuchsia.hardware.ufs:fuchsia.hardware.ufs_cpp",
   "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
   "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
   "//sdk/lib/driver/compat/cpp",

@@ -15,6 +15,9 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        { service: "fuchsia.hardware.ufs.Service" },
+    ],
     use: [
         {
             config: "fuchsia.power.SuspendEnabled",
@@ -26,5 +29,11 @@
         // Used by //sdk/lib/driver/power/cpp
         { protocol: "fuchsia.power.system.ActivityGovernor" },
         { service: "fuchsia.hardware.pci.Service" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.ufs.Service",
+            from: "self",
+        },
     ],
 }

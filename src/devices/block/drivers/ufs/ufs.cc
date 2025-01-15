@@ -5,6 +5,7 @@
 #include "ufs.h"
 
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.ufs/cpp/wire_types.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
@@ -1587,6 +1588,17 @@ zx::result<> Ufs::Start() {
     return ConfigurePowerManagement();
   }
 
+  {
+    fuchsia_hardware_ufs::Service::InstanceHandler handler({
+        .device = fit::bind_member<&Ufs::Serve>(this),
+    });
+    zx::result result = outgoing()->AddService<fuchsia_hardware_ufs::Service>(std::move(handler));
+    if (result.is_error()) {
+      FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
+      return result.take_error();
+    }
+  }
+
   return zx::ok();
 }
 
@@ -1638,6 +1650,57 @@ void Ufs::PrepareStop(fdf::PrepareStopCompleter completer) {
   }
 
   completer(zx::ok());
+}
+
+void Ufs::Serve(fidl::ServerEnd<fuchsia_hardware_ufs::Ufs> server) {
+  bindings_.AddBinding(dispatcher(), std::move(server), this, fidl::kIgnoreBindingClosure);
+}
+
+// TODO(b/379889262): Planned for implementation of the fuchsia_hardware_ufs::Ufs protocol.
+// Currently not supported. The following methods are placeholders for future functionality.
+
+void Ufs::ReadDescriptor(ReadDescriptorRequestView request,
+                         ReadDescriptorCompleter::Sync& completer) {
+  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
+}
+
+void Ufs::WriteDescriptor(WriteDescriptorRequestView request,
+                          WriteDescriptorCompleter::Sync& completer) {
+  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
+}
+
+void Ufs::ReadFlag(ReadFlagRequestView request, ReadFlagCompleter::Sync& completer) {
+  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
+}
+
+void Ufs::SetFlag(SetFlagRequestView request, SetFlagCompleter::Sync& completer) {
+  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
+}
+
+void Ufs::ClearFlag(ClearFlagRequestView request, ClearFlagCompleter::Sync& completer) {
+  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
+}
+
+void Ufs::ToggleFlag(ToggleFlagRequestView request, ToggleFlagCompleter::Sync& completer) {
+  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
+}
+
+void Ufs::ReadAttribute(ReadAttributeRequestView request, ReadAttributeCompleter::Sync& completer) {
+  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
+}
+
+void Ufs::WriteAttribute(WriteAttributeRequestView request,
+                         WriteAttributeCompleter::Sync& completer) {
+  completer.ReplyError(fuchsia_hardware_ufs::wire::QueryErrorCode::kGeneralFailure);
+}
+
+void Ufs::SendUicCommand(SendUicCommandRequestView request,
+                         SendUicCommandCompleter::Sync& completer) {
+  completer.Reply(0);
+}
+
+void Ufs::Request(RequestRequestView request, RequestCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 }  // namespace ufs
