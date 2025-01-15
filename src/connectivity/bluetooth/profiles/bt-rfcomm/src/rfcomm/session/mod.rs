@@ -95,9 +95,6 @@ impl OutstandingFrames {
             if self.commands.contains_key(&frame.dlci) {
                 // There can only be one outstanding command frame with P/F = 1 per
                 // DLCI.
-                // TODO(https://fxbug.dev/42139132): Our implementation should never try to send
-                // more than one command frame on the same DLCI. However, it may make
-                // sense to make this more intelligent and queue for later.
                 return Err(Error::Other(format_err!("Command Frame outstanding")));
             }
             let _ = self.commands.insert(frame.dlci, frame.clone());
