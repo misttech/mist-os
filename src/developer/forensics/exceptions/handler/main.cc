@@ -46,18 +46,8 @@ std::unique_ptr<WakeLease> CreateWakeLease(async_dispatcher_t* dispatcher,
     return nullptr;
   }
 
-  zx::result topology_client_end = component::Connect<fuchsia_power_broker::Topology>();
-  if (!topology_client_end.is_ok()) {
-    FX_LOGS(ERROR)
-        << "Synchronous error when connecting to the |fuchsia_power_broker::Topology| protocol: "
-        << topology_client_end.status_string();
-    return nullptr;
-  }
-
-  const std::string power_element_name = fxl::Substitute("exceptions-element-$0", handler_index);
-  return std::make_unique<WakeLease>(dispatcher, power_element_name,
-                                     std::move(sag_client_end).value(),
-                                     std::move(topology_client_end).value());
+  const std::string lease_name = fxl::Substitute("exceptions-element-$0", handler_index);
+  return std::make_unique<WakeLease>(dispatcher, lease_name, std::move(sag_client_end).value());
 }
 
 }  // namespace

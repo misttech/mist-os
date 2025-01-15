@@ -9,10 +9,9 @@
 #include <lib/async/dispatcher.h>
 #include <lib/fpromise/promise.h>
 
-#include <vector>
+#include <unordered_map>
 
 #include "src/developer/forensics/exceptions/handler/wake_lease.h"
-#include "src/developer/forensics/testing/stubs/power_broker_lease_control.h"
 #include "src/developer/forensics/utils/errors.h"
 
 namespace forensics::stubs {
@@ -21,14 +20,13 @@ class WakeLease : public exceptions::handler::WakeLeaseBase {
  public:
   explicit WakeLease(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
-  fpromise::promise<fidl::Client<fuchsia_power_broker::LeaseControl>, Error> Acquire(
-      zx::duration timeout) override;
+  fpromise::promise<fuchsia_power_system::LeaseToken, Error> Acquire(zx::duration timeout) override;
 
-  bool LeaseHeld() const { return lease_controls_.size() > 0; }
+  bool LeaseHeld() const { return active_wake_leases_.size() > 0; }
 
  private:
   async_dispatcher_t* dispatcher_;
-  std::vector<std::unique_ptr<PowerBrokerLeaseControl>> lease_controls_;
+  std::unordered_map<zx_handle_t, fuchsia_power_system::LeaseToken> active_wake_leases_;
 };
 
 }  // namespace forensics::stubs

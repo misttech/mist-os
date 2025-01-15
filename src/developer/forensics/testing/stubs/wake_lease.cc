@@ -4,31 +4,34 @@
 
 #include "src/developer/forensics/testing/stubs/wake_lease.h"
 
+#include <lib/async/cpp/wait.h>
 #include <lib/stdcompat/vector.h>
 
 namespace forensics::stubs {
 
-fpromise::promise<fidl::Client<fuchsia_power_broker::LeaseControl>, Error> WakeLease::Acquire(
-    const zx::duration timeout) {
-  zx::result<fidl::Endpoints<fuchsia_power_broker::LeaseControl>> endpoints =
-      fidl::CreateEndpoints<fuchsia_power_broker::LeaseControl>();
-  FX_CHECK(endpoints.is_ok());
+namespace {
 
-  auto lease_control = std::make_unique<PowerBrokerLeaseControl>(
-      /*level=*/1, std::move(endpoints->server), dispatcher_,
-      /*on_closure=*/[this](PowerBrokerLeaseControl* control) {
-        cpp20::erase_if(lease_controls_,
-                        [control](const std::unique_ptr<PowerBrokerLeaseControl>& item) {
-                          return item.get() == control;
-                        });
-      });
-  lease_controls_.push_back(std::move(lease_control));
+using fuchsia_power_system::LeaseToken;
 
-  fidl::Client<fuchsia_power_broker::LeaseControl> lease_control_client(
-      std::move(endpoints->client), dispatcher_);
+}  // namespace
 
-  return fpromise::make_result_promise<fidl::Client<fuchsia_power_broker::LeaseControl>, Error>(
-      fpromise::ok(std::move(lease_control_client)));
+fpromise::promise<LeaseToken, Error> WakeLease::Acquire(const zx::duration timeout) {
+  LeaseToken client_token, server_token;
+  LeaseToken::create(/*options=*/0u, &client_token, &server_token);
+
+  // Start an async task to wait for EVENTPAIR_PEER_CLOSED signal on server_token.
+  zx_handle_t token_handle = server_token.get();
+  active_wake_leases_[token_handle] = std::move(server_token);
+  auto wait = std::make_unique<async::WaitOnce>(token_handle, ZX_EVENTPAIR_PEER_CLOSED);
+  wait->Begin(dispatcher_, [this, token_handle, wait = std::move(wait)](
+                               async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                               const zx_packet_signal_t*) {
+    FX_CHECK(status == ZX_OK);
+    FX_CHECK(active_wake_leases_.contains(token_handle));
+    active_wake_leases_.erase(token_handle);
+  });
+
+  return fpromise::make_result_promise<LeaseToken, Error>(fpromise::ok(std::move(client_token)));
 }
 
 }  // namespace forensics::stubs

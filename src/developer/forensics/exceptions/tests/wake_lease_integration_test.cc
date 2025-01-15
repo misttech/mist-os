@@ -26,7 +26,6 @@
 namespace forensics::exceptions {
 namespace {
 
-using ::fidl::Client;
 using ::fidl::ClientEnd;
 using ::fidl::Endpoints;
 using ::fidl::ServerEnd;
@@ -50,11 +49,11 @@ using ::fuchsia_power_broker::RequiredLevelWatchResponse;
 using ::fuchsia_power_broker::Status;
 using ::fuchsia_power_broker::StatusWatchPowerLevelResponse;
 using ::fuchsia_power_broker::Topology;
-using ::fuchsia_power_broker::TopologyAddElementResponse;
 using ::fuchsia_power_system::ActivityGovernor;
 using ::fuchsia_power_system::ApplicationActivityLevel;
 using ::fuchsia_power_system::BootControl;
 using ::fuchsia_power_system::ExecutionStateLevel;
+using ::fuchsia_power_system::LeaseToken;
 using ::fuchsia_power_system::PowerElements;
 
 constexpr char kApplicationActivity[] = "application_activity";
@@ -114,17 +113,8 @@ std::unique_ptr<WakeLease> CreateWakeLease(async_dispatcher_t* dispatcher) {
     return nullptr;
   }
 
-  zx::result topology_client_end = component::Connect<Topology>();
-  if (!topology_client_end.is_ok()) {
-    FX_LOGS(ERROR)
-        << "Synchronous error when connecting to the fuchsia.power.broker/Topology protocol: "
-        << topology_client_end.status_string();
-    return nullptr;
-  }
-
-  return std::make_unique<WakeLease>(dispatcher, /*power_element_name=*/"exceptions-element-001",
-                                     std::move(sag_client_end).value(),
-                                     std::move(topology_client_end).value());
+  return std::make_unique<WakeLease>(dispatcher, /*lease_name=*/"exceptions-element-001",
+                                     std::move(sag_client_end).value());
 }
 
 ElementSchema BuildAssertiveApplicationActivitySchema(
@@ -254,7 +244,7 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   // Take an assertive dependency on ApplicationActivity to indicate boot complete, allowing SAG to
   // suspend if it deems appropriate. After we've acquired our wake lease using the WakeLease class,
   // we'll drop the lease on ApplicationActivity and check that ExecutionState was held at the
-  // kSuspending level (the level that WakeLease has an opportunistic dependency on).
+  // kSuspending level (the level that WakeLease has an assertive dependency on).
   ElementWithLease aa_element = RaiseApplicationActivity();
   ASSERT_TRUE(SetBootComplete());
   ASSERT_EQ(GetCurrentLevel(kApplicationActivity), ToUint(ApplicationActivityLevel::kActive));
@@ -273,28 +263,28 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   // changed.
   ASSERT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kActive));
 
-  Client<LeaseControl> lease;
+  std::optional<LeaseToken> lease;
   std::unique_ptr<WakeLease> wake_lease = CreateWakeLease(dispatcher());
 
   fpromise::promise<void, Error> lease_promise =
       wake_lease->Acquire(kWakeLeaseAcquisitionTimeout)
           .or_else([](const Error& error) {
             FX_LOGS(FATAL) << "Wake lease not acquired: " << ToString(error);
-            return fpromise::make_result_promise<Client<LeaseControl>, Error>(
+            return fpromise::make_result_promise<LeaseToken, Error>(
                 fpromise::error(Error::kBadValue));
           })
-          .and_then([&lease](Client<LeaseControl>& acquired_lease) mutable {
-            lease = std::move(acquired_lease);
-          });
+          .and_then(
+              [&lease](LeaseToken& acquired_lease) mutable { lease = std::move(acquired_lease); });
 
   async::Executor executor(dispatcher());
   executor.schedule_task(std::move(lease_promise));
-  RunLoopWithTimeoutOrUntil([&lease]() { return lease.is_valid(); },
+  RunLoopWithTimeoutOrUntil([&lease]() { return lease.has_value(); },
                             kWakeLeaseAcquisitionTimeout + zx::sec(1));
 
   // |aa_element| is still valid, so ApplicationActivity should still be holding ExecutionState at
   // kActive.
-  ASSERT_TRUE(lease.is_valid());
+  ASSERT_TRUE(lease.has_value());
+  EXPECT_TRUE(lease->is_valid());
   ASSERT_EQ(GetCurrentLevel(kExecutionState), ToUint(ExecutionStateLevel::kActive));
 
   // Drop the AA lease but leave |lease| intact.
@@ -311,7 +301,7 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   ASSERT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kSuspending));
 
   // Drop |lease| so nothing is holding the system awake anymore.
-  ASSERT_TRUE(lease.UnbindMaybeGetEndpoint().is_ok());
+  lease.reset();
   RunLoopUntilIdle();
   EXPECT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kInactive));
 }

@@ -320,7 +320,10 @@ source_set("system_activity_governor") {
     "//sdk/lib/syslog/cpp:cpp",
   ]
 
-  deps = [ "//src/lib/testing/predicates" ]
+  deps = [
+    "//sdk/lib/async:async-cpp",
+    "//src/lib/testing/predicates",
+  ]
 }
 
 source_set("ui_state_provider") {

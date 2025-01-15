@@ -28,6 +28,8 @@ namespace exceptions {
 namespace handler {
 namespace {
 
+using fuchsia_power_system::LeaseToken;
+
 // Either resets the exception immediately if the process only has one thread or with a 5s delay
 // otherwise.
 void ResetException(async_dispatcher_t* dispatcher, zx::exception exception,
@@ -133,11 +135,10 @@ void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
 
   // If suspend is enabled, acquire a wake lease before releasing the exception. The wake lease
   // should be kept in scope until after we're done filing the crash report.
-  fpromise::promise<fidl::Client<fuchsia_power_broker::LeaseControl>, Error> wake_lease_promise =
+  fpromise::promise<LeaseToken, Error> wake_lease_promise =
       wake_lease_ != nullptr
           ? wake_lease_->Acquire(kWakeLeaseAcquisitionTimeout)
-          : fpromise::make_result_promise<fidl::Client<fuchsia_power_broker::LeaseControl>, Error>(
-                fpromise::ok(fidl::Client<fuchsia_power_broker::LeaseControl>()));
+          : fpromise::make_result_promise<LeaseToken, Error>(fpromise::ok(LeaseToken()));
 
   const auto thread_koid = fsl::GetKoid(crashed_thread.get());
   auto join = fpromise::join_promises(
@@ -148,10 +149,9 @@ void CrashReporter::Send(zx::exception exception, zx::process crashed_process,
       [dispatcher = dispatcher_, services = services_, builder = std::move(builder),
        exception = std::move(exception), crashed_process = std::move(crashed_process),
        callback = std::move(callback)](
-          std::tuple<fpromise::result<fidl::Client<::fuchsia_power_broker::LeaseControl>, Error>,
-                     fpromise::result<ComponentInfo>>& results) mutable {
-        fpromise::result<fidl::Client<fuchsia_power_broker::LeaseControl>, Error>&
-            wake_lease_result = std::get<0>(results);
+          std::tuple<fpromise::result<LeaseToken, Error>, fpromise::result<ComponentInfo>>&
+              results) mutable {
+        fpromise::result<LeaseToken, Error>& wake_lease_result = std::get<0>(results);
         fpromise::result<ComponentInfo>& component_info_result = std::get<1>(results);
 
         if (wake_lease_result.is_error()) {
