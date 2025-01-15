@@ -101,10 +101,7 @@ bool SetBootComplete() {
     return false;
   }
   auto status = fidl::WireCall(boot_control_client.value())->SetBootComplete();
-  if (!status.ok()) {
-    return false;
-  }
-  return true;
+  return status.ok();
 }
 
 // Returns nullptr if there's an error connecting to required protocols.
