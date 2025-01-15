@@ -41,7 +41,7 @@ type LastReboot = table {
     /// parse the |reason| field.
     ///
     /// Planned reboots are by nature, graceful.
-    @available(added=NEXT)
+    @available(added=26)
     4: planned bool;
 };
 
@@ -123,6 +123,6 @@ type RebootReason = strict(removed=9) flexible(added=9) enum : uint16 {
     /// The Netstack component is changing versions.
     // TODO(https://fxbug.dev/42081574): Remove this reason once Netstack2 is
     // fully migrated to Netstack3.
-    @available(added=NEXT)
+    @available(added=26)
     NETSTACK_MIGRATION = 20;
 };

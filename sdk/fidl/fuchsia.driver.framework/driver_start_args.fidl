@@ -12,7 +12,7 @@ using zx;
 const MAX_NAMESPACE_COUNT uint32 = fuchsia.component.runner.MAX_NAMESPACE_COUNT;
 
 /// Contains the node properties that belong to a node.
-@available(added=19, deprecated=NEXT)
+@available(added=19, deprecated=26)
 type NodePropertyEntry = struct {
     /// Name of the node that has |node_properties|.
     name NodeName;
@@ -23,11 +23,11 @@ type NodePropertyEntry = struct {
     properties NodePropertyVector;
 };
 
-@available(added=19, deprecated=NEXT)
+@available(added=19, deprecated=26)
 alias NodePropertyDictionary = vector<NodePropertyEntry>:MAX;
 
 /// Contains the node properties that belong to a node.
-@available(added=NEXT)
+@available(added=26)
 type NodePropertyEntry2 = struct {
     /// Name of the node that has |node_properties|.
     name NodeName;
@@ -38,7 +38,7 @@ type NodePropertyEntry2 = struct {
     properties NodeProperties;
 };
 
-@available(added=NEXT)
+@available(added=26)
 alias NodePropertyDictionary2 = vector<NodePropertyEntry2>:MAX;
 
 /// Arguments for starting a driver.
@@ -55,7 +55,7 @@ type DriverStartArgs = resource table {
 
     /// Provides a token representing this node which can be exchanged with the
     /// driver framework to discern additional information about this node.
-    @available(added=NEXT)
+    @available(added=26)
     11: node_token zx.Handle:EVENT;
 
     /// Node properties of the node the driver is bound to.
@@ -66,10 +66,10 @@ type DriverStartArgs = resource table {
     /// node's properties. The composite parent node's properties are those that
     /// were provided in the composite node specification and not the original
     /// properties of the parent.
-    @available(added=19, deprecated=NEXT)
+    @available(added=19, deprecated=26)
     9: node_properties NodePropertyDictionary;
 
-    @available(added=NEXT)
+    @available(added=26)
     12: node_properties_2 NodePropertyDictionary2;
 
     /// Symbols provided to the driver, for |node|. These come from the driver

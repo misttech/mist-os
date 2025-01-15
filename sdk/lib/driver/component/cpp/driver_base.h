@@ -193,7 +193,7 @@ class DriverBase {
   // This is the name of the node that the driver is bound to.
   const std::optional<std::string>& node_name() const { return start_args_.node_name(); }
 
-#if FUCHSIA_API_LEVEL_AT_MOST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_MOST(26)
   // Returns the node properties of the node the driver is bound to or its parents.
   // Returns the node's own node properties if `parent_node_name` is "default" and the node is a
   // non-composite.
@@ -204,7 +204,7 @@ class DriverBase {
       const std::string& parent_node_name = "default") const;
 #endif
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   // Returns the node properties of the node the driver is bound to or its parents.
   // Returns the node's own node properties if `parent_node_name` is "default" and the node is a
   // non-composite.
@@ -276,7 +276,7 @@ class DriverBase {
 
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
       std::string_view node_name,
       cpp20::span<const fuchsia_driver_framework::NodeProperty2> properties,
@@ -286,7 +286,7 @@ class DriverBase {
       std::string_view node_name, fuchsia_driver_framework::DevfsAddArgs& devfs_args,
       cpp20::span<const fuchsia_driver_framework::NodeProperty2> properties,
       cpp20::span<const fuchsia_driver_framework::Offer> offers);
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(26)
 
  private:
   void InitializeAndServe(Namespace incoming,
@@ -306,15 +306,15 @@ class DriverBase {
   std::string name_;
   DriverStartArgs start_args_;
 
-#if FUCHSIA_API_LEVEL_AT_MOST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_MOST(26)
   std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::NodeProperty>>
       node_properties_;
-#endif  // FUCHSIA_API_LEVEL_AT_MOST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_MOST(26)
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   std::unordered_map<std::string, cpp20::span<const fuchsia_driver_framework::NodeProperty2>>
       node_properties_2_;
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(26)
 
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   async_dispatcher_t* dispatcher_;

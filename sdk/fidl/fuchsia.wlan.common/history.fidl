@@ -50,7 +50,7 @@ type WlanTxStatusEntry = struct {
     attempts uint8;
 };
 
-@available(removed=NEXT)
+@available(removed=26)
 type WlanBand = flexible enum : uint8 {
     TWO_GHZ = 0;
     FIVE_GHZ = 1;

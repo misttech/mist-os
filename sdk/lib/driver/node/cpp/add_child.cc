@@ -132,7 +132,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
 
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 
 zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
     fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent, fdf::Logger& logger,
@@ -197,6 +197,6 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
   return zx::ok(std::move(node_controller_client_end));
 }
 
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(26)
 
 }  // namespace fdf

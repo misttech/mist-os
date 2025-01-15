@@ -11,9 +11,9 @@ using zx;
 @available(added=15)
 type WlanSoftmacBandCapability = table {
     /// Band to which the capabilities described by this datagram apply.
-    @available(replaced=NEXT)
+    @available(replaced=26)
     1: band fuchsia.wlan.common.WlanBand;
-    @available(added=NEXT)
+    @available(added=26)
     1: band ieee80211.WlanBand;
 
     /// Count of supported basic rates. If the `basic_rate_list` field is

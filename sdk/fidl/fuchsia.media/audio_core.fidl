@@ -38,7 +38,7 @@ const RENDER_USAGE_COUNT uint8 = 5;
 /// usage cannot be changed after creation. The AudioRenderUsage2 value is used by audio policy
 /// to dictate how audio streams interact with each other. This enum expands the original (strict)
 /// enum |AudioRenderUsage| with additional stream types.
-@available(added=NEXT)
+@available(added=26)
 type AudioRenderUsage2 = flexible enum : uint32 {
     /// Stream is intended to be used for ambient or background sound. Streams
     /// that can be interrupted without consequence should use this.
@@ -65,7 +65,7 @@ type AudioRenderUsage2 = flexible enum : uint32 {
     /// agent speech output, such as screen reader TTS.
     ACCESSIBILITY = 5;
 };
-@available(added=NEXT)
+@available(added=26)
 const RENDER_USAGE2_COUNT uint8 = 6;
 
 /// Usages annotating the purpose of the stream being used to capture audio. The
@@ -99,7 +99,7 @@ const CAPTURE_USAGE_COUNT uint8 = 4;
 /// Usages annotating the purpose of the stream being used to capture audio. The
 /// AudioCaptureUsage is used by audio policy to dictate how audio streams
 /// interact with each other.
-@available(added=NEXT)
+@available(added=26)
 type AudioCaptureUsage2 = flexible enum : uint32 {
     /// Stream is used to capture audio while in the background. These streams may be active at
     /// any the time and are considered privileged.
@@ -120,17 +120,17 @@ type AudioCaptureUsage2 = flexible enum : uint32 {
     /// Voice/Video chat should use this.
     COMMUNICATION = 3;
 };
-@available(added=NEXT)
+@available(added=26)
 const CAPTURE_USAGE2_COUNT uint8 = 4;
 
 /// A reasonable upper-bound for the maximum number of render or capture usages. Use this value in
 /// FIDL APIs (e.g. for max vector size), instead of RENDER_USAGE2_COUNT or CAPTURE_USAGE2_COUNT
 /// directly. This way, an increase in these consts will not cause an ABI-breaking change.
-@available(added=NEXT)
+@available(added=26)
 const MAX_USAGE_COUNT uint8 = 8;
 
 /// The behaviors applied to streams when multiple are active.
-@available(replaced=NEXT)
+@available(replaced=26)
 type Behavior = strict enum {
     /// Mix the streams.
     NONE = 0;
@@ -141,7 +141,7 @@ type Behavior = strict enum {
     /// Apply a gain to mute one of the streams. (-160.0db)
     MUTE = 2;
 };
-@available(added=NEXT)
+@available(added=26)
 type Behavior = flexible enum : uint32 {
     /// Mix the streams.
     NONE = 0;
@@ -159,14 +159,14 @@ type Usage = strict union {
     2: capture_usage AudioCaptureUsage;
 };
 
-@available(added=NEXT)
+@available(added=26)
 type Usage2 = flexible union {
     1: render_usage AudioRenderUsage2;
     2: capture_usage AudioCaptureUsage2;
 };
 
 @discoverable(server="platform")
-closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
+closed(removed=26) open(added=26) protocol AudioCore {
     /// Creates an AudioRenderer which outputs audio to the default device.
     strict CreateAudioRenderer(resource struct {
         audio_out_request server_end:AudioRenderer;
@@ -201,21 +201,21 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     // By default, reading and writing device settings files is enabled. This
     // method (which has impact across the entire audio subsystem) allows a test
     // client to temporarily disable, then later enable, that reading/writing.
-    @available(deprecated=15, removed=NEXT)
+    @available(deprecated=15, removed=26)
     strict EnableDeviceSettings(struct {
         enabled bool;
     });
 
     /// Sets the gain for this render usage. By default, all render usages are set to Unity (0 db).
     // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
-    @available(deprecated=NEXT, note="Use SetRenderUsageGain2 and AudioRenderUsage2")
+    @available(deprecated=26, note="Use SetRenderUsageGain2 and AudioRenderUsage2")
     strict SetRenderUsageGain(struct {
         usage AudioRenderUsage;
         gain_db float32;
     });
 
     /// Sets the gain for this render usage. By default, all render usages are set to Unity (0 db).
-    @available(added=NEXT)
+    @available(added=26)
     flexible SetRenderUsageGain2(struct {
         usage AudioRenderUsage2;
         gain_db float32;
@@ -223,14 +223,14 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
 
     /// Sets gain for this capture usage. By default, all capture usages are set to Unity (0 db).
     // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioCaptureUsage|
-    @available(deprecated=NEXT, note="Use SetCaptureUsageGain2 and AudioCaptureUsage2")
+    @available(deprecated=26, note="Use SetCaptureUsageGain2 and AudioCaptureUsage2")
     strict SetCaptureUsageGain(struct {
         usage AudioCaptureUsage;
         gain_db float32;
     });
 
     /// Sets gain for this capture usage. By default, all capture usages are set to Unity (0 db).
-    @available(added=NEXT)
+    @available(added=26)
     flexible SetCaptureUsageGain2(struct {
         usage AudioCaptureUsage2;
         gain_db float32;
@@ -238,14 +238,14 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
 
     /// Binds to a volume control protocol for the given usage.
     // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
-    @available(deprecated=NEXT, note="Use BindUsageVolumeControl2 and AudioRenderUsage2")
+    @available(deprecated=26, note="Use BindUsageVolumeControl2 and AudioRenderUsage2")
     strict BindUsageVolumeControl(resource struct {
         usage Usage;
         volume_control server_end:fuchsia.media.audio.VolumeControl;
     });
 
     /// Binds to a volume control protocol for the given usage.
-    @available(added=NEXT)
+    @available(added=26)
     flexible BindUsageVolumeControl2(resource struct {
         usage Usage2;
         volume_control server_end:fuchsia.media.audio.VolumeControl;
@@ -255,7 +255,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     /// `usage`. This is the same mapping as used by the VolumeControl from
     /// `BindUsageVolumeControl`.
     // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
-    @available(deprecated=NEXT, note="Use GetVolumeFromDb2 and AudioRenderUsage2")
+    @available(deprecated=26, note="Use GetVolumeFromDb2 and AudioRenderUsage2")
     strict GetVolumeFromDb(struct {
         usage Usage;
         gain_db float32;
@@ -266,7 +266,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     /// Queries the volume percentage [0, 1] that maps to a `gain_db` value for a particular
     /// `usage`. This is the same mapping as used by the VolumeControl from
     /// `BindUsageVolumeControl`.
-    @available(added=NEXT)
+    @available(added=26)
     flexible GetVolumeFromDb2(struct {
         usage Usage2;
         gain_db float32;
@@ -277,7 +277,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     /// Queries the decibel value that maps to a volume percentage [0, 1] for a particular `usage`.
     /// This is the same mapping as used by the VolumeControl from `BindUsageVolumeControl`.
     // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
-    @available(deprecated=NEXT, note="Use GetDbFromVolume2 and AudioRenderUsage2")
+    @available(deprecated=26, note="Use GetDbFromVolume2 and AudioRenderUsage2")
     strict GetDbFromVolume(struct {
         usage Usage;
         volume float32;
@@ -287,7 +287,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
 
     /// Queries the decibel value that maps to a volume percentage [0, 1] for a particular `usage`.
     /// This is the same mapping as used by the VolumeControl from `BindUsageVolumeControl`.
-    @available(added=NEXT)
+    @available(added=26)
     flexible GetDbFromVolume2(struct {
         usage Usage2;
         volume float32;
@@ -299,7 +299,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     /// streams of Usage `active` are processing audio, and streams of Usage `affected` are as well,
     /// the Behavior specified will be applied to the streams of Usage `affected`.
     // TODO(https://fxbug.dev/384934089): deprecate and remove |Usage|
-    @available(deprecated=NEXT, note="Use SetInteraction2 and AudioRenderUsage2")
+    @available(deprecated=26, note="Use SetInteraction2 and AudioRenderUsage2")
     strict SetInteraction(struct {
         active Usage;
         affected Usage;
@@ -309,7 +309,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
     /// Sets how audio_core handles interactions of multiple active streams simultaneously. If
     /// streams of Usage `active` are processing audio, and streams of Usage `affected` are as well,
     /// the Behavior specified will be applied to the streams of Usage `affected`.
-    @available(added=NEXT)
+    @available(added=26)
     flexible SetInteraction2(struct {
         active Usage2;
         affected Usage2;
@@ -326,7 +326,7 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCore {
 };
 
 // Placeholder for routing policies.
-@available(deprecated=NEXT)
+@available(deprecated=26)
 type AudioOutputRoutingPolicy = strict enum {
     // AudioRenderers are always connected to all audio outputs which currently
     // in the plugged state (eg; have a connector attached to them)

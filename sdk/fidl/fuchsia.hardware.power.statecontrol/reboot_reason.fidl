@@ -8,7 +8,7 @@ library fuchsia.hardware.power.statecontrol;
 /// Deprecated: Replaced by `RebootReason2`.
 // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
 // to the SDK.
-@available(deprecated=NEXT)
+@available(deprecated=26)
 type RebootReason = strict enum {
     USER_REQUEST = 1;
 
@@ -39,7 +39,7 @@ type RebootReason = strict enum {
 
 /// Why the system reboots.
 // Contact OWNERS before adding a new value.
-@available(added=NEXT)
+@available(added=26)
 // TODO(https://fxbug.dev/385742868): Rename this to `RebootReason` once the
 // original `RebootReason` is removed.
 type RebootReason2 = flexible enum {

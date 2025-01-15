@@ -1185,7 +1185,7 @@ impl RealmBuilder {
         self.root_realm.add_child_realm_from_relative_url(name, relative_url, options).await
     }
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "26")]
     pub async fn add_child_realm_from_decl(
         &self,
         name: impl Into<String>,
@@ -1392,7 +1392,7 @@ impl SubRealmBuilder {
         })
     }
 
-    #[cfg(fuchsia_api_level_at_least = "NEXT")]
+    #[cfg(fuchsia_api_level_at_least = "26")]
     pub async fn add_child_realm_from_decl(
         &self,
         name: impl Into<String>,

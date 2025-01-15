@@ -335,7 +335,7 @@ closed protocol RealmQuery {
     /// [DEPRECATED - Use OpenDirectory instead.]
     ///
     /// Makes an fuchsia.io.Directory/Open call on a directory in an instance.
-    @available(added=25, removed=NEXT)
+    @available(added=25, removed=26)
     @selector("Open")
     strict DeprecatedOpen(resource struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;

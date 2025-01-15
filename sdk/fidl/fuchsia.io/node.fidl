@@ -308,7 +308,7 @@ open protocol Node {
     /// Alternatively, pass `OpenFlags.CLONE_SAME_RIGHTS` to inherit the rights on the source connection.
     /// It is invalid to pass any of the `OpenFlags.RIGHT_*` flags together with
     /// `OpenFlags.CLONE_SAME_RIGHTS`.
-    @available(replaced=NEXT, renamed="DeprecatedClone")
+    @available(replaced=26, renamed="DeprecatedClone")
     @selector("fuchsia.io1/Node.Clone")
     strict Clone(resource struct {
         flags OpenFlags;
@@ -319,7 +319,7 @@ open protocol Node {
     // TODO(https://fxbug.dev/324081103): Mark this as removed=NEXT once we ship API level 26.
     // We can't remove a method at the same API level it was added, and although this is only
     // a semantic rename with the same ordinal, it still counts as "adding" a new method.
-    @available(added=NEXT, removed=HEAD)
+    @available(added=26, removed=HEAD)
     @selector("fuchsia.io1/Node.Clone")
     flexible DeprecatedClone(resource struct {
         flags OpenFlags;

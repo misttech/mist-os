@@ -9,7 +9,7 @@
   "pkg/zx/include/lib/zx/fifo.h": "153798a14eb6d6916b9b351198204492",
   "pkg/zx/include/lib/zx/guest.h": "ca2b9c3872bfbe9cdd94c2cb4ee760fe",
   "pkg/zx/include/lib/zx/handle.h": "ea2bb0d4ad153ef048189ae1f486a53d",
-  "pkg/zx/include/lib/zx/interrupt.h": "353f82cc5690aad09a53e72739a358c2",
+  "pkg/zx/include/lib/zx/interrupt.h": "501deadf2cecbfa784d8cef171f7ea82",
   "pkg/zx/include/lib/zx/iob.h": "a40c56cd6034f5b32dc79b45bebfd7e6",
   "pkg/zx/include/lib/zx/iommu.h": "d407e69567efc11ef8b66541f5f84a75",
   "pkg/zx/include/lib/zx/job.h": "c49f1749c491a3386fd4fcdbe4dad167",

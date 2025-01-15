@@ -8,31 +8,31 @@ library fuchsia.media;
 /// A protocol for monitoring the usage activity of the AudioRenderers and AudioCapturers.
 // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
 @discoverable(server="platform")
-closed(removed=NEXT) open(added=NEXT) protocol ActivityReporter {
+closed(removed=26) open(added=26) protocol ActivityReporter {
     /// Notifies the client whenever there is a change in the set of active AudioRenderUsages.
     /// It returns immediately the first time that it is called.
-    @available(deprecated=NEXT, note="Use WatchRenderActivity2 and AudioRenderUsage2")
+    @available(deprecated=26, note="Use WatchRenderActivity2 and AudioRenderUsage2")
     strict WatchRenderActivity() -> (struct {
         active_usages vector<AudioRenderUsage>:RENDER_USAGE_COUNT;
     });
 
     /// Notifies the client whenever there is a change in the set of active AudioRenderUsages.
     /// It returns immediately the first time that it is called.
-    @available(added=NEXT)
+    @available(added=26)
     flexible WatchRenderActivity2() -> (struct {
         active_usages vector<AudioRenderUsage2>:MAX_USAGE_COUNT;
     });
 
     /// Notifies the client whenever there is a change in the set of active AudioCaptureUsages.
     /// It returns immediately the first time that it is called.
-    @available(deprecated=NEXT, note="Use WatchCaptureActivity2 and AudioCaptureUsage2")
+    @available(deprecated=26, note="Use WatchCaptureActivity2 and AudioCaptureUsage2")
     strict WatchCaptureActivity() -> (struct {
         active_usages vector<AudioCaptureUsage>:CAPTURE_USAGE_COUNT;
     });
 
     /// Notifies the client whenever there is a change in the set of active AudioCaptureUsages.
     /// It returns immediately the first time that it is called.
-    @available(added=NEXT)
+    @available(added=26)
     flexible WatchCaptureActivity2() -> (struct {
         active_usages vector<AudioCaptureUsage2>:MAX_USAGE_COUNT;
     });

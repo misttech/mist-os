@@ -62,7 +62,7 @@ type Filter = table {
     /// Filter based on a service solicitation by service UUID.
     /// Service solicitation is an invitation to a peer to connect if they
     /// provide a service we want to use.
-    @available(added=NEXT)
+    @available(added=26)
     7: solicitation_uuid bt.Uuid;
 };
 

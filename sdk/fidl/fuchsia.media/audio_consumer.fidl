@@ -22,7 +22,7 @@ closed protocol SessionAudioConsumerFactory {
 /// Interface for creating audio consumers for local rendering.
 // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
 @discoverable
-@available(deprecated=NEXT)
+@available(deprecated=26)
 closed protocol UsageAudioConsumerFactory {
     strict CreateAudioConsumer(resource struct {
         usage AudioRenderUsage;
@@ -32,7 +32,7 @@ closed protocol UsageAudioConsumerFactory {
 
 /// Interface for creating audio consumers for local rendering.
 @discoverable
-@available(added=NEXT)
+@available(added=26)
 open protocol Usage2AudioConsumerFactory {
     /// Creates an `AudioConsumer`, which is an interface for playing audio, given a usage value.
     /// Audio submitted to such a consumer is always rendered locally.

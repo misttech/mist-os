@@ -77,9 +77,9 @@ impl NodeProxyApi for fio::NodeProxy {
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fidl::Error> {
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "26")]
         return Self::deprecated_clone(self, flags, server_end);
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "26"))]
         return Self::clone(self, flags, server_end);
     }
 }
@@ -90,9 +90,9 @@ impl NodeProxyApi for fio::FileProxy {
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fidl::Error> {
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "26")]
         return Self::deprecated_clone(self, flags, server_end);
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "26"))]
         return Self::clone(self, flags, server_end);
     }
 }
@@ -103,9 +103,9 @@ impl NodeProxyApi for fio::DirectoryProxy {
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fidl::Error> {
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "26")]
         return Self::deprecated_clone(self, flags, server_end);
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "26"))]
         return Self::clone(self, flags, server_end);
     }
 }

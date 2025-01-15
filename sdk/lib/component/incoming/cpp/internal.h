@@ -61,7 +61,7 @@ zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetGlobalServiceDirectory();
 // Determines if |Protocol| contains the |fuchsia.unknown/Cloneable.Clone2| method.
 template <typename Protocol, typename = void>
 struct has_fidl_method_fuchsia_unknown_clone : public ::std::false_type {};
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 template <typename Protocol>
 struct has_fidl_method_fuchsia_unknown_clone<
     Protocol, std::void_t<decltype(fidl::WireRequest<typename Protocol::Clone>{

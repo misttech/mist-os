@@ -67,7 +67,7 @@ zx_status_t ServiceDirectory::CloneChannel(
   if (!directory_.is_bound()) {
     return ZX_ERR_BAD_HANDLE;
   }
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   return directory_->Clone(fidl::InterfaceRequest<fuchsia::unknown::Cloneable>(dir.TakeChannel()));
 #else
   return directory_->Clone2(fidl::InterfaceRequest<fuchsia::unknown::Cloneable>(dir.TakeChannel()));

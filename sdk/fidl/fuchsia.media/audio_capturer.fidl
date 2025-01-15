@@ -13,10 +13,10 @@ type LoopbackAudioCapturerConfiguration = table {};
 /// Configuration for a capturer which will receive a stream from an
 /// input device.
 type InputAudioCapturerConfiguration = table {
-    @available(deprecated=NEXT, note="Use usage2 and AudioCaptureUsage2")
+    @available(deprecated=26, note="Use usage2 and AudioCaptureUsage2")
     1: usage AudioCaptureUsage;
 
-    @available(added=NEXT)
+    @available(added=26)
     2: usage2 AudioCaptureUsage2;
 };
 
@@ -237,7 +237,7 @@ type AudioCapturerConfiguration = strict union {
 /// forced to overwrite it.
 ///
 @discoverable(server="platform")
-closed(removed=NEXT) open(added=NEXT) protocol AudioCapturer {
+closed(removed=26) open(added=26) protocol AudioCapturer {
     compose StreamBufferSet;
     compose StreamSource;
 
@@ -302,14 +302,14 @@ closed(removed=NEXT) open(added=NEXT) protocol AudioCapturer {
 
     /// Sets the usage of the capture stream. This may be changed on the fly, but packets in flight
     /// may be affected. By default, Capturers are created with the FOREGROUND usage.
-    @available(deprecated=NEXT, note="use SetUsage2 and AudioCaptureUsage2")
+    @available(deprecated=26, note="use SetUsage2 and AudioCaptureUsage2")
     strict SetUsage(struct {
         usage AudioCaptureUsage;
     });
 
     /// Sets the usage of the capture stream. This may be changed on the fly, but this may affect
     /// packets in flight. By default, Capturers are created with the FOREGROUND usage.
-    @available(added=NEXT)
+    @available(added=26)
     flexible SetUsage2(struct {
         usage AudioCaptureUsage2;
     });

@@ -128,12 +128,12 @@ type InterestChangeError = strict enum : uint32 {
 
 /// Drains a program's logs.
 @discoverable(server="platform")
-closed(removed=NEXT) open(added=NEXT) protocol LogSink {
+closed(removed=26) open(added=26) protocol LogSink {
     /// Send this socket to be drained.
     ///
     /// See [wire_format.h](https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/syslog/include/lib/syslog/wire_format.h)
     /// for what is expected to be received over the socket.
-    @available(removed=NEXT)
+    @available(removed=26)
     strict Connect(resource struct {
         socket zx.Handle:SOCKET;
     });

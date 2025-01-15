@@ -41,7 +41,7 @@ class DirectoryConnection final : public Connection,
   //
   // |fuchsia.io/Node| operations.
   //
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   void DeprecatedClone(DeprecatedCloneRequestView request,
                        DeprecatedCloneCompleter::Sync& completer) final;
 #else

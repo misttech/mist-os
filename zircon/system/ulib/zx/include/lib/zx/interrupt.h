@@ -38,7 +38,7 @@ class interrupt final : public object<interrupt> {
   // API level has been marked unsupported. The nullptr overload is only necessary to resolve
   // ambiguous candidate function errors when callers invoke wait(nullptr).
   zx_status_t wait(zx::time* timestamp) const
-      ZX_REMOVED_SINCE(7, NEXT, NEXT, "interrupt wait should use boot time") {
+      ZX_REMOVED_SINCE(7, 26, 26, "interrupt wait should use boot time") {
     return zx_interrupt_wait(get(), timestamp ? timestamp->get_address() : nullptr);
   }
   zx_status_t wait(std::nullptr_t) const ZX_AVAILABLE_SINCE(25) {
@@ -53,7 +53,7 @@ class interrupt final : public object<interrupt> {
   // TODO(https://fxbug.dev/377918269): Remove the monotonic time overload once its API level has
   // been marked unsupported.
   zx_status_t trigger(uint32_t options, zx::time timestamp) const
-      ZX_REMOVED_SINCE(7, NEXT, NEXT, "interrupt trigger should use boot time") {
+      ZX_REMOVED_SINCE(7, 26, 26, "interrupt trigger should use boot time") {
     return zx_interrupt_trigger(get(), options, timestamp.get());
   }
   zx_status_t trigger(uint32_t options, zx::time_boot timestamp) const ZX_AVAILABLE_SINCE(25) {

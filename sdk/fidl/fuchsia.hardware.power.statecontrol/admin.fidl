@@ -49,7 +49,7 @@ closed protocol Admin {
     /// Deprecated: Replaced by `PerformReboot`.
     // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
     // to the SDK.
-    @available(deprecated=NEXT)
+    @available(deprecated=26)
     strict Reboot(struct {
         reason RebootReason;
     }) -> () error zx.Status;
@@ -60,7 +60,7 @@ closed protocol Admin {
     ///   - options: The options with which to perform this requests.
     ///              `ZX_ERR_INVALID_ARGS` is returned if the options are
     ///              malformed (i.e. `reasons` is absent or empty).
-    @available(added=NEXT)
+    @available(added=26)
     strict PerformReboot(struct {
         options RebootOptions;
     }) -> () error zx.Status;
@@ -93,11 +93,11 @@ closed protocol Admin {
 
 /// The maximum number of reboot reasons that can be attributed to a single
 /// reboot request.
-@available(added=NEXT)
+@available(added=26)
 const MAX_REBOOT_REASONS uint8 = 100;
 
 /// The options specified when a reboot is requested.
-@available(added=NEXT)
+@available(added=26)
 type RebootOptions = table {
     /// The set of reboot reasons that are responsible for this reboot request.
     // When calling `Admin.PerformReboot`, the majority of clients need only
@@ -121,7 +121,7 @@ closed protocol RebootMethodsWatcherRegister {
     /// Deprecated: Replaced by `RegisterWatcher`.
     // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
     // to the SDK.
-    @available(deprecated=NEXT)
+    @available(deprecated=26)
     strict Register(resource struct {
         watcher client_end:RebootMethodsWatcher;
     });
@@ -145,7 +145,7 @@ closed protocol RebootMethodsWatcherRegister {
     /// Deprecated: Replaced by `RegisterWatcher`.
     // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
     // to the SDK.
-    @available(added=NEXT, deprecated=NEXT)
+    @available(added=26, deprecated=26)
     strict RegisterWithAck(resource struct {
         watcher client_end:RebootMethodsWatcher;
     }) -> ();
@@ -165,7 +165,7 @@ closed protocol RebootMethodsWatcherRegister {
     /// watcher of an impending reboot and allow it the chance to respond.
     ///
     /// Watchers can unregister by closing their `RebootWatcher` channel.
-    @available(added=NEXT)
+    @available(added=26)
     strict RegisterWatcher(resource struct {
         watcher client_end:RebootWatcher;
     }) -> ();
@@ -180,7 +180,7 @@ closed protocol RebootMethodsWatcherRegister {
 /// Deprecated: Replaced by `RebootWatcher`
 // TODO(https://fxbug.dev/385742868): Delete this once "deprecated" propagates
 // to the SDK.
-@available(deprecated=NEXT)
+@available(deprecated=26)
 closed protocol RebootMethodsWatcher {
     strict OnReboot(struct {
         reason RebootReason;
@@ -192,7 +192,7 @@ closed protocol RebootMethodsWatcher {
 /// before the system power state is changed. The channel will be used once to
 /// send a notification to the watcher. Once the watcher responds or the timeout
 /// expires, the channel will be closed by the client of RebootWatcher.
-@available(added=NEXT)
+@available(added=26)
 closed protocol RebootWatcher {
     strict OnReboot(struct {
         options RebootOptions;

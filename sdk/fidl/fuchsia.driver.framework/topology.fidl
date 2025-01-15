@@ -24,9 +24,9 @@ const MAX_PROPERTY_COUNT uint8 = 64;
 const MAX_NODE_NAME_LENGTH uint8 = 128;
 const MAX_SYMBOL_NAME_LENGTH uint8 = 128;
 
-@available(added=NEXT)
+@available(added=26)
 const MAX_DEVICE_ADDRESS_ARRAY_LEN uint32 = 10;
-@available(added=NEXT)
+@available(added=26)
 const MAX_DEVICE_ADDRESS_STR_LEN uint32 = 32;
 
 @available(added=18)
@@ -38,7 +38,7 @@ alias NodeOffersVector = vector<Offer>:MAX_OFFER_COUNT;
 alias NodePropertyVector = vector<NodeProperty>:MAX_PROPERTY_COUNT;
 alias NodeName = string:MAX_NODE_NAME_LENGTH;
 
-@available(added=NEXT)
+@available(added=26)
 alias NodeProperties = vector<NodeProperty2>:MAX_PROPERTY_COUNT;
 
 /// Definition of a symbol provided by a driver for a node. A symbol is local to
@@ -82,7 +82,7 @@ type Offer = flexible union {
     2: driver_transport fuchsia.component.decl.Offer;
 };
 
-@available(added=NEXT)
+@available(added=26)
 type NodeProperty2 = struct {
     /// Property key.
     key NodePropertyKeyString;
@@ -124,7 +124,7 @@ type DevfsAddArgs = resource table {
     5: controller_connector client_end:fuchsia.device.fs.Connector;
 };
 
-@available(added=NEXT)
+@available(added=26)
 type BusType = flexible enum {
     PLATFORM = 1;
     ACPI = 2;
@@ -139,7 +139,7 @@ type BusType = flexible enum {
     SPMI = 11;
 };
 
-@available(added=NEXT)
+@available(added=26)
 type DeviceAddress = flexible union {
     /// A fixed integer id, eg a spi bus address
     1: int_value uint8;
@@ -157,7 +157,7 @@ type DeviceAddress = flexible union {
     5: string_value string:MAX_DEVICE_ADDRESS_STR_LEN;
 };
 
-@available(added=NEXT)
+@available(added=26)
 type DeviceAddressStability = flexible enum {
     /// When the driver is restarted, the device address may change.
     UNSTABLE_BETWEEN_DRIVER_RESTART = 0;
@@ -172,7 +172,7 @@ type DeviceAddressStability = flexible enum {
     STABLE = 3;
 };
 
-@available(added=NEXT)
+@available(added=26)
 type BusInfo = table {
     /// The type of bus this node sits on.
     1: bus BusType;
@@ -204,13 +204,13 @@ type NodeAddArgs = resource table {
     /// Properties of the node. Deprecated: all new usages should set properties2 and leave
     /// this field blank.
     @available(
-            deprecated=NEXT,
+            deprecated=26,
             note="Deprecated for 'properties2' which only supports string-based keys.")
     4: properties NodePropertyVector;
 
     /// Properties of the node. If set, the `properties` field must be blank. Otherwise,
     /// adding the node will return an error.
-    @available(added=NEXT)
+    @available(added=26)
     8: properties2 NodeProperties;
 
     /// The arguments for how this node should be added to devfs.
@@ -224,7 +224,7 @@ type NodeAddArgs = resource table {
 
     /// Information that feeds into a structured bus topology for the device. It should
     /// only be specified by bus drivers, ideally those which are included by default.
-    @available(added=NEXT)
+    @available(added=26)
     7: bus_info BusInfo;
 };
 
@@ -282,7 +282,7 @@ type NodeError = flexible enum {
     UNBIND_CHILDREN_IN_PROGRESS = 11;
 
     /// The Node contains unsupported arguments, such as deprecated property keys or offers.
-    @available(added=NEXT)
+    @available(added=26)
     UNSUPPORTED_ARGS = 12;
 };
 

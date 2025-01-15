@@ -157,20 +157,20 @@ impl<N: Node> Connection<N> {
     /// Handle a [`NodeRequest`].
     async fn handle_request(&mut self, req: fio::NodeRequest) -> Result<ConnectionState, Error> {
         match req {
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::NodeRequest::DeprecatedClone { flags, object, control_handle: _ } => {
                 self.handle_clone_deprecated(flags, object);
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::NodeRequest::Clone { flags, object, control_handle: _ } => {
                 self.handle_clone_deprecated(flags, object);
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::NodeRequest::Clone { request, control_handle: _ } => {
                 // Suppress any errors in the event a bad `request` channel was provided.
                 self.handle_clone(ServerEnd::new(request.into_channel()));
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::NodeRequest::Clone2 { request, control_handle: _ } => {
                 // Suppress any errors in the event a bad `request` channel was provided.
                 self.handle_clone(ServerEnd::new(request.into_channel()));

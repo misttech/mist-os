@@ -85,7 +85,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
 
 #endif  // FUCHSIA_API_LEVEL_AT_LEAST(18)
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 // Adds an un-owned child node under the given |parent|. The driver framework will try to match
 // and bind a driver to this child.
 //
@@ -106,7 +106,7 @@ zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> AddChild(
     cpp20::span<const fuchsia_driver_framework::NodeProperty2> properties,
     cpp20::span<const fuchsia_driver_framework::Offer> offers);
 
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(26)
 
 }  // namespace fdf
 

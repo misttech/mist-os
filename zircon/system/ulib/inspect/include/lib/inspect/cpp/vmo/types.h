@@ -69,7 +69,7 @@ class StringReference final {
   const cpp17::string_view data_;
   const uint64_t reference_id_;
 
-} ZX_DEPRECATED_SINCE(1, NEXT, "strings are interned automatically: https://fxbug.dev/300003477");
+} ZX_DEPRECATED_SINCE(1, 26, "strings are interned automatically: https://fxbug.dev/300003477");
 
 namespace internal {
 class State;

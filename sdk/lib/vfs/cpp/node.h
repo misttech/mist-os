@@ -69,7 +69,7 @@ class Node {
   // *WARNING*: Not all node types support `Serve()` due to lifetime restrictions (e.g. `LazyDir`).
   zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
                     async_dispatcher_t* dispatcher = nullptr)
-      ZX_REMOVED_SINCE(1, 25, NEXT, "Use new signature of Serve which takes fuchsia.io/Flags.") {
+      ZX_REMOVED_SINCE(1, 25, 26, "Use new signature of Serve which takes fuchsia.io/Flags.") {
     if (!dispatcher) {
       dispatcher = async_get_default_dispatcher();
     }

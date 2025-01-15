@@ -248,7 +248,7 @@ type TransformId = struct {
 
 /// A maximum of 64 child transforms is enough for the expected usage of these APIs. Callers may
 /// beyond this limit using [`AddChild`].
-@available(added=NEXT)
+@available(added=26)
 const MAX_CHILD_TRANSFORMS int32 = 64;
 
 /// A user-defined identifier for a particular piece of Content. See Content creation functions
@@ -665,7 +665,7 @@ closed protocol Flatland {
 
     /// Removes all child Transforms from a parent Transform and replaces them with the new child
     /// transforms in `new_child_transform_ids`.
-    @available(added=NEXT)
+    @available(added=26)
     strict ReplaceChildren(struct {
         parent_transform_id TransformId;
         new_child_transform_ids vector<TransformId>:MAX_CHILD_TRANSFORMS;

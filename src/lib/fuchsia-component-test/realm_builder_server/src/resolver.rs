@@ -267,9 +267,9 @@ impl Registry {
         )
         .await?;
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "26")]
         package_dir.clone(ServerEnd::new(server_end.into_channel()))?;
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "26"))]
         package_dir.clone2(ServerEnd::new(server_end.into_channel()))?;
         let package = Some(fresolution::Package {
             url: Some(component_url.to_string()),
@@ -340,12 +340,12 @@ impl Registry {
         cm_fidl_validator::validate(&component_decl)
             .map_err(|_| fresolution::ResolverError::ManifestNotFound)?;
         let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "26")]
         component
             .package_dir
             .clone(ServerEnd::new(server_end.into_channel()))
             .map_err(|_| fresolution::ResolverError::Io)?;
-        #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+        #[cfg(not(fuchsia_api_level_at_least = "26"))]
         component
             .package_dir
             .clone2(ServerEnd::new(server_end.into_channel()))

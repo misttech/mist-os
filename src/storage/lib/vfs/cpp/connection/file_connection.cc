@@ -49,7 +49,7 @@ void FileConnection::Unbind() {
     binding_->Unbind();
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 void FileConnection::DeprecatedClone(DeprecatedCloneRequestView request,
                                      DeprecatedCloneCompleter::Sync& completer) {
 #else
@@ -64,7 +64,7 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
                                   std::move(request->object));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
 #else
 void FileConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {

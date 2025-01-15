@@ -691,7 +691,7 @@ class base_socket {
 
   zx_status_t CloneSocket(zx_handle_t* out_handle) {
     auto [client, server] = fidl::Endpoints<fuchsia_unknown::Cloneable>::Create();
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
     zx_status_t status = client_->Clone(std::move(server)).status();
 #else
     zx_status_t status = client_->Clone2(std::move(server)).status();

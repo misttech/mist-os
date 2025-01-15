@@ -566,22 +566,22 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
     /// that operate on the connection-specific buffer.
     async fn handle_request(&mut self, req: fio::FileRequest) -> Result<ConnectionState, Error> {
         match req {
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::FileRequest::DeprecatedClone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::DeprecatedClone");
                 self.handle_deprecated_clone(flags, object);
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::FileRequest::Clone { flags, object, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::Clone");
                 self.handle_deprecated_clone(flags, object);
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "26")]
             fio::FileRequest::Clone { request, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::Clone");
                 self.handle_clone(ServerEnd::new(request.into_channel()));
             }
-            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
+            #[cfg(not(fuchsia_api_level_at_least = "26"))]
             fio::FileRequest::Clone2 { request, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::Clone2");
                 self.handle_clone(ServerEnd::new(request.into_channel()));

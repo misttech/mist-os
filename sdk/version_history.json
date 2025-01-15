@@ -90,6 +90,10 @@
             "25": {
                 "abi_revision": "0x851ACAA143F52ABB",
                 "phase": "supported"
+            },
+            "26": {
+                "abi_revision": "0xB5D2EBDA9DA50585",
+                "phase": "supported"
             }
         },
         "special_api_levels": {

@@ -146,7 +146,7 @@ type FrameMediaSettings = table {
     /// instance created by the [`Frame`]. If not set, the usage is `COMMUNICATION` for WebRTC
     /// streams and `MEDIA` for all other streams.
     // TODO(https://fxbug.dev/384934089): deprecate and remove |AudioRenderUsage|
-    @available(deprecated=NEXT)
+    @available(deprecated=26)
     1: renderer_usage fuchsia.media.AudioRenderUsage;
 
     /// When set, enables usage of [`fuchsia.media/AudioConsumer`] for audio playback. In that
@@ -156,7 +156,7 @@ type FrameMediaSettings = table {
     /// The [`fuchsia.media/AudioRenderUsage2`] to set for every [`fuchsia.media/AudioRenderer`]
     /// instance created by the [`Frame`]. If not set, the usage is `COMMUNICATION` for WebRTC
     /// streams and `MEDIA` for all other streams.
-    @available(added=NEXT)
+    @available(added=26)
     3: renderer_usage2 fuchsia.media.AudioRenderUsage2;
 };
 

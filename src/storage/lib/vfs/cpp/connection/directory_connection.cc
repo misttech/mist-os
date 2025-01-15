@@ -99,7 +99,7 @@ void DirectoryConnection::Unbind() {
     binding_->Unbind();
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 void DirectoryConnection::DeprecatedClone(DeprecatedCloneRequestView request,
                                           DeprecatedCloneCompleter::Sync& completer) {
 #else
@@ -109,7 +109,7 @@ void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& 
                                   std::move(request->object));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
 void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
 #else
 void DirectoryConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {

@@ -52,7 +52,7 @@
 /// dependent power elements will power down first. Ideally, this forces the
 /// entire system into a configuration with a lower power consumption as the
 /// power level of `ExecutionState` decreases.
-@available(added=NEXT)
+@available(added=26)
 library fuchsia.power.system;
 
 using fuchsia.power.broker;
@@ -60,14 +60,14 @@ using zx;
 
 // TODO(https://fxbug.dev/339474151): Update this when EventPair is the standard
 // token for leases in Power Broker.
-@available(added=NEXT)
+@available(added=26)
 alias LeaseToken = zx.Handle:<EVENTPAIR, zx.Rights.TRANSFER | zx.Rights.DUPLICATE | zx.Rights.WAIT>;
 
-@available(added=NEXT)
+@available(added=26)
 const MAX_ELEMENT_NAME_LEN uint8 = 64;
 
 /// Errors returned by `ActivityGovernor/AcquireWakeLease`.
-@available(added=NEXT)
+@available(added=26)
 type AcquireWakeLeaseError = flexible enum : uint32 {
     /// The service encountered an error while attempting to issue a wake lease.
     INTERNAL = 1;
@@ -210,7 +210,7 @@ open protocol ActivityGovernorListener {
 /// execute code on the device. This typically includes the CPU, memory,
 /// operating system, and other components required for these components to
 /// function (clock trees, power domains, etc.).
-@available(added=NEXT)
+@available(added=26)
 @discoverable
 open protocol ActivityGovernor {
     // TODO(b/315994898): Provide tokens more granularly once client usage
@@ -249,7 +249,7 @@ open protocol ActivityGovernor {
     ///
     /// The hardware platform will not suspend as long as a valid
     /// [`LeaseToken`] exists.
-    @available(added=NEXT)
+    @available(added=26)
     flexible AcquireWakeLease(struct {
         /// The name of the lease.
         ///

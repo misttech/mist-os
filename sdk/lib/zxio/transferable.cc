@@ -68,7 +68,7 @@ zx_status_t Transferable::Clone(zx_handle_t* out_handle) {
   }
   auto client = fidl::UnownedClientEnd<funknown::Cloneable>(channel_.get());
   auto [client_end, server_end] = fidl::Endpoints<funknown::Cloneable>::Create();
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(26)
   const fidl::Status result = fidl::WireCall(client)->Clone(std::move(server_end));
 #else
   const fidl::Status result = fidl::WireCall(client)->Clone2(std::move(server_end));
