@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::manager::RepositoryManager;
-use crate::range::Range;
+use crate::range::{ContentRange, Range};
 use crate::repo_client::RepoClient;
 use crate::repository::{Error as RepoError, RepoProvider};
 use anyhow::Result;
@@ -324,17 +324,28 @@ async fn handle_connection(
                 Arc::clone(&sse_response_creators),
                 req,
             )
-            .inspect(move |resp| {
+            .map(move |(resp, content_range)| {
                 info!(
-                    "{} [ffx] {} {} {} => {}",
+                    "{} [ffx] {} {} {} => {} {}",
                     Utc::now().format("%T.%6f"),
                     peer_addr_clone,
                     method,
                     path,
-                    resp.status()
+                    resp.status(),
+                    match content_range {
+                        Some(ContentRange::Full { complete_len }) => complete_len.to_string(),
+                        Some(ContentRange::Inclusive {
+                            first_byte_pos,
+                            last_byte_pos,
+                            complete_len,
+                        }) => {
+                            format!("{first_byte_pos}-{last_byte_pos}/{complete_len}")
+                        }
+                        None => "-".into(),
+                    },
                 );
+                Ok::<_, Infallible>(resp)
             })
-            .map(Ok::<_, Infallible>)
         }),
     );
 
@@ -399,13 +410,15 @@ where
     }
 }
 
+// Handles the request and returns a response, for blobs and metadata files, also returns the
+// content range.
 async fn handle_request(
     executor: TaskExecutor<()>,
     server_stopped: Shared<futures::channel::oneshot::Receiver<()>>,
     repo_manager: Arc<RepositoryManager>,
     sse_response_creators: Arc<SseResponseCreatorMap>,
     req: Request<Body>,
-) -> Response<Body> {
+) -> (Response<Body>, Option<ContentRange>) {
     let mut path = req.uri().path();
 
     // Ignore the leading slash.
@@ -414,17 +427,18 @@ async fn handle_request(
     }
 
     if path.is_empty() {
-        return generate_repository_html(repo_manager);
+        return (generate_repository_html(repo_manager), None);
     }
 
     let (repo_name, resource_path) = path.split_once('/').unwrap_or((path, ""));
 
+    let status_response = |status_code| (status_response(status_code), None);
     let Some(repo) = repo_manager.get(repo_name) else {
         return status_response(StatusCode::NOT_FOUND);
     };
 
     if resource_path.is_empty() {
-        return generate_package_html(repo, repo_name).await;
+        return (generate_package_html(repo, repo_name).await, None);
     }
 
     let headers = req.headers();
@@ -441,14 +455,11 @@ async fn handle_request(
     let resource = match resource_path {
         "auto" => {
             if repo.read().await.supports_watch() {
-                return handle_auto(
-                    executor,
-                    server_stopped,
-                    repo_name,
-                    repo,
-                    sse_response_creators,
-                )
-                .await;
+                return (
+                    handle_auto(executor, server_stopped, repo_name, repo, sse_response_creators)
+                        .await,
+                    None,
+                );
             } else {
                 // The repo doesn't support watching.
                 return status_response(StatusCode::NOT_FOUND);
@@ -540,7 +551,7 @@ async fn handle_request(
         builder.status(StatusCode::OK)
     };
 
-    builder.body(Body::wrap_stream(resource.stream)).unwrap()
+    (builder.body(Body::wrap_stream(resource.stream)).unwrap(), Some(resource.content_range))
 }
 
 fn generate_repository_html(repo_manager: Arc<RepositoryManager>) -> Response<Body> {
