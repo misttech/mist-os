@@ -5,7 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/arm64/exception-asm.h>
-#include <lib/arch/arm64/sysreg-asm.h>
+#include <lib/arch/arm64/system-asm.h>
 #include <lib/arch/asm.h>
 #include <phys/exception.h>
 #include <phys/stack.h>

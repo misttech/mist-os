@@ -4,13 +4,15 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/arch/arm64/feature.h>
 #include <lib/arch/arm64/system.h>
 
 #include <hwreg/asm.h>
 
 int main(int argc, char** argv) {
   return hwreg::AsmHeader()  //
+      .Register<arch::ArmCurrentEl>("CURRENT_EL_")
+      .Register<arch::ArmDaif>("DAIF_")
+      .Register<arch::ArmDaifSetClr>("DAIFSETCLR_")
       .Register<arch::ArmCnthctlEl2NoEl2Host>("CNTHCTL_EL2_")
       .Register<arch::ArmCptrEl2NoEl2Host>("CPTR_EL2_")
       // The CPTR bits unknown to hwreg are those intended to be reserved as one.
@@ -18,7 +20,6 @@ int main(int argc, char** argv) {
       .Register<arch::ArmCurrentEl>("CURRENT_EL_")
       .Register<arch::ArmHcrEl2>("HCR_EL2_")
       .Register<arch::ArmIccSreEl2>("ICC_SRE_EL2_")
-      .Register<arch::ArmIdAa64Pfr0El1>("ID_AA64PFR0_EL1_")
       .Register<arch::ArmSctlrEl1>("SCTLR_EL1_")
       .Register<arch::ArmSctlrEl2>("SCTLR_EL2_")
       .Register<arch::ArmSpsrEl2>("SPSR_EL2_")
