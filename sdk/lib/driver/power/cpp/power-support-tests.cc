@@ -25,6 +25,12 @@
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/fidl/cpp/wire_natural_conversions.h>
+#include <lib/fpromise/promise.h>
+#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/cpp/inspector.h>
+#include <lib/inspect/cpp/reader.h>
+#include <lib/inspect/cpp/vmo/types.h>
+#include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/zx/event.h>
@@ -213,7 +219,7 @@ TEST_F(PowerLibTest, TestLeaseHelper) {
 
   // Now run the created element with an element runner
   fdf_power::ElementRunner element_runner(
-      std::move(description.required_level_client.value()),
+      "test element", std::move(description.required_level_client.value()),
       std::move(description.current_level_client.value()),
       [level_rose = &level_rose, lease_acquired = &lease_acquired,
        quit = QuitLoopClosure()](uint8_t new_level) {
@@ -244,7 +250,7 @@ TEST_F(PowerLibTest, TestLeaseHelper) {
               std::unique_ptr<fdf_power::LeaseHelper>>
       creation_result = fdf_power::CreateLeaseHelper(
           power_broker.client, std::move(deps), "test_lease", async_get_default_dispatcher(),
-          []() { ASSERT_TRUE(false) << "error callback triggered unexpectedly"; });
+          []() { ASSERT_TRUE(false) << "error callback triggered unexpectedly"; }, nullptr);
   ASSERT_FALSE(creation_result.is_error());
 
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_ctl;
@@ -284,7 +290,7 @@ TEST_F(PowerLibTest, TestCreateLeaseHelperWithClosedChannel) {
               std::unique_ptr<fdf_power::LeaseHelper>>
       creation_result = fdf_power::CreateLeaseHelper(
           power_broker.client, std::move(deps), "test_lease", async_get_default_dispatcher(),
-          []() { ASSERT_TRUE(false) << "error callback triggered unexpectedly"; });
+          []() { ASSERT_TRUE(false) << "error callback triggered unexpectedly"; }, nullptr);
   ASSERT_TRUE(creation_result.is_error());
   std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElementError>> error_val =
       creation_result.error_value();
@@ -328,7 +334,7 @@ TEST_F(PowerLibTest, TestCreateLeaseHelperWithInvalidToken) {
               std::unique_ptr<fdf_power::LeaseHelper>>
       creation_result = fdf_power::CreateLeaseHelper(
           power_broker.client, std::move(deps), "test_lease", async_get_default_dispatcher(),
-          []() { ASSERT_TRUE(false) << "error callback triggered unexpectedly"; });
+          []() { ASSERT_TRUE(false) << "error callback triggered unexpectedly"; }, nullptr);
   ASSERT_TRUE(creation_result.is_error());
   std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElementError>> error_val =
       creation_result.error_value();
@@ -351,6 +357,8 @@ TEST_F(PowerLibTest, TestElementRunner) {
   bool rls_done = false;
   bool runner_done = false;
 
+  inspect::Inspector general = inspect::Inspector();
+
   fit::function<void(fdf_power::ElementRunnerError)> completion_handler =
       [run_done = &runner_done, cls_done = &cls_done, rls_done = &rls_done,
        quit_loop = QuitLoopClosure()](fdf_power::ElementRunnerError err) {
@@ -360,16 +368,55 @@ TEST_F(PowerLibTest, TestElementRunner) {
         }
       };
 
+  // These are the current level values we expect inspect to have during level
+  // change callbacks.
+  const std::vector<uint8_t> current_levels{0, 2};
+  // These are teh required lievel values we expect to see in inspect during
+  // level change callbacks.
+  const std::vector<uint8_t> required_levels{2, 3};
+  uint8_t request_count = 0;
+
   std::unique_ptr<fdf_power::ElementRunner> runner = std::make_unique<fdf_power::ElementRunner>(
-      std::move(required_level_channel.client), std::move(current_level_channel.client),
-      fdf_power::default_level_changer, std::move(completion_handler), dispatcher());
+      "test element", std::move(required_level_channel.client),
+      std::move(current_level_channel.client),
+      [general = &general, loop = this, &request_count, &required_levels,
+       &current_levels](uint8_t new_level) {
+        // Check that the level reported in inspect is initially zero
+        fpromise::result<inspect::Hierarchy> inspect_tree =
+            loop->RunPromise(inspect::ReadFromInspector(*general));
+        EXPECT_TRUE(inspect_tree.is_ok());
+
+        auto* req_level =
+            inspect_tree.value().node().get_property<inspect::UintPropertyValue>("required_level");
+        EXPECT_EQ(req_level->value(), required_levels[request_count]);
+
+        auto* current_level =
+            inspect_tree.value().node().get_property<inspect::UintPropertyValue>("current_level");
+        EXPECT_EQ(current_level->value(), current_levels[request_count]);
+
+        request_count++;
+        return fit::success(new_level);
+      },
+      std::move(completion_handler), dispatcher(), &general.GetRoot());
   runner->RunPowerElement();
 
-  const std::vector<uint8_t> level_values{2, 3};
+  // Check that the level reported in inspect is initially zero
+  fpromise::result<inspect::Hierarchy> inspect_tree =
+      RunPromise(inspect::ReadFromInspector(general));
+  ASSERT_TRUE(inspect_tree.is_ok());
+  auto* req_level =
+      inspect_tree.value().node().get_property<inspect::UintPropertyValue>("required_level");
+  ASSERT_EQ(req_level->value(), 0u);
+  auto* current_level =
+      inspect_tree.value().node().get_property<inspect::UintPropertyValue>("current_level");
+  ASSERT_EQ(current_level->value(), 0u);
+  auto* name =
+      inspect_tree.value().node().get_property<inspect::StringPropertyValue>("element_name");
+  ASSERT_EQ(name->value(), "test element");
 
   std::unique_ptr<RequiredLevelServer> rls = std::make_unique<RequiredLevelServer>(
-      level_values, [run_done = &runner_done, cls_done = &cls_done, rls_done = &rls_done,
-                     quit_loop = QuitLoopClosure()]() {
+      required_levels, [run_done = &runner_done, cls_done = &cls_done, rls_done = &rls_done,
+                        quit_loop = QuitLoopClosure()]() {
         *rls_done = true;
         if (*run_done && *cls_done && *rls_done) {
           quit_loop();
@@ -382,8 +429,8 @@ TEST_F(PowerLibTest, TestElementRunner) {
              fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> channel) {});
 
   std::unique_ptr<CurrentLevelServer> cls = std::make_unique<CurrentLevelServer>(
-      level_values, [run_done = &runner_done, cls_done = &cls_done, rls_done = &rls_done,
-                     quit_loop = QuitLoopClosure()]() {
+      required_levels, [run_done = &runner_done, cls_done = &cls_done, rls_done = &rls_done,
+                        quit_loop = QuitLoopClosure()]() {
         *cls_done = true;
         if (*run_done && *cls_done && *rls_done) {
           quit_loop();
@@ -396,6 +443,15 @@ TEST_F(PowerLibTest, TestElementRunner) {
              fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> channel) {});
 
   RunLoop();
+  // Check that the level reported in inspect rose
+  inspect_tree = RunPromise(inspect::ReadFromInspector(general));
+  ASSERT_TRUE(inspect_tree.is_ok());
+  req_level =
+      inspect_tree.value().node().get_property<inspect::UintPropertyValue>("required_level");
+  ASSERT_EQ(req_level->value(), 3u);
+  current_level =
+      inspect_tree.value().node().get_property<inspect::UintPropertyValue>("current_level");
+  ASSERT_EQ(current_level->value(), 3u);
 }
 
 /// Test calling |ElementRunner.SetLevel| and expect the value to be received
@@ -442,8 +498,9 @@ TEST_F(PowerLibTest, TestElementRunnerManualSet) {
              fidl::ServerEnd<fuchsia_power_broker::CurrentLevel> current_level_channel) {});
 
   std::unique_ptr<fdf_power::ElementRunner> runner = std::make_unique<fdf_power::ElementRunner>(
-      std::move(required_level_channel.client), std::move(current_level_channel.client),
-      fdf_power::default_level_changer, [](fdf_power::ElementRunnerError err) {}, dispatcher());
+      "test element", std::move(required_level_channel.client),
+      std::move(current_level_channel.client), fdf_power::default_level_changer,
+      [](fdf_power::ElementRunnerError err) {}, dispatcher());
   runner->RunPowerElement();
 
   // Set the level manually

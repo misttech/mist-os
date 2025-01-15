@@ -341,6 +341,7 @@ void ElementRunner::RunPowerElement() {
           return;
         }
 
+        required_level_.Set(result->required_level());
         fit::result<zx_status_t, uint8_t> change_result =
             on_level_change_(result->required_level());
 
@@ -350,6 +351,7 @@ void ElementRunner::RunPowerElement() {
           return;
         }
 
+        current_level_.Set(change_result.value());
         current_level_client_->Update({change_result.value()})
             .Then([&](fidl::Result<fuchsia_power_broker::CurrentLevel::Update>& update_result) {
               if (update_result.is_error()) {
@@ -383,6 +385,8 @@ void ElementRunner::SetLevel(
     fit::function<
         void(fit::result<fidl::ErrorsIn<fuchsia_power_broker::CurrentLevel::Update>, zx_status_t>)>
         callback) {
+  current_level_.Set(level);
+
   // Sets the level and reports the result to |callback|
   current_level_client_->Update(level).Then(
       [callback = std::move(callback)](
@@ -672,7 +676,8 @@ fit::result<std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElem
             std::unique_ptr<LeaseHelper>>
 CreateLeaseHelper(const fidl::ClientEnd<fuchsia_power_broker::Topology>& topology,
                   std::vector<LeaseDependency> dependencies, std::string lease_name,
-                  async_dispatcher_t* dispatcher, fit::function<void()> error_callback) {
+                  async_dispatcher_t* dispatcher, fit::function<void()> error_callback,
+                  inspect::Node* parent) {
   // Create the channels
   fidl::Endpoints<fuchsia_power_broker::CurrentLevel> current_level =
       fidl::CreateEndpoints<fuchsia_power_broker::CurrentLevel>().value();
@@ -720,8 +725,9 @@ CreateLeaseHelper(const fidl::ClientEnd<fuchsia_power_broker::Topology>& topolog
 
   // Move the pieces from the FIDL creation result to the direct lease object
   std::unique_ptr<LeaseHelper> helper = std::make_unique<LeaseHelper>(
-      std::move(element_control.client), std::move(lessor.client), std::move(required_level.client),
-      std::move(current_level.client), dispatcher, std::move(error_callback));
+      element_definition.element_name().value(), std::move(element_control.client),
+      std::move(lessor.client), std::move(required_level.client), std::move(current_level.client),
+      dispatcher, std::move(error_callback), parent);
   return fit::success(std::move(helper));
 }
 
