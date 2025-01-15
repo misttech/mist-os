@@ -167,6 +167,7 @@ fn create_test_kernel(
         fuchsia_inspect::Node::default(),
         None,
         security::testing::kernel_state(security_server),
+        Vec::new(),
     )
     .expect("failed to create kernel")
 }

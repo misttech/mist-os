@@ -26,6 +26,7 @@ use crate::vfs::socket::{
 };
 use crate::vfs::{
     DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString, Mounts,
+    StaticDirectoryBuilder,
 };
 use bstr::BString;
 use expando::Expando;
@@ -301,6 +302,10 @@ pub struct Kernel {
     /// CryptManagement. Similarly, if a user removes a key and that user was the last user in
     /// that key's users list, Starnix will remove that wrapping key from CryptManagement.
     pub encryption_keys: RwLock<HashMap<EncryptionKeyId, Vec<u32>>>,
+
+    /// Vector of functions to be run when procfs is constructed. This is to allow
+    /// modules to expose directories into /proc/device-tree.
+    pub procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -361,6 +366,7 @@ impl Kernel {
         inspect_node: fuchsia_inspect::Node,
         framebuffer_aspect_ratio: Option<&AspectRatio>,
         security_state: security::KernelState,
+        procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =
             Box::new(|x: FsString| -> SocketAddress { SocketAddress::Unix(x) });
@@ -431,6 +437,7 @@ impl Kernel {
             memory_attribution_manager: MemoryAttributionManager::new(kernel.clone()),
             crash_reporter,
             encryption_keys: RwLock::new(HashMap::new()),
+            procfs_device_tree_setup,
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

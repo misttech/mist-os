@@ -27,7 +27,9 @@ use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::time::utc::update_utc_clock;
-use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
+use starnix_core::vfs::{
+    FileSystemOptions, FsContext, LookupContext, Namespace, StaticDirectoryBuilder, WhatToMount,
+};
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
@@ -481,6 +483,13 @@ async fn create_container(
         kernel_cmdline.extend(&*params);
     }
 
+    // Collect a vector of functions to be invoked while constructing /proc/device-tree
+    let mut procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)> =
+        Vec::new();
+    if features.nanohub {
+        procfs_device_tree_setup.push(starnix_modules_nanohub::nanohub_procfs_builder);
+    }
+
     // Check whether we actually have access to a role manager by trying to set our own
     // thread's role.
     let role_manager = connect_to_protocol_sync::<RoleManagerMarker>().unwrap();
@@ -512,6 +521,7 @@ async fn create_container(
         kernel_node,
         features.aspect_ratio.as_ref(),
         security_state,
+        procfs_device_tree_setup,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
     let fs_context = create_fs_context(

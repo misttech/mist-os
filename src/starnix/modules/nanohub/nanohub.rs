@@ -6,8 +6,24 @@ use crate::nanohub_comms_directory::NanohubCommsDirectory;
 use crate::socket_tunnel_file::register_socket_tunnel_device;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::FsString;
+use starnix_core::vfs::{BytesFile, FsString, StaticDirectoryBuilder};
 use starnix_sync::{FileOpsCore, LockBefore, Locked};
+use starnix_uapi::mode;
+
+/// Function to be invoked by ProcDirectory while constructing /proc/device-tree
+pub fn nanohub_procfs_builder(
+    builder: &'_ mut StaticDirectoryBuilder<'_>,
+    current_task: &CurrentTask,
+) {
+    builder.subdir(current_task, "mcu", 0o555, |dir| {
+        dir.entry(
+            current_task,
+            "board_type",
+            BytesFile::new_node(b"starnix".to_vec()),
+            mode!(IFREG, 0o444),
+        );
+    });
+}
 
 pub fn nanohub_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
 where

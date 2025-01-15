@@ -74,6 +74,13 @@ impl ProcDirectory {
                 DevicesFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             ),
+            "device-tree".into() => {
+                    let mut directory = StaticDirectoryBuilder::new(fs);
+                    for setup_function in &kernel.procfs_device_tree_setup {
+                        setup_function(&mut directory, current_task);
+                    }
+                    directory.build(current_task)
+            },
             "self".into() => SelfSymlink::new_node(current_task, fs),
             "thread-self".into() => ThreadSelfSymlink::new_node(current_task, fs),
             "meminfo".into() => fs.create_node(
