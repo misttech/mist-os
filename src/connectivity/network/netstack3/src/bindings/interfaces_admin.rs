@@ -252,12 +252,10 @@ impl OwnedControlHandle {
     }
 }
 
-/// Operates a fuchsia.net.interfaces.admin/DeviceControl.CreateInterface
-/// request.
+/// Operates a fuchsia.net.interfaces.admin/DeviceControl.CreateInterface request.
 ///
-/// Returns `Some([fuchsia_async::Task;2])` if an interface was created
-/// successfully. The returned `Task`s must be polled to completion and are tied
-/// to the created interface's lifetime.
+/// Returns `Some(fuchsia_async::Task)` if an interface was created successfully. The returned
+/// `Task` must be polled to completion and is tied to the created interface's lifetime.
 async fn create_interface(
     port: fhardware_network::PortId,
     control: fidl::endpoints::ServerEnd<fnet_interfaces_admin::ControlMarker>,
