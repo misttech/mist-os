@@ -295,10 +295,26 @@ zx_status_t zxio_flags_get(zxio_t* io, uint32_t* out_flags) {
     return ZX_ERR_BAD_HANDLE;
   }
   zxio_internal_t* zio = to_internal(io);
-  return zio->ops->flags_get(io, out_flags);
+  return zio->ops->flags_get_deprecated(io, out_flags);
 }
 
 zx_status_t zxio_flags_set(zxio_t* io, uint32_t flags) {
+  if (!zxio_is_valid(io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(io);
+  return zio->ops->flags_set_deprecated(io, flags);
+}
+
+zx_status_t zxio_flags_get2(zxio_t* io, uint64_t* out_flags) {
+  if (!zxio_is_valid(io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(io);
+  return zio->ops->flags_get(io, out_flags);
+}
+
+zx_status_t zxio_flags_set2(zxio_t* io, uint64_t flags) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;
   }

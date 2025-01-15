@@ -20,6 +20,8 @@
 		zxio_fault_catching_disabled;
 		zxio_flags_get;
 		zxio_flags_set;
+		zxio_flags_get2;
+		zxio_flags_set2;
 		zxio_get_posix_mode;
 		zxio_get_read_buffer_available;
 		zxio_get_window_size;

@@ -26,8 +26,10 @@ class Transferable : public HasIo {
   zx_status_t Clone(zx_handle_t* out_handle);
   zx_status_t Release(zx_handle_t* out_handle);
   zx_status_t AttrGet(zxio_node_attributes_t* inout_attr);
-  zx_status_t FlagsGet(uint32_t* out_flags);
-  zx_status_t FlagsSet(uint32_t flags);
+  zx_status_t FlagsGetDeprecated(uint32_t* out_flags);
+  zx_status_t FlagsSetDeprecated(uint32_t flags);
+  zx_status_t FlagsGet(uint64_t* out_flags);
+  zx_status_t FlagsSet(uint64_t flags);
 
   zx::channel channel_;
 };
@@ -39,6 +41,8 @@ constexpr zxio_ops_t Transferable::kOps = []() {
   ops.clone = Adaptor::From<&Transferable::Clone>;
   ops.release = Adaptor::From<&Transferable::Release>;
   ops.attr_get = Adaptor::From<&Transferable::AttrGet>;
+  ops.flags_get_deprecated = Adaptor::From<&Transferable::FlagsGetDeprecated>;
+  ops.flags_set_deprecated = Adaptor::From<&Transferable::FlagsSetDeprecated>;
   ops.flags_get = Adaptor::From<&Transferable::FlagsGet>;
   ops.flags_set = Adaptor::From<&Transferable::FlagsSet>;
   return ops;
@@ -95,7 +99,7 @@ zx_status_t Transferable::AttrGet(zxio_node_attributes_t* inout_attr) {
   return ZX_OK;
 }
 
-zx_status_t Transferable::FlagsGet(uint32_t* out_flags) {
+zx_status_t Transferable::FlagsGetDeprecated(uint32_t* out_flags) {
   // By default a transferable is readable and writeable - zxio doesn't know.
   fuchsia_io::wire::OpenFlags flags{};
   flags |= fuchsia_io::wire::OpenFlags::kRightReadable;
@@ -104,7 +108,17 @@ zx_status_t Transferable::FlagsGet(uint32_t* out_flags) {
   return ZX_OK;
 }
 
-zx_status_t Transferable::FlagsSet(uint32_t flags) { return ZX_OK; }
+zx_status_t Transferable::FlagsSetDeprecated(uint32_t flags) { return ZX_OK; }
+
+zx_status_t Transferable::FlagsGet(uint64_t* out_flags) {
+  // By default a transferable is readable and writeable.
+  constexpr fuchsia_io::wire::Flags kFlags =
+      fuchsia_io::wire::Flags::kPermRead | fuchsia_io::wire::Flags::kPermWrite;
+  *out_flags = uint64_t{kFlags};
+  return ZX_OK;
+}
+
+zx_status_t Transferable::FlagsSet(uint64_t flags) { return ZX_OK; }
 
 }  // namespace
 

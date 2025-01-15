@@ -162,11 +162,19 @@ zx_status_t zxio::link(std::string_view src, zx_handle_t dst_token, std::string_
                    dst.length());
 }
 
-zx_status_t zxio::get_flags(fio::wire::OpenFlags* out_flags) {
+zx_status_t zxio::get_flags(fio::wire::Flags* out_flags) {
+  return zxio_flags_get2(&zxio_storage().io, reinterpret_cast<uint64_t*>(out_flags));
+}
+
+zx_status_t zxio::set_flags(fio::wire::Flags flags) {
+  return zxio_flags_set2(&zxio_storage().io, static_cast<uint64_t>(flags));
+}
+
+zx_status_t zxio::get_flags_deprecated(fio::wire::OpenFlags* out_flags) {
   return zxio_flags_get(&zxio_storage().io, reinterpret_cast<uint32_t*>(out_flags));
 }
 
-zx_status_t zxio::set_flags(fio::wire::OpenFlags flags) {
+zx_status_t zxio::set_flags_deprecated(fio::wire::OpenFlags flags) {
   return zxio_flags_set(&zxio_storage().io, static_cast<uint32_t>(flags));
 }
 

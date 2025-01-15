@@ -119,18 +119,18 @@ class Vmo : public HasIo {
 
   zx_status_t Truncate(uint64_t length) { return vmo_.set_size(length); }
 
-  zx_status_t FlagsGet(uint32_t* out_flags) {
+  zx_status_t FlagsGetDeprecated(uint32_t* out_flags) {
     zx_info_handle_basic_t info;
     zx_status_t get_status =
         vmo_.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
     if (get_status != ZX_OK) {
       // Returns ZX_ERR_NOT_SUPPORTED, because a posix FD doesn't seem to have any way to lack
       // sufficient rights to F_GETFL (AFAICT), so the most accurate description of this situation
-      // (AFAICT) is that FlagsGet() isn't supported on this particular zxio_t after all. We could
-      // just return ZX_ERR_NOT_SUPPORTED directly here, but in case the behavior of
-      // zxio_default_flags_get() changes, we really do want to delegate to the default behavior
-      // here, to make sure we continue to say "we don't have that op after all" essentially.
-      return zxio_default_flags_get(io(), out_flags);
+      // (AFAICT) is that FlagsGetDeprecated() isn't supported on this particular zxio_t after all.
+      // We could return ZX_ERR_NOT_SUPPORTED here, but if zxio_default_flags_get_deprecated()
+      // changes, we really do want to delegate to the default behavior to make sure we continue to
+      // say "we don't have that op after all" essentially.
+      return zxio_default_flags_get_deprecated(io(), out_flags);
     }
     ZX_ASSERT(info.type == ZX_OBJ_TYPE_VMO);
     fuchsia_io::wire::OpenFlags flags{};
@@ -144,6 +144,33 @@ class Vmo : public HasIo {
       flags |= fuchsia_io::wire::OpenFlags::kRightExecutable;
     }
     *out_flags = static_cast<uint32_t>(flags);
+    return ZX_OK;
+  }
+
+  zx_status_t FlagsGet(uint64_t* out_flags) {
+    zx_info_handle_basic_t info;
+    zx_status_t get_status =
+        vmo_.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+    if (get_status != ZX_OK) {
+      // Returns ZX_ERR_NOT_SUPPORTED, because a posix FD doesn't seem to have any way to lack
+      // sufficient rights to F_GETFL (AFAICT), so the most accurate description of this situation
+      // (AFAICT) is that FlagsGet() isn't supported on this particular zxio_t after all. We could
+      // return ZX_ERR_NOT_SUPPORTED here, but if zxio_default_flags_get() changes, we really do
+      // want to delegate to say "we don't have that op after all" essentially.
+      return zxio_default_flags_get(io(), out_flags);
+    }
+    ZX_ASSERT(info.type == ZX_OBJ_TYPE_VMO);
+    fuchsia_io::wire::Flags flags{};
+    if (info.rights & ZX_RIGHT_READ) {
+      flags |= fuchsia_io::wire::Flags::kPermRead;
+    }
+    if (info.rights & ZX_RIGHT_WRITE) {
+      flags |= fuchsia_io::wire::Flags::kPermWrite;
+    }
+    if (info.rights & ZX_RIGHT_EXECUTE) {
+      flags |= fuchsia_io::wire::Flags::kPermExecute;
+    }
+    *out_flags = uint64_t{flags};
     return ZX_OK;
   }
 
@@ -229,6 +256,7 @@ constexpr zxio_ops_t Vmo::kOps = []() {
   ops.writev_at = Adaptor::From<&Vmo::WritevAt>;
   ops.seek = Adaptor::From<&Vmo::Seek>;
   ops.truncate = Adaptor::From<&Vmo::Truncate>;
+  ops.flags_get_deprecated = Adaptor::From<&Vmo::FlagsGetDeprecated>;
   ops.flags_get = Adaptor::From<&Vmo::FlagsGet>;
   ops.vmo_get = Adaptor::From<&Vmo::VmoGet>;
   return ops;

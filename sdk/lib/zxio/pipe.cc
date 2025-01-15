@@ -215,7 +215,7 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
 
   ops.getpeername = ops.getsockname;
 
-  ops.flags_get = [](zxio_t* io, uint32_t* out_flags) {
+  ops.flags_get_deprecated = [](zxio_t* io, uint32_t* out_flags) {
     zx_info_handle_basic info;
     zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
                                                            sizeof(info), nullptr, nullptr);
@@ -234,7 +234,7 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
     return ZX_OK;
   };
 
-  ops.flags_set = [](zxio_t* io, uint32_t flags) {
+  ops.flags_set_deprecated = [](zxio_t* io, uint32_t flags) {
     zx_info_handle_basic info;
     zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
                                                            sizeof(info), nullptr, nullptr);
@@ -249,6 +249,43 @@ static constexpr zxio_ops_t zxio_pipe_ops = []() {
     bool is_writable = info.rights & ZX_RIGHT_WRITE;
 
     // Ensure that the supported flags (readable, writeable) match the rights on the socket.
+    if ((set_readable != is_readable) || (set_writable != is_writable)) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+    return ZX_OK;
+  };
+
+  ops.flags_get = [](zxio_t* io, uint64_t* out_flags) {
+    zx_info_handle_basic info;
+    zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
+                                                           sizeof(info), nullptr, nullptr);
+    if (status != ZX_OK) {
+      return status;
+    }
+    ZX_ASSERT(info.type == ZX_OBJ_TYPE_SOCKET);
+    fuchsia_io::wire::Flags flags{};
+    if (info.rights & ZX_RIGHT_READ) {
+      flags |= fuchsia_io::wire::Flags::kPermRead;
+    }
+    if (info.rights & ZX_RIGHT_WRITE) {
+      flags |= fuchsia_io::wire::Flags::kPermWrite;
+    }
+    *out_flags = static_cast<uint64_t>(flags);
+    return ZX_OK;
+  };
+
+  ops.flags_set = [](zxio_t* io, uint64_t flags) {
+    zx_info_handle_basic info;
+    zx_status_t status = zxio_get_pipe(io).socket.get_info(ZX_INFO_HANDLE_BASIC, &info,
+                                                           sizeof(info), nullptr, nullptr);
+    if (status != ZX_OK) {
+      return status;
+    }
+    // Ensure that the supported flags (readable, writeable) match the rights on the socket.
+    const bool set_readable = flags & static_cast<uint64_t>(fuchsia_io::wire::Flags::kPermRead);
+    const bool set_writable = flags & static_cast<uint64_t>(fuchsia_io::wire::Flags::kPermWrite);
+    const bool is_readable = info.rights & ZX_RIGHT_READ;
+    const bool is_writable = info.rights & ZX_RIGHT_WRITE;
     if ((set_readable != is_readable) || (set_writable != is_writable)) {
       return ZX_ERR_NOT_SUPPORTED;
     }

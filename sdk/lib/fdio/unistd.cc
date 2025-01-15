@@ -636,8 +636,8 @@ extern "C" __EXPORT void __libc_extensions_fini(void) __TA_NO_THREAD_SAFETY_ANAL
   for (auto& var : gstate.fdtab) {
     [[maybe_unused]] const fdio_ptr io = var.release();
   }
-   // Automatic destructor registration is prevented for this object. Now that it's safely after all
-   // others, call its destructor explicitly. See commentary in `fdio_global_state`.
+  // Automatic destructor registration is prevented for this object. Now that it's safely after all
+  // others, call its destructor explicitly. See commentary in `fdio_global_state`.
   gstate.~fdio_state_t();
 }
 
@@ -976,7 +976,9 @@ int fcntl(int fd, int cmd, ...) {
         return ERRNO(EBADF);
       }
       fio::OpenFlags flags;
-      zx_status_t status = io->get_flags(&flags);
+      // TODO(https://fxbug.dev/376509077): Transition to get_flags when GetFlags2 is
+      // supported by all out-of-tree servers.
+      zx_status_t status = io->get_flags_deprecated(&flags);
       if (status != ZX_OK) {
         return ERROR(status);
       }
@@ -994,7 +996,9 @@ int fcntl(int fd, int cmd, ...) {
       GET_INT_ARG(fdio_flags);
 
       const fio::OpenFlags flags = fdio_internal::PosixToOpenFlags(fdio_flags & ~O_NONBLOCK);
-      zx_status_t status = io->set_flags(flags);
+      // TODO(https://fxbug.dev/376509077): Transition to set_flags when SetFlags2 is
+      // supported by all out-of-tree servers.
+      zx_status_t status = io->set_flags_deprecated(flags);
 
       // Some remotes don't support setting flags; we
       // can adjust their local flags anyway if NONBLOCK

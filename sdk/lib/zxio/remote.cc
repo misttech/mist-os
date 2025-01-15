@@ -496,9 +496,13 @@ class Remote : public HasIo {
 
   zx_status_t AdvisoryLock(advisory_lock_req* req);
 
-  zx_status_t FlagsGet(uint32_t* out_flags);
+  zx_status_t FlagsGetDeprecated(uint32_t* out_flags);
 
-  zx_status_t FlagsSet(uint32_t flags);
+  zx_status_t FlagsSetDeprecated(uint32_t flags);
+
+  zx_status_t FlagsGet(uint64_t* out_flags);
+
+  zx_status_t FlagsSet(uint64_t flags);
 
   zx_status_t LinkInto(zx_handle_t dst_token, const char* dst_path, size_t dst_path_len);
 
@@ -531,6 +535,8 @@ class Remote : public HasIo {
     // operations by providing a method in their public interface with the same name/type.
     ops.attr_get = Adaptor<T>::template From<&T::AttrGet>;
     ops.attr_set = Adaptor<T>::template From<&T::AttrSet>;
+    ops.flags_get_deprecated = Adaptor<T>::template From<&T::FlagsGetDeprecated>;
+    ops.flags_set_deprecated = Adaptor<T>::template From<&T::FlagsSetDeprecated>;
     ops.flags_get = Adaptor<T>::template From<&T::FlagsGet>;
     ops.flags_set = Adaptor<T>::template From<&T::FlagsSet>;
     ops.sync = Adaptor<T>::template From<&T::Sync>;
@@ -911,7 +917,7 @@ zx_status_t Remote<Protocol>::AdvisoryLock(advisory_lock_req* req) {
 }
 
 template <typename Protocol>
-zx_status_t Remote<Protocol>::FlagsGet(uint32_t* out_flags) {
+zx_status_t Remote<Protocol>::FlagsGetDeprecated(uint32_t* out_flags) {
   const fidl::WireResult result = client()->GetFlags();
   if (!result.ok()) {
     return result.status();
@@ -925,13 +931,68 @@ zx_status_t Remote<Protocol>::FlagsGet(uint32_t* out_flags) {
 }
 
 template <typename Protocol>
-zx_status_t Remote<Protocol>::FlagsSet(uint32_t flags) {
+zx_status_t Remote<Protocol>::FlagsSetDeprecated(uint32_t flags) {
   const fidl::WireResult result = client()->SetFlags(static_cast<fio::wire::OpenFlags>(flags));
   if (!result.ok()) {
     return result.status();
   }
   const auto& response = result.value();
   return response.s;
+}
+
+template <typename Protocol>
+zx_status_t Remote<Protocol>::FlagsGet(uint64_t* out_flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  const fidl::WireResult result = client()->GetFlags2();
+  if (result.ok()) {
+    if (result->is_error()) {
+      return result->error_value();
+    }
+    *out_flags = uint64_t{(*result)->flags};
+    return ZX_OK;
+  }
+  if (result.status() != ZX_ERR_NOT_SUPPORTED) {
+    return result.status();
+  }
+  // Fallback to fuchsia.io/Node.GetFlags if the server doesn't support GetFlags2.
+  // TODO(https://fxbug.dev/376509077): Remove fallback when GetFlags2 is supported by all
+  // out-of-tree servers at all API levels.
+#endif
+  // fuchsia.io servers only support setting the APPEND flag so we can ignore other flags here.
+  uint32_t deprecated_flags = {};
+  const zx_status_t status = FlagsGetDeprecated(&deprecated_flags);
+  if (status == ZX_OK) {
+    *out_flags = {};
+    if (fio::wire::OpenFlags{deprecated_flags} & fio::wire::OpenFlags::kAppend) {
+      *out_flags |= uint64_t{fio::wire::Flags::kFileAppend};
+    }
+  }
+  return status;
+}
+
+template <typename Protocol>
+zx_status_t Remote<Protocol>::FlagsSet(uint64_t flags) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  const fidl::WireResult result = client()->SetFlags2(fio::wire::Flags{flags});
+  if (result.ok()) {
+    if (result->is_error()) {
+      return result->error_value();
+    }
+    return ZX_OK;
+  }
+  if (result.status() != ZX_ERR_NOT_SUPPORTED) {
+    return result.status();
+  }
+  // Fallback to fuchsia.io/Node.SetFlags if the server doesn't support SetFlags2.
+  // TODO(https://fxbug.dev/376509077): Remove fallback when SetFlags2 is supported by all
+  // out-of-tree servers at all API levels.
+#endif
+  // fuchsia.io servers only support setting the APPEND flag so we can ignore other flags here.
+  fio::wire::OpenFlags deprecated_flags = {};
+  if (fio::wire::Flags{flags} & fio::wire::Flags::kFileAppend) {
+    deprecated_flags |= fio::wire::OpenFlags::kAppend;
+  }
+  return FlagsSetDeprecated(uint32_t{deprecated_flags});
 }
 
 template <typename Protocol>

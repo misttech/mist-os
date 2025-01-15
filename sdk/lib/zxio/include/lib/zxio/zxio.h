@@ -276,22 +276,44 @@ ZXIO_EXPORT zx_status_t zxio_seek(zxio_t* io, zxio_seek_origin_t start, int64_t 
 // Shrink the file size to |length| bytes.
 ZXIO_EXPORT zx_status_t zxio_truncate(zxio_t* io, uint64_t length);
 
-// Returns the flags associated with the file.
+// TODO(https://fxbug.dev/376509077): Remove this when soft rename of zxio_flags* is complete.
+#define ZXIO_USE_LEGACY_FLAGS_FUNCTION_NAMES
+
+// [DEPRECATED - Use |zxio_flags_get2| instead.] Returns the flags associated with the file.
 //
-// These flags are typically set when the file is opened but can be modified by
-// |zxio_flags_set|.
+// These flags are typically set when the file is opened but can be modified by |zxio_flags_set|.
 //
 // See fuchsia.io for the available |flags|.
+// TODO(https://fxbug.dev/376509077): Rename this to zxio_deprecated_flags_get.
 ZXIO_EXPORT zx_status_t zxio_flags_get(zxio_t* io, uint32_t* out_flags);
+
+// [DEPRECATED - Use |zxio_flags_set2| instead.] Modifies the flags associated with the file.
+//
+// This function can modify the following flags:
+//
+//  * |fuchsia.io/OpenFlags.APPEND|
+//
+// See fuchsia.io for the available |flags|.
+// TODO(https://fxbug.dev/376509077): Rename this to zxio_deprecated_flags_set.
+ZXIO_EXPORT zx_status_t zxio_flags_set(zxio_t* io, uint32_t flags);
+
+// Returns the flags associated with the file.
+//
+// These flags are typically set when the file is opened but can be modified by |zxio_flags_set2|.
+//
+// See fuchsia.io/Flags for the available |flags|.
+// TODO(https://fxbug.dev/376509077): Rename this to zxio_flags_get.
+ZXIO_EXPORT zx_status_t zxio_flags_get2(zxio_t* io, uint64_t* out_flags);
 
 // Modifies the flags associated with the file.
 //
 // This function can modify the following flags:
 //
-//  * |fuchsia::io::OpenFlags::APPEND|.
+//  * |fuchsia.io/Flags.FILE_APPEND|
 //
-// See fuchsia.io for the available |flags|.
-ZXIO_EXPORT zx_status_t zxio_flags_set(zxio_t* io, uint32_t flags);
+// See fuchsia.io/Flags for the available |flags|.
+// TODO(https://fxbug.dev/376509077): Rename this to zxio_flags_set.
+ZXIO_EXPORT zx_status_t zxio_flags_set2(zxio_t* io, uint64_t flags);
 
 // Gets a token associated with a directory connection.
 //

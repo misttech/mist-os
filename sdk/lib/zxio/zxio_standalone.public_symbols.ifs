@@ -22,7 +22,9 @@ Symbols:
   - { Name: zxio_enable_verity, Type: Func }
   - { Name: zxio_fault_catching_disabled, Type: Func, Weak: true }
   - { Name: zxio_flags_get, Type: Func }
+  - { Name: zxio_flags_get2, Type: Func }
   - { Name: zxio_flags_set, Type: Func }
+  - { Name: zxio_flags_set2, Type: Func }
   - { Name: zxio_get_posix_mode, Type: Func }
   - { Name: zxio_get_read_buffer_available, Type: Func }
   - { Name: zxio_get_window_size, Type: Func }

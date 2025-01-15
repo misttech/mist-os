@@ -12,6 +12,8 @@
 
 #include <zxtest/zxtest.h>
 
+namespace {
+
 TEST(Pipe, Create) {
   zx::socket socket0, socket1;
   ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
@@ -56,6 +58,84 @@ TEST(Pipe, FlagsGetDefault) {
   zxio_t* io = &storage.io;
 
   // By default, socket supports IO (Read + Write).
+  uint64_t raw_flags{};
+  ASSERT_OK(zxio_flags_get2(io, &raw_flags));
+  fuchsia_io::wire::Flags flags{raw_flags};
+  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermRead);
+  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermWrite);
+}
+
+TEST(Pipe, FlagsGetReadOnly) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+  zx::socket duplicate_readonly_socket;
+  ASSERT_OK(socket0.duplicate(ZX_RIGHTS_BASIC | ZX_RIGHT_READ, &duplicate_readonly_socket));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(duplicate_readonly_socket.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  uint64_t raw_flags{};
+  ASSERT_OK(zxio_flags_get2(io, &raw_flags));
+  fuchsia_io::wire::Flags flags{raw_flags};
+  EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermRead);
+  EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermWrite);
+}
+
+TEST(Pipe, FlagsGetNoIO) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+  zx::socket duplicate_socket;
+  ASSERT_OK(socket0.duplicate(ZX_RIGHTS_BASIC, &duplicate_socket));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(duplicate_socket.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  uint64_t raw_flags{};
+  ASSERT_OK(zxio_flags_get2(io, &raw_flags));
+  fuchsia_io::wire::Flags flags{raw_flags};
+  EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermRead);
+  EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermWrite);
+}
+
+TEST(Pipe, FlagsSetWithValidInputFlags) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(socket0.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  fuchsia_io::wire::Flags flags =
+      fuchsia_io::wire::Flags::kPermRead | fuchsia_io::wire::Flags::kPermWrite;
+  ASSERT_OK(zxio_flags_set2(io, uint64_t{flags}));
+}
+
+TEST(Pipe, FlagsSetWithInvalidInputFlagsIsError) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+  zx::socket duplicate_socket;
+  ASSERT_OK(socket0.duplicate(ZX_RIGHTS_BASIC | ZX_RIGHT_WRITE, &duplicate_socket));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(duplicate_socket.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  fuchsia_io::wire::Flags flags =
+      fuchsia_io::wire::Flags::kPermRead | fuchsia_io::wire::Flags::kPermWrite;
+  EXPECT_STATUS(zxio_flags_set2(io, uint64_t{flags}), ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST(Pipe, DeprecatedFlagsGetDefault) {
+  zx::socket socket0, socket1;
+  ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
+
+  zxio_storage_t storage;
+  ASSERT_OK(zxio_create(socket0.release(), &storage));
+  zxio_t* io = &storage.io;
+
+  // By default, socket supports IO (Read + Write).
   uint32_t raw_flags{};
   ASSERT_OK(zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::OpenFlags flags{raw_flags};
@@ -63,7 +143,7 @@ TEST(Pipe, FlagsGetDefault) {
   EXPECT_TRUE(flags & fuchsia_io::wire::OpenFlags::kRightWritable);
 }
 
-TEST(Pipe, FlagsGetReadOnly) {
+TEST(Pipe, DeprecatedFlagsGetReadOnly) {
   zx::socket socket0, socket1;
   ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
   zx::socket duplicate_readonly_socket;
@@ -80,7 +160,7 @@ TEST(Pipe, FlagsGetReadOnly) {
   EXPECT_FALSE(flags & fuchsia_io::wire::OpenFlags::kRightWritable);
 }
 
-TEST(Pipe, FlagsGetNoIO) {
+TEST(Pipe, DeprecatedFlagsGetNoIO) {
   zx::socket socket0, socket1;
   ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
   zx::socket duplicate_socket;
@@ -97,7 +177,7 @@ TEST(Pipe, FlagsGetNoIO) {
   EXPECT_FALSE(flags & fuchsia_io::wire::OpenFlags::kRightWritable);
 }
 
-TEST(Pipe, FlagsSetWithValidInputFlags) {
+TEST(Pipe, DeprecatedFlagsSetWithValidInputFlags) {
   zx::socket socket0, socket1;
   ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
 
@@ -110,7 +190,7 @@ TEST(Pipe, FlagsSetWithValidInputFlags) {
   ASSERT_OK(zxio_flags_set(io, static_cast<uint32_t>(flags)));
 }
 
-TEST(Pipe, FlagsSetWithInvalidInputFlagsIsError) {
+TEST(Pipe, DeprecatedFlagsSetWithInvalidInputFlagsIsError) {
   zx::socket socket0, socket1;
   ASSERT_OK(zx::socket::create(0u, &socket0, &socket1));
   zx::socket duplicate_socket;
@@ -294,3 +374,5 @@ TEST(Pipe, ShutdownReadWrite) {
 
   ASSERT_OK(zxio_close(io, /*should_wait=*/true));
 }
+
+}  // namespace
