@@ -4,6 +4,8 @@
 
 #include <lib/driver/compat/cpp/logging.h>
 
+#include <cstdarg>
+
 bool driver_log_severity_enabled_internal(FuchsiaLogSeverity severity) {
   return fdf::Logger::GlobalInstance()->GetSeverity() <= severity;
 }
