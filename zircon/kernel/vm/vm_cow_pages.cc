@@ -927,44 +927,49 @@ VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
   return ParentAndRange{parent, offset, parent_limit, size};
 }
 
-void VmCowPages::CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages> child) {
+void VmCowPages::MovePagesIntoLocked(fbl::RefPtr<VmCowPages> other) {
   canary_.Assert();
 
-  AssertHeld(child->lock_ref());
+  AssertHeld(other->lock_ref());
   // This function is invalid to call if any pages are pinned as the unpin after we change the
   // backlink will not work.
   DEBUG_ASSERT(pinned_page_count_ == 0);
+  // This function assumes there is no page source or discardable tracker because moving pages
+  // in the presence of these delegates changes the relationship between these pages and these
+  // objects.
+  ASSERT(!page_source_);
+  ASSERT(!discardable_tracker_);
 
-  // We are going to change this node's `paged_ref_` to eventually point to `child` instead.
-  // We need to make the new child look equivalent to this node. To do this it inherits this nodes'
-  // children, eviction count, high priority count, and size.
-  for (auto& c : children_list_) {
-    AssertHeld(c.lock_ref());
-    c.parent_ = child;
-  }
-  child->children_list_ = ktl::move(children_list_);
-  child->children_list_len_ = children_list_len_;
-  children_list_len_ = 0;
-  child->reclamation_event_count_ = reclamation_event_count_;
-  child->high_priority_count_ = high_priority_count_;
-  high_priority_count_ = 0;
-  AddChildLocked(child.get(), 0, size_);
+  VmCompression* compression = Pmm::Node().GetPageCompression();
 
-  // Time to change the VmCowPages that our paged_ref_ is pointing to.
-  // We could only have gotten here from a valid VmObjectPaged since we're trying to create a child.
-  // The paged_ref_ should therefore be valid.
-  DEBUG_ASSERT(paged_ref_);
-  child->paged_ref_ = paged_ref_;
-  AssertHeld(paged_ref_->lock_ref());
-  DEBUG_ASSERT(child->life_cycle_ == LifeCycle::Init);
-  child->life_cycle_ = LifeCycle::Alive;
-  [[maybe_unused]] fbl::RefPtr<VmCowPages> previous =
-      paged_ref_->SetCowPagesReferenceLocked(ktl::move(child));
-  // Validate that we replaced a reference to ourself as we expected, this ensures we can safely
-  // drop the refptr without triggering our own destructor, since we know someone else must be
-  // holding a refptr to us to be in this function.
-  DEBUG_ASSERT(previous.get() == this);
-  paged_ref_ = nullptr;
+  __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(other.get());
+  page_list_.ForEveryPageMutable([&](VmPageOrMarkerRef p, uint64_t off) __ALWAYS_INLINE {
+    if (p->IsReference()) {
+      // A regular reference we can move, a temporary reference we need to turn back into its
+      // page so we can move it. To determine if we have a temporary reference we can just
+      // attempt to move it, and if it was a temporary reference we will get a page returned.
+      if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
+        // For simplicity, since this is a very uncommon edge case, just update the page in
+        // place in this page list, then move it as a regular page.
+        AssertHeld(lock_ref());
+        SetNotPinnedLocked(*maybe_page, off);
+        VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
+        ASSERT(compression->IsTempReference(ref));
+      }
+    }
+    // Not an else-if to intentionally perform this if the previous block turned a reference
+    // into a page.
+    if (p->IsPage()) {
+      page_backlink_updater.Push(p->Page(), off);
+    }
+    return ZX_ERR_NEXT;
+  });
+
+  page_backlink_updater.Flush();
+
+  DEBUG_ASSERT(other->page_list_.IsEmpty());
+  other->page_list_ = ktl::move(page_list_);
+  DEBUG_ASSERT(page_list_.IsEmpty());
 }
 
 zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
@@ -986,11 +991,11 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
   AssertHeld(cow_clone->lock_ref());
 
   // If `parent` is to be the new child's parent then it must become hidden first.
-  // That requires cloning it into a new visible child of the (now) hidden parent.
-  fbl::RefPtr<VmCowPages> parent_clone;
+  // That requires creating a new hidden node and rotating `parent` to be its child.
   if (!parent->is_hidden_locked()) {
     DEBUG_ASSERT(parent == this);  // `parent` must either be hidden already, or be `this` node.
     DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
+    DEBUG_ASSERT(children_list_len_ == 0);
 
     // Invalidate everything, both the pages the clone will and will not be able to see. As hidden
     // nodes are immutable, even for pages that the clone cannot see we want the parent_clone to
@@ -998,18 +1003,47 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
     // Note: We could eagerly move these pages into the parent_clone instead.
     RangeChangeUpdateLocked(VmCowRange(0, size_), RangeChangeOp::RemoveWrite);
 
-    parent_clone = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-        hierarchy_state_ptr_, options, pmm_alloc_flags_, size_, nullptr, nullptr));
+    auto hidden_parent = fbl::AdoptRef<VmCowPages>(
+        new (&ac) VmCowPages(hierarchy_state_ptr_, options | VmCowPagesOptions::kHidden,
+                             pmm_alloc_flags_, size_, nullptr, nullptr));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
+    AssertHeld(hidden_parent->lock_ref());
+    hidden_parent->page_list_.InitializeSkew(page_list_.GetSkew(), 0);
+    hidden_parent->TransitionToAliveLocked();
 
-    // The child becomes a full clone of the parent: inheriting its children, paged backref, etc.
-    CloneParentIntoChildLocked(parent_clone);
-    DEBUG_ASSERT(children_list_len_ == 1);
+    // If the current object is not the root of the tree, then we need to replace ourselves in our
+    // parent's child list with the new hidden node before we can becomes its child.
+    if (parent_) {
+      // Copy the offsets and limits from the current node to the newly created parent.
+      // This logic is similar to AddChildLocked, except that we don't need to recompute these
+      // values.
+      hidden_parent->root_parent_offset_ = root_parent_offset_;
+      hidden_parent->parent_offset_ = parent_offset_;
+      hidden_parent->parent_limit_ = parent_limit_;
 
-    // Transition into being the hidden node.
-    options_ |= VmCowPagesOptions::kHidden;
+      // We do not need to set high_priority_count_ because the called to AddChildLocked below
+      // will initialize high_priority_count_ for hidden_parent.
+
+      parent_locked().ReplaceChildLocked(this, hidden_parent.get());
+      hidden_parent->parent_ = ktl::move(parent_);
+
+      // We have lost our parent, which means we could now be violating the invariant that
+      // parent_limit_ being non-zoer implies we have a parent. In practice this assignment
+      // shouldn't matter because we are about to add ourselves as a child of `hidden_parent`.
+      parent_offset_ = parent_limit_ = 0;
+    }
+
+    // We need to move all our pages into the new parent before adding ourselves as its child
+    // because we cannot be added as a child unless we have no pages.
+    MovePagesIntoLocked(hidden_parent);
+    DEBUG_ASSERT(page_list_.GetSkew() == 0);
+
+    hidden_parent->AddChildLocked(this, 0, size_);
+
+    // We have now established the invariant that `parent` is a hidden node.
+    parent = hidden_parent.get();
   }
 
   // The COW clone's parent must be hidden because the clone must not see any future parent writes.
@@ -1041,11 +1075,6 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
   VMO_FRUGAL_VALIDATION_ASSERT(parent->DebugValidateVmoPageBorrowingLocked());
   VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSharingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(cow_clone->DebugValidateVmoPageBorrowingLocked());
-  if (parent_clone) {
-    AssertHeld(parent_clone->lock_ref());
-    VMO_VALIDATION_ASSERT(parent_clone->DebugValidatePageSharingLocked());
-    VMO_FRUGAL_VALIDATION_ASSERT(parent_clone->DebugValidateVmoPageBorrowingLocked());
-  }
 
   *cow_child = ktl::move(cow_clone);
 

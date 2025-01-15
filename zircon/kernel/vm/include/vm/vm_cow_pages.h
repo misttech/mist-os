@@ -1247,11 +1247,9 @@ class VmCowPages final : public VmHierarchyBase,
   // Helper to invalidate any READ requests in the specified range by spuriously resolving them.
   void InvalidateReadRequestsLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
-  // Initializes and adds as a child the given VmCowPages as a full clone of this one such that the
-  // VmObjectPaged backlink can be moved from this to the child, keeping all page offsets, sizes and
-  // other requirements (see VmObjectPaged::SetCowPagesReferenceLocked) are valid. This does also
-  // move our paged_ref_ into child_ and update the VmObjectPaged backlinks.
-  void CloneParentIntoChildLocked(fbl::RefPtr<VmCowPages> child) TA_REQ(lock());
+  // Move all the pages from this VmCowPages object into another VmCowPages object.
+  // The receiving VmCowPages must not have any pages yet.
+  void MovePagesIntoLocked(fbl::RefPtr<VmCowPages> other) TA_REQ(lock());
 
   // Removes the specified child from this objects |children_list_| and performs any hierarchy
   // updates that need to happen as a result. This does not modify the |parent_| member of the

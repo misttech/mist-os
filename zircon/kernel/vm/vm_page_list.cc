@@ -49,6 +49,7 @@ VmPageList::VmPageList() { LTRACEF("%p\n", this); }
 VmPageList::VmPageList(VmPageList&& other) : list_(ktl::move(other.list_)) {
   LTRACEF("%p\n", this);
   list_skew_ = other.list_skew_;
+  other.list_skew_ = 0;
 }
 
 VmPageList::~VmPageList() {
@@ -59,6 +60,7 @@ VmPageList::~VmPageList() {
 VmPageList& VmPageList::operator=(VmPageList&& other) {
   list_ = ktl::move(other.list_);
   list_skew_ = other.list_skew_;
+  other.list_skew_ = 0;
   return *this;
 }
 
