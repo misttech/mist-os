@@ -45,7 +45,7 @@ pub enum ChunkedArchiveError {
 
 /// Validated chunk information from an archive. Compressed ranges are relative to the start of
 /// compressed data (i.e. they start after the header and seek table).
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ChunkInfo {
     pub decompressed_range: Range<usize>,
     pub compressed_range: Range<usize>,
@@ -387,7 +387,10 @@ pub struct ChunkedDecompressor {
     total_compressed_size: usize,
     decompressor: zstd::bulk::Decompressor<'static>,
     decompressed_buffer: Vec<u8>,
+    error_handler: Option<ErrorHandler>,
 }
+
+type ErrorHandler = Box<dyn Fn(usize, ChunkInfo, &[u8]) -> () + Send + 'static>;
 
 impl ChunkedDecompressor {
     /// Create a new decompressor to decode an archive from a validated seek table.
@@ -406,7 +409,17 @@ impl ChunkedDecompressor {
             total_compressed_size,
             decompressor,
             decompressed_buffer,
+            error_handler: None,
         })
+    }
+
+    /// Creates a new decompressor with an additional error handler invoked when a chunk fails to be
+    /// decompressed.
+    pub fn new_with_error_handler(
+        seek_table: Vec<ChunkInfo>,
+        error_handler: ErrorHandler,
+    ) -> Result<Self, ChunkedArchiveError> {
+        Ok(Self { error_handler: Some(error_handler), ..Self::new(seek_table)? })
     }
 
     pub fn seek_table(&self) -> &Vec<ChunkInfo> {
@@ -423,9 +436,11 @@ impl ChunkedDecompressor {
         let decompressed_size = self
             .decompressor
             .decompress_to_buffer(data, self.decompressed_buffer.as_mut_slice())
-            .map_err(|error| ChunkedArchiveError::DecompressionError {
-                index: self.curr_chunk,
-                error,
+            .map_err(|error| {
+                if let Some(ref error_handler) = self.error_handler {
+                    error_handler(self.curr_chunk, chunk.clone(), data.as_bytes());
+                }
+                ChunkedArchiveError::DecompressionError { index: self.curr_chunk, error }
             })?;
         if decompressed_size != chunk.decompressed_range.len() {
             return Err(ChunkedArchiveError::IntegrityError);
@@ -435,6 +450,7 @@ impl ChunkedDecompressor {
         Ok(())
     }
 
+    /// Update the decompressor with more data.
     pub fn update(
         &mut self,
         mut data: &[u8],
@@ -822,8 +838,16 @@ mod tests {
         // Corrupt the compressed size of the chunk.
         seek_table[0].compressed_range =
             seek_table[0].compressed_range.start..seek_table[0].compressed_range.end - 1;
+        let first_chunk_info = seek_table[0].clone();
+        let error_handler = move |chunk_index: usize, chunk_info: ChunkInfo, chunk_data: &[u8]| {
+            assert_eq!(chunk_index, 0);
+            assert_eq!(chunk_info, first_chunk_info);
+            assert_eq!(chunk_data.len(), chunk_info.compressed_range.len());
+        };
 
-        let mut decompressor = ChunkedDecompressor::new(seek_table).unwrap();
+        let mut decompressor =
+            ChunkedDecompressor::new_with_error_handler(seek_table, Box::new(error_handler))
+                .unwrap();
         assert!(matches!(
             decompressor.update(&chunk_data, &mut |_chunk| {}),
             Err(ChunkedArchiveError::DecompressionError { index: 0, .. })

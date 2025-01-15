@@ -61,6 +61,7 @@ platform_deps = [
   "//third_party/rust_crates:arrayref",
   "//third_party/rust_crates:async-channel",
   "//third_party/rust_crates:async-trait",
+  "//third_party/rust_crates:base64",
   "//third_party/rust_crates:bincode",
   "//third_party/rust_crates:bitflags",
   "//third_party/rust_crates:either",
