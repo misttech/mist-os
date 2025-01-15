@@ -38,7 +38,6 @@ import os
 import stat
 import sys
 from pathlib import Path
-from typing import Any
 
 import check_ninja_build_plan
 import compute_content_hash
@@ -166,34 +165,6 @@ def find_host_binary_path(program: str) -> str:
 _VALID_TARGET_CPUS = ("arm64", "x64", "riscv64")
 
 
-def dot_bazelrc_format_args(
-    workspace_dir: str,  # path
-    logs_dir: str,  # path
-    topdir: str,  # path
-    default_platform: str,
-    host_platform: str,
-) -> dict[str, str]:
-    """Returns a dictionary of .format args for expanding template.bazelrc.
-
-    Args:
-      workspace_dir: path to Bazel workspace
-      logs_dir: path to Bazel logs dir
-      topdir: GN output directory
-      default_platform: one of the platforms named in build/bazel/platforms/BUILD.bazel
-      host_platform: the host platform from build/bazel/platforms/BUILD.bazel
-    """
-    return {
-        "default_platform": default_platform,
-        "host_platform": host_platform,
-        "workspace_log_file": os.path.relpath(
-            os.path.join(logs_dir, "workspace-events.log"), workspace_dir
-        ),
-        "execution_log_file": os.path.relpath(
-            os.path.join(logs_dir, "exec_log.pb.zstd"), workspace_dir
-        ),
-    }
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
@@ -293,7 +264,6 @@ def main() -> int:
     logs_dir = os.path.join(topdir, "logs")
 
     host_tag = workspace_utils.get_host_tag()
-    host_tag_alt = host_tag.replace("-", "_")
 
     ninja_binary = os.path.join(
         fuchsia_dir, "prebuilt", "third_party", "ninja", host_tag, "ninja"
@@ -350,184 +320,26 @@ def main() -> int:
     generated = workspace_utils.GeneratedWorkspaceFiles()
     generated.set_file_hasher(content_hash_file)
 
-    def expand_template_file(filename: str, **kwargs: Any) -> str:
-        """Expand a template file and add it to the set of tracked input files."""
-        template_file = os.path.join(templates_dir, filename)
-        generated.record_input_file_hash(os.path.abspath(template_file))
-        with open(template_file) as f:
-            return f.read().format(**kwargs)
-
-    def write_workspace_file(path: str, content: str) -> None:
-        generated.record_file_content(os.path.join("workspace", path), content)
-
-    def create_workspace_symlink(path: str, target_path: str) -> None:
-        generated.record_symlink(os.path.join("workspace", path), target_path)
-
-    templates_dir = os.path.join(fuchsia_dir, "build", "bazel", "templates")
-
-    if args.use_bzlmod:
-        generated.record_file_content(
-            os.path.join("workspace", "WORKSPACE.bazel"),
-            "# Empty on purpose, see MODULE.bazel\n",
-        )
-
-        generated.record_symlink(
-            os.path.join("workspace", "WORKSPACE.bzlmod"),
-            os.path.join(
-                fuchsia_dir, "build", "bazel", "toplevel.WORKSPACE.bzlmod"
-            ),
-        )
-
-        generated.record_symlink(
-            os.path.join("workspace", "MODULE.bazel"),
-            os.path.join(
-                fuchsia_dir, "build", "bazel", "toplevel.MODULE.bazel"
-            ),
-        )
-    else:
-        generated.record_symlink(
-            os.path.join("workspace", "WORKSPACE.bazel"),
-            os.path.join(
-                fuchsia_dir, "build", "bazel", "toplevel.WORKSPACE.bazel"
-            ),
-        )
-
-    # Generate symlinks
-
-    for name in os.listdir(fuchsia_dir):
-        if not workspace_utils.workspace_should_exclude_file(name):
-            generated.record_symlink(
-                os.path.join("workspace", name), os.path.join(fuchsia_dir, name)
-            )
-
-    generated.record_symlink(
-        os.path.join("workspace", "BUILD.bazel"),
-        os.path.join(fuchsia_dir, "build", "bazel", "toplevel.BUILD.bazel"),
-    )
-
-    # The top-level .git directory must be symlinked because some actions actually
-    # launch git commands (e.g. to generate a build version identifier). On the other
-    # hand Jiri will complain if it finds a .git repository with Jiri metadata that
-    # it doesn't know about in its manifest. The error looks like:
-    #
-    # ```
-    # [17:49:48.200] WARN: Project "fuchsia" has path /work/fx-bazel-build, but was found in /work/fx-bazel-build/out/default/gen/build/bazel/output_base/execroot/main.
-    # jiri will treat it as a stale project. To remove this warning please delete this or move it out of your root folder
-    # ```
-    #
-    # Looking at the Jiri sources reveals that it is looking at a `.git/jiri` sub-directory
-    # in all git directories it finds during a `jiri update` operation. To avoid the complaint
-    # then symlink all $FUCHSIA_DIR/.git/ files and directories, except the 'jiri' one.
-    # Also ignore the JIRI_HEAD / JIRI_LAST_BASE files to avoid confusion.
-    fuchsia_git_dir = os.path.join(fuchsia_dir, ".git")
-    for git_file in os.listdir(fuchsia_git_dir):
-        if not (git_file == "jiri" or git_file.startswith("JIRI")):
-            generated.record_symlink(
-                "workspace/.git/" + git_file,
-                os.path.join(fuchsia_git_dir, git_file),
-            )
-
-    # Generate a platform mapping file to ensure that using --platforms=<value>
-    # also sets --cpu properly, as required by the Bazel SDK rules. See comments
-    # in template file for more details.
-    _BAZEL_CPU_MAP = {"x64": "k8", "arm64": "aarch64"}
-    host_os = workspace_utils.get_host_platform()
-    host_cpu = workspace_utils.get_host_arch()
-    platform_mappings_content = expand_template_file(
-        "template.platform_mappings",
-        host_os=host_os,
-        host_cpu=host_cpu,
-        bazel_host_cpu=_BAZEL_CPU_MAP[host_cpu],
-    )
-    generated.record_file_content(
-        os.path.join("workspace", "platform_mappings"),
-        platform_mappings_content,
-    )
-
-    # Generate the content of .bazelrc
-    bazelrc_content = expand_template_file(
-        "template.bazelrc",
-        **dot_bazelrc_format_args(
-            workspace_dir=workspace_dir,
-            logs_dir=logs_dir,
-            topdir=topdir,
-            default_platform=f"fuchsia_{args.target_arch}",
-            host_platform=host_tag_alt,
-        ),
-    )
-    if args.use_bzlmod:
-        bazelrc_content += """
-# Enable BlzMod, i.e. support for MODULE.bazel files.
-common --experimental_enable_bzlmod
-"""
-    else:
-        bazelrc_content += """
-# Disable BzlMod, i.e. support for MODULE.bazel files, now that Bazel 7.0
-# enables BzlMod by default.
-common --enable_bzlmod=false
-"""
-    generated.record_file_content(
-        os.path.join("workspace", ".bazelrc"), bazelrc_content
-    )
-
-    # Generate wrapper script in topdir/bazel that invokes Bazel with the right --output_base.
-    bazel_launcher_content = expand_template_file(
-        "template.bazel.sh",
-        ninja_output_dir=os.path.relpath(gn_output_dir, topdir),
-        ninja_prebuilt=os.path.relpath(ninja_binary, topdir),
-        workspace=os.path.relpath(workspace_dir, topdir),
-        bazel_bin_path=os.path.relpath(bazel_bin, topdir),
-        logs_dir=os.path.relpath(logs_dir, topdir),
-        python_prebuilt_dir=os.path.relpath(python_prebuilt_dir, topdir),
-        output_base=os.path.relpath(output_base_dir, topdir),
-        output_user_root=os.path.relpath(output_user_root, topdir),
-    )
-    generated.record_file_content(
-        "bazel", bazel_launcher_content, executable=True
-    )
-
     # Ensure regeneration when this script's content changes!
     generated.record_input_file_hash(os.path.abspath(__file__))
 
-    generated.record_symlink(
-        os.path.join(
-            "workspace",
-            "fuchsia_build_generated",
-            "assembly_developer_overrides.json",
-        ),
-        os.path.join(gn_output_dir, "gen", "assembly_developer_overrides.json"),
+    workspace_utils_py = os.path.join(
+        os.path.dirname(__file__), "workspace_utils.py"
     )
+    generated.record_input_file_hash(os.path.abspath(workspace_utils_py))
 
-    # LINT.IfChange
-    generated.record_symlink(
-        os.path.join("workspace", "fuchsia_build_generated", "args.json"),
-        os.path.join(gn_output_dir, "args.json"),
-    )
-    # LINT.ThenChange(//build/bazel/repository_rules/fuchsia_build_info_repository.bzl)
-
-    # LINT.IfChange
-    # Create a symlink to the git host executable to make it accessible
-    # when running a Bazel action on bots where it is not installed in
-    # a standard location.
     git_bin_path = find_host_binary_path("git")
     assert git_bin_path, "Missing `git` program in current PATH!"
-    generated.record_symlink(
-        os.path.join("workspace", "fuchsia_build_generated", "git"),
-        git_bin_path,
-    )
-    # LINT.ThenChange(//build/info/info.bzl)
 
-    # LINT.IfChange
-    # .jiri_root/ is not exposed to the workspace, but //build/info/BUILD.bazel
-    # needs to access .jiri_root/update_history/latest so create a symlink just
-    # for this file.
-    generated.record_symlink(
-        os.path.join(
-            "workspace", "fuchsia_build_generated", "jiri_snapshot.xml"
-        ),
-        os.path.join(fuchsia_dir, ".jiri_root", "update_history", "latest"),
+    workspace_utils.record_fuchsia_workspace(
+        generated,
+        top_dir=Path(topdir),
+        fuchsia_dir=Path(fuchsia_dir),
+        gn_output_dir=Path(gn_output_dir),
+        git_bin_path=Path(git_bin_path),
+        target_cpu=args.target_arch,
+        enable_bzlmod=bool(args.use_bzlmod),
     )
-    # LINT.ThenChange(//build/info/info.gni)
 
     force = args.force
     generated_json = generated.to_json()
