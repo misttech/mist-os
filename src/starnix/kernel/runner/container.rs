@@ -477,9 +477,9 @@ async fn create_container(
             Err(err) => log_warn!("could not get serial number: {err:?}"),
         }
     }
-    if features.magma {
+    if let Some(supported_vendors) = &features.magma_supported_vendors {
         kernel_cmdline.extend(b" ");
-        let params = get_magma_params();
+        let params = get_magma_params(supported_vendors);
         kernel_cmdline.extend(&*params);
     }
 

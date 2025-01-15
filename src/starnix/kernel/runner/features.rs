@@ -50,7 +50,7 @@ pub struct Features {
 
     pub gralloc: bool,
 
-    pub magma: bool,
+    pub magma_supported_vendors: Option<Vec<u16>>,
 
     pub gfxstream: bool,
 
@@ -99,7 +99,7 @@ impl Features {
                 ashmem,
                 framebuffer,
                 gralloc,
-                magma,
+                magma_supported_vendors,
                 gfxstream,
                 container,
                 test_data,
@@ -117,7 +117,17 @@ impl Features {
                 inspect_node.record_bool("ashmem", *ashmem);
                 inspect_node.record_bool("framebuffer", *framebuffer);
                 inspect_node.record_bool("gralloc", *gralloc);
-                inspect_node.record_bool("magma", *magma);
+                inspect_node.record_string(
+                    "magma_supported_vendors",
+                    match magma_supported_vendors {
+                        Some(vendors) => vendors
+                            .iter()
+                            .map(|vendor| format!("0x{:x}", vendor))
+                            .collect::<Vec<String>>()
+                            .join(","),
+                        None => "".to_string(),
+                    },
+                );
                 inspect_node.record_bool("gfxstream", *gfxstream);
                 inspect_node.record_bool("container", *container);
                 inspect_node.record_bool("test_data", *test_data);
@@ -197,7 +207,21 @@ pub fn parse_features(
             ("ashmem", _) => features.ashmem = true,
             ("framebuffer", _) => features.framebuffer = true,
             ("gralloc", _) => features.gralloc = true,
-            ("magma", _) => features.magma = true,
+            ("magma", _) => if features.magma_supported_vendors.is_none() {
+                const VENDOR_ARM: u16 = 0x13B5;
+                const VENDOR_INTEL: u16 = 0x8086;
+                const VENDOR_QCOM: u16 = 0x5143;
+                features.magma_supported_vendors = Some(vec![VENDOR_ARM, VENDOR_INTEL, VENDOR_QCOM])
+            },
+            ("magma_supported_vendors", Some(arg)) => {
+                features.magma_supported_vendors = Some(
+                    arg.split(',')
+                        .map(|s| {
+                            let err = anyhow!("Feature format must be: magma_supported_vendors:0x1234[,0xabcd]");
+                            let trimmed = s.trim_start_matches("0x");
+                            u16::from_str_radix(trimmed, 16).map_err(|_| err)
+                        }).collect::<Result<Vec<u16>, Error>>()?);
+            },
             ("nanohub", _) => features.nanohub = true,
             ("network_manager", _) => features.network_manager = true,
             ("gfxstream", _) => features.gfxstream = true,
@@ -328,8 +352,8 @@ pub fn run_container_features(
         // fail.
         gralloc_device_init(locked, system_task);
     }
-    if features.magma {
-        magma_device_init(locked, system_task);
+    if let Some(supported_vendors) = &features.magma_supported_vendors {
+        magma_device_init(locked, system_task, supported_vendors.clone());
     }
     if features.gfxstream {
         gpu_device_init(locked, system_task);
