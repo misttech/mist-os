@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2073
+From //build/config/BUILDCONFIG.gn:2097
 
 ### allowed_test_device_types
 
@@ -731,7 +731,7 @@ From //build/info/info.gni:10
 Logical version of the current build. If not set, defaults to the timestamp
 of the most recent update.
 
-**Current value for `target_cpu = "arm64"`:** `"8725722196068969521"`
+**Current value for `target_cpu = "arm64"`:** `"8725676890146940609"`
 
 From //out/not-default/args.gn:10
 
@@ -739,7 +739,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "riscv64"`:** `"8725722196068969521"`
+**Current value for `target_cpu = "riscv64"`:** `"8725676890146940609"`
 
 From //out/not-default/args.gn:10
 
@@ -747,7 +747,7 @@ From //out/not-default/args.gn:10
 
 From //build/info/info.gni:17
 
-**Current value for `target_cpu = "x64"`:** `"8725722196068969521"`
+**Current value for `target_cpu = "x64"`:** `"8725676890146940609"`
 
 From //out/not-default/args.gn:10
 
@@ -1989,7 +1989,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1865
+From //build/config/BUILDCONFIG.gn:1877
 
 ### fastboot_product
 
@@ -2855,11 +2855,14 @@ Each element of the list is one variant, which is a scope defining:
   configs = ["//build/config/profile:coverage-rust"]
   tags = ["coverage", "debugdata", "instrumented", "needs-writable-globals"]
 }, {
+  configs = ["//build/config/profile:coverage-cts"]
+  tags = ["coverage", "debugdata", "instrumented", "llvm-profdata"]
+}, {
   configs = ["//build/config/profile"]
   tags = ["debugdata", "instrumented", "llvm-profdata", "needs-writable-globals", "profile"]
 }, {
-  configs = ["//build/config/profile:coverage-cts"]
-  tags = ["coverage", "debugdata", "instrumented", "llvm-profdata"]
+  configs = ["//build/config/profile:profile-rust"]
+  tags = ["debugdata", "instrumented", "llvm-profdata", "needs-writable-globals", "profile"]
 }, {
   configs = ["//build/config/sanitizers:tsan"]
   tags = ["tsan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "uses-shadow", "kernel-excluded"]
@@ -4780,7 +4783,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2063
+From //build/config/BUILDCONFIG.gn:2087
 
 ### select_variant_canonical
 
@@ -4790,7 +4793,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2068
+From //build/config/BUILDCONFIG.gn:2092
 
 ### select_variant_shortcuts
 
@@ -4834,6 +4837,12 @@ a list that can be spliced into [`select_variant`](#select_variant).
   variant = "profile"
 }]
 }, {
+  name = "host_profile-rust"
+  select_variant = [{
+  host = true
+  variant = "profile-rust"
+}]
+}, {
   name = "host_tsan"
   select_variant = [{
   host = true
@@ -4849,7 +4858,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1872
+From //build/config/BUILDCONFIG.gn:1884
 
 ### size_checker_input
 
