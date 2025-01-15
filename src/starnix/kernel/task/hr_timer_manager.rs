@@ -869,6 +869,7 @@ mod tests {
     }
 
     #[fuchsia::test(threads = 2)]
+    #[ignore = "See for details: https://fxbug.dev/388833484"]
     async fn hr_timer_manager_wake_proxy_signal() {
         let (hrtimer_manager, resume_event) = init_hr_timer_manager();
 
