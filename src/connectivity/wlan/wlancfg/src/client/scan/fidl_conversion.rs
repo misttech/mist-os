@@ -120,8 +120,15 @@ pub async fn send_scan_results_over_fidl(
                 }
                 result_count += 1;
             }
+            // It's ok to slice this by index, since we've just calculated the `result_count` above
+            // by iterating through elements of scan_results[]
+            #[expect(clippy::indexing_slicing)]
             responder.send(Ok(&scan_results[..result_count]))?;
-            scan_results = &scan_results[result_count..];
+            // It's ok to slice this by index, since we've just calculated the `result_count` above
+            // by iterating through elements of scan_results[]
+            #[expect(clippy::indexing_slicing)]
+            let remaining_results = &scan_results[result_count..];
+            scan_results = remaining_results;
             sent_some_results = true;
 
             // Guarantees empty batch is sent before channel is closed.

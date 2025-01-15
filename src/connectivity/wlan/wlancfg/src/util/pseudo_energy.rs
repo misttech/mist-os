@@ -58,11 +58,10 @@ impl EwmaSignalData {
         signals: &Vec<client_types::Signal>,
         ewma_weight: usize,
     ) -> Result<Self, anyhow::Error> {
-        if signals.is_empty() {
-            return Err(format_err!("At least one signal must be provided"));
-        }
+        let first_signal =
+            signals.first().ok_or_else(|| format_err!("At least one signal must be provided"))?;
 
-        let mut ewma = Self::new(signals[0].rssi_dbm, signals[0].snr_db, ewma_weight);
+        let mut ewma = Self::new(first_signal.rssi_dbm, first_signal.snr_db, ewma_weight);
         for signal in signals.iter().skip(1) {
             ewma.update_with_new_measurement(signal.rssi_dbm, signal.snr_db);
         }

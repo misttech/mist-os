@@ -24,7 +24,6 @@ use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt};
 use log::{info, warn};
-use std::convert::Infallible;
 use std::fmt::Debug;
 use std::pin::pin;
 use std::sync::Arc;
@@ -298,12 +297,6 @@ pub async fn serve(
     select! {
         state_machine = state_machine.fuse() => {
             match state_machine {
-                Ok(v) => {
-                    // This should never happen because the `Infallible` type should be impossible
-                    // to create.
-                    let _: Infallible = v;
-                    unreachable!()
-                }
                 Err(ExitReason(Ok(()))) => info!("AP state machine for iface #{} exited", iface_id),
                 Err(ExitReason(Err(e))) => {
                     info!("AP state machine for iface #{} terminated with an error: {}", iface_id, e)

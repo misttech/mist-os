@@ -27,7 +27,6 @@ use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use log::{debug, error, info, warn};
-use std::convert::Infallible;
 use std::pin::Pin;
 use std::sync::Arc;
 use wlan_common::bss::BssDescription;
@@ -190,12 +189,6 @@ pub async fn serve(
     select! {
         state_machine = state_machine.fuse() => {
             match state_machine {
-                Ok(v) => {
-                    // This should never happen because the `Infallible` type should be impossible
-                    // to create.
-                    let _: Infallible = v;
-                    unreachable!()
-                }
                 Err(ExitReason(Err(e))) => error!("Client state machine for iface #{} terminated with an error: {:?}",
                     iface_id, e),
                 Err(ExitReason(Ok(_))) => info!("Client state machine for iface #{} exited gracefully",

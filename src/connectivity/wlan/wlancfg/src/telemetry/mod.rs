@@ -1067,6 +1067,7 @@ impl Telemetry {
                             *state.num_consecutive_get_counter_stats_failures.get_mut() += 1;
                             // Safe to unwrap: If we've exceeded 63 bits of consecutive failures,
                             // we have other things to worry about.
+                            #[expect(clippy::unwrap_used)]
                             self.stats_logger
                                 .log_consecutive_counter_stats_failures(
                                     (*state.num_consecutive_get_counter_stats_failures)
@@ -3863,16 +3864,22 @@ impl StatsLogger {
                     payload: MetricEventPayload::IntegerValue(score as i64),
                 });
 
-                // Record runner-up candidate's score, iff there were multiple candidates and the
-                // selected candidate is the top scoring candidate (or tied in score)
+                // Record runner-up candidate's score, iff:
+                // 1. there were multiple candidates and
+                // 2. selected candidate is the top scoring candidate (or tied in score)
                 scored_candidates.sort_by_key(|(_, score)| Reverse(*score));
-                if scored_candidates.len() > 1 && score == scored_candidates[0].1 {
-                    let delta = score - scored_candidates[1].1;
-                    metric_events.push(MetricEvent {
-                        metric_id: metrics::RUNNER_UP_CANDIDATE_SCORE_DELTA_METRIC_ID,
-                        event_codes: vec![],
-                        payload: MetricEventPayload::IntegerValue(delta as i64),
-                    });
+                #[expect(clippy::get_first)]
+                if let (Some(first_candidate), Some(second_candidate)) =
+                    (scored_candidates.get(0), scored_candidates.get(1))
+                {
+                    if score == first_candidate.1 {
+                        let delta = first_candidate.1 - second_candidate.1;
+                        metric_events.push(MetricEvent {
+                            metric_id: metrics::RUNNER_UP_CANDIDATE_SCORE_DELTA_METRIC_ID,
+                            event_codes: vec![],
+                            payload: MetricEventPayload::IntegerValue(delta as i64),
+                        });
+                    }
                 }
             }
 
@@ -3910,17 +3917,17 @@ impl StatsLogger {
         duration_dim: u32,
         signals: Vec<client::types::TimestampedSignal>,
     ) {
-        if signals.is_empty() {
+        let Some(first_signal) = signals.first() else {
             warn!("Connection signals list is unexpectedly empty.");
             return;
-        }
+        };
         let mut sum_scores = 0;
         let mut ewma_signal = EwmaSignalData::new(
-            signals[0].signal.rssi_dbm,
-            signals[0].signal.snr_db,
+            first_signal.signal.rssi_dbm,
+            first_signal.signal.snr_db,
             EWMA_SMOOTHING_FACTOR_FOR_METRICS,
         );
-        let mut velocity = RssiVelocity::new(signals[0].signal.rssi_dbm);
+        let mut velocity = RssiVelocity::new(first_signal.signal.rssi_dbm);
         for timed_signal in &signals {
             ewma_signal.update_with_new_measurement(
                 timed_signal.signal.rssi_dbm,

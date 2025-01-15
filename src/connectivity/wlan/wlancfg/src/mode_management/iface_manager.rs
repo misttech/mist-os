@@ -33,7 +33,6 @@ use std::convert::Infallible;
 use std::fmt::Debug;
 use std::pin::pin;
 use std::sync::Arc;
-use std::unimplemented;
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.
@@ -778,10 +777,7 @@ impl IfaceManagerService {
         if client_iface_ids.values().any(Result::is_err) {
             return Err(format_err!(
                 "could not start client connection: {:?}",
-                client_iface_ids
-                    .into_iter()
-                    .map(|(phy_id, error)| (phy_id, error.unwrap_err()))
-                    .collect::<Vec<_>>()
+                client_iface_ids.into_iter().collect::<Vec<_>>()
             ));
         }
         let client_iface_ids = client_iface_ids.into_values().flat_map(Result::unwrap);
@@ -1060,10 +1056,10 @@ async fn handle_terminated_state_machine(
         }
         fidl_fuchsia_wlan_common::WlanMacRole::Mesh => {
             // Not yet supported.
-            unimplemented!();
+            panic!("Mesh support unimplemented");
         }
         fidl_fuchsia_wlan_common::WlanMacRoleUnknown!() => {
-            unimplemented!();
+            panic!("State machine terminated with a WlanMacRoleUnknown interface");
         }
     }
 }
