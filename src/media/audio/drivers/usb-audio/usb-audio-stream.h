@@ -15,7 +15,6 @@
 #include <zircon/listnode.h>
 
 #include <memory>
-#include <queue>
 
 #include <audio-proto/audio-proto.h>
 #include <ddktl/device-internal.h>
@@ -141,18 +140,17 @@ class UsbAudioStream final : public UsbAudioStreamBase,
       stream_.WatchPlugState(this, completer);
     }
     void SetGain(SetGainRequestView request, SetGainCompleter::Sync& completer) override {
-      stream_.SetGain(std::move(request->target_state), completer);
+      stream_.SetGain(request->target_state, completer);
     }
     void CreateRingBuffer(CreateRingBufferRequestView request,
                           CreateRingBufferCompleter::Sync& completer) override {
-      stream_.CreateRingBuffer(this, std::move(request->format), std::move(request->ring_buffer),
-                               completer);
+      stream_.CreateRingBuffer(this, request->format, std::move(request->ring_buffer), completer);
     }
 
    private:
     friend class UsbAudioStream;
 
-    enum class Plugged : uint32_t {
+    enum class Plugged : uint8_t {
       kNotReported = 1,
       kPlugged = 2,
       kUnplugged = 3,
@@ -190,7 +188,7 @@ class UsbAudioStream final : public UsbAudioStreamBase,
  private:
   friend class fbl::RefPtr<UsbAudioStream>;
 
-  enum class RingBufferState {
+  enum class RingBufferState : uint8_t {
     STOPPED,
     STOPPING,
     STOPPING_AFTER_UNPLUG,
@@ -339,7 +337,7 @@ class UsbAudioStream final : public UsbAudioStreamBase,
   inspect::IntProperty position_reply_time_;
   inspect::UintProperty ring_buffer_size2_;
   inspect::UintProperty usb_requests_sent_;
-  inspect::IntProperty usb_requests_outstanding_;
+  inspect::UintProperty usb_requests_outstanding_;
   inspect::UintProperty frames_requested_;
   inspect::UintProperty number_of_channels_;
   inspect::UintProperty frame_rate_;

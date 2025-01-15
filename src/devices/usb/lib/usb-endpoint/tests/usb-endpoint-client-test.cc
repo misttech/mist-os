@@ -150,7 +150,7 @@ TEST_F(UsbEndpointClientTest, Copy) {
     req->clear_buffers();
     ASSERT_TRUE(req.has_value());
     {
-      auto actual = req->CopyTo(0, in_buffer, sizeof(in_buffer), client_->GetMapped);
+      auto actual = req->CopyTo(0, in_buffer, sizeof(in_buffer), client_->GetMapped());
       EXPECT_EQ(actual.size(), 1);
       EXPECT_EQ(actual[0], sizeof(in_buffer));
       (*req)->data()->at(0).size(actual[0]);
@@ -158,7 +158,7 @@ TEST_F(UsbEndpointClientTest, Copy) {
 
     uint8_t out_buffer[sizeof(in_buffer) + 4] = {0};
     {
-      auto actual = req->CopyFrom(0, out_buffer, sizeof(out_buffer), client_->GetMapped);
+      auto actual = req->CopyFrom(0, out_buffer, sizeof(out_buffer), client_->GetMapped());
       EXPECT_EQ(actual.size(), 1);
       EXPECT_EQ(actual[0], sizeof(in_buffer));
       EXPECT_BYTES_EQ(out_buffer, in_buffer, actual[0]);

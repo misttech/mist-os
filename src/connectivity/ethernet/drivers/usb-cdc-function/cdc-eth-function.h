@@ -105,7 +105,7 @@ class UsbCdc : public UsbCdcType,
 
   // Use this method to access the request lists defined above. These have correct thread
   // annotations and will ensure that any error in locking are caught during compilation.
-  inline list_node_t* tx_pending_infos() __TA_REQUIRES(tx_mutex_) { return &tx_pending_infos_; }
+  list_node_t* tx_pending_infos() __TA_REQUIRES(tx_mutex_) { return &tx_pending_infos_; }
 
   std::atomic_bool unbound_ = false;  // set to true when device is going away.
 
@@ -119,9 +119,9 @@ class UsbCdc : public UsbCdcType,
   usb_speed_t speed_ = 0;
   // TX lock -- Must be acquired before ethernet_mutex
   // when both locks are held.
-  std::mutex& tx_mutex_ = bulk_in_ep_.mutex_;
-  std::mutex& rx_mutex_ = bulk_out_ep_.mutex_;
-  std::mutex& intr_mutex_ = intr_ep_.mutex_;
+  std::mutex& tx_mutex_ = bulk_in_ep_.mutex();
+  std::mutex& rx_mutex_ = bulk_out_ep_.mutex();
+  std::mutex& intr_mutex_ = intr_ep_.mutex();
 
   uint8_t bulk_out_addr_ = 0;
   uint8_t bulk_in_addr_ = 0;

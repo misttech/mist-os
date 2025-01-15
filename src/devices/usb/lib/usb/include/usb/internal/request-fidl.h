@@ -153,7 +153,7 @@ class FidlRequest {
     }
     return *this;
   }
-  FidlRequest& reset_buffers(get_mapped_func_t GetMapped) {
+  FidlRequest& reset_buffers(const get_mapped_func_t& GetMapped) {
     for (auto& d : *request_.data()) {
       d.offset(0);
       switch (d.buffer()->Which()) {
@@ -175,7 +175,7 @@ class FidlRequest {
   // CopyTo: tries to copy `size` bytes from `buffer` to contiguous `request` buffers from
   // `offset`. Returns the number of bytes copied for each buffer.
   std::vector<size_t> CopyTo(size_t offset, const void* buffer, size_t size,
-                             get_mapped_func_t GetMapped) {
+                             const get_mapped_func_t& GetMapped) {
     const uint8_t* start = static_cast<const uint8_t*>(buffer);
     size_t todo = size;
     size_t cur_offset = offset;
@@ -226,7 +226,7 @@ class FidlRequest {
   // CopyFrom: tries to copy `size` bytes from `request` (starting from `offset`) to `buffer`.
   // Returns the number of bytes copied for each buffer.
   std::vector<size_t> CopyFrom(size_t offset, void* buffer, size_t size,
-                               get_mapped_func_t GetMapped) {
+                               const get_mapped_func_t& GetMapped) {
     uint8_t* start = static_cast<uint8_t*>(buffer);
     size_t todo = size;
     size_t cur_offset = offset;
@@ -302,7 +302,7 @@ class FidlRequest {
 
   // CacheHelper flushes and invaldiates cache for specified buffer region.
   zx_status_t CacheHelper(const fuchsia_hardware_usb_request::BufferRegion& buffer,
-                          uint32_t options, get_mapped_func_t GetMapped) {
+                          uint32_t options, const get_mapped_func_t& GetMapped) {
     auto mapped = GetMapped(*buffer.buffer());
     if (mapped.is_error()) {
       return mapped.error_value();

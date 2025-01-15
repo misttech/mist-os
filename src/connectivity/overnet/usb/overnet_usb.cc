@@ -232,8 +232,8 @@ zx_status_t OvernetUsb::UsbFunctionInterfaceSetConfigured(bool configured, usb_s
 
   std::vector<fuchsia_hardware_usb_request::Request> requests;
   while (auto req = bulk_out_ep_.GetRequest()) {
-    req->reset_buffers(bulk_out_ep_.GetMapped);
-    zx_status_t status = req->CacheFlushInvalidate(bulk_out_ep_.GetMapped);
+    req->reset_buffers(bulk_out_ep_.GetMapped());
+    zx_status_t status = req->CacheFlushInvalidate(bulk_out_ep_.GetMapped());
     if (status != ZX_OK) {
       FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
     }
@@ -310,7 +310,7 @@ void OvernetUsb::HandleSocketReadable(async_dispatcher_t*, async::WaitBase*, zx_
 
   if (status == ZX_OK) {
     (*request)->data()->at(0).size(actual);
-    status = request->CacheFlush(bulk_in_ep_.GetMappedLocked);
+    status = request->CacheFlush(bulk_in_ep_.GetMappedLocked());
     if (status != ZX_OK) {
       FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
     }
@@ -516,13 +516,13 @@ OvernetUsb::State OvernetUsb::Running::ReceiveData(uint8_t* data, size_t len,
 }
 
 void OvernetUsb::SendMagicReply(usb::FidlRequest request) {
-  auto actual = request.CopyTo(0, kOvernetMagic, kOvernetMagicSize, bulk_in_ep_.GetMappedLocked);
+  auto actual = request.CopyTo(0, kOvernetMagic, kOvernetMagicSize, bulk_in_ep_.GetMappedLocked());
 
   for (size_t i = 0; i < actual.size(); i++) {
     request->data()->at(i).size(actual[i]);
   }
 
-  auto status = request.CacheFlush(bulk_in_ep_.GetMappedLocked);
+  auto status = request.CacheFlush(bulk_in_ep_.GetMappedLocked());
   if (status != ZX_OK) {
     FDF_SLOG(ERROR, "Cache flush failed", KV("status", zx_status_get_string(status)));
   }

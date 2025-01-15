@@ -35,11 +35,11 @@ void CompleteTxn(CompleterType& completer, zx_status_t status) {
 void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& completer) {
   // Should always be started on a clean state.
   {
-    std::lock_guard<std::mutex> _(bulk_in_ep_.mutex_);
+    std::lock_guard<std::mutex> _(bulk_in_ep_.mutex());
     ZX_ASSERT(tx_pending_reqs_.empty());
   }
   {
-    std::lock_guard<std::mutex> _(bulk_out_ep_.mutex_);
+    std::lock_guard<std::mutex> _(bulk_out_ep_.mutex());
     ZX_ASSERT(rx_requests_.empty());
   }
 
@@ -71,7 +71,7 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
   CompleteTxn(completer, status);
 
   // Run receive to pass up messages received while disconnected.
-  std::lock_guard<std::mutex> _(bulk_out_ep_.mutex_);
+  std::lock_guard<std::mutex> _(bulk_out_ep_.mutex());
   ReceiveLocked();
 }
 
@@ -108,7 +108,7 @@ void UsbAdbDevice::Stop() {
   });
 
   {
-    std::lock_guard<std::mutex> _(bulk_out_ep_.mutex_);
+    std::lock_guard<std::mutex> _(bulk_out_ep_.mutex());
     while (!rx_requests_.empty()) {
       rx_requests_.front().Reply(fit::error(ZX_ERR_BAD_STATE));
       rx_requests_.pop();
@@ -120,7 +120,7 @@ void UsbAdbDevice::Stop() {
   }
 
   {
-    std::lock_guard<std::mutex> _(bulk_in_ep_.mutex_);
+    std::lock_guard<std::mutex> _(bulk_in_ep_.mutex());
     while (!tx_pending_reqs_.empty()) {
       CompleteTxn(tx_pending_reqs_.front().completer, ZX_ERR_CANCELED);
       tx_pending_reqs_.pop();
@@ -157,14 +157,14 @@ zx::result<> UsbAdbDevice::SendLocked() {
 
     size_t to_copy = std::min(current.request.data().size() - current.start, vmo_data_size_);
     auto actual = req->CopyTo(0, current.request.data().data() + current.start, to_copy,
-                              bulk_in_ep_.GetMappedLocked);
+                              bulk_in_ep_.GetMappedLocked());
     size_t actual_total = 0;
     for (size_t i = 0; i < actual.size(); i++) {
       // Fill in size of data.
       (*req)->data()->at(i).size(actual[i]);
       actual_total += actual[i];
     }
-    auto status = req->CacheFlush(bulk_in_ep_.GetMappedLocked);
+    auto status = req->CacheFlush(bulk_in_ep_.GetMappedLocked());
     if (status != ZX_OK) {
       zxlogf(ERROR, "Cache flush failed %d", status);
     }
@@ -217,8 +217,8 @@ void UsbAdbDevice::ReceiveLocked() {
   }
   rx_requests_.pop();
 
-  req.reset_buffers(bulk_out_ep_.GetMappedLocked);
-  auto status = req.CacheFlushInvalidate(bulk_out_ep_.GetMappedLocked);
+  req.reset_buffers(bulk_out_ep_.GetMappedLocked());
+  auto status = req.CacheFlushInvalidate(bulk_out_ep_.GetMappedLocked());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Cache flush and invalidate failed %d", status);
   }
@@ -240,7 +240,7 @@ void UsbAdbDevice::QueueTx(QueueTxRequest& request, QueueTxCompleter::Sync& comp
     return;
   }
 
-  std::lock_guard<std::mutex> _(bulk_in_ep_.mutex_);
+  std::lock_guard<std::mutex> _(bulk_in_ep_.mutex());
   tx_pending_reqs_.emplace(
       txn_req_t{.request = std::move(request), .start = 0, .completer = completer.ToAsync()});
 
@@ -257,7 +257,7 @@ void UsbAdbDevice::Receive(ReceiveCompleter::Sync& completer) {
     return;
   }
 
-  std::lock_guard<std::mutex> lock(bulk_out_ep_.mutex_);
+  std::lock_guard<std::mutex> lock(bulk_out_ep_.mutex());
   rx_requests_.emplace(completer.ToAsync());
   ReceiveLocked();
 }
@@ -285,13 +285,13 @@ void UsbAdbDevice::RxComplete(fendpoint::Completion completion) {
     return;
   }
 
-  std::lock_guard<std::mutex> _(bulk_out_ep_.mutex_);
+  std::lock_guard<std::mutex> _(bulk_out_ep_.mutex());
   pending_replies_.push(std::move(completion));
   ReceiveLocked();
 }
 
 void UsbAdbDevice::TxComplete(fendpoint::Completion completion) {
-  std::lock_guard<std::mutex> _(bulk_in_ep_.mutex_);
+  std::lock_guard<std::mutex> _(bulk_in_ep_.mutex());
   if (InsertUsbRequest(std::move(completion.request().value()), bulk_in_ep_) != ZX_OK) {
     return;
   }
@@ -347,8 +347,8 @@ zx_status_t UsbAdbDevice::ConfigureEndpoints(bool enable) {
     // queue RX requests
     std::vector<fuchsia_hardware_usb_request::Request> requests;
     while (auto req = bulk_out_ep_.GetRequest()) {
-      req->reset_buffers(bulk_out_ep_.GetMapped);
-      auto status = req->CacheFlushInvalidate(bulk_out_ep_.GetMapped);
+      req->reset_buffers(bulk_out_ep_.GetMapped());
+      auto status = req->CacheFlushInvalidate(bulk_out_ep_.GetMapped());
       if (status != ZX_OK) {
         zxlogf(ERROR, "Cache flush and invalidate failed %d", status);
       }
