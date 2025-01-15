@@ -21,7 +21,7 @@ use tee_internal::binding::{
 };
 use tee_internal::{
     to_tee_result, Attribute, AttributeId, Error, HandleFlags, ObjectEnumHandle, ObjectHandle,
-    PropSetHandle, Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
+    PropSetHandle, Result as TeeResult, Storage as TeeStorage, Type, Usage, ValueFields, Whence,
     OBJECT_ID_MAX_LEN,
 };
 
@@ -773,7 +773,7 @@ extern "C" fn TEE_GetObjectInfo1(
     assert!(!objectInfo.is_null());
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
-        let info = storage::get_object_info(object);
+        let info = context::with_current(|context| context.storage.get_object_info(object));
         // SAFETY: `objectInfo` nullity checked above.
         unsafe {
             *objectInfo = *info.to_binding();
@@ -792,7 +792,7 @@ extern "C" fn TEE_RestrictObjectUsage1(object: TEE_ObjectHandle, objectUsage: u3
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let usage = Usage::from_bits_retain(objectUsage);
-        storage::restrict_object_usage(object, usage);
+        context::with_current(|context| context.storage.restrict_object_usage(object, usage));
         Ok(())
     }())
 }
@@ -816,14 +816,15 @@ extern "C" fn TEE_GetObjectBufferAttribute(
         // SAFETY: `size` nullity checked above.
         let initial_size = unsafe { *size };
         let buffer = slice_from_raw_parts_mut(buffer, initial_size);
-        let (attribute_size, result) =
-            match storage::get_object_buffer_attribute(object, id, buffer) {
-                Ok(written) => {
-                    debug_assert!(written.len() <= initial_size);
-                    (written.len(), Ok(()))
-                }
-                Err(err) => (err.actual_size, Err(err.error)),
-            };
+        let (attribute_size, result) = match context::with_current(|context| {
+            context.storage.get_object_buffer_attribute(object, id, buffer)
+        }) {
+            Ok(written) => {
+                debug_assert!(written.len() <= initial_size);
+                (written.len(), Ok(()))
+            }
+            Err(err) => (err.actual_size, Err(err.error)),
+        };
         // SAFETY: `size` nullity checked above.
         unsafe {
             *size = attribute_size;
@@ -844,7 +845,9 @@ extern "C" fn TEE_GetObjectValueAttribute(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let id = AttributeId::from_u32(attributeID).unwrap();
-        let val = storage::get_object_value_attribute(object, id)?;
+        let val = context::with_current(|context| {
+            context.storage.get_object_value_attribute(object, id)
+        })?;
         // SAFETY: `a` and `b` nullity checked above.
         unsafe {
             (*a, *b) = (val.a, val.b);
@@ -856,7 +859,7 @@ extern "C" fn TEE_GetObjectValueAttribute(
 #[no_mangle]
 extern "C" fn TEE_CloseObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
-    storage::close_object(object);
+    context::with_current(|context| context.storage.close_object(object));
 }
 
 #[no_mangle]
@@ -868,7 +871,9 @@ extern "C" fn TEE_AllocateTransientObject(
     assert!(!object.is_null());
     to_tee_result(|| -> TeeResult {
         let object_type = Type::from_u32(objectType).unwrap();
-        let obj = storage::allocate_transient_object(object_type, maxObjectSize)?;
+        let obj = context::with_current(|context| {
+            context.storage.allocate_transient_object(object_type, maxObjectSize)
+        })?;
         // SAFETY: `object` nullity checked above.
         unsafe {
             *object = *obj.to_binding();
@@ -880,13 +885,13 @@ extern "C" fn TEE_AllocateTransientObject(
 #[no_mangle]
 extern "C" fn TEE_FreeTransientObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
-    storage::free_transient_object(object);
+    context::with_current(|context| context.storage.free_transient_object(object));
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetTransientObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
-    storage::reset_transient_object(object);
+    context::with_current(|context| context.storage.reset_transient_object(object));
 }
 
 #[no_mangle]
@@ -906,7 +911,9 @@ extern "C" fn TEE_PopulateTransientObject(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let attrs = slice_from_raw_parts(attrs, attrCount as usize);
-        storage::populate_transient_object(object, attrs as &[Attribute])
+        context::with_current(|context| {
+            context.storage.populate_transient_object(object, attrs as &[Attribute])
+        })
     }())
 }
 
@@ -975,10 +982,12 @@ extern "C" fn TEE_OpenPersistentObject(
 ) -> TEE_Result {
     assert!(!object.is_null());
     to_tee_result(|| -> TeeResult {
-        let storage = Storage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
+        let storage = TeeStorage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
         let flags = HandleFlags::from_bits_retain(flags);
         let id = slice_from_raw_parts(objectID, objectIDLen);
-        let obj = storage::open_persistent_object(storage, id, flags)?;
+        let obj = context::with_current(|context| {
+            context.storage.open_persistent_object(storage, id, flags)
+        })?;
         // SAFETY: `object` nullity checked above.
         unsafe {
             *object = *obj.to_binding();
@@ -999,22 +1008,30 @@ extern "C" fn TEE_CreatePersistentObject(
     object: *mut TEE_ObjectHandle,
 ) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
-        let storage = Storage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
+        let storage = TeeStorage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
         let flags = HandleFlags::from_bits_retain(flags);
         let id = slice_from_raw_parts(objectID, objectIDLen);
         let attrs = *ObjectHandle::from_binding(&attributes);
         let initial_data = slice_from_raw_parts(initialData, initialDataLen);
-        let obj = storage::create_persistent_object(storage, id, flags, attrs, initial_data)?;
-        if object.is_null() {
-            // The user doesn't want a handle, so just close the newly minted one.
-            storage::close_object(obj);
-        } else {
-            // SAFETY: `object` is non-null in this branch.
-            unsafe {
-                *object = *obj.to_binding();
+        context::with_current(|context| -> TeeResult {
+            let obj = context.storage.create_persistent_object(
+                storage,
+                id,
+                flags,
+                attrs,
+                initial_data,
+            )?;
+            if object.is_null() {
+                // The user doesn't want a handle, so just close the newly minted one.
+                context.storage.close_object(obj);
+            } else {
+                // SAFETY: `object` is non-null in this branch.
+                unsafe {
+                    *object = *obj.to_binding();
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }())
 }
 
@@ -1022,7 +1039,7 @@ extern "C" fn TEE_CreatePersistentObject(
 extern "C" fn TEE_CloseAndDeletePersistentObject1(object: TEE_ObjectHandle) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
-        storage::close_and_delete_persistent_object(object)
+        context::with_current(|context| context.storage.close_and_delete_persistent_object(object))
     }())
 }
 
@@ -1040,7 +1057,7 @@ extern "C" fn TEE_RenamePersistentObject(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let new_id = slice_from_raw_parts(newObjectID, newObjectIDLen);
-        storage::rename_persistent_object(object, new_id)
+        context::with_current(|context| context.storage.rename_persistent_object(object, new_id))
     }())
 }
 
@@ -1050,7 +1067,9 @@ extern "C" fn TEE_AllocatePersistentObjectEnumerator(
 ) -> TEE_Result {
     assert!(!objectEnumerator.is_null());
     to_tee_result(|| -> TeeResult {
-        let enumerator = storage::allocate_persistent_object_enumerator();
+        let enumerator = context::with_current(|context| {
+            context.storage.allocate_persistent_object_enumerator()
+        });
         // SAFETY: `objectEnumerator` nullity checked above.
         unsafe {
             *objectEnumerator = *enumerator.to_binding();
@@ -1062,13 +1081,13 @@ extern "C" fn TEE_AllocatePersistentObjectEnumerator(
 #[no_mangle]
 extern "C" fn TEE_FreePersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
     let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-    storage::free_persistent_object_enumerator(enumerator);
+    context::with_current(|context| context.storage.free_persistent_object_enumerator(enumerator));
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetPersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
     let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-    storage::reset_persistent_object_enumerator(enumerator);
+    context::with_current(|context| context.storage.reset_persistent_object_enumerator(enumerator));
 }
 
 #[no_mangle]
@@ -1078,8 +1097,10 @@ extern "C" fn TEE_StartPersistentObjectEnumerator(
 ) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-        let storage = Storage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
-        storage::start_persistent_object_enumerator(enumerator, storage)
+        let storage = TeeStorage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
+        context::with_current(|context| {
+            context.storage.start_persistent_object_enumerator(enumerator, storage)
+        })
     }())
 }
 
@@ -1095,7 +1116,9 @@ extern "C" fn TEE_GetNextPersistentObject(
     to_tee_result(|| -> TeeResult {
         let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
         let id_buf = slice_from_raw_parts_mut(objectID, OBJECT_ID_MAX_LEN);
-        let (info, id) = storage::get_next_persistent_object(enumerator, id_buf)?;
+        let (info, id) = context::with_current(|context| {
+            context.storage.get_next_persistent_object(enumerator, id_buf)
+        })?;
         // SAFETY: `objectIDLen` nullity checked above.
         unsafe {
             *objectIDLen = id.len();
@@ -1121,7 +1144,8 @@ extern "C" fn TEE_ReadObjectData(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let buffer = slice_from_raw_parts_mut(buffer, size);
-        let written = storage::read_object_data(object, buffer)?;
+        let written =
+            context::with_current(|context| context.storage.read_object_data(object, buffer))?;
         // SAFETY: `count` nullity checked above.
         unsafe {
             *count = written.len();
@@ -1139,7 +1163,7 @@ extern "C" fn TEE_WriteObjectData(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let buffer = slice_from_raw_parts(buffer, size);
-        storage::write_object_data(object, buffer)
+        context::with_current(|context| context.storage.write_object_data(object, buffer))
     }())
 }
 
@@ -1147,7 +1171,7 @@ extern "C" fn TEE_WriteObjectData(
 extern "C" fn TEE_TruncateObjectData(object: TEE_ObjectHandle, size: usize) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
-        storage::truncate_object_data(object, size)
+        context::with_current(|context| context.storage.truncate_object_data(object, size))
     }())
 }
 
@@ -1160,7 +1184,9 @@ extern "C" fn TEE_SeekObjectData(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let whence = Whence::from_u32(whence).unwrap();
-        storage::seek_data_object(object, offset.try_into().unwrap(), whence)
+        context::with_current(|context| {
+            context.storage.seek_data_object(object, offset.try_into().unwrap(), whence)
+        })
     }())
 }
 
