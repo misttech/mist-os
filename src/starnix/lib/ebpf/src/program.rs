@@ -611,311 +611,12 @@ mod test {
     use crate::api::*;
     use crate::conformance::test::parse_asm;
     use crate::{
-        convert_and_link_cbpf, verify_program, CallingContext, CbpfLenInstruction, FieldDescriptor,
-        FieldMapping, FieldType, NullVerifierLogger, ProgramArgument, StructDescriptor, Type,
-    };
-    use linux_uapi::{
-        seccomp_data, sock_filter, AUDIT_ARCH_AARCH64, AUDIT_ARCH_X86_64, SECCOMP_RET_ALLOW,
-        SECCOMP_RET_TRAP,
+        verify_program, CallingContext, FieldDescriptor, FieldMapping, FieldType,
+        NullVerifierLogger, ProgramArgument, StructDescriptor, Type,
     };
     use std::mem::offset_of;
     use std::sync::{Arc, LazyLock};
     use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-
-    const BPF_ALU_ADD_K: u16 = (BPF_ALU | BPF_ADD | BPF_K) as u16;
-    const BPF_ALU_SUB_K: u16 = (BPF_ALU | BPF_SUB | BPF_K) as u16;
-    const BPF_ALU_MUL_K: u16 = (BPF_ALU | BPF_MUL | BPF_K) as u16;
-    const BPF_ALU_DIV_K: u16 = (BPF_ALU | BPF_DIV | BPF_K) as u16;
-    const BPF_ALU_AND_K: u16 = (BPF_ALU | BPF_AND | BPF_K) as u16;
-    const BPF_ALU_OR_K: u16 = (BPF_ALU | BPF_OR | BPF_K) as u16;
-    const BPF_ALU_XOR_K: u16 = (BPF_ALU | BPF_XOR | BPF_K) as u16;
-    const BPF_ALU_LSH_K: u16 = (BPF_ALU | BPF_LSH | BPF_K) as u16;
-    const BPF_ALU_RSH_K: u16 = (BPF_ALU | BPF_RSH | BPF_K) as u16;
-
-    const BPF_ALU_OR_X: u16 = (BPF_ALU | BPF_OR | BPF_X) as u16;
-
-    const BPF_LD_W_ABS: u16 = (BPF_LD | BPF_ABS | BPF_W) as u16;
-    const BPF_LD_W_MEM: u16 = (BPF_LD | BPF_MEM | BPF_W) as u16;
-    const BPF_JEQ_K: u16 = (BPF_JMP | BPF_JEQ | BPF_K) as u16;
-    const BPF_JSET_K: u16 = (BPF_JMP | BPF_JSET | BPF_K) as u16;
-    const BPF_RET_K: u16 = (BPF_RET | BPF_K) as u16;
-    const BPF_RET_A: u16 = (BPF_RET | BPF_A) as u16;
-    const BPF_ST_REG: u16 = BPF_ST as u16;
-    const BPF_MISC_TAX: u16 = (BPF_MISC | BPF_TAX) as u16;
-
-    pub const TEST_CBPF_CONFIG: CbpfConfig = CbpfConfig {
-        len: CbpfLenInstruction::Static { len: size_of::<seccomp_data>() as i32 },
-        allow_msh: true,
-    };
-
-    struct TestProgramContext {}
-
-    impl BpfProgramContext for TestProgramContext {
-        type RunContext<'a> = ();
-        type Packet<'a> = &'a seccomp_data;
-        const CBPF_CONFIG: &'static CbpfConfig = &TEST_CBPF_CONFIG;
-    }
-
-    static SECCOMP_DATA_TYPE: LazyLock<Type> =
-        LazyLock::new(|| Type::PtrToMemory { id: MemoryId::new(), offset: 0, buffer_size: 0 });
-
-    impl ProgramArgument for &'_ seccomp_data {
-        fn get_type() -> &'static Type {
-            &*SECCOMP_DATA_TYPE
-        }
-    }
-
-    fn with_prg_assert_result(
-        prg: &EbpfProgram<TestProgramContext>,
-        mut data: seccomp_data,
-        result: u32,
-        msg: &str,
-    ) {
-        let return_value = prg.run(&mut (), &mut data);
-        assert_eq!(return_value, result as u64, "{}: filter return value is {}", msg, return_value);
-    }
-
-    #[test]
-    fn test_filter_with_dw_load() {
-        let test_prg = [
-            // Check data.arch
-            sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 4 },
-            sock_filter { code: BPF_JEQ_K, jt: 1, jf: 0, k: AUDIT_ARCH_X86_64 },
-            // Return 1 if arch is wrong
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: 1 },
-            // Load data.nr (the syscall number)
-            sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 0 },
-            // Always allow 41
-            sock_filter { code: BPF_JEQ_K, jt: 0, jf: 1, k: 41 },
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW },
-            // Don't allow 115
-            sock_filter { code: BPF_JEQ_K, jt: 0, jf: 1, k: 115 },
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_TRAP },
-            // For other syscalls, check the args
-            // A common hack to deal with 64-bit numbers in BPF: deal
-            // with 32 bits at a time.
-            // First, Load arg0's most significant 32 bits in M[0]
-            sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 16 },
-            sock_filter { code: BPF_ST_REG, jt: 0, jf: 0, k: 0 },
-            // Load arg0's least significant 32 bits into M[1]
-            sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 20 },
-            sock_filter { code: BPF_ST_REG, jt: 0, jf: 0, k: 1 },
-            // JSET is A & k.  Check the first 32 bits.  If the test
-            // is successful, jump, otherwise, check the next 32 bits.
-            sock_filter { code: BPF_LD_W_MEM, jt: 0, jf: 0, k: 0 },
-            sock_filter { code: BPF_JSET_K, jt: 2, jf: 0, k: 4294967295 },
-            sock_filter { code: BPF_LD_W_MEM, jt: 0, jf: 0, k: 1 },
-            sock_filter { code: BPF_JSET_K, jt: 0, jf: 1, k: 4294967292 },
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_TRAP },
-            sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW },
-        ];
-
-        let prg =
-            convert_and_link_cbpf::<TestProgramContext>(&test_prg).expect("Error parsing program");
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data { arch: AUDIT_ARCH_AARCH64, ..Default::default() },
-            1,
-            "Did not reject incorrect arch",
-        );
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data { arch: AUDIT_ARCH_X86_64, nr: 41, ..Default::default() },
-            SECCOMP_RET_ALLOW,
-            "Did not pass simple RET_ALLOW",
-        );
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data {
-                arch: AUDIT_ARCH_X86_64,
-                nr: 100,
-                args: [0xFF00000000, 0, 0, 0, 0, 0],
-                ..Default::default()
-            },
-            SECCOMP_RET_TRAP,
-            "Did not treat load of first 32 bits correctly",
-        );
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data {
-                arch: AUDIT_ARCH_X86_64,
-                nr: 100,
-                args: [0x4, 0, 0, 0, 0, 0],
-                ..Default::default()
-            },
-            SECCOMP_RET_TRAP,
-            "Did not correctly reject load of second 32 bits",
-        );
-
-        with_prg_assert_result(
-            &prg,
-            seccomp_data {
-                arch: AUDIT_ARCH_X86_64,
-                nr: 100,
-                args: [0x0, 0, 0, 0, 0, 0],
-                ..Default::default()
-            },
-            SECCOMP_RET_ALLOW,
-            "Did not correctly accept load of second 32 bits",
-        );
-    }
-
-    #[test]
-    fn test_alu_insns() {
-        {
-            let test_prg = [
-                // Load data.nr (the syscall number)
-                sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 0 }, // = 1, 11
-                // Do some math.
-                sock_filter { code: BPF_ALU_ADD_K, jt: 0, jf: 0, k: 3 }, // = 4, 14
-                sock_filter { code: BPF_ALU_SUB_K, jt: 0, jf: 0, k: 2 }, // = 2, 12
-                sock_filter { code: BPF_MISC_TAX, jt: 0, jf: 0, k: 0 },  // 2, 12 -> X
-                sock_filter { code: BPF_ALU_MUL_K, jt: 0, jf: 0, k: 8 }, // = 16, 96
-                sock_filter { code: BPF_ALU_DIV_K, jt: 0, jf: 0, k: 2 }, // = 8, 48
-                sock_filter { code: BPF_ALU_AND_K, jt: 0, jf: 0, k: 15 }, // = 8, 0
-                sock_filter { code: BPF_ALU_OR_K, jt: 0, jf: 0, k: 16 }, // = 24, 16
-                sock_filter { code: BPF_ALU_XOR_K, jt: 0, jf: 0, k: 7 }, // = 31, 23
-                sock_filter { code: BPF_ALU_LSH_K, jt: 0, jf: 0, k: 2 }, // = 124, 92
-                sock_filter { code: BPF_ALU_OR_X, jt: 0, jf: 0, k: 1 },  // = 127, 92
-                sock_filter { code: BPF_ALU_RSH_K, jt: 0, jf: 0, k: 1 }, // = 63, 46
-                sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
-            ];
-
-            let prg = convert_and_link_cbpf::<TestProgramContext>(&test_prg)
-                .expect("Error parsing program");
-
-            with_prg_assert_result(
-                &prg,
-                seccomp_data { nr: 1, ..Default::default() },
-                63,
-                "BPF math does not work",
-            );
-
-            with_prg_assert_result(
-                &prg,
-                seccomp_data { nr: 11, ..Default::default() },
-                46,
-                "BPF math does not work",
-            );
-        }
-
-        {
-            // Negative numbers simple check
-            let test_prg = [
-                // Load data.nr (the syscall number)
-                sock_filter { code: BPF_LD_W_ABS, jt: 0, jf: 0, k: 0 }, // = -1
-                sock_filter { code: BPF_ALU_SUB_K, jt: 0, jf: 0, k: 2 }, // = -3
-                sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
-            ];
-
-            let prg = convert_and_link_cbpf::<TestProgramContext>(&test_prg)
-                .expect("Error parsing program");
-
-            with_prg_assert_result(
-                &prg,
-                seccomp_data { nr: -1, ..Default::default() },
-                u32::MAX - 2,
-                "BPF math does not work",
-            );
-        }
-    }
-
-    // Test BPF_MSH cBPF instruction.
-    #[test]
-    fn test_ld_msh() {
-        let test_prg = [
-            // X <- 4 * (P[0] & 0xf)
-            sock_filter { code: (BPF_LDX | BPF_MSH | BPF_B) as u16, jt: 0, jf: 0, k: 0 },
-            // A <- X
-            sock_filter { code: (BPF_MISC | BPF_TXA) as u16, jt: 0, jf: 0, k: 0 },
-            // ret A
-            sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
-        ];
-
-        let prg =
-            convert_and_link_cbpf::<TestProgramContext>(&test_prg).expect("Error parsing program");
-
-        for i in [0x00, 0x01, 0x07, 0x15, 0xff].iter() {
-            with_prg_assert_result(
-                &prg,
-                seccomp_data { nr: *i, ..Default::default() },
-                4 * (*i & 0xf) as u32,
-                "BPF math does not work",
-            )
-        }
-    }
-
-    #[test]
-    fn test_static_packet_len() {
-        let test_prg = [
-            // A <- packet_len
-            sock_filter { code: (BPF_LD | BPF_LEN | BPF_W) as u16, jt: 0, jf: 0, k: 0 },
-            // ret A
-            sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
-        ];
-
-        let prg =
-            convert_and_link_cbpf::<TestProgramContext>(&test_prg).expect("Error parsing program");
-
-        let data = seccomp_data::default();
-        assert_eq!(prg.run(&mut (), &data), size_of::<seccomp_data>() as u64);
-    }
-
-    // A packet used by `test_variable_packet_len()` below to verify the case when the packet
-    // length is stored as a struct field.
-    #[repr(C)]
-    #[derive(Debug, Default, IntoBytes, Immutable, KnownLayout, FromBytes)]
-    struct VariableLengthPacket {
-        foo: u32,
-        len: i32,
-        bar: u64,
-    }
-
-    static VARIABLE_LENGTH_PACKET_TYPE: LazyLock<Type> = LazyLock::new(|| Type::PtrToMemory {
-        id: MemoryId::new(),
-        offset: 0,
-        buffer_size: size_of::<VariableLengthPacket>() as u64,
-    });
-
-    impl ProgramArgument for &'_ VariableLengthPacket {
-        fn get_type() -> &'static Type {
-            &*VARIABLE_LENGTH_PACKET_TYPE
-        }
-    }
-
-    pub const VARIABLE_LENGTH_CBPF_CONFIG: CbpfConfig = CbpfConfig {
-        len: CbpfLenInstruction::ContextField {
-            offset: offset_of!(VariableLengthPacket, len) as i16,
-        },
-        allow_msh: true,
-    };
-
-    struct VariableLengthPacketContext {}
-
-    impl BpfProgramContext for VariableLengthPacketContext {
-        type RunContext<'a> = ();
-        type Packet<'a> = &'a VariableLengthPacket;
-        const CBPF_CONFIG: &'static CbpfConfig = &VARIABLE_LENGTH_CBPF_CONFIG;
-    }
-
-    #[test]
-    fn test_variable_packet_len() {
-        let test_prg = [
-            // A <- packet_len
-            sock_filter { code: (BPF_LD | BPF_LEN | BPF_W) as u16, jt: 0, jf: 0, k: 0 },
-            // ret A
-            sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
-        ];
-
-        let prg = convert_and_link_cbpf::<VariableLengthPacketContext>(&test_prg)
-            .expect("Error parsing program");
-        let data = VariableLengthPacket { len: 42, ..VariableLengthPacket::default() };
-        assert_eq!(prg.run(&mut (), &data), data.len as u64);
-    }
 
     #[repr(C)]
     #[derive(Debug, Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
@@ -937,25 +638,25 @@ mod test {
         let descriptor = Arc::new(StructDescriptor {
             fields: vec![
                 FieldDescriptor {
-                    offset: std::mem::offset_of!(TestArgument, read_only_field),
+                    offset: offset_of!(TestArgument, read_only_field),
                     field_type: FieldType::Scalar { size: 4 },
                 },
                 FieldDescriptor {
-                    offset: std::mem::offset_of!(TestArgument, data),
+                    offset: offset_of!(TestArgument, data),
                     field_type: FieldType::PtrToArray {
                         is_32_bit: false,
                         id: data_memory_id.clone(),
                     },
                 },
                 FieldDescriptor {
-                    offset: std::mem::offset_of!(TestArgument, data_end),
+                    offset: offset_of!(TestArgument, data_end),
                     field_type: FieldType::PtrToEndArray {
                         is_32_bit: false,
                         id: data_memory_id.clone(),
                     },
                 },
                 FieldDescriptor {
-                    offset: std::mem::offset_of!(TestArgument, mutable_field),
+                    offset: offset_of!(TestArgument, mutable_field),
                     field_type: FieldType::MutableScalar { size: 4 },
                 },
             ],
@@ -1013,25 +714,25 @@ mod test {
         let descriptor = Arc::new(StructDescriptor {
             fields: vec![
                 FieldDescriptor {
-                    offset: std::mem::offset_of!(TestArgument32, read_only_field),
+                    offset: offset_of!(TestArgument32, read_only_field),
                     field_type: FieldType::Scalar { size: 4 },
                 },
                 FieldDescriptor {
-                    offset: std::mem::offset_of!(TestArgument32, data),
+                    offset: offset_of!(TestArgument32, data),
                     field_type: FieldType::PtrToArray {
                         is_32_bit: true,
                         id: data_memory_id.clone(),
                     },
                 },
                 FieldDescriptor {
-                    offset: std::mem::offset_of!(TestArgument32, data_end),
+                    offset: offset_of!(TestArgument32, data_end),
                     field_type: FieldType::PtrToEndArray {
                         is_32_bit: true,
                         id: data_memory_id.clone(),
                     },
                 },
                 FieldDescriptor {
-                    offset: std::mem::offset_of!(TestArgument32, mutable_field),
+                    offset: offset_of!(TestArgument32, mutable_field),
                     field_type: FieldType::MutableScalar { size: 4 },
                 },
             ],
@@ -1052,16 +753,16 @@ mod test {
                 memory_id: TEST_ARG_32_BIT_MEMORY_ID.clone(),
                 fields: vec![
                     FieldMapping {
-                        source_offset: std::mem::offset_of!(TestArgument32, data),
-                        target_offset: std::mem::offset_of!(TestArgument, data),
+                        source_offset: offset_of!(TestArgument32, data),
+                        target_offset: offset_of!(TestArgument, data),
                     },
                     FieldMapping {
-                        source_offset: std::mem::offset_of!(TestArgument32, data_end),
-                        target_offset: std::mem::offset_of!(TestArgument, data_end),
+                        source_offset: offset_of!(TestArgument32, data_end),
+                        target_offset: offset_of!(TestArgument, data_end),
                     },
                     FieldMapping {
-                        source_offset: std::mem::offset_of!(TestArgument32, mutable_field),
-                        target_offset: std::mem::offset_of!(TestArgument, mutable_field),
+                        source_offset: offset_of!(TestArgument32, mutable_field),
+                        target_offset: offset_of!(TestArgument, mutable_field),
                     },
                 ],
             }
