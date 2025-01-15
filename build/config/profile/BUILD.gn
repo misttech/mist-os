@@ -223,6 +223,24 @@ variant("profile") {
   }
 }
 
+# Enable PGO instrumentation to collect profiles for Rust.
+variant("profile-rust") {
+  rustflags = [ "-Cprofile-generate" ]
+  if (_fuchsia_prebuilt_runtime) {
+    # The statically-linked profiling runtime depends on libzircon.
+    # TODO(https://fxbug.dev/42139818): Ensure this works with shared_library() instances too!
+    deps = [ "//src/zircon/lib/zircon" ]
+
+    dynamic_linker_flags = "-dynamic-linker=profile-rust/ld.so.1"
+    ldflags = [ "-Wl,$dynamic_linker_flags" ]
+    rustflags += [ "-Clink-arg=$dynamic_linker_flags" ]
+  }
+  if (is_fuchsia || is_kernel) {
+    # TODO(https://fxbug.dev/42053322): Value profiling isn't supported by the runtime.
+    rustflags += [ "-Cllvm-args=-disable-vp" ]
+  }
+}
+
 # PGO-optimized build that uses collected profiles.
 config("profile-use") {
   if (pgo_profile_path != "") {

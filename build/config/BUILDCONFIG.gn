@@ -1711,6 +1711,16 @@ declare_args() {
     },
 
     {
+      configs = [ "//build/config/profile:coverage-cts" ]
+      tags = [
+        "coverage",
+        "debugdata",
+        "instrumented",
+        "llvm-profdata",
+      ]
+    },
+
+    {
       configs = [ "//build/config/profile" ]
       tags = [
         "debugdata",
@@ -1722,14 +1732,16 @@ declare_args() {
     },
 
     {
-      configs = [ "//build/config/profile:coverage-cts" ]
+      configs = [ "//build/config/profile:profile-rust" ]
       tags = [
-        "coverage",
         "debugdata",
         "instrumented",
         "llvm-profdata",
+        "needs-writable-globals",
+        "profile",
       ]
     },
+
     {
       configs = [ "//build/config/sanitizers:tsan" ]
       tags = [
@@ -1923,6 +1935,18 @@ declare_args() {
         },
       ]
     },
+
+    {
+      name = "host_profile-rust"
+      select_variant = []
+      select_variant = [
+        {
+          variant = "profile-rust"
+          host = true
+        },
+      ]
+    },
+
     {
       name = "host_tsan"
       select_variant = []
