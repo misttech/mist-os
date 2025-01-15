@@ -273,7 +273,7 @@ def _fuchsia_prebuilt_board_configuration_impl(ctx):
         ),
     ]
 
-_fuchsia_prebuilt_board_configuration = rule(
+fuchsia_prebuilt_board_configuration = rule(
     doc = """A prebuilt board configuration file and its main hardware support bundle.""",
     implementation = _fuchsia_prebuilt_board_configuration_impl,
     provides = [FuchsiaBoardConfigInfo],
@@ -284,17 +284,6 @@ _fuchsia_prebuilt_board_configuration = rule(
         ),
     },
 )
-
-def fuchsia_prebuilt_board_configuration(
-        *,
-        directory = None,
-        **kwargs):
-    """A board configuration that has been prebuilt and exists in a specific folder."""
-
-    # TODO(chandarren): Migrate users to use `files` instead.
-    if directory:
-        kwargs["files"] = directory
-    _fuchsia_prebuilt_board_configuration(**kwargs)
 
 def _fuchsia_hybrid_board_configuration_impl(ctx):
     src_board_config = ctx.attr.board_configuration[FuchsiaBoardConfigInfo].config

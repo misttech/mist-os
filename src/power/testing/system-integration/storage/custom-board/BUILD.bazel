@@ -8,5 +8,5 @@ package(default_visibility = ["//visibility:public"])
 
 fuchsia_prebuilt_board_configuration(
     name = "power_testing_storage_vim3",
-    directory = "@gn_targets//src/power/testing/system-integration/storage/custom-board:power_testing_storage_vim3",
+    files = "@gn_targets//src/power/testing/system-integration/storage/custom-board:power_testing_storage_vim3",
 )
