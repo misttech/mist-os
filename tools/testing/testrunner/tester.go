@@ -544,6 +544,7 @@ func (s *serialSocket) runDiagnostics(ctx context.Context) error {
 
 // for testability
 type FFXInstance interface {
+	Run(ctx context.Context, args ...string) error
 	RunWithTarget(ctx context.Context, args ...string) error
 	RunWithTargetAndTimeout(ctx context.Context, timeout time.Duration, args ...string) error
 	Stdout() io.Writer
@@ -1110,6 +1111,9 @@ func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error 
 	}, nil)
 	if err != nil {
 		logger.Errorf(ctx, "%s: %s", constants.FailedToRunSnapshotMsg, err)
+		if err := t.ffx.Run(ctx, "target", "list"); err != nil {
+			logger.Errorf(ctx, "failed to run `ffx target list`: %s", err)
+		}
 	}
 	logger.Debugf(ctx, "ran snapshot in %s", clock.Now(ctx).Sub(startTime))
 	return err
