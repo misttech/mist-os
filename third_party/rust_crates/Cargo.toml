@@ -132,7 +132,7 @@ itertools = "0.10"
 itoa = "0.4"
 json5format = "0.2.6"
 lazy_static = "1.4"
-libc = "0.2.158"
+libc = { version = "0.2.169", features = ["extra_traits"] }
 libm = "0.2.1"
 linked-hash-map = "0.5.3"
 lock_api = "0.4.11"
@@ -384,7 +384,6 @@ askama_derive = { path = "forks/askama_derive" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
-libc = { features = ["extra_traits"], path = "forks/libc-0.2.158" }
 libm = { path = "forks/libm" }
 nom = { path = "forks/nom" }
 notify = { path = "forks/notify" }
@@ -601,7 +600,7 @@ rustflags = ["--cfg=has_std"]
 [gn.package.lazy_static."1.4.0"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "lazy_static_visibility" }
 
-[gn.package.libc."0.2.158"]
+[gn.package.libc."0.2.169"]
 rustflags = [
   "--cfg=libc_priv_mod_use",
   "--cfg=libc_union",
@@ -618,7 +617,7 @@ rustflags = [
   "--cfg=libc_const_extern_fn",
  ]
 
-[gn.package.libc."0.2.158".platform."cfg(target_os = \"freebsd\")"]
+[gn.package.libc."0.2.169".platform."cfg(target_os = \"freebsd\")"]
 rustflags = ["--cfg=freebsd11"]
 
 [gn.package.libm."0.2.1"]
@@ -1024,7 +1023,7 @@ reviewed_features = [
 [gn.package.tokio."1.38.1".platform."cfg(not(target_os = \"fuchsia\"))"]
 deps = [
   ":bytes-v1_6_0",
-  ":libc-v0_2_158",
+  ":libc-v0_2_169",
   ":memchr-v2_7_1",
   ":mio-v0_8_9",
   ":num_cpus-v1_16_0",
