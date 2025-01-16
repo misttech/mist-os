@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_SUSPEND_DRIVERS_AML_SUSPEND_AML_SUSPEND_H_
-#define SRC_DEVICES_SUSPEND_DRIVERS_AML_SUSPEND_AML_SUSPEND_H_
+#ifndef SRC_DEVICES_SUSPEND_DRIVERS_GENERIC_SUSPEND_GENERIC_SUSPEND_H_
+#define SRC_DEVICES_SUSPEND_DRIVERS_GENERIC_SUSPEND_GENERIC_SUSPEND_H_
 
 #include <fidl/fuchsia.hardware.suspend/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -16,10 +16,10 @@
 
 namespace suspend {
 
-class AmlSuspend : public fdf::DriverBase,
-                   public fidl::WireServer<fuchsia_hardware_suspend::Suspender> {
+class GenericSuspend : public fdf::DriverBase,
+                       public fidl::WireServer<fuchsia_hardware_suspend::Suspender> {
  public:
-  AmlSuspend(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher);
+  GenericSuspend(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher);
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
@@ -57,4 +57,4 @@ class AmlSuspend : public fdf::DriverBase,
 
 }  // namespace suspend
 
-#endif  // SRC_DEVICES_SUSPEND_DRIVERS_AML_SUSPEND_AML_SUSPEND_H_
+#endif  // SRC_DEVICES_SUSPEND_DRIVERS_GENERIC_SUSPEND_GENERIC_SUSPEND_H_

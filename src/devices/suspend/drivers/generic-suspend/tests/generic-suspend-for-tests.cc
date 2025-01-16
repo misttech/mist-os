@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-suspend-for-tests.h"
+#include "generic-suspend-for-tests.h"
 
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -15,11 +15,11 @@
 
 namespace suspend {
 
-void AmlSuspendForTests::AtStart() {
+void GenericSuspendForTests::AtStart() {
   suspend_observer_ =
       std::make_unique<syscall_intercept::SuspendObserver>(outgoing(), dispatcher());
 }
 
 }  // namespace suspend
 
-FUCHSIA_DRIVER_EXPORT(suspend::AmlSuspendForTests);
+FUCHSIA_DRIVER_EXPORT(suspend::GenericSuspendForTests);

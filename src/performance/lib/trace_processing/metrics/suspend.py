@@ -31,8 +31,8 @@ _SAG_EVENT_NAME = "system-activity-governor:suspend"
 # LINT.ThenChange(//src/power/system-activity-governor/src/cpu_manager.rs)
 
 # LINT.IfChange
-_AML_EVENT_NAME = "aml-suspend:suspend"
-# LINT.ThenChange(//src/devices/suspend/drivers/aml-suspend/aml-suspend.cc)
+_SUSPEND_EVENT_NAME = "generic-suspend:suspend"
+# LINT.ThenChange(//src/devices/suspend/drivers/generic-suspend/generic-suspend.cc)
 
 
 class SuspendMetricsProcessor(trace_metrics.MetricsProcessor):
@@ -395,7 +395,7 @@ def get_aml_driver_event(
         trace_utils.filter_events(
             model.all_events(),
             category=_EVENT_CATEGORY,
-            name=_AML_EVENT_NAME,
+            name=_SUSPEND_EVENT_NAME,
             type=trace_model.DurationEvent,
         )
     )

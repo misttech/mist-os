@@ -187,8 +187,8 @@
 //src/devices/serial/drivers/virtio-console:virtio_console-driver
 //src/devices/spi/drivers/aml-spi:aml-spi-driver
 //src/devices/spi/drivers/spi:spi-driver
-//src/devices/suspend/drivers/aml-suspend:aml-suspend-driver
-//src/devices/suspend/drivers/aml-suspend:aml-suspend-driver-with-fake-syscall
+//src/devices/suspend/drivers/generic-suspend:generic-suspend-driver
+//src/devices/suspend/drivers/generic-suspend:generic-suspend-driver-with-fake-syscall
 //src/devices/tee/drivers/optee:optee-driver
 //src/devices/temperature/drivers/aml-trip:aml-trip-driver
 //src/devices/temperature/drivers/shtv3:shtv3-driver

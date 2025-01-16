@@ -24,7 +24,7 @@
 	};
 
 	suspend {
-		compatible="amlogic,suspend";
+		compatible="generic,suspend";
 	};
 
 	reserved-memory {

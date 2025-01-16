@@ -5,5 +5,5 @@
 group("tests") {
   testonly = true
 
-  deps = [ "aml-suspend/tests:aml-suspend-test-package" ]
+  deps = [ "generic-suspend/tests:generic-suspend-test-package" ]
 }

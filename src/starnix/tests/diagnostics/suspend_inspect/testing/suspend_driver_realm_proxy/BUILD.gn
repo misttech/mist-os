@@ -53,6 +53,6 @@ fuchsia_package("pkg") {
     "//src/devices/bin/driver_host:next_component",
     "//src/devices/bus/drivers/platform:platform-bus",
     "//src/devices/misc/drivers/test-parent",
-    "//src/devices/suspend/drivers/aml-suspend:aml-suspend-with-fake-syscall",
+    "//src/devices/suspend/drivers/generic-suspend:generic-suspend-with-fake-syscall",
   ]
 }

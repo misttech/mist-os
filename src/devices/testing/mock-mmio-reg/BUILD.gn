@@ -37,7 +37,7 @@ source_set("mock-mmio-reg-zxtest") {
     "//src/devices/power/drivers/aml-meson-power:*",
     "//src/devices/pwm/drivers/aml-pwm:*",
     "//src/devices/registers/drivers/registers:*",
-    "//src/devices/suspend/drivers/aml-suspend/tests:*",
+    "//src/devices/suspend/drivers/generic-suspend/tests:*",
     "//src/devices/temperature/drivers/aml-trip/tests:*",
     "//src/devices/thermal/drivers/aml-thermal:*",
     "//src/devices/thermal/drivers/aml-thermal-s905d2g-legacy:*",

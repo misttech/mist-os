@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "../aml-suspend.h"
+#include "../generic-suspend.h"
 
 #include <fidl/fuchsia.hardware.suspend/cpp/markers.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
@@ -18,10 +18,10 @@
 
 namespace suspend {
 
-class AmlSuspendTest : public AmlSuspend {
+class GenericSuspendTest : public GenericSuspend {
  public:
-  AmlSuspendTest(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : AmlSuspend(std::move(start_args), std::move(dispatcher)) {
+  GenericSuspendTest(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : GenericSuspend(std::move(start_args), std::move(dispatcher)) {
     zx_status_t result = zx::vmo::create(1, 0, &fake_resource_);
     ZX_ASSERT(result == ZX_OK);
   }
@@ -47,8 +47,9 @@ class AmlSuspendTest : public AmlSuspend {
   static DriverRegistration GetDriverRegistration() {
     // Use a custom DriverRegistration to create the DUT. Without this, the non-test implementation
     // will be used by default.
-    return FUCHSIA_DRIVER_REGISTRATION_V1(fdf_internal::DriverServer<AmlSuspendTest>::initialize,
-                                          fdf_internal::DriverServer<AmlSuspendTest>::destroy);
+    return FUCHSIA_DRIVER_REGISTRATION_V1(
+        fdf_internal::DriverServer<GenericSuspendTest>::initialize,
+        fdf_internal::DriverServer<GenericSuspendTest>::destroy);
   }
 
  private:
@@ -78,13 +79,13 @@ class TestEnvironmentWrapper : public fdf_testing::Environment {
   compat::DeviceServer compat_server_;
 };
 
-class AmlSuspendTestConfiguration {
+class GenericSuspendTestConfiguration {
  public:
-  using DriverType = AmlSuspendTest;
+  using DriverType = GenericSuspendTest;
   using EnvironmentType = TestEnvironmentWrapper;
 };
 
-class AmlSuspendTestFixture : public ::testing::Test {
+class GenericSuspendTestFixture : public ::testing::Test {
  public:
   void SetUp() override {
     zx::result<> result = driver_test().StartDriver();
@@ -100,16 +101,16 @@ class AmlSuspendTestFixture : public ::testing::Test {
   }
   fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender>& client() { return client_; }
 
-  fdf_testing::BackgroundDriverTest<AmlSuspendTestConfiguration>& driver_test() {
+  fdf_testing::BackgroundDriverTest<GenericSuspendTestConfiguration>& driver_test() {
     return driver_test_;
   }
 
  private:
-  fdf_testing::BackgroundDriverTest<AmlSuspendTestConfiguration> driver_test_;
+  fdf_testing::BackgroundDriverTest<GenericSuspendTestConfiguration> driver_test_;
   fidl::WireSyncClient<fuchsia_hardware_suspend::Suspender> client_;
 };
 
-TEST_F(AmlSuspendTestFixture, TrivialGetSuspendStates) {
+TEST_F(GenericSuspendTestFixture, TrivialGetSuspendStates) {
   auto result = client()->GetSuspendStates();
 
   ASSERT_TRUE(result.ok());
@@ -119,7 +120,7 @@ TEST_F(AmlSuspendTestFixture, TrivialGetSuspendStates) {
   EXPECT_GT(result.value()->suspend_states().count(), 0ul);
 }
 
-TEST_F(AmlSuspendTestFixture, TrivialSuspend) {
+TEST_F(GenericSuspendTestFixture, TrivialSuspend) {
   fidl::Arena arena;
   auto request = fuchsia_hardware_suspend::wire::SuspenderSuspendRequest::Builder(arena)
                      .state_index(0)

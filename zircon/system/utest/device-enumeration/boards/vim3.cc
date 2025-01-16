@@ -65,7 +65,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       "dev.sys.platform.power-controller.power-controller_group.power-impl.power-core.power-1",
       "dev.sys.platform.pt",
       "dev.sys.platform.pt.dt-root",
-      "dev.sys.platform.pt.suspend.aml-suspend-device",
+      "dev.sys.platform.pt.suspend.generic-suspend-device",
       "dev.sys.platform.pwm-ffd1b000.aml-pwm-device",
       "dev.sys.platform.pwm-ffd1b000.aml-pwm-device.pwm-0.pwm_a-regulator_group.pwm_vreg_big",
       "dev.sys.platform.pwm-ffd1b000.aml-pwm-device.pwm-4.pwm-init_group.aml-pwm-init",

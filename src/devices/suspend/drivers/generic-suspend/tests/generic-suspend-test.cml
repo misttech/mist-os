@@ -8,6 +8,6 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/aml-suspend-test-bin",
+        binary: "bin/generic-suspend-test-bin",
     },
 }

@@ -4,7 +4,7 @@
 
 #include <lib/driver/component/cpp/driver_export.h>
 
-#include "aml-suspend.h"
+#include "generic-suspend.h"
 
-// Register the production version of the AmlSuspend driver.
-FUCHSIA_DRIVER_EXPORT(suspend::AmlSuspend);
+// Register the production version of the GenericSuspend driver.
+FUCHSIA_DRIVER_EXPORT(suspend::GenericSuspend);

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_SUSPEND_DRIVERS_AML_SUSPEND_TESTS_AML_SUSPEND_FOR_TESTS_H_
-#define SRC_DEVICES_SUSPEND_DRIVERS_AML_SUSPEND_TESTS_AML_SUSPEND_FOR_TESTS_H_
+#ifndef SRC_DEVICES_SUSPEND_DRIVERS_GENERIC_SUSPEND_TESTS_GENERIC_SUSPEND_FOR_TESTS_H_
+#define SRC_DEVICES_SUSPEND_DRIVERS_GENERIC_SUSPEND_TESTS_GENERIC_SUSPEND_FOR_TESTS_H_
 
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
@@ -13,14 +13,14 @@
 
 #include <sdk/lib/driver/outgoing/cpp/outgoing_directory.h>
 
-#include "src/devices/suspend/drivers/aml-suspend/aml-suspend.h"
+#include "src/devices/suspend/drivers/generic-suspend/generic-suspend.h"
 #include "src/devices/testing/syscall-intercept/syscall-intercept.h"
 
 namespace suspend {
 
-class AmlSuspendForTests : public suspend::AmlSuspend {
+class GenericSuspendForTests : public suspend::GenericSuspend {
  public:
-  using AmlSuspend::AmlSuspend;
+  using GenericSuspend::GenericSuspend;
 
  protected:
   void AtStart() override;
@@ -31,4 +31,4 @@ class AmlSuspendForTests : public suspend::AmlSuspend {
 
 }  // namespace suspend
 
-#endif  // SRC_DEVICES_SUSPEND_DRIVERS_AML_SUSPEND_TESTS_AML_SUSPEND_FOR_TESTS_H_
+#endif  // SRC_DEVICES_SUSPEND_DRIVERS_GENERIC_SUSPEND_TESTS_GENERIC_SUSPEND_FOR_TESTS_H_

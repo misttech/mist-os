@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-suspend.h"
+#include "generic-suspend.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
@@ -31,19 +31,19 @@ namespace fobs = fuchsia_power_observability;
 
 namespace {
 
-constexpr char kDeviceName[] = "aml-suspend-device";
+constexpr char kDeviceName[] = "generic-suspend-device";
 
 constexpr uint64_t kInspectHistorySize = 128;
 }  // namespace
 
-AmlSuspend::AmlSuspend(fdf::DriverStartArgs start_args,
-                       fdf::UnownedSynchronizedDispatcher dispatcher)
-    : fdf::DriverBase("aml-suspend", std::move(start_args), std::move(dispatcher)),
+GenericSuspend::GenericSuspend(fdf::DriverStartArgs start_args,
+                               fdf::UnownedSynchronizedDispatcher dispatcher)
+    : fdf::DriverBase("generic-suspend", std::move(start_args), std::move(dispatcher)),
       inspect_events_(inspector().root().CreateChild(fobs::kSuspendEventsNode),
                       kInspectHistorySize),
-      devfs_connector_(fit::bind_member<&AmlSuspend::Serve>(this)) {}
+      devfs_connector_(fit::bind_member<&GenericSuspend::Serve>(this)) {}
 
-zx::result<zx::resource> AmlSuspend::GetCpuResource() {
+zx::result<zx::resource> GenericSuspend::GetCpuResource() {
   zx::result resource = incoming()->Connect<fuchsia_kernel::CpuResource>();
   if (resource.is_error()) {
     return resource.take_error();
@@ -57,7 +57,7 @@ zx::result<zx::resource> AmlSuspend::GetCpuResource() {
   return zx::ok(std::move(result.value().resource));
 }
 
-zx::result<> AmlSuspend::CreateDevfsNode() {
+zx::result<> GenericSuspend::CreateDevfsNode() {
   fidl::Arena arena;
   zx::result connector = devfs_connector_.Bind(dispatcher());
   if (connector.is_error()) {
@@ -90,7 +90,7 @@ zx::result<> AmlSuspend::CreateDevfsNode() {
   return zx::ok();
 }
 
-zx::result<> AmlSuspend::Start() {
+zx::result<> GenericSuspend::Start() {
   fuchsia_hardware_suspend::SuspendService::InstanceHandler handler({
       .suspender = suspend_bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure),
   });
@@ -118,16 +118,16 @@ zx::result<> AmlSuspend::Start() {
     return create_devfs_node_result.take_error();
   }
 
-  FDF_LOG(INFO, "Started Amlogic Suspend Driver");
+  FDF_LOG(INFO, "Started Generic Suspend Driver");
 
   return zx::ok();
 }
 
-void AmlSuspend::Stop() {}
+void GenericSuspend::Stop() {}
 
-void AmlSuspend::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
+void GenericSuspend::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
 
-void AmlSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
+void GenericSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
   fidl::Arena arena;
 
   auto suspend_to_idle =
@@ -141,14 +141,14 @@ void AmlSuspend::GetSuspendStates(GetSuspendStatesCompleter::Sync& completer) {
   completer.ReplySuccess(resp);
 }
 
-zx_status_t AmlSuspend::SystemSuspendEnter() {
+zx_status_t GenericSuspend::SystemSuspendEnter() {
   // LINT.IfChange
-  TRACE_DURATION("power", "aml-suspend:suspend");
+  TRACE_DURATION("power", "generic-suspend:suspend");
   // LINT.ThenChange(//src/performance/lib/trace_processing/metrics/suspend.py)
   return zx_system_suspend_enter(cpu_resource_.get(), ZX_TIME_INFINITE);
 }
 
-void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& completer) {
+void GenericSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& completer) {
   fidl::Arena arena;
   auto function_start = zx_clock_get_boot();
 
@@ -186,11 +186,11 @@ void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& com
   }
 }
 
-void AmlSuspend::Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> request) {
+void GenericSuspend::Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> request) {
   suspend_bindings_.AddBinding(dispatcher(), std::move(request), this, fidl::kIgnoreBindingClosure);
 }
 
 }  // namespace suspend
 
 // See driver-registration.cc for:
-// FUCHSIA_DRIVER_EXPORT(suspend::AmlSuspend);
+// FUCHSIA_DRIVER_EXPORT(suspend::GenericSuspend);

@@ -934,7 +934,7 @@
 	};
 
 	suspend {
-		compatible = "amlogic,suspend";
+		compatible = "generic,suspend";
 	};
 
 	system-activity-governor {

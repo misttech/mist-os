@@ -7,12 +7,12 @@ import("//build/drivers.gni")
 import("//build/test.gni")
 import("//build/testing/cc_test_executable.gni")
 
-cc_test_executable("aml-suspend-test-bin") {
+cc_test_executable("generic-suspend-test-bin") {
   configs += [ "//build/config:all_source" ]
   testonly = true
   sources = [
-    "../aml-suspend.cc",
-    "aml-suspend-test.cc",
+    "../generic-suspend.cc",
+    "generic-suspend-test.cc",
   ]
   deps = [
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
@@ -29,7 +29,6 @@ cc_test_executable("aml-suspend-test-bin") {
     "//sdk/lib/inspect/contrib/cpp:bounded_list_node",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-mmio-reg",
     "//src/lib/fxl/test:gtest_main",
@@ -43,10 +42,10 @@ cc_test_executable("aml-suspend-test-bin") {
   ]
 }
 
-fuchsia_unittest_package("aml-suspend-test-package") {
-  manifest = "aml-suspend-test.cml"
-  package_name = "aml-suspend-test-package"
-  deps = [ ":aml-suspend-test-bin" ]
+fuchsia_unittest_package("generic-suspend-test-package") {
+  manifest = "generic-suspend-test.cml"
+  package_name = "generic-suspend-test-package"
+  deps = [ ":generic-suspend-test-bin" ]
   test_specs = {
     environments = basic_envs
     log_settings = {

@@ -896,7 +896,7 @@ class SystemPowerStateControllerUsingStarnix(
         #     {
         #         "data_source": "Inspect",
         #         "metadata": {
-        #             "component_url": "fuchsia-boot:///aml-suspend#meta/aml-suspend.cm",
+        #             "component_url": "fuchsia-boot:///generic-suspend#meta/generic-suspend.cm",
         #             "timestamp": 372140515750,
         #         },
         #         "moniker": "'bootstrap/boot-drivers:dev.sys.platform.pt.suspend'",
@@ -915,7 +915,7 @@ class SystemPowerStateControllerUsingStarnix(
             inspect_data_collection: fuchsia_inspect.InspectDataCollection = (
                 self._insect.get_data(
                     selectors=[
-                        "bootstrap/boot-drivers*:[name=aml-suspend]root"
+                        "bootstrap/boot-drivers*:[name=generic-suspend]root"
                     ],
                 )
             )

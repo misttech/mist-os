@@ -1,9 +1,9 @@
-# Amlogic Suspend HAL
+# Generic Suspend HAL
 
 ## Building
 
 To add this component to your build, append
-`--with-base //src/devices/suspend/drivers/aml-suspend`
+`--with-base //src/devices/suspend/drivers/generic-suspend`
 to your `fx set` invocation.
 
 ## Testing
@@ -14,7 +14,7 @@ To add tests to your build, append `--with
 Run tests with:
 
 ```
-$ fx test aml-suspend-test
+$ fx test generic-suspend-test
 ```
 
 To see output, use the `-o` flag.
@@ -27,8 +27,8 @@ To grab the inspect data, run this `ffx` command:
 $ ffx inspect show "bootstrap/boot-drivers\:dev.sys.platform.pt.suspend"
 bootstrap/boot-drivers:dev.sys.platform.pt.suspend:
   metadata:
-    name = aml-suspend
-    component_url = fuchsia-boot:///aml-suspend#meta/aml-suspend.cm
+    name = generic-suspend
+    component_url = fuchsia-boot:///generic-suspend#meta/generic-suspend.cm
     timestamp = 85237566250
   payload:
     root:
