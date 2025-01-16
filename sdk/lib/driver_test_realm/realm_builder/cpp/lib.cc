@@ -35,18 +35,6 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
   realm_builder.AddChild(std::string(kComponentName), "#meta/driver_test_realm.cm");
 
   // Offers from parent to driver_test_realm.
-  realm_builder.AddCapability(fuchsia::component::decl::Capability::WithDictionary(
-      std::move(fuchsia::component::decl::Dictionary().set_name("diagnostics"))));
-  realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{"fuchsia.logger.LogSink"}},
-      .source = {ParentRef()},
-      .targets = {ChildRef{kComponentName}, DictionaryRef{.path = "self/diagnostics"}},
-  });
-  realm_builder.AddRoute(Route{
-      .capabilities = {Dictionary{"diagnostics"}},
-      .source = {SelfRef()},
-      .targets = {ChildRef{kComponentName}},
-  });
   realm_builder.AddRoute(Route{
       .capabilities = {Protocol{"fuchsia.component.resolution.Resolver-hermetic"}},
       .source = {ParentRef()},
@@ -73,9 +61,9 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
       .targets = {ParentRef()},
   });
   realm_builder.AddRoute(Route{
-      .capabilities = {Protocol{"fuchsia.inspect.InspectSink"}},
+      .capabilities = {Dictionary{.name = "diagnostics"}},
       .source = {ParentRef()},
-      .targets = {ChildRef{kComponentName}, DictionaryRef{.path = "self/diagnostics"}},
+      .targets = {ChildRef{kComponentName}},
   });
   realm_builder.AddRoute(Route{
       .capabilities = {Protocol{"fuchsia.diagnostics.ArchiveAccessor"}},

@@ -39,14 +39,14 @@
             to: "#context-factory",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [ "#context-factory" ],
+        },
+        {
             protocol: [ "fuchsia.ui.test.context.RealmFactory" ],
             from: "#context-factory",
             to: "#validator",
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
-            to: [ "#context-factory" ],
         },
         {
             protocol: [ "fuchsia.ui.test.conformance.PuppetFactory" ],

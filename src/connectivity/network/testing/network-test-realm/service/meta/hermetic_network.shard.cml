@@ -43,6 +43,16 @@
             to: [ "#dns-resolver" ],
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#dhcpd",
+                "#dhcpv6-client",
+                "#dns-resolver",
+                "#stubs",
+            ],
+        },
+        {
             protocol: [ "fuchsia.posix.socket.Provider" ],
             from: "#netstack",
             to: [
@@ -56,16 +66,6 @@
             protocol: [ "fuchsia.posix.socket.packet.Provider" ],
             from: "#netstack",
             to: [ "#dhcpd" ],
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
-            to: [
-                "#dhcpd",
-                "#dhcpv6-client",
-                "#dns-resolver",
-                "#stubs",
-            ],
         },
     ],
     expose: [

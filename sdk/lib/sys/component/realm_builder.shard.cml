@@ -25,9 +25,9 @@
             to: [ "#realm_builder" ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
-            to: [ "#realm_builder_server" ],
+            to: "#realm_builder_server",
         },
     ],
 }

@@ -25,7 +25,6 @@
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReportingProductRegister",
                 "fuchsia.fonts.Provider",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.intl.PropertyProvider",
                 "fuchsia.media.Audio",
                 "fuchsia.media.AudioDeviceEnumerator",
@@ -110,6 +109,11 @@
             from: "parent",
             to: "#system-validation-tests",
             rights: [ "r*" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#system-validation-tests",
         },
         {
             storage: [

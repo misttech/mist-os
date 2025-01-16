@@ -15,7 +15,6 @@
             // These hermetic protocols are offered to be used by tests.
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",
@@ -31,6 +30,11 @@
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.vulkan.loader.Loader",
             ],
+            from: "parent",
+            to: "#vulkan-tests",
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: "#vulkan-tests",
         },

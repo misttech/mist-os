@@ -17,18 +17,14 @@
         },
     ],
     offer: [
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
-            to: [ "#realm_builder_server" ],
-        },
-
         // [START collection_offers]
         {
-            protocol: [
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.inspect.InspectSink",
-            ],
+            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
+            from: "parent",
+            to: [ "#realm_builder" ],
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#realm_builder" ],
         },

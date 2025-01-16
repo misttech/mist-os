@@ -14,7 +14,6 @@
                 "fuchsia.boot.Items",
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebuglogResource",
                 "fuchsia.kernel.DebugResource",
@@ -38,6 +37,11 @@
             ],
             from: "parent",
             to: [ "#vfs-compliance-tests" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#vfs-compliance-tests",
         },
         {
             event_stream: [ "capability_requested" ],

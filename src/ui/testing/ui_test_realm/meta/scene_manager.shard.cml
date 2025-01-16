@@ -41,6 +41,14 @@
             to: [ "#scene-provider" ],
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [
+                "#input-helper",
+                "#scene_manager",
+            ],
+        },
+        {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
             from: "#fake_cobalt",
             to: [ "#scene_manager" ],
@@ -54,14 +62,6 @@
             protocol: [ "fuchsia.ui.display.singleton.Info" ],
             from: "#scenic",
             to: [ "#input-helper" ],
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "parent",
-            to: [
-                "#input-helper",
-                "#scene_manager",
-            ],
         },
     ],
     expose: [

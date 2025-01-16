@@ -11,7 +11,6 @@
     offer: [
         {
             protocol: [
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
@@ -19,6 +18,11 @@
             ],
             from: "parent",
             to: [ "#codec-factory" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#codec-factory",
         },
         {
             directory: "dev-mediacodec",

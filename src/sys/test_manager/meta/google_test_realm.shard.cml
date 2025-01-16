@@ -20,10 +20,7 @@
         },
         {
             // These hermetic protocols are offered to be used by tests.
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.process.Launcher",
-            ],
+            protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
             to: [ "#google-tests" ],
         },
@@ -80,6 +77,11 @@
             storage: "cache",
             from: "self",
             to: [ "#google-tests" ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#google-tests",
         },
         {
             directory: "root-ssl-certificates",

@@ -19,7 +19,7 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.inspect.InspectSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: "#factory_driver_test_realm",
         },

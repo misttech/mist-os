@@ -34,15 +34,6 @@
             from: "#echo_server",
         },
     ],
-
-    // Capabilities required by components under test.
-    offer: [
-        {
-            protocol: [ "fuchsia.inspect.InspectSink" ],
-            from: "parent",
-            to: "#echo_server",
-        },
-    ],
 }
 
 // [END example_snippet]

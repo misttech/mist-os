@@ -206,6 +206,15 @@
             from: "parent/tee-client-capabilities",
             to: "#session",
         },
+
+        // TODO(b/345827642): Remove this route and instead route
+        // only "diagnostics" once all #session clients
+        // are migrated to use the dictionary.
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent/diagnostics",
+            to: "#session",
+        },
         {
             // Routed to session-manager via factory_store_providers.core_shard.cml.
             protocol: [

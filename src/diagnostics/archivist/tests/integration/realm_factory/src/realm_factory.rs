@@ -6,6 +6,7 @@ use cm_rust::{CapabilityDecl, DictionaryDecl};
 use diagnostics_data::Severity;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_archivist_test::*;
+use fidl_fuchsia_inspect::InspectSinkMarker;
 use fidl_fuchsia_logger::LogSinkMarker;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
@@ -236,6 +237,7 @@ impl ArchivistRealmFactory {
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<LogSinkMarker>())
+                    .capability(Capability::protocol::<InspectSinkMarker>())
                     .from(&archivist)
                     .to(Ref::dictionary("self/diagnostics")),
             )

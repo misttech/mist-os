@@ -112,7 +112,7 @@
             to: [ "#starnix-tests" ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#starnix-tests" ],
         },

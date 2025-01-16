@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/inspect/client.shard.cml",
+        "inspect/use.shard.cml",
 
         // TODO(b/345827642): Remove inline declarations
         // of RealmBuilder shards once Chromium uses dictionaries.
@@ -63,10 +63,12 @@
         },
     ],
     offer: [
+        // NOTE: These routes are not redundant. They are needed for Chromium
+        // which can't yet use dictionaries.
         {
             protocol: "fuchsia.inspect.InspectSink",
             from: "parent",
-            to: [ "#realm_builder_server" ],
+            to: "all",
         },
         {
             protocol: "fuchsia.logger.LogSink",

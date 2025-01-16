@@ -17,10 +17,12 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.inspect.InspectSink",
-            ],
+            protocol: [ "fuchsia.boot.WriteOnlyLog" ],
+            from: "parent",
+            to: [ "#fs-collection" ],
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#fs-collection" ],
         },

@@ -19,11 +19,15 @@
             to: "#test_manager",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.SvcStashProvider",
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.kernel.Stats",

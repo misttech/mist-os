@@ -78,6 +78,15 @@
             from: "#bt-gap",
             to: [ "#bt-host-collection" ],
         },
+
+        // TODO(b/345827642): Remove this route when
+        // the prebuilt is updated to use InspectSink
+        // from the dictionary.
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent/diagnostics",
+            to: "#bt-host-collection",
+        },
         {
             protocol: [
                 "fuchsia.device.NameProvider",

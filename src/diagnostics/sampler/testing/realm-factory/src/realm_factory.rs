@@ -4,6 +4,7 @@
 
 use crate::mocks;
 use anyhow::*;
+use cm_rust::{CapabilityDecl, DictionaryDecl};
 use fidl_fuchsia_io::R_STAR_DIR;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
@@ -127,32 +128,49 @@ pub async fn create_realm(options: ftest::RealmOptions) -> Result<RealmInstance,
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<flogger::LogSinkMarker>())
+                .capability(Capability::dictionary("diagnostics"))
                 .from(Ref::parent())
                 .to(&wrapper_realm),
         )
         .await?;
+
     wrapper_realm
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol::<flogger::LogSinkMarker>())
-                .from(Ref::parent())
-                .to(&test_case_archivist)
-                .to(&fake_cobalt)
-                .to(&sampler)
-                .to(&single_counter),
-        )
+        .add_capability(CapabilityDecl::Dictionary(DictionaryDecl {
+            name: "diagnostics".parse().unwrap(),
+            source_path: None,
+        }))
         .await?;
+
     wrapper_realm
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<finspect::InspectSinkMarker>())
                 .from(&test_case_archivist)
+                .to(Ref::dictionary("self/diagnostics")),
+        )
+        .await?;
+
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<flogger::LogSinkMarker>())
+                .from(Ref::parent())
+                .from_dictionary("diagnostics")
+                .to(Ref::dictionary("self/diagnostics")),
+        )
+        .await?;
+
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::dictionary("diagnostics"))
+                .from(Ref::self_())
                 .to(&fake_cobalt)
                 .to(&sampler)
                 .to(&single_counter),
         )
         .await?;
+
     // TODO(https://fxbug.dev/42156520): refactor these tests to use the single test archivist and remove
     // this archivist. We can also remove the `wrapper` realm when this is done. The
     // ArchiveAccessor and Log protocols routed here would be routed from AboveRoot instead. To

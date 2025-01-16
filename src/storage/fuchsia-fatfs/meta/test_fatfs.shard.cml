@@ -4,10 +4,12 @@
 {
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.process.Launcher",
-            ],
+            protocol: [ "fuchsia.process.Launcher" ],
+            from: "parent",
+            to: "#fs-collection",
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: "#fs-collection",
         },

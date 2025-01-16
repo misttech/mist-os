@@ -42,6 +42,11 @@
             subdir: "scenic",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#scenic",
+        },
+        {
             storage: "tmp",
             from: "parent",
             to: "#scenic",
@@ -51,7 +56,6 @@
         // scenic_base_routes.shard.cml.
         {
             protocol: [
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.scheduler.RoleManager",
             ],

@@ -17,6 +17,14 @@
             to: "#flash_ts_feedback_id",
             subdir: "{{PACKAGE_NAME}}",
         },
+        // TODO(b/345827642): Remove this route and instead route
+        // only "diagnostics" once #flash_ts_feedback_id
+        // is migrated to use the dictionary.
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "parent/diagnostics",
+            to: "#flash_ts_feedback_id",
+        },
         {
             protocol: "fuchsia.metrics.MetricEventLoggerFactory",
             from: "#cobalt",
