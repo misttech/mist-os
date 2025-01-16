@@ -42,7 +42,7 @@ use {
 pub struct Features {
     pub kernel: KernelFeatures,
 
-    pub selinux: bool,
+    pub selinux: SELinuxFeature,
 
     pub ashmem: bool,
 
@@ -80,6 +80,15 @@ pub struct Features {
     pub nanohub: bool,
 }
 
+#[derive(Default, Debug)]
+pub struct SELinuxFeature {
+    pub enabled: bool,
+
+    /// A path to a file in the Container's package that lists all the permission checks
+    /// that are allowed to fail.
+    pub exceptions_path: Option<String>,
+}
+
 impl Features {
     pub fn record_inspect(&self, parent_node: &fuchsia_inspect::Node) {
         parent_node.record_child("features", |inspect_node| match self {
@@ -113,7 +122,7 @@ impl Features {
                 network_manager,
                 nanohub,
             } => {
-                inspect_node.record_bool("selinux", *selinux);
+                inspect_node.record_bool("selinux", selinux.enabled);
                 inspect_node.record_bool("ashmem", *ashmem);
                 inspect_node.record_bool("framebuffer", *framebuffer);
                 inspect_node.record_bool("gralloc", *gralloc);
@@ -237,7 +246,9 @@ pub fn parse_features(
             }
             ("rootfs_rw", _) => features.rootfs_rw = true,
             ("self_profile", _) => features.self_profile = true,
-            ("selinux", _) => features.selinux = true,
+            ("selinux", arg) => {
+                features.selinux = SELinuxFeature { enabled: true, exceptions_path: arg };
+            }
             ("test_data", _) => features.test_data = true,
             (f, _) => {
                 return Err(anyhow!("Unsupported feature: {}", f));

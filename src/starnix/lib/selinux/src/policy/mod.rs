@@ -26,7 +26,7 @@ use parsed_policy::ParsedPolicy;
 use parser::{ByRef, ByValue, ParseStrategy};
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::ops::Deref;
 use symbols::{find_class_by_name, find_common_symbol_by_name_bytes};
 use zerocopy::{
@@ -75,6 +75,10 @@ pub struct AccessDecision {
     pub auditallow: AccessVector,
     pub auditdeny: AccessVector,
     pub flags: u32,
+
+    /// If this field is set then denials should be audit-logged with "todo_deny" as the reason, with
+    /// the `bug` number included in the audit message.
+    pub todo_bug: Option<NonZeroU64>,
 }
 
 impl Default for AccessDecision {
@@ -87,7 +91,13 @@ impl AccessDecision {
     /// Returns an [`AccessDecision`] with the specified permissions to `allow`, and default audit
     /// behaviour.
     pub(super) const fn allow(allow: AccessVector) -> Self {
-        Self { allow, auditallow: AccessVector::NONE, auditdeny: AccessVector::ALL, flags: 0 }
+        Self {
+            allow,
+            auditallow: AccessVector::NONE,
+            auditdeny: AccessVector::ALL,
+            flags: 0,
+            todo_bug: None,
+        }
     }
 }
 
@@ -224,6 +234,11 @@ impl<PS: ParseStrategy> Policy<PS> {
             .iter()
             .map(|class| ClassInfo { class_name: class.name_bytes(), class_id: class.id() })
             .collect()
+    }
+
+    /// Returns the parsed `Type` corresponding to the specified `name` (including aliases).
+    pub(super) fn type_id_by_name(&self, name: &str) -> Option<TypeId> {
+        self.0.parsed_policy().type_by_name(name).map(|x| x.id())
     }
 
     /// Returns the set of permissions for the given class, including both the explicitly owned permissions

@@ -10,6 +10,7 @@ rustc_library("selinux") {
   edition = "2021"
   sources = [
     "src/access_vector_cache.rs",
+    "src/exceptions_config.rs",
     "src/lib.rs",
     "src/permission_check.rs",
     "src/policy/arrays.rs",
@@ -34,6 +35,7 @@ rustc_library("selinux") {
     "testdata/composite_policies/compiled/role_transition_not_allowed_policy.pp",
     "testdata/composite_policies/compiled/role_transition_policy.pp",
     "testdata/composite_policies/compiled/type_transition_policy.pp",
+    "testdata/composite_policies/compiled/exceptions_config_policy.pp",
     "testdata/composite_policies/compiled/with_additional_domain_policy.pp",
     "testdata/composite_policies/compiled/with_unlabeled_access_domain_policy.pp",
     "testdata/expectations/emulator",

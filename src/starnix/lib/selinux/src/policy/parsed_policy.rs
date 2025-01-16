@@ -302,6 +302,7 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             auditallow: computed_audit_allow,
             auditdeny: computed_audit_deny,
             flags,
+            todo_bug: None,
         }
     }
 

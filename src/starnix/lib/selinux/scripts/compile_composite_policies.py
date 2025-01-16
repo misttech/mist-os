@@ -56,6 +56,13 @@ _COMPOSITE_POLICY_PATHS = (
     (
         (
             "base_policy.conf",
+            "new_file/exceptions_config_policy.conf",
+        ),
+        "exceptions_config_policy.pp",
+    ),
+    (
+        (
+            "base_policy.conf",
             "new_file/role_transition_policy.conf",
         ),
         "role_transition_policy.pp",

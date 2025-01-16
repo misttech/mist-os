@@ -6,6 +6,7 @@ use fuchsia_inspect::Inspector;
 use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
 use std::collections::HashMap;
+use std::num::NonZeroU64;
 use std::panic::Location;
 use std::sync::LazyLock;
 
@@ -173,6 +174,12 @@ impl BugRef {
         }
 
         Some(Self { number })
+    }
+}
+
+impl From<NonZeroU64> for BugRef {
+    fn from(value: NonZeroU64) -> Self {
+        Self { number: value.get() }
     }
 }
 

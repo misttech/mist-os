@@ -5,7 +5,7 @@
 use bstr::BStr;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::{ClassPermission, Permission, SecurityId};
-use starnix_logging::log_warn;
+use starnix_logging::{log_warn, BugRef, __track_stub_inner};
 
 /// Default audit logging handler. Specialized handlers should typically update the `AuditContext`
 /// and then pass it on to this function to perform the actual audit logging operation.
@@ -13,7 +13,7 @@ use starnix_logging::log_warn;
 /// See the SELinux Project's "AVC Audit Events" description (at
 /// https://selinuxproject.org/page/NB_AL) for details of the format and fields in audit logs.
 pub(super) fn audit_log(context: AuditContext<'_>) {
-    let decision = context.decision;
+    let mut decision = context.decision;
     let tclass = context.permission.class().name();
     let permission_name = context.permission.name();
 
@@ -24,6 +24,27 @@ pub(super) fn audit_log(context: AuditContext<'_>) {
     let scontext = BStr::new(&scontext);
     let tcontext = security_server.sid_to_security_context(context.target_sid).unwrap();
     let tcontext = BStr::new(&tcontext);
+
+    // If `todo_bug` is set then this check is being granted to accommodate errata, rather than
+    // the denial being enforced. Such checks are logged as "todo_deny", and the denial tracked.
+    if let Some(todo_bug) = context.result.todo_bug {
+        decision = "todo_deny";
+
+        // Audit-log the first few denials, but skip further denials to avoid logspamming.
+        const MAX_TODO_AUDIT_DENIALS: u64 = 5;
+
+        // Re-using the `track_stub!()` internals to track the denial, and determine whether
+        // too many denial audit logs have already been emit for this case.
+        if __track_stub_inner(
+            BugRef::from(todo_bug),
+            "Enforce access check",
+            None,
+            std::panic::Location::caller(),
+        ) > MAX_TODO_AUDIT_DENIALS
+        {
+            return;
+        }
+    }
 
     log_warn!("avc: {decision} {{ {permission_name} }} scontext={scontext} tcontext={tcontext} tclass={tclass}");
 }

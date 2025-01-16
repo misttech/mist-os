@@ -10,6 +10,7 @@ use crate::{ClassPermission, FileClass, Permission, SecurityId};
 #[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::profile_duration;
 
+use std::num::NonZeroU64;
 use std::sync::Weak;
 
 /// Describes the result of a permission lookup between two Security Contexts.
@@ -23,6 +24,10 @@ pub struct PermissionCheckResult {
     /// "permissive"), but may be suppressed for some denials ("dontaudit"), or for some allowed
     /// permissions ("auditallow").
     pub audit: bool,
+
+    /// If the `AccessDecision` indicates that permission denials should not be enforced then `permit`
+    /// will be true, and this field will hold the Id of the bug to reference in audit logging.
+    pub todo_bug: Option<NonZeroU64>,
 }
 
 /// Implements the `has_permission()` API, based on supplied `Query` and `AccessVectorComputer`
@@ -100,9 +105,9 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
         } else {
             permission_access_vector & decision.auditdeny == permission_access_vector
         };
-        PermissionCheckResult { permit, audit }
+        PermissionCheckResult { permit, audit, todo_bug: None }
     } else {
-        PermissionCheckResult { permit: false, audit: true }
+        PermissionCheckResult { permit: false, audit: true, todo_bug: None }
     };
 
     if !result.permit {
@@ -113,6 +118,11 @@ fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
             // If the access decision indicates that the source domain is permissive then permit
             // all access.
             result.permit = true;
+        } else if decision.todo_bug.is_some() {
+            // If the access decision includes a `todo_bug` then permit the access and return the
+            // bug Id to the caller, for audit logging.
+            result.permit = true;
+            result.todo_bug = decision.todo_bug;
         }
     }
 
@@ -250,7 +260,7 @@ mod tests {
         for permission in &permissions {
             // DenyAllPermissions denies.
             assert_eq!(
-                PermissionCheckResult { permit: false, audit: true },
+                PermissionCheckResult { permit: false, audit: true, todo_bug: None },
                 has_permission(
                     /*is_enforcing=*/ true,
                     &deny_all,
@@ -262,7 +272,7 @@ mod tests {
             );
             // AllowAllPermissions allows.
             assert_eq!(
-                PermissionCheckResult { permit: true, audit: false },
+                PermissionCheckResult { permit: true, audit: false, todo_bug: None },
                 has_permission(
                     /*is_enforcing=*/ true,
                     &allow_all,

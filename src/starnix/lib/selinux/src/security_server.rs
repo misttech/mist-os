@@ -5,6 +5,7 @@
 use crate::access_vector_cache::{
     CacheStats, HasCacheStats, Manager as AvcManager, Query, QueryMut, Reset,
 };
+use crate::exceptions_config::ExceptionsConfig;
 use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
@@ -36,6 +37,9 @@ struct ActivePolicy {
 
     /// Allocates and maintains the mapping between `SecurityId`s (SIDs) and Security Contexts.
     sid_table: SidTable,
+
+    /// Describes access checks that should be granted, with associated bug Ids.
+    exceptions: ExceptionsConfig,
 }
 
 #[derive(Default)]
@@ -121,10 +125,17 @@ pub struct SecurityServer {
 
     /// The mutable state of the security server.
     state: Mutex<SecurityServerState>,
+
+    /// Optional configuration to apply to the `TodoDenyList`.
+    exceptions_config: String,
 }
 
 impl SecurityServer {
     pub fn new() -> Arc<Self> {
+        Self::new_with_exceptions(String::new())
+    }
+
+    pub fn new_with_exceptions(exceptions_config: String) -> Arc<Self> {
         let avc_manager = AvcManager::new();
         let state = Mutex::new(SecurityServerState {
             active_policy: None,
@@ -134,7 +145,7 @@ impl SecurityServer {
             policy_change_count: 0,
         });
 
-        let security_server = Arc::new(Self { avc_manager, state });
+        let security_server = Arc::new(Self { avc_manager, state, exceptions_config });
 
         // TODO(http://b/304776236): Consider constructing shared owner of `AvcManager` and
         // `SecurityServer` to eliminate weak reference.
@@ -186,6 +197,8 @@ impl SecurityServer {
         let (parsed, binary) = parse_policy_by_value(binary_policy)?;
         let parsed = Arc::new(parsed.validate()?);
 
+        let exceptions = ExceptionsConfig::new(&parsed, &self.exceptions_config)?;
+
         // Replace any existing policy and push update to `state.status_publisher`.
         self.with_state_and_update_status(|state| {
             let sid_table = if let Some(previous_active_policy) = &state.active_policy {
@@ -205,7 +218,7 @@ impl SecurityServer {
                     .collect(),
             );
 
-            state.active_policy = Some(ActivePolicy { parsed, binary, sid_table });
+            state.active_policy = Some(ActivePolicy { parsed, binary, sid_table, exceptions });
             state.policy_change_count += 1;
         });
 
@@ -423,11 +436,17 @@ impl SecurityServer {
         // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules are respected.
         match target_class {
             AbstractObjectClass::System(target_class) => {
-                active_policy.parsed.compute_explicitly_allowed(
+                let mut decision = active_policy.parsed.compute_explicitly_allowed(
                     source_context.type_(),
                     target_context.type_(),
                     target_class,
-                )
+                );
+                decision.todo_bug = active_policy.exceptions.lookup(
+                    source_context.type_(),
+                    target_context.type_(),
+                    target_class,
+                );
+                decision
             }
             AbstractObjectClass::Custom(target_class) => {
                 active_policy.parsed.compute_explicitly_allowed_custom(
@@ -610,9 +629,9 @@ fn sid_from_mount_option(
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::permission_check::PermissionCheckResult;
-    use crate::{CommonFilePermission, ProcessPermission};
+    use crate::{CommonFilePermission, FilePermission, ProcessPermission};
+    use std::num::NonZeroU64;
 
     const TESTSUITE_BINARY_POLICY: &[u8] = include_bytes!("../testdata/policies/selinux_testsuite");
     const TESTS_BINARY_POLICY: &[u8] =
@@ -1199,7 +1218,7 @@ mod tests {
         // Since the permission is granted by policy, the check will not be audit logged.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::Fork),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself, but
@@ -1207,7 +1226,7 @@ mod tests {
         // granted by the policy, the check will be audit logged.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
 
         // Test policy is built with "deny unknown" behaviour, and has no "blk_file" class defined.
@@ -1219,7 +1238,7 @@ mod tests {
                 sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
     }
 
@@ -1236,14 +1255,14 @@ mod tests {
         // Test policy grants "type0" the process-fork permission to itself.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::Fork),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself.
         // Permission denials are audit logged in enforcing mode.
         assert_eq!(
             permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
 
         // Test policy is built with "deny unknown" behaviour, and has no "blk_file" class defined.
@@ -1254,7 +1273,7 @@ mod tests {
                 sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
     }
 
@@ -1280,7 +1299,7 @@ mod tests {
                 permissive_sid,
                 ProcessPermission::GetSched
             ),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
         assert_eq!(
             permission_check.has_permission(
@@ -1288,7 +1307,7 @@ mod tests {
                 non_permissive_sid,
                 ProcessPermission::GetSched
             ),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
 
         // Test policy does not grant process-getsched permission to the test domains on one another.
@@ -1299,7 +1318,7 @@ mod tests {
                 non_permissive_sid,
                 ProcessPermission::GetSched
             ),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
         assert_eq!(
             permission_check.has_permission(
@@ -1307,7 +1326,7 @@ mod tests {
                 permissive_sid,
                 ProcessPermission::GetSched
             ),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
 
         // Test policy has "deny unknown" behaviour and does not define the "blk_file" class, so
@@ -1320,7 +1339,7 @@ mod tests {
                 non_permissive_sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
         assert_eq!(
             permission_check.has_permission(
@@ -1328,7 +1347,7 @@ mod tests {
                 non_permissive_sid,
                 CommonFilePermission::GetAttr.for_class(FileClass::Block)
             ),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
     }
 
@@ -1347,25 +1366,128 @@ mod tests {
         // Test policy grants the domain self-fork permission, and marks it audit-allow.
         assert_eq!(
             permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::Fork),
-            PermissionCheckResult { permit: true, audit: true }
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
 
         // Self-setsched permission is granted, and marked dont-audit, which takes no effect.
         assert_eq!(
             permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::SetSched),
-            PermissionCheckResult { permit: true, audit: false }
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
         );
 
         // Self-getsched permission is denied, but marked dont-audit.
         assert_eq!(
             permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::GetSched),
-            PermissionCheckResult { permit: false, audit: false }
+            PermissionCheckResult { permit: false, audit: false, todo_bug: None }
         );
 
         // Self-getpgid permission is denied, with neither audit-allow nor dont-audit.
         assert_eq!(
             permission_check.has_permission(audit_sid, audit_sid, ProcessPermission::GetPgid),
-            PermissionCheckResult { permit: false, audit: true }
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+    }
+
+    #[test]
+    fn access_checks_with_exceptions_config() {
+        const EXCEPTIONS_CONFIG: &str = "
+            // These statement should all be resolved.
+            todo_deny b/001 test_exception_source_t test_exception_target_t file
+            todo_deny b/002 test_exception_other_t test_exception_target_t chr_file
+            todo_deny b/003 test_exception_source_t test_exception_other_t anon_inode
+            todo_deny b/004 test_exception_permissive_t test_exception_target_t file
+
+            // These statements should not be resolved.
+            todo_deny b/101 test_undefined_source_t test_exception_target_t file
+            todo_deny b/102 test_exception_source_t test_undefined_target_t file
+        ";
+        let security_server = SecurityServer::new_with_exceptions(EXCEPTIONS_CONFIG.into());
+        security_server.set_enforcing(true);
+
+        const EXCEPTIONS_POLICY: &[u8] =
+            include_bytes!("../testdata/composite_policies/compiled/exceptions_config_policy.pp");
+        assert!(security_server.load_policy(EXCEPTIONS_POLICY.into()).is_ok());
+
+        let source_sid = security_server
+            .security_context_to_sid("test_exception_u:object_r:test_exception_source_t:s0".into())
+            .unwrap();
+        let target_sid = security_server
+            .security_context_to_sid("test_exception_u:object_r:test_exception_target_t:s0".into())
+            .unwrap();
+        let other_sid = security_server
+            .security_context_to_sid("test_exception_u:object_r:test_exception_other_t:s0".into())
+            .unwrap();
+        let permissive_sid = security_server
+            .security_context_to_sid(
+                "test_exception_u:object_r:test_exception_permissive_t:s0".into(),
+            )
+            .unwrap();
+        let unmatched_sid = security_server
+            .security_context_to_sid(
+                "test_exception_u:object_r:test_exception_unmatched_t:s0".into(),
+            )
+            .unwrap();
+
+        let permission_check = security_server.as_permission_check();
+
+        // Source SID has no "process" permissions to target SID, and no exceptions.
+        assert_eq!(
+            permission_check.has_permission(source_sid, target_sid, ProcessPermission::GetPgid),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Source SID has no "file:entrypoint" permission to target SID, but there is an exception defined.
+        assert_eq!(
+            permission_check.has_permission(source_sid, target_sid, FilePermission::Entrypoint),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(1).unwrap())
+            }
+        );
+
+        // Source SID has "file:execute_no_trans" permission to target SID.
+        assert_eq!(
+            permission_check.has_permission(source_sid, target_sid, FilePermission::ExecuteNoTrans),
+            PermissionCheckResult { permit: true, audit: false, todo_bug: None }
+        );
+
+        // Other SID has no "file:entrypoint" permissions to target SID, and the exception does not match "file" class.
+        assert_eq!(
+            permission_check.has_permission(other_sid, target_sid, FilePermission::Entrypoint),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Other SID has no "chr_file" permissions to target SID, but there is an exception defined.
+        assert_eq!(
+            permission_check.has_permission(
+                other_sid,
+                target_sid,
+                CommonFilePermission::Read.for_class(FileClass::Character)
+            ),
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(2).unwrap())
+            }
+        );
+
+        // Source SID has no "file:entrypoint" permissions to unmatched SID, and no exception is defined.
+        assert_eq!(
+            permission_check.has_permission(source_sid, unmatched_sid, FilePermission::Entrypoint),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Unmatched SID has no "file:entrypoint" permissions to target SID, and no exception is defined.
+        assert_eq!(
+            permission_check.has_permission(unmatched_sid, target_sid, FilePermission::Entrypoint),
+            PermissionCheckResult { permit: false, audit: true, todo_bug: None }
+        );
+
+        // Permissive SID is granted all permissions, so matching exception should be ignored.
+        assert_eq!(
+            permission_check.has_permission(permissive_sid, target_sid, FilePermission::Entrypoint),
+            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
         );
     }
 }

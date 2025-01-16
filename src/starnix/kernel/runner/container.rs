@@ -510,7 +510,24 @@ async fn create_container(
     kernel_node.record_int("created_at", zx::MonotonicInstant::get().into_nanos());
     features.record_inspect(&kernel_node);
 
-    let security_state = security::kernel_init_security(features.selinux);
+    let selinux_exceptions_config = if let Some(ref file_path) = features.selinux.exceptions_path {
+        let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
+
+        let flags = fio::Flags::PERM_READ | fio::Flags::PROTOCOL_FILE;
+
+        pkg_dir_proxy
+            .open3(&file_path, flags, &fio::Options::default(), server_end.into_channel())
+            .expect("failed to open security exception file");
+
+        let contents =
+            fuchsia_fs::file::read(&file).await.expect("reading security exception file");
+        String::from_utf8(contents).expect("parsing security exception file")
+    } else {
+        String::new()
+    };
+    let security_state =
+        security::kernel_init_security(features.selinux.enabled, selinux_exceptions_config);
+
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel.clone(),

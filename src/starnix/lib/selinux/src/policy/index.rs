@@ -92,7 +92,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
 
         // Locate the "object_r" role.
         let cached_object_r_role = parsed_policy
-            .role_by_name("object_r")
+            .role_by_name("object_r".into())
             .ok_or_else(|| anyhow::anyhow!("missing 'object_r' role"))?
             .id();
 
