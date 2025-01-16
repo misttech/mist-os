@@ -25,6 +25,9 @@ type MockFFXInstance struct {
 	stderr      io.Writer
 }
 
+func (f *MockFFXInstance) SetTarget(target string) {
+}
+
 func (f *MockFFXInstance) Stdout() io.Writer {
 	if f.stdout == nil {
 		return os.Stdout

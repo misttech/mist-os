@@ -547,6 +547,7 @@ type FFXInstance interface {
 	Run(ctx context.Context, args ...string) error
 	RunWithTarget(ctx context.Context, args ...string) error
 	RunWithTargetAndTimeout(ctx context.Context, timeout time.Duration, args ...string) error
+	SetTarget(target string)
 	Stdout() io.Writer
 	Stderr() io.Writer
 	SetStdoutStderr(stdout, stderr io.Writer)
@@ -1111,8 +1112,15 @@ func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error 
 	}, nil)
 	if err != nil {
 		logger.Errorf(ctx, "%s: %s", constants.FailedToRunSnapshotMsg, err)
-		if err := t.ffx.Run(ctx, "target", "list"); err != nil {
+		// TODO(https://fxbug.dev/387497485): For debugging. Remove when issue is fixed.
+		target := os.Getenv(botanistconstants.NodenameEnvKey)
+		if err := t.ffx.Run(ctx, "target", "list", target); err != nil {
 			logger.Errorf(ctx, "failed to run `ffx target list`: %s", err)
+		}
+		// Try capturing snapshot using target nodename.
+		t.ffx.SetTarget(target)
+		if err := t.ffx.Snapshot(ctx, t.localOutputDir, snapshotFile); err != nil {
+			logger.Errorf(ctx, "%s: %s", constants.FailedToRunSnapshotMsg, err)
 		}
 	}
 	logger.Debugf(ctx, "ran snapshot in %s", clock.Now(ctx).Sub(startTime))
