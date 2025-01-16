@@ -653,14 +653,36 @@ zx::result<> Device::AddDevice(const char* name, cpp20::span<zx_device_str_prop_
             Device* dev = static_cast<Device*>(ctx);
             zx_status_t result = ZX_OK;
             switch (dev->bus_type_) {
-              case BusType::kSpi:
+              case BusType::kSpi: {
+                const auto& metadata =
+                    std::get<fuchsia_hardware_spi_businfo::SpiBusMetadata>(dev->metadata_);
+                fit::result encoded_metadata = fidl::Persist(metadata);
+                if (encoded_metadata.is_error()) {
+                  zxlogf(ERROR, "Failed to encode spi bus metadata: %s",
+                         encoded_metadata.error_value().FormatDescription().c_str());
+                  result = encoded_metadata.error_value().status();
+                  break;
+                }
                 result = device_add_metadata(dev->passthrough_dev_, DEVICE_METADATA_SPI_CHANNELS,
-                                             dev->metadata_.data(), dev->metadata_.size());
+                                             encoded_metadata.value().data(),
+                                             encoded_metadata.value().size());
                 break;
-              case BusType::kI2c:
+              }
+              case BusType::kI2c: {
+                const auto& metadata =
+                    std::get<fuchsia_hardware_i2c_businfo::I2CBusMetadata>(dev->metadata_);
+                fit::result encoded_metadata = fidl::Persist(metadata);
+                if (encoded_metadata.is_error()) {
+                  zxlogf(ERROR, "Failed to encode i2c bus metadata: %s",
+                         encoded_metadata.error_value().FormatDescription().c_str());
+                  result = encoded_metadata.error_value().status();
+                  break;
+                }
                 result = device_add_metadata(dev->passthrough_dev_, DEVICE_METADATA_I2C_CHANNELS,
-                                             dev->metadata_.data(), dev->metadata_.size());
+                                             encoded_metadata.value().data(),
+                                             encoded_metadata.value().size());
                 break;
+              }
               default:
                 break;
             }

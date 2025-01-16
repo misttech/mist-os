@@ -220,8 +220,8 @@ class Device : public DeviceType,
   std::unordered_map<uint8_t, PowerStateInfo> supported_power_states_;
   uint8_t current_power_state_ = DEV_POWER_STATE_D3COLD;
 
-  // FIDL-encoded child metadata.
-  std::vector<uint8_t> metadata_;
+  // Child metadata.
+  BusMetadata metadata_;
   BusType bus_type_ = BusType::kUnknown;
   uint32_t bus_id_ = UINT32_MAX;
 

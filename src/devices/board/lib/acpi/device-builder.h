@@ -5,8 +5,8 @@
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_BUILDER_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_DEVICE_BUILDER_H_
 
-#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
-#include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.spi.businfo/cpp/natural_types.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -84,10 +84,12 @@ using PciTopo = uint64_t;
 // Every T in `DeviceChildEntry` should also have a std::vector<T> in DeviceChildData.
 // TODO(https://fxbug.dev/42158297): support more child bus types.
 using DeviceChildData = std::variant<std::monostate, std::vector<PciTopo>,
-                                     std::vector<fuchsia_hardware_spi_businfo::wire::SpiChannel>,
-                                     std::vector<fuchsia_hardware_i2c_businfo::wire::I2CChannel>>;
-using DeviceChildEntry = std::variant<PciTopo, fuchsia_hardware_spi_businfo::wire::SpiChannel,
-                                      fuchsia_hardware_i2c_businfo::wire::I2CChannel>;
+                                     std::vector<fuchsia_hardware_spi_businfo::SpiChannel>,
+                                     std::vector<fuchsia_hardware_i2c_businfo::I2CChannel>>;
+using DeviceChildEntry = std::variant<PciTopo, fuchsia_hardware_spi_businfo::SpiChannel,
+                                      fuchsia_hardware_i2c_businfo::I2CChannel>;
+using BusMetadata = std::variant<std::monostate, fuchsia_hardware_spi_businfo::SpiBusMetadata,
+                                 fuchsia_hardware_i2c_businfo::I2CBusMetadata>;
 
 // Represents a device that's been discovered inside the ACPI tree.
 class DeviceBuilder {
@@ -143,8 +145,8 @@ class DeviceBuilder {
   // child device on the bus. InferBusTypes is called from |Manager::ConfigureDiscoveredDevice|, and
   // is used to determine bus IDs and child indexes on the bus.
   using GatherResourcesCallback = std::function<size_t(ACPI_HANDLE, BusType, DeviceChildEntry)>;
-  acpi::status<> GatherResources(acpi::Acpi* acpi, fidl::AnyArena& allocator,
-                                 acpi::Manager* manager, GatherResourcesCallback callback);
+  acpi::status<> GatherResources(acpi::Acpi* acpi, acpi::Manager* manager,
+                                 GatherResourcesCallback callback);
 
   BusType GetBusType() { return bus_type_; }
   uint32_t GetBusId() { return bus_id_.value_or(UINT32_MAX); }
@@ -159,8 +161,8 @@ class DeviceBuilder {
   // Special HID/CID value for using a device tree "compatible" property. See
   // https://www.kernel.org/doc/html/latest/firmware-guide/acpi/enumeration.html#device-tree-namespace-link-device-id
   constexpr static const char* kDeviceTreeLinkID = "PRP0001";
-  // Encode this bus's child metadata for consumption by the bus driver.
-  zx::result<std::vector<uint8_t>> FidlEncodeMetadata();
+  // Get the bus's child metadata for consumption by the bus driver.
+  zx::result<BusMetadata> GetMetadata();
   // Build a composite node spec for this device that binds to all of its parents. For instance, if
   // a device had an i2c and spi resource, this would generate a composite node spec that binds to
   // the i2c device, the spi device, and the acpi device.

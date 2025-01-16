@@ -66,8 +66,7 @@ ddk::BindRule MakeAcceptBindRule(zx_device_str_prop_t str_prop) {
 
 }  // namespace
 
-acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& allocator,
-                                              acpi::Manager* manager,
+acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, acpi::Manager* manager,
                                               GatherResourcesCallback callback) {
   if (!handle_ || !parent_) {
     // Skip the root device.
@@ -82,15 +81,14 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
 
   // TODO(https://fxbug.dev/42158705): Handle other resources like serial buses.
   auto result = acpi->WalkResources(
-      handle_, "_CRS",
-      [this, acpi, manager, &allocator, &callback](ACPI_RESOURCE* res) -> acpi::status<> {
+      handle_, "_CRS", [this, acpi, manager, &callback](ACPI_RESOURCE* res) -> acpi::status<> {
         ACPI_HANDLE bus_parent = nullptr;
         BusType type = BusType::kUnknown;
         DeviceChildEntry entry;
         const char* bus_id_prop;
         if (resource_is_spi(res)) {
           type = BusType::kSpi;
-          auto result = resource_parse_spi(acpi, handle_, res, allocator, &bus_parent);
+          auto result = resource_parse_spi(acpi, handle_, res, &bus_parent);
           if (result.is_error()) {
             zxlogf(WARNING, "Failed to parse SPI resource: %d", result.error_value());
             return result.take_error();
@@ -98,10 +96,10 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
           entry = result.value();
           bus_id_prop = bind_fuchsia::SPI_BUS_ID.c_str();
           str_props_.emplace_back(
-              OwnedStringProp(bind_fuchsia::SPI_CHIP_SELECT.c_str(), result.value().cs()));
+              OwnedStringProp(bind_fuchsia::SPI_CHIP_SELECT.c_str(), result.value().cs().value()));
         } else if (resource_is_i2c(res)) {
           type = BusType::kI2c;
-          auto result = resource_parse_i2c(acpi, handle_, res, allocator, &bus_parent);
+          auto result = resource_parse_i2c(acpi, handle_, res, &bus_parent);
           if (result.is_error()) {
             zxlogf(WARNING, "Failed to parse I2C resource: %d", result.error_value());
             return result.take_error();
@@ -110,7 +108,7 @@ acpi::status<> DeviceBuilder::GatherResources(acpi::Acpi* acpi, fidl::AnyArena& 
           bus_id_prop = bind_fuchsia::I2C_BUS_ID.c_str();
           ;
           str_props_.emplace_back(
-              OwnedStringProp(bind_fuchsia::I2C_ADDRESS.c_str(), result.value().address()));
+              OwnedStringProp(bind_fuchsia::I2C_ADDRESS.c_str(), result.value().address().value()));
         } else if (resource_is_irq(res)) {
           irq_count_++;
         }
@@ -199,9 +197,9 @@ zx::result<zx_device_t*> DeviceBuilder::Build(acpi::Manager* manager,
   }
   DeviceArgs device_args(parent_->zx_device_, manager, device_dispatcher, handle_);
   if (HasBusId() && bus_type_ != BusType::kPci) {
-    zx::result<std::vector<uint8_t>> metadata = FidlEncodeMetadata();
+    zx::result metadata = GetMetadata();
     if (metadata.is_error()) {
-      zxlogf(ERROR, "Error while encoding metadata for '%s': %d", name(), metadata.status_value());
+      zxlogf(ERROR, "Failed to get metadata for '%s': %d", name(), metadata.status_value());
       return metadata.take_error();
     }
     device_args.SetBusMetadata(std::move(*metadata), bus_type_, GetBusId());
@@ -273,35 +271,33 @@ size_t DeviceBuilder::AddBusChild(DeviceChildEntry d) {
       d);
 }
 
-zx::result<std::vector<uint8_t>> DeviceBuilder::FidlEncodeMetadata() {
+zx::result<BusMetadata> DeviceBuilder::GetMetadata() {
 #ifdef __Fuchsia__
-  using SpiChannel = fuchsia_hardware_spi_businfo::wire::SpiChannel;
-  using I2CChannel = fuchsia_hardware_i2c_businfo::wire::I2CChannel;
-  fidl::Arena<> allocator;
+  using SpiChannel = fuchsia_hardware_spi_businfo::SpiChannel;
+  using I2CChannel = fuchsia_hardware_i2c_businfo::I2CChannel;
   return std::visit(
-      [this, &allocator](auto&& arg) -> zx::result<std::vector<uint8_t>> {
-        using T = std::decay_t<decltype(arg)>;
-        if constexpr (std::is_same_v<T, std::monostate>) {
-          return zx::ok(std::vector<uint8_t>());
-        } else if constexpr (std::is_same_v<T, std::vector<SpiChannel>>) {
-          ZX_ASSERT(HasBusId());  // Bus ID should get set when a child device is added.
-          fuchsia_hardware_spi_businfo::wire::SpiBusMetadata metadata(allocator);
-          auto channels = fidl::VectorView<SpiChannel>::FromExternal(arg);
-          metadata.set_bus_id(GetBusId());
-          metadata.set_channels(allocator, channels);
-          return zx::result<std::vector<uint8_t>>{
-              fidl::Persist(metadata).map_error(std::mem_fn(&fidl::Error::status))};
-        } else if constexpr (std::is_same_v<T, std::vector<I2CChannel>>) {
-          ZX_ASSERT(HasBusId());  // Bus ID should get set when a child device is added.
-          fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata metadata(allocator);
-          auto channels = fidl::VectorView<I2CChannel>::FromExternal(arg);
-          metadata.set_channels(allocator, channels);
-          metadata.set_bus_id(GetBusId());
-          return zx::result<std::vector<uint8_t>>{
-              fidl::Persist(metadata).map_error(std::mem_fn(&fidl::Error::status))};
-        } else {
-          return zx::error(ZX_ERR_NOT_SUPPORTED);
+      [this](DeviceChildData&& arg) -> zx::result<BusMetadata> {
+        if (std::holds_alternative<std::monostate>(arg)) {
+          return zx::ok(std::monostate{});
         }
+
+        if (std::holds_alternative<std::vector<SpiChannel>>(arg)) {
+          ZX_ASSERT(HasBusId());  // Bus ID should get set when a child device is added.
+          return zx::ok(fuchsia_hardware_spi_businfo::SpiBusMetadata{{
+              .channels = std::get<std::vector<SpiChannel>>(arg),
+              .bus_id = GetBusId(),
+          }});
+        }
+
+        if (std::holds_alternative<std::vector<I2CChannel>>(arg)) {
+          ZX_ASSERT(HasBusId());  // Bus ID should get set when a child device is added.
+          return zx::ok(fuchsia_hardware_i2c_businfo::I2CBusMetadata{{
+              .channels = std::get<std::vector<I2CChannel>>(arg),
+              .bus_id = GetBusId(),
+          }});
+        }
+
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
       },
       bus_children_);
 #else  // __Fuchsia__
@@ -401,20 +397,21 @@ DeviceBuilder::GetFragmentBindRulesAndPropertiesForChild(size_t child_index) {
   std::visit(
       [&bind_rules, &properties, child_index, bus_id = GetBusId()](auto&& arg) {
         using T = std::decay_t<decltype(arg)>;
-        using SpiChannel = fuchsia_hardware_spi_businfo::wire::SpiChannel;
-        using I2CChannel = fuchsia_hardware_i2c_businfo::wire::I2CChannel;
+        using SpiChannel = fuchsia_hardware_spi_businfo::SpiChannel;
+        using I2CChannel = fuchsia_hardware_i2c_businfo::I2CChannel;
         if constexpr (std::is_same_v<T, std::monostate>) {
           ZX_PANIC("Bus should have children");
         } else if constexpr (std::is_same_v<T, std::vector<SpiChannel>>) {
           SpiChannel& chan = arg[child_index];
           bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::SPI_BUS_ID, bus_id));
           bind_rules.emplace_back(
-              ddk::MakeAcceptBindRule(bind_fuchsia::SPI_CHIP_SELECT, chan.cs()));
+              ddk::MakeAcceptBindRule(bind_fuchsia::SPI_CHIP_SELECT, chan.cs().value()));
           properties.emplace_back(ddk::MakeProperty(bind_fuchsia::SPI_BUS_ID, bus_id));
-          properties.emplace_back(ddk::MakeProperty(bind_fuchsia::SPI_CHIP_SELECT, chan.cs()));
+          properties.emplace_back(
+              ddk::MakeProperty(bind_fuchsia::SPI_CHIP_SELECT, chan.cs().value()));
         } else if constexpr (std::is_same_v<T, std::vector<I2CChannel>>) {
           I2CChannel& chan = arg[child_index];
-          auto chan_addr = static_cast<uint32_t>(chan.address());
+          auto chan_addr = static_cast<uint32_t>(chan.address().value());
           bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bus_id));
           bind_rules.emplace_back(ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS, chan_addr));
           bind_rules.emplace_back(

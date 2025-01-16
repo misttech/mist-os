@@ -5,8 +5,8 @@
 #ifndef SRC_DEVICES_BOARD_LIB_ACPI_RESOURCES_H_
 #define SRC_DEVICES_BOARD_LIB_ACPI_RESOURCES_H_
 
-#include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
-#include <fidl/fuchsia.hardware.spi.businfo/cpp/wire.h>
+#include <fidl/fuchsia.hardware.i2c.businfo/cpp/natural_types.h>
+#include <fidl/fuchsia.hardware.spi.businfo/cpp/natural_types.h>
 #include <zircon/types.h>
 
 #include <acpica/acpi.h>
@@ -15,8 +15,8 @@
 #include "src/devices/board/lib/acpi/status.h"
 
 struct DeviceResources {
-  std::vector<fuchsia_hardware_spi_businfo::wire::SpiChannel> spi;
-  std::vector<fuchsia_hardware_i2c_businfo::wire::I2CChannel> i2c;
+  std::vector<fuchsia_hardware_spi_businfo::SpiChannel> spi;
+  std::vector<fuchsia_hardware_i2c_businfo::I2CChannel> i2c;
 };
 
 enum resource_address_type {
@@ -87,20 +87,16 @@ zx_status_t resource_parse_irq(ACPI_RESOURCE* res, resource_irq_t* out);
 // |acpi| - ACPI implementation.
 // |device| - Device to which this resource belongs.
 // |res| - Resource to parse.
-// |allocator| - FIDL arena to allocate returned SpiChannel with.
 // |resource_source| - Pointer which will have the ResourceSource's handle put into it.
-acpi::status<fuchsia_hardware_spi_businfo::wire::SpiChannel> resource_parse_spi(
-    acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res, fidl::AnyArena& allocator,
-    ACPI_HANDLE* resource_source);
+acpi::status<fuchsia_hardware_spi_businfo::SpiChannel> resource_parse_spi(
+    acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res, ACPI_HANDLE* resource_source);
 
 // Parse the given I2C resource.
 // Arguments:
 // |acpi| - ACPI implementation.
 // |device| - Device to which this resource belongs.
 // |res| - Resource to parse.
-// |allocator| - FIDL arena to allocate returned I2CChannel with.
 // |resource_source| - Pointer which will have the ResourceSource's handle put into it.
-acpi::status<fuchsia_hardware_i2c_businfo::wire::I2CChannel> resource_parse_i2c(
-    acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res, fidl::AnyArena& allocator,
-    ACPI_HANDLE* resource_source);
+acpi::status<fuchsia_hardware_i2c_businfo::I2CChannel> resource_parse_i2c(
+    acpi::Acpi* acpi, ACPI_HANDLE device, ACPI_RESOURCE* res, ACPI_HANDLE* resource_source);
 #endif  // SRC_DEVICES_BOARD_LIB_ACPI_RESOURCES_H_
