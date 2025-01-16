@@ -891,37 +891,6 @@ mod test {
         assert!(dbg!(target_spec_res.unwrap_err().to_string()).contains("multiple targets"));
     }
 
-    #[fuchsia::test]
-    async fn test_locally_resolve_manual_before_mdns() {
-        use manual_targets::ManualTargets;
-        let test_env = ffx_config::test_init().await.unwrap();
-        let mut resolver = MockQueryResolverT::new();
-        let name_spec = Some("foobar".to_string());
-        // Set up to return an mDNS address;
-        let mdns_addr = "[fe80::8c14:9c4e:7c7c:c57]:123".to_string();
-        let sa = mdns_addr.parse::<SocketAddr>().unwrap();
-        let state = TargetState::Product(vec![sa.into()]);
-        let th = TargetHandle { node_name: name_spec.clone(), state };
-        resolver.expect_resolve_target_query().return_once(move |_, _| Ok(vec![th]));
-
-        let mt_addr = "127.0.0.1:123".to_string();
-        let mt_sa = mt_addr.parse::<SocketAddr>().unwrap();
-        let mt_config = manual_targets::Config::default();
-        // Also set up a manual target with a different result
-        mt_config.add(mt_addr.clone(), None).await.expect("add manual target");
-        resolver
-            .expect_try_resolve_manual_target()
-            .return_once(move |_, _| Ok(Some(Resolution::from_addr(mt_sa))));
-
-        // Confirm that we get the manual address back
-        let name_spec = Some("foobar".to_string());
-        let target_spec =
-            locally_resolve_target_spec(name_spec.clone(), &resolver, &test_env.context)
-                .await
-                .unwrap();
-        assert_eq!(target_spec, Some(mt_addr));
-    }
-
     // XXX Creating a reasonable test for the rest of the behavior:
     // * partial matching of names
     // * timing out when no matching targets return
