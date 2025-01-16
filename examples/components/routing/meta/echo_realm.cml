@@ -25,17 +25,6 @@
 
         // Route diagnostics protocols to both children.
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "parent",
-            to: [
-                "#echo_client",
-                "#echo_server",
-            ],
-        },
-        {
             dictionary: "diagnostics",
             from: "parent",
             to: [

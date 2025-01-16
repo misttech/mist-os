@@ -22,10 +22,7 @@
 
         // Route diagnostics support to all children.
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#client",
