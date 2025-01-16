@@ -63,9 +63,6 @@ group_with_no_dir_target_deps("core_x64_stable_tests") {
   public_deps = [
     "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
-
-    # TODO(https://fxbug.dev/384233293): This test caused buildbot infra errors. Fix the flaky test.
-    # "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
@@ -80,7 +77,13 @@ group_with_no_dir_target_deps("core_x64_unstable_sl4f_tests") {
 
 group_with_no_dir_target_deps("core_x64_unstable_tests") {
   testonly = true
-  public_deps = [ "honeydew/tests/functional_tests:core_x64_unstable_tests" ]
+  public_deps = [
+    # TODO(https://fxbug.dev/384233293): This test caused buildbot infra errors. Fix the flaky test.
+    # Until then keep it under core_x64_unstable_tests and move it back to core_x64_stable_tests
+    # once the issue is fixed
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    "honeydew/tests/functional_tests:core_x64_unstable_tests",
+  ]
 }
 
 group("core_x64_staging_sl4f_tests") {
