@@ -13,6 +13,7 @@ use super::error::{ParseError, QueryError, ValidateError};
 use super::extensible_bitmap::ExtensibleBitmap;
 use super::metadata::{Config, Counts, HandleUnknown, Magic, PolicyVersion, Signature};
 use super::parser::ParseStrategy;
+use super::security_context::Level;
 use super::symbols::{
     find_class_by_name, find_class_permission_by_name, Category, Class, Classes, CommonSymbol,
     CommonSymbols, ConditionalBoolean, MlsLevel, Permission, Role, Sensitivity, SymbolList, Type,
@@ -422,8 +423,8 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
     // IDs:
     // - Verify that all sensitivity and category IDs referenced in the MLS levels are
     //   defined.
-    // - TODO: https://fxbug.dev/329221265 - Verify that the range is internally consistent;
-    //   i.e., the high level (if any) dominates the low level.
+    // - Verify that the range is internally consistent; i.e., the high level (if any)
+    //   dominates the low level.
     fn validate_mls_range(
         &self,
         low_level: &MlsLevel<PS>,
@@ -439,6 +440,13 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
             validate_id(sensitivity_ids, high.sensitivity(), "sensitivity")?;
             for id in high.category_ids() {
                 validate_id(category_ids, id, "category")?;
+            }
+            if !high.dominates(low_level) {
+                return Err(ValidateError::InvalidMlsRange {
+                    low: low_level.serialize(self).into(),
+                    high: high.serialize(self).into(),
+                }
+                .into());
             }
         }
         Ok(())
@@ -817,7 +825,9 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         let category_ids: HashSet<CategoryId> =
             self.categories.data.iter().map(|x| x.id()).collect();
 
-        // Validate that users use only defined sensitivities and categories.
+        // Validate that users use only defined sensitivities and categories, and that
+        // each user's MLS levels are internally consistent (i.e., the high level
+        // dominates the low level).
         for user in &self.users.data {
             self.validate_mls_range(
                 user.mls_range().low(),
@@ -828,7 +838,8 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         }
 
         // Validate that initial contexts use only defined user, role, type, etc Ids.
-        // Check that all sensitivity and category IDs are defined.
+        // Check that all sensitivity and category IDs are defined and that MLS levels
+        // are internally consistent.
         for initial_sid in &self.initial_sids.data {
             let context = initial_sid.context();
             validate_id(&user_ids, context.user_id(), "user")?;
@@ -843,7 +854,8 @@ impl<PS: ParseStrategy> Validate for ParsedPolicy<PS> {
         }
 
         // Validate that contexts specified in filesystem labeling rules only use
-        // policy-defined Ids for their fields.
+        // policy-defined Ids for their fields. Check that MLS levels are internally
+        // consistent.
         for fs_use in &self.fs_uses.data {
             let context = fs_use.context();
             validate_id(&user_ids, context.user_id(), "user")?;

@@ -10,6 +10,7 @@ use super::metadata::{
 };
 use super::symbols::{ClassDefault, ClassDefaultRange};
 
+use bstr::BString;
 use thiserror::Error;
 
 /// Structured errors that may be encountered parsing a binary policy.
@@ -95,6 +96,8 @@ pub enum ValidateError {
     NotImplemented,
     #[error("undefined {kind} Id value {id}")]
     UnknownId { kind: &'static str, id: String },
+    #[error("invalid MLS range: {low}-{high}")]
+    InvalidMlsRange { low: BString, high: BString },
 }
 
 /// Structured errors that may be encountered querying a binary policy.

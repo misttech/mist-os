@@ -3,19 +3,17 @@
 // found in the LICENSE file.
 
 use super::arrays::{Context, FsContext, FsUseType};
-use super::extensible_bitmap::ExtensibleBitmapSpan;
 use super::metadata::HandleUnknown;
 use super::parser::ParseStrategy;
-use super::security_context::{CategorySpan, SecurityContext, SecurityLevel};
+use super::security_context::{Level, SecurityContext, SecurityLevel};
 use super::symbols::{
     Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
     Permission,
 };
-use super::{CategoryId, ClassId, ParsedPolicy, RoleId, TypeId};
+use super::{ClassId, ParsedPolicy, RoleId, TypeId};
 
 use crate::{ClassPermission as _, NullessByteStr};
 use std::collections::HashMap;
-use std::num::NonZeroU32;
 
 /// The [`SecurityContext`] and [`FsUseType`] derived from some `fs_use_*` line of the policy.
 pub struct FsUseLabelAndType {
@@ -397,16 +395,7 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     fn security_level(&self, level: &MlsLevel<PS>) -> SecurityLevel {
         SecurityLevel::new(
             level.sensitivity(),
-            level.categories().spans().map(|span| self.security_context_category(span)).collect(),
-        )
-    }
-
-    /// Helper used by `security_level()` to create a `CategorySpan` instance from policy fields.
-    fn security_context_category(&self, span: ExtensibleBitmapSpan) -> CategorySpan {
-        // Spans describe zero-based bit indexes, corresponding to 1-based category Ids.
-        CategorySpan::new(
-            CategoryId(NonZeroU32::new(span.low + 1).unwrap()),
-            CategoryId(NonZeroU32::new(span.high + 1).unwrap()),
+            level.category_spans().map(|span| span.into()).collect(),
         )
     }
 

@@ -3,8 +3,11 @@
 // found in the LICENSE file.
 
 use super::error::{ParseError, ValidateError};
-use super::extensible_bitmap::ExtensibleBitmap;
+use super::extensible_bitmap::{
+    ExtensibleBitmap, ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator,
+};
 use super::parser::ParseStrategy;
+use super::security_context::{CategoryIterator, Level};
 use super::{
     array_type, array_type_validate_deref_both, array_type_validate_deref_data,
     array_type_validate_deref_metadata_data_vec, array_type_validate_deref_none_data_vec, Array,
@@ -1298,13 +1301,6 @@ pub(super) struct MlsLevel<PS: ParseStrategy> {
 }
 
 impl<PS: ParseStrategy> MlsLevel<PS> {
-    pub fn sensitivity(&self) -> SensitivityId {
-        SensitivityId(NonZeroU32::new(PS::deref(&self.sensitivity).get()).unwrap())
-    }
-    pub fn categories(&self) -> &ExtensibleBitmap<PS> {
-        &self.categories
-    }
-
     pub fn category_ids(&self) -> impl Iterator<Item = CategoryId> + use<'_, PS> {
         self.categories.spans().flat_map(|span| {
             (span.low..=span.high).map(|i| CategoryId(NonZeroU32::new(i + 1).unwrap()))
@@ -1333,6 +1329,20 @@ where
             .context("parsing mls level categories")?;
 
         Ok((Self { sensitivity, categories }, tail))
+    }
+}
+
+impl<'a, PS: ParseStrategy> Level<'a, ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator<'a, PS>>
+    for MlsLevel<PS>
+{
+    fn sensitivity(&self) -> SensitivityId {
+        SensitivityId(NonZeroU32::new(PS::deref(&self.sensitivity).get()).unwrap())
+    }
+
+    fn category_spans(
+        &'a self,
+    ) -> CategoryIterator<ExtensibleBitmapSpan, ExtensibleBitmapSpansIterator<'a, PS>> {
+        CategoryIterator::new(self.categories.spans())
     }
 }
 
@@ -1638,6 +1648,7 @@ impl Validate for CategoryMetadata {
 
 #[cfg(test)]
 mod tests {
+    use super::super::security_context::Level;
     use super::super::{parse_policy_by_reference, CategoryId, SensitivityId, UserId};
 
     use std::num::NonZeroU32;

@@ -84,7 +84,7 @@ impl<PS: ParseStrategy> ExtensibleBitmap<PS> {
 /// Describes the indexes of a span of "true" bits in an `ExtensibleBitmap`.
 /// Low and high values are inclusive, such that when `low==high`, the span consists
 /// of a single bit.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(super) struct ExtensibleBitmapSpan {
     pub low: u32,
     pub high: u32,
