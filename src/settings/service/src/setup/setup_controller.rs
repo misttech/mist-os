@@ -12,7 +12,7 @@ use crate::handler::setting_handler::{
 use crate::service_context::ServiceContext;
 use crate::setup::types::SetupInfo;
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_power_statecontrol::RebootReason;
+use fidl_fuchsia_hardware_power_statecontrol::{RebootOptions, RebootReason2};
 
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::{NoneT, StorageAccess};
@@ -39,12 +39,14 @@ async fn reboot(service_context_handle: &ServiceContext) -> Result<(), Controlle
         )
     };
 
-    call_async!(hardware_power_statecontrol_admin => reboot(RebootReason::UserRequest))
-        .await
-        .map_err(|e| reboot_err(format!("{e:?}")))
-        .and_then(|r| {
-            r.map_err(|zx_status| reboot_err(format!("{:?}", zx::Status::from_raw(zx_status))))
-        })
+    call_async!(hardware_power_statecontrol_admin => perform_reboot(&RebootOptions{
+        reasons: Some(vec![RebootReason2::UserRequest]), ..Default::default()
+    }))
+    .await
+    .map_err(|e| reboot_err(format!("{e:?}")))
+    .and_then(|r| {
+        r.map_err(|zx_status| reboot_err(format!("{:?}", zx::Status::from_raw(zx_status))))
+    })
 }
 
 impl DeviceStorageCompatible for SetupInfo {

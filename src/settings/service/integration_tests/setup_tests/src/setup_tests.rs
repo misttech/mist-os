@@ -4,8 +4,11 @@
 
 use crate::common::{Action, Mocks, SetupTest};
 use anyhow::Error;
+use assert_matches::assert_matches;
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_power_statecontrol::{AdminRequest, AdminRequestStream, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{
+    AdminRequest, AdminRequestStream, RebootOptions, RebootReason2,
+};
 use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_component_test::LocalComponentHandles;
@@ -34,11 +37,12 @@ impl Mocks for SetupTest {
                         log::info!("Get a request.");
                         // Support future expansion of FIDL.
                         #[allow(unreachable_patterns)]
-                        if let AdminRequest::Reboot {
-                            reason: RebootReason::UserRequest,
+                        if let AdminRequest::PerformReboot {
+                            options: RebootOptions { reasons: Some(reasons), .. },
                             responder,
                         } = req
                         {
+                            assert_matches!(&reasons[..], [RebootReason2::UserRequest]);
                             log::info!("Request has user reboot request.");
                             recorded_actions_clone.lock().await.push(Action::Reboot);
                             log::info!("recorded_actions added Action::Reboot.");
