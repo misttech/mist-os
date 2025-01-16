@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <elf.h>
+#include <lib/arch/intrin.h>
 #include <lib/fit/defer.h>
 #include <lib/maybe-standalone-test/maybe-standalone.h>
 #include <lib/zx/bti.h>
@@ -1985,26 +1986,6 @@ TEST_F(VmoClone2TestCase, ParentStartLimitRegression) {
   vmo_c.reset();
 }
 
-#ifdef __x86_64__
-#include <immintrin.h>
-#define yield()  \
-  do {           \
-    _mm_pause(); \
-  } while (0)
-#endif
-#ifdef __aarch64__
-#define yield()                         \
-  do {                                  \
-    asm volatile("yield" ::: "memory"); \
-  } while (0)
-#endif
-#ifdef __riscv
-#define yield()                         \
-  do {                                  \
-    asm volatile("pause" ::: "memory"); \
-  } while (0)
-#endif
-
 // This is a regression test for https://fxbug.dev/42133843 and checks that if both children of a
 // hidden parent are dropped 'at the same time', then there are no races with their parallel
 // destruction.
@@ -2026,12 +2007,12 @@ TEST_F(VmoClone2TestCase, DropChildrenInParallel) {
     std::thread thread{[&ready, &child] {
       ready = false;
       while (!ready) {
-        yield();
+        arch::Yield();
       }
       child.reset();
     }};
     while (ready) {
-      yield();
+      arch::Yield();
     }
     ready = true;
     vmo.reset();
@@ -2167,7 +2148,7 @@ TEST_F(VmoClone2TestCase, DropParentCommittedBytes) {
     std::thread thread{[&ready, &child, &kAttrBytesCloneSplit, &kAttrBytesCloneNoSplit] {
       ready = false;
       while (!ready) {
-        yield();
+        arch::Yield();
       }
       size_t committed = VmoPopulatedBytes(child);
       // Depending on who wins the race between this thread and the thread destroying the parent,
@@ -2177,7 +2158,7 @@ TEST_F(VmoClone2TestCase, DropParentCommittedBytes) {
                   "committed bytes in child: %zu\n", committed);
     }};
     while (ready) {
-      yield();
+      arch::Yield();
     }
     ready = true;
     // Drop the parent.
