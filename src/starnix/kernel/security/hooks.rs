@@ -185,6 +185,7 @@ pub fn file_permission(
     file: &FileObject,
     permission_flags: PermissionFlags,
 ) -> Result<(), Errno> {
+    profile_duration!("security.hooks.file_permission");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::file_permission(security_server, current_task, file, permission_flags)
     })
