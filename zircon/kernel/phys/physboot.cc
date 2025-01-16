@@ -133,6 +133,14 @@ void RelocateElfKernel(ElfImage& elf_kernel) {
   }
 
   auto start_elf_kernel = [&elf_kernel](PhysHandoff* handoff) {
+
+  // TODO(https://fxbug.dev/42164859): Hand off virtual address space for ARM
+  // too.
+#ifdef __aarch64__
+    // This runs in an identity-mapped environment, so the MMU can be safely
+    // turned off.  The physzircon kernel entry code expects the MMU to be off.
+    arch::DisableMmu();
+#endif
     elf_kernel.Handoff<void(PhysHandoff*)>(handoff);
   };
   prep.DoHandoff(uart, kernel_storage.zbi().storage(), package, patch_info, start_elf_kernel);

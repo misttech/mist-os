@@ -71,15 +71,17 @@ static_assert(MMU_KERNEL_SIZE_SHIFT >= 25, "");
 // TODO(https://fxbug.dev/42098994): Choose it randomly.
 uint64_t kernel_relocated_base = kArchHandoffVirtualAddress;
 
-// Physical addresses of the kernel(/upper) and lower root page tables,
-// saved in start.S.
-paddr_t root_kernel_page_table_phys;
-paddr_t root_lower_page_table_phys;
+// The main translation table for the kernel. Globally declared because it's reached
+// from assembly.
+pte_t arm64_kernel_translation_table[MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP] __ALIGNED(
+    MMU_KERNEL_PAGE_TABLE_ENTRIES_TOP * 8);
+// Physical address of the above table, saved in start.S.
+paddr_t arm64_kernel_translation_table_phys;
 
 // Global accessor for the kernel page table
-pte_t* arm64_root_kernel_page_table() {
-  return static_cast<pte_t*>(paddr_to_physmap(root_kernel_page_table_phys));
-}
+pte_t* arm64_get_kernel_ptable() { return arm64_kernel_translation_table; }
+
+paddr_t arm64_get_kernel_ptable_phys() { return arm64_kernel_translation_table_phys; }
 
 namespace {
 
@@ -1829,9 +1831,9 @@ zx_status_t ArmArchVmAspace::Init() {
     top_index_shift_ = MMU_KERNEL_TOP_SHIFT;
     page_size_shift_ = MMU_KERNEL_PAGE_SIZE_SHIFT;
 
-    tt_virt_ = static_cast<volatile pte_t*>(arm64_root_kernel_page_table());
-    tt_phys_ = root_kernel_page_table_phys;
-    tt_page_ = Pmm::Node().PaddrToPage(root_kernel_page_table_phys);
+    tt_virt_ = (volatile pte_t*)paddr_to_physmap(arm64_kernel_translation_table_phys);
+    tt_phys_ = arm64_kernel_translation_table_phys;
+    tt_page_ = Pmm::Node().PaddrToPage(arm64_kernel_translation_table_phys);
     DEBUG_ASSERT(tt_page_);
     DEBUG_ASSERT(tt_page_->state() == vm_page_state::MMU);
     asid_ = (uint16_t)MMU_ARM64_GLOBAL_ASID;
