@@ -219,8 +219,7 @@ pub fn parse_features(
             ("magma", _) => if features.magma_supported_vendors.is_none() {
                 const VENDOR_ARM: u16 = 0x13B5;
                 const VENDOR_INTEL: u16 = 0x8086;
-                const VENDOR_QCOM: u16 = 0x5143;
-                features.magma_supported_vendors = Some(vec![VENDOR_ARM, VENDOR_INTEL, VENDOR_QCOM])
+                features.magma_supported_vendors = Some(vec![VENDOR_ARM, VENDOR_INTEL])
             },
             ("magma_supported_vendors", Some(arg)) => {
                 features.magma_supported_vendors = Some(
