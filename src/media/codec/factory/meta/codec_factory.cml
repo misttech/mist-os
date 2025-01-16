@@ -4,11 +4,7 @@
 {
     include: [
         "inspect/client.shard.cml",
-
-        // TODO(b/345827642): Use regular shards
-        // once Chromium migrates to dictionaries.
-        "syslog/shards/offer.shard.cml",
-        "syslog/shards/use.shard.cml",
+        "syslog/client.shard.cml",
         "trace/client.shard.cml",
     ],
     program: {
