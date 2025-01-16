@@ -859,7 +859,7 @@ extern "C" fn TEE_GetObjectValueAttribute(
 #[no_mangle]
 extern "C" fn TEE_CloseObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
-    context::with_current(|context| context.storage.close_object(object));
+    context::with_current_mut(|context| context.storage.close_object(object));
 }
 
 #[no_mangle]
@@ -985,7 +985,7 @@ extern "C" fn TEE_OpenPersistentObject(
         let storage = TeeStorage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
         let flags = HandleFlags::from_bits_retain(flags);
         let id = slice_from_raw_parts(objectID, objectIDLen);
-        let obj = context::with_current(|context| {
+        let obj = context::with_current_mut(|context| {
             context.storage.open_persistent_object(storage, id, flags)
         })?;
         // SAFETY: `object` nullity checked above.
@@ -1013,7 +1013,7 @@ extern "C" fn TEE_CreatePersistentObject(
         let id = slice_from_raw_parts(objectID, objectIDLen);
         let attrs = *ObjectHandle::from_binding(&attributes);
         let initial_data = slice_from_raw_parts(initialData, initialDataLen);
-        context::with_current(|context| -> TeeResult {
+        context::with_current_mut(|context| -> TeeResult {
             let obj = context.storage.create_persistent_object(
                 storage,
                 id,
@@ -1039,7 +1039,9 @@ extern "C" fn TEE_CreatePersistentObject(
 extern "C" fn TEE_CloseAndDeletePersistentObject1(object: TEE_ObjectHandle) -> TEE_Result {
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
-        context::with_current(|context| context.storage.close_and_delete_persistent_object(object))
+        context::with_current_mut(|context| {
+            context.storage.close_and_delete_persistent_object(object)
+        })
     }())
 }
 
@@ -1057,7 +1059,9 @@ extern "C" fn TEE_RenamePersistentObject(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let new_id = slice_from_raw_parts(newObjectID, newObjectIDLen);
-        context::with_current(|context| context.storage.rename_persistent_object(object, new_id))
+        context::with_current_mut(|context| {
+            context.storage.rename_persistent_object(object, new_id)
+        })
     }())
 }
 
@@ -1067,7 +1071,7 @@ extern "C" fn TEE_AllocatePersistentObjectEnumerator(
 ) -> TEE_Result {
     assert!(!objectEnumerator.is_null());
     to_tee_result(|| -> TeeResult {
-        let enumerator = context::with_current(|context| {
+        let enumerator = context::with_current_mut(|context| {
             context.storage.allocate_persistent_object_enumerator()
         });
         // SAFETY: `objectEnumerator` nullity checked above.
@@ -1081,13 +1085,17 @@ extern "C" fn TEE_AllocatePersistentObjectEnumerator(
 #[no_mangle]
 extern "C" fn TEE_FreePersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
     let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-    context::with_current(|context| context.storage.free_persistent_object_enumerator(enumerator));
+    context::with_current_mut(|context| {
+        context.storage.free_persistent_object_enumerator(enumerator)
+    });
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetPersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
     let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
-    context::with_current(|context| context.storage.reset_persistent_object_enumerator(enumerator));
+    context::with_current_mut(|context| {
+        context.storage.reset_persistent_object_enumerator(enumerator)
+    });
 }
 
 #[no_mangle]
@@ -1098,7 +1106,7 @@ extern "C" fn TEE_StartPersistentObjectEnumerator(
     to_tee_result(|| -> TeeResult {
         let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
         let storage = TeeStorage::from_u32(storageID).ok_or(Error::ItemNotFound)?;
-        context::with_current(|context| {
+        context::with_current_mut(|context| {
             context.storage.start_persistent_object_enumerator(enumerator, storage)
         })
     }())
