@@ -6423,12 +6423,19 @@ static zx_status_t brcmf_handle_assoc_ind(struct brcmf_if* ifp, const struct brc
   }
 
   // Extract the RSN information from the IEs
-  std::vector<uint8_t> rsne(fuchsia_wlan_ieee80211_wire::kWlanIeBodyMaxLen, 0);
+  std::vector<uint8_t> rsne{};
   if (rsn_ie != nullptr) {
     size_t rsn_len = rsn_ie->len + TLV_HDR_LEN;
     const uint8_t* rsn_ie_ptr = reinterpret_cast<const uint8_t*>(rsn_ie);
     cpp20::span<const uint8_t> rsne_span = {rsn_ie_ptr, rsn_len};
-    rsne.assign(rsne_span.begin(), rsne_span.end());
+    if (rsne_span.size() <= fuchsia_wlan_ieee80211_wire::kWlanIeBodyMaxLen) {
+      rsne.assign(rsne_span.begin(), rsne_span.end());
+    } else {
+      BRCMF_ERR("Received ASSOC_IND with invalid RSN IE length %zu", rsne_span.size());
+      brcmf_cfg80211_del_station(ndev, peer_sta_address.data(),
+                                 fuchsia_wlan_ieee80211::ReasonCode::kInvalidRsneCapabilities);
+      return ZX_OK;
+    }
   }
   auto assoc_ind_builder =
       fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcAssocIndRequest::Builder(arena)
