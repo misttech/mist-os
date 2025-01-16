@@ -134,7 +134,7 @@ pub fn dispatch_syscall(
 
     #[cfg(all(target_arch = "aarch64", feature = "arch32"))]
     mod aarch64_arch32 {
-        pub use crate::arch::syscalls::sys_arch32_ARM_set_tls;
+        pub use crate::arch::syscalls::{sys_arch32_ARM_set_tls, sys_clone as sys_arch32_clone};
         pub use crate::mm::syscalls::{
             sys_arch32_mmap2, sys_arch32_munmap, sys_arch32_set_robust_list,
             sys_brk as sys_arch32_brk, sys_mprotect as sys_arch32_mprotect,
@@ -142,6 +142,7 @@ pub fn dispatch_syscall(
         pub use crate::signals::syscalls::{
             sys_rt_sigaction as sys_arch32_rt_sigaction,
             sys_rt_sigprocmask as sys_arch32_rt_sigprocmask, sys_tgkill as sys_arch32_tgkill,
+            sys_wait4 as sys_arch32_wait4,
         };
         pub use crate::syscalls::misc::{sys_arch32_uname, sys_getrandom as sys_arch32_getrandom};
         pub use crate::syscalls::time::{
@@ -150,18 +151,23 @@ pub fn dispatch_syscall(
             sys_timer_gettime as sys_arch32_timer_gettime64,
         };
         pub use crate::task::syscalls::{
-            sys_arch32_ugetrlimit, sys_exit as sys_arch32_exit,
+            sys_arch32_setrlimit, sys_arch32_ugetrlimit, sys_capget as sys_arch32_capget,
+            sys_capset as sys_arch32_capset, sys_exit as sys_arch32_exit,
             sys_exit_group as sys_arch32_exit_group, sys_getpid as sys_arch32_getpid,
-            sys_gettid as sys_arch32_gettid, sys_set_tid_address as sys_arch32_set_tid_address,
-            sys_setuid as sys_arch32_setuid,
+            sys_gettid as sys_arch32_gettid, sys_prctl as sys_arch32_prctl,
+            sys_prlimit64 as sys_arch32_prlimit64,
+            sys_set_tid_address as sys_arch32_set_tid_address, sys_setuid as sys_arch32_setuid,
         };
         pub use crate::vfs::syscalls::{
-            sys_arch32_access, sys_arch32_fstat64, sys_arch32_open, sys_arch32_readlink,
-            sys_arch32_stat64, sys_close as sys_arch32_close, sys_getcwd as sys_arch32_getcwd,
+            sys_arch32_access, sys_arch32_fstat64, sys_arch32_mkdir, sys_arch32_open,
+            sys_arch32_readlink, sys_arch32_rmdir, sys_arch32_stat64,
+            sys_close as sys_arch32_close, sys_fcntl as sys_arch32_fcntl64,
+            sys_getcwd as sys_arch32_getcwd, sys_getdents64 as sys_arch32_getdents64,
             sys_ioctl as sys_arch32_ioctl, sys_lseek as sys_arch32_lseek,
-            sys_newfstatat as sys_arch32_fstatat64, sys_openat as sys_arch32_openat,
-            sys_pwritev as sys_arch32_pwritev, sys_read as sys_arch32_read,
-            sys_readlinkat as sys_arch32_readlinkat, sys_write as sys_arch32_write,
+            sys_memfd_create as sys_arch32_memfd_create, sys_newfstatat as sys_arch32_fstatat64,
+            sys_openat as sys_arch32_openat, sys_pwritev as sys_arch32_pwritev,
+            sys_read as sys_arch32_read, sys_readlinkat as sys_arch32_readlinkat,
+            sys_umount2 as sys_arch32_umount2, sys_write as sys_arch32_write,
             sys_writev as sys_arch32_writev,
         };
     }
@@ -191,40 +197,53 @@ pub fn dispatch_syscall(
             ARM_set_tls[1],
             access[2],
             brk[1],
+            capget[2],
+            capset[2],
             clock_getres[2],
             clock_gettime[2],
             clock_gettime64[2],
+            clone[5],
             close[1],
             exit[1],
             exit_group[1],
+            fcntl64[3],
             fstat64[2],
             fstatat64[4],
             getcwd[2],
+            getdents64[3],
             getpid[0],
             getrandom[3],
             gettid[0],
             gettimeofday[2],
             ioctl[3],
             lseek[3],
+            memfd_create[2],
+            mkdir[2],
             mmap2[6],
             mprotect[3],
             munmap[2],
             open[3],
             openat[4],
+            prctl[5],
+            prlimit64[4],
             pwritev[4],
             read[3],
             readlink[3],
             readlinkat[4],
+            rmdir[1],
             rt_sigaction[4],
             rt_sigprocmask[4],
             set_robust_list[2],
             set_tid_address[1],
             setuid[1],
+            setrlimit[2],
             stat64[2],
             tgkill[3],
             timer_gettime64[2],
             ugetrlimit[2],
+            umount2[2],
             uname[1],
+            wait4[4],
             write[3],
             writev[3],
         };

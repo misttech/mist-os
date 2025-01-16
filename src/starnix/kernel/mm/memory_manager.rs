@@ -2913,6 +2913,22 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     ) -> Result<usize, Errno> {
         self.write_memory(user.addr(), objects.as_bytes())
     }
+
+    fn write_multi_arch_object<
+        T64: IntoBytes + Immutable,
+        T32: IntoBytes + Immutable + From<T64>,
+    >(
+        &self,
+        user: MultiArchUserRef<T64, T32>,
+        object: T64,
+    ) -> Result<usize, Errno> {
+        match user {
+            MultiArchUserRef::<T64, T32>::Arch64(user) => self.write_object(user, &object),
+            MultiArchUserRef::<T64, T32>::Arch32(user) => {
+                self.write_object(user, &T32::from(object))
+            }
+        }
+    }
 }
 
 impl MemoryManager {

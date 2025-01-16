@@ -3154,13 +3154,16 @@ pub fn sys_io_uring_register(
 #[cfg(feature = "arch32")]
 mod arch32 {
     use crate::mm::MemoryAccessorExt;
-    use crate::vfs::syscalls::{lookup_at, sys_faccessat, sys_openat, sys_readlinkat, LookupFlags};
+    use crate::vfs::syscalls::{
+        lookup_at, sys_faccessat, sys_mkdirat, sys_openat, sys_readlinkat, sys_unlinkat,
+        LookupFlags,
+    };
     use crate::vfs::{CurrentTask, FdNumber, FsNode};
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::FileMode;
-    use starnix_uapi::uapi;
     use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+    use starnix_uapi::{uapi, AT_REMOVEDIR};
 
     pub fn sys_arch32_open(
         locked: &mut Locked<'_, Unlocked>,
@@ -3221,6 +3224,23 @@ mod arch32 {
         buffer_size: usize,
     ) -> Result<usize, Errno> {
         sys_readlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, buffer, buffer_size)
+    }
+
+    pub fn sys_arch32_mkdir(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+        mode: FileMode,
+    ) -> Result<(), Errno> {
+        sys_mkdirat(locked, current_task, FdNumber::AT_FDCWD, user_path, mode)
+    }
+
+    pub fn sys_arch32_rmdir(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        user_path: UserCString,
+    ) -> Result<(), Errno> {
+        sys_unlinkat(locked, current_task, FdNumber::AT_FDCWD, user_path, AT_REMOVEDIR)
     }
 }
 

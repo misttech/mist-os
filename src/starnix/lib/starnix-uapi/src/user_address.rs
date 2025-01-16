@@ -308,6 +308,10 @@ impl<T64, T32> MultiArchUserRef<T64, T32> {
         Self::Arch32(addr)
     }
 
+    pub fn is_null(&self) -> bool {
+        self.addr() == UserAddress::NULL
+    }
+
     pub fn addr(&self) -> UserAddress {
         match self {
             Self::Arch64(addr) => addr.addr(),

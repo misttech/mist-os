@@ -2,6 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+fn saturating_u64_to_u32(v: u64) -> u32 {
+    if v > u32::max_value().into() {
+        u32::max_value()
+    } else {
+        v as u32
+    }
+}
+
 fn saturating_i64_to_i32(v: i64) -> i32 {
     if v > i32::max_value().into() {
         i32::max_value()
@@ -51,6 +59,21 @@ impl From<crate::timeval> for crate::arch32::timeval {
         Self {
             tv_sec: saturating_i64_to_i32(tv.tv_sec),
             tv_usec: saturating_i64_to_i32(tv.tv_usec),
+        }
+    }
+}
+
+impl From<crate::arch32::rlimit> for crate::rlimit {
+    fn from(rlimit: crate::arch32::rlimit) -> Self {
+        Self { rlim_cur: rlimit.rlim_cur.into(), rlim_max: rlimit.rlim_max.into() }
+    }
+}
+
+impl From<crate::rlimit> for crate::arch32::rlimit {
+    fn from(rlimit: crate::rlimit) -> Self {
+        Self {
+            rlim_cur: saturating_u64_to_u32(rlimit.rlim_cur),
+            rlim_max: saturating_u64_to_u32(rlimit.rlim_max),
         }
     }
 }

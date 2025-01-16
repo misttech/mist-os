@@ -30,11 +30,11 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, UncheckedSignal};
 use starnix_uapi::syslog::SyslogAction;
-use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
+use starnix_uapi::user_address::{MultiArchUserRef, UserAddress, UserCString, UserRef};
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct, c_char, c_int, clone_args, errno, error,
-    gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, sock_fprog, uid_t, AT_EMPTY_PATH,
+    gid_t, pid_t, rlimit, rusage, sched_param, sock_filter, sock_fprog, uapi, uid_t, AT_EMPTY_PATH,
     AT_SYMLINK_NOFOLLOW, BPF_MAXINSNS, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
     CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_FS, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS,
     CLONE_VFORK, NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ,
@@ -1183,13 +1183,15 @@ pub fn sys_getrusage(
     Ok(())
 }
 
+type PrLimitRef = MultiArchUserRef<uapi::rlimit, uapi::arch32::rlimit>;
+
 pub fn sys_getrlimit(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     resource: u32,
     user_rlimit: UserRef<rlimit>,
 ) -> Result<(), Errno> {
-    sys_prlimit64(locked, current_task, 0, resource, Default::default(), user_rlimit)
+    do_prlimit64(locked, current_task, 0, resource, Default::default(), user_rlimit.into())
 }
 
 pub fn sys_setrlimit(
@@ -1198,7 +1200,7 @@ pub fn sys_setrlimit(
     resource: u32,
     user_rlimit: UserRef<rlimit>,
 ) -> Result<(), Errno> {
-    sys_prlimit64(locked, current_task, 0, resource, user_rlimit, Default::default())
+    do_prlimit64(locked, current_task, 0, resource, user_rlimit.into(), Default::default())
 }
 
 pub fn do_prlimit64(
@@ -1206,9 +1208,8 @@ pub fn do_prlimit64(
     current_task: &CurrentTask,
     pid: pid_t,
     user_resource: u32,
-    maybe_new_limit: Option<rlimit>,
-    old_limit: &mut rlimit,
-    has_user_old_limit: bool,
+    new_limit_ref: PrLimitRef,
+    old_limit_ref: PrLimitRef,
 ) -> Result<(), Errno> {
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
@@ -1233,17 +1234,17 @@ pub fn do_prlimit64(
         security::task_prlimit(
             current_task,
             &target_task,
-            has_user_old_limit,
-            maybe_new_limit.is_some(),
+            !old_limit_ref.is_null(),
+            !new_limit_ref.is_null(),
         )?;
     }
 
     let resource = Resource::from_raw(user_resource)?;
 
-    *old_limit = match resource {
+    let old_limit = match resource {
         // TODO: Integrate Resource::STACK with generic ResourceLimits machinery.
         Resource::STACK => {
-            if maybe_new_limit.is_some() {
+            if !new_limit_ref.is_null() {
                 track_stub!(
                     TODO("https://fxbug.dev/322874791"),
                     "prlimit64 cannot set RLIMIT_STACK"
@@ -1256,8 +1257,22 @@ pub fn do_prlimit64(
             let stack_size = mm_state.stack_size as u64;
             rlimit { rlim_cur: stack_size, rlim_max: stack_size }
         }
-        _ => target_task.thread_group.adjust_rlimits(current_task, resource, maybe_new_limit)?,
+        _ => {
+            let new_limit = if new_limit_ref.is_null() {
+                None
+            } else {
+                let new_limit = current_task.read_multi_arch_object(new_limit_ref)?;
+                if new_limit.rlim_cur > new_limit.rlim_max {
+                    return error!(EINVAL);
+                }
+                Some(new_limit)
+            };
+            target_task.thread_group.adjust_rlimits(current_task, resource, new_limit)?
+        }
     };
+    if !old_limit_ref.is_null() {
+        current_task.write_multi_arch_object(old_limit_ref, old_limit)?;
+    }
     Ok(())
 }
 
@@ -1269,31 +1284,14 @@ pub fn sys_prlimit64(
     user_new_limit: UserRef<rlimit>,
     user_old_limit: UserRef<rlimit>,
 ) -> Result<(), Errno> {
-    let maybe_new_limit = if !user_new_limit.is_null() {
-        let new_limit = current_task.read_object(user_new_limit)?;
-        if new_limit.rlim_cur > new_limit.rlim_max {
-            return error!(EINVAL);
-        }
-        Some(new_limit)
-    } else {
-        None
-    };
-
-    let mut old_limit: rlimit = Default::default();
     do_prlimit64(
         locked,
         current_task,
         pid,
         user_resource,
-        maybe_new_limit,
-        &mut old_limit,
-        !user_old_limit.is_null(),
-    )?;
-
-    if !user_old_limit.is_null() {
-        current_task.write_object(user_old_limit, &old_limit)?;
-    }
-    Ok(())
+        user_new_limit.into(),
+        user_old_limit.into(),
+    )
 }
 
 pub fn sys_quotactl(
@@ -1898,8 +1896,7 @@ pub fn sys_vhangup(
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::mm::MemoryAccessorExt;
-    use crate::task::syscalls::do_prlimit64;
+    use crate::task::syscalls::{do_prlimit64, PrLimitRef};
     use crate::task::CurrentTask;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
@@ -1912,16 +1909,29 @@ mod arch32 {
         resource: u32,
         user_rlimit: UserRef<uapi::arch32::rlimit>,
     ) -> Result<(), Errno> {
-        let mut limit: uapi::rlimit = Default::default();
-        do_prlimit64(locked, current_task, 0, resource, None, &mut limit, !user_rlimit.is_null())?;
-        if !user_rlimit.is_null() {
-            let arch32_rlimit = uapi::arch32::rlimit {
-                rlim_cur: u32::try_from(limit.rlim_cur).unwrap_or(u32::MAX),
-                rlim_max: u32::try_from(limit.rlim_max).unwrap_or(u32::MAX),
-            };
-            current_task.write_object(user_rlimit, &arch32_rlimit)?;
-        }
-        Ok(())
+        do_prlimit64(
+            locked,
+            current_task,
+            0,
+            resource,
+            Default::default(),
+            PrLimitRef::from_32(user_rlimit),
+        )
+    }
+    pub fn sys_arch32_setrlimit(
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
+        resource: u32,
+        user_rlimit: UserRef<uapi::arch32::rlimit>,
+    ) -> Result<(), Errno> {
+        do_prlimit64(
+            locked,
+            current_task,
+            0,
+            resource,
+            PrLimitRef::from_32(user_rlimit),
+            Default::default(),
+        )
     }
 }
 
