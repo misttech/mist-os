@@ -79,6 +79,7 @@ fuchsia_driver_component("generic-suspend") {
 
 fuchsia_driver_package("package") {
   package_name = "generic-suspend"
+  export_to_bazel = true
   driver_components = [ ":generic-suspend" ]
 }
 
