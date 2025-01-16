@@ -95,8 +95,11 @@ rustc_binary("bin") {
       [ "//src/connectivity/openthread/third_party/openthread/platform" ]
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]
 
-  # TODO(https://fxbug.dev/356474618): re-enable and fix existing lints
+  # TODO(https://fxbug.dev/356474618): Re-enable and fix existing lints.
   # configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 fuchsia_component("lowpan-ot-driver-cv2") {

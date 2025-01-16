@@ -49,6 +49,9 @@ rustc_binary("bin") {
     "//third_party/rust_crates:log",
   ]
   test_deps = [ "//third_party/rust_crates:test-case" ]
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 trusted_app_aidl_interface_files = [

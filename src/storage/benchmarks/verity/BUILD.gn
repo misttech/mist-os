@@ -67,6 +67,9 @@ rustc_binary("test_fxfs_bin") {
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:futures",
   ]
+
+  # TODO(https://fxbug.dev/390250858): Re-enable when lld issue is fixed.
+  exclude_toolchain_tags = [ "profile" ]
 }
 
 fuchsia_component("test_fxfs") {
