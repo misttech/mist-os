@@ -218,7 +218,12 @@ def main() -> int:
         fstate.hash_source_path(source_path)
 
     if args.output:
-        args.output.write_text(fstate.content_hash)
+        # Do not modify existing output if it has the same content.
+        current_content = "~~~"
+        if args.output.exists():
+            current_content = args.output.read_text()
+        if current_content != fstate.content_hash:
+            args.output.write_text(fstate.content_hash)
     else:
         print(fstate.content_hash)
 

@@ -9,7 +9,7 @@ for the purposes of testing bazel features and capabilities
 such as remote execution.  This workflow should remain host-agnostic,
 and toolchain-agnostic.
 
-Unlike update_workspace.py, this does not require any Fuchsia SDK.
+This does not require any Fuchsia SDK.
 
 The TOPDIR directory argument will be populated with the following
 files:

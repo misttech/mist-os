@@ -610,7 +610,7 @@ template("bazel_action") {
     mnemonic = "BAZEL"
     script = "//build/bazel/scripts/bazel_action.py"
 
-    inputs = [ bazel_launcher ] + _bazel_build_files
+    inputs = _bazel_build_files
 
     inputs += [ _ninja_inputs_manifest ]
 

@@ -36,8 +36,6 @@ fx-update-bazel-workspace () {
     echo "fx-bazel: Regenerating Ninja build plan to ensure all workspace dependencies are correct!"
     fx-command-run build build.ninja
   fi
-  # Second, refresh Bazel workspace files if needed.
-  "${FUCHSIA_DIR}"/build/bazel/scripts/update_workspace.py
 }
 
 # Run bazel command in the Fuchsia workspace, after ensuring it is up-to-date.

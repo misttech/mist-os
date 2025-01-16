@@ -21,56 +21,7 @@ assert(
     current_toolchain == default_toolchain,
     "This BUILD.gn file should only be parsed in the default toolchain, to prevent generating Bazel workspace multiple times.")
 
-action("generate_main_workspace") {
-  script = "//build/bazel/scripts/update_workspace.py"
-
-  # The update script tracks the file and directory entries of FUCHSIA_DIR
-  # and will update the workspace if they change (i.e. if a file or
-  # directory is added to / removed from FUCHSIA_DIR itself). However,
-  # there is no way for Ninja to track these changes, and thus no way
-  # to enforce the action to be run when this happens, even though these
-  # are rare occurences, that could happen in the following cases:
-  #
-  # - A developer manually adds or removes a file to/from FUCHSIA_DIR.
-  #   In this case, manually calling the script is needed, and this
-  #   can be done by invoking any `fx bazel ...` command (even
-  #   `fx bazel version`) or `fx build bazel_workspace`.
-  #
-  # - A `jiri update` modifies the content of FUCHSIA_DIR. Depend on
-  #   the top-level //.git/index file to detect this. Note that the
-  #   script will not necessarily update the workspace in this case,
-  #   this simply ensures that it is run to do its checks.
-  #
-  # - A manual `git checkout HEAD^ -- .` command will modify the local
-  #   workspace without modifying the index, so also depend on
-  #   //.git/HEAD to detect this.
-  #
-  inputs = [
-    "//.git/index",
-    "//.git/HEAD",
-
-    # The bazel prebuilt is an implicit input for the script.
-    "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel",
-
-    # The script expands these templates
-    "//build/bazel/templates/template.bazel.sh",
-    "//build/bazel/templates/template.bazelrc",
-    "//build/bazel/templates/template.platform_mappings",
-
-    # The script reads this configuration file
-    "//build/bazel/config/main_workspace_top_dir",
-
-    # The script imports these python files
-    "//build/bazel/scripts/check_ninja_build_plan.py",
-    "//build/bazel/scripts/compute_content_hash.py",
-    "//build/bazel/scripts/get_git_head_commit.py",
-    "//build/bazel/scripts/workspace_utils.py",
-
-    # The script reads RBE configs
-    rewrapper_config_file,
-    reproxy_config_file,
-  ]
-
+group("generate_main_workspace") {
   # This dependency is needed to properly populate the @fuchsia_sdk repository.
   deps = [ "//sdk:bazel_in_tree_idk" ]
 
@@ -78,38 +29,6 @@ action("generate_main_workspace") {
   # (see https://fxbug.dev/42063353).
   # TODO(https://fxbug.dev/333907192): Remove this.
   deps += [ "//sdk:bazel_internal_only_idk" ]
-
-  depfile = "${target_gen_dir}/${target_name}.d"
-
-  outputs = [
-    # LINT.IfChange
-    "${bazel_main_top_dir}/bazel",
-    "${bazel_main_top_dir}/generated-info.json",
-    "${bazel_main_top_dir}/workspace/.bazelrc",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/args.json",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/git",
-    "${bazel_main_top_dir}/workspace/fuchsia_build_generated/jiri_snapshot.xml",
-
-    # Other files.
-    "${bazel_main_top_dir}/workspace/platform_mappings",
-    "${bazel_main_top_dir}/workspace/WORKSPACE.bazel",
-
-    # LINT.ThenChange(scripts/update_workspace.py)
-  ]
-
-  args = [
-    "--gn_output_dir",
-    rebase_path(root_build_dir, root_build_dir),
-    "--target_arch",
-    target_cpu,
-    "--depfile",
-    rebase_path(depfile, root_build_dir),
-  ]
-
-  # The generated wrapper includes the absolute path of the Ninja output
-  # directory, which will be read by Bazel repository rules during workspace
-  # setup.
-  no_output_dir_leaks = false
 }
 
 # Generate a symlink to the @fuchsia_sdk repository, after ensuring it was
@@ -123,23 +42,13 @@ group("generate_fuchsia_sdk_repository") {
 generate_content_hash_file("fuchsia_in_tree_idk.hash") {
   source_paths = [ "$root_build_dir/sdk/exported/bazel_in_tree_idk" ]
   output = "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash"
-  deps = [
-    # For now ensure this is run after update_workspace.py to avoid the content
-    # of fuchsia_build_generated/ from being rewritten by it.
-    ":generate_main_workspace",
-    "//sdk:bazel_in_tree_idk",
-  ]
+  deps = [ "//sdk:bazel_in_tree_idk" ]
 }
 
 generate_content_hash_file("fuchsia_internal_only_idk.hash") {
   source_paths = [ "$root_build_dir/sdk/exported/bazel_internal_only_idk" ]
   output = "${bazel_main_top_dir}/workspace/fuchsia_build_generated/fuchsia_internal_only_idk.hash"
-  deps = [
-    # For now ensure this is run after update_workspace.py to avoid the content
-    # of fuchsia_build_generated/ from being rewritten by it.
-    ":generate_main_workspace",
-    "//sdk:bazel_internal_only_idk",
-  ]
+  deps = [ "//sdk:bazel_internal_only_idk" ]
 }
 
 # The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk

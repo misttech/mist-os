@@ -7,6 +7,7 @@
 import errno
 import json
 import os
+import stat
 import sys
 import typing as T
 from pathlib import Path
@@ -40,8 +41,16 @@ def get_host_tag() -> str:
 
 def get_bazel_relative_topdir(
     fuchsia_dir: str | Path, workspace_name: str
-) -> str:
-    """Return Bazel topdir for a given workspace, relative to Ninja output dir."""
+) -> T.Tuple[str, T.Set[Path]]:
+    """Return Bazel topdir for a given workspace, relative to Ninja output dir.
+
+    Args:
+        fuchsia_dir: Fuchsia source directory path.
+        workspace_name: Name of workspace.
+    Returns:
+        A (topdir, input_files) pair, where input_files is a set of Path
+        values corresponding to the file(s) read by this function.
+    """
     input_file = os.path.join(
         fuchsia_dir,
         "build",
@@ -51,7 +60,7 @@ def get_bazel_relative_topdir(
     )
     assert os.path.exists(input_file), "Missing input file: " + input_file
     with open(input_file) as f:
-        return f.read().strip()
+        return f.read().strip(), {Path(input_file)}
 
 
 def workspace_should_exclude_file(path: str) -> bool:
@@ -96,6 +105,99 @@ def force_symlink(dst_path: str | Path, target_path: str | Path) -> None:
             os.symlink(target_path, dst_path)
         else:
             raise
+
+
+def make_removable(path: str) -> None:
+    """Ensure the file at |path| is removable."""
+
+    islink = os.path.islink(path)
+
+    # Skip if the input path is a symlink, and chmod with
+    # `follow_symlinks=False` is not supported. Linux is the most notable
+    # platform that meets this requirement, and adding S_IWUSR is not necessary
+    # for removing symlinks.
+    if islink and (os.chmod not in os.supports_follow_symlinks):
+        return
+
+    info = os.stat(path, follow_symlinks=False)
+    if info.st_mode & stat.S_IWUSR == 0:
+        try:
+            if islink:
+                os.chmod(
+                    path, info.st_mode | stat.S_IWUSR, follow_symlinks=False
+                )
+            else:
+                os.chmod(path, info.st_mode | stat.S_IWUSR)
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to chmod +w to {path}, islink: {islink}, info: {info}, error: {e}"
+            )
+
+
+def remove_dir(path: str) -> None:
+    """Properly remove a directory."""
+    # shutil.rmtree() does not work well when there are readonly symlinks to
+    # directories. This results in weird NotADirectory error when trying to
+    # call os.scandir() or os.rmdir() on them (which happens internally).
+    #
+    # Re-implement it correctly here. This is not as secure as it could
+    # (see "shutil.rmtree symlink attack"), but is sufficient for the Fuchsia
+    # build.
+    all_files = []
+    all_dirs = []
+    for root, subdirs, files in os.walk(path):
+        # subdirs may contain actual symlinks which should be treated as
+        # files here.
+        real_subdirs = []
+        for subdir in subdirs:
+            if os.path.islink(os.path.join(root, subdir)):
+                files.append(subdir)
+            else:
+                real_subdirs.append(subdir)
+
+        for file in files:
+            file_path = os.path.join(root, file)
+            all_files.append(file_path)
+            make_removable(file_path)
+        for subdir in real_subdirs:
+            dir_path = os.path.join(root, subdir)
+            all_dirs.append(dir_path)
+            make_removable(dir_path)
+
+    for file in reversed(all_files):
+        os.remove(file)
+    for dir in reversed(all_dirs):
+        os.rmdir(dir)
+    os.rmdir(path)
+
+
+def create_clean_dir(path: str) -> None:
+    """Create a clean directory."""
+    if os.path.exists(path):
+        remove_dir(path)
+    os.makedirs(path)
+
+
+def find_host_binary_path(program: str) -> str:
+    """Find the absolute path of a given program. Like the UNIX `which` command.
+
+    Args:
+        program: Program name.
+    Returns:
+        program's absolute path, found by parsing the content of $PATH.
+        An empty string is returned if nothing is found.
+    """
+    for path in os.environ.get("PATH", "").split(":"):
+        # According to Posix, an empty path component is equivalent to ´.'.
+        if path == "" or path == ".":
+            path = os.getcwd()
+        candidate = os.path.realpath(os.path.join(path, program))
+        if os.path.isfile(candidate) and os.access(
+            candidate, os.R_OK | os.X_OK
+        ):
+            return candidate
+
+    return ""
 
 
 # Type describing a callable that takes a file path as input and
@@ -272,7 +374,7 @@ def record_fuchsia_workspace(
 
     if log:
         log(
-            f"""Using directories and files:
+            f"""- Using directories and files:
   Fuchsia:                {fuchsia_dir}
   GN build:               {gn_output_dir}
   Ninja binary:           {ninja_binary}
@@ -283,7 +385,7 @@ def record_fuchsia_workspace(
   Bazel output_base:      {output_base_dir}
   Bazel output user root: {output_user_root}
   Bazel launcher:         {bazel_launcher}
-"""
+  Git binary path:        {git_bin_path}"""
         )
 
     def expand_template_file(filename: str, **kwargs: T.Any) -> str:
@@ -451,3 +553,77 @@ common --enable_bzlmod=false
         fuchsia_dir / ".jiri_root" / "update_history" / "latest",
     )
     # LINT.ThenChange(//build/info/info.gni)
+
+
+def generate_fuchsia_workspace(
+    fuchsia_dir: Path,
+    build_dir: Path,
+    log: T.Optional[T.Callable[[str], None]] = None,
+    enable_bzlmod: bool = False,
+) -> T.Set[Path]:
+    """Generate the Fuchsia Bazel workspace and associated files.
+
+    Args:
+        fuchsia_dir: Path to the Fuchsia source checkout.
+        build_dir: Path to the GN/Ninja output directory.
+        log: Optional logging callback. If not None, must take a single
+            string as argument.
+        enable_bzlmod: Optional flag. Set to True to enable Bzlmod.
+
+    Returns:
+       A set of input file paths that were read by this function.
+    """
+    # Find path of host git tool
+    git_bin_path = find_host_binary_path("git")
+    assert git_bin_path, f"Could not find 'git' in current PATH!"
+
+    # Extract target_cpu from args.json. This file is GN-generated
+    # and doesn't need to be added to input_files.
+    args_json_path = build_dir / "args.json"
+    assert args_json_path.exists(), f"Missing GN output file: {args_json_path}"
+    with args_json_path.open("rb") as f:
+        args_json = json.load(f)
+
+    target_cpu = args_json.get("target_cpu")
+    assert target_cpu, f"Missing target_cpu key in {args_json_path}"
+
+    # Find the location of the Bazel top-dir relative to the Ninja
+    # build directory.
+    bazel_top_dir, input_files = get_bazel_relative_topdir(fuchsia_dir, "main")
+
+    # Generate the bazel launcher and Bazel workspace files.
+    generated = GeneratedWorkspaceFiles()
+
+    top_dir = build_dir / bazel_top_dir
+
+    record_fuchsia_workspace(
+        generated,
+        top_dir=top_dir,
+        fuchsia_dir=fuchsia_dir,
+        gn_output_dir=build_dir,
+        git_bin_path=Path(git_bin_path),
+        target_cpu=target_cpu,
+        log=log,
+        enable_bzlmod=False,
+    )
+
+    # Remove the old workspace's content, which is just a set
+    # of symlinks and some auto-generated files.
+    create_clean_dir(str(top_dir / "workspace"))
+
+    # Do not clean the output_base because it is now massive,
+    # and doing this will very slow and will force a lot of
+    # unnecessary rebuilds after that,
+    #
+    # However, do remove $OUTPUT_BASE/external/ which holds
+    # the content of external repositories.
+    #
+    # This is a guard against repository rules that do not
+    # list their input dependencies properly, and would fail
+    # to re-run if one of them is updated. Sadly, this is
+    # pretty common with Bazel.
+    create_clean_dir(os.path.join(top_dir / "output_base" / "external"))
+
+    generated.write(top_dir)
+
+    return input_files
