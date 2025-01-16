@@ -22,7 +22,7 @@ static NO_KVM_MESSAGE: &str = "KVM is not enabled for the current user. This \
 will prevent emulator acceleration from working with the Fuchsia emulator.";
 static NO_KVM_RESOLUTION_MESSAGE: &str = "enable KVM for the current user by \
 following the instructions here: \
-https://fuchsia.dev/fuchsia-src/get-started/set_up_femu#enable-kvm";
+https://fuchsia.dev/fuchsia-src/get-started/set_up_femu#enable-vm-acceleration";
 
 static WARNING_MESSAGE_MACOS: &str = "Hypervisor Framework is not enabled. \
 This will prevent emulator acceleration from working with the Fuchsia emulator.";
