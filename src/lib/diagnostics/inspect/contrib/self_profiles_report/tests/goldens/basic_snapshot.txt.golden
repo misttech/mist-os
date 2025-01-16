@@ -81,3 +81,17 @@ Custom rollup: RGB Leaves
     cpu: 35.750ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 35.793ms
     source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5
 
+Custom rollup: Nested 123
+
+62.393%: FirstNestedDuration, 1000x
+    cpu: 358.745ms, queue: 0.009ms, faulting: 0.000ms, contended: 0.000ms, wall: 359.149ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:41:25
+
+18.700%: SecondNestedDuration, 100x
+    cpu: 107.521ms, queue: 0.008ms, faulting: 0.000ms, contended: 0.000ms, wall: 107.570ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:45:25
+
+12.468%: ThirdNestedDuration, 100x
+    cpu: 71.685ms, queue: 0.000ms, faulting: 0.000ms, contended: 0.000ms, wall: 71.725ms
+    source: ../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:51:41
+

@@ -107,6 +107,8 @@ compiled_action("generate_self_report_text") {
     "Fuchsia Leaves=Fuchsia",
     "--add-rollup",
     "RGB Leaves=Red,Green,Blue",
+    "--add-rollup",
+    "Nested 123=FirstNested,SecondNested,ThirdNested",
   ]
 }
 

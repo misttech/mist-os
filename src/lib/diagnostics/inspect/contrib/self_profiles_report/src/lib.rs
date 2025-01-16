@@ -62,10 +62,21 @@ impl SelfProfilesReport {
         self.root_summary.summarize_leaves(&self.name, &mut leaves);
 
         let mut leaves = leaves.into_iter().collect::<Vec<_>>();
-        leaves.sort_by_key(|d| d.1.runtime.cpu_time);
+        leaves.sort_by_key(|(_, duration)| duration.runtime.cpu_time);
         leaves.reverse();
 
         leaves
+    }
+
+    pub fn matching_durations(&self, match_prefixes: &[String]) -> Vec<(String, DurationSummary)> {
+        let mut matches = BTreeMap::new();
+        self.root_summary.summarize_matches(&self.name, match_prefixes, &mut matches);
+
+        let mut matches = matches.into_iter().collect::<Vec<_>>();
+        matches.sort_by_key(|(_, duration)| duration.runtime.cpu_time);
+        matches.reverse();
+
+        matches
     }
 
     pub fn delta_from(&self, baseline: &Self) -> Result<Self, ComparisonError> {
@@ -98,11 +109,10 @@ impl std::fmt::Display for SelfProfilesReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Profile duration summary for `{}`:\n\n{}\n", self.name, self.root_summary)?;
 
-        let leaf_durations = self.leaf_durations();
         let root_runtime = self.root_summary.runtime;
 
         writeln!(f, "Rolled up leaf durations:\n")?;
-        for (name, duration) in &leaf_durations {
+        for (name, duration) in &self.leaf_durations() {
             let proportion_of_total =
                 duration.runtime.cpu_time as f64 / root_runtime.cpu_time as f64;
             if proportion_of_total >= CHILD_PROPORTION_DISPLAY_THRESHOLD {
@@ -113,19 +123,8 @@ impl std::fmt::Display for SelfProfilesReport {
         for rollup in &self.custom_rollups {
             writeln!(f, "Custom rollup: {}\n", rollup.display_title)?;
 
-            for (name, duration) in &leaf_durations {
-                #[allow(
-                    clippy::search_is_some,
-                    reason = "mass allow for https://fxbug.dev/381896734"
-                )]
-                if rollup
-                    .match_prefixes
-                    .iter()
-                    .find(|prefix| name.starts_with(prefix.as_str()))
-                    .is_some()
-                {
-                    write!(f, "{}", duration.display_tree(name, root_runtime))?;
-                }
+            for (name, duration) in &self.matching_durations(&rollup.match_prefixes) {
+                write!(f, "{}", duration.display_tree(name, root_runtime))?;
             }
         }
 
@@ -268,6 +267,35 @@ impl DurationSummary {
             for (name, child) in &self.children {
                 child.summarize_leaves(name, leaves);
             }
+        }
+    }
+
+    fn summarize_matches(
+        &self,
+        own_name: &str,
+        match_prefixes: &[String],
+        out: &mut BTreeMap<String, Self>,
+    ) {
+        if match_prefixes.iter().any(|prefix| own_name.starts_with(prefix.as_str())) {
+            match out.entry(own_name.to_string()) {
+                std::collections::btree_map::Entry::Vacant(v) => {
+                    v.insert(DurationSummary {
+                        count: self.count,
+                        runtime: self.runtime,
+                        location: self.location.clone(),
+                        children: vec![],
+                    });
+                }
+                std::collections::btree_map::Entry::Occupied(mut o) => {
+                    let leaf = o.get_mut();
+                    leaf.runtime += self.runtime;
+                    leaf.count += self.count;
+                }
+            }
+        }
+
+        for (name, child) in &self.children {
+            child.summarize_matches(name, match_prefixes, out);
         }
     }
 
