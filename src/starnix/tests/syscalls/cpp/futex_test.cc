@@ -485,6 +485,8 @@ constexpr uintptr_t kLowestNormalModeAddress = ((1ULL << 46));
 #elif defined(__aarch64__)
 // From zircon/kernel/arch/arm64/include/arch/kernel_aspace.h
 constexpr uintptr_t kLowestNormalModeAddress = ((1ULL << 47));
+#elif defined(__arm__)
+constexpr uintptr_t kLowestNormalModeAddress = 0xffff0000;
 #elif defined(__riscv)
 // From zircon/kernel/arch/riscv64/include/arch/kernel_aspace.h
 // Currently we only support the RV39 address space model.

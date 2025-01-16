@@ -82,7 +82,7 @@ TEST(FsTest, FchmodTest) {
 }
 
 // This test passes non-null arguments and has other quirks that fail under sanitizers.
-#if (!__has_feature(address_sanitizer))
+#if (!__has_feature(address_sanitizer) && !defined(__arm__))
 TEST(FsTest, DevZeroAndNullQuirks) {
   size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGESIZE));
 

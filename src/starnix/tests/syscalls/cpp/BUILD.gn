@@ -7,15 +7,34 @@ import("//build/test.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
 import("//src/lib/testing/expectation/generated_expectations_file.gni")
+import("//src/starnix/kernel/args.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/build/starnix_linux_test_component.gni")
+import("//src/starnix/tests/environments.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
 
 # We want to use a newer sysroot than is available by default in $host_toolchain.
 _host_linux_toolchain = "//build/toolchain:linux_$host_cpu"
 
+# syscall tests that can be run on both arch32 and arch64.
 syscall_tests = [
   # go/keep-sorted start
+
+  "loop_test",
+  "restart_read_test",
+  "syslog_test",
+  "time_test",
+  "touch_standby_test",
+  "udev_test",
+
+  # go/keep-sorted end
+]
+
+# syscall tests that can only be run on arch64.
+# TODO(https://fxbug.dev/389018266): Fix and move most of these tests to `syscall_tests`.
+arch64_syscall_tests = [
+  # go/keep-sorted start
+
   "abort_test",
   "ashmem_test",
   "aspace_test",
@@ -34,7 +53,6 @@ syscall_tests = [
   "getrandom_test",
   "input_test",
   "ioctl_test",
-  "loop_test",
   "memfd_test",
   "mmap_test",
   "mount_test",
@@ -49,7 +67,6 @@ syscall_tests = [
   "ptrace_test",
   "read_write_test",
   "reboot_test",
-  "restart_read_test",
   "rlimit_test",
   "seccomp_test",
   "sendfile_test",
@@ -60,18 +77,14 @@ syscall_tests = [
   "symlink_test",
   "sysfs_kernel_test",
   "sysfs_power_test",
-  "syslog_test",
   "task_test",
   "terminal_test",
   "test_helper_test",
-  "time_test",
   "timerfd_test",
   "timers_test",
   "tmpfs_test",
-  "touch_standby_test",
   "trivial_test",
   "tun_test",
-  "udev_test",
   "uio_test",
   "vdso_test",
   "vmsplice_test",
@@ -90,8 +103,11 @@ if (target_cpu == "x64") {
 group("tests") {
   testonly = true
   deps = [ ":starnix_syscalls_cpp_tests" ]
+  if (starnix_enable_arch32) {
+    deps += [ ":starnix_arch32_syscalls_cpp_tests" ]
+  }
   if (host_os == "linux" && host_cpu == "x64") {
-    foreach(test_name, syscall_tests) {
+    foreach(test_name, syscall_tests + arch64_syscall_tests) {
       deps += [
         # These are Linux tests, so we can run them as host tests on our host Linux bot.
         ":starnix_${test_name}_baseline($host_toolchain)",
@@ -202,7 +218,6 @@ template("syscall_test") {
   if (is_linux) {
     _test_deps = [
       ":test_utils",
-      "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
       "//sdk/lib/fit",
       "//src/lib/fxl",
       "//src/lib/fxl/test:gtest_main",
@@ -210,6 +225,9 @@ template("syscall_test") {
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/fbl",
     ]
+    if (current_cpu != "arm") {
+      _test_deps += [ "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp" ]
+    }
     _test_configs = [
       "//build/config:rtti",
       "//build/config:thread_safety_annotations",
@@ -274,11 +292,41 @@ template("syscall_test") {
     generated_expectations = ":syscalls_cpp_test_expectations"
     test_type = "starnix"
   }
+
+  if (!invoker.arch64_only && starnix_enable_arch32) {
+    starnix_linux_test_component("${target_name}_arch32") {
+      test_toolchain = target_linux_arch32_toolchain
+      test_label = ":${_target_test_label}"
+      test_binary = _target_test_label
+      manifest = _manifest_file
+      deps = [
+        ":${_manifest_label}",
+        ":fuse_overlayfs",
+        ":ptrace_test_exec_child_resource($target_linux_arch32_toolchain)",
+        ":simple_ext4_image",
+        ":suid_test_exec_child_resource($target_linux_arch32_toolchain)",
+        ":syscall_test_exec_child_resource($target_linux_arch32_toolchain)",
+        "test_programs:print_helper_resource($target_linux_arch32_toolchain)",
+      ]
+      uses_expectations = true
+      generated_expectations =
+          ":syscalls_cpp_test_expectations($target_linux_arch32_toolchain)"
+      test_type = "starnix"
+    }
+  }
 }
 
 foreach(test_name, syscall_tests) {
   syscall_test(test_name) {
     test_name = test_name
+    arch64_only = false
+  }
+}
+
+foreach(test_name, arch64_syscall_tests) {
+  syscall_test(test_name) {
+    test_name = test_name
+    arch64_only = true
   }
 }
 
@@ -422,7 +470,7 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     ":syslog_non_root_test",
     ":crash_test",
   ]
-  foreach(test_name, syscall_tests) {
+  foreach(test_name, syscall_tests + arch64_syscall_tests) {
     test_components += [ ":${test_name}" ]
   }
 
@@ -451,6 +499,43 @@ fuchsia_test_package("starnix_syscalls_cpp_tests") {
     log_settings = {
       # Tests exercise failure cases, so ERROR logs are expected.
       max_severity = "ERROR"
+    }
+  }
+}
+
+if (starnix_enable_arch32) {
+  fuchsia_test_package("starnix_arch32_syscalls_cpp_tests") {
+    test_components = []
+    foreach(test_name, syscall_tests) {
+      test_components += [ ":${test_name}_arch32" ]
+    }
+
+    subpackages = starnix_test_subpackages
+    subpackages += [ "//src/starnix/containers/debian:debian_package" ]
+
+    if (target_cpu == "x64") {
+      # TODO(https://fxbug.dev/42059962): arm64 emulator does not have Vulkan support yet.
+      # Without Vulkan, test-ui-stack will stuck on Scenic startup.
+      subpackages += [ "//src/ui/testing/test_ui_stack:test-ui-stack" ]
+    }
+
+    deps = [
+      ":extended_pstate_initial_state_child_resource",
+      "//src/lib/testing/expectation:expectation_comparer",
+    ]
+
+    test_specs = {
+      # TODO(https://fxbug.dev/319150842): GCE doesn't support Vulkan, so, for now, just disable all
+      # of these tests on GCE.
+      _env = arch32_envs
+      _env += [ gce_env ]
+      _env -= [ gce_env ]
+      environments = _env
+
+      log_settings = {
+        # Tests exercise failure cases, so ERROR logs are expected.
+        max_severity = "ERROR"
+      }
     }
   }
 }
