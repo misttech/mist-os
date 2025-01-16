@@ -62,9 +62,10 @@ group("assembly") {
   testonly = true
   deps = [ ":eng" ]
 
-  # Coverage and sanitizer builders rename the shared libs, therefore ignore them.
+  # Coverage, profile and sanitizer builders rename the shared libs, therefore ignore them.
   # RISCV skips some artifacts, therefore we also ignore that.
-  if (!is_coverage && !is_asan && !is_hwasan && current_cpu != "riscv64") {
+  if (!is_coverage && !is_profile && !is_asan && !is_hwasan &&
+      current_cpu != "riscv64") {
     deps += [ "//bundles/assembly/scrutiny" ]
   }
 }

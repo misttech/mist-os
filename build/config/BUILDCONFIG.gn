@@ -2116,7 +2116,14 @@ is_rust_coverage =
     select_variant + [ "coverage-rust" ] - [ "coverage-rust" ] != select_variant
 is_cts_coverage =
     select_variant + [ "coverage-cts" ] - [ "coverage-cts" ] != select_variant
-is_profile = select_variant + [ "profile" ] - [ "profile" ] != select_variant
+is_profile = select_variant + [
+               "profile",
+               "profile-rust",
+             ] -
+             [
+               "profile",
+               "profile-rust",
+             ] != select_variant
 
 # Whether sanitizer instrumentation is enabled.
 is_asan = select_variant + [
