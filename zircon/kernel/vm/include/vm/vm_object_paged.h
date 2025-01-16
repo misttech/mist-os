@@ -349,27 +349,6 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   void ForwardRangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeChangeOp op)
       TA_REQ(lock());
 
-  // This is exposed so that VmCowPages can call it. It is used to update the VmCowPages object
-  // that this VMO points to for its operations. When updating it must be set to a non-null
-  // reference, and any mappings or pin operations must remain equivalently valid.
-  // The previous cow pages references is returned so that the caller can perform sanity checks.
-  fbl::RefPtr<VmCowPages> SetCowPagesReferenceLocked(fbl::RefPtr<VmCowPages> cow_pages)
-      TA_REQ(lock()) {
-    DEBUG_ASSERT(cow_pages);
-    fbl::RefPtr<VmCowPages> ret = ktl::move(cow_pages_);
-    cow_pages_ = ktl::move(cow_pages);
-    // Update the VmCowPages for all reference children as well.
-    for (auto& ref : reference_list_) {
-      AssertHeld(ref.lock_ref());
-      fbl::RefPtr<VmCowPages> const cow = ref.SetCowPagesReferenceLocked(cow_pages_);
-      // Validate that the reference that was replaced was the same as the one we're going to
-      // return. This ensures that we can safely drop |cow| here without triggering the
-      // destructor.
-      DEBUG_ASSERT(cow.get() == ret.get());
-    }
-    return ret;
-  }
-
   // Hint how the specified range is intended to be used, so that the hint can be taken into
   // consideration when reclaiming pages under memory pressure (if applicable).
   zx_status_t HintRange(uint64_t offset, uint64_t len, EvictionHint hint) override;
@@ -384,8 +363,10 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
 
  private:
   // private constructor (use Create())
-  VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state);
-  VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state, VmCowRange range);
+  VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state,
+                fbl::RefPtr<VmCowPages> cow_pages);
+  VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state,
+                fbl::RefPtr<VmCowPages> cow_pages, VmCowRange range);
 
   static zx_status_t CreateCommon(uint32_t pmm_alloc_flags, uint32_t options, uint64_t size,
                                   fbl::RefPtr<VmObjectPaged>* vmo);
@@ -503,10 +484,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // Tracks the last cached attribution counts.
   mutable CachedMemoryAttribution cached_memory_attribution_ TA_GUARDED(lock()) = {};
 
-  // Our VmCowPages may be null during object initialization in the internal Create routines. As a
-  // consequence if this is null it implies that the VMO is *not* in the global list. Otherwise it
-  // can generally be assumed that this is non-null.
-  fbl::RefPtr<VmCowPages> cow_pages_ TA_GUARDED(lock());
+  const fbl::RefPtr<VmCowPages> cow_pages_;
 
   // The range in |cow_pages_| that this VmObject references.
   //

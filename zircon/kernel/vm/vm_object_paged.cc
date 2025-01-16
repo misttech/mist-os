@@ -47,13 +47,18 @@ KCOUNTER(vmo_attribution_cache_misses, "vm.attributed_memory.object.cache_misses
 }  // namespace
 
 VmObjectPaged::VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state,
-                             VmCowRange range)
-    : VmObject(VMOType::Paged, ktl::move(hierarchy_state)), options_(options), cow_range_(range) {
+                             fbl::RefPtr<VmCowPages> cow_pages, VmCowRange range)
+    : VmObject(VMOType::Paged, ktl::move(hierarchy_state)),
+      options_(options),
+      cow_pages_(ktl::move(cow_pages)),
+      cow_range_(range) {
   LTRACEF("%p\n", this);
 }
 
-VmObjectPaged::VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state)
-    : VmObjectPaged(options, ktl::move(hierarchy_state), VmCowRange(0, UINT64_MAX)) {}
+VmObjectPaged::VmObjectPaged(uint32_t options, fbl::RefPtr<VmHierarchyState> hierarchy_state,
+                             fbl::RefPtr<VmCowPages> cow_pages)
+    : VmObjectPaged(options, ktl::move(hierarchy_state), ktl::move(cow_pages),
+                    VmCowRange(0, UINT64_MAX)) {}
 
 VmObjectPaged::~VmObjectPaged() {
   canary_.Assert();
@@ -333,7 +338,8 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
     ASSERT(status == ZX_OK);
   }
 
-  auto vmo = fbl::AdoptRef<VmObjectPaged>(new (&ac) VmObjectPaged(options, ktl::move(state)));
+  auto vmo = fbl::AdoptRef<VmObjectPaged>(
+      new (&ac) VmObjectPaged(options, ktl::move(state), ktl::move(cow_pages)));
   if (!ac.check()) {
     if (options & kAlwaysPinned) {
       Guard<CriticalMutex> guard{cow_pages->lock()};
@@ -345,10 +351,8 @@ zx_status_t VmObjectPaged::CreateCommon(uint32_t pmm_alloc_flags, uint32_t optio
   // This creation has succeeded. Must wire up the cow pages and *then* place in the globals list.
   {
     Guard<CriticalMutex> guard{vmo->lock()};
-    AssertHeld(cow_pages->lock_ref());
-    cow_pages->set_paged_backlink_locked(vmo.get());
-    cow_pages->TransitionToAliveLocked();
-    vmo->cow_pages_ = ktl::move(cow_pages);
+    vmo->cow_pages_locked()->set_paged_backlink_locked(vmo.get());
+    vmo->cow_pages_locked()->TransitionToAliveLocked();
   }
   vmo->AddToGlobalList();
 
@@ -565,7 +569,8 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
     return status;
   }
 
-  auto vmo = fbl::AdoptRef<VmObjectPaged>(new (&ac) VmObjectPaged(options, ktl::move(state)));
+  auto vmo = fbl::AdoptRef<VmObjectPaged>(
+      new (&ac) VmObjectPaged(options, ktl::move(state), ktl::move(cow_pages)));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -573,10 +578,8 @@ zx_status_t VmObjectPaged::CreateWithSourceCommon(fbl::RefPtr<PageSource> src,
   // This creation has succeeded. Must wire up the cow pages and *then* place in the globals list.
   {
     Guard<CriticalMutex> guard{vmo->lock()};
-    AssertHeld(cow_pages->lock_ref());
-    cow_pages->set_paged_backlink_locked(vmo.get());
-    cow_pages->TransitionToAliveLocked();
-    vmo->cow_pages_ = ktl::move(cow_pages);
+    vmo->cow_pages_locked()->set_paged_backlink_locked(vmo.get());
+    vmo->cow_pages_locked()->TransitionToAliveLocked();
   }
   vmo->AddToGlobalList();
 
@@ -687,9 +690,11 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
     options |= kCanBlockOnPageRequests;
   }
 
+  // Reference shares the same VmCowPages as the parent.
+
   fbl::AllocChecker ac;
-  auto vmo =
-      fbl::AdoptRef<VmObjectPaged>(new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, range));
+  auto vmo = fbl::AdoptRef<VmObjectPaged>(
+      new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, cow_pages_, range));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -703,13 +708,6 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
       return ZX_ERR_BAD_STATE;
     }
     vmo->cache_policy_ = cache_policy_;
-
-    // Reference shares the same VmCowPages as the parent.
-    auto cow_pages = fbl::RefPtr<VmCowPages>(this->cow_pages_locked());
-    // Link up the cow pages and our parent/children. Both child notification and inserting into
-    // the globals list has to happen outside the lock.
-    vmo->cow_pages_ = ktl::move(cow_pages);
-
     vmo->parent_ = this;
     const bool first = AddChildLocked(vmo.get());
     if (first_child) {
@@ -775,30 +773,17 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  uint32_t options = 0;
-  if (resizable == Resizability::Resizable) {
-    options |= kResizable;
-  }
-  if (can_block_on_page_requests()) {
-    options |= kCanBlockOnPageRequests;
-  }
-  fbl::AllocChecker ac;
-  auto vmo = fbl::AdoptRef<VmObjectPaged>(new (&ac) VmObjectPaged(options, hierarchy_state_ptr_));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
+  fbl::RefPtr<VmObjectPaged> vmo;
 
   {
     // Declare these prior to the guard so that any failure paths destroy these without holding
     // the lock.
     fbl::RefPtr<VmCowPages> clone_cow_pages;
     Guard<CriticalMutex> guard{lock()};
-    AssertHeld(vmo->lock_ref());
     // check that we're not uncached in some way
     if (cache_policy_ != ARCH_MMU_FLAG_CACHED) {
       return ZX_ERR_BAD_STATE;
     }
-    DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
 
     // If we are a slice we require a unidirection clone, as performing a bi-directional clone
     // through a slice does not yet have defined semantics.
@@ -809,12 +794,27 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
       return status;
     }
 
+    uint32_t options = 0;
+    if (resizable == Resizability::Resizable) {
+      options |= kResizable;
+    }
+    if (can_block_on_page_requests()) {
+      options |= kCanBlockOnPageRequests;
+    }
+    fbl::AllocChecker ac;
+    vmo = fbl::AdoptRef<VmObjectPaged>(
+        new (&ac) VmObjectPaged(options, hierarchy_state_ptr_, ktl::move(clone_cow_pages)));
+    if (!ac.check()) {
+      return ZX_ERR_NO_MEMORY;
+    }
+
+    AssertHeld(vmo->lock_ref());
+    DEBUG_ASSERT(vmo->cache_policy_ == ARCH_MMU_FLAG_CACHED);
+
     // Now that everything has succeeded we can wire up cow pages references. VMO will be placed in
     // the global list later once lock has been dropped.
-    AssertHeld(clone_cow_pages->lock_ref());
-    clone_cow_pages->set_paged_backlink_locked(vmo.get());
-    clone_cow_pages->TransitionToAliveLocked();
-    vmo->cow_pages_ = ktl::move(clone_cow_pages);
+    vmo->cow_pages_locked()->set_paged_backlink_locked(vmo.get());
+    vmo->cow_pages_locked()->TransitionToAliveLocked();
 
     // Install the parent.
     vmo->parent_ = this;
