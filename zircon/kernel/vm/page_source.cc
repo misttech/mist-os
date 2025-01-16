@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/console.h>
+#include <lib/dump/depth_printer.h>
 #include <trace.h>
 
 #include <kernel/lockdep.h>
@@ -481,24 +482,26 @@ zx_status_t PageSource::WaitOnRequest(PageRequest* request) {
   return page_provider_->WaitOnEvent(&request->event_);
 }
 
-void PageSource::Dump(uint depth) const {
+void PageSource::DumpSelf(uint depth, uint max_items) const {
   Guard<Mutex> guard{&page_source_mtx_};
-  for (uint i = 0; i < depth; ++i) {
-    printf("  ");
-  }
-  printf("page_source %p detached %d closed %d\n", this, detached_, closed_);
+  dump::DepthPrinter printer(depth);
+  printer.Emit("page_source %p detached %d closed %d", this, detached_, closed_);
   for (uint8_t type = 0; type < page_request_type::COUNT; type++) {
+    printer.BeginList(max_items);
     for (auto& req : outstanding_requests_[type]) {
-      for (uint i = 0; i < depth; ++i) {
-        printf("  ");
-      }
-      printf("  vmo 0x%lx/k%lu %s req [0x%lx, 0x%lx) pending 0x%lx overlap %lu %s\n",
-             req.vmo_debug_info_.vmo_ptr, req.vmo_debug_info_.vmo_id,
-             PageRequestTypeToString(page_request_type(type)), req.offset_, req.GetEnd(),
-             req.pending_size_, req.overlap_.size_slow(), req.provider_owned_ ? "[sent]" : "");
+      printer.Emit("  vmo 0x%lx/k%lu %s req [0x%lx, 0x%lx) pending 0x%lx overlap %lu %s",
+                   req.vmo_debug_info_.vmo_ptr, req.vmo_debug_info_.vmo_id,
+                   PageRequestTypeToString(page_request_type(type)), req.offset_, req.GetEnd(),
+                   req.pending_size_, req.overlap_.size_slow(),
+                   req.provider_owned_ ? "[sent]" : "");
     }
+    printer.EndList();
   }
-  page_provider_->Dump(depth);
+}
+
+void PageSource::Dump(uint depth, uint max_items) const {
+  DumpSelf(depth, max_items);
+  page_provider_->Dump(depth, max_items);
 }
 
 PageRequest::~PageRequest() { CancelRequest(); }
@@ -609,7 +612,7 @@ static int cmd_page_source(int argc, const cmd_args* argv, uint32_t flags) {
     if (argc < 3) {
       goto notenoughargs;
     }
-    reinterpret_cast<PageSource*>(argv[2].u)->Dump(0);
+    reinterpret_cast<PageSource*>(argv[2].u)->Dump(0, UINT32_MAX);
   } else {
     printf("unknown command\n");
     goto usage;

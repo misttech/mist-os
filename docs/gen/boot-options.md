@@ -486,6 +486,14 @@ fatal page fault exception. For a software page fault triggered by a syscall,
 the syscall will fail with `ZX_ERR_TIMED_OUT`. A value of 0 indicates a page
 fault is never aborted due to a time out.
 
+### kernel.userpager.overtime_printout_limit=\<uint32_t>
+
+**Default:** `0x4`
+
+This options configures the maximum number of outstanding requests to emit to the debuglog when
+reporting an overtime condition. If there are a large number of outstanding requests, the details of
+all of them may not be useful, and can overload the debuglog.
+
 ### kernel.heap-max-size-mb=\<uint64_t>
 
 **Default:** `0x800`

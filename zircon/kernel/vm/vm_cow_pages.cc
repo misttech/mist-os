@@ -1379,7 +1379,7 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
       printf("  ");
     }
     printf("page_source preserves content %d\n", is_source_preserving_page_content());
-    page_source_->Dump(depth + 1);
+    page_source_->Dump(depth + 1, UINT32_MAX);
   }
 
   if (verbose) {

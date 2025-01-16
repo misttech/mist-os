@@ -74,6 +74,7 @@ zx_library("object") {
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/counters",
     "//zircon/kernel/lib/crashlog",
+    "//zircon/kernel/lib/dump",
     "//zircon/kernel/lib/fbl",
     "//zircon/kernel/lib/init",
     "//zircon/kernel/lib/kconcurrent",

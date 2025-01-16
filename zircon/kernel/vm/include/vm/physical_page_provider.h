@@ -50,7 +50,7 @@ class PhysicalPageProvider : public PageProvider {
   // to process all the requests in pending_requests_.
   zx_status_t WaitOnEvent(Event* event) final;
 
-  void Dump(uint depth) final;
+  void Dump(uint depth, uint32_t max_items) final;
 
   bool SupportsPageRequestType(page_request_type type) const final;
 

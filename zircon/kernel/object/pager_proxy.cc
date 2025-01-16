@@ -6,6 +6,7 @@
 
 #include <lib/boot-options/boot-options.h>
 #include <lib/counters.h>
+#include <lib/dump/depth_printer.h>
 #include <trace.h>
 #include <zircon/syscalls-next.h>
 
@@ -337,28 +338,36 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event) {
         waited * gBootOptions->userpager_overtime_wait_seconds >=
             gBootOptions->userpager_overtime_timeout_seconds) {
       Guard<Mutex> guard{&mtx_};
-      printf("ERROR Page source %p has been blocked for %" PRIu64
-             " seconds. Page request timed out.\n",
+      printf("ERROR Page source %p blocked for %" PRIu64 " seconds. Page request timed out.\n",
              page_source_.get(), gBootOptions->userpager_overtime_timeout_seconds);
       Thread::Current::Dump(false);
       kcounter_add(dispatcher_pager_timed_out_request_count, 1);
       return ZX_ERR_TIMED_OUT;
     }
 
-    // Determine whether we have any requests that have not yet been received off of the port.
+    // Do an informational printout of the source and ourselves if the overtime period has elapsed.
     fbl::RefPtr<PageSource> src;
-    bool active;
+    bool do_printout = false;
     {
       Guard<Mutex> guard{&mtx_};
-      active = !!active_request_;
       src = page_source_;
+      const zx_instant_mono_t now = current_mono_time();
+      if (now >= zx_time_add_duration(last_overtime_dump_,
+                                      ZX_SEC(gBootOptions->userpager_overtime_wait_seconds))) {
+        do_printout = true;
+        last_overtime_dump_ = now;
+      }
     }
-    printf("WARNING Page source %p has been blocked for %" PRIu64
-           " seconds with%s message waiting on port.\n",
-           src.get(), waited * gBootOptions->userpager_overtime_wait_seconds, active ? "" : " no");
-    // Dump out the rest of the state of the oustanding requests.
-    if (src) {
-      src->Dump(0);
+    printf("WARNING Page source %p blocked for %" PRIu64 " seconds on event %p. %s\n", src.get(),
+           waited * gBootOptions->userpager_overtime_wait_seconds, event,
+           do_printout ? "Dump:" : "Dump skipped.");
+    // Dump out the rest of the state of the outstanding requests.
+    if (do_printout) {
+      Dump(0, gBootOptions->userpager_overtime_printout_limit);
+      if (src) {
+        // Use DumpSelf to avoid it calling our Dump method that we already performed.
+        src->DumpSelf(0, gBootOptions->userpager_overtime_printout_limit);
+      }
     }
   }
 
@@ -374,47 +383,35 @@ zx_status_t PagerProxy::WaitOnEvent(Event* event) {
   return result;
 }
 
-void PagerProxy::Dump(uint depth) {
+void PagerProxy::Dump(uint depth, uint32_t max_items) {
   Guard<Mutex> guard{&mtx_};
-  for (uint i = 0; i < depth; ++i) {
-    printf("  ");
-  }
-  printf("pager_proxy %p pager_dispatcher %p page_source %p key %lu\n", this, pager_,
-         page_source_.get(), key_);
+  dump::DepthPrinter printer(depth);
+  printer.Emit("pager_proxy %p pager_dispatcher %p page_source %p key %lu", this, pager_,
+               page_source_.get(), key_);
 
-  for (uint i = 0; i < depth; ++i) {
-    printf("  ");
-  }
-  printf("  source closed %d pager closed %d packet_busy %d complete_pending %d\n",
-         page_source_closed_, pager_dispatcher_closed_, packet_busy_, complete_pending_);
+  printer.Emit("  source closed %d pager closed %d packet_busy %d complete_pending %d",
+               page_source_closed_, pager_dispatcher_closed_, packet_busy_, complete_pending_);
 
-  for (uint i = 0; i < depth; ++i) {
-    printf("  ");
-  }
   if (active_request_) {
-    printf("  active %s request on pager port [0x%lx, 0x%lx) (port koid 0x%lx)\n",
-           PageRequestTypeToString(GetRequestType(active_request_)),
-           GetRequestOffset(active_request_),
-           GetRequestOffset(active_request_) + GetRequestLen(active_request_),
-           port_.get()->get_koid());
+    printer.Emit("  active %s request on pager port [0x%lx, 0x%lx) (port koid 0x%lx)",
+                 PageRequestTypeToString(GetRequestType(active_request_)),
+                 GetRequestOffset(active_request_),
+                 GetRequestOffset(active_request_) + GetRequestLen(active_request_),
+                 port_.get()->get_koid());
   } else {
-    printf("  no active request on pager port\n");
+    printer.Emit("  no active request on pager port");
   }
 
   if (pending_requests_.is_empty()) {
-    for (uint i = 0; i < depth; ++i) {
-      printf("  ");
-    }
-    printf("  no pending requests to queue on pager port\n");
+    printer.Emit("  no pending requests to queue on pager port");
     return;
   }
 
+  printer.BeginList(max_items);
   for (auto& req : pending_requests_) {
-    for (uint i = 0; i < depth; ++i) {
-      printf("  ");
-    }
-    printf("  pending %s req to queue on pager port [0x%lx, 0x%lx)\n",
-           PageRequestTypeToString(GetRequestType(&req)), GetRequestOffset(&req),
-           GetRequestOffset(&req) + GetRequestLen(&req));
+    printer.Emit("  pending %s req to queue on pager port [0x%lx, 0x%lx)",
+                 PageRequestTypeToString(GetRequestType(&req)), GetRequestOffset(&req),
+                 GetRequestOffset(&req) + GetRequestLen(&req));
   }
+  printer.EndList();
 }

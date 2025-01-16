@@ -54,7 +54,7 @@ class PagerProxy : public PageProvider,
   void OnClose() final;
   void OnDetach() final;
   zx_status_t WaitOnEvent(Event* event) final;
-  void Dump(uint depth) final;
+  void Dump(uint depth, uint32_t max_items) final;
   bool SupportsPageRequestType(page_request_type type) const final {
     if (type == page_request_type::READ) {
       return true;
@@ -125,6 +125,11 @@ class PagerProxy : public PageProvider,
   // deletion doesn't happen whilst port packets are queued. The cycle will be explicitly cut during
   // the graceful destruction triggered by OnDispatcherClose or OnClose.
   fbl::RefPtr<PageSource> page_source_ TA_GUARDED(mtx_);
+
+  // Timestamp of the last time an overtime page request triggered an informational dump. This is
+  // used to prevent multiple overtime requests on the same PagerProxy from all redundantly
+  // triggering the same informational dump and spamming the debuglog.
+  zx_instant_mono_t last_overtime_dump_ TA_GUARDED(mtx_) = ZX_TIME_INFINITE_PAST;
 };
 
 #endif  // ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_PAGER_PROXY_H_

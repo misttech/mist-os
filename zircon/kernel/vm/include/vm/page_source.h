@@ -171,8 +171,9 @@ class PageProvider : public fbl::RefCounted<PageProvider> {
   // Waits on an |event| associated with a page request.
   virtual zx_status_t WaitOnEvent(Event* event) = 0;
 
-  // Dumps relevant state for debugging purposes.
-  virtual void Dump(uint depth) = 0;
+  // Dumps relevant state for debugging purposes. The |max_items| parameter should be used to cap
+  // the number of elements printed from any kind of variable sized list to prevent spam.
+  virtual void Dump(uint depth, uint max_items) = 0;
 
   // Whether the provider supports the |type| of page request. Controls which requests can be safely
   // forwarded to the provider.
@@ -337,7 +338,12 @@ class PageSource final : public PageRequestInterface {
   // The returned properties will last at least until Detach() or Close().
   const PageSourceProperties& properties() const { return page_provider_properties_; }
 
-  void Dump(uint depth) const;
+  // Prints state of the page source and any pending requests. The maximum number of requests
+  // printed is capped by |max_items|.
+  void Dump(uint depth, uint32_t max_items) const;
+  // Similar to Dump, but only dumps information about this exact object, and will not forward the
+  // Dump request to the related PageProvider.
+  void DumpSelf(uint depth, uint32_t max_items) const;
 
   bool is_detached() const {
     Guard<Mutex> guard{&page_source_mtx_};
