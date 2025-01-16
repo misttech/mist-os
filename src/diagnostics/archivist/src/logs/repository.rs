@@ -556,7 +556,7 @@ mod tests {
         drop(stream);
         loop {
             fasync::Timer::new(Duration::from_millis(100)).await;
-            if repo.mutable_state.lock().logs_multiplexers.live_iterators.lock().len() == 0 {
+            if repo.mutable_state.lock().logs_multiplexers.live_iterators.lock().is_empty() {
                 break;
             }
         }

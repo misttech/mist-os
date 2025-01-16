@@ -177,7 +177,7 @@ fn create_tee_clients(
             component_url
                 .resource()
                 .split('/')
-                .last()
+                .next_back()
                 .ok_or_else(|| anyhow!("no resource name: {}", component_url.resource()))?
                 .split('.')
                 .next()

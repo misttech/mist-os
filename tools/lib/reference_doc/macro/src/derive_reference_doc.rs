@@ -274,7 +274,7 @@ impl ToTokens for ReferenceDocFieldAttributes {
 /// Returns true if the outer type in `p` is equal to `str`. For example, for
 /// a type such as a::b::Option, this function will return true if `rhs == "Option"`.
 fn outer_type_ident_eq(p: &syn::TypePath, rhs: &str) -> bool {
-    p.path.segments.iter().last().unwrap().ident == rhs
+    p.path.segments.iter().next_back().unwrap().ident == rhs
 }
 
 /// Extracts a TypePath from a syn::Type, and panics for anything else.
@@ -423,7 +423,7 @@ fn trim_first_space(str: &str) -> String {
 }
 
 fn get_last_markdown_header_depth(s: &str) -> usize {
-    let last = s.split('\n').filter(|s| s.starts_with('#')).last();
+    let last = s.split('\n').filter(|s| s.starts_with('#')).next_back();
     last.map(|h| h.chars().take_while(|c| c == &'#').count()).unwrap_or(0)
 }
 

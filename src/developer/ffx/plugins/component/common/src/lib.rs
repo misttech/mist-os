@@ -19,7 +19,7 @@ pub fn parse_component_url(url: &str) -> Result<AbsoluteComponentUrl> {
     let manifest = url
         .resource()
         .split('/')
-        .last()
+        .next_back()
         .ok_or(ffx_error!("Could not extract manifest filename from URL"))?;
 
     if let Some(_) = manifest.strip_suffix(".cm") {

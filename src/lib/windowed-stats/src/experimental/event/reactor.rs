@@ -430,7 +430,7 @@ where
              .0
             .iter_mut()
             .map(|reactor| reactor.react(event.clone()))
-            .last()
+            .next_back()
             .expect("empty `then` combinator")
     }
 }
