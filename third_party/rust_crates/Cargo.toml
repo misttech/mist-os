@@ -22,7 +22,7 @@ name = "fuchsia-third-party"
 version = "0.1.0"
 
 [dependencies]
-# Keep this sorted alphabetically, please.
+# keep-sorted start
 aead = { version = "0.4.2", features = ["std"] }
 aes = "0.8.4"
 aes-gcm = "0.10.1"
@@ -44,16 +44,18 @@ async-trait = "0.1.71"
 atty = "0.2.11"
 base64 = "0.22.1"
 bincode = "1.3"
-bitfield = "0.14.0"
-bitflags = { version = "2.7.0", features = ["serde"] }
 bit-set = "0.5.3"
 bit-vec = { version = "0.6.3", features = [ "serde" ] }
+bitfield = "0.14.0"
+bitflags = { version = "2.7.0", features = ["serde"] }
 blocking = "1.0.2"
 bstr = { version = "1.5.0", default-features = false, features = [ "std" ] }
 bumpalo = { version = "3.2.1", features = [ "collections" ] }
 byteorder = { version = "1.4.3", features = ["i128"] }
 bytes = "1.6.0"
 camino = { version = "1.1.1", features = ["proptest1", "serde1"] }
+cfg-if = "1.0.0"
+chacha20 = "0.9.0"
 # NB: morally we'd like to default-features = false here, but we have
 # transitive dependencies on this crate that *do* enable default features.
 # Cargo does something called "feature unification"
@@ -78,8 +80,6 @@ crc = "1.8.1"
 criterion = { version = "0.2", default-features = false }
 crossbeam = "0.8.0"
 crossbeam-utils = "0.8.14"
-cfg-if = "1.0.0"
-chacha20 = "0.9.0"
 csv = "1.2.1"
 darling = "0.20.10"
 data-encoding = "2.1.2"
@@ -91,8 +91,8 @@ digest = "0.10.7"
 downcast-rs = "1.2.0"
 dyn-clone = "1.0.5"
 ecdsa = { version = "0.14.3", features = ["pkcs8"] }
-elliptic-curve = { version = "0.12.3", features = [ "ecdh" ] }
 either = "1.13.0"
+elliptic-curve = { version = "0.12.3", features = [ "ecdh" ] }
 eui48 = { version = "1.1.0", default-features = false, features = ["serde", "disp_hexstring"] }
 event-listener = "5.3.1"
 # TODO(https://fxbug.dev/112722): We're importing this explicitly for now, but eventually
@@ -117,11 +117,11 @@ half = "1.6.0"
 handlebars = "4.3.5"
 heck = "0.3.1"
 hex = { version = "0.4.3", features = ["serde"] }
-hmac = "0.12.1"
 hkdf = "0.12.3"
+hmac = "0.12.1"
 hound = "3.5.0"
-humansize = "1.1.1"
 http = "0.2.4"
+humansize = "1.1.1"
 # TODO(https://fxbug.dev/100964): We intentionally did not enable http2, since we're
 # currently not using it on Fuchsia. Please see this ticket if you want to
 # enable it.
@@ -138,8 +138,8 @@ linked-hash-map = "0.5.3"
 lock_api = "0.4.11"
 log = { version = "0.4.22", features = ["kv", "std"] }
 lru-cache = "0.1.2"
-maplit = "1.0"
 macro_rules_attribute = "0.1.3"
+maplit = "1.0"
 maybe-owned = "0.3.2"
 md-5 = "0.10.5"
 memchr = "2.7.1"
@@ -151,15 +151,14 @@ munge = "0.4.1"
 nix = { version = "0.29.0", features = ["feature", "fs", "hostname", "net", "process", "signal", "user"] }
 nom = { version = "7.1.3", default-features = false, features = ["std"] }
 nom_locate = "4.2.0"
+nu-ansi-term = "0.46.0"
 num = { version = "0.4.0", features = ["rand"] }
 num-derive = "0.4.2"
 num-traits = "0.2.18"
 omaha_client = "0.2"
 once_cell = "1.20.2"
-nu-ansi-term = "0.46.0"
 overload = "0.1.1"
 p256 = { version = "0.11.1", features = ["pem", "serde"] }
-pkcs8 = "0.9.0"
 paste = "1.0"
 pathdiff = { version = "0.2.1", features = ["camino"] }
 pem = "0.8.3"
@@ -168,6 +167,7 @@ pest = "2.7.8"
 pest_derive = "2.7.8"
 pin-project = "1.0.11"
 pin-project-lite = "0.2.13"
+pkcs8 = "0.9.0"
 png = "0.14" # saved for future use
 pretty = "0.5.2"
 pretty_assertions = "1.2.1"
@@ -191,9 +191,6 @@ rustls-pemfile = "1.0.4"
 rustls-webpki = "0.101.6"
 rustyline = "2.1.0"
 rutabaga_gfx = { version = "0.1.3", features = ["gfxstream"] }
-# TODO(https://fxbug.dev/385403698): add a visibility allowlist to prevent unintended usage when
-# targetting fuchsia.
-simplelog = "0.10.2"
 schemars = { version = "0.8", features = ["chrono", "preserve_order"] }
 scopeguard = "1.1.0"
 scrypt = "0.10.0"
@@ -206,6 +203,9 @@ serde_repr = "0.1.7"
 sha1 = "0.10.5"
 sha2 = "0.10.2"
 signature =  "1.4.0"
+# TODO(https://fxbug.dev/385403698): add a visibility allowlist to prevent unintended usage when
+# targetting fuchsia.
+simplelog = "0.10.2"
 siphasher = "0.3.10"
 slab = "0.4.7"
 smallvec = {version= "1.13.1", features = ["const_generics", "const_new", "union"]}
@@ -217,9 +217,8 @@ structopt = "0.2.14"
 strum = "0.25.0"
 strum_macros = "0.25.3"
 tempfile = "3.2"
-termtree = "0.4.1"
-tuf = { version = "=0.3.0-beta12", default-features = false, features = ["hyper"] }
 termion = "1.5.3"
+termtree = "0.4.1"
 test-case = "3.2.1"
 textwrap = "0.11.0"
 thiserror = "1.0.57"
@@ -230,25 +229,27 @@ tracing = { version = "0.1.40", default-features = false, features = ["std", "at
 tracing-core = "0.1.32"
 tracing-log = "0.2.0"
 tracing-mutex = { version = "0.3.0", features = ["lockapi", "parkinglot"] }
+tuf = { version = "=0.3.0-beta12", default-features = false, features = ["hyper"] }
 typed-builder = "0.10.0"
-unicase = "2.7.0"
-untrusted = "0.7.1"
-url = "2.3"
-uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
-valico = "2.4.2"
-vte = "0.3"
-xml-rs = "0.8"
 unic-char-range = "0.9"
 unic-ucd-block = "0.9"
+unicase = "2.7.0"
 unicode-segmentation = "1.10"
 unicode-width = "0.1.3"
 unicode-xid = "0.2.0"
+untrusted = "0.7.1"
+url = "2.3"
 utf8parse = "0.1"
+uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
+valico = "2.4.2"
 vm-device = "0.1.0"
+vte = "0.3"
 walkdir = "2.2.7"
 which = "4.0.2"
+xml-rs = "0.8"
 zerocopy = { version = "0.8.1", features = ["derive", "simd"] }
 zstd = "0.11.2"
+# keep-sorted end
 
 [dependencies.tracing-subscriber]
 version = "0.3.18"
@@ -257,6 +258,7 @@ features = ["ansi", "env-filter", "fmt", "registry", "std", "tracing-log"]
 
 # Target-side only dependencies
 [target.'cfg(target_os = "fuchsia")'.dependencies]
+# keep-sorted start
 # do not add back without verifying certificate transparency is ready to use - see https://fxbug.dev/25100
 # ct-logs = "0.6"
 euclid = { version = "0.22.1", features = [ "serde" ] }
@@ -280,9 +282,11 @@ trust-dns-resolver = { version = "0.22.0", default-features = false, features = 
 ttf-parser = "0.10.1"
 unicode-normalization = "0.1"
 vk-sys = "0.7.0"
+# keep-sorted end
 
 # Host-side only dependencies
 [target.'cfg(not(target_os = "fuchsia"))'.dependencies]
+# keep-sorted start
 askama = { version = "0.12.1", default-features = false, features = ["config"] }
 async-executor = "1.5.0"
 async-fs = "1.6.0"
@@ -327,16 +331,19 @@ tokio = { version = "=1.38.1", default-features = false }
 tokio-stream = "0.1.14"
 wait-timeout = "0.2.0"
 zip = { version = "0.5.5", default-features = false, features = ["deflate"] }
+# keep-sorted end
 
 # For crates we don't want to vendor, follow instructions at
 # //docs/development/languages/rust/external_crates.md.
 [patch.crates-io]
-# Keep each section sorted alphabetically, please.
 
 ### In-tree Crates: crates which are on crates.io but which we build from our in-tree copy
+# keep-sorted start
 fuchsia-cprng = { path = "intree/fuchsia-cprng" }
+# keep-sorted end
 
 ### Ask to Patch: crates which require a policy exception to contribute to.
+# keep-sorted start
 aho-corasick = { path = "ask2patch/aho-corasick" }
 byteorder = { path = "ask2patch/byteorder" }
 csv = { path = "ask2patch/csv" }
@@ -346,8 +353,10 @@ regex-automata = { path = "ask2patch/regex-automata" }
 same-file = { path = "ask2patch/same-file" }
 termcolor = { path = "ask2patch/termcolor" }
 walkdir = { path = "ask2patch/walkdir" }
+# keep-sorted end
 
 ### Empty Forks: empty forks kept only for satisfying cargo's resolution
+# keep-sorted start
 android-tzdata = { path = "empty/android-tzdata" }
 android_system_properties = { path = "empty/android_system_properties" }
 backtrace = { path = "empty/backtrace" }
@@ -378,8 +387,10 @@ windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0
 windows-sys-0_52_0 = { package = "windows-sys", path = "empty/windows-sys-0.52.0" }
 windows-targets-0_48_5 = { package = "windows-targets", path = "empty/windows-targets-0.48.5" }
 windows-targets-0_52_0 = { package = "windows-targets", path = "empty/windows-targets-0.52.0" }
+# keep-sorted end
 
 ### Forks: vendored crates whose code doesn't match the upstream version
+# keep-sorted start
 askama_derive = { path = "forks/askama_derive" }
 fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
@@ -395,9 +406,12 @@ security-framework = { path = "forks/security-framework" }
 tracing-core = { path = "forks/tracing-core" }
 zeroize = { path = "forks/zeroize" }
 zstd-sys = { path = "forks/zstd-sys" }
+# keep-sorted end
 
 ### Mirrors: forked crates managed as separate git repos
+# keep-sorted start
 serde_json5 = { path = "mirrors/serde_json5" } # TODO(https://fxbug.dev/75491) remove
+# keep-sorted end
 
 #################################################################################
 ###                            Cargo GNaw Configs                             ###
