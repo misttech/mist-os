@@ -1062,7 +1062,9 @@ impl Netstack {
             interfaces_admin::OwnedControlHandle::new_channel();
         let loopback_rx_notifier = Default::default();
 
-        let binding_id = devices.alloc_new_id();
+        let (binding_id, binding_id_alloc) = devices
+            .try_reserve_name_and_alloc_new_id(LOOPBACK_NAME.to_string())
+            .expect("loopback device should only be added once");
         let events = self.create_interface_event_producer(
             binding_id,
             InterfaceProperties {
@@ -1094,9 +1096,8 @@ impl Netstack {
             loopback.external_state();
         let rx_task =
             crate::bindings::devices::spawn_rx_task(rx_notifier, self.ctx.clone(), &loopback);
-        let binding_id = loopback.bindings_id().id;
         let loopback: DeviceId<_> = loopback.into();
-        self.ctx.bindings_ctx().devices.add_device(binding_id, loopback.clone());
+        self.ctx.bindings_ctx().devices.add_device(binding_id_alloc, loopback.clone());
 
         // Don't need DAD and IGMP/MLD on loopback.
         let ip_config = IpDeviceConfigurationUpdate {

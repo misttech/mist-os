@@ -468,34 +468,31 @@ impl DeviceHandler {
         };
         let Netstack { interfaces_event_sink, neighbor_event_sink, ctx } = ns;
 
-        // Check if there already exists an interface with this name.
-        // Interface names are unique.
-        let name = name
-            .map(|name| {
-                if let Some(_device_info) = ctx.bindings_ctx().devices.get_device_by_name(&name) {
-                    return Err(Error::DuplicateName(name));
-                };
-                Ok(name)
-            })
-            .transpose()?;
-
         let max_frame_size =
             mtu.try_into().map_err(|TryFromIntError { .. }| Error::ConfigurationNotSupported)?;
 
         let port_class = fnet_interfaces_ext::PortClass::try_from(hw_port_class)
             .map_err(Error::InvalidPortClass)?;
 
+        let (binding_id, binding_id_alloc, name) = match name {
+            None => ctx.bindings_ctx().devices.generate_and_reserve_name_and_alloc_new_id(
+                match wire_format {
+                    PortWireFormat::Ethernet => "eth",
+                    PortWireFormat::Ip => "ip",
+                },
+            ),
+            Some(name) => {
+                match ctx.bindings_ctx().devices.try_reserve_name_and_alloc_new_id(name.clone()) {
+                    Err(devices::NameNotAvailableError) => return Err(Error::DuplicateName(name)),
+                    Ok((id, alloc)) => (id, alloc, name),
+                }
+            }
+        };
+
         // Do the rest of the work in a closure so we don't accidentally add
         // errors after the binding ID is already allocated. This part of the
         // function should be infallible.
         let finalize = move || async move {
-            let binding_id = ctx.bindings_ctx().devices.alloc_new_id();
-
-            let name = name.unwrap_or_else(|| match wire_format {
-                PortWireFormat::Ethernet => format!("eth{}", binding_id),
-                PortWireFormat::Ip => format!("ip{}", binding_id),
-            });
-
             let tx_notifier = NeedsDataNotifier::default();
             let tx_watcher = tx_notifier.watcher();
             let static_netdevice_info = devices::StaticNetdeviceInfo {
@@ -629,7 +626,7 @@ impl DeviceHandler {
                 .unwrap();
 
             info!("created interface {:?}", core_id);
-            ctx.bindings_ctx().devices.add_device(binding_id, core_id);
+            ctx.bindings_ctx().devices.add_device(binding_id_alloc, core_id);
 
             (binding_id, tx_task)
         };
