@@ -417,6 +417,9 @@ eng_only_platform_aib_names =
       # Sensors support with playback.
       "sensors_framework_eng",
 
+      # Fake power sensor
+      "fake_power_sensor",
+
       # Bluetooth testing support
       "bluetooth_pandora",
 

@@ -10,4 +10,12 @@
             environment: "#core-env",
         },
     ],
+    offer: [
+        {
+            service: "fuchsia.hardware.sensors.Service",
+            from: "parent",
+            to: "#sensors",
+            availability: "optional",
+        },
+    ],
 }

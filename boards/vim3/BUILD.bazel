@@ -132,6 +132,7 @@ _COMMON_PROVIDED_FEATURES = [
     "fuchsia::bt_transport_uart",
     "fuchsia::bus_pci",
     "fuchsia::fake_battery",
+    "fuchsia::fake_power_sensor",
     "fuchsia::fan",
     "fuchsia::mali_gpu",
     "fuchsia::paver",

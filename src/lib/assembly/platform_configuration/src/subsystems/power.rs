@@ -182,6 +182,14 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
             }
         }
 
+        // Include fake-power-sensor through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::fake_power_sensor")
+            && *context.feature_set_level == FeatureSupportLevel::Standard
+            && *context.build_type == BuildType::Eng
+        {
+            builder.platform_bundle("fake_power_sensor");
+        }
+
         Ok(())
     }
 }

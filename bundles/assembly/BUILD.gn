@@ -542,6 +542,22 @@ assembly_input_bundle("fake_battery_driver") {
   ]
 }
 
+# AIB for the fake-powersensor driver
+assembly_input_bundle("fake_power_sensor") {
+  base_packages = [ "//src/power/fake-powersensor:fake_power_sensor_package" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/power/fake-powersensor/meta/fake-power-sensor.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # AIB for the sdhci driver
 assembly_input_bundle("sdhci_driver") {
   boot_driver_packages = [
