@@ -278,6 +278,11 @@ func testDetailsToResultSink(tags []*resultpb.StringPair, testDetail *runtests.T
 	}
 
 	r.Expected = determineExpected(testStatus, resultpb.TestStatus_STATUS_UNSPECIFIED)
+	if testDetail.FailureReason != "" {
+		r.FailureReason = &resultpb.FailureReason{
+			PrimaryErrorMessage: testDetail.FailureReason,
+		}
+	}
 	return &r, testsSkipped, nil
 }
 

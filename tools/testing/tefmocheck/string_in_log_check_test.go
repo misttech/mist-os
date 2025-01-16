@@ -18,6 +18,7 @@ import (
 func TestCheck(t *testing.T) {
 	const killerString = "KILLER STRING"
 	const exceptString = "Don't die!"
+	const line = "KILLER STRING: Something failed."
 	exceptBlock := &logBlock{
 		startString: "skip_test",
 		endString:   "end_test",
@@ -55,6 +56,7 @@ func TestCheck(t *testing.T) {
 		shouldMatch         bool
 		wantName            string
 		wantFlake           bool
+		wantLine            string
 		wantTags            []build.TestTag
 	}{
 		{
@@ -63,6 +65,22 @@ func TestCheck(t *testing.T) {
 				SwarmingOutput: []byte(fmt.Sprintf("PREFIX %s SUFFIX", killerString)),
 			},
 			shouldMatch: true,
+		},
+		{
+			name: "should match with failure reason",
+			testingOutputs: TestingOutputs{
+				SwarmingOutput: []byte(fmt.Sprintf("1\n2\n%s\n4\n5\n", line)),
+			},
+			shouldMatch: true,
+			wantLine:    line,
+		},
+		{
+			name: "should match if string before except_block and return failure reason",
+			testingOutputs: TestingOutputs{
+				SwarmingOutput: []byte(fmt.Sprintf("%s\n%s\n%s", exceptBlock.startString, exceptBlock.endString, line)),
+			},
+			shouldMatch: true,
+			wantLine:    line,
 		},
 		{
 			name: "exceptSuccessfulSwarmingResult",
@@ -621,6 +639,9 @@ func TestCheck(t *testing.T) {
 			}
 			if tc.wantFlake != c.IsFlake() {
 				t.Errorf("c.IsFlake() returned %t, expected %t", c.IsFlake(), tc.wantFlake)
+			}
+			if tc.wantLine != "" && tc.wantLine != c.line {
+				t.Errorf("Got line %s, expected %s", c.line, tc.wantLine)
 			}
 		})
 	}

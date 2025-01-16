@@ -56,6 +56,8 @@ type FailureModeCheck interface {
 	// IsInfraFailure is true if the check is a result of an
 	// infrastructure failure.
 	IsInfraFailure() bool
+	// FailureReason is the human-readable error message.
+	FailureReason() string
 }
 
 // baseCheck provides default implementations of the FailureModeCheck interface.
@@ -89,4 +91,8 @@ func (c baseCheck) Tags() []build.TestTag {
 
 func (c baseCheck) IsInfraFailure() bool {
 	return false
+}
+
+func (c baseCheck) FailureReason() string {
+	return ""
 }

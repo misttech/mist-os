@@ -111,6 +111,9 @@ type TestDetails struct {
 
 	// Tags contain test metadata.
 	Tags []build.TestTag `json:"tags"`
+
+	// FailureReason is an optional human-readable error message or explanation of the failure.
+	FailureReason string `json:"error_line,omitempty"`
 }
 
 // TestCaseResult contains the details of a single test case, nested within a
