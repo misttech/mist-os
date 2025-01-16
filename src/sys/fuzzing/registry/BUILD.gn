@@ -38,7 +38,12 @@ rustc_binary("bin") {
 
 fuchsia_component("registry") {
   component_name = "fuzz-registry"
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/sys/fuzzing:*",
+    "//src/sys/fuzzing/registry/tests:*",
+    "//src/sys/test_runners/fuzz/tests:*",
+  ]
   testonly = true
   manifest = "meta/fuzz-registry.cml"
   deps = [ ":bin" ]
