@@ -35,15 +35,22 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
-namespace sysmem2 = fuchsia_sysmem2;
-
 namespace display_coordinator {
 
 class IntegrationTest : public TestBase {
  public:
+  // Configures the VSync event delivery check in `IsClientActive()`.
+  enum class VsyncCheck : bool {
+    // The client may or may not be receiving VSync events.
+    kNoCheck = false,
+
+    // The client is receiving VSync events.
+    kVsyncEnabled = true,
+  };
+
   // Returns -1 if no display exists with the given ID.
   int64_t DisplayLayerCount(display::DisplayId id) {
-    fbl::AutoLock lock(CoordinatorController()->mtx());
+    fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
     auto displays_it = CoordinatorController()->displays_.find(id);
     if (!displays_it.IsValid()) {
       return -1;
@@ -51,32 +58,57 @@ class IntegrationTest : public TestBase {
     return int64_t{displays_it->layer_count};
   }
 
-  bool primary_client_connected() {
-    fbl::AutoLock l(CoordinatorController()->mtx());
-    if (!CoordinatorController()->primary_client_) {
+  // Returns null if there is no client connected at `client_priority`.
+  static ClientProxy* GetClientProxy(Controller& coordinator_controller,
+                                     ClientPriority client_priority)
+      __TA_REQUIRES(coordinator_controller.mtx()) {
+    switch (client_priority) {
+      case ClientPriority::kPrimary:
+        return coordinator_controller.primary_client_;
+      case ClientPriority::kVirtcon:
+        return coordinator_controller.virtcon_client_;
+    }
+    ZX_DEBUG_ASSERT_MSG(false, "Unimplemtened client priority: %d",
+                        static_cast<int>(client_priority));
+    return nullptr;
+  }
+
+  // True iff `client_priority` is the display coordinator's active client
+  // and the client's Vsync delivery configuration matches `vsync_check`.
+  bool IsClientActive(ClientPriority client_priority,
+                      VsyncCheck vsync_check = VsyncCheck::kVsyncEnabled) {
+    Controller& coordinator_controller = *CoordinatorController();
+    fbl::AutoLock<fbl::Mutex> controller_lock(coordinator_controller.mtx());
+    ClientProxy* client_proxy = GetClientProxy(coordinator_controller, client_priority);
+    if (client_proxy == nullptr) {
       return false;
     }
-    fbl::AutoLock cl(&CoordinatorController()->primary_client_->mtx_);
-    return (CoordinatorController()->primary_client_ == CoordinatorController()->active_client_ &&
-            // DC processed the SetVsyncEventDelivery request. We can now expect VSync events.
-            CoordinatorController()->primary_client_->vsync_delivery_enabled_);
+    if (coordinator_controller.active_client_ != client_proxy) {
+      return false;
+    }
+
+    if (vsync_check == VsyncCheck::kVsyncEnabled) {
+      fbl::AutoLock<fbl::Mutex> client_proxy_lock(&client_proxy->mtx_);
+      if (!client_proxy->vsync_delivery_enabled_) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
-  bool virtcon_client_connected() {
-    fbl::AutoLock l(CoordinatorController()->mtx());
-    return (CoordinatorController()->virtcon_client_ != nullptr &&
-            CoordinatorController()->virtcon_client_ == CoordinatorController()->active_client_);
-  }
+  display::VsyncAckCookie MostRecentAckedCookie(ClientPriority client_priority) {
+    Controller& coordinator_controller = *CoordinatorController();
+    fbl::AutoLock<fbl::Mutex> controller_lock(coordinator_controller.mtx());
+    ClientProxy* client_proxy = GetClientProxy(coordinator_controller, client_priority);
+    ZX_ASSERT(client_proxy != nullptr);
 
-  bool vsync_acknowledge_delivered(display::VsyncAckCookie vsync_ack_cookie) {
-    fbl::AutoLock l(CoordinatorController()->mtx());
-    fbl::AutoLock cl(&CoordinatorController()->primary_client_->mtx_);
-    return CoordinatorController()->primary_client_->handler_.LatestAckedCookie() ==
-           vsync_ack_cookie;
+    fbl::AutoLock<fbl::Mutex> client_proxy_lock(&client_proxy->mtx_);
+    return client_proxy->handler_.LatestAckedCookie();
   }
 
   void SendVsyncAfterUnbind(std::unique_ptr<TestFidlClient> client, display::DisplayId display_id) {
-    fbl::AutoLock l(CoordinatorController()->mtx());
+    fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
     // Resetting the client will *start* client tear down.
     //
     // ~MockCoordinatorListener fences the server-side dispatcher thread (consistent with the
@@ -90,44 +122,41 @@ class IntegrationTest : public TestBase {
     client_ptr->OnDisplayVsync(display_id, 0, display::kInvalidConfigStamp);
   }
 
-  bool primary_client_dead() {
-    fbl::AutoLock l(CoordinatorController()->mtx());
-    return CoordinatorController()->primary_client_ == nullptr;
+  bool IsClientConnected(ClientPriority client_priority) {
+    Controller& coordinator_controller = *CoordinatorController();
+    fbl::AutoLock<fbl::Mutex> controller_lock(coordinator_controller.mtx());
+    return GetClientProxy(coordinator_controller, client_priority) != nullptr;
   }
 
-  bool virtcon_client_dead() {
-    fbl::AutoLock l(CoordinatorController()->mtx());
-    return CoordinatorController()->virtcon_client_ == nullptr;
-  }
-
-  void client_proxy_send_vsync() {
-    fbl::AutoLock l(CoordinatorController()->mtx());
+  void SendVsyncFromCoordinatorClientProxy() {
+    fbl::AutoLock<fbl::Mutex> controller_lock(CoordinatorController()->mtx());
     CoordinatorController()->active_client_->OnDisplayVsync(display::kInvalidDisplayId, 0,
                                                             display::kInvalidConfigStamp);
   }
 
-  void SendDisplayVsync() { FakeDisplayEngine().SendVsync(); }
+  void SendVsyncFromDisplayEngine() { FakeDisplayEngine().SendVsync(); }
 
   std::unique_ptr<TestFidlClient> OpenCoordinatorTestFidlClient(
-      const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem,
-      const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
+      const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem_client,
+      const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& display_provider_client,
       ClientPriority client_priority) {
-    auto client = std::make_unique<TestFidlClient>(sysmem_);
+    auto coordinator_client = std::make_unique<TestFidlClient>(sysmem_client_);
     zx::result<> open_coordinator_result =
-        client->OpenCoordinator(provider, client_priority, dispatcher());
+        coordinator_client->OpenCoordinator(display_provider_client, client_priority, dispatcher());
     ZX_ASSERT_MSG(open_coordinator_result.is_ok(), "Failed to open coordinator: %s",
                   open_coordinator_result.status_string());
 
-    bool poll_result = PollUntilOnLoop([&]() { return client->HasOwnershipAndValidDisplay(); });
+    bool poll_result =
+        PollUntilOnLoop([&]() { return coordinator_client->HasOwnershipAndValidDisplay(); });
     ZX_ASSERT_MSG(poll_result,
                   "Failed to wait until client has ownership of the coordinator "
                   "and has a valid display");
 
-    zx::result<> enable_vsync_result = client->EnableVsyncEventDelivery();
-    ZX_ASSERT_MSG(enable_vsync_result.is_ok(), "Failed to enable Vsync for client: %s",
+    zx::result<> enable_vsync_result = coordinator_client->EnableVsyncEventDelivery();
+    ZX_ASSERT_MSG(enable_vsync_result.is_ok(), "Failed to enable Vsync delivery for client: %s",
                   enable_vsync_result.status_string());
 
-    return client;
+    return coordinator_client;
   }
 
   // |TestBase|
@@ -140,37 +169,38 @@ class IntegrationTest : public TestBase {
     request.id() = fsl::GetCurrentProcessKoid();
     auto set_debug_result = sysmem->SetDebugClientInfo(std::move(request));
     EXPECT_TRUE(set_debug_result.is_ok());
-    sysmem_ = fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(sysmem.TakeClientEnd());
+    sysmem_client_ = fidl::WireSyncClient<fuchsia_sysmem2::Allocator>(sysmem.TakeClientEnd());
   }
 
   // |TestBase|
   void TearDown() override {
     // Wait until the display core has processed all client disconnections before sending the last
     // vsync.
-    EXPECT_TRUE(PollUntilOnLoop([&]() { return primary_client_dead(); }));
-    EXPECT_TRUE(PollUntilOnLoop([&]() { return virtcon_client_dead(); }));
+    EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kPrimary); }));
+    EXPECT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kVirtcon); }));
 
     // Send one last vsync, to make sure any blank configs take effect.
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     EXPECT_EQ(0u, CoordinatorController()->TEST_imported_images_count());
     TestBase::TearDown();
   }
 
-  fidl::WireSyncClient<sysmem2::Allocator> sysmem_;
+ protected:
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_client_;
 };
 
 TEST_F(IntegrationTest, DISABLED_ClientsCanBail) {
   for (size_t i = 0; i < 100; i++) {
-    ASSERT_TRUE(PollUntilOnLoop([&]() { return !primary_client_connected(); }));
+    ASSERT_TRUE(PollUntilOnLoop([&]() { return !IsClientActive(ClientPriority::kPrimary); }));
 
-    std::unique_ptr<TestFidlClient> client =
-        OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
+    std::unique_ptr<TestFidlClient> client = OpenCoordinatorTestFidlClient(
+        sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   }
 }
 
 TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
-  std::unique_ptr<TestFidlClient> client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
+  std::unique_ptr<TestFidlClient> client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   zx::event event_a, event_b, event_c;
   ASSERT_OK(zx::event::create(0, &event_a));
   ASSERT_OK(zx::event::create(0, &event_b));
@@ -187,28 +217,29 @@ TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
 }
 
 TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
-  TestFidlClient vc_client(sysmem_);
-  ASSERT_OK(
-      vc_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon, dispatcher()));
+  TestFidlClient virtcon_client(sysmem_client_);
+  ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
+                                           dispatcher()));
   {
-    fbl::AutoLock lock(vc_client.mtx());
+    fbl::AutoLock lock(virtcon_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
     const display::DisplayId virtcon_display_id(1);
-    EXPECT_OK(vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
-    EXPECT_OK(vc_client.dc_->ApplyConfig().status());
+    EXPECT_OK(
+        virtcon_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
+    EXPECT_OK(virtcon_client.dc_->ApplyConfig().status());
   }
 
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // Present an image
   EXPECT_OK(primary_client->PresentLayers());
   ASSERT_TRUE(
       PollUntilOnLoop([&]() { return DisplayLayerCount(primary_client->display_id()) == 1; }));
   uint64_t count = primary_client->vsync_count();
-  SendDisplayVsync();
+  SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->vsync_count() > count; }));
 
   // Set an empty config
@@ -226,12 +257,12 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
 
   // The old client disconnects
   primary_client.reset();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_dead(); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return !IsClientConnected(ClientPriority::kPrimary); }));
 
   // A new client connects
-  primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  primary_client = OpenCoordinatorTestFidlClient(sysmem_client_, DisplayProviderClient(),
+                                                 ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
   // ... and presents before the previous client's empty vsync
   EXPECT_OK(primary_client->PresentLayers());
   ASSERT_TRUE(
@@ -244,30 +275,31 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
 
   // Send a second vsync, using the config the client applied.
   count = primary_client->vsync_count();
-  SendDisplayVsync();
+  SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->vsync_count() > count; }));
 }
 
 TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
-  TestFidlClient vc_client(sysmem_);
-  ASSERT_OK(
-      vc_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon, dispatcher()));
+  TestFidlClient virtcon_client(sysmem_client_);
+  ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
+                                           dispatcher()));
   {
-    fbl::AutoLock lock(vc_client.mtx());
+    fbl::AutoLock lock(virtcon_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
     const display::DisplayId virtcon_display_id(1);
-    EXPECT_OK(vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
-    EXPECT_OK(vc_client.dc_->ApplyConfig().status());
+    EXPECT_OK(
+        virtcon_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
+    EXPECT_OK(virtcon_client.dc_->ApplyConfig().status());
   }
 
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // Present an image
   EXPECT_OK(primary_client->PresentLayers());
-  SendDisplayVsync();
+  SendVsyncFromDisplayEngine();
   ASSERT_TRUE(
       PollUntilOnLoop([&]() { return DisplayLayerCount(primary_client->display_id()) == 1; }));
 
@@ -280,28 +312,28 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
       ToBanjoDisplayId(primary_client->display_id()), 0u, &invalid_banjo_config_stamp);
 
   // Send a second vsync, using the config the client applied.
-  SendDisplayVsync();
+  SendVsyncFromDisplayEngine();
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->vsync_count() == 2; }));
   EXPECT_EQ(2u, primary_client->vsync_count());
 }
 
 TEST_F(IntegrationTest, SendVsyncsAfterClientDies) {
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
   auto id = primary_client->display_id();
   SendVsyncAfterUnbind(std::move(primary_client), id);
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsync) {
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
   EXPECT_EQ(0u, primary_client->vsync_count());
 
   // send vsyncs upto watermark level
   for (uint32_t i = 0; i < ClientProxy::kVsyncMessagesWatermark; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   ASSERT_TRUE(PollUntilOnLoop(
       [&]() { return primary_client->vsync_ack_cookie() != display::kInvalidVsyncAckCookie; }));
@@ -314,19 +346,20 @@ TEST_F(IntegrationTest, AcknowledgeVsync) {
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return MostRecentAckedCookie(ClientPriority::kPrimary) == primary_client->vsync_ack_cookie();
+  }));
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // send vsyncs until max vsync
   uint32_t vsync_count = ClientProxy::kMaxVsyncMessages;
   while (vsync_count--) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   {
     static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages;
@@ -339,7 +372,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
   for (uint32_t i = 0; i < kNumVsync; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
 
@@ -350,11 +383,12 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return MostRecentAckedCookie(ClientPriority::kPrimary) == primary_client->vsync_ack_cookie();
+  }));
 
   // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  client_proxy_send_vsync();
+  SendVsyncFromCoordinatorClientProxy();
   {
     static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages + kNumVsync + 1;
     ASSERT_TRUE(
@@ -364,13 +398,13 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // send vsyncs until max vsyncs
   for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   ASSERT_TRUE(PollUntilOnLoop(
       [&]() { return primary_client->vsync_count() == ClientProxy::kMaxVsyncMessages; }));
@@ -380,7 +414,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
   // At this point, display will not send any more vsync events. Let's confirm by sending a lot
   constexpr uint32_t kNumVsync = ClientProxy::kVsyncBufferSize * 10;
   for (uint32_t i = 0; i < kNumVsync; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
 
@@ -391,11 +425,12 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return MostRecentAckedCookie(ClientPriority::kPrimary) == primary_client->vsync_ack_cookie();
+  }));
 
   // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  client_proxy_send_vsync();
+  SendVsyncFromCoordinatorClientProxy();
   {
     static constexpr uint64_t expected_vsync_count =
         ClientProxy::kMaxVsyncMessages + ClientProxy::kVsyncBufferSize + 1;
@@ -406,13 +441,13 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
 }
 
 TEST_F(IntegrationTest, InvalidVSyncCookie) {
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // send vsyncs until max vsync
   for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   ASSERT_TRUE(PollUntilOnLoop(
       [&]() { return (primary_client->vsync_count() == ClientProxy::kMaxVsyncMessages); }));
@@ -422,7 +457,7 @@ TEST_F(IntegrationTest, InvalidVSyncCookie) {
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
   for (uint32_t i = 0; i < kNumVsync; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
 
@@ -440,13 +475,13 @@ TEST_F(IntegrationTest, InvalidVSyncCookie) {
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;
-      return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie());
+      return MostRecentAckedCookie(ClientPriority::kPrimary) == primary_client->vsync_ack_cookie();
     });
   }
-  EXPECT_FALSE(vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()));
+  EXPECT_NE(MostRecentAckedCookie(ClientPriority::kPrimary), primary_client->vsync_ack_cookie());
 
   // We should still not receive vsync events since acknowledge did not use valid cookie
-  client_proxy_send_vsync();
+  SendVsyncFromCoordinatorClientProxy();
   constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages;
 
   // This check can have a false positive pass, due to using a hard-coded
@@ -465,13 +500,13 @@ TEST_F(IntegrationTest, InvalidVSyncCookie) {
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // send vsyncs until max vsync
   for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   {
     static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages;
@@ -484,7 +519,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   constexpr uint32_t kNumVsync = 5;
   for (uint32_t i = 0; i < kNumVsync; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages, primary_client->vsync_count());
 
@@ -495,11 +530,12 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return MostRecentAckedCookie(ClientPriority::kPrimary) == primary_client->vsync_ack_cookie();
+  }));
 
   // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  client_proxy_send_vsync();
+  SendVsyncFromCoordinatorClientProxy();
   {
     static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages + kNumVsync + 1;
     ASSERT_TRUE(
@@ -512,7 +548,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
 
   // send vsyncs until max vsync
   for (uint32_t i = 0; i < ClientProxy::kMaxVsyncMessages; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
 
   {
@@ -525,7 +561,7 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
 
   // At this point, display will not send any more vsync events. Let's confirm by sending a few
   for (uint32_t i = 0; i < ClientProxy::kVsyncBufferSize; i++) {
-    client_proxy_send_vsync();
+    SendVsyncFromCoordinatorClientProxy();
   }
   EXPECT_EQ(ClientProxy::kMaxVsyncMessages * 2, primary_client->vsync_count());
 
@@ -543,13 +579,13 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
     PollUntilOnLoop([&]() {
       if (zx::clock::get_monotonic() >= deadline)
         return true;
-      return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie());
+      return MostRecentAckedCookie(ClientPriority::kPrimary) == primary_client->vsync_ack_cookie();
     });
   }
-  EXPECT_FALSE(vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()));
+  EXPECT_NE(MostRecentAckedCookie(ClientPriority::kPrimary), primary_client->vsync_ack_cookie());
 
   // Since we did not acknowledge with most recent cookie, we should not get any vsync events back
-  client_proxy_send_vsync();
+  SendVsyncFromCoordinatorClientProxy();
   {
     static constexpr uint64_t expected_vsync_count = ClientProxy::kMaxVsyncMessages * 2;
 
@@ -576,11 +612,12 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
     (void)primary_client->dc_->AcknowledgeVsync(
         ToFidlVsyncAckCookieValue(primary_client->vsync_ack_cookie()));
   }
-  ASSERT_TRUE(PollUntilOnLoop(
-      [&]() { return vsync_acknowledge_delivered(primary_client->vsync_ack_cookie()); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() {
+    return MostRecentAckedCookie(ClientPriority::kPrimary) == primary_client->vsync_ack_cookie();
+  }));
 
   // After acknowledge, we should expect to get all the stored messages + the latest vsync
-  client_proxy_send_vsync();
+  SendVsyncFromCoordinatorClientProxy();
   {
     static constexpr uint64_t expected_vsync_count =
         ClientProxy::kMaxVsyncMessages * 2 + ClientProxy::kVsyncBufferSize + 1;
@@ -591,8 +628,8 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
 }
 
 TEST_F(IntegrationTest, CreateLayer) {
-  std::unique_ptr<TestFidlClient> client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
+  std::unique_ptr<TestFidlClient> client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
 
   fbl::AutoLock lock(client->mtx());
   auto create_layer_reply = client->dc_->CreateLayer();
@@ -601,8 +638,8 @@ TEST_F(IntegrationTest, CreateLayer) {
 }
 
 TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
-  std::unique_ptr<TestFidlClient> client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
+  std::unique_ptr<TestFidlClient> client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
 
   fbl::AutoLock lock(client->mtx());
   constexpr display::ImageId image_id = display::kInvalidImageId;
@@ -620,8 +657,8 @@ TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
 }
 
 TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
-  std::unique_ptr<TestFidlClient> client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
+  std::unique_ptr<TestFidlClient> client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
 
   fbl::AutoLock lock(client->mtx());
   constexpr display::BufferCollectionId kNonExistentCollectionId(0xffeeeedd);
@@ -639,26 +676,26 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
 }
 
 TEST_F(IntegrationTest, ClampRgb) {
-  // Create vc client
-  TestFidlClient vc_client(sysmem_);
-  ASSERT_OK(
-      vc_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon, dispatcher()));
+  TestFidlClient virtcon_client(sysmem_client_);
+  ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
+                                           dispatcher()));
   {
-    fbl::AutoLock lock(vc_client.mtx());
+    fbl::AutoLock lock(virtcon_client.mtx());
     // set mode to Fallback
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-    (void)vc_client.dc_->SetVirtconMode(fuchsia_hardware_display::VirtconMode::kFallback);
-    ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client_connected(); }));
+    (void)virtcon_client.dc_->SetVirtconMode(fuchsia_hardware_display::VirtconMode::kFallback);
+    ASSERT_TRUE(PollUntilOnLoop(
+        [&]() { return IsClientActive(ClientPriority::kVirtcon, VsyncCheck::kNoCheck); }));
     // Clamp RGB to a minimum value
     // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-    (void)vc_client.dc_->SetMinimumRgb(32);
+    (void)virtcon_client.dc_->SetMinimumRgb(32);
     ASSERT_TRUE(PollUntilOnLoop([&]() { return FakeDisplayEngine().GetClampRgbValue() == 32; }));
   }
 
   // Create a primary client
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
   {
     fbl::AutoLock lock(primary_client->mtx());
     // Clamp RGB to a new value
@@ -670,15 +707,17 @@ TEST_F(IntegrationTest, ClampRgb) {
   primary_client.reset(nullptr);
   // Apply a config for virtcon client to become active.
   {
-    fbl::AutoLock lock(vc_client.mtx());
+    fbl::AutoLock lock(virtcon_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
     const display::DisplayId virtcon_display_id(1);
-    EXPECT_OK(vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
-    EXPECT_OK(vc_client.dc_->ApplyConfig().status());
+    EXPECT_OK(
+        virtcon_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
+    EXPECT_OK(virtcon_client.dc_->ApplyConfig().status());
   }
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client_connected(); }));
-  SendDisplayVsync();
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return IsClientActive(ClientPriority::kVirtcon, VsyncCheck::kNoCheck); }));
+  SendVsyncFromDisplayEngine();
   // make sure clamp value was restored
   ASSERT_TRUE(PollUntilOnLoop([&]() { return FakeDisplayEngine().GetClampRgbValue() == 32; }));
 }
@@ -686,33 +725,37 @@ TEST_F(IntegrationTest, ClampRgb) {
 // TODO(https://fxbug.dev/340926351): De-flake and reenable this test.
 TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
   // Create and bind virtcon client.
-  TestFidlClient vc_client(sysmem_);
-  ASSERT_OK(
-      vc_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon, dispatcher()));
+  TestFidlClient virtcon_client(sysmem_client_);
+  ASSERT_OK(virtcon_client.OpenCoordinator(DisplayProviderClient(), ClientPriority::kVirtcon,
+                                           dispatcher()));
   {
-    fbl::AutoLock lock(vc_client.mtx());
-    EXPECT_OK(vc_client.dc_->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback)
-                  .status());
+    fbl::AutoLock lock(virtcon_client.mtx());
+    EXPECT_OK(
+        virtcon_client.dc_->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback)
+            .status());
   }
   {
-    fbl::AutoLock lock(vc_client.mtx());
+    fbl::AutoLock lock(virtcon_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
     // display events instead.
     const display::DisplayId virtcon_display_id(1);
-    EXPECT_OK(vc_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
-    EXPECT_OK(vc_client.dc_->ApplyConfig().status());
+    EXPECT_OK(
+        virtcon_client.dc_->SetDisplayLayers(ToFidlDisplayId(virtcon_display_id), {}).status());
+    EXPECT_OK(virtcon_client.dc_->ApplyConfig().status());
   }
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client_connected(); }));
+  ASSERT_TRUE(PollUntilOnLoop(
+      [&]() { return IsClientActive(ClientPriority::kVirtcon, VsyncCheck::kNoCheck); }));
 
   // Create and bind primary client.
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   // Virtcon client should remain active until primary client has set a config.
-  uint64_t vc_vsync_count = vc_client.vsync_count();
-  SendDisplayVsync();
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return vc_client.vsync_count() > vc_vsync_count; }));
+  uint64_t virtcon_client_vsync_count = virtcon_client.vsync_count();
+  SendVsyncFromDisplayEngine();
+  ASSERT_TRUE(
+      PollUntilOnLoop([&]() { return virtcon_client.vsync_count() > virtcon_client_vsync_count; }));
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->vsync_count() == 0; }));
 
   // Present an image from the primary client.
@@ -722,7 +765,7 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
 
   // Primary client should have become active after a config was set.
   const uint64_t primary_vsync_count = primary_client->vsync_count();
-  SendDisplayVsync();
+  SendVsyncFromDisplayEngine();
   ASSERT_TRUE(
       PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
 }
@@ -746,8 +789,8 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
 // Both images are ready at ApplyConfig() time, i.e. no fences are provided.
 TEST_F(IntegrationTest, VsyncEvent) {
   // Create and bind primary client.
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
@@ -760,11 +803,11 @@ TEST_F(IntegrationTest, VsyncEvent) {
   }
   auto apply_config_stamp_0 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -797,7 +840,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -818,7 +861,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -843,7 +886,7 @@ TEST_F(IntegrationTest, VsyncEvent) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -872,8 +915,8 @@ TEST_F(IntegrationTest, VsyncEvent) {
 //
 TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   // Create and bind primary client.
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
@@ -886,11 +929,11 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   }
   auto apply_config_stamp_0 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -928,7 +971,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -951,7 +994,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -971,7 +1014,7 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -1001,8 +1044,8 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
 //
 TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   // Create and bind primary client.
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
@@ -1015,11 +1058,11 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   }
   auto apply_config_stamp_0 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -1057,7 +1100,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -1080,7 +1123,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -1109,7 +1152,7 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   // image has been removed from the configuration.
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -1145,8 +1188,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
 // Note that fence1 is never signaled.
 TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   // Create and bind primary client.
-  std::unique_ptr<TestFidlClient> primary_client =
-      OpenCoordinatorTestFidlClient(sysmem_, DisplayProviderClient(), ClientPriority::kPrimary);
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
 
   zx::result<display::LayerId> create_default_layer_result = primary_client->CreateLayer();
   zx::result<display::ImageId> create_image_0_result = primary_client->CreateImage();
@@ -1181,11 +1224,11 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   }));
   auto apply_config_stamp_0 = display::ToConfigStamp(primary_client->GetRecentAppliedConfigStamp());
   EXPECT_NE(display::kInvalidConfigStamp, apply_config_stamp_0);
-  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -1209,7 +1252,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -1231,7 +1274,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -1249,7 +1292,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
@@ -1267,7 +1310,7 @@ TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
 
   {
     const uint64_t primary_vsync_count = primary_client->vsync_count();
-    SendDisplayVsync();
+    SendVsyncFromDisplayEngine();
     ASSERT_TRUE(
         PollUntilOnLoop([&]() { return primary_client->vsync_count() > primary_vsync_count; }));
   }
