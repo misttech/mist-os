@@ -292,7 +292,7 @@ impl Worker {
                 Item::SinkItem(Some(SinkItem::Event(
                     ref event @ Event { ref id, kind, addr, at },
                 ))) => {
-                    info!("{}", EventLogger { event, ctx: &ctx });
+                    info!(tag = "NUD"; "{}", EventLogger { event, ctx: &ctx });
 
                     let DeviceIdAndName { id: binding_id, name: _ } = *id.bindings_id();
                     let entry = neighbor_state

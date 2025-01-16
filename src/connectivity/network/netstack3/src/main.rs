@@ -24,6 +24,14 @@ pub fn main() {
     let mut executor = fuchsia_async::SendExecutor::new(num_threads.get().into());
 
     let mut log_options = diagnostics_log::PublishOptions::default();
+
+    // NB: netstack3 is usually launched with a 'netstack' moniker already -
+    // which implies an automatic 'netstack' tag. However, the automatic tag has
+    // shown problems when extra tags are present in specific log lines (e.g.
+    // https://fxbug.dev/390252317, https://fxbug.dev/390252218). Given that,
+    // we always initialize with the netstack tag here.
+    log_options = log_options.tags(&["netstack"]);
+
     if *debug_logs {
         // When forcing debug logs, disable all the dynamic features from the
         // logging framework, we want logs pegged at Severity::Debug.
