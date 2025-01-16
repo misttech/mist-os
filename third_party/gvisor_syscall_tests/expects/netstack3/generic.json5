@@ -16,15 +16,11 @@
 
                 // Netstack3 does not support many UDP socket options or operations
                 "IPUnboundSockets/IPUnboundSocketTest.CheckSkipECN/[4-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.InvalidLargeTOS/[4-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.InvalidNegativeTOS/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.InvalidNegativeTOS/[4-5]",
                 "IPUnboundSockets/IPUnboundSocketTest.LargeTOSOptionSize/[4-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.NegativeTOS/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.NegativeTOS/[4-5]",
                 "IPUnboundSockets/IPUnboundSocketTest.SetTOS/[4-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.SmallTOSOptionSize/[4-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.TOSDefault/[4-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.ZeroTOS/[4-7]",
-                "IPUnboundSockets/IPUnboundSocketTest.ZeroTOSOptionSize/[4-7]",
+                "IPUnboundSockets/IPUnboundSocketTest.SmallTOSOptionSize/[4-5]",
 
                 // TODO(https://fxbug.dev/329317900): Support setting/getting TTL for
                 // TCP sockets.

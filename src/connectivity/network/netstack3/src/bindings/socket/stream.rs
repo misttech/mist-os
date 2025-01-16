@@ -934,7 +934,8 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 responder.send(Ok(())).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetIpTypeOfService { responder } => {
-                respond_not_supported!("stream::GetIpTypeOfService", responder);
+                debug!("stream::GetIpTypeOfService is not supported, returning Ok(0)");
+                responder.send(Ok(0)).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetIpTtl { value: _, responder } => {
                 respond_not_supported!("stream::SetIpTtl", responder);
@@ -1084,10 +1085,24 @@ impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I> {
                 respond_not_supported!("stream::GetIpv6ReceiveTrafficClass", responder);
             }
             fposix_socket::StreamSocketRequest::SetIpv6TrafficClass { value: _, responder } => {
-                respond_not_supported!("stream::SetIpv6TrafficClass", responder);
+                let result = match I::VERSION {
+                    IpVersion::V4 => Err(fposix::Errno::Eopnotsupp),
+                    IpVersion::V6 => {
+                        debug!("stream::SetIpv6TrafficClass is not supported, returning Ok(())");
+                        Ok(())
+                    }
+                };
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::GetIpv6TrafficClass { responder } => {
-                respond_not_supported!("stream::GetIpv6TrafficClass", responder);
+                let result = match I::VERSION {
+                    IpVersion::V4 => Err(fposix::Errno::Eopnotsupp),
+                    IpVersion::V6 => {
+                        debug!("stream::GetIpv6TrafficClass is not supported, returning Ok(0)");
+                        Ok(0)
+                    }
+                };
+                responder.send(result).unwrap_or_log("failed to respond");
             }
             fposix_socket::StreamSocketRequest::SetIpv6ReceivePacketInfo {
                 value: _,
