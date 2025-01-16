@@ -378,7 +378,7 @@ macro_rules! vmar_flags {
     ) => {
         /// Flags to VMAR routines which are considered safe.
         #[repr(transparent)]
-        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable)]
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable)]
         pub struct VmarFlags(sys::zx_vm_option_t);
 
         bitflags! {
@@ -389,9 +389,15 @@ macro_rules! vmar_flags {
             }
         }
 
+        impl std::fmt::Debug for VmarFlags {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                bitflags::parser::to_writer(self, f)
+            }
+        }
+
         /// Flags to all VMAR routines.
         #[repr(transparent)]
-        #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable, Default)]
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, FromBytes, Immutable, Default)]
         pub struct VmarFlagsExtended(sys::zx_vm_option_t);
 
         bitflags! {
@@ -402,6 +408,12 @@ macro_rules! vmar_flags {
                 $(
                     const $ex_name = sys::$ex_sys_name;
                 )*
+            }
+        }
+
+        impl std::fmt::Debug for VmarFlagsExtended {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                bitflags::parser::to_writer(self, f)
             }
         }
     };
