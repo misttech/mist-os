@@ -39,6 +39,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use zx::AsHandleRef;
 
 /// The mutable state of the ThreadGroup.
 pub struct ThreadGroupMutableState {
@@ -196,7 +197,12 @@ pub struct ThreadGroup {
 
 impl fmt::Debug for ThreadGroup {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.leader)
+        write!(
+            f,
+            "{}({})",
+            self.process.get_name().unwrap_or(zx::Name::new_lossy("<unknown>")),
+            self.leader
+        )
     }
 }
 
