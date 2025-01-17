@@ -447,8 +447,12 @@ async fn do_if<C: NetCliDepsConnector>(
                         Ok(mac) => {
                             let mac = mac.map(|box_| *box_);
                             let view = (properties, mac).into();
-                            write_tabulated_interfaces_info(out, std::iter::once(view))
-                                .context("error tabulating interface info")?;
+                            if out.is_machine() {
+                                out.machine(&serde_json::to_value(&view)?)?;
+                            } else {
+                                write_tabulated_interfaces_info(out, std::iter::once(view))
+                                    .context("error tabulating interface info")?;
+                            }
                         }
                     };
                 }
