@@ -27,7 +27,7 @@ mod ir;
 mod templates;
 
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -64,13 +64,21 @@ fn main() {
 
     let config = Config { emit_debug_impls: true, resource_bindings: ResourceBindings::default() };
     let context = Context::new(schema, config);
+
+    let result = context.render().expect("failed to emit FIDL bindings");
+
+    // Manually trim trailing whitespace; rustfmt ICEs on some long lines with trailing whitespace.
     let out = File::create(&args.output_filename).expect("failed to create output file");
-    context.write_into(&mut BufWriter::new(out)).expect("failed to emit FIDL bindings");
+    let mut writer = BufWriter::new(out);
+    for line in result.lines() {
+        writeln!(writer, "{}", line.trim_end()).expect("failed to write to output file");
+    }
+    writer.flush().unwrap();
 
     Command::new(args.rustfmt)
         .arg("--config-path")
         .arg(&args.rustfmt_config)
         .arg(&args.output_filename)
         .status()
-        .unwrap();
+        .expect("failed to run format output file");
 }

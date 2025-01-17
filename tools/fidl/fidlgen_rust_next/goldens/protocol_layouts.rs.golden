@@ -2918,14 +2918,14 @@ where
                     {
         self.as_untyped().send_one_way(467706262354916833, request)
     }
-                
-            
-    
-        
-        
 
-        
-                
+
+
+
+
+
+
+
                     fn two_way_anon_composed<___R>(
                         &self,
                         request: &mut ___R,
@@ -2943,14 +2943,14 @@ where
             .send_two_way(1634702755099390832, request)
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
-                
-            
-    
-        
-        
 
-        
-                
+
+
+
+
+
+
+
                     fn two_way_anon_composed_with_error<___R>(
                         &self,
                         request: &mut ___R,
@@ -3957,14 +3957,14 @@ where
                     {
         self.as_untyped().send_one_way(3516779973873009953, request)
     }
-                
-            
-    
-        
-        
 
-        
-                
+
+
+
+
+
+
+
                     fn flexible_two_way_no_error<___R>(
                         &self,
                         request: &mut ___R,
@@ -3982,14 +3982,14 @@ where
             .send_two_way(5572735551219638488, request)
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
-                
-            
-    
-        
-        
 
-        
-                
+
+
+
+
+
+
+
                     fn flexible_two_way_with_error<___R>(
                         &self,
                         request: &mut ___R,
@@ -4007,20 +4007,20 @@ where
             .send_two_way(3504132377779779458, request)
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
-                
-            
-    
-        
-        
 
-        
-        
-    
-        
-        
 
-        
-                
+
+
+
+
+
+
+
+
+
+
+
+
                     fn strict_one_way<___R>(
                         &self,
                         request: &mut ___R,
@@ -4033,14 +4033,14 @@ where
                     {
         self.as_untyped().send_one_way(8790149921168801703, request)
     }
-                
-            
-    
-        
-        
 
-        
-                
+
+
+
+
+
+
+
                     fn strict_two_way_no_error<___R>(
                         &self,
                         request: &mut ___R,
@@ -4058,14 +4058,14 @@ where
             .send_two_way(3690935745864999300, request)
             .map(::fidl_next::bind::ResponseFuture::from_untyped)
     }
-                
-            
-    
-        
-        
 
-        
-                
+
+
+
+
+
+
+
                     fn strict_two_way_with_error<___R>(
                         &self,
                         request: &mut ___R,
@@ -4209,25 +4209,25 @@ where
                 {
         self.as_untyped().send_event(9152311661656086484, request)
     }
-            
-        
-    
-        
 
-        
-    
-        
 
-        
-    
-        
 
-        
-    
-        
 
-        
-            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                 fn strict_event<___R>(
                     &self,
                     request: &mut ___R,

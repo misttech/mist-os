@@ -235,14 +235,14 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -251,14 +251,14 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -783,18 +783,18 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult {
         &self,
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -802,18 +802,18 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult {
         &mut self,
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -1237,10 +1237,10 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_resu
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -1250,18 +1250,18 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -1270,18 +1270,18 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -1604,14 +1604,14 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -1620,14 +1620,14 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -1923,10 +1923,10 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_resul
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -1936,18 +1936,18 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult<'
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -1956,18 +1956,18 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult<'
     ) -> crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -2388,10 +2388,10 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_resul
 
     pub enum Mut<'union, 'buf> {
         Response(&'union mut crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse<'buf>),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -2403,18 +2403,18 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult<'
         'buf,
     > {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -2425,18 +2425,18 @@ impl<'buf> WireUnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult<'
         'buf,
     > {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -3415,14 +3415,14 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -3430,14 +3430,14 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -4391,18 +4391,18 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -4410,18 +4410,18 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -4738,14 +4738,14 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -4753,14 +4753,14 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -5062,18 +5062,18 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -5081,18 +5081,18 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -5514,18 +5514,18 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult<'buf> {
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -5534,18 +5534,18 @@ impl<'buf> WireUnknownInteractionsAjarProtocolStrictTwoWayTableErrResult<'buf> {
     ) -> crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_ajar_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -5907,14 +5907,14 @@ impl WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -5922,14 +5922,14 @@ impl WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_strict_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -6443,14 +6443,14 @@ impl WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -6458,14 +6458,14 @@ impl WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -7966,14 +7966,14 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -7982,14 +7982,14 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -8519,18 +8519,18 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult {
         &self,
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -8538,18 +8538,18 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult {
         &mut self,
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -8977,10 +8977,10 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_re
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -8990,18 +8990,18 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -9010,18 +9010,18 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -9346,14 +9346,14 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -9362,14 +9362,14 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -9669,10 +9669,10 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_union_err_res
 
     pub enum Mut<'union> {
         Response(&'union mut crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -9682,18 +9682,18 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -9702,18 +9702,18 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult
     ) -> crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -10138,10 +10138,10 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_table_err_res
 
     pub enum Mut<'union, 'buf> {
         Response(&'union mut crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse<'buf>),
-        
+
             Err(&'union mut ::fidl_next::i32_le),
-        
-        
+
+
     }
 }
 
@@ -10153,18 +10153,18 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult
         'buf,
     > {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -10175,18 +10175,18 @@ impl<'buf> WireUnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult
         'buf,
     > {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_driver_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -11147,14 +11147,14 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -11162,14 +11162,14 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -12132,18 +12132,18 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult {
         &self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -12151,18 +12151,18 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult {
         &mut self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -12484,14 +12484,14 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -12500,14 +12500,14 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -12809,18 +12809,18 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult<'buf>
         &self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -12828,18 +12828,18 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult<'buf>
         &mut self,
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -13264,18 +13264,18 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult<'buf>
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -13284,18 +13284,18 @@ impl<'buf> WireUnknownInteractionsClosedProtocolStrictTwoWayTableErrResult<'buf>
     ) -> crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_closed_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -13663,14 +13663,14 @@ impl WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -13678,14 +13678,14 @@ impl WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_closed_protocol_strict_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_closed_protocol_strict_event_union_request::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -14957,14 +14957,14 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -14972,14 +14972,14 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -15942,18 +15942,18 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -15961,18 +15961,18 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -16294,14 +16294,14 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -16310,14 +16310,14 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -16619,18 +16619,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult<'buf>
         &self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -16638,18 +16638,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult<'buf>
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -17074,18 +17074,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult<'buf>
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -17094,18 +17094,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolStrictTwoWayTableErrResult<'buf>
     ) -> crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_strict_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -17462,18 +17462,18 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -17481,18 +17481,18 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -17921,18 +17921,18 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -17940,18 +17940,18 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -18275,14 +18275,14 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -18290,14 +18290,14 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -18600,18 +18600,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult<'buf> 
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -18619,18 +18619,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult<'buf> 
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -19062,18 +19062,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult<'buf> 
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -19082,18 +19082,18 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableResult<'buf> 
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -19480,22 +19480,22 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
         &self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -19503,22 +19503,22 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
         &mut self,
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -19995,22 +19995,22 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -20019,22 +20019,22 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_fields_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -20384,14 +20384,14 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -20400,14 +20400,14 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -20731,22 +20731,22 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult<'bu
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Ref<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -20755,22 +20755,22 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult<'bu
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Mut<'_>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -21233,22 +21233,22 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult<'bu
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Ref<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -21257,22 +21257,22 @@ impl<'buf> WireUnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult<'bu
     ) -> crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Mut<'_, 'buf>
     {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_driver_protocol_flexible_two_way_table_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -22705,14 +22705,14 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_protocol_strict_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -22720,14 +22720,14 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_protocol_strict_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -23994,14 +23994,14 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         &self,
     ) -> crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -24009,14 +24009,14 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         &mut self,
     ) -> crate::unknown_interactions_protocol_strict_two_way_union_err_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -25555,18 +25555,18 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_fields_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_fields_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_fields_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -25574,18 +25574,18 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_fields_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_fields_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_fields_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -25895,14 +25895,14 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -25910,14 +25910,14 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -26208,18 +26208,18 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_union_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -26227,18 +26227,18 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_union_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -26653,18 +26653,18 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_table_result::Ref<'_, 'buf> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_table_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_table_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -26672,18 +26672,18 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_table_result::Mut<'_, 'buf> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_table_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_table_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -27558,22 +27558,22 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -27581,22 +27581,22 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_fields_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -27934,14 +27934,14 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -27949,14 +27949,14 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -28265,22 +28265,22 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -28288,22 +28288,22 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_union_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -28748,22 +28748,22 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult<'buf> {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Ref<'_, 'buf> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Ref::Response(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Ref::Err(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Ref::FrameworkErr(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 
@@ -28771,22 +28771,22 @@ impl<'buf> WireUnknownInteractionsProtocolFlexibleTwoWayTableErrResult<'buf> {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Mut<'_, 'buf> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Mut::Response(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 2 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Mut::Err(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
+
                 3 => crate::unknown_interactions_protocol_flexible_two_way_table_err_result::Mut::FrameworkErr(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
-            
+
         }
     }
 }
@@ -29163,14 +29163,14 @@ impl WireUnknownInteractionsProtocolStrictEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_protocol_strict_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_event_union_request::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -29178,14 +29178,14 @@ impl WireUnknownInteractionsProtocolStrictEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_protocol_strict_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_strict_event_union_request::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_strict_event_union_request::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
@@ -29693,14 +29693,14 @@ impl WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_protocol_flexible_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_event_union_request::Ref::SomeField(
                     unsafe { self.raw.get().deref_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Ref::UnknownOrdinal_(unknown),
-            
+
         }
     }
 
@@ -29708,14 +29708,14 @@ impl WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_protocol_flexible_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            
+
                 1 => crate::unknown_interactions_protocol_flexible_event_union_request::Mut::SomeField(
                     unsafe { self.raw.get_mut().deref_mut_unchecked() }
                 ),
-            
-            
+
+
                 unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Mut::UnknownOrdinal_(unknown),
-            
+
         }
     }
 }
