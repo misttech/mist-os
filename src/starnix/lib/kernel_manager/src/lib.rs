@@ -257,6 +257,7 @@ async fn suspend_container(
 
     // These handles need to kept alive until the end of the block, as they will
     // resume the kernel when dropped.
+    log::info!("Suspending all container processes.");
     let _suspend_handles = match suspend_kernel(&container_job).await {
         Ok(handles) => handles,
         Err(e) => {
@@ -269,6 +270,7 @@ async fn suspend_container(
             return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
         }
     };
+    log::info!("Finished suspending all container processes.");
 
     let suspend_start = zx::BootInstant::get();
 
@@ -290,6 +292,7 @@ async fn suspend_container(
     }
 
     {
+        log::info!("Notifying wake watchers of container suspend.");
         let watchers = suspend_context.wake_watchers.lock();
         for event in watchers.iter() {
             let (clear_mask, set_mask) = (AWAKE_SIGNAL, ASLEEP_SIGNAL);
@@ -315,6 +318,7 @@ async fn suspend_container(
     {
         fuchsia_trace::duration!(c"power", c"starnix-runner:waiting-on-container-wake");
         if wait_items.len() > 0 {
+            log::info!("Waiting on container to receive incoming message on wake proxies");
             match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
                 Ok(_) => (),
                 Err(e) => {
@@ -323,26 +327,27 @@ async fn suspend_container(
             };
         }
     }
+    log::info!("Finished waiting on container wake proxies.");
 
     for wait_item in &wait_items {
         if wait_item.pending.contains(RUNNER_SIGNAL) {
             let koid = wait_item.handle.get_koid().unwrap();
             if let Some(event) = resume_events.events.get(&koid) {
-                log::info!("Woke from sleep for: {}", event.name);
+                log::info!("Woke container from sleep for: {}", event.name);
             }
         }
     }
 
     kernels.acquire_wake_lease(&container_job).await?;
 
-    log::info!("Signalling wake watchers.");
+    log::info!("Notifying wake watchers of container wakeup.");
     let watchers = suspend_context.wake_watchers.lock();
     for event in watchers.iter() {
         let (clear_mask, set_mask) = (ASLEEP_SIGNAL, AWAKE_SIGNAL);
         event.signal_peer(clear_mask, set_mask)?;
     }
 
-    log::info!("Returning from SuspendContainer.");
+    log::info!("Returning successfully from suspend container");
     Ok(Ok(fstarnixrunner::ManagerSuspendContainerResponse {
         suspend_time: Some((zx::BootInstant::get() - suspend_start).into_nanos()),
         ..Default::default()
