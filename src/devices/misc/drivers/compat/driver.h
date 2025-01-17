@@ -177,6 +177,7 @@ class GlobalLoggerList {
   class LoggerInstances {
    public:
     explicit LoggerInstances(bool log_node_names) : log_node_names_(log_node_names) {}
+    bool IsSeverityEnabled(FuchsiaLogSeverity severity) const;
     // Logs a message for the DFv1 driver.
     void Log(FuchsiaLogSeverity severity, const char* tag, const char* file, int line,
              const char* msg, va_list args);

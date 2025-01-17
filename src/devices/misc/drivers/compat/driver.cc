@@ -247,6 +247,17 @@ promise<void, zx_status_t> GetAndAddMetadata(
   return bridge.consumer.promise_or(error(ZX_ERR_INTERNAL));
 }
 
+bool GlobalLoggerList::LoggerInstances::IsSeverityEnabled(FuchsiaLogSeverity severity) const {
+  std::lock_guard guard(kGlobalLoggerListLock);
+  auto it = loggers_.begin();
+
+  if (it == loggers_.end()) {
+    return severity >= driver_logger::GetLogger().GetSeverity();
+  }
+
+  return severity >= (*it)->GetSeverity();
+}
+
 void GlobalLoggerList::LoggerInstances::Log(FuchsiaLogSeverity severity, const char* tag,
                                             const char* file, int line, const char* msg,
                                             va_list args) {
