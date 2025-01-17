@@ -125,7 +125,7 @@ fx build generate_fuchsia_sdk_repository
 LOCAL_SDK="$(fx get-build-dir)/gen/build/bazel/fuchsia_sdk"
 
 # Run the full test suite
-scripts/bazel_test.py --fuchsia_sdk_dir="${LOCAL_SDK}"
+scripts/bazel_test.py --fuchsia_sdk_directory="${LOCAL_SDK}"
 ```
 
 Alternatively, run it against the Core Bazel SDK
@@ -135,7 +135,7 @@ fx build //sdk:final_fuchsia_sdk
 LOCAL_SDK="$(fx get-build-dir)/obj/sdk/final_fuchsia_sdk"
 
 # Run the full test suite
-scripts/bazel_test.py --fuchsia_sdk_dir="${LOCAL_SDK}"
+scripts/bazel_test.py --fuchsia_sdk_directory="${LOCAL_SDK}"
 ```
 
 ### Running against the in-tree `@fuchsia_sdk` repository:
@@ -145,18 +145,18 @@ or the content of the in-tree IDK/SDK. Testing against the final
 Fuchsia in-tree SDK, as described in the previous section, should be
 equivalent:
 
-[TODO](https://fxbug.dev/383536158): This is currently broken as it uses gen/build/bazel/fuchsia_sdk instead of the in-tree @fuchsia_sdk
-
 ```
 # Prepare the @fuchsia_sdk repository. Only needed once per `jiri update`
 fx build bazel_workspace
-fx bazel query --config=quiet @fuchsia_sdk//:BUILD.bazel
+fx bazel --query --config=quiet @fuchsia_sdk//:BUILD.bazel
 
 # Run the full test suite
-scripts/bazel_test.py
+scripts/bazel_test.py --fuchsia-in-tree-sdk
 
 # Run a subset of test targets, and change test output.
-scripts/bazel_test.py --test_target=:build_only_tests -- --test_output=streamed
+scripts/bazel_test.py \
+    --fuchsia-in-tree-sdk \
+    --test_target=:build_only_tests -- --test_output=streamed
 ```
 
 ## Direct bazel invocation
@@ -198,11 +198,10 @@ fx set core.x64
 
 # Do this after each `jiri update` or modifying the SDK
 fx build generate_fuchsia_sdk_repository
-export LOCAL_FUCHSIA_PLATFORM_BUILD=$(fx get-build-dir)
 
 # Run the test suite
 cd build/bazel_sdk/tests
-bazel test --config=fuchsia_x64 :tests
+LOCAL_FUCHSIA_PLATFORM_BUILD=$(fx get-build-dir) bazel test --config=fuchsia_x64 :tests
 ```
 
 ### Running against the `@fuchsia_sdk` repository:
@@ -233,5 +232,3 @@ bazel test \
     --override_repository=fuchsia_in_tree_idk="${FUCHSIA_IN_TREE_IDK_REPO}" \
     :tests
 ```
-
-[TODO](https://fxbug.dev/383536158): This fails to build!

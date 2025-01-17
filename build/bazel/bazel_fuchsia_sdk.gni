@@ -275,16 +275,17 @@ template("run_fuchsia_bazel_sdk_tests") {
         args += [
           "--fuchsia_build_dir",
           rebase_path(root_build_dir, root_build_dir),
-          "--fuchsia_sdk_dir",
+          "--fuchsia_sdk_directory",
           rebase_path(_fuchsia_sdk_path, root_build_dir),
         ]
         deps += [ _fuchsia_sdk_target ]
       } else {
+        # Using @fuchsia_sdk, which depends on @fuchsia_in_tree_idk
         args += [
-          "--fuchsia_build_dir",
-          rebase_path(root_build_dir, root_build_dir),
+          "--fuchsia-in-tree-sdk",
+          "--fuchsia_build_dir=" + rebase_path(root_build_dir, root_build_dir),
         ]
-        deps += [ "//build/bazel:generate_fuchsia_sdk_repository" ]
+        deps += [ "//build/bazel/bazel_sdk:in_tree_fuchsia_sdk" ]
       }
       args += [
         "--prebuilt-python-version-file",

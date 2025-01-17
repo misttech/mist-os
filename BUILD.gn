@@ -2173,6 +2173,10 @@ group("root_targets") {
 
     # Required to generate the symlink used by the Bazel SDK test suite when
     # invoked directly with Bazel. See //build/bazel_sdk/tests/README.md.
+    "//build/bazel:generate_fuchsia_sdk_repository",
+
+    # Required to regenerate the @fuchsia_in_tree_idk, used by one of the
+    # sections in //build/bazel_sdk/tests/README.md
     "//build/bazel:final_fuchsia_in_tree_idk",
 
     # The list of content hash files required by the Bazel workspace.

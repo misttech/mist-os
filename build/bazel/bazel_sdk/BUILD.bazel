@@ -63,6 +63,16 @@ generate_bazel_sdk(
     use_rules_fuchsia = False,
 )
 
+# A target used to force the creation of the @fuchsia_sdk repository,
+# then copy its top-level BUILD.bazel to an output stamp file for
+# a GN target with the same label.
+genrule(
+    name = "in_tree_fuchsia_sdk",
+    srcs = ["@fuchsia_sdk//:BUILD.bazel"],
+    outs = ["stamp"],
+    cmd = "cp -f $(SRCS) \"$@\"",
+)
+
 # Compare the content of the @fuchsia_sdk with the SDK generated
 # from the Ninja-generated in-tree IDK. Success means that
 # using the fuchsia_sdk_repository() function either at build time or

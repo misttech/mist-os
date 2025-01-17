@@ -223,6 +223,7 @@ group("bazel_action_allowlist") {
     "//build/bazel:final_fuchsia_in_tree_idk",
     "//build/bazel:final_fuchsia_in_tree_sdk",
     "//build/bazel/assembly:verify_assembly_configs.bazel_build_group",
+    "//build/bazel/bazel_sdk:in_tree_fuchsia_sdk",
     "//build/bazel/bazel_sdk:verify_fuchsia_sdk_repository",
     "//build/bazel/bazel_sdk/docs:docs.bazel_build_group",
     "//build/bazel/examples:examples",
