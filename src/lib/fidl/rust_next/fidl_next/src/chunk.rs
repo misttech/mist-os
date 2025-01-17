@@ -10,3 +10,18 @@ pub const CHUNK_SIZE: usize = 8;
 
 /// A group of eight bytes, aligned to an 8-byte boundary.
 pub type Chunk = u64_le;
+
+/// Returns a slice of chunks with the same bytewise value as the given bytes.
+#[macro_export]
+macro_rules! chunks {
+    ($(
+        $b0:literal, $b1:literal, $b2:literal, $b3:literal,
+        $b4:literal, $b5:literal, $b6:literal, $b7:literal
+    ),* $(,)?) => {
+        [
+            $($crate::Chunk::from_native(u64::from_le_bytes([
+                $b0, $b1, $b2, $b3, $b4, $b5, $b6, $b7,
+            ])),)*
+        ]
+    }
+}
