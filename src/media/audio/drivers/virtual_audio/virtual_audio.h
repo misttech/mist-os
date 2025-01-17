@@ -1,8 +1,8 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_CONTROL_IMPL_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_CONTROL_IMPL_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_H_
 
 #include <fidl/fuchsia.virtualaudio/cpp/fidl.h>
 #include <lib/ddk/device.h>
@@ -14,7 +14,7 @@ namespace virtual_audio {
 
 class VirtualAudioDeviceImpl;
 
-class VirtualAudioControlImpl : public fidl::WireServer<fuchsia_virtualaudio::Control> {
+class VirtualAudio : public fidl::WireServer<fuchsia_virtualaudio::Control> {
  public:
   static zx_status_t DdkBind(void* ctx, zx_device_t* parent_bus);
   static void DdkRelease(void* ctx);
@@ -22,7 +22,7 @@ class VirtualAudioControlImpl : public fidl::WireServer<fuchsia_virtualaudio::Co
   static void DdkMessage(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn);
 
  private:
-  VirtualAudioControlImpl() = default;
+  VirtualAudio() = default;
 
   // Implements virtualaudio.Control.
   void GetDefaultConfiguration(GetDefaultConfigurationRequestView request,
@@ -39,4 +39,4 @@ class VirtualAudioControlImpl : public fidl::WireServer<fuchsia_virtualaudio::Co
 
 }  // namespace virtual_audio
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_CONTROL_IMPL_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_H_

@@ -1,7 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_control_impl.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/binding_driver.h>
@@ -23,8 +23,8 @@
 namespace virtual_audio {
 
 // static
-zx_status_t VirtualAudioControlImpl::DdkBind(void* ctx, zx_device_t* parent_bus) {
-  std::unique_ptr<VirtualAudioControlImpl> control(new VirtualAudioControlImpl);
+zx_status_t VirtualAudio::DdkBind(void* ctx, zx_device_t* parent_bus) {
+  std::unique_ptr<VirtualAudio> control(new VirtualAudio);
 
   // Define entry-point operations for this control device.
   static zx_protocol_device_t device_ops = {
@@ -62,10 +62,10 @@ zx_status_t VirtualAudioControlImpl::DdkBind(void* ctx, zx_device_t* parent_bus)
 }
 
 // static
-void VirtualAudioControlImpl::DdkUnbind(void* ctx) {
+void VirtualAudio::DdkUnbind(void* ctx) {
   ZX_ASSERT(ctx);
 
-  auto self = static_cast<VirtualAudioControlImpl*>(ctx);
+  auto self = static_cast<VirtualAudio*>(ctx);
   if (self->devices_.empty()) {
     zxlogf(INFO, "%s with no devices; unbinding self", __func__);
     device_unbind_reply(self->dev_node_);
@@ -90,26 +90,25 @@ void VirtualAudioControlImpl::DdkUnbind(void* ctx) {
 }
 
 // static
-void VirtualAudioControlImpl::DdkRelease(void* ctx) {
+void VirtualAudio::DdkRelease(void* ctx) {
   ZX_ASSERT(ctx);
 
   // Always called after DdkUnbind.
   // By now, all our lists should be empty and we can destroy the ctx.
-  std::unique_ptr<VirtualAudioControlImpl> control_ptr(static_cast<VirtualAudioControlImpl*>(ctx));
+  std::unique_ptr<VirtualAudio> control_ptr(static_cast<VirtualAudio*>(ctx));
   ZX_ASSERT(control_ptr->devices_.empty());
 }
 
 // static
-void VirtualAudioControlImpl::DdkMessage(void* ctx, fidl_incoming_msg_t msg,
-                                         device_fidl_txn_t txn) {
-  VirtualAudioControlImpl* self = static_cast<VirtualAudioControlImpl*>(ctx);
+void VirtualAudio::DdkMessage(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
+  VirtualAudio* self = static_cast<VirtualAudio*>(ctx);
   fidl::WireDispatch<fuchsia_virtualaudio::Control>(
       self, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
       ddk::FromDeviceFIDLTransaction(txn));
 }
 
-void VirtualAudioControlImpl::GetDefaultConfiguration(
-    GetDefaultConfigurationRequestView request, GetDefaultConfigurationCompleter::Sync& completer) {
+void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView request,
+                                           GetDefaultConfigurationCompleter::Sync& completer) {
   fidl::Arena arena;
   switch (request->type) {
     case fuchsia_virtualaudio::wire::DeviceType::kComposite:
@@ -135,8 +134,7 @@ void VirtualAudioControlImpl::GetDefaultConfiguration(
   }
 }
 
-void VirtualAudioControlImpl::AddDevice(AddDeviceRequestView request,
-                                        AddDeviceCompleter::Sync& completer) {
+void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& completer) {
   auto config = fidl::ToNatural(request->config);
   ZX_ASSERT(config.device_specific().has_value());
   auto result = VirtualAudioDeviceImpl::Create(std::move(config), std::move(request->server),
@@ -151,7 +149,7 @@ void VirtualAudioControlImpl::AddDevice(AddDeviceRequestView request,
   completer.ReplySuccess();
 }
 
-void VirtualAudioControlImpl::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
+void VirtualAudio::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
   uint32_t num_inputs = 0;
   uint32_t num_outputs = 0;
   uint32_t num_unspecified_direction = 0;
@@ -173,7 +171,7 @@ void VirtualAudioControlImpl::GetNumDevices(GetNumDevicesCompleter::Sync& comple
   completer.Reply(num_inputs, num_outputs, num_unspecified_direction);
 }
 
-void VirtualAudioControlImpl::RemoveAll(RemoveAllCompleter::Sync& completer) {
+void VirtualAudio::RemoveAll(RemoveAllCompleter::Sync& completer) {
   if (devices_.empty()) {
     completer.Reply();
     return;
@@ -202,3 +200,12 @@ void VirtualAudioControlImpl::RemoveAll(RemoveAllCompleter::Sync& completer) {
 }
 
 }  // namespace virtual_audio
+
+static constexpr zx_driver_ops_t virtual_audio_driver_ops = []() {
+  zx_driver_ops_t ops = {};
+  ops.version = DRIVER_OPS_VERSION;
+  ops.bind = &virtual_audio::VirtualAudio::DdkBind;
+  return ops;
+}();
+
+ZIRCON_DRIVER(virtual_audio, virtual_audio_driver_ops, "fuchsia", "0.1");
