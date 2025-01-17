@@ -1117,7 +1117,7 @@ group("unicode-segmentation") {
 }
 
 group("unicode-width") {
-  public_deps = [ ":unicode-width-v0_1_10" ]
+  public_deps = [ ":unicode-width-v0_2_0" ]
 }
 
 group("unicode-xid") {
@@ -17328,6 +17328,36 @@ rust_library("unicode-width-v0_1_10") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":unicode-width-v0_1_10.license" ]
+}
+
+license("unicode-width-v0_2_0.license") {
+  public_package_name = "unicode_width"
+  license_files =
+      [ "//third_party/rust_crates/vendor/unicode-width-0.2.0/LICENSE-APACHE" ]
+}
+
+rust_library("unicode-width-v0_2_0") {
+  crate_name = "unicode_width"
+  crate_root = "//third_party/rust_crates/vendor/unicode-width-0.2.0/src/lib.rs"
+  output_name = "unicode_width-73160b7502b3536"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=73160b7502b3536",
+    "-Cextra-filename=-73160b7502b3536",
+    "--cfg=feature=\"cjk\"",
+    "--cfg=feature=\"default\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":unicode-width-v0_2_0.license" ]
 }
 
 license("unicode-xid-v0_1_0.license") {

@@ -177,7 +177,7 @@ async fn display_result_list<'a, W: AsyncWrite + Unpin + 'a>(
     let mut cols = 0;
     for _ in 0..header_height {
         let header = header.iter_mut().map(|x| x.next().unwrap()).collect::<Vec<_>>().join("  ");
-        cols = header.width();
+        cols = header.lines().map(|x| x.width()).sum();
         let header = header_style(header, depth);
         writer.write_all(format!("{linebreak}{header}").as_bytes()).await?;
         linebreak = "\n";
@@ -270,7 +270,9 @@ fn display_result_inner<'a, W: AsyncWrite + Unpin + 'a>(
                 Ok((ret, DisplayedType::Text))
             }
             Ok(Value::Object(items)) => {
-                let name_width = items.iter().map(|x| x.0.width()).max().unwrap_or(0) + 1;
+                let name_width =
+                    items.iter().map(|x| x.0.lines().map(|y| y.width()).sum()).max().unwrap_or(0)
+                        + 1;
                 let mut cols = 0;
                 let mut lines = 0;
                 for (name, value) in items {
