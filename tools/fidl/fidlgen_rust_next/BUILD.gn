@@ -134,5 +134,6 @@ group("tests") {
     ":fidlgen_rust_next_test($host_toolchain)",
     ":goldens",
     ":goldens($host_toolchain)",
+    "examples/calculator:tests",
   ]
 }

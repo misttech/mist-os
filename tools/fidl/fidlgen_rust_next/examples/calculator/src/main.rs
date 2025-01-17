@@ -108,19 +108,25 @@ impl<T: Transport> CalculatorServerHandler<T> for MyCalculatorServer {
 }
 
 #[cfg(not(target_os = "fuchsia"))]
-fn make_transport() -> (fidl_next::protocol::mpsc::Mpsc, fidl_next::protocol::mpsc::Mpsc) {
-    fidl_next::protocol::mpsc::Mpsc::new()
-}
+type Endpoint = fidl_next::protocol::mpsc::Mpsc;
 
 #[cfg(target_os = "fuchsia")]
-fn make_transport() -> (zx::Channel, zx::Channel) {
-    zx::Channel::create()
+type Endpoint = zx::Channel;
+
+fn make_transport() -> (Endpoint, Endpoint) {
+    #[cfg(not(target_os = "fuchsia"))]
+    {
+        fidl_next::protocol::mpsc::Mpsc::new()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    {
+        zx::Channel::create()
+    }
 }
 
-#[fuchsia_async::run_singlethreaded]
-async fn main() {
-    println!("Starting right now!");
-
+async fn create_endpoints(
+) -> (ClientSender<Endpoint, Calculator>, Task<()>, ServerSender<Endpoint, Calculator>, Task<()>) {
     let (client_transport, server_transport) = make_transport();
 
     let client_end = ClientEnd::<_, Calculator>::from_untyped(client_transport);
@@ -129,48 +135,120 @@ async fn main() {
     let mut client = Client::new(client_end);
     let client_sender = client.sender().clone();
     let mut server = Server::new(server_end);
+    let server_sender = server.sender().clone();
 
     let client_task = Task::spawn(async move {
         client.run(MyCalculatorClient).await.unwrap();
+        println!("client exited");
     });
     let server_task = Task::spawn(async move {
         server.run(MyCalculatorServer { scope: Scope::new() }).await.unwrap();
+        println!("server exited");
     });
 
+    (client_sender, client_task, server_sender, server_task)
+}
+
+async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
     use fidl_next_examples_calculator::{
-        calculator_add_result, calculator_divide_result, CalculatorAddRequest,
-        CalculatorClientSender as _, CalculatorDivideRequest, DivisionError,
+        calculator_add_result, CalculatorAddRequest, CalculatorClientSender as _,
     };
 
     let mut buffer =
         client_sender.add(&mut CalculatorAddRequest { a: 16, b: 26 }).unwrap().await.unwrap();
+
     let result = buffer.decode().unwrap();
     let calculator_add_result::Ref::Response(response) = result.as_ref() else { panic!() };
-    assert_eq!(response.sum, 42);
 
+    assert_eq!(response.sum, 42);
+}
+
+async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
+    use fidl_next_examples_calculator::{
+        calculator_divide_result, CalculatorClientSender as _, CalculatorDivideRequest,
+        DivisionError,
+    };
+
+    // Normal division
     let mut buffer = client_sender
         .divide(&mut CalculatorDivideRequest { dividend: 100, divisor: 3 })
         .unwrap()
         .await
         .unwrap();
+
     let result = buffer.decode().unwrap();
     let calculator_divide_result::Ref::Response(response) = result.as_ref() else { panic!() };
+
     assert_eq!(response.quotient, 33);
     assert_eq!(response.remainder, 1);
 
+    // Cause an error
     let mut buffer = client_sender
         .divide(&mut CalculatorDivideRequest { dividend: 42, divisor: 0 })
         .unwrap()
         .await
         .unwrap();
+
     let result = buffer.decode().unwrap();
     let calculator_divide_result::Ref::Err(error) = result.as_ref() else { panic!() };
     assert_eq!(DivisionError::DivideByZero, (*error).into());
+}
+
+async fn clear(client_sender: &ClientSender<Endpoint, Calculator>) {
+    use fidl_next_examples_calculator::CalculatorClientSender as _;
 
     client_sender.clear().unwrap().await.unwrap();
+}
+
+#[fuchsia_async::run_singlethreaded]
+async fn main() {
+    let (client_sender, client_task, _, server_task) = create_endpoints().await;
+
+    add(&client_sender).await;
+    divide(&client_sender).await;
+    clear(&client_sender).await;
 
     client_task.await;
     server_task.await;
+}
 
-    println!("All tests passed!");
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_add() {
+        let (client_sender, client_task, _, server_task) = create_endpoints().await;
+
+        add(&client_sender).await;
+
+        // Dropping the client task will close the stream
+        drop(client_sender);
+        drop(client_task);
+        server_task.await;
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_divide() {
+        let (client_sender, client_task, _, server_task) = create_endpoints().await;
+
+        divide(&client_sender).await;
+
+        // Dropping the client task will close the stream
+        drop(client_sender);
+        drop(client_task);
+        server_task.await;
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_clear() {
+        let (client_sender, client_task, _, server_task) = create_endpoints().await;
+
+        clear(&client_sender).await;
+
+        // clear() triggers a stream closure, so we can just await both tasks
+        drop(client_sender);
+        client_task.await;
+        server_task.await;
+    }
 }
