@@ -15,6 +15,11 @@
     ],
     offer: [
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [ "#storage-tests" ],
+        },
+        {
             directory: [
                 "dev-class",
                 "dev-topological",
