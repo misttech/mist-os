@@ -23,7 +23,18 @@ libc_headers = {
 
   # Files taken from llvm-libc's include/ directory in some fashion.
   # See README.md about the two different fashions.
-  llvm_libc_headers = [ "__llvm-libc-common.h" ]
+  llvm_libc_headers = [
+    "__llvm-libc-common.h",
+    "llvm-libc-macros/fenv-macros.h",
+    "llvm-libc-types/fenv_t.h",
+    "llvm-libc-types/fexcept_t.h",
+  ]
+
+  # Files generated from corresponding `.h.def` and `.yaml` files.  These files
+  # are used in all the same ways as the $llvm_libc_headers list once they've
+  # been generated, with gen/... files in the build serving as the "source of
+  # truth" `.h` file rather than sources in the llvm-libc checkout.
+  llvm_libc_generated_headers = [ "fenv.h" ]
 
   # Files inherited from the legacy musl fork.  These are maintained within the
   # source tree and have no other active source of truth, but they are not
@@ -38,11 +49,9 @@ libc_headers = {
     "arpa/telnet.h",
     "arpa/tftp.h",
     "assert.h",
-    "bits/aarch64/fenv.h",
     "bits/aarch64/setjmp.h",
     "bits/alltypes.h",
     "bits/errno.h",
-    "bits/fenv.h",
     "bits/io.h",
     "bits/ioctl.h",
     "bits/ipc.h",
@@ -51,14 +60,12 @@ libc_headers = {
     "bits/poll.h",
     "bits/posix.h",
     "bits/resource.h",
-    "bits/riscv64/fenv.h",
     "bits/riscv64/setjmp.h",
     "bits/setjmp.h",
     "bits/signal.h",
     "bits/stat.h",
     "bits/statfs.h",
     "bits/termios.h",
-    "bits/x86_64/fenv.h",
     "bits/x86_64/io.h",
     "bits/x86_64/setjmp.h",
     "byteswap.h",
@@ -73,7 +80,6 @@ libc_headers = {
     "errno.h",
     "fcntl.h",
     "features.h",
-    "fenv.h",
     "fnmatch.h",
     "getopt.h",
     "glob.h",
@@ -194,7 +200,7 @@ libc_headers = {
     {
       sdk = {
         include_dir = golden_dir
-        headers = llvm_libc_headers
+        headers = llvm_libc_headers + llvm_libc_generated_headers
         deps = [ root_dir ]
       }
     },

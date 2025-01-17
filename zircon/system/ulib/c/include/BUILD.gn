@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/python/python_action.gni")
+import("//build/python/python_binary.gni")
 import("//build/testing/golden_files.gni")
 import("../libc.gni")
 import("libc_headers.gni")
@@ -29,14 +31,18 @@ import("libc_headers.gni")
 # llvm-libc roll to complete.  Finally, the flag must be set back to false
 # along with rebuilding with `update_goldens=true` in `args.gn` to update the
 # API summary files for the SDK, for a change that go through API review.
-llvm_libc_soft_transition = true  # TODO(https://fxbug.dev/376333113)
+llvm_libc_soft_transition = false
+
+# Generated headers go into this directory, always the same in every toolchain.
+gen_dir =
+    get_label_info("//third_party/llvm-libc/src/include($default_toolchain)",
+                   "target_gen_dir")
 
 # This target is in an sdk.deps list in sysroot_entries, to ensure that the
 # llvm-libc-golden copies are up to date.  It does nothing during a soft
 # transition declared by setting llvm_libc_soft_transition=true above.  This
 # checking only happens in the $default_toolchain and is not repeated
 # elsewhere.
-# TODO(https://fxbug.dev/376333113): header generation will happen here too.
 group("include") {
   if (!llvm_libc_soft_transition) {
     public_deps = [ ":check-llvm-libc-golden($default_toolchain)" ]
@@ -61,6 +67,14 @@ if (current_toolchain == default_toolchain) {
         },
       ]
     }
+    foreach(file, libc_headers.llvm_libc_generated_headers) {
+      contents += [
+        {
+          candidate = rebase_path(file, root_build_dir, gen_dir)
+          golden = rebase_path(file, "//", libc_headers.golden_dir)
+        },
+      ]
+    }
   }
 
   golden_files("check-llvm-libc-golden") {
@@ -72,9 +86,59 @@ if (current_toolchain == default_toolchain) {
               " to allow //third_party/llvm-libc/src to be updated." +
               " Then flip the flag back, build with `update_goldens=true`." +
               " This will update API summary files."
-    deps = [ ":check-llvm-libc-golden.manifest" ]
+    deps = [
+      ":check-llvm-libc-golden.manifest",
+      ":llvm-libc-generated-headers",
+    ]
     _outputs = get_target_outputs(deps[0])
     comparisons = _outputs[0]
+  }
+
+  python_action_foreach("llvm-libc-generated-headers") {
+    binary_label = ":hdrgen"
+
+    sources = []
+    generated_headers = []
+    foreach(header, libc_headers.llvm_libc_generated_headers) {
+      header_dir = get_path_info(header, "dir")
+      header_name = get_path_info(header, "name")
+      if (header_dir == ".") {
+        header_dir = ""
+      } else {
+        header_dir += "/"
+      }
+      sources += [ "$llvm_libc/include/$header_dir$header_name.yaml" ]
+      generated_headers += [ "$gen_dir/$header_dir$header_name.h" ]
+    }
+
+    # This is evaluated only in $default_toolchain, where $root_gen_dir is the
+    # prefix of $gen_dir before the full source-relative path in $llvm_libc.
+    # This isn't simpler because the action_foreach() path expansion logic only
+    # does a few fixed things, and it can't be used to distinguish the
+    # directory prefix that's part of the header name (e.g. sys/) from the rest
+    # of the path to the sources or outputs directory.
+    outputs =
+        [ "$root_gen_dir/{{source_root_relative_dir}}/{{source_name_part}}.h" ]
+
+    # That should wind up the same as "$gen_dir/$header" for each one.
+    _processed_sources = process_file_template(sources, outputs)
+    assert(_processed_sources == generated_headers,
+           "process_file_template($sources, $outputs) => " +
+               "$_processed_sources != $generated_headers")
+
+    depfile = "${outputs[0]}.d"
+    args = [
+      "--output=" + rebase_path(outputs[0], root_build_dir),
+      "--depfile=" + rebase_path(depfile, root_build_dir),
+      "--write-if-changed",
+      "{{source}}",
+    ]
+
+    metadata = {
+      # Populate build_api("generated_sources") to ensure all the headers are
+      # present for analysis.
+      generated_sources = rebase_path(generated_headers, root_build_dir)
+    }
   }
 }
 
@@ -105,16 +169,26 @@ basic_source_set("headers") {
 
   public_configs = [ ":headers.config" ]
   public = []
+  public_deps = []
+
   foreach(file, libc_headers.root_headers) {
     public += [ file ]
   }
+
   foreach(file, libc_headers.musl_headers) {
     public += [ "${libc_headers.musl_dir}/$file" ]
   }
+
   foreach(file, libc_headers.llvm_libc_headers) {
     public += [ "$llvm_libc/include/$file" ]
   }
-  public_deps = [ "//zircon/system/public" ]
+
+  foreach(file, libc_headers.llvm_libc_generated_headers) {
+    public += [ "$gen_dir/$file" ]
+  }
+  public_deps += [ ":llvm-libc-generated-headers($default_toolchain)" ]
+
+  public_deps += [ "//zircon/system/public" ]
 }
 
 config("headers.config") {
@@ -124,6 +198,7 @@ config("headers.config") {
           [
             ".",
             libc_headers.musl_dir,
+            gen_dir,
             "$llvm_libc/include",
           ]) {
     cflags += [
@@ -132,4 +207,24 @@ config("headers.config") {
     ]
   }
   asmflags = cflags
+}
+
+python_binary("hdrgen") {
+  visibility = [ ":*" ]
+
+  hdrgen_dir = "$llvm_libc/utils/hdrgen"
+  main_source = "$hdrgen_dir/main.py"
+  sources = [
+    "$hdrgen_dir/enumeration.py",
+    "$hdrgen_dir/function.py",
+    "$hdrgen_dir/gpu_headers.py",
+    "$hdrgen_dir/header.py",
+    "$hdrgen_dir/macro.py",
+    "$hdrgen_dir/object.py",
+    "$hdrgen_dir/type.py",
+    "$hdrgen_dir/yaml_to_classes.py",
+  ]
+  deps = [ "//third_party/pyyaml:yaml" ]
+
+  enable_mypy = false
 }
