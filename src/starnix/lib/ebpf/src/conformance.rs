@@ -941,7 +941,7 @@ pub mod test {
                     Type::ScalarValueParameter,
                     Type::ScalarValueParameter,
                 ],
-                return_value: Type::unknown_written_scalar_value(),
+                return_value: Type::UNKNOWN_SCALAR,
                 invalidate_array_bounds: false,
             },
             gather_bytes,
@@ -966,7 +966,7 @@ pub mod test {
             2,
             FunctionSignature {
                 args: vec![],
-                return_value: Type::unknown_written_scalar_value(),
+                return_value: Type::UNKNOWN_SCALAR,
                 invalidate_array_bounds: false,
             },
             trash_registers,
@@ -975,7 +975,7 @@ pub mod test {
             3,
             FunctionSignature {
                 args: vec![Type::ScalarValueParameter],
-                return_value: Type::unknown_written_scalar_value(),
+                return_value: Type::UNKNOWN_SCALAR,
                 invalidate_array_bounds: false,
             },
             sqrti,
@@ -986,7 +986,7 @@ pub mod test {
                 // Args cannot be correctly verified as the verifier cannot check the string
                 // are correctly 0 terminated.
                 args: vec![],
-                return_value: Type::unknown_written_scalar_value(),
+                return_value: Type::UNKNOWN_SCALAR,
                 invalidate_array_bounds: false,
             },
             strcmp_ext,
@@ -995,7 +995,7 @@ pub mod test {
             100,
             FunctionSignature {
                 args: vec![Type::ScalarValueParameter],
-                return_value: Type::NullOrParameter(Box::new(Type::unknown_written_scalar_value())),
+                return_value: Type::NullOrParameter(Box::new(Type::UNKNOWN_SCALAR)),
                 invalidate_array_bounds: false,
             },
             null_or,
@@ -1008,7 +1008,7 @@ pub mod test {
                     input: true,
                     output: false,
                 }],
-                return_value: Type::unknown_written_scalar_value(),
+                return_value: Type::UNKNOWN_SCALAR,
                 invalidate_array_bounds: false,
             },
             read_only,
@@ -1024,7 +1024,7 @@ pub mod test {
                     },
                     Type::ScalarValueParameter,
                 ],
-                return_value: Type::unknown_written_scalar_value(),
+                return_value: Type::UNKNOWN_SCALAR,
                 invalidate_array_bounds: false,
             },
             write_only,
@@ -1049,7 +1049,7 @@ pub mod test {
             104,
             FunctionSignature {
                 args: vec![Type::ReleaseParameter { id: malloc_id.clone() }],
-                return_value: Type::unknown_written_scalar_value(),
+                return_value: Type::UNKNOWN_SCALAR,
                 invalidate_array_bounds: false,
             },
             free,
