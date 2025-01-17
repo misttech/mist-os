@@ -41,7 +41,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::{errno, rlimit};
+use starnix_uapi::{errno, pid_t, rlimit};
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
@@ -657,7 +657,7 @@ async fn create_container(
     )?;
 
     if !config.startup_file_path.is_empty() {
-        wait_for_init_file(&config.startup_file_path, &system_task).await?;
+        wait_for_init_file(&config.startup_file_path, &system_task, init_pid).await?;
     };
 
     let memory_attribution_manager = ContainerMemoryAttributionManager::new(
@@ -847,6 +847,7 @@ fn create_remote_block_device_from_spec<'a>(
 async fn wait_for_init_file(
     startup_file_path: &str,
     current_task: &CurrentTask,
+    init_pid: pid_t,
 ) -> Result<(), Error> {
     // TODO(https://fxbug.dev/42178400): Use inotify machinery to wait for the file.
     loop {
@@ -860,8 +861,12 @@ async fn wait_for_init_file(
             startup_file_path.into(),
         ) {
             Ok(_) => break,
-            Err(error) if error == ENOENT => continue,
+            Err(error) if error == ENOENT => {}
             Err(error) => return Err(anyhow::Error::from(error)),
+        }
+
+        if current_task.get_task(init_pid).upgrade().is_none() {
+            return Err(anyhow!("Init task terminated before startup_file_path was ready"));
         }
     }
     Ok(())
@@ -935,7 +940,9 @@ mod test {
             .expect("Failed to create file");
 
         fasync::Task::local(async move {
-            wait_for_init_file(path, &current_task).await.expect("failed to wait for file");
+            wait_for_init_file(path, &current_task, current_task.get_pid())
+                .await
+                .expect("failed to wait for file");
             sender.send(()).await.expect("failed to send message");
         })
         .detach();
@@ -953,9 +960,12 @@ mod test {
             current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
         let path = "/path";
 
+        let test_init_pid = current_task.get_pid();
         fasync::Task::local(async move {
             sender.send(()).await.expect("failed to send message");
-            wait_for_init_file(path, &init_task).await.expect("failed to wait for file");
+            wait_for_init_file(path, &init_task, test_init_pid)
+                .await
+                .expect("failed to wait for file");
             sender.send(()).await.expect("failed to send message");
         })
         .detach();
@@ -977,6 +987,35 @@ mod test {
             .expect("Failed to create file");
 
         // Wait for the file creation to be detected.
+        assert!(receiver.next().await.is_some());
+    }
+
+    #[fuchsia::test]
+    async fn test_init_exits_before_file_exists() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
+
+        let init_task =
+            current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
+        const STARTUP_FILE_PATH: &str = "/path";
+
+        let test_init_pid = init_task.get_pid();
+        fasync::Task::local(async move {
+            sender.send(()).await.expect("failed to send message");
+            wait_for_init_file(STARTUP_FILE_PATH, &current_task, test_init_pid)
+                .await
+                .expect_err("Did not detect init exit");
+            sender.send(()).await.expect("failed to send message");
+        })
+        .detach();
+
+        // Wait for message that file check has started.
+        assert!(receiver.next().await.is_some());
+
+        // Drop the `init_task`.
+        std::mem::drop(init_task);
+
+        // Wait for the init failure to be detected.
         assert!(receiver.next().await.is_some());
     }
 }
