@@ -167,17 +167,14 @@ async fn do_start(
         component.execution_scope.clone(),
     )
     .await
-    .map_err(|err| StartActionError::CreateNamespaceError {
-        moniker: component.moniker.clone(),
-        err,
-    })?;
+    .map_err(|err| StartActionError::CreateNamespaceError(err))?;
     for NamespaceEntry { directory, path } in additional_namespace_entries {
         let directory: sandbox::Directory = directory.into();
         namespace_builder.add_entry(Capability::Directory(directory), &path).map_err(|err| {
-            StartActionError::CreateNamespaceError {
+            StartActionError::CreateNamespaceError(CreateNamespaceError::BuildNamespaceError {
                 moniker: component.moniker.clone(),
-                err: CreateNamespaceError::BuildNamespaceError(err),
-            }
+                err,
+            })
         })?;
     }
 

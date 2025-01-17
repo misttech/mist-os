@@ -658,13 +658,17 @@ impl ResolvedInstanceState {
                 component.execution_scope.clone(),
             )
             .await?;
-            let namespace =
-                namespace_builder.serve().map_err(CreateNamespaceError::BuildNamespaceError)?;
-            let namespace_dir: Arc<pfs::Simple> = namespace.try_into().map_err(|err| {
-                CreateNamespaceError::ConvertToDirectory(ClonableError::from(anyhow::Error::from(
-                    err,
-                )))
+            let namespace = namespace_builder.serve().map_err(|e| {
+                CreateNamespaceError::BuildNamespaceError {
+                    moniker: component.moniker.clone(),
+                    err: e,
+                }
             })?;
+            let namespace_dir: Arc<pfs::Simple> =
+                namespace.try_into().map_err(|err| CreateNamespaceError::ConvertToDirectory {
+                    moniker: component.moniker.clone(),
+                    err: ClonableError::from(anyhow::Error::from(err)),
+                })?;
             Ok(namespace_dir)
         };
 

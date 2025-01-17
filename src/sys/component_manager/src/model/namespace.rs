@@ -15,7 +15,7 @@ use fidl_fuchsia_io as fio;
 use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::StreamExt;
 use sandbox::{Capability, Dict};
-use serve_processargs::NamespaceBuilder;
+use serve_processargs::{BuildNamespaceError, NamespaceBuilder};
 use std::sync::Arc;
 use vfs::execution_scope::ExecutionScope;
 
@@ -33,9 +33,12 @@ pub async fn create_namespace(
     let not_found_sender = not_found_logging(component);
     let mut namespace = NamespaceBuilder::new(scope.clone(), not_found_sender);
     if let Some(package) = package {
-        let pkg_dir = fuchsia_fs::directory::clone(&package.package_dir)
-            .map_err(CreateNamespaceError::ClonePkgDirFailed)?;
-        add_pkg_directory(&mut namespace, pkg_dir)?;
+        let pkg_dir = fuchsia_fs::directory::clone(&package.package_dir).map_err(|e| {
+            CreateNamespaceError::ClonePkgDirFailed { moniker: component.moniker.clone(), err: e }
+        })?;
+        add_pkg_directory(&mut namespace, pkg_dir).map_err(|e| {
+            CreateNamespaceError::BuildNamespaceError { moniker: component.moniker.clone(), err: e }
+        })?;
     }
 
     for use_ in &decl.uses {
@@ -50,7 +53,9 @@ pub async fn create_namespace(
         }
     }
 
-    program_input_dict_to_namespace("", &mut namespace, program_input_dict)?;
+    program_input_dict_to_namespace("", &mut namespace, program_input_dict).map_err(|e| {
+        CreateNamespaceError::BuildNamespaceError { moniker: component.moniker.clone(), err: e }
+    })?;
     Ok(namespace)
 }
 
@@ -58,7 +63,7 @@ pub async fn create_namespace(
 fn add_pkg_directory(
     namespace: &mut NamespaceBuilder,
     pkg_dir: fio::DirectoryProxy,
-) -> Result<(), CreateNamespaceError> {
+) -> Result<(), BuildNamespaceError> {
     // TODO(https://fxbug.dev/42060182): Use Proxy::into_client_end when available.
     let client_end = ClientEnd::new(pkg_dir.into_channel().unwrap().into_zx_channel());
     let directory: sandbox::Directory = client_end.into();
@@ -72,7 +77,7 @@ fn program_input_dict_to_namespace(
     prefix: &str,
     namespace: &mut NamespaceBuilder,
     program_input_dict: &Dict,
-) -> Result<(), CreateNamespaceError> {
+) -> Result<(), serve_processargs::BuildNamespaceError> {
     // Convert (the transformed) program_input_dict to namespace.
     //
     // Flatten the namespace as much as possible.

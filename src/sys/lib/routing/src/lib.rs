@@ -1062,7 +1062,7 @@ where
     {
         return Err(RoutingError::ComponentNotInIdIndex {
             source_moniker,
-            target_moniker: instance.moniker().clone(),
+            target_name: instance.moniker().leaf().cloned(),
         });
     }
     Ok(())
