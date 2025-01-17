@@ -1133,7 +1133,7 @@ group("url") {
 }
 
 group("utf8parse") {
-  public_deps = [ ":utf8parse-v0_1_1" ]
+  public_deps = [ ":utf8parse-v0_2_2" ]
 }
 
 group("uuid") {
@@ -17637,6 +17637,37 @@ rust_library("utf8parse-v0_1_1") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":utf8parse-v0_1_1.license" ]
+}
+
+license("utf8parse-v0_2_2.license") {
+  public_package_name = "utf8parse"
+  license_files = [
+    "//third_party/rust_crates/vendor/utf8parse-0.2.2/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/utf8parse-0.2.2/LICENSE-MIT",
+  ]
+}
+
+rust_library("utf8parse-v0_2_2") {
+  crate_name = "utf8parse"
+  crate_root = "//third_party/rust_crates/vendor/utf8parse-0.2.2/src/lib.rs"
+  output_name = "utf8parse-4c5eb08d06e9b27f"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=4c5eb08d06e9b27f",
+    "-Cextra-filename=-4c5eb08d06e9b27f",
+    "--cfg=feature=\"default\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":utf8parse-v0_2_2.license" ]
 }
 
 license("uuid-v0_7_2.license") {

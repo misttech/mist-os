@@ -239,7 +239,7 @@ unicode-width = "0.2.0"
 unicode-xid = "0.2.0"
 untrusted = "0.7.1"
 url = "2.3"
-utf8parse = "0.1"
+utf8parse = "0.2.2"
 uuid = { version = "1.1.2", features = ["serde", "v4"] } # move ?
 valico = "2.4.2"
 vm-device = "0.1.0"
