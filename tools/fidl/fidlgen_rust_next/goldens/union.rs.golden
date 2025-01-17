@@ -6207,7 +6207,7 @@ pub struct WireUnion<'buf> {
     _phantom: ::core::marker::PhantomData<&'buf mut [::fidl_next::Chunk]>,
 }
 
-pub mod r#union {
+pub mod union_ {
     pub enum Ref<'union, 'buf> {
         Primitive(&'union ::fidl_next::i32_le),
 
@@ -6230,15 +6230,15 @@ pub mod r#union {
 }
 
 impl<'buf> WireUnion<'buf> {
-    pub fn as_ref(&self) -> crate::r#union::Ref<'_, 'buf> {
+    pub fn as_ref(&self) -> crate::union_::Ref<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => crate::r#union::Ref::Primitive(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_::Ref::Primitive(unsafe { self.raw.get().deref_unchecked() }),
 
-            2 => crate::r#union::Ref::StringNeedsConstructor(unsafe {
+            2 => crate::union_::Ref::StringNeedsConstructor(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
-            3 => crate::r#union::Ref::VectorStringAlsoNeedsConstructor(unsafe {
+            3 => crate::union_::Ref::VectorStringAlsoNeedsConstructor(unsafe {
                 self.raw.get().deref_unchecked()
             }),
 
@@ -6246,17 +6246,15 @@ impl<'buf> WireUnion<'buf> {
         }
     }
 
-    pub fn as_mut(&mut self) -> crate::r#union::Mut<'_, 'buf> {
+    pub fn as_mut(&mut self) -> crate::union_::Mut<'_, 'buf> {
         match self.raw.ordinal() {
-            1 => {
-                crate::r#union::Mut::Primitive(unsafe { self.raw.get_mut().deref_mut_unchecked() })
-            }
+            1 => crate::union_::Mut::Primitive(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            2 => crate::r#union::Mut::StringNeedsConstructor(unsafe {
+            2 => crate::union_::Mut::StringNeedsConstructor(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            3 => crate::r#union::Mut::VectorStringAlsoNeedsConstructor(unsafe {
+            3 => crate::union_::Mut::VectorStringAlsoNeedsConstructor(unsafe {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 

@@ -6566,7 +6566,7 @@ where
 
 #[derive(Debug)]
 pub struct WithProtocolEndsClientEndsRequest {
-    pub r#in: ::fidl_next::bind::ClientEnd<::fidl_next::zx::Handle, crate::DiscoverableProtocol>,
+    pub in_: ::fidl_next::bind::ClientEnd<::fidl_next::zx::Handle, crate::DiscoverableProtocol>,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsClientEndsRequest {
@@ -6585,12 +6585,12 @@ where
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
-                r#in,
+                in_,
 
             } = slot;
         }
 
-        ::fidl_next::Encode::encode(&mut self.r#in, encoder, r#in)?;
+        ::fidl_next::Encode::encode(&mut self.in_, encoder, in_)?;
 
         Ok(())
     }
@@ -6625,7 +6625,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsRequest>
     for WithProtocolEndsClientEndsRequest
 {
     fn take_from(from: &mut WireWithProtocolEndsClientEndsRequest) -> Self {
-        Self { r#in: ::fidl_next::TakeFrom::take_from(&mut from.r#in) }
+        Self { in_: ::fidl_next::TakeFrom::take_from(&mut from.in_) }
     }
 }
 
@@ -6633,7 +6633,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsClientEndsRequest>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsClientEndsRequest {
-    pub r#in: ::fidl_next::bind::ClientEnd<::fidl_next::WireHandle, crate::DiscoverableProtocol>,
+    pub in_: ::fidl_next::bind::ClientEnd<::fidl_next::WireHandle, crate::DiscoverableProtocol>,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithProtocolEndsClientEndsRequest
@@ -6649,12 +6649,12 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge! {
             let Self {
-                mut r#in,
+                mut in_,
 
             } = slot;
         }
 
-        ::fidl_next::Decode::decode(r#in.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(in_.as_mut(), decoder)?;
 
         Ok(())
     }
@@ -6760,7 +6760,7 @@ where
 
 #[derive(Debug)]
 pub struct WithProtocolEndsServerEndsRequest {
-    pub r#in:
+    pub in_:
         ::fidl_next::bind::ServerEnd<Option<::fidl_next::zx::Handle>, crate::DiscoverableProtocol>,
 }
 
@@ -6780,12 +6780,12 @@ where
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
-                r#in,
+                in_,
 
             } = slot;
         }
 
-        ::fidl_next::Encode::encode(&mut self.r#in, encoder, r#in)?;
+        ::fidl_next::Encode::encode(&mut self.in_, encoder, in_)?;
 
         Ok(())
     }
@@ -6820,7 +6820,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsRequest>
     for WithProtocolEndsServerEndsRequest
 {
     fn take_from(from: &mut WireWithProtocolEndsServerEndsRequest) -> Self {
-        Self { r#in: ::fidl_next::TakeFrom::take_from(&mut from.r#in) }
+        Self { in_: ::fidl_next::TakeFrom::take_from(&mut from.in_) }
     }
 }
 
@@ -6828,7 +6828,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsServerEndsRequest>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsServerEndsRequest {
-    pub r#in:
+    pub in_:
         ::fidl_next::bind::ServerEnd<::fidl_next::WireOptionalHandle, crate::DiscoverableProtocol>,
 }
 
@@ -6845,12 +6845,12 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge! {
             let Self {
-                mut r#in,
+                mut in_,
 
             } = slot;
         }
 
-        ::fidl_next::Decode::decode(r#in.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(in_.as_mut(), decoder)?;
 
         Ok(())
     }
@@ -6954,7 +6954,7 @@ where
 
 #[derive(Debug)]
 pub struct WithProtocolEndsStructContainingEndsRequest {
-    pub r#in: crate::ProtocolEnds,
+    pub in_: crate::ProtocolEnds,
 }
 
 impl ::fidl_next::Encodable for WithProtocolEndsStructContainingEndsRequest {
@@ -6972,12 +6972,12 @@ where
     ) -> Result<(), ::fidl_next::EncodeError> {
         ::fidl_next::munge! {
             let Self::Encoded {
-                r#in,
+                in_,
 
             } = slot;
         }
 
-        ::fidl_next::Encode::encode(&mut self.r#in, encoder, r#in)?;
+        ::fidl_next::Encode::encode(&mut self.in_, encoder, in_)?;
 
         Ok(())
     }
@@ -7013,7 +7013,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsStructContainingEndsRequest>
     for WithProtocolEndsStructContainingEndsRequest
 {
     fn take_from(from: &mut WireWithProtocolEndsStructContainingEndsRequest) -> Self {
-        Self { r#in: ::fidl_next::TakeFrom::take_from(&mut from.r#in) }
+        Self { in_: ::fidl_next::TakeFrom::take_from(&mut from.in_) }
     }
 }
 
@@ -7021,7 +7021,7 @@ impl ::fidl_next::TakeFrom<WireWithProtocolEndsStructContainingEndsRequest>
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireWithProtocolEndsStructContainingEndsRequest {
-    pub r#in: crate::WireProtocolEnds,
+    pub in_: crate::WireProtocolEnds,
 }
 
 unsafe impl<___D> ::fidl_next::Decode<___D> for WireWithProtocolEndsStructContainingEndsRequest
@@ -7036,12 +7036,12 @@ where
     ) -> Result<(), ::fidl_next::DecodeError> {
         ::fidl_next::munge! {
             let Self {
-                mut r#in,
+                mut in_,
 
             } = slot;
         }
 
-        ::fidl_next::Decode::decode(r#in.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(in_.as_mut(), decoder)?;
 
         Ok(())
     }

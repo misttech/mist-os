@@ -679,7 +679,7 @@ pub struct WireUnion {
     _phantom: ::core::marker::PhantomData<()>,
 }
 
-pub mod r#union {
+pub mod union_ {
     pub enum Ref<'union> {
         B(&'union bool),
 
@@ -694,19 +694,19 @@ pub mod r#union {
 }
 
 impl WireUnion {
-    pub fn as_ref(&self) -> crate::r#union::Ref<'_> {
+    pub fn as_ref(&self) -> crate::union_::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::r#union::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
+            1 => crate::union_::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::r#union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::union_::Ref::UnknownOrdinal(unknown),
         }
     }
 
-    pub fn as_mut(&mut self) -> crate::r#union::Mut<'_> {
+    pub fn as_mut(&mut self) -> crate::union_::Mut<'_> {
         match self.raw.ordinal() {
-            1 => crate::r#union::Mut::B(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
+            1 => crate::union_::Mut::B(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            unknown => crate::r#union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::union_::Mut::UnknownOrdinal(unknown),
         }
     }
 }
@@ -1463,13 +1463,13 @@ where
 pub struct Compound {
     pub bits: crate::Bits,
 
-    pub r#enum: crate::Enum,
+    pub enum_: crate::Enum,
 
-    pub r#struct: crate::Struct,
+    pub struct_: crate::Struct,
 
     pub table: crate::Table,
 
-    pub r#union: crate::Union,
+    pub union_: crate::Union,
 
     pub opt_struct: Option<Box<crate::Struct>>,
 
@@ -1504,10 +1504,10 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 bits,
-                r#enum,
-                r#struct,
+                enum_,
+                struct_,
                 table,
-                r#union,
+                union_,
                 opt_struct,
                 opt_union,
 
@@ -1516,13 +1516,13 @@ where
 
         ::fidl_next::Encode::encode(&mut self.bits, encoder, bits)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#enum, encoder, r#enum)?;
+        ::fidl_next::Encode::encode(&mut self.enum_, encoder, enum_)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#struct, encoder, r#struct)?;
+        ::fidl_next::Encode::encode(&mut self.struct_, encoder, struct_)?;
 
         ::fidl_next::Encode::encode(&mut self.table, encoder, table)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#union, encoder, r#union)?;
+        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
 
         ::fidl_next::Encode::encode(&mut self.opt_struct, encoder, opt_struct)?;
 
@@ -1562,13 +1562,13 @@ impl<'buf> ::fidl_next::TakeFrom<WireCompound<'buf>> for Compound {
         Self {
             bits: ::fidl_next::TakeFrom::take_from(&mut from.bits),
 
-            r#enum: ::fidl_next::TakeFrom::take_from(&mut from.r#enum),
+            enum_: ::fidl_next::TakeFrom::take_from(&mut from.enum_),
 
-            r#struct: ::fidl_next::TakeFrom::take_from(&mut from.r#struct),
+            struct_: ::fidl_next::TakeFrom::take_from(&mut from.struct_),
 
             table: ::fidl_next::TakeFrom::take_from(&mut from.table),
 
-            r#union: ::fidl_next::TakeFrom::take_from(&mut from.r#union),
+            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
 
             opt_struct: ::fidl_next::TakeFrom::take_from(&mut from.opt_struct),
 
@@ -1583,13 +1583,13 @@ impl<'buf> ::fidl_next::TakeFrom<WireCompound<'buf>> for Compound {
 pub struct WireCompound<'buf> {
     pub bits: crate::WireBits,
 
-    pub r#enum: crate::WireEnum,
+    pub enum_: crate::WireEnum,
 
-    pub r#struct: crate::WireStruct,
+    pub struct_: crate::WireStruct,
 
     pub table: crate::WireTable<'buf>,
 
-    pub r#union: crate::WireUnion,
+    pub union_: crate::WireUnion,
 
     pub opt_struct: ::fidl_next::WireBox<'buf, crate::WireStruct>,
 
@@ -1621,10 +1621,10 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut bits,
-                mut r#enum,
-                mut r#struct,
+                mut enum_,
+                mut struct_,
                 mut table,
-                mut r#union,
+                mut union_,
                 mut opt_struct,
                 mut opt_union,
 
@@ -1633,13 +1633,13 @@ where
 
         ::fidl_next::Decode::decode(bits.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#enum.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(enum_.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#struct.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(struct_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(table.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#union.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(opt_struct.as_mut(), decoder)?;
 
@@ -4836,11 +4836,11 @@ pub struct Resource {
 
     pub server_end: ::fidl_next::bind::ServerEnd<::fidl_next::zx::Handle, crate::Protocol>,
 
-    pub r#struct: crate::ResourceStruct,
+    pub struct_: crate::ResourceStruct,
 
     pub table: crate::ResourceTable,
 
-    pub r#union: crate::ResourceUnion,
+    pub union_: crate::ResourceUnion,
 
     pub opt_handle: Option<::fidl_next::zx::Handle>,
 
@@ -4968,9 +4968,9 @@ where
                 vmo,
                 client_end,
                 server_end,
-                r#struct,
+                struct_,
                 table,
-                r#union,
+                union_,
                 opt_handle,
                 opt_vmo,
                 opt_client_end,
@@ -5003,11 +5003,11 @@ where
 
         ::fidl_next::Encode::encode(&mut self.server_end, encoder, server_end)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#struct, encoder, r#struct)?;
+        ::fidl_next::Encode::encode(&mut self.struct_, encoder, struct_)?;
 
         ::fidl_next::Encode::encode(&mut self.table, encoder, table)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#union, encoder, r#union)?;
+        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
 
         ::fidl_next::Encode::encode(&mut self.opt_handle, encoder, opt_handle)?;
 
@@ -5089,11 +5089,11 @@ impl<'buf> ::fidl_next::TakeFrom<WireResource<'buf>> for Resource {
 
             server_end: ::fidl_next::TakeFrom::take_from(&mut from.server_end),
 
-            r#struct: ::fidl_next::TakeFrom::take_from(&mut from.r#struct),
+            struct_: ::fidl_next::TakeFrom::take_from(&mut from.struct_),
 
             table: ::fidl_next::TakeFrom::take_from(&mut from.table),
 
-            r#union: ::fidl_next::TakeFrom::take_from(&mut from.r#union),
+            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
 
             opt_handle: ::fidl_next::TakeFrom::take_from(&mut from.opt_handle),
 
@@ -5150,11 +5150,11 @@ pub struct WireResource<'buf> {
 
     pub server_end: ::fidl_next::bind::ServerEnd<::fidl_next::WireHandle, crate::Protocol>,
 
-    pub r#struct: crate::WireResourceStruct,
+    pub struct_: crate::WireResourceStruct,
 
     pub table: crate::WireResourceTable<'buf>,
 
-    pub r#union: crate::WireResourceUnion,
+    pub union_: crate::WireResourceUnion,
 
     pub opt_handle: ::fidl_next::WireOptionalHandle,
 
@@ -5287,9 +5287,9 @@ where
                 mut vmo,
                 mut client_end,
                 mut server_end,
-                mut r#struct,
+                mut struct_,
                 mut table,
-                mut r#union,
+                mut union_,
                 mut opt_handle,
                 mut opt_vmo,
                 mut opt_client_end,
@@ -5322,11 +5322,11 @@ where
 
         ::fidl_next::Decode::decode(server_end.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#struct.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(struct_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(table.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#union.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(opt_handle.as_mut(), decoder)?;
 

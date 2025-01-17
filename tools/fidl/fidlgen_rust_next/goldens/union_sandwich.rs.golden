@@ -236,7 +236,7 @@ impl<'buf> ::core::fmt::Debug for WireOptionalUnionSize12Alignment4<'buf> {
 pub struct SandwichUnionSize12Alignment4 {
     pub before: u32,
 
-    pub r#union: crate::UnionSize12Alignment4,
+    pub union_: crate::UnionSize12Alignment4,
 
     pub after: i32,
 }
@@ -261,7 +261,7 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 before,
-                r#union,
+                union_,
                 after,
 
             } = slot;
@@ -269,7 +269,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.before, encoder, before)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#union, encoder, r#union)?;
+        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
 
         ::fidl_next::Encode::encode(&mut self.after, encoder, after)?;
 
@@ -309,7 +309,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4<'buf>>
         Self {
             before: ::fidl_next::TakeFrom::take_from(&mut from.before),
 
-            r#union: ::fidl_next::TakeFrom::take_from(&mut from.r#union),
+            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
 
             after: ::fidl_next::TakeFrom::take_from(&mut from.after),
         }
@@ -322,7 +322,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize12Alignment4<'buf>>
 pub struct WireSandwichUnionSize12Alignment4<'buf> {
     pub before: ::fidl_next::u32_le,
 
-    pub r#union: crate::WireUnionSize12Alignment4<'buf>,
+    pub union_: crate::WireUnionSize12Alignment4<'buf>,
 
     pub after: ::fidl_next::i32_le,
 }
@@ -344,7 +344,7 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut before,
-                mut r#union,
+                mut union_,
                 mut after,
 
             } = slot;
@@ -352,7 +352,7 @@ where
 
         ::fidl_next::Decode::decode(before.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#union.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(after.as_mut(), decoder)?;
 
@@ -711,7 +711,7 @@ impl<'buf> ::core::fmt::Debug for WireOptionalUnionSize24Alignment8<'buf> {
 pub struct SandwichUnionSize24Alignment8 {
     pub before: u32,
 
-    pub r#union: crate::UnionSize24Alignment8,
+    pub union_: crate::UnionSize24Alignment8,
 
     pub after: u32,
 }
@@ -736,7 +736,7 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 before,
-                r#union,
+                union_,
                 after,
 
             } = slot;
@@ -744,7 +744,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.before, encoder, before)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#union, encoder, r#union)?;
+        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
 
         ::fidl_next::Encode::encode(&mut self.after, encoder, after)?;
 
@@ -784,7 +784,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8<'buf>>
         Self {
             before: ::fidl_next::TakeFrom::take_from(&mut from.before),
 
-            r#union: ::fidl_next::TakeFrom::take_from(&mut from.r#union),
+            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
 
             after: ::fidl_next::TakeFrom::take_from(&mut from.after),
         }
@@ -797,7 +797,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize24Alignment8<'buf>>
 pub struct WireSandwichUnionSize24Alignment8<'buf> {
     pub before: ::fidl_next::u32_le,
 
-    pub r#union: crate::WireUnionSize24Alignment8<'buf>,
+    pub union_: crate::WireUnionSize24Alignment8<'buf>,
 
     pub after: ::fidl_next::u32_le,
 }
@@ -819,7 +819,7 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut before,
-                mut r#union,
+                mut union_,
                 mut after,
 
             } = slot;
@@ -827,7 +827,7 @@ where
 
         ::fidl_next::Decode::decode(before.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#union.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(after.as_mut(), decoder)?;
 
@@ -1069,7 +1069,7 @@ impl<'buf> ::core::fmt::Debug for WireOptionalUnionSize36Alignment4<'buf> {
 pub struct SandwichUnionSize36Alignment4 {
     pub before: u32,
 
-    pub r#union: crate::UnionSize36Alignment4,
+    pub union_: crate::UnionSize36Alignment4,
 
     pub after: u32,
 }
@@ -1094,7 +1094,7 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 before,
-                r#union,
+                union_,
                 after,
 
             } = slot;
@@ -1102,7 +1102,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.before, encoder, before)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#union, encoder, r#union)?;
+        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
 
         ::fidl_next::Encode::encode(&mut self.after, encoder, after)?;
 
@@ -1142,7 +1142,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4<'buf>>
         Self {
             before: ::fidl_next::TakeFrom::take_from(&mut from.before),
 
-            r#union: ::fidl_next::TakeFrom::take_from(&mut from.r#union),
+            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
 
             after: ::fidl_next::TakeFrom::take_from(&mut from.after),
         }
@@ -1155,7 +1155,7 @@ impl<'buf> ::fidl_next::TakeFrom<WireSandwichUnionSize36Alignment4<'buf>>
 pub struct WireSandwichUnionSize36Alignment4<'buf> {
     pub before: ::fidl_next::u32_le,
 
-    pub r#union: crate::WireUnionSize36Alignment4<'buf>,
+    pub union_: crate::WireUnionSize36Alignment4<'buf>,
 
     pub after: ::fidl_next::u32_le,
 }
@@ -1177,7 +1177,7 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut before,
-                mut r#union,
+                mut union_,
                 mut after,
 
             } = slot;
@@ -1185,7 +1185,7 @@ where
 
         ::fidl_next::Decode::decode(before.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#union.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(after.as_mut(), decoder)?;
 
@@ -1461,7 +1461,7 @@ impl ::core::fmt::Debug for WireOptionalUnionSize8Alignment4 {
 pub struct SandwichUnionSize8Alignment4 {
     pub before: u32,
 
-    pub r#union: crate::UnionSize8Alignment4,
+    pub union_: crate::UnionSize8Alignment4,
 
     pub after: u32,
 }
@@ -1486,7 +1486,7 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 before,
-                r#union,
+                union_,
                 after,
 
             } = slot;
@@ -1494,7 +1494,7 @@ where
 
         ::fidl_next::Encode::encode(&mut self.before, encoder, before)?;
 
-        ::fidl_next::Encode::encode(&mut self.r#union, encoder, r#union)?;
+        ::fidl_next::Encode::encode(&mut self.union_, encoder, union_)?;
 
         ::fidl_next::Encode::encode(&mut self.after, encoder, after)?;
 
@@ -1532,7 +1532,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize8Alignment4> for SandwichUnionSi
         Self {
             before: ::fidl_next::TakeFrom::take_from(&mut from.before),
 
-            r#union: ::fidl_next::TakeFrom::take_from(&mut from.r#union),
+            union_: ::fidl_next::TakeFrom::take_from(&mut from.union_),
 
             after: ::fidl_next::TakeFrom::take_from(&mut from.after),
         }
@@ -1545,7 +1545,7 @@ impl ::fidl_next::TakeFrom<WireSandwichUnionSize8Alignment4> for SandwichUnionSi
 pub struct WireSandwichUnionSize8Alignment4 {
     pub before: ::fidl_next::u32_le,
 
-    pub r#union: crate::WireUnionSize8Alignment4,
+    pub union_: crate::WireUnionSize8Alignment4,
 
     pub after: ::fidl_next::u32_le,
 }
@@ -1567,7 +1567,7 @@ where
         ::fidl_next::munge! {
             let Self {
                 mut before,
-                mut r#union,
+                mut union_,
                 mut after,
 
             } = slot;
@@ -1575,7 +1575,7 @@ where
 
         ::fidl_next::Decode::decode(before.as_mut(), decoder)?;
 
-        ::fidl_next::Decode::decode(r#union.as_mut(), decoder)?;
+        ::fidl_next::Decode::decode(union_.as_mut(), decoder)?;
 
         ::fidl_next::Decode::decode(after.as_mut(), decoder)?;
 
