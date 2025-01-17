@@ -231,6 +231,7 @@ pub fn sys_getrandom(
     Ok(bytes_written)
 }
 
+#[track_caller]
 fn panic_or_error(kernel: &Kernel, errno: Errno) -> Result<(), Errno> {
     if kernel.features.error_on_failed_reboot {
         return Err(errno);
