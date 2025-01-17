@@ -110,7 +110,7 @@ pub struct Server<T: Transport, P> {
 
 impl<T: Transport, P> Server<T, P> {
     /// Creates a new server from a server end.
-    pub fn new(server_end: ServerEnd<T, P>) -> Server<T, P> {
+    pub fn new(server_end: ServerEnd<T, P>) -> Self {
         Self { server: protocol::Server::new(server_end.into_untyped()), _protocol: PhantomData }
     }
 

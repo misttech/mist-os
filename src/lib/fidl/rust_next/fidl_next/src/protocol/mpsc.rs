@@ -45,7 +45,7 @@ pub struct Mpsc {
 
 impl Mpsc {
     /// Creates two mpscs which can communicate with each other.
-    pub fn new() -> (Mpsc, Mpsc) {
+    pub fn new() -> (Self, Self) {
         let shared = Arc::new(Shared {
             is_closed: AtomicBool::new(false),
             send_wakers: [AtomicWaker::new(), AtomicWaker::new()],
