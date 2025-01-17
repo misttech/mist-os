@@ -25,6 +25,7 @@
 #include <ramdevice-client/ramdisk.h>
 #include <src/lib/uuid/uuid.h>
 
+#include "gmock/gmock.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/security/lib/fcrypto/secret.h"
 #include "src/security/lib/zxcrypt/client.h"
@@ -54,11 +55,14 @@ class MockAdmin : public fidl::testing::WireTestBase<fuchsia_hardware_power_stat
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void Reboot(RebootRequestView request, RebootCompleter::Sync& completer) override {
+  void PerformReboot(PerformRebootRequestView request,
+                     PerformRebootCompleter::Sync& completer) override {
     ASSERT_FALSE(suspend_called_);
     suspend_called_ = true;
-    ASSERT_EQ(request->reason,
-              fuchsia_hardware_power_statecontrol::RebootReason::kFactoryDataReset);
+    ASSERT_TRUE(request->options.has_reasons());
+    ASSERT_THAT(request->options.reasons(),
+                testing::ElementsAre(
+                    fuchsia_hardware_power_statecontrol::RebootReason2::kFactoryDataReset));
     completer.ReplySuccess();
   }
 

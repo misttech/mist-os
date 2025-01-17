@@ -12,7 +12,7 @@ pub mod partition;
 
 use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::{Proxy, ServerEnd};
-use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, RebootOptions, RebootReason2};
 use fidl_fuchsia_paver::{
     BootManagerMarker, Configuration, DynamicDataSinkProxy, PaverMarker, PaverProxy,
 };
@@ -110,7 +110,10 @@ pub async fn restart() {
         .expect("Could not connect to 'fuchsia.hardware.power.statecontrol.Admin' service");
 
     proxy
-        .reboot(RebootReason::UserRequest)
+        .perform_reboot(&RebootOptions {
+            reasons: Some(vec![RebootReason2::UserRequest]),
+            ..Default::default()
+        })
         .await
         .expect("Failed to reboot")
         .expect("Failed to reboot");
