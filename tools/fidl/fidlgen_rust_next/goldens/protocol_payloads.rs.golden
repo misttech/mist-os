@@ -556,7 +556,7 @@ impl Clone for WireMainProtocolTwoWayImportWithErrorResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayImportWithErrorResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     fidl_next_test_protocolpayloads_imported::WireImportStructPayload: ::fidl_next::Decode<___D>,
 
@@ -677,7 +677,7 @@ impl Clone for WireOptionalMainProtocolTwoWayImportWithErrorResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalMainProtocolTwoWayImportWithErrorResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     fidl_next_test_protocolpayloads_imported::WireImportStructPayload: ::fidl_next::Decode<___D>,
 

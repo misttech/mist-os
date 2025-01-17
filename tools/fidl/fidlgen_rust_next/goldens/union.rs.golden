@@ -198,7 +198,7 @@ impl Clone for WireEmptyFlexibleUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireEmptyFlexibleUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -290,7 +290,7 @@ impl Clone for WireOptionalEmptyFlexibleUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalEmptyFlexibleUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -1979,7 +1979,7 @@ impl Clone for WireFieldCollision {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireFieldCollision
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -2080,7 +2080,7 @@ impl Clone for WireOptionalFieldCollision {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalFieldCollision
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -4080,7 +4080,7 @@ impl Clone for WireReverseOrdinalUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireReverseOrdinalUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 
@@ -4193,7 +4193,7 @@ impl Clone for WireOptionalReverseOrdinalUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalReverseOrdinalUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 
@@ -6556,7 +6556,7 @@ impl Clone for WireUnionContainingEmptyStruct {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionContainingEmptyStruct
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireEmpty: ::fidl_next::Decode<___D>,
 {
@@ -6660,7 +6660,7 @@ impl Clone for WireOptionalUnionContainingEmptyStruct {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionContainingEmptyStruct
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireEmpty: ::fidl_next::Decode<___D>,
 {

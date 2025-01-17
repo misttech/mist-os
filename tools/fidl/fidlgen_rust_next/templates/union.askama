@@ -4,40 +4,16 @@
 {% let wire_name = format!("Wire{base_name}") %}
 {% let mod_name = filters::ident(union.name.decl_name().snake())? %}
 
-{% let params %}
-{% let phantom %}
-{% let decode_param %}
-{% let decode_where %}
-{% let decode_unknown %}
-{% let decode_as %}
-{% if is_static %}
-    {% let params = "" %}
-    {% let phantom = "()" %}
-    {% let decode_param = "" %}
-    {% let decode_where = "___D: fidl_next::decoder::InternalHandleDecoder" %}
-    {% let decode_unknown = "decode_unknown_static" %}
-    {% let decode_as = "decode_as_static" %}
-{% else %}
-    {% let params = "<'buf>" %}
-    {% let phantom = "&'buf mut [::fidl_next::Chunk]" %}
-    {% let decode_param = "'buf, " %}
-    {% let decode_where = "___D: ::fidl_next::Decoder<'buf>" %}
-    {% let decode_unknown = "decode_unknown" %}
-    {% let decode_as = "decode_as" %}
-{% endif %}
-
-{% let access_params %}
-{% let access_args %}
-{% if union.members.is_empty() %}
-    {% let access_params = "" %}
-    {% let access_args = "" %}
-{% else if self.has_only_static_members() %}
-    {% let access_params = "<'union>" %}
-    {% let access_args = "<'_>" %}
-{% else %}
-    {% let access_params = "<'union, 'buf>" %}
-    {% let access_args = "<'_, 'buf>" %}
-{% endif %}
+{%
+    let UnionTemplateStrings {
+        params,
+        phantom,
+        decode_param,
+        decode_where,
+        decode_unknown,
+        decode_as,
+    } = self.template_strings()
+%}
 
 {{ self::doc_string(union.attributes) -}}
 #[derive(
@@ -157,6 +133,19 @@ pub struct {{ wire_name }}{{ params }} {
     raw: ::fidl_next::RawWireUnion,
     _phantom: ::core::marker::PhantomData<{{ phantom }}>,
 }
+
+{% let access_params %}
+{% let access_args %}
+{% if union.members.is_empty() %}
+    {% let access_params = "" %}
+    {% let access_args = "" %}
+{% else if self.has_only_static_members() %}
+    {% let access_params = "<'union>" %}
+    {% let access_args = "<'_>" %}
+{% else %}
+    {% let access_params = "<'union, 'buf>" %}
+    {% let access_args = "<'_, 'buf>" %}
+{% endif %}
 
 pub mod {{ mod_name }} {
     pub enum Ref{{ access_params }} {

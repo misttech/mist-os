@@ -754,7 +754,7 @@ impl Clone for WireExampleUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireExampleUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
@@ -855,7 +855,7 @@ impl Clone for WireOptionalExampleUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalExampleUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {

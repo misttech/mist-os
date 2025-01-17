@@ -131,6 +131,15 @@ impl BitsTemplate<'_> {
     }
 }
 
+struct UnionTemplateStrings {
+    params: &'static str,
+    phantom: &'static str,
+    decode_param: &'static str,
+    decode_where: &'static str,
+    decode_unknown: &'static str,
+    decode_as: &'static str,
+}
+
 impl UnionTemplate<'_> {
     fn has_only_static_members(&self) -> bool {
         let mut result = true;
@@ -141,6 +150,28 @@ impl UnionTemplate<'_> {
             }
         }
         result
+    }
+
+    fn template_strings(&self) -> &'static UnionTemplateStrings {
+        if self.union.shape.max_out_of_line == 0 {
+            &UnionTemplateStrings {
+                params: "",
+                phantom: "()",
+                decode_param: "",
+                decode_where: "___D: ::fidl_next::decoder::InternalHandleDecoder",
+                decode_unknown: "decode_unknown_static",
+                decode_as: "decode_as_static",
+            }
+        } else {
+            &UnionTemplateStrings {
+                params: "<'buf>",
+                phantom: "&'buf mut [::fidl_next::Chunk]",
+                decode_param: "'buf, ",
+                decode_where: "___D: ::fidl_next::Decoder<'buf>",
+                decode_unknown: "decode_unknown",
+                decode_as: "decode_as",
+            }
+        }
     }
 }
 

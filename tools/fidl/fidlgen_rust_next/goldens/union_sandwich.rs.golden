@@ -1328,7 +1328,7 @@ impl Clone for WireUnionSize8Alignment4 {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionSize8Alignment4
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
@@ -1429,7 +1429,7 @@ impl Clone for WireOptionalUnionSize8Alignment4 {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionSize8Alignment4
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {

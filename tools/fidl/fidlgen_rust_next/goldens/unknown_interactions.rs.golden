@@ -282,7 +282,7 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionRespons
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -393,7 +393,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnio
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -841,7 +841,7 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -969,7 +969,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayErrR
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -1309,7 +1309,7 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -1437,7 +1437,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayFiel
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -1651,7 +1651,7 @@ impl Clone for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResp
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -1762,7 +1762,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnio
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -3461,7 +3461,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -3568,7 +3568,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionRespo
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -3995,7 +3995,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -4118,7 +4118,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayErrResult 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -4449,7 +4449,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -4577,7 +4577,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrR
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -4784,7 +4784,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -4895,7 +4895,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrRe
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -5953,7 +5953,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -6060,7 +6060,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionReques
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -6489,7 +6489,7 @@ impl Clone for WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -6596,7 +6596,7 @@ impl Clone for WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequ
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsAjarProtocolFlexibleEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -8013,7 +8013,7 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionRespo
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -8124,7 +8124,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUn
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -8577,7 +8577,7 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -8705,7 +8705,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayEr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -9049,7 +9049,7 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrR
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -9177,7 +9177,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayFi
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -9393,7 +9393,7 @@ impl Clone for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrRe
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -9506,7 +9506,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUn
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -11193,7 +11193,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -11304,7 +11304,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -11734,7 +11734,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -11857,7 +11857,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayErrResul
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -12190,7 +12190,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -12318,7 +12318,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayFieldsEr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -12531,7 +12531,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -12642,7 +12642,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -13709,7 +13709,7 @@ impl Clone for WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsClosedProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -13816,7 +13816,7 @@ impl Clone for WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequ
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsClosedProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -15003,7 +15003,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -15114,7 +15114,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -15544,7 +15544,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -15667,7 +15667,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayErrResul
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -16000,7 +16000,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -16128,7 +16128,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayFieldsEr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -16341,7 +16341,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -16452,7 +16452,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErr
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -17520,7 +17520,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
@@ -17646,7 +17646,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayResult
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
@@ -17979,7 +17979,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse:
         ::fidl_next::Decode<___D>,
@@ -18110,7 +18110,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFields
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse:
         ::fidl_next::Decode<___D>,
@@ -18321,7 +18321,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -18432,7 +18432,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionR
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -19551,7 +19551,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -19690,7 +19690,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayErrRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse:
         ::fidl_next::Decode<___D>,
@@ -20067,7 +20067,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResul
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -20210,7 +20210,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFields
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -20431,7 +20431,7 @@ impl Clone for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrRespon
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -20542,7 +20542,7 @@ impl Clone for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionE
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -22751,7 +22751,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -22858,7 +22858,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -23278,7 +23278,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -23399,7 +23399,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolStrictTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -23716,7 +23716,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Decode<___D>,
 
@@ -23839,7 +23839,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayFieldsErrResul
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolStrictTwoWayFieldsErrResponse: ::fidl_next::Decode<___D>,
 
@@ -24040,7 +24040,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -24147,7 +24147,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrRespon
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -25170,7 +25170,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
@@ -25294,7 +25294,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayResponse: ::fidl_next::Decode<___D>,
 
@@ -25613,7 +25613,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Decode<___D>,
 
@@ -25739,7 +25739,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsResponse: ::fidl_next::Decode<___D>,
 
@@ -25941,7 +25941,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -26048,7 +26048,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionRespons
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -27131,7 +27131,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -27269,7 +27269,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayErrResponse: ::fidl_next::Decode<___D>,
 
@@ -27629,7 +27629,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -27768,7 +27768,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsErrRes
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireUnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse:
         ::fidl_next::Decode<___D>,
@@ -27980,7 +27980,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -28089,7 +28089,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResp
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -29209,7 +29209,7 @@ impl Clone for WireUnknownInteractionsProtocolStrictEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -29316,7 +29316,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolStrictEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -29739,7 +29739,7 @@ impl Clone for WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireUnknownInteractionsProtocolFlexibleEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {
@@ -29846,7 +29846,7 @@ impl Clone for WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalUnknownInteractionsProtocolFlexibleEventUnionRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::i32_le: ::fidl_next::Decode<___D>,
 {

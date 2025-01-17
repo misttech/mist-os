@@ -272,7 +272,7 @@ impl Clone for WireComposedProtocolTwoWayAnonComposedRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireComposedProtocolTwoWayAnonComposedRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -372,7 +372,7 @@ impl Clone for WireOptionalComposedProtocolTwoWayAnonComposedRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolTwoWayAnonComposedRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -811,7 +811,7 @@ impl Clone for WireComposedProtocolTwoWayAnonComposedWithErrorResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireComposedProtocolTwoWayAnonComposedWithErrorResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -913,7 +913,7 @@ impl Clone for WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolTwoWayAnonComposedWithErrorResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1371,7 +1371,7 @@ impl Clone for WireComposedProtocolOnAnonComposedRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireComposedProtocolOnAnonComposedRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1471,7 +1471,7 @@ impl Clone for WireOptionalComposedProtocolOnAnonComposedRequest {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalComposedProtocolOnAnonComposedRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1755,7 +1755,7 @@ impl Clone for WireUnionPayload {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionPayload
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -1854,7 +1854,7 @@ impl Clone for WireOptionalUnionPayload {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionPayload
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3258,7 +3258,7 @@ impl Clone for WireMainProtocolTwoWayAnonRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3360,7 +3360,7 @@ impl Clone for WireOptionalMainProtocolTwoWayAnonRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalMainProtocolTwoWayAnonRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3801,7 +3801,7 @@ impl Clone for WireMainProtocolTwoWayAnonWithErrorResponse {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolTwoWayAnonWithErrorResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -3904,7 +3904,7 @@ impl Clone for WireOptionalMainProtocolTwoWayAnonWithErrorResponse {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalMainProtocolTwoWayAnonWithErrorResponse
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -4358,7 +4358,7 @@ impl Clone for WireMainProtocolOnAnonRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireMainProtocolOnAnonRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -4460,7 +4460,7 @@ impl Clone for WireOptionalMainProtocolOnAnonRequest {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalMainProtocolOnAnonRequest
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {

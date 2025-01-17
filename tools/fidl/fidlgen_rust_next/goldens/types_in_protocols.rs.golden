@@ -728,7 +728,7 @@ impl Clone for WireUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -830,7 +830,7 @@ impl Clone for WireOptionalUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -4720,7 +4720,7 @@ impl WireResourceUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireResourceUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {
@@ -4799,7 +4799,7 @@ impl Default for WireOptionalResourceUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalResourceUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     bool: ::fidl_next::Decode<___D>,
 {

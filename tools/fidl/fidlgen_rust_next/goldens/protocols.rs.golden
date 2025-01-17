@@ -2607,7 +2607,7 @@ impl Clone for WireTheUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireTheUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
@@ -2711,7 +2711,7 @@ impl Clone for WireOptionalTheUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalTheUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::u32_le: ::fidl_next::Decode<___D>,
 {
@@ -5373,7 +5373,7 @@ impl Clone for WireWithErrorSyntaxErrorAsPrimitiveResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireWithErrorSyntaxErrorAsPrimitiveResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireWithErrorSyntaxErrorAsPrimitiveResponse: ::fidl_next::Decode<___D>,
 
@@ -5495,7 +5495,7 @@ impl Clone for WireOptionalWithErrorSyntaxErrorAsPrimitiveResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalWithErrorSyntaxErrorAsPrimitiveResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireWithErrorSyntaxErrorAsPrimitiveResponse: ::fidl_next::Decode<___D>,
 
@@ -5780,7 +5780,7 @@ impl Clone for WireWithErrorSyntaxErrorAsEnumResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireWithErrorSyntaxErrorAsEnumResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireWithErrorSyntaxErrorAsEnumResponse: ::fidl_next::Decode<___D>,
 
@@ -5901,7 +5901,7 @@ impl Clone for WireOptionalWithErrorSyntaxErrorAsEnumResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalWithErrorSyntaxErrorAsEnumResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireWithErrorSyntaxErrorAsEnumResponse: ::fidl_next::Decode<___D>,
 
@@ -6182,7 +6182,7 @@ impl WireWithErrorSyntaxHandleInResultResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireWithErrorSyntaxHandleInResultResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireWithErrorSyntaxHandleInResultResponse: ::fidl_next::Decode<___D>,
 
@@ -6277,7 +6277,7 @@ impl Default for WireOptionalWithErrorSyntaxHandleInResultResult {
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D>
     for WireOptionalWithErrorSyntaxHandleInResultResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireWithErrorSyntaxHandleInResultResponse: ::fidl_next::Decode<___D>,
 

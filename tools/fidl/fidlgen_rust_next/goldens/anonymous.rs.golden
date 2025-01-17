@@ -1084,7 +1084,7 @@ impl Clone for WireUnionMember {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionMember
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     u8: ::fidl_next::Decode<___D>,
 {
@@ -1186,7 +1186,7 @@ impl Clone for WireOptionalUnionMember {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionMember
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     u8: ::fidl_next::Decode<___D>,
 {
@@ -1917,7 +1917,7 @@ impl Clone for WireSomeProtocolSomeMethodResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireSomeProtocolSomeMethodResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireSomeProtocolSomeMethodResponse: ::fidl_next::Decode<___D>,
 
@@ -2040,7 +2040,7 @@ impl Clone for WireOptionalSomeProtocolSomeMethodResult {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalSomeProtocolSomeMethodResult
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     crate::WireSomeProtocolSomeMethodResponse: ::fidl_next::Decode<___D>,
 

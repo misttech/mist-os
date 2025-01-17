@@ -271,7 +271,7 @@ impl WireEmptyResourceUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireEmptyResourceUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -345,7 +345,7 @@ impl Default for WireOptionalEmptyResourceUnion {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalEmptyResourceUnion
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 {
     fn decode(
         mut slot: ::fidl_next::Slot<'_, Self>,
@@ -717,7 +717,7 @@ impl WireUnionWithHandle {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireUnionWithHandle
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
 {
@@ -798,7 +798,7 @@ impl Default for WireOptionalUnionWithHandle {
 
 unsafe impl<___D: ?Sized> ::fidl_next::Decode<___D> for WireOptionalUnionWithHandle
 where
-    ___D: fidl_next::decoder::InternalHandleDecoder,
+    ___D: ::fidl_next::decoder::InternalHandleDecoder,
 
     ::fidl_next::WireHandle: ::fidl_next::Decode<___D>,
 {
