@@ -148,34 +148,8 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
   Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
   Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
-  // This should be called whenever a change is made to the VMO tree or the VMO's page list, that
-  // could result in memory attribution counts to change for any VMO in this tree.
-  void IncrementHierarchyGenerationCountLocked() TA_REQ(lock()) {
-    DEBUG_ASSERT(hierarchy_generation_count_ != 0);
-    hierarchy_generation_count_++;
-  }
-
-  // Get the current generation count.
-  uint64_t GetHierarchyGenerationCountLocked() const TA_REQ(lock()) {
-    DEBUG_ASSERT(hierarchy_generation_count_ != 0);
-    return hierarchy_generation_count_;
-  }
-
  private:
   mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
-
-  // Each VMO hierarchy has a generation count, which is incremented on any change to the hierarchy
-  // - either in the VMO tree, or the page lists of VMO's.
-  //
-  // The generation count is used to implement caching for memory attribution counts, which get
-  // periodically track memory usage on the system. Attributing memory to a VMO is an expensive
-  // operation and involves walking the VMO tree, quite often multiple times. If the generation
-  // counts for the vmo *and* the mapping do not change between two successive queries, we can avoid
-  // re-counting attributed memory, and simply return the previously cached value.
-  //
-  // The generation count starts at 1 to ensure that there can be no cached values initially; the
-  // cached generation count starts at 0.
-  uint64_t hierarchy_generation_count_ TA_GUARDED(lock_) = 1;
 };
 
 // Base class for any objects that want to be part of the VMO hierarchy and share some state,
@@ -201,25 +175,11 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
   // Pointer to state shared across all objects in a hierarchy.
   fbl::RefPtr<VmHierarchyState> const hierarchy_state_ptr_;
 
-  // Convenience helpers that forward operations to the referenced hierarchy state.
-  void IncrementHierarchyGenerationCountLocked() TA_REQ(lock());
-  uint64_t GetHierarchyGenerationCountLocked() const TA_REQ(lock());
-
  private:
   friend VmHierarchyState;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmHierarchyBase);
 };
-
-inline void VmHierarchyBase::IncrementHierarchyGenerationCountLocked() {
-  AssertHeld(hierarchy_state_ptr_->lock_ref());
-  hierarchy_state_ptr_->IncrementHierarchyGenerationCountLocked();
-}
-
-inline uint64_t VmHierarchyBase::GetHierarchyGenerationCountLocked() const {
-  AssertHeld(hierarchy_state_ptr_->lock_ref());
-  return hierarchy_state_ptr_->GetHierarchyGenerationCountLocked();
-}
 
 // Cursor to allow for walking global vmo lists without needing to hold the lock protecting them all
 // the time. This can be required to enforce order of acquisition with another lock (as in the case

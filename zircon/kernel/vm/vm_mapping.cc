@@ -36,8 +36,6 @@
 namespace {
 
 KCOUNTER(vm_mapping_attribution_queries, "vm.attributed_memory.mapping.queries")
-KCOUNTER(vm_mapping_attribution_cache_hits, "vm.attributed_memory.mapping.cache_hits")
-KCOUNTER(vm_mapping_attribution_cache_misses, "vm.attributed_memory.mapping.cache_misses")
 KCOUNTER(vm_mappings_merged, "vm.aspace.mapping.merged_neighbors")
 KCOUNTER(vm_mappings_protect_no_write, "vm.aspace.mapping.protect_without_write")
 
@@ -142,35 +140,7 @@ VmMapping::AttributionCounts VmMapping::GetAttributedMemoryLocked() {
 
   vm_mapping_attribution_queries.Add(1);
 
-  VmObjectPaged* object_paged = DownCastVmObject<VmObjectPaged>(object_.get());
-  if (!object_paged) {
-    return object_->GetAttributedMemoryInRange(object_offset_locked(), size_);
-  }
-
-  // If |object_| is a VmObjectPaged, check if the previously cached value still holds.
-  uint64_t vmo_gen_count = object_paged->GetHierarchyGenerationCount();
-  uint64_t mapping_gen_count = GetMappingGenerationCountLocked();
-
-  // Return the cached attribution counts if the mapping's generation count and the vmo's
-  // generation count have not changed.
-  if (cached_memory_attribution_.mapping_generation_count == mapping_gen_count &&
-      cached_memory_attribution_.vmo_generation_count == vmo_gen_count) {
-    vm_mapping_attribution_cache_hits.Add(1);
-    return cached_memory_attribution_.attribution_counts;
-  }
-
-  vm_mapping_attribution_cache_misses.Add(1);
-
-  AttributionCounts counts =
-      object_paged->GetAttributedMemoryInRange(object_offset_locked(), size_);
-
-  DEBUG_ASSERT(cached_memory_attribution_.mapping_generation_count != mapping_gen_count ||
-               cached_memory_attribution_.vmo_generation_count != vmo_gen_count);
-  cached_memory_attribution_.mapping_generation_count = mapping_gen_count;
-  cached_memory_attribution_.vmo_generation_count = vmo_gen_count;
-  cached_memory_attribution_.attribution_counts = counts;
-
-  return counts;
+  return object_->GetAttributedMemoryInRange(object_offset_locked(), size_);
 }
 
 void VmMapping::DumpLocked(uint depth, bool verbose) const {
@@ -959,10 +929,6 @@ zx_status_t VmMapping::DestroyLocked() {
     // The size may only be set to zero when not in the subregion tree.
     set_size_locked(0);
   }
-
-  // Clear the cached attribution count.
-  // The generation count should already have been incremented by UnmapLocked above.
-  cached_memory_attribution_ = {};
 
   // detach from any object we have mapped. Note that we are holding the aspace_->lock() so we
   // will not race with other threads calling vmo()

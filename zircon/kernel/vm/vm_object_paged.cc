@@ -41,8 +41,6 @@
 namespace {
 
 KCOUNTER(vmo_attribution_queries, "vm.attributed_memory.object.queries")
-KCOUNTER(vmo_attribution_cache_hits, "vm.attributed_memory.object.cache_hits")
-KCOUNTER(vmo_attribution_cache_misses, "vm.attributed_memory.object.cache_misses")
 
 }  // namespace
 
@@ -733,7 +731,6 @@ zx_status_t VmObjectPaged::CreateChildReferenceCommon(uint32_t options, VmCowRan
     if (copy_name) {
       vmo->name_ = name_;
     }
-    IncrementHierarchyGenerationCountLocked();
   }
 
   // Add to the global list now that fully initialized.
@@ -826,7 +823,6 @@ zx_status_t VmObjectPaged::CreateClone(Resizability resizable, CloneType type, u
     if (copy_name) {
       vmo->name_ = name_;
     }
-    IncrementHierarchyGenerationCountLocked();
   }
 
   // Add to the global list now that fully initialized.
@@ -882,33 +878,8 @@ VmObject::AttributionCounts VmObjectPaged::GetAttributedMemoryInRangeLocked(
     return AttributionCounts{};
   }
 
-  uint64_t gen_count;
-  bool update_cached_attribution = false;
-  // Use cached value if generation count has not changed since the last time we attributed memory.
-  // Only applicable for attribution over the entire VMO, not a partial range.
-  if (offset_bytes == 0 && new_len_bytes == size_locked()) {
-    gen_count = GetHierarchyGenerationCountLocked();
-
-    if (cached_memory_attribution_.generation_count == gen_count) {
-      vmo_attribution_cache_hits.Add(1);
-      return cached_memory_attribution_.attribution_counts;
-    } else {
-      vmo_attribution_cache_misses.Add(1);
-      update_cached_attribution = true;
-    }
-  }
-
   auto cow_range = GetCowRange(offset_bytes, new_len_bytes);
-  AttributionCounts counts = cow_pages_locked()->GetAttributedMemoryInRangeLocked(*cow_range);
-
-  if (update_cached_attribution) {
-    // Cache attribution counts along with current generation count.
-    DEBUG_ASSERT(cached_memory_attribution_.generation_count != gen_count);
-    cached_memory_attribution_.generation_count = gen_count;
-    cached_memory_attribution_.attribution_counts = counts;
-  }
-
-  return counts;
+  return cow_pages_locked()->GetAttributedMemoryInRangeLocked(*cow_range);
 }
 
 zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bool pin,

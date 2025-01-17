@@ -307,25 +307,6 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
     return cow_pages_locked()->DebugValidatePageSharingLocked();
   }
 
-  // Used to cache the memory attribution counts for this VMO. Also tracks the hierarchy
-  // generation count at the time of caching the attribution counts.
-  struct CachedMemoryAttribution {
-    uint64_t generation_count = 0;
-    AttributionCounts attribution_counts;
-  };
-
-  // Exposed for testing.
-  CachedMemoryAttribution GetCachedMemoryAttribution() const {
-    Guard<CriticalMutex> guard{lock()};
-    return cached_memory_attribution_;
-  }
-
-  // Called from VmMapping to cache memory attribution counts.
-  uint64_t GetHierarchyGenerationCount() const {
-    Guard<CriticalMutex> guard{lock()};
-    return GetHierarchyGenerationCountLocked();
-  }
-
   // Exposed for testing.
   fbl::RefPtr<VmCowPages> DebugGetCowPages() const {
     Guard<CriticalMutex> guard{lock()};
@@ -480,9 +461,6 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   // parent pointer (may be null). This is a raw pointer as we have no need to hold our parent alive
   // once they want to go away.
   VmObjectPaged* parent_ TA_GUARDED(lock()) = nullptr;
-
-  // Tracks the last cached attribution counts.
-  mutable CachedMemoryAttribution cached_memory_attribution_ TA_GUARDED(lock()) = {};
 
   const fbl::RefPtr<VmCowPages> cow_pages_;
 

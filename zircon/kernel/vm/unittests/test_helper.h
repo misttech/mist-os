@@ -115,21 +115,6 @@ bool fill_and_test(void* ptr, size_t len);
 // just like |fill_and_test|, but for user memory
 bool fill_and_test_user(user_inout_ptr<void> ptr, size_t len);
 
-// Helper function used by the vmo_attribution_* tests.
-// Verifies that the current generation count is |vmo_gen| and the current attribution counts
-// are |expected_counts|. Also verifies that the cached memory attribution has the expected
-// generation and attribution counts after the call to GetAttributedMemory().
-bool verify_object_memory_attribution(VmObject* vmo, uint64_t vmo_gen,
-                                      VmObject::AttributionCounts expected_counts);
-
-// Helper function used by the vm_mapping_attribution_* tests.
-// Verifies that the mapping generation count is |mapping_gen| and the current attribution
-// counts are |expected_counts|. Also verifies that the cached memory attribution has
-// |mapping_gen| as the mapping generation count, |vmo_gen| as the VMO generation count
-// and |expected_counts| as the attribution counts after the call to GetAttributedMemory().
-bool verify_mapping_memory_attribution(VmMapping* mapping, uint64_t mapping_gen, uint64_t vmo_gen,
-                                       VmObject::AttributionCounts expected_counts);
-
 // Helper function used by vmo_mapping_page_fault_optimisation_test.
 // Given a mapping, check that a run of consecutive pages are mapped (indicated by
 // expected_mapped_page_count) and that remaining pages are unmapped.

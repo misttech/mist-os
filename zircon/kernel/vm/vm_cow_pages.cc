@@ -451,7 +451,6 @@ zx_status_t VmCowPages::ReplaceReferenceWithPageLocked(VmPageOrMarkerRef page_or
   if (status != ZX_OK) {
     return status;
   }
-  IncrementHierarchyGenerationCountLocked();
   // Add the new page to the page queues for tracking. References are by definition not pinned, so
   // we know this is not wired.
   SetNotPinnedLocked(page_or_mark->Page(), offset);
@@ -493,9 +492,6 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
 
   // To prevent races with a hidden parent creation or merging, it is necessary to hold the lock
   // over the is_hidden and parent_ check and into the subsequent removal call.
-
-  // We'll be making changes to the hierarchy we're part of.
-  IncrementHierarchyGenerationCountLocked();
 
   // At the point of destruction we should no longer have any mappings or children still
   // referencing us, and by extension our priority count must therefore be back to zero.
@@ -783,7 +779,6 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
     RemoveAndFreePageLocked(released_page, /*freeing_owned_page=*/true);
 
     reclamation_event_count_++;
-    IncrementHierarchyGenerationCountLocked();
     VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
     VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
     return true;
@@ -2417,7 +2412,6 @@ VmCowPages::LookupCursor::TargetAllocateCopyPageAsResult(vm_page_t* source, Dirt
   [[maybe_unused]] VmPageOrMarker old = target_->CompleteAddPageLocked(
       *page_transaction, VmPageOrMarker::Page(out_page), /*do_range_update=*/true);
   DEBUG_ASSERT(!old.IsPageOrRef());
-  target_->IncrementHierarchyGenerationCountLocked();
 
   // If asked to explicitly mark zero forks, and this is actually fork of the zero page, move to the
   // correct queue. Discardable pages are not considered zero forks as they are always in the
@@ -2741,7 +2735,6 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     if (result != ZX_OK) {
       return zx::error(result);
     }
-    target_->IncrementHierarchyGenerationCountLocked();
     // Cloning the cow page may have impacted our cursor due to a page being moved so invalidate the
     // cursor to perform a fresh lookup on the next page requested.
     IncrementOffsetAndInvalidateCursor(PAGE_SIZE);
@@ -3016,9 +3009,6 @@ zx_status_t VmCowPages::DecommitRangeLocked(VmCowRange range) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // Assume we will free some pages and increment the gen count.
-  IncrementHierarchyGenerationCountLocked();
-
   return UnmapAndFreePagesLocked(range.offset, range.len).status_value();
 }
 
@@ -3111,8 +3101,6 @@ zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(uint64_t page_start_bas
   if (!dirty_track && AnyPagesPinnedLocked(start, end - start)) {
     return ZX_ERR_BAD_STATE;
   }
-
-  IncrementHierarchyGenerationCountLocked();
 
   // Inserting zero intervals can modify the page list such that new nodes are added and deleted.
   // So we cannot safely insert zero intervals while iterating the page list. The pattern we
@@ -3403,16 +3391,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   }
   // dirty_track has no meaning for VMOs without page sources that preserve content, so ignore it
   // for the remainder of the function.
-
-  // Increment the gen count early as it's possible to fail part way through and this function
-  // doesn't unroll its actions. If we were able to successfully decommit pages above,
-  // DecommitRangeLocked would have incremented the gen count already, so we can do this after the
-  // decommit attempt.
-  //
-  // Zeroing pages of a contiguous VMO doesn't commit or decommit any pages currently, but we
-  // increment the generation count anyway in case that changes in future, and to keep the tests
-  // more consistent.
-  IncrementHierarchyGenerationCountLocked();
 
   // Helper lambda to determine if this VMO can see parent contents at offset, or if a length is
   // specified as well in the range [offset, offset + length).
@@ -4393,8 +4371,6 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
   // save bytewise size
   size_ = s;
 
-  IncrementHierarchyGenerationCountLocked();
-
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
@@ -4643,9 +4619,6 @@ zx_status_t VmCowPages::TakePagesLocked(VmCowRange range, VmPageSpliceList* page
     return ZX_ERR_BAD_STATE;
   }
 
-  // Now that all early checks are done, increment the gen count since we're going to remove pages.
-  IncrementHierarchyGenerationCountLocked();
-
   // If this is a child of any other kind, we need to handle it specially.
   if (parent_) {
     return TakePagesWithParentLocked(range, pages, taken_len, page_request);
@@ -4762,10 +4735,6 @@ zx_status_t VmCowPages::SupplyPagesLocked(VmCowRange range, VmPageSpliceList* pa
       position += PAGE_SIZE;
     }
   }
-
-  // It is possible that we fail to insert pages below and we increment the gen count needlessly,
-  // but the user is certainly expecting it to succeed.
-  IncrementHierarchyGenerationCountLocked();
 
   const uint64_t start = range.offset;
   const uint64_t end = range.end();
@@ -5210,9 +5179,6 @@ zx_status_t VmCowPages::DirtyPagesLocked(VmCowRange range, list_node_t* alloc_li
 
     // All operations from this point on must succeed so we can atomically mark pages dirty.
 
-    // Increment the generation count as we're going to be inserting new pages.
-    IncrementHierarchyGenerationCountLocked();
-
     // Install newly allocated pages in place of the zero page markers and interval sentinels. Start
     // with clean zero pages even for the intervals, so that the dirty transition logic below can
     // uniformly transition them to dirty along with pager supplied pages.
@@ -5478,9 +5444,6 @@ zx_status_t VmCowPages::WritebackEndLocked(VmCowRange range) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // We might end up removing / clipping zero intervals, so update the generation count.
-  IncrementHierarchyGenerationCountLocked();
-
   const uint64_t start_offset = range.offset;
   const uint64_t end_offset = range.end();
 
@@ -5680,8 +5643,6 @@ void VmCowPages::DetachSourceLocked() {
 
   page_remover.Flush();
   FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
-
-  IncrementHierarchyGenerationCountLocked();
 }
 
 void VmCowPages::RangeChangeUpdateLocked(VmCowRange range, RangeChangeOp op) {
@@ -5894,7 +5855,6 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* pa
   RemoveAndFreePageLocked(page, true);
 
   reclamation_event_count_++;
-  IncrementHierarchyGenerationCountLocked();
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ReclaimCounts{
@@ -5945,9 +5905,6 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
     DEBUG_ASSERT(compress_page == page);
   }
   pmm_page_queues()->Remove(page);
-  // Going to drop the lock so need to indicate that we've modified the hierarchy by putting in the
-  // temporary reference.
-  IncrementHierarchyGenerationCountLocked();
 
   // We now stack own the page (and guarantee to the compressor that it will not be modified) and
   // the VMO owns the temporary reference. We can safely drop the VMO lock and perform the
@@ -6018,8 +5975,6 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
     }
     // Temporary reference has been replaced, can return it to the compressor.
     compressor->ReturnTempReference(old_ref);
-    // Have done a modification.
-    IncrementHierarchyGenerationCountLocked();
   } else {
     // The temporary reference is no longer there. We know nothing else about the state of the VMO
     // at this point and will just free any compression result and exit.
@@ -6256,9 +6211,6 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   if (after_page) {
     *after_page = new_page;
   }
-
-  // We've changed a page in the page list. Update the generation count.
-  IncrementHierarchyGenerationCountLocked();
 
   return ZX_OK;
 }
@@ -6795,7 +6747,6 @@ zx::result<uint64_t> VmCowPages::DiscardPagesLocked() {
 
   if (result.is_ok()) {
     reclamation_event_count_++;
-    IncrementHierarchyGenerationCountLocked();
 
     // Set state to discarded.
     discardable_tracker_->SetDiscardedLocked();

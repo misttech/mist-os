@@ -216,54 +216,6 @@ bool fill_and_test_user(user_inout_ptr<void> ptr, size_t len) {
   END_TEST;
 }
 
-bool verify_object_memory_attribution(VmObject* vmo, uint64_t vmo_gen,
-                                      VmObject::AttributionCounts expected_counts) {
-  BEGIN_TEST;
-
-  auto vmo_paged = static_cast<VmObjectPaged*>(vmo);
-  EXPECT_EQ(vmo_gen, vmo_paged->GetHierarchyGenerationCount());
-
-  // Test equality of both the fields and the structs. The former gives better error messages, but
-  // the latter is also done in case any additional fields are added.
-  {
-    VmObject::AttributionCounts vmo_counts = vmo->GetAttributedMemory();
-    EXPECT_EQ(expected_counts.uncompressed_bytes, vmo_counts.uncompressed_bytes);
-    EXPECT_EQ(expected_counts.compressed_bytes, vmo_counts.compressed_bytes);
-    EXPECT_TRUE(expected_counts == vmo_counts);
-  }
-
-  // References (and slices) return an empty attribution and so its meaningless to talk about their
-  // cached attribution.
-  if (!vmo_paged->is_reference()) {
-    VmObjectPaged::CachedMemoryAttribution vmo_cached_counts =
-        vmo_paged->GetCachedMemoryAttribution();
-    EXPECT_EQ(vmo_gen, vmo_cached_counts.generation_count);
-    EXPECT_EQ(expected_counts.uncompressed_bytes,
-              vmo_cached_counts.attribution_counts.uncompressed_bytes);
-    EXPECT_EQ(expected_counts.compressed_bytes,
-              vmo_cached_counts.attribution_counts.compressed_bytes);
-    EXPECT_TRUE(expected_counts == vmo_cached_counts.attribution_counts);
-  }
-
-  END_TEST;
-}
-
-bool verify_mapping_memory_attribution(VmMapping* mapping, uint64_t mapping_gen, uint64_t vmo_gen,
-                                       VmObject::AttributionCounts expected_counts) {
-  BEGIN_TEST;
-
-  EXPECT_EQ(mapping_gen, mapping->GetMappingGenerationCount());
-
-  EXPECT_TRUE(expected_counts == mapping->GetAttributedMemory());
-
-  VmMapping::CachedMemoryAttribution cached_counts = mapping->GetCachedMemoryAttribution();
-  EXPECT_EQ(mapping_gen, cached_counts.mapping_generation_count);
-  EXPECT_EQ(vmo_gen, cached_counts.vmo_generation_count);
-  EXPECT_TRUE(expected_counts == cached_counts.attribution_counts);
-
-  END_TEST;
-}
-
 // Helper function used by vmo_mapping_page_fault_optimisation_test.
 // Given a mapping, check that a run of consecutive pages are mapped (indicated by
 // expected_mapped_page_count) and that remaining pages are unmapped.
