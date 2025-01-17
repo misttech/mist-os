@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashMap;
 use std::convert::{TryFrom as _, TryInto as _};
 use std::num::TryFromIntError;
 use std::sync::Arc;
@@ -508,17 +507,15 @@ impl DeviceHandler {
             };
             let dynamic_netdevice_info_builder = |mtu: Mtu| devices::DynamicNetdeviceInfo {
                 phy_up,
-                common_info: devices::DynamicCommonInfo {
+                common_info: devices::DynamicCommonInfo::new(
                     mtu,
-                    admin_enabled: false,
-                    events: crate::bindings::create_interface_event_producer(
+                    crate::bindings::create_interface_event_producer(
                         interfaces_event_sink,
                         binding_id,
                         crate::bindings::InterfaceProperties { name: name.clone(), port_class },
                     ),
-                    control_hook: control_hook,
-                    addresses: HashMap::new(),
-                },
+                    control_hook,
+                ),
             };
 
             let core_id = match properties {

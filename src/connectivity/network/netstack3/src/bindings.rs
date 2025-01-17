@@ -36,7 +36,6 @@ mod timers;
 mod util;
 mod verifier_worker;
 
-use std::collections::HashMap;
 use std::convert::Infallible as Never;
 use std::ffi::CStr;
 use std::fmt::Debug;
@@ -1075,13 +1074,11 @@ impl Netstack {
 
         let loopback_info = LoopbackInfo {
             static_common_info: StaticCommonInfo { authorization_token: zx::Event::create() },
-            dynamic_common_info: CoreRwLock::new(DynamicCommonInfo {
-                mtu: DEFAULT_LOOPBACK_MTU,
-                admin_enabled: true,
+            dynamic_common_info: CoreRwLock::new(DynamicCommonInfo::new_for_loopback(
+                DEFAULT_LOOPBACK_MTU,
                 events,
-                control_hook: control_sender,
-                addresses: HashMap::new(),
-            }),
+                control_sender,
+            )),
             rx_notifier: loopback_rx_notifier,
         };
 

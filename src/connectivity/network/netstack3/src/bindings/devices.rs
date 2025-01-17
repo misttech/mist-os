@@ -31,7 +31,9 @@ use {
 
 use crate::bindings::power::TransmitSuspensionHandler;
 use crate::bindings::util::NeedsDataNotifier;
-use crate::bindings::{interfaces_admin, neighbor_worker, netdevice_worker, BindingsCtx, Ctx};
+use crate::bindings::{
+    interfaces_admin, neighbor_worker, netdevice_worker, BindingsCtx, Ctx, InterfaceEventProducer,
+};
 
 pub(crate) const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 
@@ -592,6 +594,25 @@ pub(crate) struct DynamicCommonInfo {
     #[derivative(Debug = "ignore")]
     pub(crate) control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
     pub(crate) addresses: HashMap<SpecifiedAddr<IpAddr>, AddressInfo>,
+}
+
+impl DynamicCommonInfo {
+    pub(crate) fn new(
+        mtu: Mtu,
+        events: InterfaceEventProducer,
+        control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
+    ) -> Self {
+        Self { mtu, admin_enabled: false, events, control_hook, addresses: HashMap::new() }
+    }
+
+    /// Only loopback should start with `admin_enabled` = true.
+    pub(crate) fn new_for_loopback(
+        mtu: Mtu,
+        events: super::InterfaceEventProducer,
+        control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
+    ) -> Self {
+        Self { mtu, admin_enabled: true, events, control_hook, addresses: HashMap::new() }
+    }
 }
 
 #[derive(Debug)]
