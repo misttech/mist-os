@@ -42,8 +42,8 @@ class LocalPowerStateControl
     FX_LOGS(ERROR) << "Not implemented " << name;
   }
 
-  void Reboot(::fuchsia::hardware::power::statecontrol::RebootReason reason,
-              RebootCallback callback) override {
+  void PerformReboot(::fuchsia::hardware::power::statecontrol::RebootOptions options,
+                     PerformRebootCallback callback) override {
     expect_reboot_--;
     reboot_complete = true;
   }
