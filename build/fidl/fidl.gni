@@ -87,10 +87,9 @@ import("//build/testing/host_test_data.gni")
 #     Defaults are:
 #       * When testonly is true: "unversioned"
 #       * When the library name starts with "fuchsia.":
-#         * If `stable` is true: to "fuchsia"
-#         * For unstable libraries in the IDK: "fuchsia:HEAD"
-#         * Otherwise: Unset.
-#           TODO(https://fxbug.dev/325669391): Update when fixed.
+#         * If `stable` is true: "fuchsia"
+#         * For unstable libraries in an SDK category: "fuchsia:HEAD"
+#         * Otherwise: "fuchsia:HEAD" (with a few temporary exceptions)
 #       * Otherwise: "unversioned"
 #
 #   available (optional)
