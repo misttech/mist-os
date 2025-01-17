@@ -9,7 +9,7 @@ import json
 import logging
 import os
 import subprocess
-from typing import Any, List, Optional, Text
+from typing import Any, List, Optional, Text, Tuple
 
 import ffxtestcase
 from honeydew.errors import FfxCommandError
@@ -113,6 +113,22 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
         all_args += cmd
         return json.loads(self.run_ffx(all_args))
 
+    def _run_strict_ffx_unchecked(
+        self, cmd: List[str], target: Optional[str] = None
+    ) -> Tuple[int, str, str]:
+        all_args = [
+            "--strict",
+            "--machine",
+            "json",
+            "-o",
+            "/dev/null",
+            *self._build_strict_config_args([]),
+        ]
+        if target is not None:
+            all_args += ["-t", target]
+        all_args += cmd
+        return self.run_ffx_unchecked(all_args)
+
     # Run ffx --strict <cmd> with the default configs, and
     # optionally with a target
     def _run_strict_ffx(
@@ -151,16 +167,17 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
 
     def test_strict_can_check_for_no_target(self) -> None:
         """Test `ffx --strict target echo` requires a target."""
-        with asserts.assert_raises(subprocess.CalledProcessError):
-            try:
-                self._run_strict_ffx(["target", "echo"], None)
-            except subprocess.CalledProcessError as e:
-                asserts.assert_true(
-                    b"ffx strict requires that the target be explicitly specified"
-                    in e.stderr,
-                    "The command should require a target",
-                )
-                raise
+        (code, stdout, stderr) = self._run_strict_ffx_unchecked(
+            ["target", "echo"], None
+        )
+        message = json.loads(stdout)
+        asserts.assert_equal(stderr, "")
+        asserts.assert_equal(message["type"], "user")
+        asserts.assert_equal(message["code"], 1)
+        asserts.assert_equal(
+            message["message"],
+            "Command line flags unsatisfactory for strict mode:\n\tffx strict requires that the target be explicitly specified",
+        )
 
     def test_strict_can_accept_no_target(self) -> None:
         """Test `ffx --strict product download` doesn't require a target."""
@@ -229,21 +246,31 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
 
     def test_target_wait_down_strict(self) -> None:
         """Test `ffx --strict target wait --down`."""
-        with asserts.assert_raises(subprocess.CalledProcessError):
-            try:
-                self._run_strict_ffx(
-                    [
-                        "target",
-                        "wait",
-                        "--timeout",
-                        "1",
-                        "--down",
-                    ],
-                    f"{self.dut_ssh_address}",
-                )
-            except subprocess.CalledProcessError as e:
-                asserts.assert_in(b"Timeout", e.stderr)
-                raise
+        (code, stdout, stderr) = self._run_strict_ffx_unchecked(
+            [
+                "target",
+                "wait",
+                "--timeout",
+                "1",
+                "--down",
+            ],
+            f"{self.dut_ssh_address}",
+        )
+        # the raw json decoder doesnt like whitespace or newlines
+        output = stdout.strip().replace("\n", "")
+        decoder = json.JSONDecoder()
+        messages = []
+        position = 0
+        while position < len(output):
+            (message, read) = decoder.raw_decode(output[position:])
+            messages.append(message)
+            position = position + read
+        asserts.assert_equal(stderr, "")
+        # We'll grab the last message to parse
+        message = messages[-1]
+        asserts.assert_equal(message["type"], "user")
+        asserts.assert_equal(message["code"], 1)
+        asserts.assert_equal(code, 1)
 
 
 if __name__ == "__main__":

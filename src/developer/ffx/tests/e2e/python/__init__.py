@@ -6,6 +6,7 @@
 
 import logging
 import subprocess
+from typing import Tuple
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
@@ -49,3 +50,18 @@ class FfxTestCase(fuchsia_base_test.FuchsiaBaseTest):
         except subprocess.CalledProcessError:
             _LOGGER.warning("FFX cmd failed. Stderr: %s", proc.stderr.decode())
             raise
+
+    def run_ffx_unchecked(self, args: list[str]) -> Tuple[int, str, str]:
+        """Run ffx in the specific way we need, not the standard Honeydew way.
+        Also does not check for errors"""
+        config = self.dut.ffx.config
+        cmd = [config.binary_path]
+        if "--strict" not in args:
+            cmd += [
+                "--isolate-dir",
+                config.isolate_dir.directory(),
+            ]
+        cmd += args
+        _LOGGER.info("Running FFX cmd: %s", cmd)
+        proc = subprocess.run(cmd, capture_output=True)
+        return (proc.returncode, proc.stdout.decode(), proc.stderr.decode())

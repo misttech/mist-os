@@ -93,6 +93,18 @@ type ProductArtifacts struct {
 	} `json:"unexpected_error"`
 }
 
+// If ffx outputs machine errors then this is the schema it is output in
+type FfxMachineError struct {
+	Type    string `json:"type"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e *FfxMachineError) Error() string {
+	return fmt.Sprintf("Error type \"%s\" with code %v, and message  \"\"%s",
+		e.Type, e.Code, e.Message)
+}
+
 // Output for get-image-path
 type ProductImagePath struct {
 	Ok struct {
@@ -534,6 +546,27 @@ func processImageFromPBResult(pbPath string, raw string, err error) (*bootserver
 		}
 		return nil, fmt.Errorf("No output received from command")
 
+	} else if err != nil {
+		// We got output and there is an error. Try to find it.
+		// We'll only take the last one
+		dec := json.NewDecoder(strings.NewReader(raw))
+		var errMsg FfxMachineError
+		for {
+			if marshalErr := dec.Decode(&errMsg); marshalErr == io.EOF {
+				// Cool we got the message
+				break
+			} else if marshalErr != nil {
+				return nil, fmt.Errorf("Error parsing error message %s: %v", raw, marshalErr)
+			}
+		}
+
+		if errMsg.Type == "unexpected" || errMsg.Type == "user" {
+			// An error is returned if the image cannot be found in the product bundle
+			// which is ok.
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("Error getting image: %v", errMsg)
 	}
 
 	var result ProductImagePath

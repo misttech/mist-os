@@ -5,6 +5,8 @@
 use errors::IntoExitCode;
 use ffx_config::environment::ExecutableKind;
 use fuchsia_async::TimeoutExt;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
 use std::os::unix::process::ExitStatusExt;
@@ -216,25 +218,40 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
 }
 
 /// Terminates the process, outputting errors as appropriately and with the indicated exit code.
-pub async fn exit(res: Result<ExitStatus>) -> ! {
+pub async fn exit(res: Result<ExitStatus>, should_format: bool) -> ! {
     const SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(500);
-
     let exit_code = res.exit_code();
     match res {
         Err(Error::Help { output, .. }) => {
             writeln!(&mut std::io::stdout(), "{output}").unwrap();
         }
         Err(err @ Error::Config(_)) | Err(err @ Error::User(_)) => {
-            let mut out = std::io::stderr();
             // abort hard on a failure to print the user error somehow
-            writeln!(&mut out, "{err}").unwrap();
+            if should_format {
+                let mut out = std::io::stdout();
+                let err = SerializableError::from(&err);
+                let message = serde_json::to_string(&err).unwrap();
+                writeln!(&mut out, "{message}").unwrap();
+            } else {
+                let mut out = std::io::stderr();
+                let message = format!("{err}");
+                writeln!(&mut out, "{message}").unwrap();
+            };
         }
         Err(err @ Error::Unexpected(_)) => {
-            let mut out = std::io::stderr();
             // abort hard on a failure to print the unexpected error somehow
-            writeln!(&mut out, "{err}").unwrap();
+            if should_format {
+                let mut out = std::io::stdout();
+                let err = SerializableError::from(&err);
+                let message = serde_json::to_string(&err).unwrap();
+                writeln!(&mut out, "{message}").unwrap();
+            } else {
+                let mut out = std::io::stderr();
+                let message = format!("{err}");
+                writeln!(&mut out, "{message}").unwrap();
+                ffx_config::print_log_hint(&mut out).await;
+            };
             report_bug(&err).await;
-            ffx_config::print_log_hint(&mut out).await;
         }
         Ok(_) | Err(Error::ExitWithCode(_)) => (),
     }
@@ -260,12 +277,62 @@ fn find_machine_and_help(cmd: &FfxCommandLine) -> Option<ffx_writer::Format> {
     }
 }
 
+/// We need this additional type to proxy the underlying ffx_command::Error
+/// since that enum embeds anyhow::Error in it (which cannot be serialized).
+/// Having a private enum we control the shape of as well as the
+/// From::ffx_command::Error implementation allows us to define a schema for
+/// the error messages and keep them stable across versions.
+///
+/// Note that we explicitly do NOT put the error chain in this enum as if that
+/// information is conveyed to the caller, it becomes another API surface that
+/// will become load bearing.
+#[derive(Debug, thiserror::Error, Serialize, Deserialize, JsonSchema, PartialEq)]
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
+enum SerializableError {
+    #[error("{message}")]
+    Unexpected { code: i32, message: String },
+    #[error("{message}")]
+    User { message: String, code: i32 },
+    #[error("{output}")]
+    Help { command: Vec<String>, output: String, code: i32 },
+    #[error("{message}")]
+    Config { code: i32, message: String },
+    #[error("Exiting with code {code}")]
+    ExitWithCode { code: i32 },
+}
+
+impl From<&Error> for SerializableError {
+    fn from(error: &Error) -> Self {
+        match error {
+            err @ Error::Unexpected(e) => {
+                Self::Unexpected { code: err.exit_code(), message: format!("{}", e) }
+            }
+            err @ Error::User(e) => Self::User { code: err.exit_code(), message: format!("{}", e) },
+            err @ Error::Config(e) => {
+                Self::Config { code: err.exit_code(), message: format!("{}", e) }
+            }
+            Error::ExitWithCode(code) => Self::ExitWithCode { code: *code },
+            Error::Help { command, output, code } => {
+                Self::Help { command: command.to_vec(), output: output.to_string(), code: *code }
+            }
+        }
+    }
+}
+
+impl From<Error> for SerializableError {
+    fn from(error: Error) -> Self {
+        Self::from(&error)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use serde_json::json;
     use std::io::BufWriter;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stamp_file_creation() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("stamp").into_os_string().into_string().ok();
@@ -274,23 +341,77 @@ mod test {
         assert!(stamp.unwrap().is_some());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stamp_file_no_create() {
         let no_stamp = stamp_file(&None);
         assert!(no_stamp.unwrap().is_none());
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_write_exit_code() {
         let mut out = BufWriter::new(Vec::new());
         write_exit_code(&Ok(ExitStatus::from_raw(0)), &mut out);
         assert_eq!(String::from_utf8(out.into_inner().unwrap()).unwrap(), "0\n");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_write_exit_code_on_failure() {
         let mut out = BufWriter::new(Vec::new());
         write_exit_code(&Result::<ExitStatus>::Err(Error::from(anyhow::anyhow!("fail"))), &mut out);
         assert_eq!(String::from_utf8(out.into_inner().unwrap()).unwrap(), "1\n")
+    }
+
+    #[fuchsia::test]
+    async fn test_serializable_error_from_error() -> () {
+        assert_eq!(
+            SerializableError::from(Error::Unexpected(anyhow::Error::msg("Cytherea".to_string()))),
+            SerializableError::Unexpected { code: 1, message: "Cytherea".to_string() }
+        );
+        assert_eq!(
+            SerializableError::from(Error::User(anyhow::Error::msg("Cytherea".to_string()))),
+            SerializableError::User { code: 1, message: "Cytherea".to_string() }
+        );
+        assert_eq!(
+            SerializableError::from(Error::Config(anyhow::Error::msg("Cytherea".to_string()))),
+            SerializableError::Config { code: 1, message: "Cytherea".to_string() }
+        );
+        assert_eq!(
+            SerializableError::from(Error::Help {
+                command: vec!["Cytherea".to_string()],
+                code: 134,
+                output: "Hot-Sauce".to_string(),
+            }),
+            SerializableError::Help {
+                code: 134,
+                command: vec!["Cytherea".to_string()],
+                output: "Hot-Sauce".to_string()
+            }
+        );
+        assert_eq!(
+            SerializableError::from(Error::ExitWithCode(123)),
+            SerializableError::ExitWithCode { code: 123 }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_serializable_error() -> () {
+        let cases = vec![
+            SerializableError::Unexpected { code: 1, message: "Cytherea".to_string() },
+            SerializableError::User { code: 1, message: "Cytherea".to_string() },
+            SerializableError::Config { code: 1, message: "Cytherea".to_string() },
+            SerializableError::Help {
+                code: 134,
+                command: vec!["Cytherea".to_string()],
+                output: "Hot-Sauce".to_string(),
+            },
+            SerializableError::ExitWithCode { code: 123 },
+        ];
+        for case in cases {
+            let output = serde_json::to_string(&case).unwrap();
+            let err = format!("schema not valid {output}");
+            let json: serde_json::Value = serde_json::from_str(&output).expect(&err);
+
+            assert_eq!(json, json!(case));
+        }
     }
 }

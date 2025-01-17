@@ -199,16 +199,18 @@ func TestFFXPBImagePath(t *testing.T) {
 			wantError: nil,
 		},
 		{
-			name:      "pb not found paths",
-			output:    `{"user_error": {"message": "path not found"}}`,
+			name: "pb not found paths",
+			output: `{"user_error": {"message": "path not found"}}
+{"type":"unexpected","code":1,"message":"path not found?"}`,
 			errOutput: "path not found",
 			exitCode:  1,
 			wantImage: nil,
 			wantError: nil,
 		},
 		{
-			name:      "unexpected error",
-			output:    `{"unexpected_error": {"message": "somthing went wrong"}}`,
+			name: "unexpected error",
+			output: `{"unexpected_error": {"message": "somthing went wrong"}}
+{"type":"unexpected","code":1,"message":"path not found?"}`,
 			errOutput: "exception processing metadata",
 			exitCode:  1,
 			wantImage: nil,

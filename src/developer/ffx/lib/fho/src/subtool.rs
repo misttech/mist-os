@@ -32,7 +32,9 @@ pub trait FfxTool: FfxMain + Sized {
     /// Executes the tool. This is intended to be invoked by the user in main.
     async fn execute_tool() {
         let result = ffx_command::run::<FhoSuite<Self>>(ExecutableKind::Subtool).await;
-        ffx_command::exit(result).await;
+        let cli = FfxCommandLine::from_env().unwrap();
+        let should_format = cli.global.machine.is_some();
+        ffx_command::exit(result, should_format).await;
     }
 }
 
