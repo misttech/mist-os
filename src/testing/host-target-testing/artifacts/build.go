@@ -1062,6 +1062,7 @@ func (b *OmahaBuild) updateVBMeta(
 	imageArguments := map[string]string{
 		"omaha_url":    b.omahatool.URL(),
 		"omaha_app_id": b.omahatool.Args.AppId,
+		"ota_channel":  "ota-test-channel",
 	}
 
 	if err := b.zbitool.MakeImageArgsZbi(ctx, destZbiPath, imageArguments); err != nil {

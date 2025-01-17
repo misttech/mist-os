@@ -414,6 +414,7 @@ func (u *OmahaUpdater) Update(
 	imageArguments := map[string]string{
 		"omaha_url":    u.omahaTool.URL(),
 		"omaha_app_id": u.omahaTool.Args.AppId,
+		"ota_channel":  "ota-test-channel",
 	}
 
 	logger.Infof(ctx, "Omaha Server URL set in vbmeta to %q", u.omahaTool.URL())
