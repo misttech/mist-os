@@ -125,6 +125,14 @@ This also allows for metrics to be non-determistic in whether they are
 produced or not.  However, having a non-deterministic metric will
 usually be considered a bug that should be fixed.
 
+## Disabling metrics
+
+If a metric is disabled and will never be produced by the code in its
+current state, it is better to remove it from the list or comment it
+out than to mark it as optional.  Otherwise we are liable to forget to
+remove the `[optional]` tag when the metric gets re-enabled, which
+would mean that we won't notice if the metric later goes missing.
+
 ## Skipping summarization of metrics
 
 By default, when using the Python `perf_publish` library, the fuchsiaperf files
