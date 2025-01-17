@@ -199,7 +199,6 @@ group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_vim3_stable_tests",
   ]
@@ -208,6 +207,8 @@ group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
 group_with_no_dir_target_deps("starnix_vim3_unstable_tests") {
   testonly = true
   public_deps = [
+    # TODO(https://fxbug.dev/390219788): Moved from stable because it closed the tree.
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_vim3_unstable_tests",
     "//src/performance/memory/attribution/monitor/tests/e2e:tests",
   ]
@@ -230,7 +231,6 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
     "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
     "examples/test_power_cycle:power_cycle_test($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_stable_tests",
   ]
@@ -240,6 +240,9 @@ group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
   public_deps = [
     "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+
+    # TODO(https://fxbug.dev/390219788): Moved from stable because it closed the tree.
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_unstable_tests",
     "//src/performance/memory/attribution/monitor/tests/e2e:tests",
   ]
