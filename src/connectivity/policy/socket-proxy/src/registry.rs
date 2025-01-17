@@ -322,32 +322,44 @@ pub struct Registry {
 macro_rules! handle_registry_request {
     ($request_type:ident, $request:expr, $network_registry:expr, $name:expr) => {{
         let mut networks = $network_registry.networks.as_mut();
-        let (op, send): (_, Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static>) =
-            match $request {
-                $request_type::SetDefault { network_id, responder } => {
-                    let result = networks.set_default_network(match network_id {
-                        fposix_socket::OptionalUint32::Value(value) => Some(value),
-                        fposix_socket::OptionalUint32::Unset(_) => None,
-                    });
-                    ("set default", Box::new(move || responder.send(result)))
-                }
-                $request_type::Add { network, responder } => {
-                    let result = networks.add_network(network);
-                    ("add", Box::new(move || responder.send(result)))
-                }
-                $request_type::Update { network, responder } => {
-                    let result = networks.update_network(network);
-                    ("update", Box::new(move || responder.send(result)))
-                }
-                $request_type::Remove { network_id, responder } => {
-                    let result = networks.remove_network(network_id);
-                    ("remove", Box::new(move || responder.send(result)))
-                }
-            };
-        let new_mark = networks.current_mark();
-        info!("{} registry {op}. mark: {new_mark:?}, networks count: {}", $name, networks.len());
+        let (op, send, did_state_change): (
+            _,
+            Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static>,
+            bool,
+        ) = match $request {
+            $request_type::SetDefault { network_id, responder } => {
+                let result = networks.set_default_network(match network_id {
+                    fposix_socket::OptionalUint32::Value(value) => Some(value),
+                    fposix_socket::OptionalUint32::Unset(_) => None,
+                });
+                ("set default", Box::new(move || responder.send(result)), true)
+            }
+            $request_type::Add { network, responder } => {
+                let result = networks.add_network(network);
+                ("add", Box::new(move || responder.send(result)), true)
+            }
+            $request_type::Update { network, responder } => {
+                let result = networks.update_network(network);
+                ("update", Box::new(move || responder.send(result)), true)
+            }
+            $request_type::Remove { network_id, responder } => {
+                let result = networks.remove_network(network_id);
+                ("remove", Box::new(move || responder.send(result)), true)
+            }
+            $request_type::CheckPresence { responder } => {
+                ("check_presence", Box::new(move || responder.send()), false)
+            }
+        };
+        if did_state_change {
+            let new_mark = networks.current_mark();
+            info!(
+                "{} registry {op}. mark: {new_mark:?}, networks count: {}",
+                $name,
+                networks.len()
+            );
+        }
         std::mem::drop(networks);
-        send
+        (send, did_state_change)
     }};
 }
 
@@ -384,8 +396,10 @@ impl Registry {
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
                 let mut network_registry = self.networks.starnix.lock().await;
-                let send: Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static> =
-                handle_registry_request!(
+                let (send, did_state_change): (
+                    Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static>,
+                    bool,
+                ) = handle_registry_request!(
                     StarnixNetworksRequest,
                     request,
                     network_registry,
@@ -393,23 +407,29 @@ impl Registry {
                 );
                 std::mem::drop(network_registry);
 
-                // We do feed here instead of send so that we don't wait for a flush
-                // in the event that the DnsServerWatcher is not running.
-                self.dns_tx
-                    .clone()
-                    .feed(self.networks.current_dns_servers().await)
-                    .await
-                    .unwrap_or_else(|e| {
-                    if !e.is_disconnected() {
-                        // Log if the feed fails for reasons other than disconnection.
-                        error!("Unable to feed DNS update: {e:?}")
-                    }
-                });
+                if did_state_change {
+                    // We do feed here instead of send so that we don't wait for a flush
+                    // in the event that the DnsServerWatcher is not running.
+                    self.dns_tx
+                        .clone()
+                        .feed(self.networks.current_dns_servers().await)
+                        .await
+                        .unwrap_or_else(|e| {
+                            if !e.is_disconnected() {
+                                // Log if the feed fails for reasons other than disconnection.
+                                error!("Unable to feed DNS update: {e:?}")
+                            }
+                        });
 
-                // Ensure the mark is updated prior to sending out the response
-                // and dropping the registry.
-                self.marks.lock().await.mark_1 = self.networks.current_mark().await;
-                send().context("error sending response")?;
+                    // Ensure the mark is updated prior to sending out the response
+                    // and dropping the registry.
+                    self.marks.lock().await.mark_1 = self.networks.current_mark().await;
+                    send().context("error sending response")?;
+                } else {
+                    // Not a request involving a state change,
+                    // so ignore any errors.
+                    let _: Result<(), fidl::Error> = send();
+                }
                 Ok(())
             })
             .await
@@ -434,8 +454,10 @@ impl Registry {
             .map(|result| result.context("failed request"))
             .try_for_each(|request| async {
                 let mut network_registry = self.networks.fuchsia.lock().await;
-                let send: Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static> =
-                handle_registry_request!(
+                let (send, did_state_change): (
+                    Box<dyn FnOnce() -> Result<(), _> + Send + Sync + 'static>,
+                    bool,
+                ) = handle_registry_request!(
                     FuchsiaNetworksRequest,
                     request,
                     network_registry,
@@ -443,23 +465,29 @@ impl Registry {
                 );
                 std::mem::drop(network_registry);
 
-                // We do feed here instead of send so that we don't wait for a flush
-                // in the event that the DnsServerWatcher is not running.
-                self.dns_tx
-                    .clone()
-                    .feed(self.networks.current_dns_servers().await)
-                    .await
-                    .unwrap_or_else(|e| {
-                    if !e.is_disconnected() {
-                        // Log if the feed fails for reasons other than disconnection.
-                        error!("Unable to feed DNS update: {e:?}")
-                    }
-                });
+                if did_state_change {
+                    // We do feed here instead of send so that we don't wait for a flush
+                    // in the event that the DnsServerWatcher is not running.
+                    self.dns_tx
+                        .clone()
+                        .feed(self.networks.current_dns_servers().await)
+                        .await
+                        .unwrap_or_else(|e| {
+                            if !e.is_disconnected() {
+                                // Log if the feed fails for reasons other than disconnection.
+                                error!("Unable to feed DNS update: {e:?}")
+                            }
+                        });
 
-                // Ensure the mark is updated prior to sending out the response
-                // and dropping the registry.
-                self.marks.lock().await.mark_1 = self.networks.current_mark().await;
-                send().context("error sending response")?;
+                    // Ensure the mark is updated prior to sending out the response
+                    // and dropping the registry.
+                    self.marks.lock().await.mark_1 = self.networks.current_mark().await;
+                    send().context("error sending response")?;
+                } else {
+                    // Not a request involving a state change,
+                    // so ignore any errors.
+                    let _: Result<(), fidl::Error> = send();
+                }
                 Ok(())
             })
             .await

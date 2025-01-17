@@ -1006,6 +1006,9 @@ mod tests {
                         });
                         responder.send(res).expect("respond to Remove");
                     }
+                    fnp_socketproxy::StarnixNetworksRequest::CheckPresence { responder: _ } => {
+                        unreachable!("not called in tests")
+                    }
                 }
             }
         })

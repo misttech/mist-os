@@ -76,6 +76,10 @@ impl DnsServerWatcher {
                             state.maybe_respond()?;
                         }
                     },
+                     Some(fnp_socketproxy::DnsServerWatcherRequest::CheckPresence { responder }) => {
+                        // This is a no-op method, so ignore any errors.
+                        let _: Result<(), fidl::Error> = responder.send();
+                    }
                     None => {}
                 },
                 dns_update = dns_rx.select_next_some() => {
