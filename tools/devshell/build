@@ -124,7 +124,7 @@ function count-ninja-log-lines {
   if [[ -f "${NINJA_LOG_FILE}" ]]; then
     echo "$(wc -l <"${NINJA_LOG_FILE}" 2>/dev/null)"
   else
-    echo 0
+    echo -1
   fi
 }
 
@@ -422,6 +422,12 @@ function main {
 
   local -i target_count=0
   local -i ninja_log_line_count_before="$(count-ninja-log-lines)"
+  local -i is_clean_build=0
+  if (( ninja_log_line_count_before < 0 )); then
+    is_clean_build=1
+    ninja_log_line_count_before=0
+  fi
+
   if [ -n "${fint_params_path}" ]; then
     readonly fint="${FX_CACHE_DIR}/fint"
     "$FUCHSIA_DIR/tools/integration/bootstrap.sh" -o "$fint" || exit $?
@@ -523,7 +529,7 @@ build_dir: \"${FUCHSIA_BUILD_DIR}\"
   fi
 
   declare -r end_time="${EPOCHREALTIME/./}"
-  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" "${target_count}" &
+  track-build-event "${start_time}" "${end_time}" "${status}" "${ninja_switches[*]}" "${switches[*]}" "${fuchsia_targets[*]}" "${FUCHSIA_BUILD_DIR}" "${target_count}" "${is_clean_build}"&
   exit-with-message
 }
 
