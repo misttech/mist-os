@@ -39,9 +39,7 @@
     {% let access_args = "<'_, 'buf>" %}
 {% endif %}
 
-{% if let Some(doc) = union.attributes.doc_string() %}
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+{{ self::doc_string(union.attributes) -}}
 #[derive(
 {% if !union.is_resource %}
     Clone,

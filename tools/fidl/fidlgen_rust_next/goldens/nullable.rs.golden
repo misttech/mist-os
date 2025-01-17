@@ -356,7 +356,8 @@ where
 }
 
 /// A client handler for the SimpleProtocol protocol.
-
+///
+/// See [`SimpleProtocol`] for more details.
 pub trait SimpleProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for SimpleProtocol
@@ -392,7 +393,8 @@ where
 }
 
 /// A server handler for the SimpleProtocol protocol.
-
+///
+/// See [`SimpleProtocol`] for more details.
 pub trait SimpleProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn add(
         &mut self,

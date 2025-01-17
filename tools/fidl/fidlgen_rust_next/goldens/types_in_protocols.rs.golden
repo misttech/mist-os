@@ -273,7 +273,6 @@ where
 }
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -6697,7 +6696,8 @@ where
 }
 
 /// A client handler for the Protocol protocol.
-
+///
+/// See [`Protocol`] for more details.
 pub trait ProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn event_basic(
         &mut self,
@@ -7104,7 +7104,8 @@ where
 }
 
 /// A server handler for the Protocol protocol.
-
+///
+/// See [`Protocol`] for more details.
 pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_basic(
         &mut self,

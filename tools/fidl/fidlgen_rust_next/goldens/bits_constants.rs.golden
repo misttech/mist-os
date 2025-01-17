@@ -3,7 +3,6 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,

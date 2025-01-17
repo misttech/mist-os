@@ -2192,7 +2192,8 @@ where
 }
 
 /// A client handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_composed(
         &mut self,
@@ -2395,7 +2396,8 @@ where
 }
 
 /// A server handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_composed(
         &mut self,

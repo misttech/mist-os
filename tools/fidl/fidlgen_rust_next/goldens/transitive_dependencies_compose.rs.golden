@@ -43,7 +43,8 @@ where
 }
 
 /// A client handler for the Top protocol.
-
+///
+/// See [`Top`] for more details.
 pub trait TopClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Top
@@ -77,7 +78,8 @@ impl<___T> TopServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Top> 
 }
 
 /// A server handler for the Top protocol.
-
+///
+/// See [`Top`] for more details.
 pub trait TopServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn get_foo(
         &mut self,

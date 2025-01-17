@@ -233,7 +233,8 @@ where
 }
 
 /// A client handler for the OneWay protocol.
-
+///
+/// See [`OneWay`] for more details.
 pub trait OneWayClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for OneWay
@@ -264,7 +265,8 @@ impl<___T> OneWayServerSender<___T> for ::fidl_next::bind::ServerSender<___T, On
 }
 
 /// A server handler for the OneWay protocol.
-
+///
+/// See [`OneWay`] for more details.
 pub trait OneWayServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn send(
         &mut self,

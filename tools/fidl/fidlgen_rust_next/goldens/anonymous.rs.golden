@@ -3,7 +3,6 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -300,7 +299,6 @@ where
 }
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -2137,7 +2135,8 @@ where
 }
 
 /// A client handler for the SomeProtocol protocol.
-
+///
+/// See [`SomeProtocol`] for more details.
 pub trait SomeProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for SomeProtocol
@@ -2171,7 +2170,8 @@ impl<___T> SomeProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<__
 }
 
 /// A server handler for the SomeProtocol protocol.
-
+///
+/// See [`SomeProtocol`] for more details.
 pub trait SomeProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn some_method(
         &mut self,

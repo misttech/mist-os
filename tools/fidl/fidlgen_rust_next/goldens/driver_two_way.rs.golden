@@ -253,7 +253,8 @@ where
 }
 
 /// A client handler for the TwoWay protocol.
-
+///
+/// See [`TwoWay`] for more details.
 pub trait TwoWayClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for TwoWay
@@ -287,7 +288,8 @@ impl<___T> TwoWayServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Tw
 }
 
 /// A server handler for the TwoWay protocol.
-
+///
+/// See [`TwoWay`] for more details.
 pub trait TwoWayServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn add(
         &mut self,

@@ -557,7 +557,8 @@ where
 }
 
 /// A client handler for the EmptyProtocol protocol.
-
+///
+/// See [`EmptyProtocol`] for more details.
 pub trait EmptyProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn receive(
         &mut self,
@@ -629,7 +630,8 @@ where
 }
 
 /// A server handler for the EmptyProtocol protocol.
-
+///
+/// See [`EmptyProtocol`] for more details.
 pub trait EmptyProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn send(
         &mut self,

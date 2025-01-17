@@ -2948,7 +2948,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsAjarDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsAjarDriverProtocol`] for more details.
 pub trait UnknownInteractionsAjarDriverProtocolClientHandler<___T: ::fidl_next::protocol::Transport>
 {
     fn on_unknown_interaction(
@@ -3012,7 +3013,8 @@ where
 }
 
 /// A server handler for the UnknownInteractionsAjarDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsAjarDriverProtocol`] for more details.
 pub trait UnknownInteractionsAjarDriverProtocolServerHandler<___T: ::fidl_next::protocol::Transport>
 {
     fn strict_one_way(
@@ -7214,7 +7216,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsAjarProtocol protocol.
-
+///
+/// See [`UnknownInteractionsAjarProtocol`] for more details.
 pub trait UnknownInteractionsAjarProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(
         &mut self,
@@ -7553,7 +7556,8 @@ where
 }
 
 /// A server handler for the UnknownInteractionsAjarProtocol protocol.
-
+///
+/// See [`UnknownInteractionsAjarProtocol`] for more details.
 pub trait UnknownInteractionsAjarProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_one_way(
         &mut self,
@@ -10683,7 +10687,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsClosedDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsClosedDriverProtocol`] for more details.
 pub trait UnknownInteractionsClosedDriverProtocolClientHandler<
     ___T: ::fidl_next::protocol::Transport,
 >
@@ -10746,7 +10751,8 @@ where
 }
 
 /// A server handler for the UnknownInteractionsClosedDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsClosedDriverProtocol`] for more details.
 pub trait UnknownInteractionsClosedDriverProtocolServerHandler<
     ___T: ::fidl_next::protocol::Transport,
 >
@@ -14365,7 +14371,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsClosedProtocol protocol.
-
+///
+/// See [`UnknownInteractionsClosedProtocol`] for more details.
 pub trait UnknownInteractionsClosedProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(
         &mut self,
@@ -14560,7 +14567,8 @@ where
 }
 
 /// A server handler for the UnknownInteractionsClosedProtocol protocol.
-
+///
+/// See [`UnknownInteractionsClosedProtocol`] for more details.
 pub trait UnknownInteractionsClosedProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_one_way(
         &mut self,
@@ -22098,7 +22106,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsDriverProtocol`] for more details.
 pub trait UnknownInteractionsDriverProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_unknown_interaction(
         &mut self,
@@ -22182,7 +22191,8 @@ where
 }
 
 /// A server handler for the UnknownInteractionsDriverProtocol protocol.
-
+///
+/// See [`UnknownInteractionsDriverProtocol`] for more details.
 pub trait UnknownInteractionsDriverProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_one_way(
         &mut self,
@@ -30735,7 +30745,8 @@ where
 }
 
 /// A client handler for the UnknownInteractionsProtocol protocol.
-
+///
+/// See [`UnknownInteractionsProtocol`] for more details.
 pub trait UnknownInteractionsProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_event(
         &mut self,
@@ -31094,7 +31105,8 @@ where
 }
 
 /// A server handler for the UnknownInteractionsProtocol protocol.
-
+///
+/// See [`UnknownInteractionsProtocol`] for more details.
 pub trait UnknownInteractionsProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_one_way(
         &mut self,

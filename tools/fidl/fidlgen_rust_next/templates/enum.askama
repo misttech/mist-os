@@ -4,9 +4,7 @@
 {% let natural_int = context.natural_int(enm.ty) %}
 {% let wire_int = context.wire_int(enm.ty) %}
 
-{% if let Some(doc) = enm.attributes.doc_string() %}
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+{{ self::doc_string(enm.attributes) -}}
 #[derive(
     Clone,
     Copy,

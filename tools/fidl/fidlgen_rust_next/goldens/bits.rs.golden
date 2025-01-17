@@ -3,7 +3,6 @@
 #![allow(unused_parens, unused_variables, unused_mut, unused_imports, unreachable_code)]
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -74,7 +73,6 @@ impl ::core::convert::From<EmptyBits> for WireEmptyBits {
 }
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -147,7 +145,6 @@ impl ::core::convert::From<FlexibleBits> for WireFlexibleBits {
 }
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -230,7 +227,6 @@ impl ::core::convert::From<MyBits> for WireMyBits {
 }
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,

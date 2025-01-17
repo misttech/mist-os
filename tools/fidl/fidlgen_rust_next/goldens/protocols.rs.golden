@@ -19,7 +19,8 @@ where
 }
 
 /// A client handler for the AnotherDiscoverableProtocol protocol.
-
+///
+/// See [`AnotherDiscoverableProtocol`] for more details.
 pub trait AnotherDiscoverableProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for AnotherDiscoverableProtocol
@@ -52,7 +53,8 @@ where
 }
 
 /// A server handler for the AnotherDiscoverableProtocol protocol.
-
+///
+/// See [`AnotherDiscoverableProtocol`] for more details.
 pub trait AnotherDiscoverableProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for AnotherDiscoverableProtocol
@@ -985,7 +987,8 @@ where
 }
 
 /// A client handler for the ChannelProtocol protocol.
-
+///
+/// See [`ChannelProtocol`] for more details.
 pub trait ChannelProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn event_a(
         &mut self,
@@ -1061,7 +1064,8 @@ where
 }
 
 /// A server handler for the ChannelProtocol protocol.
-
+///
+/// See [`ChannelProtocol`] for more details.
 pub trait ChannelProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn method_a(
         &mut self,
@@ -1204,7 +1208,8 @@ where
 }
 
 /// A client handler for the DiscoverableProtocol protocol.
-
+///
+/// See [`DiscoverableProtocol`] for more details.
 pub trait DiscoverableProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for DiscoverableProtocol
@@ -1237,7 +1242,8 @@ where
 }
 
 /// A server handler for the DiscoverableProtocol protocol.
-
+///
+/// See [`DiscoverableProtocol`] for more details.
 pub trait DiscoverableProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn method(&mut self, sender: &::fidl_next::bind::ServerSender<___T, DiscoverableProtocol>);
 }
@@ -1856,7 +1862,8 @@ where
 }
 
 /// A client handler for the HandleRightsProtocol protocol.
-
+///
+/// See [`HandleRightsProtocol`] for more details.
 pub trait HandleRightsProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn an_event(
         &mut self,
@@ -1929,7 +1936,8 @@ where
 }
 
 /// A server handler for the HandleRightsProtocol protocol.
-
+///
+/// See [`HandleRightsProtocol`] for more details.
 pub trait HandleRightsProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn no_response_method(
         &mut self,
@@ -2369,7 +2377,8 @@ where
 }
 
 /// A client handler for the ManyParameters protocol.
-
+///
+/// See [`ManyParameters`] for more details.
 pub trait ManyParametersClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for ManyParameters
@@ -2402,7 +2411,8 @@ where
 }
 
 /// A server handler for the ManyParameters protocol.
-
+///
+/// See [`ManyParameters`] for more details.
 pub trait ManyParametersServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn fifteen(
         &mut self,
@@ -2977,7 +2987,8 @@ where
 }
 
 /// A client handler for the MethodWithUnion protocol.
-
+///
+/// See [`MethodWithUnion`] for more details.
 pub trait MethodWithUnionClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for MethodWithUnion
@@ -3013,7 +3024,8 @@ where
 }
 
 /// A server handler for the MethodWithUnion protocol.
-
+///
+/// See [`MethodWithUnion`] for more details.
 pub trait MethodWithUnionServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn union_method(
         &mut self,
@@ -3085,7 +3097,8 @@ where
 }
 
 /// A client handler for the PlatformServer protocol.
-
+///
+/// See [`PlatformServer`] for more details.
 pub trait PlatformServerClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for PlatformServer
@@ -3118,7 +3131,8 @@ where
 }
 
 /// A server handler for the PlatformServer protocol.
-
+///
+/// See [`PlatformServer`] for more details.
 pub trait PlatformServerServerHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ServerProtocol<___T, ___H> for PlatformServer
@@ -3470,7 +3484,8 @@ where
 }
 
 /// A client handler for the SyscallProtocol protocol.
-
+///
+/// See [`SyscallProtocol`] for more details.
 pub trait SyscallProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for SyscallProtocol
@@ -3503,7 +3518,8 @@ where
 }
 
 /// A server handler for the SyscallProtocol protocol.
-
+///
+/// See [`SyscallProtocol`] for more details.
 pub trait SyscallProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn method_c(
         &mut self,
@@ -4462,7 +4478,8 @@ where
 }
 
 /// A client handler for the WithAndWithoutRequestResponse protocol.
-
+///
+/// See [`WithAndWithoutRequestResponse`] for more details.
 pub trait WithAndWithoutRequestResponseClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_empty_response(
         &mut self,
@@ -4556,7 +4573,8 @@ where
 }
 
 /// A server handler for the WithAndWithoutRequestResponse protocol.
-
+///
+/// See [`WithAndWithoutRequestResponse`] for more details.
 pub trait WithAndWithoutRequestResponseServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn no_request_no_response(
         &mut self,
@@ -6431,7 +6449,8 @@ where
 }
 
 /// A client handler for the WithErrorSyntax protocol.
-
+///
+/// See [`WithErrorSyntax`] for more details.
 pub trait WithErrorSyntaxClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for WithErrorSyntax
@@ -6476,7 +6495,8 @@ where
 }
 
 /// A server handler for the WithErrorSyntax protocol.
-
+///
+/// See [`WithErrorSyntax`] for more details.
 pub trait WithErrorSyntaxServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn response_as_struct(
         &mut self,
@@ -7288,7 +7308,8 @@ where
 }
 
 /// A client handler for the WithProtocolEnds protocol.
-
+///
+/// See [`WithProtocolEnds`] for more details.
 pub trait WithProtocolEndsClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for WithProtocolEnds
@@ -7330,7 +7351,8 @@ where
 }
 
 /// A server handler for the WithProtocolEnds protocol.
-
+///
+/// See [`WithProtocolEnds`] for more details.
 pub trait WithProtocolEndsServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn client_ends(
         &mut self,

@@ -239,7 +239,8 @@ where
 }
 
 /// A client handler for the super protocol.
-
+///
+/// See [`Super`] for more details.
 pub trait SuperClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Super
@@ -273,7 +274,8 @@ impl<___T> SuperServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Sup
 }
 
 /// A server handler for the super protocol.
-
+///
+/// See [`Super`] for more details.
 pub trait SuperServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn foo(
         &mut self,
@@ -381,7 +383,8 @@ where
 }
 
 /// A client handler for the sub protocol.
-
+///
+/// See [`Sub`] for more details.
 pub trait SubClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Sub
@@ -415,7 +418,8 @@ impl<___T> SubServerSender<___T> for ::fidl_next::bind::ServerSender<___T, Sub> 
 }
 
 /// A server handler for the sub protocol.
-
+///
+/// See [`Sub`] for more details.
 pub trait SubServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn foo(
         &mut self,

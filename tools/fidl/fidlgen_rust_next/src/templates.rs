@@ -52,6 +52,16 @@ impl Context {
     }
 }
 
+fn doc_string(attributes: &Attributes) -> DocStringTemplate<'_> {
+    DocStringTemplate { attributes }
+}
+
+#[derive(Template)]
+#[template(path = "doc_string.askama")]
+struct DocStringTemplate<'a> {
+    attributes: &'a Attributes,
+}
+
 #[derive(Template)]
 #[template(path = "prefixed_id.askama", whitespace = "suppress")]
 struct PrefixedIdTemplate<'a> {

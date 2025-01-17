@@ -5992,7 +5992,8 @@ where
 }
 
 /// A client handler for the TestProtocol protocol.
-
+///
+/// See [`TestProtocol`] for more details.
 pub trait TestProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for TestProtocol
@@ -6029,7 +6030,8 @@ impl<___T> TestProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<__
 }
 
 /// A server handler for the TestProtocol protocol.
-
+///
+/// See [`TestProtocol`] for more details.
 pub trait TestProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn strict_union_hence_response_may_be_stack_allocated(
         &mut self,

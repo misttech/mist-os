@@ -2,9 +2,7 @@
 {% let name = filters::ident(base_name)? %}
 {% let wire_name = format!("Wire{base_name}") %}
 
-{% if let Some(doc) = table.attributes.doc_string() %}
-    #[doc = "{{ doc.escape_default() }}"]
-{% endif %}
+{{ self::doc_string(table.attributes) -}}
 #[derive(
 {% if !table.is_resource %}
     Clone,

@@ -61,6 +61,7 @@ if (is_host) {
       "templates/union.askama",
 
       # Helpers
+      "templates/doc_string.askama",
       "templates/natural_constant.askama",
       "templates/natural_int.askama",
       "templates/natural_prim.askama",

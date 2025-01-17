@@ -2925,7 +2925,6 @@ where
         
 
         
-        
                 
                     fn two_way_anon_composed<___R>(
                         &self,
@@ -2950,7 +2949,6 @@ where
         
         
 
-        
         
                 
                     fn two_way_anon_composed_with_error<___R>(
@@ -3167,7 +3165,8 @@ where
 }
 
 /// A client handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_anon_composed(
         &mut self,
@@ -3416,7 +3415,8 @@ where
 }
 
 /// A server handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_anon_composed(
         &mut self,
@@ -3964,7 +3964,6 @@ where
         
 
         
-        
                 
                     fn flexible_two_way_no_error<___R>(
                         &self,
@@ -3989,7 +3988,6 @@ where
         
         
 
-        
         
                 
                     fn flexible_two_way_with_error<___R>(
@@ -4017,12 +4015,10 @@ where
 
         
         
-        
     
         
         
 
-        
         
                 
                     fn strict_one_way<___R>(
@@ -4043,7 +4039,6 @@ where
         
         
 
-        
         
                 
                     fn strict_two_way_no_error<___R>(
@@ -4069,7 +4064,6 @@ where
         
         
 
-        
         
                 
                     fn strict_two_way_with_error<___R>(
@@ -4105,7 +4099,8 @@ where
 }
 
 /// A client handler for the OpenProtocol protocol.
-
+///
+/// See [`OpenProtocol`] for more details.
 pub trait OpenProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn flexible_event(
         &mut self,
@@ -4220,21 +4215,17 @@ where
         
 
         
+    
+        
+
         
     
         
 
         
-        
     
         
 
-        
-        
-    
-        
-
-        
         
             
                 fn strict_event<___R>(
@@ -4252,7 +4243,8 @@ where
 }
 
 /// A server handler for the OpenProtocol protocol.
-
+///
+/// See [`OpenProtocol`] for more details.
 pub trait OpenProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn flexible_one_way(
         &mut self,

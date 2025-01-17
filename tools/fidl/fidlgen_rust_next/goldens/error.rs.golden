@@ -506,7 +506,8 @@ where
 }
 
 /// A client handler for the Example protocol.
-
+///
+/// See [`Example`] for more details.
 pub trait ExampleClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Example
@@ -540,7 +541,8 @@ impl<___T> ExampleServerSender<___T> for ::fidl_next::bind::ServerSender<___T, E
 }
 
 /// A server handler for the Example protocol.
-
+///
+/// See [`Example`] for more details.
 pub trait ExampleServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn foo(
         &mut self,

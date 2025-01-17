@@ -5,7 +5,6 @@
 pub const BOOL: bool = true;
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,
@@ -88,7 +87,6 @@ impl ::core::convert::From<Bits> for WireBits {
 pub const UINT32: u32 = 4;
 
 ::fidl_next::bitflags! {
-
     #[derive(
         Clone,
         Copy,

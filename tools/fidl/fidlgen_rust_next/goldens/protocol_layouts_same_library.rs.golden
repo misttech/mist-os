@@ -2442,7 +2442,8 @@ where
 }
 
 /// A client handler for the ComposedProtocol protocol.
-
+///
+/// See [`ComposedProtocol`] for more details.
 pub trait ComposedProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_anon_composed(
         &mut self,
@@ -2558,7 +2559,8 @@ where
 }
 
 /// A server handler for the ComposedProtocol protocol.
-
+///
+/// See [`ComposedProtocol`] for more details.
 pub trait ComposedProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_anon_composed(
         &mut self,
@@ -5008,7 +5010,8 @@ where
 }
 
 /// A client handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {
     fn on_anon_composed(
         &mut self,
@@ -5207,7 +5210,8 @@ where
 }
 
 /// A server handler for the MainProtocol protocol.
-
+///
+/// See [`MainProtocol`] for more details.
 pub trait MainProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn one_way_anon_composed(
         &mut self,

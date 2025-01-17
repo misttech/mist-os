@@ -1014,7 +1014,8 @@ where
 }
 
 /// A client handler for the Protocol protocol.
-
+///
+/// See [`Protocol`] for more details.
 pub trait ProtocolClientHandler<___T: ::fidl_next::protocol::Transport> {}
 
 impl<___T, ___H> ::fidl_next::bind::ClientProtocol<___T, ___H> for Protocol
@@ -1051,7 +1052,8 @@ impl<___T> ProtocolServerSender<___T> for ::fidl_next::bind::ServerSender<___T, 
 }
 
 /// A server handler for the Protocol protocol.
-
+///
+/// See [`Protocol`] for more details.
 pub trait ProtocolServerHandler<___T: ::fidl_next::protocol::Transport> {
     fn request_strict_response_flexible(
         &mut self,
