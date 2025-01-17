@@ -52,9 +52,9 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
         {% let method_name = filters::ident(method.name.snake())? %}
         {% let method_type_name = filters::ident(method.name.camel())? %}
 
-        {{ self::doc_string(method.attributes) -}}
         {% match method.kind %}
             {% when ProtocolMethodKind::OneWay %}
+                {{ self::doc_string(method.attributes) -}}
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
@@ -71,6 +71,7 @@ pub trait {{ client_sender_name }}<___T: ::fidl_next::protocol::Transport> {
                     ) -> Result<___T::SendFuture<'_>, ::fidl_next::EncodeError>;
                 {% endif %}
             {% when ProtocolMethodKind::TwoWay %}
+                {{ self::doc_string(method.attributes) -}}
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
@@ -113,9 +114,9 @@ where
         {% let method_name = filters::ident(method.name.snake())? %}
         {% let method_type_name = filters::ident(method.name.camel())? %}
 
-        {{ self::doc_string(method.attributes) -}}
         {% match method.kind %}
             {% when ProtocolMethodKind::OneWay %}
+                {{ self::doc_string(method.attributes) -}}
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
@@ -137,6 +138,7 @@ where
                     }
                 {% endif %}
             {% when ProtocolMethodKind::TwoWay %}
+                {{ self::doc_string(method.attributes) -}}
                 {% if let Some(request) = method.maybe_request_payload %}
                     fn {{ method_name }}<___R>(
                         &self,
@@ -253,8 +255,8 @@ pub trait {{ server_sender_name }}<___T: ::fidl_next::protocol::Transport> {
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.snake())? %}
 
-        {{ self::doc_string(method.attributes) -}}
         {% if method.kind == ProtocolMethodKind::Event %}
+            {{ self::doc_string(method.attributes) -}}
             {% if let Some(request) = method.maybe_response_payload %}
                 fn {{ method_name }}<___R>(
                     &self,
@@ -281,8 +283,8 @@ where
     {% for method in protocol.methods %}
         {% let method_name = filters::ident(method.name.snake())? %}
 
-        {{ self::doc_string(method.attributes) -}}
         {% if method.kind == ProtocolMethodKind::Event %}
+            {{ self::doc_string(method.attributes) -}}
             {% if let Some(request) = method.maybe_response_payload %}
                 fn {{ method_name }}<___R>(
                     &self,
