@@ -22,89 +22,58 @@
 
 namespace virtual_audio {
 
-// static
-zx_status_t VirtualAudio::DdkBind(void* ctx, zx_device_t* parent_bus) {
-  std::unique_ptr<VirtualAudio> control(new VirtualAudio);
-
-  // Define entry-point operations for this control device.
-  static zx_protocol_device_t device_ops = {
-      .version = DEVICE_OPS_VERSION,
-      .unbind = &DdkUnbind,
-      .release = &DdkRelease,
-      .message = &DdkMessage,
-  };
-
-  // Define other metadata, incl. "control" as our entry-point context.
-  device_add_args_t args = {};
-  args.version = DEVICE_ADD_ARGS_VERSION;
-  args.name = "virtual_audio";
-  args.ctx = control.get();
-  args.ops = &device_ops;
-  args.flags = DEVICE_ADD_NON_BINDABLE;
-
-  // Add the virtual_audio device node under the given parent.
-  zx_status_t status = device_add(parent_bus, &args, &control->dev_node_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s could not add device '%s': %d", __func__, args.name, status);
-    return status;
+zx_status_t VirtualAudio::Bind(void* ctx, zx_device_t* parent) {
+  auto device = std::make_unique<VirtualAudio>(parent);
+  if (zx::result result = device->Init(); result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize device: %s", result.status_string());
+    return result.status_value();
   }
-
-  zxlogf(INFO, "%s added device '%s': %d", __func__, args.name, status);
-
-  // Use the dispatcher supplied by the driver runtime.
-  control->dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 
   // On successful Add, Devmgr takes ownership (relinquished on DdkRelease), so transfer our
   // ownership to a local var, and let it go out of scope.
-  [[maybe_unused]] auto temp_ref = control.release();
+  [[maybe_unused]] auto _ = device.release();
 
   return ZX_OK;
 }
 
-// static
-void VirtualAudio::DdkUnbind(void* ctx) {
-  ZX_ASSERT(ctx);
+zx::result<> VirtualAudio::Init() {
+  zx_status_t status =
+      DdkAdd(ddk::DeviceAddArgs("virtual_audio").set_flags(DEVICE_ADD_NON_BINDABLE));
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
 
-  auto self = static_cast<VirtualAudio*>(ctx);
-  if (self->devices_.empty()) {
+  return zx::ok();
+}
+
+void VirtualAudio::DdkUnbind(ddk::UnbindTxn txn) {
+  if (devices_.empty()) {
     zxlogf(INFO, "%s with no devices; unbinding self", __func__);
-    device_unbind_reply(self->dev_node_);
+    txn.Reply();
     return;
   }
 
   // Close any remaining device bindings, freeing those drivers.
-  auto remaining = std::make_shared<size_t>(self->devices_.size());
+  auto remaining = std::make_shared<size_t>(devices_.size());
 
-  for (auto& d : self->devices_) {
+  for (auto& d : devices_) {
     zxlogf(INFO, "%s with %lu devices; shutting one down", __func__, *remaining);
-    d->ShutdownAsync([remaining, self]() {
+    d->ShutdownAsync([remaining, txn = std::move(txn)]() mutable {
       ZX_ASSERT(*remaining > 0);
       // After all devices are gone we can remove the control device itself.
       if (--(*remaining) == 0) {
         zxlogf(INFO, "DdkUnbind(lambda): after shutting down devices; unbinding self");
-        device_unbind_reply(self->dev_node_);
+        txn.Reply();
       }
     });
   }
-  self->devices_.clear();
+  devices_.clear();
 }
 
-// static
-void VirtualAudio::DdkRelease(void* ctx) {
-  ZX_ASSERT(ctx);
-
-  // Always called after DdkUnbind.
-  // By now, all our lists should be empty and we can destroy the ctx.
-  std::unique_ptr<VirtualAudio> control_ptr(static_cast<VirtualAudio*>(ctx));
-  ZX_ASSERT(control_ptr->devices_.empty());
-}
-
-// static
-void VirtualAudio::DdkMessage(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
-  VirtualAudio* self = static_cast<VirtualAudio*>(ctx);
-  fidl::WireDispatch<fuchsia_virtualaudio::Control>(
-      self, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
-      ddk::FromDeviceFIDLTransaction(txn));
+void VirtualAudio::DdkRelease() {
+  // By now, all our lists should be empty and we release.
+  ZX_ASSERT(devices_.empty());
 }
 
 void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView request,
@@ -138,7 +107,7 @@ void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::S
   auto config = fidl::ToNatural(request->config);
   ZX_ASSERT(config.device_specific().has_value());
   auto result = VirtualAudioDeviceImpl::Create(std::move(config), std::move(request->server),
-                                               dev_node_, dispatcher_);
+                                               parent_, dispatcher_);
   if (!result.is_ok()) {
     zxlogf(ERROR, "Device creation failed with status %d",
            fidl::ToUnderlying(result.error_value()));
@@ -204,7 +173,7 @@ void VirtualAudio::RemoveAll(RemoveAllCompleter::Sync& completer) {
 static constexpr zx_driver_ops_t virtual_audio_driver_ops = []() {
   zx_driver_ops_t ops = {};
   ops.version = DRIVER_OPS_VERSION;
-  ops.bind = &virtual_audio::VirtualAudio::DdkBind;
+  ops.bind = &virtual_audio::VirtualAudio::Bind;
   return ops;
 }();
 

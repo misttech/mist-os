@@ -10,19 +10,27 @@
 #include <memory>
 #include <unordered_set>
 
+#include <ddktl/device.h>
+
 namespace virtual_audio {
 
 class VirtualAudioDeviceImpl;
 
-class VirtualAudio : public fidl::WireServer<fuchsia_virtualaudio::Control> {
+class VirtualAudio;
+using VirtualAudioDeviceType = ddk::Device<VirtualAudio, ddk::Unbindable,
+                                           ddk::Messageable<fuchsia_virtualaudio::Control>::Mixin>;
+
+class VirtualAudio : public VirtualAudioDeviceType {
  public:
-  static zx_status_t DdkBind(void* ctx, zx_device_t* parent_bus);
-  static void DdkRelease(void* ctx);
-  static void DdkUnbind(void* ctx);
-  static void DdkMessage(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn);
+  static zx_status_t Bind(void* ctx, zx_device_t* parent);
+
+  explicit VirtualAudio(zx_device_t* parent) : VirtualAudioDeviceType(parent) {}
+
+  void DdkRelease();
+  void DdkUnbind(ddk::UnbindTxn txn);
 
  private:
-  VirtualAudio() = default;
+  zx::result<> Init();
 
   // Implements virtualaudio.Control.
   void GetDefaultConfiguration(GetDefaultConfigurationRequestView request,
@@ -31,8 +39,7 @@ class VirtualAudio : public fidl::WireServer<fuchsia_virtualaudio::Control> {
   void GetNumDevices(GetNumDevicesCompleter::Sync& completer) override;
   void RemoveAll(RemoveAllCompleter::Sync& completer) override;
 
-  zx_device_t* dev_node_ = nullptr;
-  async_dispatcher_t* dispatcher_ = nullptr;
+  async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 
   std::unordered_set<std::shared_ptr<VirtualAudioDeviceImpl>> devices_;
 };
