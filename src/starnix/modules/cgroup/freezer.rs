@@ -12,10 +12,10 @@ use starnix_uapi::{errno, error};
 
 use crate::cgroup::{Cgroup, CgroupOps};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FreezerState {
-    Frozen,
     Thawed,
+    Frozen,
 }
 
 impl std::fmt::Display for FreezerState {
@@ -52,14 +52,14 @@ impl BytesFileOps for FreezerFile {
         let state_str = std::str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
         let cgroup = self.cgroup()?;
         match state_str.trim() {
-            "1" => cgroup.freeze(),
+            "1" => Ok(cgroup.freeze()),
             "0" => Ok(cgroup.thaw()),
             _ => error!(EINVAL),
         }
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let state_str = format!("{}\n", self.cgroup()?.get_status().freezer_state);
+        let state_str = format!("{}\n", self.cgroup()?.get_status().self_freezer_state);
         Ok(state_str.as_bytes().to_owned().into())
     }
 }

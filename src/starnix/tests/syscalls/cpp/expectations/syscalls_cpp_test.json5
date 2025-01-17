@@ -94,8 +94,8 @@
                 // TODO(https://fxbug.dev/377755814)
                 "CgroupTest.EventsWithPopulatedChild",
 
-                // TODO(https://fxbug.dev/377755814): Re-enable impl of cgroup.events is complete
-                "CgroupFreezerTest.CheckStateInEventsFile",
+                // TODO(https://fxbug.dev/388081859)
+                "CgroupFreezerTest.FreezeNestedCgroups",
             ],
         },
     ],

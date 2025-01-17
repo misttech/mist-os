@@ -66,8 +66,11 @@ pub trait CgroupOps: Send + Sync + 'static {
     /// Return all pids that belong to this cgroup.
     fn get_pids(&self) -> Vec<pid_t>;
 
+    /// Gets the current status of the cgroup.
+    fn get_status(&self) -> CgroupStatus;
+
     /// Freeze all tasks in the cgroup.
-    fn freeze(&self) -> Result<(), Errno>;
+    fn freeze(&self);
 
     /// Thaw all tasks in the cgroup.
     fn thaw(&self);
@@ -177,8 +180,10 @@ impl CgroupOps for CgroupRoot {
         name: &FsStr,
     ) -> Result<CgroupHandle, Errno> {
         let mut children = self.children.lock();
-        children
-            .insert_child(name.into(), Cgroup::new(current_task, fs, name, &self.weak_self, None))
+        children.insert_child(
+            name.into(),
+            Cgroup::new(current_task, fs, name, &self.weak_self, None, FreezerState::Thawed),
+        )
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
@@ -214,7 +219,11 @@ impl CgroupOps for CgroupRoot {
         kernel_pids.into_iter().filter(|pid| !controlled_pids.contains_key(pid)).collect()
     }
 
-    fn freeze(&self) -> Result<(), Errno> {
+    fn get_status(&self) -> CgroupStatus {
+        Default::default()
+    }
+
+    fn freeze(&self) {
         unreachable!("Root cgroup cannot freeze any processes.");
     }
 
@@ -274,6 +283,10 @@ impl CgroupChildren {
         })
     }
 
+    fn get_children(&self) -> impl IntoIterator<Item = &CgroupHandle> + '_ {
+        self.0.values()
+    }
+
     fn get_node(&self, name: &FsStr) -> Result<FsNodeHandle, Errno> {
         self.0.get(name).map(|child| child.directory_node.clone()).ok_or_else(|| errno!(ENOENT))
     }
@@ -287,14 +300,23 @@ impl Deref for CgroupChildren {
     }
 }
 
-/// Status of the cgroup, used for populating `cgroup.events` file.
-#[derive(Debug, Default)]
+/// Status of the cgroup, used for populating `cgroup.events` and `cgroup.freeze` file.
+#[derive(Debug, Default, Clone)]
 pub struct CgroupStatus {
     /// Whether the cgroup or any of its descendants have any processes.
     pub populated: bool,
 
-    /// Freezer state of the cgroup.
-    pub freezer_state: FreezerState,
+    /// Effective freezer state of this cgroup.
+    ///
+    /// This considers both the cgroup's own freezer state as set by the `cgroup.freeze` file and
+    /// the freezer state of its ancestors. A cgroup is considered frozen if either itself
+    /// or any of its ancestors is frozen.
+    pub effective_freezer_state: FreezerState,
+
+    /// The cgroup's own freezer state as set by the `cgroup.freeze` file.
+    ///
+    /// This does not reflect the state of its ancestors.
+    pub self_freezer_state: FreezerState,
 }
 
 #[derive(Default)]
@@ -311,8 +333,11 @@ struct CgroupState {
     /// Wait queue to thaw all blocked tasks in this cgroup.
     wait_queue: WaitQueue,
 
-    /// State of the cgroup freezer.
-    freezer_state: FreezerState,
+    /// The cgroup's own freezer state.
+    self_freezer_state: FreezerState,
+
+    /// Effective freezer state inherited from the parent cgroup.
+    inherited_freezer_state: FreezerState,
 }
 
 impl CgroupState {
@@ -327,7 +352,7 @@ impl CgroupState {
         });
     }
 
-    fn freeze_thread_group(&self, thread_group: &ThreadGroup) -> Result<(), Errno> {
+    fn freeze_thread_group(&self, thread_group: &ThreadGroup) {
         // Create static-lifetime TempRefs of Tasks so that we avoid don't hold the ThreadGroup
         // lock while iterating and sending the signal.
         // SAFETY: static TempRefs are released after all signals are queued.
@@ -335,10 +360,55 @@ impl CgroupState {
         for task in tasks {
             let waiter = Waiter::new();
             let wait_canceler = self.wait_queue.wait_async(&waiter);
-            send_freeze_signal(&task, waiter, wait_canceler)?;
+            send_freeze_signal(&task, waiter, wait_canceler)
+                .expect("sending freeze signal should not fail");
+        }
+    }
+
+    fn get_status(&mut self) -> CgroupStatus {
+        if self.deleted {
+            return CgroupStatus::default();
+        }
+        self.update_processes();
+        CgroupStatus {
+            populated: !self.processes.is_empty(),
+            effective_freezer_state: self.get_effective_freezer_state(),
+            self_freezer_state: self.self_freezer_state,
+        }
+    }
+
+    fn get_effective_freezer_state(&self) -> FreezerState {
+        std::cmp::max(self.self_freezer_state, self.inherited_freezer_state)
+    }
+
+    fn propagate_freeze(&mut self, inherited_freezer_state: FreezerState) {
+        let prev_effective_freezer_state = self.get_effective_freezer_state();
+        self.inherited_freezer_state = inherited_freezer_state;
+        if prev_effective_freezer_state == FreezerState::Frozen {
+            return;
         }
 
-        Ok(())
+        for (_, thread_group) in self.processes.iter() {
+            let Some(thread_group) = thread_group.upgrade() else {
+                continue;
+            };
+            self.freeze_thread_group(&thread_group);
+        }
+
+        // Freeze all children cgroups while holding self state lock
+        for child in self.children.get_children() {
+            child.state.lock().propagate_freeze(FreezerState::Frozen);
+        }
+    }
+
+    fn propagate_thaw(&mut self, inherited_freezer_state: FreezerState) {
+        self.inherited_freezer_state = inherited_freezer_state;
+        if self.get_effective_freezer_state() == FreezerState::Thawed {
+            self.wait_queue.notify_all();
+            for child in self.children.get_children() {
+                child.state.lock().propagate_thaw(FreezerState::Thawed);
+            }
+        }
     }
 }
 
@@ -385,14 +455,17 @@ impl Cgroup {
         name: &FsStr,
         root: &Weak<CgroupRoot>,
         parent: Option<Weak<Cgroup>>,
+        inherited_freezer_state: FreezerState,
     ) -> CgroupHandle {
         Arc::new_cyclic(|weak| {
             let weak_ops = weak.clone() as Weak<dyn CgroupOps>;
+            let mut state: CgroupState = Default::default();
+            state.inherited_freezer_state = inherited_freezer_state;
             Self {
                 root: root.clone(),
                 name: name.to_owned(),
                 parent,
-                state: Default::default(),
+                state: Mutex::new(state),
                 directory_node: fs.create_node(
                     current_task,
                     CgroupDirectory::new(weak_ops.clone()),
@@ -462,11 +535,9 @@ impl Cgroup {
         }
         state.processes.insert(pid, WeakRef::from(thread_group));
 
-        // Check if the cgroup is frozen. If so, freeze the new process.
-        if state.freezer_state == FreezerState::Frozen {
-            state.freeze_thread_group(&thread_group)?;
+        if state.get_effective_freezer_state() == FreezerState::Frozen {
+            state.freeze_thread_group(&thread_group);
         }
-
         Ok(())
     }
 
@@ -475,16 +546,6 @@ impl Cgroup {
         if !state.deleted {
             state.processes.remove(&pid);
         }
-    }
-
-    /// Gets the current status of the cgroup.
-    pub fn get_status(&self) -> CgroupStatus {
-        let mut state = self.state.lock();
-        if state.deleted {
-            return CgroupStatus::default();
-        }
-        state.update_processes();
-        CgroupStatus { populated: !state.processes.is_empty(), freezer_state: state.freezer_state }
     }
 }
 
@@ -532,9 +593,17 @@ impl CgroupOps for Cgroup {
         if state.deleted {
             return error!(ENOENT);
         }
+        let freezer_state = state.get_effective_freezer_state();
         state.children.insert_child(
             name.into(),
-            Cgroup::new(current_task, fs, name, &self.root, Some(self.weak_self.clone())),
+            Cgroup::new(
+                current_task,
+                fs,
+                name,
+                &self.root,
+                Some(self.weak_self.clone()),
+                freezer_state,
+            ),
         )
     }
 
@@ -571,23 +640,22 @@ impl CgroupOps for Cgroup {
         state.processes.keys().copied().collect()
     }
 
-    fn freeze(&self) -> Result<(), Errno> {
-        let mut state = self.state.lock();
+    fn get_status(&self) -> CgroupStatus {
+        self.state.lock().get_status()
+    }
 
-        for (_, thread_group) in state.processes.iter() {
-            let Some(thread_group) = thread_group.upgrade() else {
-                continue;
-            };
-            state.freeze_thread_group(&thread_group)?;
-        }
-        state.freezer_state = FreezerState::Frozen;
-        Ok(())
+    fn freeze(&self) {
+        let mut state = self.state.lock();
+        let inherited_freezer_state = state.inherited_freezer_state;
+        state.propagate_freeze(inherited_freezer_state);
+        state.self_freezer_state = FreezerState::Frozen;
     }
 
     fn thaw(&self) {
         let mut state = self.state.lock();
-        state.wait_queue.notify_all();
-        state.freezer_state = FreezerState::Thawed;
+        state.self_freezer_state = FreezerState::Thawed;
+        let inherited_freezer_state = state.inherited_freezer_state;
+        state.propagate_thaw(inherited_freezer_state);
     }
 }
 
@@ -805,12 +873,15 @@ impl FileOps for ControlGroupFile {
         let pid = pid_string.trim().parse::<pid_t>().map_err(|_| errno!(ENOENT))?;
 
         // Check if the pid is a valid task.
-        let kernel_pids = current_task.kernel().pids.read();
-        let Some(ProcessEntryRef::Process(ref thread_group)) = kernel_pids.get_process(pid) else {
+        let thread_group = if let Some(ProcessEntryRef::Process(thread_group)) =
+            current_task.kernel().pids.read().get_process(pid)
+        {
+            TempRef::into_static(thread_group)
+        } else {
             return error!(EINVAL);
         };
 
-        self.cgroup()?.add_process(pid, thread_group)?;
+        self.cgroup()?.add_process(pid, &thread_group)?;
 
         Ok(bytes.len())
     }
@@ -836,8 +907,10 @@ impl BytesFileOps for EventsFile {
             "cgroup.events does not check state of parent and children cgroup"
         );
         let status = self.cgroup()?.get_status();
-        let events_str =
-            format!("populated {}\nfrozen {}\n", status.populated as u8, status.freezer_state);
+        let events_str = format!(
+            "populated {}\nfrozen {}\n",
+            status.populated as u8, status.effective_freezer_state
+        );
         Ok(events_str.as_bytes().to_owned().into())
     }
 }
