@@ -37,7 +37,6 @@ cc_test_executable("audio_driver_tests_bin") {
   output_name = "audio_driver_tests"
 
   sources = [
-    "//src/media/audio/drivers/virtual_audio/virtual_audio.h",
     "admin_test.cc",
     "admin_test.h",
     "audio_device_enumerator_stub.cc",
