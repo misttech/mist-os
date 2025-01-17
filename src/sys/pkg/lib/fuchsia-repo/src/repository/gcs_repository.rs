@@ -11,7 +11,7 @@
 use crate::range::{ContentLength, Range};
 use crate::repository::{Error, RepoProvider, RepositorySpec};
 use crate::resource::Resource;
-use crate::util::file_stream;
+use crate::util::FileStream;
 use anyhow::{anyhow, Context as _};
 use futures::future::BoxFuture;
 use futures::{AsyncRead, FutureExt as _, TryStreamExt as _};
@@ -206,7 +206,7 @@ where
 
         Ok(Resource {
             content_range: content_len.into(),
-            stream: Box::pin(file_stream(total_len, file, None)),
+            stream: Box::pin(FileStream::new(total_len, file, None)),
         })
     }
 }

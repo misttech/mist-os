@@ -25,6 +25,7 @@ rustc_library("fuchsia-repo") {
     "//third_party/rust_crates:bytes",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:chrono",
+    "//third_party/rust_crates:crc",
     "//third_party/rust_crates:data-encoding",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:http",
