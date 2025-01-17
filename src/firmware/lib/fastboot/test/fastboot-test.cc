@@ -1018,7 +1018,8 @@ class FastbootRebootTest : public zxtest::Test {
       completer.ReplySuccess();
     }
 
-    void Reboot(RebootRequestView request, RebootCompleter::Sync& completer) override {
+    void PerformReboot(PerformRebootRequestView request,
+                       PerformRebootCompleter::Sync& completer) override {
       state_->set_reboot_triggered(true);
       completer.ReplySuccess();
     }

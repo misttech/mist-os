@@ -555,8 +555,14 @@ zx::result<> Fastboot::Reboot(const std::string& command, Transport* transport) 
   // Wait for 1s to make sure the response is sent over to the transport
   std::this_thread::sleep_for(std::chrono::seconds(1));
 
-  auto resp = connect_result.value()->Reboot(
-      fuchsia_hardware_power_statecontrol::RebootReason::kUserRequest);
+  fidl::Arena arena;
+  auto builder = fuchsia_hardware_power_statecontrol::wire::RebootOptions::Builder(arena);
+  fuchsia_hardware_power_statecontrol::RebootReason2 reasons[1] = {
+      fuchsia_hardware_power_statecontrol::RebootReason2::kUserRequest};
+  auto vector_view =
+      fidl::VectorView<fuchsia_hardware_power_statecontrol::RebootReason2>::FromExternal(reasons);
+  builder.reasons(vector_view);
+  auto resp = connect_result.value()->PerformReboot(builder.Build());
   if (!resp.ok()) {
     return zx::error(resp.status());
   }
