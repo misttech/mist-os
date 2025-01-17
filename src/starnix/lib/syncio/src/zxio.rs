@@ -871,10 +871,16 @@ unsafe extern "C" {
     pub fn zxio_truncate(io: *mut zxio_t, length: u64) -> zx_status_t;
 }
 unsafe extern "C" {
-    pub fn zxio_flags_get(io: *mut zxio_t, out_flags: *mut u32) -> zx_status_t;
+    pub fn zxio_deprecated_flags_get(io: *mut zxio_t, out_flags: *mut u32) -> zx_status_t;
 }
 unsafe extern "C" {
-    pub fn zxio_flags_set(io: *mut zxio_t, flags: u32) -> zx_status_t;
+    pub fn zxio_deprecated_flags_set(io: *mut zxio_t, flags: u32) -> zx_status_t;
+}
+unsafe extern "C" {
+    pub fn zxio_flags_get(io: *mut zxio_t, out_flags: *mut u64) -> zx_status_t;
+}
+unsafe extern "C" {
+    pub fn zxio_flags_set(io: *mut zxio_t, flags: u64) -> zx_status_t;
 }
 unsafe extern "C" {
     pub fn zxio_token_get(io: *mut zxio_t, out_token: *mut zx_handle_t) -> zx_status_t;

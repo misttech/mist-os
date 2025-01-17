@@ -59,7 +59,7 @@ TEST(Pipe, FlagsGetDefault) {
 
   // By default, socket supports IO (Read + Write).
   uint64_t raw_flags{};
-  ASSERT_OK(zxio_flags_get2(io, &raw_flags));
+  ASSERT_OK(zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
   EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermRead);
   EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermWrite);
@@ -76,7 +76,7 @@ TEST(Pipe, FlagsGetReadOnly) {
   zxio_t* io = &storage.io;
 
   uint64_t raw_flags{};
-  ASSERT_OK(zxio_flags_get2(io, &raw_flags));
+  ASSERT_OK(zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
   EXPECT_TRUE(flags & fuchsia_io::wire::Flags::kPermRead);
   EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermWrite);
@@ -93,7 +93,7 @@ TEST(Pipe, FlagsGetNoIO) {
   zxio_t* io = &storage.io;
 
   uint64_t raw_flags{};
-  ASSERT_OK(zxio_flags_get2(io, &raw_flags));
+  ASSERT_OK(zxio_flags_get(io, &raw_flags));
   fuchsia_io::wire::Flags flags{raw_flags};
   EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermRead);
   EXPECT_FALSE(flags & fuchsia_io::wire::Flags::kPermWrite);
@@ -109,7 +109,7 @@ TEST(Pipe, FlagsSetWithValidInputFlags) {
 
   fuchsia_io::wire::Flags flags =
       fuchsia_io::wire::Flags::kPermRead | fuchsia_io::wire::Flags::kPermWrite;
-  ASSERT_OK(zxio_flags_set2(io, uint64_t{flags}));
+  ASSERT_OK(zxio_flags_set(io, uint64_t{flags}));
 }
 
 TEST(Pipe, FlagsSetWithInvalidInputFlagsIsError) {
@@ -124,7 +124,7 @@ TEST(Pipe, FlagsSetWithInvalidInputFlagsIsError) {
 
   fuchsia_io::wire::Flags flags =
       fuchsia_io::wire::Flags::kPermRead | fuchsia_io::wire::Flags::kPermWrite;
-  EXPECT_STATUS(zxio_flags_set2(io, uint64_t{flags}), ZX_ERR_NOT_SUPPORTED);
+  EXPECT_STATUS(zxio_flags_set(io, uint64_t{flags}), ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST(Pipe, DeprecatedFlagsGetDefault) {
@@ -137,7 +137,7 @@ TEST(Pipe, DeprecatedFlagsGetDefault) {
 
   // By default, socket supports IO (Read + Write).
   uint32_t raw_flags{};
-  ASSERT_OK(zxio_flags_get(io, &raw_flags));
+  ASSERT_OK(zxio_deprecated_flags_get(io, &raw_flags));
   fuchsia_io::wire::OpenFlags flags{raw_flags};
   EXPECT_TRUE(flags & fuchsia_io::wire::OpenFlags::kRightReadable);
   EXPECT_TRUE(flags & fuchsia_io::wire::OpenFlags::kRightWritable);
@@ -154,7 +154,7 @@ TEST(Pipe, DeprecatedFlagsGetReadOnly) {
   zxio_t* io = &storage.io;
 
   uint32_t raw_flags{};
-  ASSERT_OK(zxio_flags_get(io, &raw_flags));
+  ASSERT_OK(zxio_deprecated_flags_get(io, &raw_flags));
   fuchsia_io::wire::OpenFlags flags{raw_flags};
   EXPECT_TRUE(flags & fuchsia_io::wire::OpenFlags::kRightReadable);
   EXPECT_FALSE(flags & fuchsia_io::wire::OpenFlags::kRightWritable);
@@ -171,7 +171,7 @@ TEST(Pipe, DeprecatedFlagsGetNoIO) {
   zxio_t* io = &storage.io;
 
   uint32_t raw_flags{};
-  ASSERT_OK(zxio_flags_get(io, &raw_flags));
+  ASSERT_OK(zxio_deprecated_flags_get(io, &raw_flags));
   fuchsia_io::wire::OpenFlags flags{raw_flags};
   EXPECT_FALSE(flags & fuchsia_io::wire::OpenFlags::kRightReadable);
   EXPECT_FALSE(flags & fuchsia_io::wire::OpenFlags::kRightWritable);
@@ -187,7 +187,7 @@ TEST(Pipe, DeprecatedFlagsSetWithValidInputFlags) {
 
   fuchsia_io::wire::OpenFlags flags =
       fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable;
-  ASSERT_OK(zxio_flags_set(io, static_cast<uint32_t>(flags)));
+  ASSERT_OK(zxio_deprecated_flags_set(io, static_cast<uint32_t>(flags)));
 }
 
 TEST(Pipe, DeprecatedFlagsSetWithInvalidInputFlagsIsError) {
@@ -202,7 +202,7 @@ TEST(Pipe, DeprecatedFlagsSetWithInvalidInputFlagsIsError) {
 
   fuchsia_io::wire::OpenFlags flags =
       fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable;
-  EXPECT_STATUS(zxio_flags_set(io, static_cast<uint32_t>(flags)), ZX_ERR_NOT_SUPPORTED);
+  EXPECT_STATUS(zxio_deprecated_flags_set(io, static_cast<uint32_t>(flags)), ZX_ERR_NOT_SUPPORTED);
 }
 
 TEST(Pipe, Basic) {

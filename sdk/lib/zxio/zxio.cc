@@ -290,7 +290,7 @@ zx_status_t zxio_truncate(zxio_t* io, uint64_t length) {
   return zio->ops->truncate(io, length);
 }
 
-zx_status_t zxio_flags_get(zxio_t* io, uint32_t* out_flags) {
+zx_status_t zxio_deprecated_flags_get(zxio_t* io, uint32_t* out_flags) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -298,7 +298,7 @@ zx_status_t zxio_flags_get(zxio_t* io, uint32_t* out_flags) {
   return zio->ops->flags_get_deprecated(io, out_flags);
 }
 
-zx_status_t zxio_flags_set(zxio_t* io, uint32_t flags) {
+zx_status_t zxio_deprecated_flags_set(zxio_t* io, uint32_t flags) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -306,7 +306,7 @@ zx_status_t zxio_flags_set(zxio_t* io, uint32_t flags) {
   return zio->ops->flags_set_deprecated(io, flags);
 }
 
-zx_status_t zxio_flags_get2(zxio_t* io, uint64_t* out_flags) {
+zx_status_t zxio_flags_get(zxio_t* io, uint64_t* out_flags) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;
   }
@@ -314,7 +314,7 @@ zx_status_t zxio_flags_get2(zxio_t* io, uint64_t* out_flags) {
   return zio->ops->flags_get(io, out_flags);
 }
 
-zx_status_t zxio_flags_set2(zxio_t* io, uint64_t flags) {
+zx_status_t zxio_flags_set(zxio_t* io, uint64_t flags) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;
   }
