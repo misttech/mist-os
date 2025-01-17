@@ -9,13 +9,6 @@ All logs have a timestamp attached, which is read from the [monotonic clock] whe
 message. There are many ways that a `LogSink` can receive messages in a different order than
 indicated by their timestamps.
 
-The primary [`fuchsia.logger.Log`] implementation sorts messages it is sending via the `LogMany`
-method on [`fuchsia.logger.LogListenerSafe`]. This method is called whenever sending
-already-collected messages to a newly-connected listener. However, when messages first arrive with
-out-of-order timestamps, any active listeners will receive them in an arbitrary ordering. Tools
-which display logs accumulated from successive calls to `fuchsia.logger/LogListenerSafe.Log` should
-alert their users when messages are received without a strictly linear ordering in timestamps.
-
 ## Online
 
 Because there are two buffers that store logs, there are two main ways to view them when you have a
@@ -23,19 +16,23 @@ live device. For more information about where logs are stored on-device, see [Co
 
 ### syslog and kernel log
 
-During development, running `ffx log` is a good default to see all logs. Under the hood, this
-command runs the [`log_listener`] program, printing every message from the system
-log. This includes those [forwarded from the klog].
+During development, running [`ffx log`] is a good default to see all logs, including those
+[forwarded from the klog].
 
-[`log_listener`] receives logs through the [`fuchsia.logger.Log`] and
-[`fuchsia.logger.LogListenerSafe`] protocols.
+For scenarios when there's only serial console access, no network or you are simply working on a
+`bringup` build, it can be useful to run [`log_listener`] in the serial console. This command uses
+the same CLI as `ffx log`. If you are working with `log_listener`, any example that uses `ffx log`
+can be replaced with `log_listener`.
+
+`ffx log` receives logs through the [`fuchsia.diagnostics.ArchiveAccessor`] protocol.
 
 Additionally, some logs from syslog are printed to the serial console. By default, this includes the
-driver and `driver_manager` logs.
+all components under the `bootstrap` realm (for example, drivers and `driver_manager`). Additional
+components may be added through the [Diagnostics assembly configuration][assembly-diagnostics].
 
 #### Format
 
-[`log_listener`] emits lines in this format by default:
+By default, [`ffx log`] emits lines in this format:
 
 ```
 [seconds][pid][tid][tags] LEVEL: message
@@ -51,7 +48,7 @@ and thread=1904 at time=278.14, the default output would be:
 [278.14][1902][1904][my-component] WARN: something happened
 ```
 
-[`log_listener`] has `--hide_metadata` and `--pretty` flags that reduces the printed metadata,
+`ffx log` has `--hide_metadata` and `--pretty` flags that reduces the printed metadata,
 and color codes log lines by severity, respectively. With these flags, some metadata is hidden
 (PID, TID, etc.) while others are trimmed down (timestamp, severity).
 
@@ -62,7 +59,8 @@ time=278.14, the pretty output will look like:
 [278.14][my-component][W] something happened
 ```
 
-With a running device available, run `ffx log --help` to see the options for modifying the output format.
+With a running device available, run `ffx log --help` to see the options for modifying the output
+format.
 
 #### `fx test`
 
@@ -127,6 +125,26 @@ unknown severity at time=278.14, the pretty output will look like:
 [278.14] something happened
 ```
 
+#### Dynamically setting minimum log severity
+
+By default, components that integrate with [`fuchsia.logger.LogSink`] through Fuchsia's logging
+libraries, support the configuration of their minimum log severity at
+runtime.
+
+You can do this by passing `--set-severity` to `ffx log`. The `--set-severity` option accepts a
+string argument in the format of `<component_query>#<SEVERITY>`, where
+`<component_query>` is a string that will fuzzy match a component moniker or URL
+and `<severity>` is one of `TRACE`, `DEBUG`,`INFO`,`WARN`,`ERROR`,`FATAL`.
+
+For example, if you run `ffx log --set-severity netstack#DEBUG`, the `core/network/netstack`
+component starts emitting `DEBUG` logs and the `ffx log` output prints a log stream containing
+`DEBUG` logs for `netstack`. When the command is stopped (for example through Ctrl-C) the
+component goes back to emitting logs with its default minimum severity (typically `INFO`).
+
+This functionality is also supported for tests. For more information, see
+[Set the minimum log severity][test-dynamic-severity]).
+
+
 ## Offline: CQ/CI/LUCI
 
 When running tests, a [Swarming] bot invokes [botanist], which collects several output streams to be
@@ -140,8 +158,7 @@ stdout, stderr, and logs from the test environment and prints them inline.
 
 ### syslog.txt
 
-Botanist runs `log_listener` on the target device and saves that output to syslog.txt. This is
-comparable to running `ffx log` at a development machine.
+Botanist runs `ffx log` on the target device and saves that output to syslog.txt.
 
 ### infra_and_test_std_and_klog.txt
 
@@ -176,16 +193,19 @@ Debug logs emitted during infra's recipe step execution.
 The details of a recipe step, including the command run and environmental details.
 This log is often helpful for reproducing the recipe step locally.
 
+[assembly-diagnostics]: /reference/assembly/DiagnosticsConfig/index.md
 [monotonic clock]: /reference/syscalls/clock_get_monotonic.md
 [Concepts: Storage]: /docs/concepts/components/diagnostics/README.md#log_storage
 [forwarded from the klog]: /docs/development/diagnostics/logs/recording.md#forwarding-klog-to-syslog
+[`fuchsia.diagnostics.ArchiveAccessor`]: /reference/fidl/fuchsia.diagnostics#ArchiveAccessor
 [`log_listener`]: /src/diagnostics/log_listener/README.md
-[`fuchsia.logger.Log`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#Log
-[`fuchsia.logger.LogListenerSafe`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#LogListenerSafe
+[`fuchsia.logger.LogSink`]: /reference/fidl/fuchsia.logger#LogSink
 [printed over the kernel console]: /zircon/kernel/lib/debuglog/debuglog.cc
 [forwarded over UDP by netsvc]: /src/bringup/bin/netsvc/debuglog.cc
 [`dlog`]: /src/bringup/bin/dlog/README.md
+[`ffx log`]: /reference/tools/sdk/ffx#ffx_log
 [botanist]: /tools/botanist/cmd/main.go
 [testrunner]: /tools/testing/testrunner/lib.go
+[test-dynamic-severity]: /docs/development/testing/run_fuchsia_tests.md#set_the_minimum_log_severity
 [triage tool]: /docs/development/diagnostics/triage/README.md
 [Swarming]: https://chromium.googlesource.com/infra/luci/luci-py/+/HEAD/appengine/swarming/doc/README.md
