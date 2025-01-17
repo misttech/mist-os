@@ -348,7 +348,7 @@ impl ::core::convert::From<Bits> for WireBits {
 #[repr(u32)]
 pub enum Enum {
     Val = 1,
-    UnknownOrdinal(u32),
+    UnknownOrdinal_(u32),
 }
 
 impl ::fidl_next::Encodable for Enum {
@@ -368,7 +368,7 @@ where
         *value = ::fidl_next::u32_le::from(match *self {
             Self::Val => 1,
 
-            Self::UnknownOrdinal(value) => value,
+            Self::UnknownOrdinal_(value) => value,
         });
 
         Ok(())
@@ -380,7 +380,7 @@ impl ::core::convert::From<WireEnum> for Enum {
         match u32::from(wire.value) {
             1 => Self::Val,
 
-            value => Self::UnknownOrdinal(value),
+            value => Self::UnknownOrdinal_(value),
         }
     }
 }
@@ -419,7 +419,7 @@ impl ::core::convert::From<Enum> for WireEnum {
         match natural {
             Enum::Val => WireEnum::VAL,
 
-            Enum::UnknownOrdinal(value) => WireEnum { value: ::fidl_next::u32_le::from(value) },
+            Enum::UnknownOrdinal_(value) => WireEnum { value: ::fidl_next::u32_le::from(value) },
         }
     }
 }
@@ -589,7 +589,7 @@ impl ::core::fmt::Debug for WireTable<'_> {
 pub enum Union {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for Union {
@@ -614,7 +614,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -683,13 +683,13 @@ pub mod union_ {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -698,7 +698,7 @@ impl WireUnion {
         match self.raw.ordinal() {
             1 => crate::union_::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::union_::Ref::UnknownOrdinal(unknown),
+            unknown => crate::union_::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -706,7 +706,7 @@ impl WireUnion {
         match self.raw.ordinal() {
             1 => crate::union_::Mut::B(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            unknown => crate::union_::Mut::UnknownOrdinal(unknown),
+            unknown => crate::union_::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -4597,7 +4597,7 @@ impl ::core::fmt::Debug for WireResourceTable<'_> {
 pub enum ResourceUnion {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for ResourceUnion {
@@ -4622,7 +4622,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -4691,13 +4691,13 @@ pub mod resource_union {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -4706,7 +4706,7 @@ impl WireResourceUnion {
         match self.raw.ordinal() {
             1 => crate::resource_union::Ref::B(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::resource_union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::resource_union::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -4714,7 +4714,7 @@ impl WireResourceUnion {
         match self.raw.ordinal() {
             1 => crate::resource_union::Mut::B(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            unknown => crate::resource_union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::resource_union::Mut::UnknownOrdinal_(unknown),
         }
     }
 }

@@ -110,7 +110,7 @@ where
 pub enum UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
@@ -136,7 +136,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -219,13 +219,13 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_union_response 
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -241,7 +241,7 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -257,7 +257,7 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -1479,7 +1479,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
@@ -1505,7 +1505,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -1588,13 +1588,13 @@ pub mod unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_respo
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -1610,7 +1610,7 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -1626,7 +1626,7 @@ impl WireUnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -3295,7 +3295,7 @@ where
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
@@ -3320,7 +3320,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -3398,13 +3398,13 @@ pub mod unknown_interactions_ajar_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -3419,7 +3419,7 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -3434,7 +3434,7 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -4615,7 +4615,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsAjarProtocolStrictTwo
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
@@ -4640,7 +4640,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -4721,13 +4721,13 @@ pub mod unknown_interactions_ajar_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -4742,7 +4742,7 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -4757,7 +4757,7 @@ impl WireUnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -5789,7 +5789,7 @@ where
 pub enum UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolStrictEventUnionRequest {
@@ -5814,7 +5814,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -5890,13 +5890,13 @@ pub mod unknown_interactions_ajar_protocol_strict_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -5911,7 +5911,7 @@ impl WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -5926,7 +5926,7 @@ impl WireUnknownInteractionsAjarProtocolStrictEventUnionRequest {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_protocol_strict_event_union_request::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -6323,7 +6323,7 @@ where
 pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
@@ -6348,7 +6348,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -6426,13 +6426,13 @@ pub mod unknown_interactions_ajar_protocol_flexible_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -6447,7 +6447,7 @@ impl WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -6462,7 +6462,7 @@ impl WireUnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
                 ),
             
             
-                unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_ajar_protocol_flexible_event_union_request::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -7837,7 +7837,7 @@ where
 pub enum UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
@@ -7863,7 +7863,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -7946,13 +7946,13 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_union_respons
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -7968,7 +7968,7 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -7984,7 +7984,7 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -9215,7 +9215,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable
@@ -9243,7 +9243,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -9326,13 +9326,13 @@ pub mod unknown_interactions_closed_driver_protocol_strict_two_way_union_err_res
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -9348,7 +9348,7 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -9364,7 +9364,7 @@ impl WireUnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -11020,7 +11020,7 @@ where
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
@@ -11045,7 +11045,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -11126,13 +11126,13 @@ pub mod unknown_interactions_closed_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -11147,7 +11147,7 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -11162,7 +11162,7 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -12354,7 +12354,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
@@ -12380,7 +12380,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -12462,13 +12462,13 @@ pub mod unknown_interactions_closed_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -12484,7 +12484,7 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -12500,7 +12500,7 @@ impl WireUnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -13539,7 +13539,7 @@ where
 pub enum UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsClosedProtocolStrictEventUnionRequest {
@@ -13564,7 +13564,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -13642,13 +13642,13 @@ pub mod unknown_interactions_closed_protocol_strict_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -13663,7 +13663,7 @@ impl WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -13678,7 +13678,7 @@ impl WireUnknownInteractionsClosedProtocolStrictEventUnionRequest {
                 ),
             
             
-                unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_closed_protocol_strict_event_union_request::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -14828,7 +14828,7 @@ where
 pub enum UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
@@ -14853,7 +14853,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -14934,13 +14934,13 @@ pub mod unknown_interactions_driver_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -14955,7 +14955,7 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -14970,7 +14970,7 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -16162,7 +16162,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
@@ -16188,7 +16188,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -16270,13 +16270,13 @@ pub mod unknown_interactions_driver_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -16292,7 +16292,7 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -16308,7 +16308,7 @@ impl WireUnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_driver_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -18145,7 +18145,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
@@ -18171,7 +18171,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -18252,13 +18252,13 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -18273,7 +18273,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -18288,7 +18288,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -20251,7 +20251,7 @@ impl ::core::fmt::Debug
 pub enum UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
@@ -20277,7 +20277,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -20360,13 +20360,13 @@ pub mod unknown_interactions_driver_protocol_flexible_two_way_union_err_response
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -20382,7 +20382,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -20398,7 +20398,7 @@ impl WireUnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_driver_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -22579,7 +22579,7 @@ where
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayUnionResponse {
@@ -22604,7 +22604,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -22680,13 +22680,13 @@ pub mod unknown_interactions_protocol_strict_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -22701,7 +22701,7 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -22716,7 +22716,7 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_strict_two_way_union_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -23868,7 +23868,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolStrictTwoWayF
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
@@ -23893,7 +23893,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -23969,13 +23969,13 @@ pub mod unknown_interactions_protocol_strict_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -23990,7 +23990,7 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -24005,7 +24005,7 @@ impl WireUnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_strict_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -25769,7 +25769,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
@@ -25794,7 +25794,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -25870,13 +25870,13 @@ pub mod unknown_interactions_protocol_flexible_two_way_union_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -25891,7 +25891,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -25906,7 +25906,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -27805,7 +27805,7 @@ impl ::core::fmt::Debug for WireOptionalUnknownInteractionsProtocolFlexibleTwoWa
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
@@ -27830,7 +27830,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -27909,13 +27909,13 @@ pub mod unknown_interactions_protocol_flexible_two_way_union_err_response {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -27930,7 +27930,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -27945,7 +27945,7 @@ impl WireUnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_flexible_two_way_union_err_response::Mut::UnknownOrdinal_(unknown),
             
         }
     }
@@ -29037,7 +29037,7 @@ where
 pub enum UnknownInteractionsProtocolStrictEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolStrictEventUnionRequest {
@@ -29062,7 +29062,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -29138,13 +29138,13 @@ pub mod unknown_interactions_protocol_strict_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -29153,15 +29153,14 @@ impl WireUnknownInteractionsProtocolStrictEventUnionRequest {
         &self,
     ) -> crate::unknown_interactions_protocol_strict_event_union_request::Ref<'_> {
         match self.raw.ordinal() {
-            1 => crate::unknown_interactions_protocol_strict_event_union_request::Ref::SomeField(
-                unsafe { self.raw.get().deref_unchecked() },
-            ),
-
-            unknown => {
-                crate::unknown_interactions_protocol_strict_event_union_request::Ref::UnknownOrdinal(
-                    unknown,
-                )
-            }
+            
+                1 => crate::unknown_interactions_protocol_strict_event_union_request::Ref::SomeField(
+                    unsafe { self.raw.get().deref_unchecked() }
+                ),
+            
+            
+                unknown => crate::unknown_interactions_protocol_strict_event_union_request::Ref::UnknownOrdinal_(unknown),
+            
         }
     }
 
@@ -29169,15 +29168,14 @@ impl WireUnknownInteractionsProtocolStrictEventUnionRequest {
         &mut self,
     ) -> crate::unknown_interactions_protocol_strict_event_union_request::Mut<'_> {
         match self.raw.ordinal() {
-            1 => crate::unknown_interactions_protocol_strict_event_union_request::Mut::SomeField(
-                unsafe { self.raw.get_mut().deref_mut_unchecked() },
-            ),
-
-            unknown => {
-                crate::unknown_interactions_protocol_strict_event_union_request::Mut::UnknownOrdinal(
-                    unknown,
-                )
-            }
+            
+                1 => crate::unknown_interactions_protocol_strict_event_union_request::Mut::SomeField(
+                    unsafe { self.raw.get_mut().deref_mut_unchecked() }
+                ),
+            
+            
+                unknown => crate::unknown_interactions_protocol_strict_event_union_request::Mut::UnknownOrdinal_(unknown),
+            
         }
     }
 }
@@ -29569,7 +29567,7 @@ where
 pub enum UnknownInteractionsProtocolFlexibleEventUnionRequest {
     SomeField(i32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnknownInteractionsProtocolFlexibleEventUnionRequest {
@@ -29594,7 +29592,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, i32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -29670,13 +29668,13 @@ pub mod unknown_interactions_protocol_flexible_event_union_request {
     pub enum Ref<'union> {
         SomeField(&'union ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         SomeField(&'union mut ::fidl_next::i32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -29691,7 +29689,7 @@ impl WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Ref::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Ref::UnknownOrdinal_(unknown),
             
         }
     }
@@ -29706,7 +29704,7 @@ impl WireUnknownInteractionsProtocolFlexibleEventUnionRequest {
                 ),
             
             
-                unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Mut::UnknownOrdinal(unknown),
+                unknown => crate::unknown_interactions_protocol_flexible_event_union_request::Mut::UnknownOrdinal_(unknown),
             
         }
     }

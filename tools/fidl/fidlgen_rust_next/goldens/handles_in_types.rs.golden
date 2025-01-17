@@ -165,7 +165,7 @@ impl ::core::fmt::Debug for WireEmptyResourceTable<'_> {
 
 #[derive(Debug)]
 pub enum EmptyResourceUnion {
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for EmptyResourceUnion {
@@ -184,7 +184,7 @@ where
         ::fidl_next::munge!(let WireEmptyResourceUnion { raw, _phantom: _ } = slot);
 
         match self {
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -247,24 +247,24 @@ pub struct WireEmptyResourceUnion {
 
 pub mod empty_resource_union {
     pub enum Ref {
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut {
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
 impl WireEmptyResourceUnion {
     pub fn as_ref(&self) -> crate::empty_resource_union::Ref {
         match self.raw.ordinal() {
-            unknown => crate::empty_resource_union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::empty_resource_union::Ref::UnknownOrdinal_(unknown),
         }
     }
 
     pub fn as_mut(&mut self) -> crate::empty_resource_union::Mut {
         match self.raw.ordinal() {
-            unknown => crate::empty_resource_union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::empty_resource_union::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -589,7 +589,7 @@ impl ::core::fmt::Debug for WireTableWithHandle<'_> {
 pub enum UnionWithHandle {
     H(::fidl_next::zx::Handle),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for UnionWithHandle {
@@ -616,7 +616,7 @@ where
                 )?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -685,13 +685,13 @@ pub mod union_with_handle {
     pub enum Ref<'union> {
         H(&'union ::fidl_next::WireHandle),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         H(&'union mut ::fidl_next::WireHandle),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -700,7 +700,7 @@ impl WireUnionWithHandle {
         match self.raw.ordinal() {
             1 => crate::union_with_handle::Ref::H(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::union_with_handle::Ref::UnknownOrdinal(unknown),
+            unknown => crate::union_with_handle::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -710,7 +710,7 @@ impl WireUnionWithHandle {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::union_with_handle::Mut::UnknownOrdinal(unknown),
+            unknown => crate::union_with_handle::Mut::UnknownOrdinal_(unknown),
         }
     }
 }

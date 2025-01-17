@@ -55,7 +55,7 @@ pub enum {{ name }} {
         {{ member.name.camel()|ident }}({{ context.natural_type(member.ty) }}),
     {% endfor %}
     {% if !union.is_strict %}
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     {% endif %}
 }
 
@@ -85,7 +85,7 @@ where
                 >(value, {{ member.ordinal }}, encoder, raw)?,
             {% endfor %}
             {% if !union.is_strict %}
-                Self::UnknownOrdinal(ordinal) => return Err(
+                Self::UnknownOrdinal_(ordinal) => return Err(
                     ::fidl_next::EncodeError::UnknownUnionOrdinal(
                         *ordinal as usize
                     )
@@ -166,7 +166,7 @@ pub mod {{ mod_name }} {
             {{ member.name.camel()|ident }}(&'union {{ context.wire_type(member.ty) }}),
         {% endfor %}
         {% if !union.is_strict %}
-            UnknownOrdinal(u64),
+            UnknownOrdinal_(u64),
         {% endif %}
     }
 
@@ -175,7 +175,7 @@ pub mod {{ mod_name }} {
             {{ member.name.camel()|ident }}(&'union mut {{ context.wire_type(member.ty) }}),
         {% endfor %}
         {% if !union.is_strict %}
-            UnknownOrdinal(u64),
+            UnknownOrdinal_(u64),
         {% endif %}
     }
 }
@@ -191,7 +191,7 @@ impl{{ params }} {{ wire_name }}{{ params }} {
             {% if union.is_strict %}
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
             {% else %}
-                unknown => crate::{{ mod_name }}::Ref::UnknownOrdinal(unknown),
+                unknown => crate::{{ mod_name }}::Ref::UnknownOrdinal_(unknown),
             {% endif %}
         }
     }
@@ -206,7 +206,7 @@ impl{{ params }} {{ wire_name }}{{ params }} {
             {% if union.is_strict %}
                 _ => unsafe { ::core::hint::unreachable_unchecked() },
             {% else %}
-                unknown => crate::{{ mod_name }}::Mut::UnknownOrdinal(unknown),
+                unknown => crate::{{ mod_name }}::Mut::UnknownOrdinal_(unknown),
             {% endif %}
         }
     }

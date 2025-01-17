@@ -3110,7 +3110,7 @@ impl ::core::fmt::Debug for WireMainProtocolOneWayAnonRequest<'_> {
 pub enum MainProtocolTwoWayAnonRequest {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonRequest {
@@ -3135,7 +3135,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -3206,13 +3206,13 @@ pub mod main_protocol_two_way_anon_request {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -3223,7 +3223,7 @@ impl WireMainProtocolTwoWayAnonRequest {
                 self.raw.get().deref_unchecked()
             }),
 
-            unknown => crate::main_protocol_two_way_anon_request::Ref::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_two_way_anon_request::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -3233,7 +3233,7 @@ impl WireMainProtocolTwoWayAnonRequest {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::main_protocol_two_way_anon_request::Mut::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_two_way_anon_request::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
@@ -3647,7 +3647,7 @@ impl ::core::fmt::Debug for WireMainProtocolTwoWayAnonWithErrorRequest<'_> {
 pub enum MainProtocolTwoWayAnonWithErrorResponse {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for MainProtocolTwoWayAnonWithErrorResponse {
@@ -3672,7 +3672,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -3745,13 +3745,13 @@ pub mod main_protocol_two_way_anon_with_error_response {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -3763,7 +3763,7 @@ impl WireMainProtocolTwoWayAnonWithErrorResponse {
             }),
 
             unknown => {
-                crate::main_protocol_two_way_anon_with_error_response::Ref::UnknownOrdinal(unknown)
+                crate::main_protocol_two_way_anon_with_error_response::Ref::UnknownOrdinal_(unknown)
             }
         }
     }
@@ -3775,7 +3775,7 @@ impl WireMainProtocolTwoWayAnonWithErrorResponse {
             }),
 
             unknown => {
-                crate::main_protocol_two_way_anon_with_error_response::Mut::UnknownOrdinal(unknown)
+                crate::main_protocol_two_way_anon_with_error_response::Mut::UnknownOrdinal_(unknown)
             }
         }
     }
@@ -4210,7 +4210,7 @@ impl<'buf> ::core::fmt::Debug for WireOptionalMainProtocolTwoWayAnonWithErrorRes
 pub enum MainProtocolOnAnonRequest {
     B(bool),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for MainProtocolOnAnonRequest {
@@ -4235,7 +4235,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, bool>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -4306,13 +4306,13 @@ pub mod main_protocol_on_anon_request {
     pub enum Ref<'union> {
         B(&'union bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         B(&'union mut bool),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -4323,7 +4323,7 @@ impl WireMainProtocolOnAnonRequest {
                 self.raw.get().deref_unchecked()
             }),
 
-            unknown => crate::main_protocol_on_anon_request::Ref::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_on_anon_request::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -4333,7 +4333,7 @@ impl WireMainProtocolOnAnonRequest {
                 self.raw.get_mut().deref_mut_unchecked()
             }),
 
-            unknown => crate::main_protocol_on_anon_request::Mut::UnknownOrdinal(unknown),
+            unknown => crate::main_protocol_on_anon_request::Mut::UnknownOrdinal_(unknown),
         }
     }
 }

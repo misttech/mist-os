@@ -2457,7 +2457,7 @@ where
 pub enum TheUnion {
     V(u32),
 
-    UnknownOrdinal(u64),
+    UnknownOrdinal_(u64),
 }
 
 impl ::fidl_next::Encodable for TheUnion {
@@ -2482,7 +2482,7 @@ where
                 ::fidl_next::RawWireUnion::encode_as::<___E, u32>(value, 1, encoder, raw)?
             }
 
-            Self::UnknownOrdinal(ordinal) => {
+            Self::UnknownOrdinal_(ordinal) => {
                 return Err(::fidl_next::EncodeError::UnknownUnionOrdinal(*ordinal as usize))
             }
         }
@@ -2551,13 +2551,13 @@ pub mod the_union {
     pub enum Ref<'union> {
         V(&'union ::fidl_next::u32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 
     pub enum Mut<'union> {
         V(&'union mut ::fidl_next::u32_le),
 
-        UnknownOrdinal(u64),
+        UnknownOrdinal_(u64),
     }
 }
 
@@ -2566,7 +2566,7 @@ impl WireTheUnion {
         match self.raw.ordinal() {
             1 => crate::the_union::Ref::V(unsafe { self.raw.get().deref_unchecked() }),
 
-            unknown => crate::the_union::Ref::UnknownOrdinal(unknown),
+            unknown => crate::the_union::Ref::UnknownOrdinal_(unknown),
         }
     }
 
@@ -2574,7 +2574,7 @@ impl WireTheUnion {
         match self.raw.ordinal() {
             1 => crate::the_union::Mut::V(unsafe { self.raw.get_mut().deref_mut_unchecked() }),
 
-            unknown => crate::the_union::Mut::UnknownOrdinal(unknown),
+            unknown => crate::the_union::Mut::UnknownOrdinal_(unknown),
         }
     }
 }
