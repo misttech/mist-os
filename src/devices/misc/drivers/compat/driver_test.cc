@@ -24,6 +24,7 @@
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
 
+#include <cstdarg>
 #include <unordered_set>
 
 #include <fbl/unique_fd.h>
