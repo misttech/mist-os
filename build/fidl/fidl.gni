@@ -311,6 +311,11 @@ template("fidl") {
     marker_category = "unknown"
     if (defined(invoker.sdk_category)) {
       marker_category = invoker.sdk_category
+
+      # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
+      if (marker_category == "internal_only_idk") {
+        marker_category = "internal"
+      }
     }
 
     host_test_data("_${target_name}_host_test_data") {
@@ -468,6 +473,11 @@ template("fidl") {
           marker_category = "unknown"
           if (defined(invoker.sdk_category)) {
             marker_category = invoker.sdk_category
+
+            # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
+            if (marker_category == "internal_only_idk") {
+              marker_category = "internal"
+            }
           }
           if (is_allowed_for_ffx) {
             marker_category = "allowed-for-ffx-subtool"
@@ -503,6 +513,11 @@ template("fidl") {
           marker_category = "unknown"
           if (defined(invoker.sdk_category)) {
             marker_category = invoker.sdk_category
+
+            # TODO(https://fxbug.dev/333907192): Remove when fuchsia.boot is promoted.
+            if (marker_category == "internal_only_idk") {
+              marker_category = "internal"
+            }
           }
           if (is_allowed_for_ffx) {
             marker_category = "allowed-for-ffx-subtool"
