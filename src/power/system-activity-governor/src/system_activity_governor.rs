@@ -836,7 +836,13 @@ impl SuspendResumeListener for SystemActivityGovernor {
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
         for l in listeners {
-            // TODO(b/363055581): Remove the timeout when it is no longer needed.
+            // Log every 10 seconds while waiting until the `on_suspend_started` responds.
+            let _log_warning_task = fasync::Task::local(async move {
+                loop {
+                    fasync::Timer::new(fasync::MonotonicDuration::from_seconds(10)).await;
+                    log::warn!("No response from on_suspend_started after 10 seconds!");
+                }
+            });
             let _ = l.on_suspend_started().await;
         }
     }
