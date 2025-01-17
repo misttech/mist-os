@@ -3335,7 +3335,7 @@ rust_library("clap-v2_34_0") {
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":strsim-v0_8_0" ]
   deps += [ ":textwrap-v0_11_0" ]
-  deps += [ ":unicode-width-v0_1_10" ]
+  deps += [ ":unicode-width-v0_1_14" ]
   deps += [ ":vec_map-v0_8_1" ]
   if (!false) {
     deps += [ ":ansi_term-v0_12_1" ]
@@ -6376,7 +6376,7 @@ rust_library("getopts-v0_2_18") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":unicode-width-v0_1_10" ]
+  deps += [ ":unicode-width-v0_1_14" ]
 
   rustenv = []
 
@@ -11139,7 +11139,7 @@ rust_library("prettytable-rs-v0_8_0") {
   deps += [ ":encode_unicode-v0_3_5" ]
   deps += [ ":lazy_static-v1_4_0" ]
   deps += [ ":term-v0_5_1" ]
-  deps += [ ":unicode-width-v0_1_10" ]
+  deps += [ ":unicode-width-v0_1_14" ]
 
   rustenv = []
 
@@ -13495,7 +13495,7 @@ rust_library("rustyline-v2_1_0") {
   deps += [ ":libc-v0_2_169" ]
   deps += [ ":log-v0_4_22" ]
   deps += [ ":unicode-segmentation-v1_10_1" ]
-  deps += [ ":unicode-width-v0_1_10" ]
+  deps += [ ":unicode-width-v0_1_14" ]
   if (true && !(current_os == "fuchsia")) {
     deps += [ ":nix-v0_26_2" ]
   }
@@ -15686,7 +15686,7 @@ rust_library("term_grid-v0_2_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":unicode-width-v0_1_10" ]
+  deps += [ ":unicode-width-v0_1_14" ]
 
   rustenv = []
 
@@ -15934,7 +15934,7 @@ rust_library("textwrap-v0_11_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":unicode-width-v0_1_10" ]
+  deps += [ ":unicode-width-v0_1_14" ]
 
   rustenv = []
 
@@ -17300,17 +17300,17 @@ rust_library("unicode-segmentation-v1_10_1") {
   applicable_licenses = [ ":unicode-segmentation-v1_10_1.license" ]
 }
 
-license("unicode-width-v0_1_10.license") {
+license("unicode-width-v0_1_14.license") {
   public_package_name = "unicode_width"
   license_files =
-      [ "//third_party/rust_crates/vendor/unicode-width-0.1.10/LICENSE-APACHE" ]
+      [ "//third_party/rust_crates/vendor/unicode-width-0.1.14/LICENSE-APACHE" ]
 }
 
-rust_library("unicode-width-v0_1_10") {
+rust_library("unicode-width-v0_1_14") {
   crate_name = "unicode_width"
   crate_root =
-      "//third_party/rust_crates/vendor/unicode-width-0.1.10/src/lib.rs"
-  output_name = "unicode_width-c9257868b6b793d2"
+      "//third_party/rust_crates/vendor/unicode-width-0.1.14/src/lib.rs"
+  output_name = "unicode_width-24f469bf68fa9c61"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -17319,15 +17319,16 @@ rust_library("unicode-width-v0_1_10") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=c9257868b6b793d2",
-    "-Cextra-filename=-c9257868b6b793d2",
+    "--edition=2021",
+    "-Cmetadata=24f469bf68fa9c61",
+    "-Cextra-filename=-24f469bf68fa9c61",
+    "--cfg=feature=\"cjk\"",
     "--cfg=feature=\"default\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":unicode-width-v0_1_10.license" ]
+  applicable_licenses = [ ":unicode-width-v0_1_14.license" ]
 }
 
 license("unicode-width-v0_2_0.license") {

@@ -1107,7 +1107,7 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.unicode-segmentation."1.10.1"]
 license_files = ["LICENSE-APACHE"]
 
-[gn.package.unicode-width."0.1.10"]
+[gn.package.unicode-width."0.1.14"]
 license_files = ["LICENSE-APACHE"]
 
 [gn.package.unicode-width."0.2.0"]
