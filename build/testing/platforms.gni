@@ -163,14 +163,18 @@ test_platforms = [
     pool = "fuchsia.tests.anvl"
     os = "Linux"
   },
-
-  # https://fxbug.dev/355507826
   {
     device_type = "Kola"
     cpu = "arm64"
   },
-
-  # https://fxbug.dev/355507826
+  {
+    device_type = "Lilac"
+    cpu = "arm64"
+  },
+  {
+    device_type = "Maple"
+    cpu = "arm64"
+  },
   {
     device_type = "Sorrel"
     cpu = "arm64"

@@ -160,6 +160,30 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+lilac_env = {
+  dimensions = {
+    device_type = "Lilac"
+  }
+}
+_all_named_fuchsia_envs += [
+  {
+    name = "lilac"
+    env = lilac_env
+  },
+]
+
+maple_env = {
+  dimensions = {
+    device_type = "Maple"
+  }
+}
+_all_named_fuchsia_envs += [
+  {
+    name = "maple"
+    env = maple_env
+  },
+]
+
 sorrel_env = {
   dimensions = {
     device_type = "Sorrel"
