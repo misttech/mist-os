@@ -72,7 +72,7 @@ class WakeLease : public fidl::WireServer<fuchsia_power_system::ActivityGovernor
   fidl::WireSyncClient<fuchsia_power_system::ActivityGovernor> sag_client_;
   std::optional<fidl::ServerBinding<fuchsia_power_system::ActivityGovernorListener>>
       listener_binding_;
-  bool system_suspended_ = false;
+  bool system_suspended_ = true;
 
   async::TaskClosureMethod<WakeLease, &WakeLease::HandleTimeout> lease_task_{this};
   zx::eventpair lease_;
