@@ -18,7 +18,9 @@ use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl::Error;
 use fidl_fuchsia_developer_ffx::{TargetRebootError, TargetRebootResponder, TargetRebootState};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
-use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
+use fidl_fuchsia_hardware_power_statecontrol::{
+    AdminMarker, AdminProxy, RebootOptions, RebootReason2,
+};
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async::TimeoutExt;
@@ -265,7 +267,13 @@ impl RebootController {
                     };
                     match state {
                         TargetRebootState::Product => {
-                            match admin_proxy.reboot(RebootReason::UserRequest).await {
+                            match admin_proxy
+                                .perform_reboot(&RebootOptions {
+                                    reasons: Some(vec![RebootReason2::UserRequest]),
+                                    ..Default::default()
+                                })
+                                .await
+                            {
                                 Ok(_) => responder.send(Ok(())).map_err(Into::into),
                                 Err(e) => {
                                     handle_fidl_connection_err(e, responder).map_err(Into::into)
@@ -366,6 +374,7 @@ async fn build_ssh_command_local(
 mod tests {
     use super::*;
     use anyhow::anyhow;
+    use assert_matches::assert_matches;
     use ffx_fastboot::test::setup_connection_factory;
     use fidl::endpoints::{create_proxy_and_stream, RequestStream};
     use fidl_fuchsia_developer_ffx::{TargetMarker, TargetProxy, TargetRequest};
@@ -379,7 +388,11 @@ mod tests {
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
-                    AdminRequest::Reboot { reason: RebootReason::UserRequest, responder } => {
+                    AdminRequest::PerformReboot {
+                        options: RebootOptions { reasons: Some(reasons), .. },
+                        responder,
+                    } => {
+                        assert_matches!(&reasons[..], [RebootReason2::UserRequest]);
                         responder.send(Ok(())).unwrap();
                     }
                     AdminRequest::RebootToBootloader { responder } => {
