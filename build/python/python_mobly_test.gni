@@ -536,7 +536,7 @@ template("python_mobly_test") {
         "--c-extension-library-tree",
         rebase_path(
                 get_label_info(
-                    "//src/developer/ffx/lib/fuchsia-controller:libfidl_codec",
+                    "//src/developer/ffx/lib/fuchsia-controller/cpp:libfidl_codec",
                     "root_out_dir"),
                 root_build_dir) + "/libfidl_codec.so",
         rebase_path(
@@ -552,8 +552,8 @@ template("python_mobly_test") {
       deps = [
         ":${_labels.fidl_ir_list}",
         ":${_test_binary_target}",
-        "//src/developer/ffx/lib/fuchsia-controller:libfidl_codec",
-        "//src/developer/ffx/lib/fuchsia-controller:libfuchsia_controller_internal",
+        "//src/developer/ffx/lib/fuchsia-controller/cpp:libfidl_codec",
+        "//src/developer/ffx/lib/fuchsia-controller/cpp:libfuchsia_controller_internal",
       ]
     }
 

@@ -744,7 +744,7 @@ see this [async Python][async-python] page.
 
 <!-- Reference links -->
 
-[fuchsia-controller-header-file]: /src/developer/ffx/lib/fuchsia-controller/cpp/abi/fuchsia_controller.h
+[fuchsia-controller-header-file]: /src/developer/ffx/lib/fuchsia-controller/cpp/fuchsia_controller_internal/fuchsia_controller.h
 [file-a-bug]: https://issuetracker.google.com/issues/new?component=1378581&template=1840403
 [interact-with-target-devices]: /docs/development/tools/ffx/getting-started.md#interacting_with_target_devices
 [femu-guide]: /docs/get-started/set_up_femu.md

@@ -901,7 +901,6 @@ config("Wno-vla-cxx-extension") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:*",
     "//src/developer/adb/bin/adb-file-sync:*",
     "//src/developer/debug/debug_agent/test_data:*",
-    "//src/developer/ffx/lib/fuchsia-controller:*",
     "//src/developer/memory/metrics/tests:*",
     "//src/devices/block/bin/gpt:*",
     "//src/devices/block/bin/iochk:*",

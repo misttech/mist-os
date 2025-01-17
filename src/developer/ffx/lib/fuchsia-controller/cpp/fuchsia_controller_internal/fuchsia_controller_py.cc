@@ -6,16 +6,19 @@
 #include <type_traits>
 #include <vector>
 
+#include <fuchsia_controller_abi/abi.h>
+#include <fuchsia_controller_abi/utils.h>
+
 #include "error.h"
 #include "fuchsia_controller.h"
 #include "macros.h"
 #include "mod.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
 extern struct PyModuleDef fuchsia_controller_internal;
 
 namespace {
+
+namespace fc = fuchsia_controller;
 
 constexpr PyMethodDef SENTINEL = {nullptr, nullptr, 0, nullptr};
 
@@ -33,7 +36,7 @@ const std::vector<const char *> TypeStrings = {"Handle", "Channel",    "Context"
                                                "Socket", "IsolateDir", "Event"};
 
 void SetDowncastError(PyObject *obj, const char *expected) {
-  py::Object repr(PyObject_Repr(obj));
+  fc::abi::utils::Object repr(PyObject_Repr(obj));
   PyErr_Format(PyExc_TypeError, "Failed casting \"%s\", expected %s",
                PyUnicode_AsUTF8AndSize(repr.get(), nullptr), expected);
 }
@@ -563,14 +566,16 @@ PyObject *context_config_get_string(PyObject *self, PyObject *args) {
   if (!context) {
     return nullptr;
   }
-  uint64_t buf_size = 4096;
-  char buf[buf_size];
+  const uint64_t kMaxBufSize = 4096;
+  uint64_t buf_size = kMaxBufSize;
+  char buf[kMaxBufSize];
   if (zx_status_t res = ffx_config_get_string(context->context(), key,
                                               static_cast<uint64_t>(key_len), buf, &buf_size);
       res != ZX_OK) {
     switch (res) {
       case ZX_ERR_BUFFER_TOO_SMALL:
-        PyErr_SetString(PyExc_BufferError, "config key larger than 4096 characters");
+        PyErr_Format(PyExc_BufferError, "config key larger than %" PRIu64 " characters",
+                     kMaxBufSize);
         break;
       case ZX_ERR_NOT_FOUND:
         Py_RETURN_NONE;
@@ -691,16 +696,17 @@ PyObject *channel_read(PyObject *self, PyObject *args) {
     PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
     return nullptr;
   }
-  auto res = py::Object(PyTuple_New(2));
+  auto res = fc::abi::utils::Object(PyTuple_New(2));
   if (res == nullptr) {
     return nullptr;
   }
-  auto buf = py::Object(PyByteArray_FromStringAndSize(const_cast<const char *>(c_buf),
-                                                      static_cast<Py_ssize_t>(actual_bytes_count)));
+  auto buf = fc::abi::utils::Object(PyByteArray_FromStringAndSize(
+      const_cast<const char *>(c_buf), static_cast<Py_ssize_t>(actual_bytes_count)));
   if (buf == nullptr) {
     return nullptr;
   }
-  auto handles_list = py::Object(PyList_New(static_cast<Py_ssize_t>(actual_handles_count)));
+  auto handles_list =
+      fc::abi::utils::Object(PyList_New(static_cast<Py_ssize_t>(actual_handles_count)));
   if (handles_list == nullptr) {
     return nullptr;
   }
@@ -851,7 +857,7 @@ PyObject *channel_create(PyObject *self, PyObject *args) {
   zx_handle_t hdl0;
   zx_handle_t hdl1;
   ffx_channel_create(mod::get_module_state()->ctx, 0, &hdl0, &hdl1);
-  py::Object tuple(PyTuple_New(2));
+  fc::abi::utils::Object tuple(PyTuple_New(2));
   if (tuple == nullptr) {
     return nullptr;
   }
@@ -939,7 +945,7 @@ PyObject *event_create_pair(PyObject *self, PyObject *args) {
     PyErr_SetObject(reinterpret_cast<PyObject *>(error::ZxStatusType), PyLong_FromLong(status));
     return nullptr;
   }
-  py::Object tuple(PyTuple_New(2));
+  fc::abi::utils::Object tuple(PyTuple_New(2));
   if (tuple == nullptr) {
     return nullptr;
   }
@@ -1073,7 +1079,7 @@ PyMODINIT_FUNC PyInit_libfuchsia_controller_internal() {
   if (InternalHandleTypeInit() < 0) {
     return nullptr;
   }
-  auto m = py::Object(PyModule_Create(&fuchsia_controller_internal));
+  auto m = fc::abi::utils::Object(PyModule_Create(&fuchsia_controller_internal));
   if (m == nullptr) {
     return nullptr;
   }
@@ -1083,11 +1089,12 @@ PyMODINIT_FUNC PyInit_libfuchsia_controller_internal() {
   }
   auto state = reinterpret_cast<mod::FuchsiaControllerState *>(PyModule_GetState(m.get()));
   create_ffx_lib_context(&state->ctx, state->ERR_SCRATCH, mod::ERR_SCRATCH_LEN);
-  if (PyModule_AddObject(m.get(), "ZxStatus", PyObjCast(zx_status_type)) < 0) {
+  if (PyModule_AddObject(m.get(), "ZxStatus", reinterpret_cast<PyObject *>(zx_status_type)) < 0) {
     Py_DECREF(zx_status_type);
     return nullptr;
   }
-  if (PyModule_AddObject(m.get(), "InternalHandle", PyObjCast(InternalHandleType)) < 0) {
+  if (PyModule_AddObject(m.get(), "InternalHandle",
+                         reinterpret_cast<PyObject *>(InternalHandleType)) < 0) {
     return nullptr;
   }
   return m.take();

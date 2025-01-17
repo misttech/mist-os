@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/python/python_binary.gni")
-import("//build/python/python_c_extension.gni")
 import("//build/python/python_host_test.gni")
 import("//build/python/python_library.gni")
 import("//build/rust/rustc_staticlib.gni")
@@ -12,7 +11,10 @@ import("//tools/fidl/gidl/gidl.gni")
 
 assert(is_host)
 
-visibility = [ ":*" ]
+visibility = [
+  ":*",
+  "cpp:*",
+]
 
 conformance_test_source = "$target_gen_dir/conformance_test.py"
 
@@ -77,75 +79,13 @@ rustc_staticlib("lib") {
   ]
 }
 
-python_c_extension("fidl_codec") {
-  visibility += [
-    "tests:*",
-    "//src/testing/end_to_end/*",
-    "//src/tests/end_to_end/*",
-  ]
-  sources = [
-    "cpp/abi/convert.h",
-    "cpp/fidl_codec/decode.cc",
-    "cpp/fidl_codec/decode.h",
-    "cpp/fidl_codec/encode.cc",
-    "cpp/fidl_codec/encode.h",
-    "cpp/fidl_codec/fidl_codec.cc",
-    "cpp/fidl_codec/ir.cc",
-    "cpp/fidl_codec/ir.h",
-    "cpp/fidl_codec/mod.cc",
-    "cpp/fidl_codec/mod.h",
-    "cpp/fidl_codec/object_converter.cc",
-    "cpp/fidl_codec/object_converter.h",
-    "cpp/fidl_codec/python_dict_visitor.h",
-    "cpp/python/py_header.h",
-    "cpp/raii/py_wrapper.h",
-  ]
-
-  deps = [
-    "//sdk/lib/fidl_base",
-    "//src/lib/fidl_codec",
-    "//third_party/rapidjson",
-    "//zircon/system/public",
-  ]
-}
-
-python_c_extension("fuchsia_controller_internal") {
-  visibility += [
-    "//src/testing/end_to_end/*",
-    "//src/tests/end_to_end/*",
-  ]
-  sources = [
-    "cpp/abi/convert.h",
-    "cpp/abi/error.cc",
-    "cpp/abi/error.h",
-    "cpp/abi/fuchsia_controller.h",
-    "cpp/abi/fuchsia_controller_py.cc",
-    "cpp/abi/macros.h",
-    "cpp/abi/mod.cc",
-    "cpp/abi/mod.h",
-    "cpp/python/py_header.h",
-    "cpp/raii/py_wrapper.h",
-  ]
-
-  stubs_root = "cpp/stubs"
-  stubs = [ "__init__.pyi" ]
-
-  deps = [
-    ":lib",
-    "//zircon/system/public",
-  ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
-}
-
 python_library("fuchsia_controller_py") {
   visibility += [ "tests:*" ]
   library_name = "fuchsia_controller_py"
   source_root = "python/fuchsia_controller_py"
   library_deps = [
-    ":fidl_codec",
-    ":fuchsia_controller_internal",
+    "cpp:fidl_codec",
+    "cpp:fuchsia_controller_internal",
   ]
   sources = [
     "__init__.py",
@@ -175,8 +115,8 @@ python_library("fidl_bindings") {
   library_name = "fidl"
   source_root = "python/fidl"
   library_deps = [
-    ":fidl_codec",
     ":fuchsia_controller_py",
+    "cpp:fidl_codec",
   ]
   sources = [
     "__init__.py",
@@ -195,8 +135,8 @@ python_binary("example") {
   main_source = "python/example.py"
   deps = [
     ":fidl_bindings",
-    ":fidl_codec",
     ":fuchsia_controller_py",
+    "cpp:fidl_codec",
     "//src/developer/ffx:ffx_tool",
   ]
 }
@@ -206,8 +146,8 @@ group("fuchsia-controller") {
   visibility += [ "//src/developer/ffx/lib" ]
   deps = [
     ":example",
-    ":fidl_codec",
     ":fuchsia_controller_py",
+    "cpp:fidl_codec",
   ]
 }
 

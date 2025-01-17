@@ -3,16 +3,19 @@
 // found in the LICENSE file.
 #define PY_SSIZE_T_CLEAN
 
+#include <fuchsia_controller_abi/abi.h>
+#include <fuchsia_controller_abi/utils.h>
+
 #include "decode.h"
 #include "encode.h"
 #include "ir.h"
 #include "mod.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
 
 extern struct PyModuleDef libfidl_codec;
-
+namespace fuchsia_controller::fidl_codec {
 namespace {
+
+namespace fc = fuchsia_controller;
 
 constexpr PyMethodDef SENTINEL = {nullptr, nullptr, 0, nullptr};
 
@@ -36,7 +39,7 @@ int FidlCodecModule_clear(PyObject *m) {
 }
 
 PyMODINIT_FUNC PyInit_libfidl_codec() {
-  auto m = py::Object(PyModule_Create(&libfidl_codec));
+  auto m = fc::abi::utils::Object(PyModule_Create(&libfidl_codec));
   if (m == nullptr) {
     return nullptr;
   }
@@ -47,11 +50,13 @@ PyMODINIT_FUNC PyInit_libfidl_codec() {
 
 }  // namespace
 
+}  // namespace fuchsia_controller::fidl_codec
+
 struct PyModuleDef libfidl_codec = {
     .m_base = PyModuleDef_HEAD_INIT,
     .m_name = "fidl_codec",
     .m_doc = nullptr,
-    .m_size = sizeof(mod::FidlCodecState *),
-    .m_methods = FidlCodecMethods,
-    .m_clear = FidlCodecModule_clear,
+    .m_size = sizeof(::fuchsia_controller::fidl_codec::mod::FidlCodecState *),
+    .m_methods = ::fuchsia_controller::fidl_codec::FidlCodecMethods,
+    .m_clear = ::fuchsia_controller::fidl_codec::FidlCodecModule_clear,
 };

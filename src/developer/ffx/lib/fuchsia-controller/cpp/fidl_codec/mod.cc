@@ -7,11 +7,11 @@
 // Defined in fuchsia_controller_py.cc
 extern struct PyModuleDef libfidl_codec;
 
-namespace mod {
+namespace fuchsia_controller::fidl_codec::mod {
 
 FidlCodecState *get_module_state() {
   auto mod = PyState_FindModule(&libfidl_codec);
   return reinterpret_cast<FidlCodecState *>(PyModule_GetState(mod));
 }
 
-}  // namespace mod
+}  // namespace fuchsia_controller::fidl_codec::mod

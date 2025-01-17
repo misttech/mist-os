@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_MOD_H_
-#define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_MOD_H_
+#ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_MOD_H_
+#define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_MOD_H_
+
+#include <fuchsia_controller_abi/abi.h>
+#include <fuchsia_controller_abi/utils.h>
 
 #include "fuchsia_controller.h"
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
 
 namespace mod {
 
@@ -23,7 +25,7 @@ void dump_python_err();
 
 inline int GenericTypeInit(PyTypeObject **type, PyType_Spec *spec) {
   assert(type != nullptr);
-  *type = PyTypeCast(PyType_FromSpec(spec));
+  *type = reinterpret_cast<PyTypeObject *>(PyType_FromSpec(spec));
   if (*type == nullptr) {
     return -1;
   }
@@ -35,4 +37,4 @@ inline int GenericTypeInit(PyTypeObject **type, PyType_Spec *spec) {
 
 }  // namespace mod
 
-#endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_MOD_H_
+#endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_MOD_H_

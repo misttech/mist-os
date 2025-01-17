@@ -8,21 +8,22 @@
 #include <sstream>
 #include <string>
 
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/python/py_header.h"
+#include <fuchsia_controller_abi/abi.h>
+
 #include "src/lib/fidl_codec/library_loader.h"
 
-namespace mod {
+namespace fuchsia_controller::fidl_codec::mod {
 
 static const std::string FIDL_IR_DEPFILE("all_fidl_json.txt");
 
 struct FidlCodecState {
-  FidlCodecState() : loader(std::make_unique<fidl_codec::LibraryLoader>()) {}
-  std::unique_ptr<fidl_codec::LibraryLoader> loader;
+  FidlCodecState() : loader(std::make_unique<::fidl_codec::LibraryLoader>()) {}
+  std::unique_ptr<::fidl_codec::LibraryLoader> loader;
 };
 
 FidlCodecState *get_module_state();
 
-inline fidl_codec::Library *get_ir_library(const std::string &library_name) {
+inline ::fidl_codec::Library *get_ir_library(const std::string &library_name) {
   auto res = get_module_state()->loader->GetLibraryFromName(library_name);
   if (res == nullptr) {
     std::stringstream ss;
@@ -34,6 +35,6 @@ inline fidl_codec::Library *get_ir_library(const std::string &library_name) {
   return res;
 }
 
-}  // namespace mod
+}  // namespace fuchsia_controller::fidl_codec::mod
 
 #endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_MOD_H_

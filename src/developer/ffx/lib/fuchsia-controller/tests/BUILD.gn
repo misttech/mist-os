@@ -13,15 +13,15 @@ host_test_data("fuchsia_controller_host_test_data") {
   sources = [
     get_label_info("//build/fidl:all_fidl_json($default_toolchain)",
                    "root_out_dir") + "/all_fidl_json.txt",
-    get_label_info("//src/developer/ffx/lib/fuchsia-controller",
+    get_label_info("//src/developer/ffx/lib/fuchsia-controller/cpp",
                    "root_out_dir") + "/libfuchsia_controller_internal.so",
-    get_label_info("//src/developer/ffx/lib/fuchsia-controller",
+    get_label_info("//src/developer/ffx/lib/fuchsia-controller/cpp",
                    "root_out_dir") + "/libfidl_codec.so",
   ]
   deps = [
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
     "//src/developer/ffx/lib/fuchsia-controller:lib",
-    "//src/developer/ffx/lib/fuchsia-controller:libfidl_codec",
+    "//src/developer/ffx/lib/fuchsia-controller/cpp:libfidl_codec",
   ]
 }
 
@@ -58,7 +58,7 @@ python_host_test("fuchsia_controller_ir_test") {
   # TODO(https://fxbug.dev/346628306): Resolve mypy errors and enable type checking
   enable_mypy = false
   main_source = "ir.py"
-  libraries = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_codec" ]
+  libraries = [ "//src/developer/ffx/lib/fuchsia-controller/cpp:fidl_codec" ]
   test_data_deps = [ ":fuchsia_controller_test_data" ]
 }
 
@@ -67,7 +67,7 @@ python_host_test("fuchsia_controller_encode_test") {
   enable_mypy = false
   main_source = "encode.py"
   sources = [ "common.py" ]
-  libraries = [ "//src/developer/ffx/lib/fuchsia-controller:fidl_codec" ]
+  libraries = [ "//src/developer/ffx/lib/fuchsia-controller/cpp:fidl_codec" ]
   test_data_deps = [
     ":fuchsia_controller_fidl_test_data",
     ":fuchsia_controller_test_data",
@@ -79,7 +79,7 @@ python_host_test("fuchsia_controller_importing_test") {
   enable_mypy = false
   main_source = "importing.py"
   libraries = [
-    "//src/developer/ffx/lib/fuchsia-controller:libfidl_codec",
+    "//src/developer/ffx/lib/fuchsia-controller/cpp:libfidl_codec",
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
   ]
   test_data_deps = [

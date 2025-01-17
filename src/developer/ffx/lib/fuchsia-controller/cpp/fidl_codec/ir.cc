@@ -7,7 +7,7 @@
 #include "pyerrors.h"
 #include "rapidjson/error/en.h"
 
-namespace ir {
+namespace fuchsia_controller::fidl_codec::ir {
 
 PyMethodDef add_ir_path_py_def = {
     "add_ir_path", reinterpret_cast<PyCFunction>(add_ir_path), METH_O,
@@ -29,18 +29,19 @@ PyMethodDef get_ir_path_py_def = {
     "get_ir_path", reinterpret_cast<PyCFunction>(get_ir_path), METH_O,
     "Attempts to get the path to the IR based on the library name. Raises an exception if it cannot be found"};
 
-PyObject *get_error(const fidl_codec::LibraryReadError &loader_err) {
+namespace {
+PyObject *get_error(const ::fidl_codec::LibraryReadError &loader_err) {
   switch (loader_err.value) {
-    case fidl_codec::LibraryReadError::kIoError: {
+    case ::fidl_codec::LibraryReadError::kIoError: {
       PyErr_Format(PyExc_RuntimeError, "Unable to open fidl file. Error: %s",
                    strerror(loader_err.errno_value));
       return nullptr;
     }
-    case fidl_codec::LibraryReadError::kParseError:
+    case ::fidl_codec::LibraryReadError::kParseError:
       PyErr_SetString(PyExc_RuntimeError,
                       rapidjson::GetParseError_En(loader_err.parse_result.Code()));
       return nullptr;
-    case fidl_codec::LibraryReadError::kOk:
+    case ::fidl_codec::LibraryReadError::kOk:
       break;
     default:
       PyErr_SetString(PyExc_RuntimeError, "Unhandled FIDL_codec return result");
@@ -48,6 +49,7 @@ PyObject *get_error(const fidl_codec::LibraryReadError &loader_err) {
   };
   Py_RETURN_NONE;
 }
+}  // namespace
 
 PyObject *get_method_ordinal(PyObject *self, PyObject *args, PyObject *kwds) {  // NOLINT
   static const char *kwlist[] = {"protocol", "method", nullptr};
@@ -70,9 +72,9 @@ PyObject *get_method_ordinal(PyObject *self, PyObject *args, PyObject *kwds) {  
   if (lib == nullptr) {
     return nullptr;
   }
-  fidl_codec::Protocol *codec_protocol;
+  ::fidl_codec::Protocol *codec_protocol;
   if (!lib->GetProtocolByName(protocol, &codec_protocol)) {
-    PyErr_Format(PyExc_RuntimeError, "Unable to find protocol %s under library %s", protocol.data(),
+    PyErr_Format(PyExc_RuntimeError, "Unable to find protocol %s under library %s", c_protocol,
                  library.c_str());
     return nullptr;
   }
@@ -91,7 +93,7 @@ PyObject *add_ir_path(PyObject *self, PyObject *path_obj) {  // NOLINT
     return nullptr;
   }
   auto path = std::string(c_path);
-  fidl_codec::LibraryReadError loader_err;
+  ::fidl_codec::LibraryReadError loader_err;
   mod::get_module_state()->loader->AddPath(path, &loader_err);
   return get_error(loader_err);
 }
@@ -102,7 +104,7 @@ PyObject *get_ir_path(PyObject *self, PyObject *library_name) {  // NOLINT
     return nullptr;
   }
   auto lib = std::string(c_lib);
-  fidl_codec::Library *ir_lib = mod::get_ir_library(lib);
+  ::fidl_codec::Library *ir_lib = mod::get_ir_library(lib);
   if (ir_lib == nullptr) {
     return nullptr;
   }
@@ -137,9 +139,9 @@ PyObject *add_ir_paths(PyObject *self, PyObject *path_list) {  // NOLINT
     }
     paths[i] = std::string(elmnt_str);
   }
-  fidl_codec::LibraryReadError loader_err;
+  ::fidl_codec::LibraryReadError loader_err;
   mod::get_module_state()->loader->AddAll(paths, &loader_err);
   return get_error(loader_err);
 }
 
-}  // namespace ir
+}  // namespace fuchsia_controller::fidl_codec::ir

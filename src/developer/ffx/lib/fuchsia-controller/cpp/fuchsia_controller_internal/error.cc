@@ -7,9 +7,14 @@
 
 #include <sstream>
 
-#include "src/developer/ffx/lib/fuchsia-controller/cpp/raii/py_wrapper.h"
+#include <fuchsia_controller_abi/abi.h>
+#include <fuchsia_controller_abi/utils.h>
 
 namespace error {
+
+namespace fc = fuchsia_controller;
+
+namespace {
 
 // TODO(https://fxbug.dev/42077810): This has been copied from zircon code, as vdso doesn't build
 // this for host.
@@ -143,7 +148,7 @@ PyObject *ZxStatus_str(PyObject *self) {
 }
 
 PyObject *ZxStatus_raw(PyObject *self) {
-  auto args = py::Object(PyObject_GetAttrString(self, "args"));
+  auto args = fc::abi::utils::Object(PyObject_GetAttrString(self, "args"));
   if (args == nullptr) {
     return nullptr;
   }
@@ -244,6 +249,8 @@ PyObject *ZxStatus_make_constants() {
   return dict;
 }
 
+}  // namespace
+
 PyTypeObject *ZxStatusType = nullptr;
 
 // This is necessary as Python exception extensions in C are weird. Python exceptions can't be
@@ -256,7 +263,7 @@ PyTypeObject *ZxStatusType_Create() {
   if (constants == nullptr) {
     return nullptr;
   }
-  auto res = PyTypeCast(
+  auto res = reinterpret_cast<PyTypeObject *>(
       PyErr_NewException("fuchsia_controller_internal.ZxStatus", PyExc_Exception, constants));
   if (res == nullptr) {
     return nullptr;
@@ -265,21 +272,21 @@ PyTypeObject *ZxStatusType_Create() {
   if (repr == nullptr) {
     return nullptr;
   }
-  if (PyObject_SetAttrString(PyObjCast(res), "__repr__", repr) < 0) {
+  if (PyObject_SetAttrString(reinterpret_cast<PyObject *>(res), "__repr__", repr) < 0) {
     return nullptr;
   }
   auto raw = PyDescr_NewMethod(res, &ZxStatus_raw_def);
-  if (PyObject_SetAttrString(PyObjCast(res), "raw", raw) < 0) {
+  if (PyObject_SetAttrString(reinterpret_cast<PyObject *>(res), "raw", raw) < 0) {
     return nullptr;
   }
   auto str = PyDescr_NewMethod(res, &ZxStatus_str_def);
   if (str == nullptr) {
     return nullptr;
   }
-  if (PyObject_SetAttrString(PyObjCast(res), "__str__", str) < 0) {
+  if (PyObject_SetAttrString(reinterpret_cast<PyObject *>(res), "__str__", str) < 0) {
     return nullptr;
   }
-  Py_IncRef(PyObjCast(res));
+  Py_IncRef(reinterpret_cast<PyObject *>(res));
   ZxStatusType = res;
   return res;
 }

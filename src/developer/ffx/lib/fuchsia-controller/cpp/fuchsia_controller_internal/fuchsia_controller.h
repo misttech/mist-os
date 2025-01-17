@@ -1,8 +1,8 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FUCHSIA_CONTROLLER_H_
-#define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FUCHSIA_CONTROLLER_H_
+#ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_FUCHSIA_CONTROLLER_H_
+#define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_FUCHSIA_CONTROLLER_H_
 // LINT.IfChange
 #include <stdint.h>
 #include <zircon/errors.h>
@@ -101,4 +101,4 @@ extern int32_t ffx_connect_handle_notifier(ffx_lib_context_t* ctx);
 #endif  // __cplusplus
 
 // LINT.ThenChange(../../src/lib.rs)
-#endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_ABI_FUCHSIA_CONTROLLER_H_
+#endif  // SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_FUCHSIA_CONTROLLER_H_
