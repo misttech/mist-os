@@ -255,6 +255,7 @@ siglongjmp
 sigsetjmp
 
 # STDIO
+asprintf
 fclose
 fcntl
 fdopen
