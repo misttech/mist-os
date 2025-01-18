@@ -135,7 +135,8 @@ impl<R: io::Read + Unpin> Stream for FileStream<R> {
 
 impl<R: io::Read + Unpin> Drop for FileStream<R> {
     fn drop(&mut self) {
-        if self.remaining_len > 0 {
+        // In some code path we only read delivery blob header, don't warn in that case.
+        if self.remaining_len > 0 && self.expected_len - self.remaining_len > 65536 {
             log::warn!(
                 "file stream of {} dropped: only read {} out of {} bytes, CRC32 = {:08x}",
                 self.path.as_deref().unwrap_or_else(|| "unknown path".into()),
