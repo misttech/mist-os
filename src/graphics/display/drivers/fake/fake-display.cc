@@ -827,7 +827,7 @@ void FakeDisplay::RecordDisplayConfigToInspectRootNode() {
     config_node.RecordInt("width_px", kWidth);
     config_node.RecordInt("height_px", kHeight);
     config_node.RecordDouble("refresh_rate_hz", kRefreshRateFps);
-    config_node.RecordBool("manual_vsync_trigger", device_config_.manual_vsync_trigger);
+    config_node.RecordBool("periodic_vsync", device_config_.periodic_vsync);
     config_node.RecordBool("no_buffer_access", device_config_.no_buffer_access);
   });
 }
@@ -848,7 +848,7 @@ zx_status_t FakeDisplay::Initialize() {
     return status;
   }
 
-  if (!device_config_.manual_vsync_trigger) {
+  if (device_config_.periodic_vsync) {
     status = thrd_status_to_zx_status(thrd_create(
         &vsync_thread_,
         [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this));

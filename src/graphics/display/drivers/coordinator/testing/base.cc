@@ -37,7 +37,7 @@ void TestBase::SetUp() {
   ASSERT_OK(create_sysmem_provider_result);
 
   static constexpr fake_display::FakeDisplayDeviceConfig kDeviceConfig = {
-      .manual_vsync_trigger = true,
+      .periodic_vsync = false,
       .no_buffer_access = false,
   };
   fake_display_stack_ = std::make_unique<fake_display::FakeDisplayStack>(

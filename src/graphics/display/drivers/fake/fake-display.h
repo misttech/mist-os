@@ -33,9 +33,16 @@
 namespace fake_display {
 
 struct FakeDisplayDeviceConfig {
-  // If enabled, the fake display device will not automatically emit Vsync
-  // events. `SendVsync()` must be called to emit a Vsync event manually.
-  bool manual_vsync_trigger = false;
+  // Enables periodically-generated VSync events.
+  //
+  // By default, this member is false. Tests must call `FakeDisplay::TriggerVsync()`
+  // explicitly to get VSync events.
+  //
+  // If set to true, the `FakeDisplay` implementation will periodically generate
+  // VSync events. These periodically-generated VSync events are a source of
+  // non-determinism. They can lead to flaky tests, when coupled with overly
+  // strict assertions around event timing.
+  bool periodic_vsync = false;
 
   // If true, the fake display device will never access imported image buffers,
   // and it will not add extra image format constraints to the imported buffer

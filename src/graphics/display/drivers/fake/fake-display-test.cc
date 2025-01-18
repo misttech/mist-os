@@ -63,7 +63,7 @@ class FakeDisplayTest : public testing::Test {
 
   virtual FakeDisplayDeviceConfig GetFakeDisplayDeviceConfig() const {
     return FakeDisplayDeviceConfig{
-        .manual_vsync_trigger = true,
+        .periodic_vsync = false,
         .no_buffer_access = false,
     };
   }
@@ -105,10 +105,10 @@ TEST_F(FakeDisplayTest, Inspect) {
   ASSERT_NE(refresh_rate_hz, nullptr);
   EXPECT_DOUBLE_EQ(refresh_rate_hz->value(), kRefreshRateHz);
 
-  const inspect::BoolPropertyValue* manual_vsync_trigger =
-      config->node().get_property<inspect::BoolPropertyValue>("manual_vsync_trigger");
-  ASSERT_NE(manual_vsync_trigger, nullptr);
-  EXPECT_EQ(manual_vsync_trigger->value(), true);
+  const inspect::BoolPropertyValue* periodic_vsync =
+      config->node().get_property<inspect::BoolPropertyValue>("periodic_vsync");
+  ASSERT_NE(periodic_vsync, nullptr);
+  EXPECT_EQ(periodic_vsync->value(), false);
 
   const inspect::BoolPropertyValue* no_buffer_access =
       config->node().get_property<inspect::BoolPropertyValue>("no_buffer_access");
@@ -751,7 +751,7 @@ class FakeDisplayWithoutCaptureRealSysmemTest : public FakeDisplayRealSysmemTest
  public:
   FakeDisplayDeviceConfig GetFakeDisplayDeviceConfig() const override {
     return {
-        .manual_vsync_trigger = true,
+        .periodic_vsync = false,
         .no_buffer_access = true,
     };
   }
