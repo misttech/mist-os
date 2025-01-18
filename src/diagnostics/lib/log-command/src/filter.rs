@@ -156,7 +156,7 @@ impl LogFilterCriteria {
             || log.moniker.to_string().contains(filter_string)
     }
 
-    // TODO(b/303315896): If/when debuglog is strutured remove this.
+    // TODO(b/303315896): If/when debuglog is structured remove this.
     fn parse_tags(value: &str) -> Vec<&str> {
         let mut tags = Vec::new();
         let mut current = value;
@@ -243,8 +243,7 @@ impl LogFilterCriteria {
         if !self.tags.is_empty()
             && !self.tags.iter().any(|query_tag| {
                 let has_tag = data.tags().map(|t| t.contains(query_tag)).unwrap_or(false);
-                let moniker_has_tag = data.tags().map(|tags| tags.is_empty()).unwrap_or(true)
-                    && moniker_contains_in_last_segment(&data.moniker, query_tag);
+                let moniker_has_tag = moniker_contains_in_last_segment(&data.moniker, query_tag);
                 has_tag || moniker_has_tag
             })
         {
@@ -254,7 +253,11 @@ impl LogFilterCriteria {
             return false;
         }
 
-        if self.exclude_tags.iter().any(|f| data.tags().map(|t| t.contains(f)).unwrap_or(false)) {
+        if self.exclude_tags.iter().any(|excluded_tag| {
+            let has_tag = data.tags().map(|tag| tag.contains(excluded_tag)).unwrap_or(false);
+            let moniker_has_tag = moniker_contains_in_last_segment(&data.moniker, excluded_tag);
+            has_tag || moniker_has_tag
+        }) {
             return false;
         }
 
@@ -303,6 +306,46 @@ mod test {
             timestamp: Timestamp::from_nanos(default_ts().as_nanos() as i64),
             data: log_data,
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_criteria_tag_filter_filters_moniker() {
+        let cmd = LogCommand { tag: vec!["testcomponent".to_string()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::from(cmd);
+
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "my/testcomponent".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("included")
+            .add_tag("tag1")
+            .add_tag("tag2")
+            .build()
+            .into()
+        )));
+    }
+
+    #[fuchsia::test]
+    async fn test_criteria_exclude_tag_filters_moniker() {
+        let cmd =
+            LogCommand { exclude_tags: vec!["testcomponent".to_string()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::from(cmd);
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("".into()),
+                moniker: "my/testcomponent".try_into().unwrap(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("excluded")
+            .add_tag("tag1")
+            .add_tag("tag2")
+            .build()
+            .into()
+        )));
     }
 
     #[fuchsia::test]
