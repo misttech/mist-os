@@ -24,8 +24,8 @@
   add sp, #16
 
   // Save the contents of r7 to TLS prior to running a syscall.
-  // r0 -> TPIDRURW
-  mrc	p15, 0, r0, c13, c0, 2
+  // Load TPIDRURO into r0 as zircon should shadow TPIDR into it.
+  mrc p15, 0, r0, c13, c0, 3
   str r7, [r0]
 .endm
 
