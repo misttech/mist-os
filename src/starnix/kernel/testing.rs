@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::container_namespace::ContainerNamespace;
 use crate::device::mem::new_null_file;
 use crate::execution::execute_task_with_prerun_result;
 use crate::fs::fuchsia::RemoteFs;
@@ -160,8 +161,7 @@ fn create_test_kernel(
     Kernel::new(
         b"".into(),
         Default::default(),
-        None,
-        None,
+        ContainerNamespace::new(),
         None,
         None,
         fuchsia_inspect::Node::default(),

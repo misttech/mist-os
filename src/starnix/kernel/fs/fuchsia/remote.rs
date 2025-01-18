@@ -18,7 +18,7 @@ use crate::vfs::{
     FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget, SymlinkTarget, XattrOp, XattrStorage,
     DEFAULT_BYTES_PER_BLOCK,
 };
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 use fidl::AsHandleRef;
 use fuchsia_runtime::UtcInstant;
 use linux_uapi::SYNC_IOC_MAGIC;
@@ -61,12 +61,21 @@ pub fn new_remote_fs(
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     let kernel = current_task.kernel();
-    let data_dir = kernel
-        .container_data_dir
-        .as_ref()
-        .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?;
-    let rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
-    return create_remotefs_filesystem(kernel, data_dir, options, rights);
+    // TODO(379929394): After soft transition of fstab is complete, we should
+    // validate the requested_path is a non-empty, non-root path.
+    let requested_path = std::str::from_utf8(&options.source)
+        .map_err(|_| errno!(EINVAL, "source path is not utf8"))?;
+    let create_flags = fio::PERM_READABLE
+        | fio::PERM_WRITABLE
+        | fio::Flags::FLAG_MAYBE_CREATE
+        | fio::Flags::PROTOCOL_DIRECTORY;
+    let (root_proxy, subdir) = kernel.open_ns_dir(requested_path, create_flags)?;
+
+    let subdir = if subdir.is_empty() { ".".to_string() } else { subdir };
+    let open_rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
+    let mut subdir_options = options;
+    subdir_options.source = BString::from(subdir);
+    create_remotefs_filesystem(kernel, &root_proxy, subdir_options, open_rights)
 }
 
 /// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside

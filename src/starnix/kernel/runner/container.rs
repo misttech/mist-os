@@ -11,7 +11,6 @@ use anyhow::{anyhow, bail, Context, Error};
 use bstr::BString;
 use fasync::OnSignals;
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
-use fidl::AsyncChannel;
 use fidl_fuchsia_component_runner::{TaskProviderRequest, TaskProviderRequestStream};
 use fidl_fuchsia_feedback::CrashReporterMarker;
 use fidl_fuchsia_scheduler::RoleManagerMarker;
@@ -21,6 +20,7 @@ use fuchsia_component::server::ServiceFs;
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
+use starnix_core::container_namespace::ContainerNamespace;
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
@@ -157,19 +157,14 @@ pub struct Config {
     /// The remote block devices to use for the container.
     remote_block_devices: Vec<String>,
 
-    /// The `/pkg` directory of the container.
-    pkg_dir: Option<zx::Channel>,
-
     /// The outgoing directory of the container, used to serve protocols on behalf of the container.
     /// For example, the starnix_kernel serves a component runner in the containers' outgoing
     /// directory.
     outgoing_dir: Option<zx::Channel>,
 
-    /// The svc directory of the container, used to access protocols from the container.
-    svc_dir: Option<zx::Channel>,
-
-    /// The data directory of the container, used to persist data.
-    data_dir: Option<zx::Channel>,
+    /// Mapping of top-level namespace entries to an associated channel.
+    /// For example, "/svc" to the respective channel.
+    container_namespace: ContainerNamespace,
 
     /// The runtime directory of the container, used to provide CF introspection.
     runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
@@ -192,18 +187,6 @@ pub struct Config {
     /// Component moniker token for the container component. This token is used in various protocols
     /// to uniquely identify a component.
     component_instance: Option<zx::Event>,
-}
-
-fn get_ns_entry(
-    ns: &mut Option<Vec<frunner::ComponentNamespaceEntry>>,
-    entry_name: &str,
-) -> Option<zx::Channel> {
-    ns.as_mut().and_then(|ns| {
-        ns.iter_mut()
-            .find(|entry| entry.path == Some(entry_name.to_string()))
-            .and_then(|entry| entry.directory.take())
-            .map(|dir| dir.into_channel())
-    })
 }
 
 fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartInfo) -> Config {
@@ -230,11 +213,9 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
     let remote_block_devices = get_strvec("remote_block_devices");
     let rlimits = get_strvec("rlimits");
     let startup_file_path = get_string("startup_file_path");
+    let ns = start_info.ns.take().expect("Unable to access container namespace!");
+    let container_namespace = ContainerNamespace::from(ns);
 
-    let mut ns = start_info.ns.take();
-    let pkg_dir = get_ns_entry(&mut ns, "/pkg");
-    let svc_dir = get_ns_entry(&mut ns, "/svc");
-    let data_dir = get_ns_entry(&mut ns, "/data");
     let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
     let component_instance = start_info.component_instance;
 
@@ -250,10 +231,8 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
         name,
         startup_file_path,
         remote_block_devices,
-        pkg_dir,
         outgoing_dir,
-        svc_dir,
-        data_dir,
+        container_namespace,
         component_instance,
         runtime_dir: start_info.runtime_dir,
     }
@@ -451,20 +430,8 @@ async fn create_container(
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
     const DEFAULT_INIT: &str = "/container/init";
 
-    // Install container svc into the kernel namespace
-    let svc_dir = if let Some(svc_dir) = config.svc_dir.take() {
-        Some(fio::DirectoryProxy::new(AsyncChannel::from_channel(svc_dir)))
-    } else {
-        None
-    };
-
-    let data_dir = if let Some(data_dir) = config.data_dir.take() {
-        Some(fio::DirectorySynchronousProxy::new(data_dir))
-    } else {
-        None
-    };
-
-    let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
+    let pkg_channel = config.container_namespace.get_namespace_channel("/pkg").unwrap();
+    let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
     let features = parse_features(&config, structured_config)?;
     let mut kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
@@ -531,8 +498,7 @@ async fn create_container(
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel.clone(),
-        svc_dir,
-        data_dir,
+        config.container_namespace.try_clone()?,
         role_manager,
         Some(crash_reporter),
         kernel_node,

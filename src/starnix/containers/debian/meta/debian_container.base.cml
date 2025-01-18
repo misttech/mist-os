@@ -50,6 +50,10 @@
             from: "parent",
             availability: "optional",
         },
+        {
+            storage: "data",
+            path: "/data",
+        },
     ],
     expose: [
         {

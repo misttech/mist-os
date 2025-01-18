@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::container_namespace::ContainerNamespace;
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
 use crate::device::binder::BinderDevice;
 use crate::device::framebuffer::{AspectRatio, Framebuffer};
@@ -30,9 +31,7 @@ use crate::vfs::{
 };
 use bstr::BString;
 use expando::Expando;
-use fidl::endpoints::{
-    create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker, Proxy,
-};
+use fidl::endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker};
 use fidl_fuchsia_feedback::CrashReporterProxy;
 use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use futures::FutureExt;
@@ -48,9 +47,10 @@ use starnix_sync::{
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{errno, from_status_like_fdio};
 use std::collections::{BTreeMap, HashMap};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU16, AtomicU8};
 use std::sync::{Arc, OnceLock, Weak};
 use zx::AsHandleRef;
@@ -174,11 +174,10 @@ pub struct Kernel {
     /// The registry of device drivers.
     pub device_registry: DeviceRegistry,
 
-    /// The service directory of the container.
-    container_svc: Option<fio::DirectoryProxy>,
-
-    /// The data directory of the container.
-    pub container_data_dir: Option<fio::DirectorySynchronousProxy>,
+    /// Mapping of top-level namespace entries to an associated proxy.
+    /// For example, "/svc" to the respective proxy. Only the namespace entries
+    /// which were known at component startup will be available by the kernel.
+    pub container_namespace: ContainerNamespace,
 
     /// The registry of block devices backed by a remote fuchsia.io file.
     pub remote_block_device_registry: Arc<RemoteBlockDeviceRegistry>,
@@ -359,8 +358,7 @@ impl Kernel {
     pub fn new(
         cmdline: BString,
         features: KernelFeatures,
-        container_svc: Option<fio::DirectoryProxy>,
-        container_data_dir: Option<fio::DirectorySynchronousProxy>,
+        container_namespace: ContainerNamespace,
         role_manager: Option<RoleManagerSynchronousProxy>,
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
@@ -401,8 +399,7 @@ impl Kernel {
             security_state,
             trace_fs: Default::default(),
             device_registry: Default::default(),
-            container_svc,
-            container_data_dir,
+            container_namespace,
             remote_block_device_registry: Default::default(),
             bootloader_message_store: OnceLock::new(),
             framebuffer,
@@ -510,11 +507,18 @@ impl Kernel {
         &self,
         filename: &str,
     ) -> Result<ClientEnd<P>, Errno> {
-        let svc = self.container_svc.as_ref().ok_or_else(|| errno!(ENOENT))?;
-        let (client_end, server_end) = create_endpoints::<P>();
-        fdio::service_connect_at(svc.as_channel().as_ref(), filename, server_end.into_channel())
-            .map_err(|status| from_status_like_fdio!(status))?;
-        Ok(client_end)
+        match self.container_namespace.get_namespace_channel("/svc") {
+            Ok(channel) => {
+                let (client_end, server_end) = create_endpoints::<P>();
+                fdio::service_connect_at(channel.as_ref(), filename, server_end.into_channel())
+                    .map_err(|status| from_status_like_fdio!(status))?;
+                Ok(client_end)
+            }
+            Err(err) => {
+                log_error!("Unable to get /svc namespace channel! {}", err);
+                Err(Errno::new(starnix_uapi::errors::ENOENT))
+            }
+        }
     }
 
     /// Returns a Proxy to the service `P` used by the container.
@@ -569,6 +573,51 @@ impl Kernel {
         control_handle: fattribution::ProviderControlHandle,
     ) -> attribution_server::Observer {
         self.memory_attribution_manager.new_observer(control_handle)
+    }
+
+    /// Opens and returns a directory proxy from the container's namespace, at
+    /// the requested path, using the provided flags. This method will open the
+    /// closest existing path from the namespace hierarchy. For instance, if
+    /// the parameter provided is `/path/to/foo/bar` and the exists namespace
+    /// entries for `/path/to/foo` and `/path/to`, then the former will be used
+    /// as the root proxy and the subdir `bar` returned.
+    pub fn open_ns_dir(
+        &self,
+        path: &str,
+        open_flags: fio::Flags,
+    ) -> Result<(fio::DirectorySynchronousProxy, String), Errno> {
+        let ns_path = match path {
+            // TODO(379929394): This condition is specifically to soft
+            // transition the fstab file to the new format.
+            "" | "/" | "." => PathBuf::from("/data"),
+            _ => PathBuf::from(path),
+        };
+
+        match self.container_namespace.find_closest_channel(&ns_path) {
+            Ok((root_channel, remaining_subdir)) => {
+                let (_, server_end) = create_endpoints::<fio::DirectoryMarker>();
+                fdio::open_at(
+                    &root_channel,
+                    &remaining_subdir,
+                    open_flags,
+                    server_end.into_channel(),
+                )
+                .map_err(|e| {
+                    log_error!("Failed to intialize the subdirs: {}", e);
+                    Errno::new(starnix_uapi::errors::EIO)
+                })?;
+
+                Ok((fio::DirectorySynchronousProxy::new(root_channel), remaining_subdir))
+            }
+            Err(err) => {
+                log_error!(
+                    "Unable to find a channel for {}. Received error: {}",
+                    ns_path.display(),
+                    err
+                );
+                Err(Errno::new(starnix_uapi::errors::ENOENT))
+            }
+        }
     }
 }
 
