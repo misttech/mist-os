@@ -66,6 +66,7 @@ pub(crate) async fn package_server_task(
     repos: Deferred<RepositoryRegistryProxy>,
     context: EnvironmentContext,
     product_bundle: PathBuf,
+    repo_port: u16,
 ) -> Result<Option<PackageServerTask>> {
     tracing::info!("starting package server for {product_bundle:?}");
 
@@ -74,8 +75,8 @@ pub(crate) async fn package_server_task(
     let repo_name = format!("{repo_name_prefix}{}", process::id());
 
     let cmd = ffx_repository_server_start_args::StartCommand {
-        // Start a server on a dynamic port.
-        address: Some((Ipv6Addr::UNSPECIFIED, 0).into()),
+        // Start a server on the given port.
+        address: Some((Ipv6Addr::UNSPECIFIED, repo_port).into()),
         foreground: true,
         // Give it a name. This is actually a prefix of the name when running a product bundle.
         repository: Some(repo_name.clone()),
@@ -678,6 +679,7 @@ mod tests {
             fake_env.repo_proxy,
             fake_env.context,
             product_bundle,
+            0,
         )
         .await;
         assert!(result.is_ok(), "got {:?}", result.err());

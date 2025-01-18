@@ -83,13 +83,14 @@ impl UpdateTool {
         let package_server_task = if cmd.product_bundle {
             let product_path =
                 Self::get_product_bundle_path(&cmd.product_bundle_path, &self.context.clone())?;
-
+            let repo_port: u16 = cmd.product_bundle_port()?.try_into().unwrap();
             server::package_server_task(
                 self.target_proxy_connector.clone(),
                 self.rcs_proxy_connector.clone(),
                 self.repos,
                 self.context.clone(),
                 product_path,
+                repo_port,
             )
             .await?
         } else if cmd.product_bundle_path.is_some() {
@@ -193,12 +194,14 @@ impl UpdateTool {
             let product_path =
                 Self::get_product_bundle_path(&cmd.product_bundle_path, &self.context.clone())?;
 
+            let repo_port: u16 = cmd.product_bundle_port()?.try_into().unwrap();
             server::package_server_task(
                 self.target_proxy_connector.clone(),
                 self.rcs_proxy_connector.clone(),
                 self.repos,
                 self.context.clone(),
                 product_path,
+                repo_port,
             )
             .await?
         } else if cmd.product_bundle_path.is_some() {
@@ -679,6 +682,7 @@ mod tests {
                     monitor: true,
                     product_bundle: false,
                     product_bundle_path: None,
+                    product_bundle_port: None,
                 }),
             },
             context: test_env.context.clone(),
@@ -734,6 +738,7 @@ mod tests {
             update_pkg_url: "fuchsia-pkg://fuchsia.test/update".into(),
             product_bundle: false,
             product_bundle_path: None,
+            product_bundle_port: None,
         };
 
         let fake_update_manager_proxy =

@@ -48,6 +48,7 @@ ffx_plugin("ffx_update") {
 
   args_test_deps = [ "//third_party/rust_crates:assert_matches" ]
   args_deps = [
+    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/core:lib",
     "//third_party/rust_crates:argh",
   ]

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
+use ffx_config::FfxConfigBacked;
 use ffx_core::ffx_command;
 use std::path::PathBuf;
 
@@ -132,7 +133,7 @@ Returns an empty list if no other update channels are configured.",
 }
 
 /// Start an update. If no newer update is available, no update is performed.
-#[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+#[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, FfxConfigBacked, PartialEq)]
 #[argh(
     subcommand,
     name = "check-now",
@@ -163,6 +164,12 @@ pub struct CheckNow {
     #[argh(switch)]
     pub product_bundle: bool,
 
+    /// port to start the OTA repo server on when using --product_bundle. This is configured by
+    /// `repository.ota_port` and defaults to 0, which indicates a random unassigned port.
+    #[argh(option)]
+    #[ffx_config_default(key = "repository.ota_port", default = "0")]
+    pub product_bundle_port: Option<u64>,
+
     /// optionally specify the product bundle to use as the source of the update
     /// when `--product-bundle` is set. The default is to use the product bundle
     /// configured with `product.path`.
@@ -172,7 +179,7 @@ pub struct CheckNow {
 
 /// Directly invoke the system updater to install the provided update, bypassing
 /// any update checks.
-#[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
+#[derive(Clone, Debug, Eq, ArgsInfo, FromArgs, FfxConfigBacked, PartialEq)]
 #[argh(
     subcommand,
     name = "force-install",
@@ -209,6 +216,12 @@ pub struct ForceInstall {
     /// use the product bundle to use as the source of the update.
     #[argh(switch)]
     pub product_bundle: bool,
+
+    /// port to start the OTA repo server on when using --product_bundle. This is configured by
+    /// `repository.ota_port` and defaults to 0, which indicates a random unassigned port.
+    #[argh(option)]
+    #[ffx_config_default(key = "repository.ota_port", default = "0")]
+    pub product_bundle_port: Option<u64>,
 
     /// optionally specify the product bundle to use as the source of the update
     /// when `--product-bundle` is set. The default is to use the product bundle
@@ -290,7 +303,8 @@ mod tests {
                     service_initiated: false,
                     monitor: false,
                     product_bundle: false,
-                    product_bundle_path: None
+                    product_bundle_path: None,
+                    product_bundle_port: None
                 })
             }
         );
@@ -306,7 +320,8 @@ mod tests {
                     service_initiated: false,
                     monitor: true,
                     product_bundle: false,
-                    product_bundle_path: None
+                    product_bundle_path: None,
+                    product_bundle_port: None
                 })
             }
         );
@@ -322,7 +337,8 @@ mod tests {
                     service_initiated: true,
                     monitor: false,
                     product_bundle: false,
-                    product_bundle_path: None
+                    product_bundle_path: None,
+                    product_bundle_port: None
                 })
             }
         );
@@ -343,7 +359,8 @@ mod tests {
                     update_pkg_url: "url".to_owned(),
                     reboot: true,
                     product_bundle: false,
-                    product_bundle_path: None
+                    product_bundle_path: None,
+                    product_bundle_port: None
                 })
             }
         );
@@ -360,7 +377,28 @@ mod tests {
                     update_pkg_url: "url".to_owned(),
                     reboot: false,
                     product_bundle: false,
-                    product_bundle_path: None
+                    product_bundle_path: None,
+                    product_bundle_port: None
+                })
+            }
+        );
+    }
+    #[test]
+    fn test_force_install_custom_port() {
+        let update = Update::from_args(
+            &["update"],
+            &["force-install", "--product-bundle", "--product-bundle-port", "1234", "url"],
+        )
+        .unwrap();
+        assert_eq!(
+            update,
+            Update {
+                cmd: Command::ForceInstall(ForceInstall {
+                    update_pkg_url: "url".to_owned(),
+                    reboot: true,
+                    product_bundle: true,
+                    product_bundle_path: None,
+                    product_bundle_port: Some(1234)
                 })
             }
         );

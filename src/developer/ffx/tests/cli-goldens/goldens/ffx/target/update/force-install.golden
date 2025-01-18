@@ -32,6 +32,18 @@
       "short": null,
       "description": "use the product bundle to use as the source of the update.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "product-bundle-port"
+        }
+      },
+      "optionality": "optional",
+      "long": "--product-bundle-port",
+      "short": null,
+      "description": "port to start the OTA repo server on when using --product_bundle. This is configured by `repository.ota_port` and defaults to 0, which indicates a random unassigned port.",
+      "hidden": false
     }
   ],
   "notes": [
