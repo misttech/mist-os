@@ -396,6 +396,7 @@ fatfs = { path = "forks/fatfs" }
 fuse3 = { path = "forks/fuse3" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
+nix_0_29_0 = { package = "nix", path = "forks/nix-0.29.0" }
 nom = { path = "forks/nom" }
 notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
