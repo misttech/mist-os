@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context, Error};
+use fidl::endpoints::ProtocolMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use futures::future::OptionFuture;
@@ -237,19 +238,22 @@ async fn serve_wifi_chip<I: IfaceManager>(
     .await;
 }
 
-fn run_callbacks<T>(
+fn run_callbacks<T: fidl::endpoints::Proxy>(
+    event_name: &'static str,
     callback_fn: impl Fn(&T) -> Result<(), fidl::Error>,
-    callbacks: &[T],
-    ctx: &'static str,
+    callbacks: &mut Vec<T>,
 ) {
-    let mut failed_callbacks = 0u32;
-    for callback in callbacks {
-        if let Err(_e) = callback_fn(callback) {
-            failed_callbacks += 1;
-        }
+    let num_registered = callbacks.len();
+    callbacks.retain(|callback| !callback.is_closed());
+    if callbacks.len() < num_registered {
+        let dropped = num_registered - callbacks.len();
+        warn!("Dropped {} {} proxy because channel is closed", dropped, T::Protocol::DEBUG_NAME);
     }
-    if failed_callbacks > 0 {
-        warn!("Failed sending {} event to {} subscribers", ctx, failed_callbacks);
+
+    for callback in callbacks {
+        if let Err(e) = callback_fn(callback) {
+            warn!("Failed sending {} event: {}", event_name, e);
+        }
     }
 }
 
@@ -280,9 +284,9 @@ async fn handle_wifi_request<I: IfaceManager>(
             state.started = true;
             responder.send(Ok(())).context("send Start response")?;
             run_callbacks(
+                "WifiEventCallbackProxy::OnStart",
                 fidl_wlanix::WifiEventCallbackProxy::on_start,
-                &state.callbacks[..],
-                "OnStart",
+                &mut state.callbacks,
             );
 
             let event = wlan_telemetry::ClientConnectionsToggleEvent::Enabled;
@@ -302,9 +306,9 @@ async fn handle_wifi_request<I: IfaceManager>(
             let mut state = state.lock();
             state.started = false;
             run_callbacks(
+                "WifiEventCallbackProxy::OnStop",
                 fidl_wlanix::WifiEventCallbackProxy::on_stop,
-                &state.callbacks[..],
-                "OnStop",
+                &mut state.callbacks,
             );
 
             let event = wlan_telemetry::ClientConnectionsToggleEvent::Disabled;
@@ -413,8 +417,8 @@ struct ConnectionContext {
 fn send_disconnect_event<C: ClientIface>(
     source: &fidl_sme::DisconnectSource,
     ctx: &ConnectionContext,
-    sta_iface_state: &SupplicantStaIfaceState,
-    wifi_state: &WifiState,
+    sta_iface_state: &mut SupplicantStaIfaceState,
+    wifi_state: &mut WifiState,
     iface: &C,
     iface_id: u16,
 ) {
@@ -434,9 +438,9 @@ fn send_disconnect_event<C: ClientIface>(
         ..Default::default()
     };
     run_callbacks(
+        "SupplicantStaIfaceCallbackProxy::onDisconnected",
         |callback_proxy| callback_proxy.on_disconnected(&disconnected_event),
-        &sta_iface_state.callbacks[..],
-        "on_disconnected",
+        &mut sta_iface_state.callbacks,
     );
     let state_changed_event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
         new_state: Some(fidl_wlanix::StaIfaceCallbackState::Disconnected),
@@ -447,9 +451,9 @@ fn send_disconnect_event<C: ClientIface>(
         ..Default::default()
     };
     run_callbacks(
+        "SupplicantStaIfaceCallbackProxy::onStateChanged",
         |callback_proxy| callback_proxy.on_state_changed(&state_changed_event),
-        &sta_iface_state.callbacks[..],
-        "on_state_changed",
+        &mut sta_iface_state.callbacks,
     );
     // Also communicate the state change via nl80211.
     if let Some(proxy) = &wifi_state.mlme_multicast_proxy {
@@ -501,8 +505,8 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                             send_disconnect_event(
                                 info,
                                 &ctx,
-                                &sta_iface_state.lock(),
-                                &wifi_state.lock(),
+                                &mut sta_iface_state.lock(),
+                                &mut wifi_state.lock(),
                                 &*iface,
                                 iface_id,
                             );
@@ -542,8 +546,8 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                         send_disconnect_event(
                             &source,
                             &ctx,
-                            &sta_iface_state.lock(),
-                            &wifi_state.lock(),
+                            &mut sta_iface_state.lock(),
+                            &mut wifi_state.lock(),
                             &*iface,
                             iface_id,
                         );
@@ -575,8 +579,8 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                     send_disconnect_event(
                         &info.disconnect_source,
                         &ctx,
-                        &sta_iface_state.lock(),
-                        &wifi_state.lock(),
+                        &mut sta_iface_state.lock(),
+                        &mut wifi_state.lock(),
                         &*iface,
                         iface_id,
                     );
@@ -654,9 +658,9 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             ..Default::default()
                         };
                         run_callbacks(
+                            "SupplicantStaIfaceCallbackProxy::onStateChanged",
                             |callback_proxy| callback_proxy.on_state_changed(&event),
-                            &sta_iface_state.lock().callbacks[..],
-                            "on_state_changed",
+                            &mut sta_iface_state.lock().callbacks,
                         );
                         (
                             Ok(()),
@@ -685,9 +689,9 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                                 ..Default::default()
                             };
                         run_callbacks(
+                            "SupplicantStaIfaceCallbackProxy::onAssociationRejected",
                             |callback_proxy| callback_proxy.on_association_rejected(&event),
-                            &sta_iface_state.lock().callbacks[..],
-                            "on_association_rejected",
+                            &mut sta_iface_state.lock().callbacks,
                         );
                         (Err(zx::sys::ZX_ERR_INTERNAL), None)
                     }
@@ -1576,6 +1580,29 @@ mod tests {
             &message.payload.as_ref().expect("Message should always have a payload")[..],
         )
         .expect("Failed to deserialize genetlink message")
+    }
+
+    #[test]
+    fn test_run_callbacks() {
+        let _exec = fasync::TestExecutor::new_with_fake_time();
+        let (callback_proxy, server_end) = create_proxy::<fidl_wlanix::WifiEventCallbackMarker>();
+        let mut callbacks = vec![callback_proxy];
+        // Simple validation that running callback works fine
+        run_callbacks(
+            "WifiEventCallbackProxy::onStart",
+            fidl_wlanix::WifiEventCallbackProxy::on_start,
+            &mut callbacks,
+        );
+        assert_eq!(callbacks.len(), 1);
+
+        // Validate that dropping the server end would cause callback proxy to be removed
+        std::mem::drop(server_end);
+        run_callbacks(
+            "WifiEventCallbackProxy::onStart",
+            fidl_wlanix::WifiEventCallbackProxy::on_start,
+            &mut callbacks,
+        );
+        assert_eq!(callbacks.len(), 0);
     }
 
     #[test]
