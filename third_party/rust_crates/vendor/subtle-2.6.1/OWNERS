@@ -5,7 +5,6 @@
 include /third_party/rust_crates/vendor/aes-gcm-0.10.2/OWNERS
 include /third_party/rust_crates/vendor/aes-gcm-siv-0.11.1/OWNERS
 include /third_party/rust_crates/vendor/crypto-bigint-0.4.9/OWNERS
-include /third_party/rust_crates/vendor/crypto-mac-0.11.1/OWNERS
 include /third_party/rust_crates/vendor/digest-0.10.7/OWNERS
 include /third_party/rust_crates/vendor/elliptic-curve-0.12.3/OWNERS
 include /third_party/rust_crates/vendor/ff-0.12.1/OWNERS

@@ -1340,7 +1340,7 @@ rust_library("aes-gcm-v0_10_2") {
   deps += [ ":cipher-v0_4_4" ]
   deps += [ ":ctr-v0_9_2" ]
   deps += [ ":ghash-v0_5_0" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
@@ -1382,7 +1382,7 @@ rust_library("aes-gcm-siv-v0_11_1") {
   deps += [ ":cipher-v0_4_4" ]
   deps += [ ":ctr-v0_9_2" ]
   deps += [ ":polyval-v0_6_0" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
@@ -4012,7 +4012,7 @@ rust_library("crypto-bigint-v0_4_9") {
   deps += [ ":zeroize-v1_6_0" ]
   deps += [ ":generic-array-v0_14_5" ]
   deps += [ ":rand_core-v0_6_3" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
@@ -4784,7 +4784,7 @@ rust_library("digest-v0_10_7") {
   deps = []
   deps += [ ":block-buffer-v0_10_4" ]
   deps += [ ":crypto-common-v0_1_6" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
@@ -5040,7 +5040,7 @@ rust_library("elliptic-curve-v0_12_3") {
   deps += [ ":rand_core-v0_6_3" ]
   deps += [ ":sec1-v0_3_0" ]
   deps += [ ":serdect-v0_1_0" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
@@ -5427,7 +5427,7 @@ rust_library("ff-v0_12_1") {
 
   deps = []
   deps += [ ":rand_core-v0_6_3" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
@@ -6542,7 +6542,7 @@ rust_library("group-v0_12_1") {
   deps = []
   deps += [ ":ff-v0_12_1" ]
   deps += [ ":rand_core-v0_6_3" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
@@ -10185,7 +10185,7 @@ rust_library("password-hash-v0_4_2") {
   deps = []
   deps += [ ":base64ct-v1_6_0" ]
   deps += [ ":rand_core-v0_6_3" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
@@ -13948,7 +13948,7 @@ rust_library("sec1-v0_3_0") {
   deps += [ ":generic-array-v0_14_5" ]
   deps += [ ":pkcs8-v0_9_0" ]
   deps += [ ":serdect-v0_1_0" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
@@ -15261,15 +15261,15 @@ rust_proc_macro("strum_macros-v0_25_3") {
   applicable_licenses = [ ":strum_macros-v0_25_3.license" ]
 }
 
-license("subtle-v2_4_1.license") {
+license("subtle-v2_6_1.license") {
   public_package_name = "subtle"
-  license_files = [ "//third_party/rust_crates/vendor/subtle-2.4.1/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/subtle-2.6.1/LICENSE" ]
 }
 
-rust_library("subtle-v2_4_1") {
+rust_library("subtle-v2_6_1") {
   crate_name = "subtle"
-  crate_root = "//third_party/rust_crates/vendor/subtle-2.4.1/src/lib.rs"
-  output_name = "subtle-6f67d79a9c7c75a8"
+  crate_root = "//third_party/rust_crates/vendor/subtle-2.6.1/src/lib.rs"
+  output_name = "subtle-821717df2f9b87f1"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -15278,15 +15278,15 @@ rust_library("subtle-v2_4_1") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=6f67d79a9c7c75a8",
-    "-Cextra-filename=-6f67d79a9c7c75a8",
+    "--edition=2018",
+    "-Cmetadata=821717df2f9b87f1",
+    "-Cextra-filename=-821717df2f9b87f1",
     "--cfg=feature=\"i128\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":subtle-v2_4_1.license" ]
+  applicable_licenses = [ ":subtle-v2_6_1.license" ]
 }
 
 license("syn-v0_15_26.license") {
@@ -17466,7 +17466,7 @@ rust_library("universal-hash-v0_5_1") {
 
   deps = []
   deps += [ ":crypto-common-v0_1_6" ]
-  deps += [ ":subtle-v2_4_1" ]
+  deps += [ ":subtle-v2_6_1" ]
 
   rustenv = []
 
