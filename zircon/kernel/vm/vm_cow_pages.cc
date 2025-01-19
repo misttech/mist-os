@@ -3864,97 +3864,95 @@ zx_status_t VmCowPages::ProtectRangeFromReclamationLocked(VmCowRange range, bool
   uint64_t end_offset = ROUNDUP(range.end(), PAGE_SIZE);
 
   __UNINITIALIZED MultiPageRequest page_request;
-  __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
-      GetLookupCursorLocked(VmCowRange(cur_offset, end_offset - cur_offset));
-  // Track the validity of the cursor as we would like to efficiently look up runs where possible,
-  // but due to both errors and lock drops will need to acquire new cursors on occasion.
-  bool cursor_valid = true;
-  for (; cur_offset < end_offset; cur_offset += PAGE_SIZE) {
-    const uint64_t remaining = end_offset - cur_offset;
-    if (!cursor_valid) {
-      cursor = GetLookupCursorLocked(VmCowRange(cur_offset, remaining));
-      if (cursor.is_error()) {
-        return cursor.status_value();
-      }
-      cursor_valid = true;
+  while (cur_offset < end_offset) {
+    __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
+        GetLookupCursorLocked(VmCowRange(cur_offset, end_offset - cur_offset));
+    if (cursor.is_error()) {
+      return cursor.status_value();
     }
     AssertHeld(cursor->lock_ref());
-    // Lookup the page, this will fault in the page from the parent if neccessary, but will not
-    // allocate pages directly in this if it is a child.
-    auto result =
-        cursor->RequirePage(false, static_cast<uint>(remaining / PAGE_SIZE), &page_request);
-    zx_status_t status = result.status_value();
-    if (status == ZX_OK) {
-      // If we reached here, we successfully found a page at the current offset.
-      vm_page_t* page = result->page;
-
-      // The root might have gone away when the lock was dropped while waiting above. Compute the
-      // root again and check if we still have a page source backing it before applying the hint.
-      if (!can_root_source_evict_locked()) {
-        // Hinting is not applicable anymore. No more pages to hint.
-        return ZX_OK;
-      }
-
-      // Check to see if the page is owned by the root VMO. Hints only apply to the root.
-      VmCowPages* owner = reinterpret_cast<VmCowPages*>(page->object.get_object());
-      if (owner != GetRootLocked()) {
-        // Hinting is not applicable to this page, but it might apply to following ones.
-        continue;
-      }
-
-      // If the page is loaned, replace it with a non-loaned page. Loaned pages are reclaimed by
-      // eviction, and hinted pages should not be evicted.
-      if (page->is_loaned()) {
-        DEBUG_ASSERT(is_page_clean(page));
-        AssertHeld(owner->lock_ref());
-        status =
-            owner->ReplacePageLocked(page, page->object.get_page_offset(),
-                                     /*with_loaned=*/false, &page, page_request.GetAnonymous());
-        // Let the status fall through below to have success, waiting and errors handled.
-      }
-
+    for (; cur_offset < end_offset; cur_offset += PAGE_SIZE) {
+      const uint64_t remaining = end_offset - cur_offset;
+      // Lookup the page, this will fault in the page from the parent if necessary, but will not
+      // allocate pages directly in this if it is a child.
+      auto result =
+          cursor->RequirePage(false, static_cast<uint>(remaining / PAGE_SIZE), &page_request);
+      zx_status_t status = result.status_value();
       if (status == ZX_OK) {
-        DEBUG_ASSERT(!page->is_loaned());
-        if (set_always_need) {
-          page->object.always_need = 1;
-          vm_vmo_always_need.Add(1);
-          // Nothing more to do beyond marking the page always_need true. The lookup must have
-          // already marked the page accessed, moving it to the head of the first page queue.
+        // If we reached here, we successfully found a page at the current offset.
+        vm_page_t* page = result->page;
+
+        // The root might have gone away when the lock was dropped while waiting above. Compute the
+        // root again and check if we still have a page source backing it before applying the hint.
+        if (!can_root_source_evict_locked()) {
+          // Hinting is not applicable anymore. No more pages to hint.
+          return ZX_OK;
         }
-        continue;
-      }
-    }
-    // There was either an error in the original require page, or in processing what was looked up.
-    // Either way when go back around in the loop we are going to need a new cursor.
-    cursor_valid = false;
 
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      guard->CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
+        // Check to see if the page is owned by the root VMO. Hints only apply to the root.
+        VmCowPages* owner = reinterpret_cast<VmCowPages*>(page->object.get_object());
+        if (owner != GetRootLocked()) {
+          // Hinting is not applicable to this page, but it might apply to following ones.
+          continue;
+        }
 
-      // The size might have changed since we dropped the lock. Adjust the range if required.
-      if (cur_offset >= size_locked()) {
-        // No more pages to hint.
-        return ZX_OK;
+        // If the page is loaned, replace it with a non-loaned page. Loaned pages are reclaimed by
+        // eviction, and hinted pages should not be evicted.
+        if (page->is_loaned()) {
+          DEBUG_ASSERT(is_page_clean(page));
+          AssertHeld(owner->lock_ref());
+          status =
+              owner->ReplacePageLocked(page, page->object.get_page_offset(),
+                                       /*with_loaned=*/false, &page, page_request.GetAnonymous());
+          // Let the status fall through below to have success, waiting and errors handled.
+        }
+
+        if (status == ZX_OK) {
+          DEBUG_ASSERT(!page->is_loaned());
+          if (set_always_need) {
+            page->object.always_need = 1;
+            vm_vmo_always_need.Add(1);
+            // Nothing more to do beyond marking the page always_need true. The lookup must have
+            // already marked the page accessed, moving it to the head of the first page queue.
+          }
+          continue;
+        }
       }
-      // Shrink the range if required. Proceed with hinting on the remaining pages in the range;
-      // we've already hinted on the preceding pages, so just go on ahead instead of returning an
-      // error. The range was valid at the time we started hinting.
-      if (end_offset > size_locked()) {
-        end_offset = size_locked();
+      // There was either an error in the original require page, or in processing what was looked
+      // up. Either way when go back around in the loop we are going to need a new cursor.
+
+      if (status == ZX_ERR_SHOULD_WAIT) {
+        guard->CallUnlocked([&status, &page_request]() { status = page_request.Wait(); });
+
+        // The size might have changed since we dropped the lock. Adjust the range if required.
+        if (cur_offset >= size_locked()) {
+          // No more pages to hint.
+          return ZX_OK;
+        }
+        // Shrink the range if required. Proceed with hinting on the remaining pages in the range;
+        // we've already hinted on the preceding pages, so just go on ahead instead of returning an
+        // error. The range was valid at the time we started hinting.
+        if (end_offset > size_locked()) {
+          end_offset = size_locked();
+        }
+
+        // If the wait succeeded, cur_offset will now have a backing page, so we need to try the
+        // same offset again with a new cursor. In case of failure, simply continue on to the next
+        // page, as hints are best effort only.
+        if (status == ZX_OK) {
+          break;
+        }
       }
 
-      // If the wait succeeded, cur_offset will now have a backing page, so we need to try the
-      // same offset again. Move back a page so the loop increment keeps us at the same offset. In
-      // case of failure, simply continue on to the next page, as hints are best effort only.
-      if (status == ZX_OK) {
-        cur_offset -= PAGE_SIZE;
-        continue;
+      // Should only get here if an error was encountered, check if we should ignore or return it.
+      DEBUG_ASSERT(status != ZX_OK);
+      if (!ignore_errors) {
+        return status;
       }
-    }
-    // Should only get here if an error was encountered, check if we should ignore or return it.
-    DEBUG_ASSERT(status != ZX_OK);
-    if (!ignore_errors) {
-      return status;
+
+      // Break out of the inner loop to get a new cursor for the next offset.
+      cur_offset += PAGE_SIZE;
+      break;
     }
   }
   return ZX_OK;
