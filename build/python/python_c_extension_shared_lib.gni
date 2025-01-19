@@ -16,6 +16,7 @@ template("python_c_extension_shared_lib") {
     forward_variables_from(invoker,
                            [
                              "assert_no_deps",
+                             "public_configs",
                              "testonly",
                              "sources",
                              "deps",

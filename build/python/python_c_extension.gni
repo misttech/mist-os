@@ -30,6 +30,10 @@ import("//build/python/python_library.gni")
 #     Forwarded to python_c_extension_shared_lib.
 #     Type: list(target)
 #
+#   public_configs (optional)
+#     Forwarded to python_c_extension_shared_lib.
+#     Type: list(target)
+#
 #   stubs_root (optional)
 #     Base path for paths specified in `stubs`. This argument is required when `stubs` is
 #     provided.
@@ -55,6 +59,7 @@ template("python_c_extension") {
                            [
                              "assert_no_deps",
                              "configs",
+                             "public_configs",
                              "deps",
                              "sources",
                              "testonly",
