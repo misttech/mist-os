@@ -70,18 +70,14 @@ zx_status_t VmObject::set_name(const char* name, size_t len) {
 
 void VmObject::set_user_id(uint64_t user_id) {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
   DEBUG_ASSERT(user_id_ == 0);
   user_id_ = user_id;
 }
 
 uint64_t VmObject::user_id() const {
   canary_.Assert();
-  Guard<CriticalMutex> guard{lock()};
   return user_id_;
 }
-
-uint64_t VmObject::user_id_locked() const { return user_id_; }
 
 void VmObject::AddMappingLocked(VmMapping* r) {
   canary_.Assert();

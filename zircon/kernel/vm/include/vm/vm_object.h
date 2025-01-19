@@ -559,9 +559,8 @@ class VmObject : public VmHierarchyBase,
   zx_status_t set_name(const char* name, size_t len);
 
   // Returns a user ID associated with this VMO, or zero.
-  // Typically used to hold a zircon koid for Dispatcher-wrapped VMOs.
+  // Used to hold a zircon koid for Dispatcher-wrapped VMOs.
   uint64_t user_id() const;
-  uint64_t user_id_locked() const TA_REQ(lock());
 
   // Returns the parent's user_id() if this VMO has a parent,
   // otherwise returns zero.
@@ -756,7 +755,13 @@ class VmObject : public VmHierarchyBase,
   // list of every child
   fbl::TaggedDoublyLinkedList<VmObject*, internal::ChildListTag> children_list_ TA_GUARDED(lock());
 
-  uint64_t user_id_ TA_GUARDED(lock()) = 0;
+  // The user_id_ is semi-const in that it is set once, before the VMO becomes publicly visible, by
+  // the dispatcher layer. While the dispatcher setting the ID and querying it is trivially
+  // synchronized by the dispatcher, other parts of the VMO code (mostly debug related) may racily
+  // inspect this ID before it gets set and so to avoid technical undefined behavior use a relaxed
+  // atomic.
+  RelaxedAtomic<uint64_t> user_id_ = 0;
+
   uint32_t mapping_list_len_ TA_GUARDED(lock()) = 0;
   uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
 

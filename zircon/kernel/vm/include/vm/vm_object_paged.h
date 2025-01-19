@@ -116,8 +116,7 @@ class VmObjectPaged final : public VmObject, public VmDeferredDeleter<VmObjectPa
   uint64_t parent_user_id() const override {
     Guard<CriticalMutex> guard{lock()};
     if (parent_) {
-      AssertHeld(parent_->lock_ref());
-      return parent_->user_id_locked();
+      return parent_->user_id();
     }
     return 0;
   }

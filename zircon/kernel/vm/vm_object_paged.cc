@@ -838,15 +838,14 @@ void VmObjectPaged::DumpLocked(uint depth, bool verbose) const {
 
   uint64_t parent_id = 0;
   if (parent_) {
-    AssertHeld(parent_->lock_ref());
-    parent_id = parent_->user_id_locked();
+    parent_id = parent_->user_id();
   }
 
   for (uint i = 0; i < depth; ++i) {
     printf("  ");
   }
-  printf("vmo %p/k%" PRIu64 " ref %d parent %p/k%" PRIu64 "\n", this, user_id_, ref_count_debug(),
-         parent_, parent_id);
+  printf("vmo %p/k%" PRIu64 " ref %d parent %p/k%" PRIu64 "\n", this, user_id_.load(),
+         ref_count_debug(), parent_, parent_id);
 
   char name[ZX_MAX_NAME_LEN];
   get_name(name, sizeof(name));

@@ -38,10 +38,7 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
   }
   bool is_contiguous() const override { return true; }
   bool is_slice() const { return is_slice_; }
-  uint64_t parent_user_id() const override {
-    Guard<CriticalMutex> guard{lock()};
-    return parent_user_id_;
-  }
+  uint64_t parent_user_id() const override { return parent_user_id_; }
 
   uint64_t size_locked() const override { return size_; }
 
@@ -79,8 +76,8 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
 
  private:
   // private constructor (use Create())
-  VmObjectPhysical(fbl::RefPtr<VmHierarchyState> state, paddr_t base, uint64_t size,
-                   bool is_slice_);
+  VmObjectPhysical(fbl::RefPtr<VmHierarchyState> state, paddr_t base, uint64_t size, bool is_slice_,
+                   uint64_t parent_user_id);
 
   // private destructor, only called from refptr
   ~VmObjectPhysical() override;
@@ -92,7 +89,7 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
   const uint64_t size_ = 0;
   const paddr_t base_ = 0;
   const bool is_slice_ = false;
-  uint64_t parent_user_id_ TA_GUARDED(lock()) = 0;
+  const uint64_t parent_user_id_;
   uint32_t mapping_cache_flags_ TA_GUARDED(lock()) = 0;
 
   // parent pointer (may be null)
