@@ -5,10 +5,10 @@
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_MOD_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_MOD_H_
 
+#include <Python.h>
+
 #include <sstream>
 #include <string>
-
-#include <fuchsia_controller_abi/abi.h>
 
 #include "src/lib/fidl_codec/library_loader.h"
 

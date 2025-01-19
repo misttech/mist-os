@@ -4,9 +4,10 @@
 
 #include "encode.h"
 
+#include <Python.h>
+
 #include <string>
 
-#include <fuchsia_controller_abi/abi.h>
 #include <fuchsia_controller_abi/utils.h>
 
 #include "mod.h"

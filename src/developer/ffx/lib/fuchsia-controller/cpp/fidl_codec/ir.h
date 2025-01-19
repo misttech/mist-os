@@ -4,7 +4,7 @@
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_IR_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_IR_H_
 
-#include <fuchsia_controller_abi/abi.h>
+#include <Python.h>
 
 namespace fuchsia_controller::fidl_codec::ir {
 

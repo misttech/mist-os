@@ -5,12 +5,12 @@
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_UTILS_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_UTILS_H_
 
+#include <Python.h>
+
 #include <locale>
 #include <sstream>
 #include <string>
 #include <unordered_set>
-
-#include <fuchsia_controller_abi/abi.h>
 
 namespace fuchsia_controller::fidl_codec::utils {
 

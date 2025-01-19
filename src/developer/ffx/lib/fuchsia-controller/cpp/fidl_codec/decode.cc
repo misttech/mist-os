@@ -4,10 +4,11 @@
 
 #include "decode.h"
 
+#include <Python.h>
+
 #include <cinttypes>
 #include <vector>
 
-#include <fuchsia_controller_abi/abi.h>
 #include <fuchsia_controller_abi/utils.h>
 
 #include "mod.h"

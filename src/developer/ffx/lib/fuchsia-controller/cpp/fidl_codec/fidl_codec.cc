@@ -1,9 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#define PY_SSIZE_T_CLEAN
 
-#include <fuchsia_controller_abi/abi.h>
+#include <Python.h>
+
 #include <fuchsia_controller_abi/utils.h>
 
 #include "decode.h"

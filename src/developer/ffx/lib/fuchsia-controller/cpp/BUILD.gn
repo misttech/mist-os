@@ -9,6 +9,13 @@ visibility = [
   "..:*",
 ]
 
+config("python_config") {
+  defines = [
+    "Py_LIMITED_API=0x030b00f0",
+    "PY_SSIZE_T_CLEAN",
+  ]
+}
+
 source_set("fuchsia_controller_abi") {
   sources = [
     "fuchsia_controller_abi/abi.h",
@@ -21,7 +28,10 @@ source_set("fuchsia_controller_abi") {
   ]
 
   # If you need to add include directories, use `public_configs` or `configs`
-  public_configs = [ ":fuchsia_controller_abi_config" ]
+  public_configs = [
+    ":fuchsia_controller_abi_config",
+    ":python_config",
+  ]
 }
 
 config("fuchsia_controller_abi_config") {
@@ -57,6 +67,8 @@ python_c_extension("fidl_codec") {
     "//third_party/rapidjson",
     "//zircon/system/public",
   ]
+
+  public_configs = [ ":python_config" ]
 }
 
 python_c_extension("fuchsia_controller_internal") {
@@ -82,4 +94,6 @@ python_c_extension("fuchsia_controller_internal") {
     "..:lib",
     "//zircon/system/public",
   ]
+
+  public_configs = [ ":python_config" ]
 }

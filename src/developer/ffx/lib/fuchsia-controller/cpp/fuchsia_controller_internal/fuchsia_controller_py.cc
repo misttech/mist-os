@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <Python.h>
+
 #include <filesystem>
 #include <type_traits>
 #include <vector>
 
-#include <fuchsia_controller_abi/abi.h>
 #include <fuchsia_controller_abi/utils.h>
 
 #include "error.h"

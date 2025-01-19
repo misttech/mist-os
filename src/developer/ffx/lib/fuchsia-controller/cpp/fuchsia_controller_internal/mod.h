@@ -5,7 +5,8 @@
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_MOD_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_MOD_H_
 
-#include <fuchsia_controller_abi/abi.h>
+#include <Python.h>
+
 #include <fuchsia_controller_abi/utils.h>
 
 #include "fuchsia_controller.h"

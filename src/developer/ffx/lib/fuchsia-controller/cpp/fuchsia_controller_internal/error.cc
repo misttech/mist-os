@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 #include "error.h"
 
+#include <Python.h>
 #include <structmember.h>  // PyMemberDef.
 
 #include <sstream>
 
-#include <fuchsia_controller_abi/abi.h>
 #include <fuchsia_controller_abi/utils.h>
 
 namespace error {

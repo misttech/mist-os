@@ -4,9 +4,10 @@
 
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_PYTHON_DICT_VISITOR_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FIDL_CODEC_PYTHON_DICT_VISITOR_H_
+#include <Python.h>
+
 #include <string>
 
-#include <fuchsia_controller_abi/abi.h>
 #include <fuchsia_controller_abi/utils.h>
 
 #include "src/lib/fidl_codec/printer.h"

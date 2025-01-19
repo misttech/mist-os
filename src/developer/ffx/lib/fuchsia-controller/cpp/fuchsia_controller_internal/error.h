@@ -4,10 +4,9 @@
 #ifndef SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_ERROR_H_
 #define SRC_DEVELOPER_FFX_LIB_FUCHSIA_CONTROLLER_CPP_FUCHSIA_CONTROLLER_INTERNAL_ERROR_H_
 
+#include <Python.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
-
-#include <fuchsia_controller_abi/abi.h>
 
 namespace error {
 
