@@ -23,7 +23,6 @@ group("ffx") {
   public_deps = [
     ":ffx-defaults.json($host_toolchain)",
     ":ffx_tool($host_toolchain)",
-    ":tests",
     "lib($host_toolchain)",
   ]
 }
