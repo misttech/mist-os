@@ -22,8 +22,12 @@ template("python_c_extension_shared_lib") {
                              "deps",
                              "visibility",
                            ])
+
+    # Erase default for configs
     configs = []
-    configs = invoker.configs
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
     configs += [ "//build/config/python:include_python" ]
 
     # Since this is building a .so there should be no errors about undefined
