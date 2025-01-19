@@ -132,3 +132,7 @@ template("python_c_extension") {
     }
   }
 }
+
+set_defaults("python_c_extension") {
+  configs = default_shared_library_configs
+}

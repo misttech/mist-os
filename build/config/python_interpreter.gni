@@ -5,8 +5,8 @@
 # NOTE: This file is included from //build/config/BUILDCONFIG.gn and other
 # .gni files before host_tag and most other variables are defined.
 
-python_version = "3.11"
-python_exe_src = "//prebuilt/third_party/python3/${host_os}-${host_cpu}/bin/python${python_version}"
+python_exe_src =
+    "//prebuilt/third_party/python3/${host_os}-${host_cpu}/bin/python3"
 python_include_dir =
     "//prebuilt/third_party/python3/${host_os}-${host_cpu}/include"
 
