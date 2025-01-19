@@ -22,21 +22,15 @@ template("python_c_extension_shared_lib") {
                              "deps",
                              "visibility",
                            ])
-
-    # Erase default for configs
-    configs = []
     if (defined(invoker.configs)) {
       configs += invoker.configs
     }
-    configs += [ "//build/config/python:include_python" ]
+    configs += [ "//build/config/python:python_c_extension_shared_lib_config" ]
 
-    # Since this is building a .so there should be no errors about undefined
-    # symbols. Some systems may not have this enabled, so add it before
-    # subsequently removing it. A better approach might be to find out why this
-    # symbol isn't present in the first place and conditionally remove it only
-    # if it is there.
-    configs += [ "//build/config:symbol_no_undefined" ]
-    configs -= [ "//build/config:symbol_no_undefined" ]
+    if (!defined(invoker.deps)) {
+      deps = []
+    }
+    deps += [ "//build/config/python:generate_python_api_symbols" ]
 
     if (host_os == "mac") {
       configs += [ "//build/config/mac:symbol_dynamic_lookup_undefined" ]
