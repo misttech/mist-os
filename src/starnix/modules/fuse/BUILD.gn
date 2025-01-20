@@ -22,6 +22,7 @@ rustc_library("fuse") {
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-types",
     "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/lib/syncio",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:zerocopy",
