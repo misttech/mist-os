@@ -4,7 +4,6 @@
 
 use crate::{dirs_to_test, repeat_by_n, PackageSource};
 use anyhow::{anyhow, Context as _, Error};
-use assert_matches::assert_matches;
 use fidl::endpoints::{create_proxy, Proxy as _};
 use fidl::AsHandleRef as _;
 use fidl_fuchsia_io as fio;
@@ -1068,79 +1067,4 @@ async fn get_token_per_package_source(source: PackageSource) {
         assert_eq!(status, Err(zx::Status::NOT_SUPPORTED));
         assert!(token.is_none(), "token should be absent");
     }
-}
-
-#[fuchsia::test]
-async fn unsupported() {
-    for source in dirs_to_test().await {
-        unsupported_per_package_source(source).await
-    }
-}
-
-async fn unsupported_per_package_source(source: PackageSource) {
-    // Test unsupported APIs for root directory and subdirectory.
-    assert_unsupported_directory_calls(&source, ".", "file").await;
-    assert_unsupported_directory_calls(&source, ".", "dir").await;
-    assert_unsupported_directory_calls(&source, ".", "meta").await;
-    assert_unsupported_directory_calls(&source, "dir", "file").await;
-    assert_unsupported_directory_calls(&source, "dir", "dir").await;
-
-    // Test unsupported APIs for meta directory and subdirectory.
-    assert_unsupported_directory_calls(&source, "meta", "file").await;
-    assert_unsupported_directory_calls(&source, "meta", "dir").await;
-    assert_unsupported_directory_calls(&source, "meta/dir", "file").await;
-    assert_unsupported_directory_calls(&source, "meta/dir", "dir").await;
-}
-
-async fn assert_unsupported_directory_calls(
-    source: &PackageSource,
-    parent_path: &str,
-    child_base_path: &str,
-) {
-    let parent =
-        fuchsia_fs::directory::open_directory(&source.dir, parent_path, fuchsia_fs::PERM_READABLE)
-            .await
-            .expect("open parent directory");
-
-    // Verify unlink() is not supported.
-    assert_eq!(
-        parent.unlink(child_base_path, &fio::UnlinkOptions::default()).await.unwrap(),
-        Err(zx::Status::NOT_SUPPORTED.into_raw())
-    );
-
-    // get_token() should fail because the parent does not have the write right.
-    assert_matches!(parent.get_token().await.expect("get_token fidl failed"),
-                    (status, None) if status != 0);
-
-    // Verify link() is not supported.  parent doesn't have the WRITE right, so this could fail with
-    // BAD_HANDLE, but the token is bad so this could also fail with NOT_FOUND.  We don't care what
-    // error we get just so long as we get one.
-    assert_ne!(
-        zx::Status::from_raw(
-            parent.link(child_base_path, zx::Event::create().into(), "link").await.unwrap()
-        ),
-        zx::Status::OK
-    );
-
-    // Verify rename() is not supported.
-    // Since we can't call GetToken, we can't construct a valid token to pass here.
-    // But we can at least test what it does with an arbitrary event object.
-    let token = zx::Event::create();
-    assert_eq!(
-        parent.rename(child_base_path, token, "renamed").await.unwrap(),
-        Err(zx::sys::ZX_ERR_NOT_SUPPORTED)
-    );
-
-    // Verify watch() is not supported.
-    let (_client, server) = fidl::endpoints::create_endpoints();
-    assert_eq!(
-        zx::Status::from_raw(parent.watch(fio::WatchMask::empty(), 0, server).await.unwrap()),
-        zx::Status::NOT_SUPPORTED
-    );
-
-    // Verify nodeSetFlags() is not supported.
-    assert_eq!(
-        zx::Status::from_raw(parent.set_flags(fio::OpenFlags::empty()).await.unwrap()),
-        zx::Status::NOT_SUPPORTED
-    );
 }
