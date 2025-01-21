@@ -45,8 +45,8 @@ class FfxRunner:
     def required_configs(self):
         return [f"ssh.priv={self.ssh_key}"]
 
-    def run_strict(self, target, args):
-        cfgs = ",".join(self.required_configs())
+    def run_strict(self, target, args, extra_configs=[]):
+        cfgs = ",".join(self.required_configs() + extra_configs)
         res = self.run(
             target, ["--strict", "--config", cfgs, "-o", self.log_file], args
         )
@@ -65,3 +65,19 @@ class FfxRunner:
     def target_echo(self, msg):
         res = self.run_strict(self.target, ["target", "echo", msg])
         return res["message"]
+
+    def target_list(self, emu_instance_dir):
+        if emu_instance_dir:
+            extra_configs = [f"emu.instance_dir={emu_instance_dir}"]
+        else:
+            extra_configs = ["emu.instance_dir="]
+        res = self.run_strict(self.target, ["target", "list"], extra_configs)
+        return res
+
+    def target_show(self):
+        res = self.run_strict(self.target, ["target", "show"])
+        return res
+
+    def component_list(self):
+        res = self.run_strict(self.target, ["component", "list"])
+        return res
