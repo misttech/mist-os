@@ -260,7 +260,7 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
       display::ToBufferCollectionId(request->buffer_collection_id);
   // TODO: Switch to .contains() when C++20.
   if (collection_map_.count(buffer_collection_id)) {
-    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
     return;
   }
 
