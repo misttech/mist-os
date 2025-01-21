@@ -21,6 +21,7 @@ rustc_library("alarms") {
     "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_rust",
     "//sdk/fidl/fuchsia.time.alarms:fuchsia.time.alarms_rust",
     "//sdk/rust/zx",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

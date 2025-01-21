@@ -29,6 +29,12 @@ enum Services {
 #[fuchsia::main(logging_tags = ["test"])]
 async fn main() -> Result<()> {
     log::debug!("starting fake wake alarms service");
+
+    // Provide inspect.
+    let inspector = fuchsia_inspect::component::inspector();
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
+
     let mut fs = ServiceFs::new();
     fs.dir("svc").add_fidl_service(Services::Wake);
     fs.take_and_serve_directory_handle()
@@ -39,7 +45,9 @@ async fn main() -> Result<()> {
             warn!("could not connect to hrtimer: {}", &e);
             e
         })
-        .map(|proxy| Rc::new(alarms::Loop::new(proxy)))?;
+        .map(|proxy| {
+            Rc::new(alarms::Loop::new(proxy, inspector.root().create_child("wake_alarms")))
+        })?;
     fs.for_each_concurrent(/*limit=*/ None, move |connection| {
         let timer_loop = Rc::clone(&timer_loop);
         async move {

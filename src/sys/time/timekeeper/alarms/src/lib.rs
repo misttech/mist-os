@@ -42,7 +42,7 @@ use std::sync::LazyLock;
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_hardware_hrtimer as ffhh, fidl_fuchsia_time_alarms as fta,
-    fuchsia_async as fasync, fuchsia_trace as trace,
+    fuchsia_async as fasync, fuchsia_inspect as finspect, fuchsia_trace as trace,
 };
 
 static I64_MAX_AS_U64: LazyLock<u64> = LazyLock::new(|| i64::MAX.try_into().expect("infallible"));
@@ -384,11 +384,12 @@ impl Loop {
     /// Creates a new instance of [Loop].
     ///
     /// `device_proxy` is a connection to a low-level timer device.
-    pub fn new(device_proxy: ffhh::DeviceProxy) -> Self {
+    pub fn new(device_proxy: ffhh::DeviceProxy, inspect: finspect::Node) -> Self {
         let (snd, rcv) = mpsc::channel(CHANNEL_SIZE);
         let snd_clone = snd.clone();
-        let _task =
-            fasync::Task::local(async move { wake_timer_loop(snd_clone, rcv, device_proxy).await });
+        let _task = fasync::Task::local(async move {
+            wake_timer_loop(snd_clone, rcv, device_proxy, inspect).await
+        });
         Self { _task, snd_cloneable: snd }
     }
 
@@ -978,10 +979,12 @@ struct TimerState {
 /// - `snd`: the send end of `cmd` below, a clone is given to each spawned sub-task.
 /// - `cmds``: the input queue of alarm related commands.
 /// - `timer_proxy`: the FIDL API proxy for interacting with the hardware device.
+/// - `inspect`: the inspect node to record loop info into.
 async fn wake_timer_loop(
     snd: mpsc::Sender<Cmd>,
     mut cmds: mpsc::Receiver<Cmd>,
     timer_proxy: ffhh::DeviceProxy,
+    inspect: finspect::Node,
 ) {
     debug!("wake_timer_loop: started");
 
@@ -997,6 +1000,7 @@ async fn wake_timer_loop(
         trace::duration!(c"alarms", c"Cmd");
         // Use a consistent notion of "now" across commands.
         let now = fasync::BootInstant::now();
+        inspect.record_int("now_ns", now.into_nanos());
         trace::instant!(c"alarms", c"wake_timer_loop", trace::Scope::Process, "now" => now.into_nanos());
         match cmd {
             Cmd::Start { cid, deadline, setup_done, alarm_id, responder } => {
@@ -1196,20 +1200,41 @@ async fn wake_timer_loop(
                 }
             }
         }
-        debug!("wake_timer_loop: now:                             {}", format_timer(now.into()));
-        debug!("wake_timer_loop: currently pending timer count:   {}", timers.timer_count());
-        debug!("wake_timer_loop: currently pending timers:        {}", timers);
-        debug!(
-            "wake_timer_loop: current hardware timer deadline: {:?}",
-            hrtimer_status.as_ref().map(|s| format!("{}", format_timer(s.deadline.into())))
-        );
-        debug!(
-            "wake_timer_loop: remaining duration until alarm:  {:?}",
-            hrtimer_status
+
+        {
+            // Print and record diagnostics after each iteration.
+            trace::duration!(c"timekeeper", c"inspect");
+            let now_formatted = format_timer(now.into());
+            debug!("wake_timer_loop: now:                             {}", &now_formatted);
+            inspect.record_string("now_formatted", now_formatted);
+
+            let pending_timers_count: u64 =
+                timers.timer_count().try_into().expect("always convertible");
+            debug!("wake_timer_loop: currently pending timer count:   {}", pending_timers_count);
+            inspect.record_uint("pending_timers_count", pending_timers_count);
+
+            let pending_timers = format!("{}", timers);
+            debug!("wake_timer_loop: currently pending timers:        {}", &timers);
+            inspect.record_string("pending_timers", pending_timers);
+
+            let current_deadline: String = hrtimer_status
+                .as_ref()
+                .map(|s| format!("{}", format_timer(s.deadline.into())))
+                .unwrap_or_else(|| "(none)".into());
+            debug!("wake_timer_loop: current hardware timer deadline: {:?}", current_deadline);
+            inspect.record_string("current_hw_deadline", current_deadline);
+
+            let remaining_duration_until_alarm = hrtimer_status
                 .as_ref()
                 .map(|s| format!("{}", format_duration((s.deadline - now).into())))
-        );
-        debug!("---");
+                .unwrap_or_else(|| "(none)".into());
+            debug!(
+                "wake_timer_loop: remaining duration until alarm:  {}",
+                &remaining_duration_until_alarm
+            );
+            inspect.record_string("remaining_until_alarm", remaining_duration_until_alarm);
+            debug!("---");
+        }
     }
 
     debug!("wake_timer_loop: exiting. This is unlikely in prod code.");
@@ -1414,7 +1439,8 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
         let (mut fake_commands_in, fake_commands_out) = mpsc::channel::<FakeCmd>(0);
         let (hrtimer_proxy, hrtimer_task) = fake_hrtimer_connection(fake_commands_out);
-        let alarms = Rc::new(Loop::new(hrtimer_proxy));
+        let inspector = fuchsia_inspect::component::inspector();
+        let alarms = Rc::new(Loop::new(hrtimer_proxy, inspector.root().create_child("test")));
 
         let (_handle, peer) = zx::EventPair::create();
 

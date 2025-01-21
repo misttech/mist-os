@@ -285,6 +285,8 @@ async fn main() -> Result<()> {
     })
     .detach();
 
+    let loop_inspect = diagnostics::INSPECTOR.root().create_child("wake_alarms");
+
     let _inspect_server_task = inspect_runtime::publish(
         &diagnostics::INSPECTOR,
         inspect_runtime::PublishOptions::default(),
@@ -316,7 +318,7 @@ async fn main() -> Result<()> {
                 warn!("could not connect to hrtimer: {}", &e);
                 e
             })
-            .map(|proxy| Rc::new(alarms::Loop::new(proxy))),
+            .map(|proxy| Rc::new(alarms::Loop::new(proxy, loop_inspect))),
     );
 
     // Look for this text to know whether connections have succeeded.

@@ -24,6 +24,8 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.time.alarms:fuchsia.time.alarms_rust",
+    "//src/lib/diagnostics/inspect/runtime/rust",
+    "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/sys/time/timekeeper/alarms",
