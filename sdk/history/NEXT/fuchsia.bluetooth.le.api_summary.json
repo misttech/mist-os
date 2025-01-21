@@ -965,6 +965,16 @@
         "error": "int32"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStream.Write",
+        "strictness": "flexible",
+        "ordinal": "5945570693255859523",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/IsochronousStreamWriteRequest",
+        "response": "fuchsia.bluetooth.le/IsochronousStream_Write_Response",
+        "error": "int32"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.bluetooth.le/IsochronousStream",
         "openness": "open",
@@ -1007,6 +1017,16 @@
     {
         "kind": "table",
         "name": "fuchsia.bluetooth.le/IsochronousStreamSetupDataPathRequest"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/IsochronousStreamWriteRequest.data",
+        "ordinal": "1",
+        "type": "vector<uint8>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth.le/IsochronousStreamWriteRequest"
     },
     {
         "kind": "table/member",
