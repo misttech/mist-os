@@ -13,6 +13,7 @@ use futures::{future, StreamExt};
 use test_case::{test_case, test_matrix};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_hardware_power_statecontrol as fstatecontrol,
+    fidl_fuchsia_power as fpower, fidl_fuchsia_power_internal as fpower_internal,
     fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys,
     fidl_fuchsia_system_state as fdevicemanager, fuchsia_async as fasync,
 };
@@ -83,6 +84,26 @@ async fn new_realm(
         .add_route(
             Route::new()
                 .capability(Capability::protocol::<fstatecontrol::AdminMarker>())
+                .from(&shutdown_shim)
+                .to(Ref::parent()),
+        )
+        .await?;
+    // Expose the shim's Collaborative Reboot protocols so test cases can access
+    // them.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<
+                    fpower_internal::CollaborativeRebootSchedulerMarker,
+                >())
+                .from(&shutdown_shim)
+                .to(Ref::parent()),
+        )
+        .await?;
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fpower::CollaborativeRebootInitiatorMarker>())
                 .from(&shutdown_shim)
                 .to(Ref::parent()),
         )
@@ -370,6 +391,58 @@ async fn power_manager_present_suspend_to_ram(
 #[test_case(true; "with_power_framework")]
 #[test_case(false; "without_power_framework")]
 #[fuchsia::test]
+async fn power_manager_present_collaborative_reboot(
+    is_power_framework_available: bool,
+) -> Result<(), Error> {
+    let (realm_instance, mut recv_signals) =
+        new_realm(is_power_framework_available, RealmVariant::PowerManagerPresent).await?;
+    let shim_scheduler = realm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fpower_internal::CollaborativeRebootSchedulerMarker>(
+        )?;
+    let shim_initiator = realm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fpower::CollaborativeRebootInitiatorMarker>()?;
+
+    shim_scheduler
+        .schedule_reboot(fpower_internal::CollaborativeRebootReason::SystemUpdate, None)
+        .await
+        .expect("failed to schedule reboot");
+    let result = shim_initiator
+        .perform_pending_reboot()
+        .await
+        .expect("perform pending reboot should succeed");
+    assert_matches!(result.rebooting, Some(true));
+
+    if is_power_framework_available {
+        assert_matches!(
+            recv_signals.next().await,
+            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
+        );
+    }
+
+    let expected_reboot_options = fstatecontrol::RebootOptions {
+        reasons: Some(vec![fstatecontrol::RebootReason2::SystemUpdate]),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
+    let actual_reboot_options = assert_matches!(
+        recv_signals.next().await,
+        Some(Signal::Statecontrol(Admin::PerformReboot(options))) => options
+    );
+    assert_eq!(actual_reboot_options, expected_reboot_options);
+
+    if is_power_framework_available {
+        assert_matches!(
+            recv_signals.next().await,
+            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
+        );
+    }
+    Ok(())
+}
+
+#[test_case(true; "with_power_framework")]
+#[test_case(false; "without_power_framework")]
+#[fuchsia::test]
 async fn power_manager_missing_poweroff(is_power_framework_available: bool) -> Result<(), Error> {
     let (realm_instance, mut recv_signals) =
         new_realm(is_power_framework_available, RealmVariant::PowerManagerIsntStartedYet).await?;
@@ -583,6 +656,51 @@ async fn power_manager_not_present_mexec(is_power_framework_available: bool) -> 
         );
     }
     assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
+    if is_power_framework_available {
+        assert_matches!(
+            recv_signals.next().await,
+            Some(Signal::ShutdownControlLease(LeaseState::Dropped))
+        );
+    }
+    Ok(())
+}
+
+#[test_case(true; "with_power_framework")]
+#[test_case(false; "without_power_framework")]
+#[fuchsia::test]
+async fn power_manager_not_present_collaborative_reboot(
+    is_power_framework_available: bool,
+) -> Result<(), Error> {
+    let (realm_instance, mut recv_signals) =
+        new_realm(is_power_framework_available, RealmVariant::PowerManagerNotPresent).await?;
+    let shim_scheduler = realm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fpower_internal::CollaborativeRebootSchedulerMarker>(
+        )?;
+    let shim_initiator = realm_instance
+        .root
+        .connect_to_protocol_at_exposed_dir::<fpower::CollaborativeRebootInitiatorMarker>()?;
+
+    shim_scheduler
+        .schedule_reboot(fpower_internal::CollaborativeRebootReason::SystemUpdate, None)
+        .await
+        .expect("failed to schedule reboot");
+    fasync::Task::spawn(async move {
+        shim_initiator.perform_pending_reboot().await.expect_err(
+            "the shutdown shim should close the channel when manual shutdown driving is complete",
+        );
+    })
+    .detach();
+
+    if is_power_framework_available {
+        assert_matches!(
+            recv_signals.next().await,
+            Some(Signal::ShutdownControlLease(LeaseState::Acquired))
+        );
+    }
+
+    assert_matches!(recv_signals.next().await, Some(Signal::Sys2Shutdown(_)));
+
     if is_power_framework_available {
         assert_matches!(
             recv_signals.next().await,

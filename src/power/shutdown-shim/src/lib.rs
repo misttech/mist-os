@@ -10,6 +10,10 @@ use fidl_fuchsia_hardware_power_statecontrol::{
     RebootMethodsWatcherRegisterMarker, RebootOptions, RebootReason, RebootReason2,
     RebootWatcherMarker, RebootWatcherRequest,
 };
+use fidl_fuchsia_power::CollaborativeRebootInitiatorRequestStream;
+use fidl_fuchsia_power_internal::{
+    CollaborativeRebootReason, CollaborativeRebootSchedulerRequestStream,
+};
 use fidl_fuchsia_sys2::SystemControllerMarker;
 use fidl_fuchsia_system_state::{
     SystemPowerState, SystemStateTransitionRequest, SystemStateTransitionRequestStream,
@@ -25,6 +29,8 @@ use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 use {fidl_fuchsia_io as fio, fidl_fuchsia_power_system as fsystem, fuchsia_async as fasync};
 
+mod collaborative_reboot;
+
 // The amount of time that the shim will spend trying to connect to
 // power_manager before giving up.
 // TODO(https://fxbug.dev/42131944): increase this timeout
@@ -37,6 +43,8 @@ const MANUAL_SYSTEM_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 enum IncomingRequest {
     SystemStateTransition(SystemStateTransitionRequestStream),
     Admin(AdminRequestStream),
+    CollaborativeRebootInitiator(CollaborativeRebootInitiatorRequestStream),
+    CollaborativeRebootScheduler(CollaborativeRebootSchedulerRequestStream),
 }
 
 pub async fn main(
@@ -48,16 +56,25 @@ pub async fn main(
     let mut service_fs = ServiceFs::new();
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Admin);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::SystemStateTransition);
+    service_fs.dir("svc").add_fidl_service(IncomingRequest::CollaborativeRebootInitiator);
+    service_fs.dir("svc").add_fidl_service(IncomingRequest::CollaborativeRebootScheduler);
     service_fs.serve_connection(directory_request).context("failed to serve outgoing namespace")?;
 
     let (abort_tx, mut abort_rx) = mpsc::unbounded::<()>();
-    let ctx = ProgramContext { svc, abort_tx };
+    let (cr_state, cr_cancellations) = collaborative_reboot::new();
+    let ctx = ProgramContext { svc, abort_tx, collaborative_reboot: cr_state };
     let mut service_fut = service_fs
         .for_each_concurrent(None, |request: IncomingRequest| async {
             match request {
                 IncomingRequest::Admin(stream) => ctx.handle_admin_request(stream).await,
                 IncomingRequest::SystemStateTransition(stream) => {
                     ctx.handle_system_state_transition(stream).await
+                }
+                IncomingRequest::CollaborativeRebootInitiator(stream) => {
+                    ctx.collaborative_reboot.handle_initiator_requests(stream, &ctx).await
+                }
+                IncomingRequest::CollaborativeRebootScheduler(stream) => {
+                    ctx.collaborative_reboot.handle_scheduler_requests(stream).await
                 }
             }
         })
@@ -68,10 +85,13 @@ pub async fn main(
         std::future::pending::<()>().await;
     });
     let mut reboot_watcher_fut = reboot_watcher_fut.fuse();
+    let collaborative_reboot_cancellation_fut = pin!(cr_cancellations.run());
+    let mut collaborative_reboot_cancellation_fut = collaborative_reboot_cancellation_fut.fuse();
     let mut abort_fut = abort_rx.next().fuse();
     select! {
         () = service_fut => {},
         () = reboot_watcher_fut => unreachable!(),
+        () = collaborative_reboot_cancellation_fut => unreachable!(),
         _ = abort_fut => {},
     };
 
@@ -81,6 +101,7 @@ pub async fn main(
 struct ProgramContext<D: Directory + AsRefDirectory + Send + Sync> {
     svc: D,
     abort_tx: mpsc::UnboundedSender<()>,
+    collaborative_reboot: collaborative_reboot::State,
 }
 
 impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
@@ -106,24 +127,7 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
                     let _ = responder.send(res.map_err(|s| s.into_raw()));
                 }
                 AdminRequest::PerformReboot { options, responder } => {
-                    let _reboot_control_lease = self.acquire_shutdown_control_lease().await;
-                    let target_state = if options
-                        .reasons
-                        .as_ref()
-                        .is_some_and(|reasons| reasons.contains(&RebootReason2::OutOfMemory))
-                    {
-                        SystemPowerState::RebootKernelInitiated
-                    } else {
-                        SystemPowerState::Reboot
-                    };
-                    set_system_power_state(target_state);
-                    let res = self
-                        .forward_command(
-                            target_state,
-                            Some(RebootArguments::PerformReboot(options)),
-                            None,
-                        )
-                        .await;
+                    let res = self.perform_reboot(options).await;
                     let _ = responder.send(res.map_err(|s| s.into_raw()));
                 }
                 AdminRequest::RebootToBootloader { responder } => {
@@ -243,6 +247,23 @@ impl<D: Directory + AsRefDirectory + Send + Sync> ProgramContext<D> {
                 eprintln!("[shutdown-shim]: Not able to connect to RebootMethodsWatcherRegister");
             }
         }
+    }
+
+    // A handler for the `Admin.PerformReboot` method.
+    async fn perform_reboot(&self, options: RebootOptions) -> Result<(), zx::Status> {
+        let _reboot_control_lease = self.acquire_shutdown_control_lease().await;
+        let target_state = if options
+            .reasons
+            .as_ref()
+            .is_some_and(|reasons| reasons.contains(&RebootReason2::OutOfMemory))
+        {
+            SystemPowerState::RebootKernelInitiated
+        } else {
+            SystemPowerState::Reboot
+        };
+        set_system_power_state(target_state);
+        self.forward_command(target_state, Some(RebootArguments::PerformReboot(options)), None)
+            .await
     }
 
     async fn forward_command(
@@ -434,6 +455,26 @@ enum RebootArguments {
     Reboot(RebootReason),
     // Corresponds to the `Admin.PerformReboot` method.
     PerformReboot(RebootOptions),
+}
+
+impl<D: Directory + AsRefDirectory + Send + Sync> collaborative_reboot::RebootActuator
+    for ProgramContext<D>
+{
+    async fn perform_reboot(
+        &self,
+        reasons: Vec<CollaborativeRebootReason>,
+    ) -> Result<(), zx::Status> {
+        // Transform the reasons, and dispatch the request along the standard
+        // reboot pipeline.
+        let reasons = reasons
+            .into_iter()
+            .map(|reason| match reason {
+                CollaborativeRebootReason::NetstackMigration => RebootReason2::NetstackMigration,
+                CollaborativeRebootReason::SystemUpdate => RebootReason2::SystemUpdate,
+            })
+            .collect();
+        self.perform_reboot(RebootOptions { reasons: Some(reasons), ..Default::default() }).await
+    }
 }
 
 struct SystemState {
