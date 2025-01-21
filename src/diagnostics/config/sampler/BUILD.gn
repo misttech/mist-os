@@ -10,7 +10,6 @@ import("//build/config.gni")
 # in this variable will be ignored.
 sampler_files = [
   "archivist.json",
-  "avrcp.json",
   "driver_manager_all.json",
   "fshost.json",
   "netstack.json",
