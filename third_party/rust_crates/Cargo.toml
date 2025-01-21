@@ -180,7 +180,7 @@ prost-types = "0.11.1"
 rand = { version = "0.8", features = ["small_rng"] }
 rand_xorshift = "0.3"
 rayon = "1.10.0"
-ref-cast = "1.0.9"
+ref-cast = "1.0.23"
 regex = "1.7.3"
 regex-syntax = "0.8.3"
 rend = { version = "0.5.2", features = ["zerocopy-0_8"] }
@@ -824,7 +824,7 @@ license_files = ["LICENSE-APACHE"]
 [gn.package.rayon-core."1.12.1"]
 # Has build script but no config needed.
 
-[gn.package.ref-cast."1.0.9"]
+[gn.package.ref-cast."1.0.23"]
 rustflags = []
 
 [gn.package.ring."0.16.20"]
