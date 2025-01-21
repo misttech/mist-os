@@ -247,7 +247,7 @@ vte = "0.3"
 walkdir = "2.2.7"
 which = "4.0.2"
 xml-rs = "0.8"
-zerocopy = { version = "0.8.1", features = ["derive", "simd"] }
+zerocopy = { version = "0.8.14", features = ["derive", "simd"] }
 zstd = "0.11.2"
 # keep-sorted end
 
@@ -1139,17 +1139,17 @@ env_vars = ["OUT_DIR=../../../../compat/valico"]
 [gn.package.valuable."0.1.0"]
 rustflags = []
 
-[gn.package.zerocopy."0.8.1"]
+[gn.package.zerocopy."0.8.14"]
 rustflags = [
-  "--cfg=zerocopy_core_error",
-  "--cfg=zerocopy_diagnostic_on_unimplemented",
-  "--cfg=zerocopy_generic_bounds_in_const_fn",
-  "--cfg=zerocopy_target_has_atomics",
-  "--cfg=zerocopy_aarch64_simd",
-  "--cfg=zerocopy_panic_in_const_and_vec_try_reserve"
+  "--cfg=zerocopy_core_error_1_81_0",
+  "--cfg=zerocopy_diagnostic_on_unimplemented_1_78_0",
+  "--cfg=zerocopy_generic_bounds_in_const_fn_1_61_0",
+  "--cfg=zerocopy_target_has_atomics_1_60_0",
+  "--cfg=zerocopy_aarch64_simd_1_59_0",
+  "--cfg=zerocopy_panic_in_const_and_vec_try_reserve_1_57_0"
 ]
 
-[gn.package.zerocopy-derive."0.8.1"]
+[gn.package.zerocopy-derive."0.8.14"]
 # See https://github.com/google/zerocopy/issues/1792
 rustflags = [ "--cfg=zerocopy_derive_union_into_bytes" ]
 

@@ -39,7 +39,7 @@ pub const ICMP_HEADER_LEN: usize = std::mem::size_of::<IcmpHeader>();
 #[repr(C)]
 #[derive(KnownLayout, FromBytes, IntoBytes, Immutable, Unaligned, Debug, PartialEq, Eq, Clone)]
 struct IcmpHeader {
-    r#type: u8,
+    type_: u8,
     code: u8,
     checksum: U16,
     id: U16,
@@ -49,7 +49,7 @@ struct IcmpHeader {
 impl IcmpHeader {
     fn new<I: IpExt>(sequence: u16) -> Self {
         Self {
-            r#type: I::ECHO_REQUEST_TYPE,
+            type_: I::ECHO_REQUEST_TYPE,
             code: 0,
             checksum: 0.into(),
             id: 0.into(),
@@ -396,10 +396,10 @@ fn verify_packet<I: IpExt>(addr: I::SockAddr, packet: &[u8]) -> Result<PingData<
     // verified the checksum since the code and identifier fields must be inspected. Also, the
     // ICMPv6 checksum computation includes a pseudo header which includes the src and dst
     // addresses, and the dst/local address is not readily available.
-    let &IcmpHeader { r#type, code, checksum: _, id: _, sequence } = zerocopy::Ref::into_ref(reply);
+    let &IcmpHeader { type_, code, checksum: _, id: _, sequence } = zerocopy::Ref::into_ref(reply);
 
-    if r#type != I::ECHO_REPLY_TYPE {
-        return Err(PingError::ReplyType { got: r#type, want: I::ECHO_REPLY_TYPE });
+    if type_ != I::ECHO_REPLY_TYPE {
+        return Err(PingError::ReplyType { got: type_, want: I::ECHO_REPLY_TYPE });
     }
 
     if code != 0 {
@@ -492,7 +492,7 @@ mod test {
                         )))
                     }
                 };
-            header.r#type = I::ECHO_REPLY_TYPE;
+            header.type_ = I::ECHO_REPLY_TYPE;
             let len = buf.len();
             let () = self.buffer.borrow_mut().push_back((buf, addr.clone()));
             Poll::Ready(Ok(len))

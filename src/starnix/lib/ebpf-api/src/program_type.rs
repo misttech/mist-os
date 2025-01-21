@@ -630,7 +630,7 @@ static BPF_FUSE_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![BPF_FUSE_TYPE.
 #[repr(C)]
 #[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
 struct TraceEntry {
-    r#type: u16,
+    type_: u16,
     flags: u8,
     preemp_count: u8,
     pid: u32,
