@@ -98,7 +98,10 @@ impl ComponentManagerInstance {
             let res = async move {
                 let statecontrol_proxy = this.connect_to_statecontrol_admin().await?;
                 statecontrol_proxy
-                    .reboot(fstatecontrol::RebootReason::CriticalComponentFailure)
+                    .perform_reboot(&fstatecontrol::RebootOptions {
+                        reasons: Some(vec![fstatecontrol::RebootReason2::CriticalComponentFailure]),
+                        ..Default::default()
+                    })
                     .await?
                     .map_err(|s| RebootError::AdminError(zx::Status::from_raw(s)))
             }
