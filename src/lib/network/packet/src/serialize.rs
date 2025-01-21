@@ -97,9 +97,6 @@ impl<A> Either<A, Never> {
     pub fn into_a(self) -> A {
         match self {
             Either::A(a) => a,
-            // TODO(https://fxbug.dev/360181296): audit this code to ensure it's working as intended
-            #[allow(unreachable_patterns)]
-            Either::B(never) => match never {},
         }
     }
 }
@@ -109,9 +106,6 @@ impl<B> Either<Never, B> {
     #[inline]
     pub fn into_b(self) -> B {
         match self {
-            // TODO(https://fxbug.dev/360181296): audit this code to ensure it's working as intended
-            #[allow(unreachable_patterns)]
-            Either::A(never) => match never {},
             Either::B(b) => b,
         }
     }
