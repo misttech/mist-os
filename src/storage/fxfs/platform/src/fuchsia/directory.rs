@@ -337,36 +337,48 @@ impl FxDirectory {
     ) -> Result<(), zx::Status> {
         let source_dir = source_dir.downcast::<Self>().unwrap();
         let store = self.store();
-        let fs = store.filesystem().clone();
-        let source_id =
+        let mut source_id =
             match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
                 Some((object_id, ObjectDescriptor::File)) => object_id,
                 None => return Err(zx::Status::NOT_FOUND),
                 _ => return Err(zx::Status::NOT_SUPPORTED),
             };
-        // We don't need a lock on the source directory, as it will be unchanged (unless it is the
-        // same as the destination directory). We just need a lock on the source object to ensure
-        // that it hasn't been simultaneously unlinked. We need that lock anyway to update the ref
-        // count. Note, fscrypt does not require the source directory to be locked because a
-        // directory's wrapping key cannot change once the directory has entries.
-        let transaction = fs
-            .new_transaction(
-                lock_keys![
-                    LockKey::object(store.store_object_id(), self.object_id()),
-                    LockKey::object(store.store_object_id(), source_id),
-                ],
-                Options::default(),
-            )
-            .await
-            .map_err(map_to_status)?;
-        self.check_fscrypt_hard_link_conditions(source_dir.directory().wrapping_key_id())?;
-        // Ensure under lock that the file still exists there.
-        match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
-            Some((_, ObjectDescriptor::File)) => {}
-            None => return Err(zx::Status::NOT_FOUND),
-            _ => return Err(zx::Status::NOT_SUPPORTED),
-        };
-        self.link_object(transaction, &name, source_id, ObjectDescriptor::File).await
+        loop {
+            // We don't need a lock on the source directory, as it will be unchanged (unless it is
+            // the same as the destination directory). We just need a lock on the source object to
+            // ensure that it hasn't been simultaneously unlinked. This may race with a rename of
+            // the source file to somewhere else but that shouldn't matter. We need that lock anyway
+            // to update the ref count. Note, fscrypt does not require the source directory to be
+            // locked because a directory's wrapping key cannot change once the directory has
+            // entries.
+            let fs = store.filesystem();
+            let transaction = fs
+                .new_transaction(
+                    lock_keys![
+                        LockKey::object(store.store_object_id(), self.object_id()),
+                        LockKey::object(store.store_object_id(), source_id),
+                    ],
+                    Options::default(),
+                )
+                .await
+                .map_err(map_to_status)?;
+            self.check_fscrypt_hard_link_conditions(source_dir.directory().wrapping_key_id())?;
+            // Ensure under lock that the file still exists there.
+            match source_dir.directory.lookup(source_name).await.map_err(map_to_status)? {
+                Some((new_id, ObjectDescriptor::File)) => {
+                    if new_id == source_id {
+                        // We found the object that we got a lock on, it is still valid.
+                        return self
+                            .link_object(transaction, &name, source_id, ObjectDescriptor::File)
+                            .await;
+                    } else {
+                        source_id = new_id
+                    }
+                }
+                None => return Err(zx::Status::NOT_FOUND),
+                _ => return Err(zx::Status::NOT_SUPPORTED),
+            }
+        }
     }
 
     async fn rename_impl(
@@ -984,7 +996,8 @@ mod tests {
     use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
-    use futures::StreamExt;
+    use futures::{join, StreamExt};
+    use fxfs::object_store::transaction::{lock_keys, LockKey};
     use fxfs::object_store::Timestamp;
     use fxfs_crypto::FSCRYPT_PADDING;
     use fxfs_insecure_crypto::InsecureCrypt;
@@ -3129,6 +3142,135 @@ mod tests {
             );
         }
 
+        fixture.close().await;
+    }
+
+    // Creates two files in an inner directory and creates a race between linking the first file
+    // into another directory and renaming the second file over the first file. There is naive
+    // TOCTOU bug since we need to take a lock on the source file being linked but we have to look
+    // up what that file id is before we take any locks.
+    #[fuchsia::test]
+    async fn test_race_hard_link_with_unlink() {
+        let fixture = TestFixture::new().await;
+        {
+            let root = fixture.root();
+
+            let inner = open_dir_checked(
+                root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "bar",
+            )
+            .await;
+            let inner2 = open_dir_checked(
+                &inner,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                ".",
+            )
+            .await;
+
+            let file = open_file_checked(
+                &inner,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                "foo",
+            )
+            .await;
+            assert_eq!(
+                file.write("valid".as_bytes()).await.expect("FIDL failed").expect("Write success"),
+                5
+            );
+            close_file_checked(file).await;
+
+            let file = open_file_checked(
+                &inner,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                "foo2",
+            )
+            .await;
+            assert_eq!(
+                file.write("valid".as_bytes()).await.expect("FIDL failed").expect("Write success"),
+                5
+            );
+            close_file_checked(file).await;
+
+            let inner_token = inner
+                .get_token()
+                .await
+                .expect("fidl failed")
+                .1
+                .expect("get_token returned no handle");
+            let root_token = root
+                .get_token()
+                .await
+                .expect("fidl failed")
+                .1
+                .expect("get_token returned no handle");
+
+            // Takes the lock on the destination dir of the link. Causing it to stall while trying
+            // take the requisite lock to add a child there. A lock also needs to be taken on the
+            // object being linked which will interfere with the rename call 50% of the time. Which
+            // lock gets taken first depends on the sort order, which will be dependent on the
+            // object ids for the two objects. So 50% of the time, this test can spuriously pass.
+            let write_lock = fixture
+                .fs()
+                .lock_manager()
+                .write_lock(lock_keys![LockKey::object(
+                    fixture.volume().volume().store().store_object_id(),
+                    fixture.volume().root_dir().directory().object_id()
+                )])
+                .await;
+
+            join!(
+                async move {
+                    // Ensure that the other the link task can stay blocked while locking until
+                    // renaming is complete.
+                    fasync::Timer::new(Duration::from_millis(50)).await;
+                    let _lock = write_lock;
+                },
+                async move {
+                    // Give time for the link call to do some initial lookups that the rename will
+                    // invalidate.
+                    fasync::Timer::new(Duration::from_millis(25)).await;
+                    inner
+                        .rename("foo2", inner_token.into(), "foo")
+                        .await
+                        .expect("FIDL call failed")
+                        .expect("Rename failed");
+                },
+                async move {
+                    // This link should always succeed. Since the rename should be atomic, we
+                    // should either link in the old file or the new.
+                    assert_eq!(
+                        inner2.link("foo", root_token, "baz").await.expect("Fidl call"),
+                        zx::Status::OK.into_raw()
+                    );
+                }
+            );
+        }
+
+        // Ensure that the file contents can be read back. If a race in object management happens
+        // it may resurrect the object in the tree, but the extents will all still be missing.
+        let file = open_file_checked(
+            fixture.root(),
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            "baz",
+        )
+        .await;
+        let buff = file.read(5).await.expect("FIDL failed").expect("Read failed");
+        close_file_checked(file).await;
+        assert_eq!(buff.as_slice(), "valid".as_bytes());
         fixture.close().await;
     }
 

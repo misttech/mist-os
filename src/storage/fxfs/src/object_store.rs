@@ -1881,7 +1881,8 @@ impl ObjectStore {
                     .tree
                     .find(&ObjectKey::object(object_id))
                     .await?
-                    .ok_or(FxfsError::NotFound)?,
+                    .ok_or(FxfsError::Inconsistent)
+                    .context("Object id missing")?,
                 op: Operation::ReplaceOrInsert,
             })
         }
