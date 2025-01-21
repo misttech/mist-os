@@ -149,8 +149,6 @@ static_library("testing") {
   sources = [
     "testing/base.cc",
     "testing/base.h",
-    "testing/fidl_client.cc",
-    "testing/fidl_client.h",
     "testing/mock-coordinator-listener.cc",
     "testing/mock-coordinator-listener.h",
   ]
