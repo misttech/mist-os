@@ -79,9 +79,8 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   }
 #endif
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  void GetFlags2(GetFlags2Completer::Sync& completer) final {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
+  void GetFlags2(GetFlags2Completer::Sync& completer) final;
+  // SetFlags2 is not supported for node connections.
   void SetFlags2(SetFlags2RequestView request, SetFlags2Completer::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }

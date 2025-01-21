@@ -29,6 +29,9 @@ class StreamFileConnection final : public FileConnection {
  private:
   const zx::stream* stream() const final { return &stream_; }
 
+  bool GetAppend() const final;
+  zx::result<> SetAppend(bool append) final;
+
   //
   // |fuchsia.io/File| operations.
   //
@@ -43,15 +46,13 @@ class StreamFileConnection final : public FileConnection {
   // |fuchsia.io/Node| operations.
   //
 
-  void GetFlags(GetFlagsCompleter::Sync& completer) final;
-  void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) final;
-
   zx_status_t ReadInternal(void* data, size_t len, size_t* out_actual);
   zx_status_t ReadAtInternal(void* data, size_t len, size_t offset, size_t* out_actual);
   zx_status_t WriteInternal(const void* data, size_t len, size_t* out_actual);
   zx_status_t WriteAtInternal(const void* data, size_t len, size_t offset, size_t* out_actual);
 
   zx::stream stream_;
+  bool append_;
 };
 
 }  // namespace fs::internal

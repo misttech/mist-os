@@ -22,13 +22,11 @@
 
 namespace fio = fuchsia_io;
 
-namespace fs {
-
-namespace internal {
+namespace fs::internal {
 
 RemoteFileConnection::RemoteFileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
                                            fuchsia_io::Rights rights, bool append, zx_koid_t koid)
-    : FileConnection(vfs, std::move(vnode), rights, append, koid) {}
+    : FileConnection(vfs, std::move(vnode), rights, koid), append_(append) {}
 
 zx_status_t RemoteFileConnection::ReadInternal(void* data, size_t len, size_t* out_actual) {
   FS_PRETTY_TRACE_DEBUG("[FileRead] rights: ", rights());
@@ -90,7 +88,7 @@ zx_status_t RemoteFileConnection::WriteInternal(const void* data, size_t len, si
     return ZX_ERR_BAD_HANDLE;
   }
   zx_status_t status;
-  if (append()) {
+  if (append_) {
     size_t end = 0u;
     status = vnode()->Append(data, len, &end, out_actual);
     if (status == ZX_OK) {
@@ -207,6 +205,4 @@ void RemoteFileConnection::Seek(SeekRequestView request, SeekCompleter::Sync& co
   }
 }
 
-}  // namespace internal
-
-}  // namespace fs
+}  // namespace fs::internal

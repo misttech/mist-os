@@ -115,6 +115,12 @@ void NodeConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sy
   completer.Reply(ZX_ERR_BAD_HANDLE);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+void NodeConnection::GetFlags2(GetFlags2Completer::Sync& completer) {
+  completer.ReplySuccess(fio::Flags::kProtocolNode | RightsToFlags(rights()));
+}
+#endif
+
 void NodeConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) {
   zx::result result = Connection::NodeQueryFilesystem();
   completer.Reply(result.status_value(),

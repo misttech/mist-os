@@ -9,9 +9,6 @@ use io_conformance_util::*;
 #[fuchsia::test]
 async fn dir_get_flags2() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_set_flags2 {
-        return;
-    }
 
     let dir = harness.get_directory(vec![], fio::PERM_READABLE | fio::PERM_WRITABLE);
 
@@ -23,9 +20,6 @@ async fn dir_get_flags2() {
 #[fuchsia::test]
 async fn file_get_flags2() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_set_flags2 {
-        return;
-    }
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
@@ -47,9 +41,6 @@ async fn file_get_flags2() {
 #[fuchsia::test]
 async fn node_reference_get_flags2() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_set_flags2 {
-        return;
-    }
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
@@ -88,9 +79,6 @@ async fn node_reference_get_flags2() {
 #[fuchsia::test]
 async fn file_set_flags2() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_set_flags2 {
-        return;
-    }
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
@@ -119,9 +107,6 @@ async fn file_set_flags2() {
 #[fuchsia::test]
 async fn file_set_flags2_empty_clears_append_mode() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_set_flags2 {
-        return;
-    }
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
@@ -146,9 +131,6 @@ async fn file_set_flags2_empty_clears_append_mode() {
 #[fuchsia::test]
 async fn file_set_flags2_invalid_flags() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_set_flags2 {
-        return;
-    }
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, fio::PERM_READABLE);
@@ -170,9 +152,6 @@ async fn file_set_flags2_invalid_flags() {
 #[fuchsia::test]
 async fn dir_set_flags2_not_supported() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_set_flags2 {
-        return;
-    }
 
     let dir = harness.get_directory(vec![], fio::Flags::empty());
 
@@ -188,9 +167,6 @@ async fn dir_set_flags2_not_supported() {
 #[fuchsia::test]
 async fn node_reference_set_flags2_not_supported() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_set_flags2 {
-        return;
-    }
 
     let entries = vec![file(TEST_FILE, vec![])];
     let dir = harness.get_directory(entries, fio::PERM_READABLE);

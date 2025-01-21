@@ -26,8 +26,8 @@ namespace fio = fuchsia_io;
 namespace fs::internal {
 
 FileConnection::FileConnection(fs::FuchsiaVfs* vfs, fbl::RefPtr<fs::Vnode> vnode,
-                               fuchsia_io::Rights rights, bool append, zx_koid_t koid)
-    : Connection(vfs, std::move(vnode), rights), koid_(koid), append_(append) {
+                               fuchsia_io::Rights rights, zx_koid_t koid)
+    : Connection(vfs, std::move(vnode), rights), koid_(koid) {
   // Ensure the VFS does not create connections that have privileges which cannot be used.
   ZX_DEBUG_ASSERT(internal::DownscopeRights(rights, VnodeProtocol::kFile) == rights);
 }
@@ -57,7 +57,7 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
 #endif
   fio::OpenFlags inherited_flags = {};
   // The APPEND flag should be preserved when cloning a file connection.
-  if (append()) {
+  if (GetAppend()) {
     inherited_flags |= fio::OpenFlags::kAppend;
   }
   Connection::NodeCloneDeprecated(request->flags | inherited_flags, VnodeProtocol::kFile,
@@ -70,7 +70,7 @@ void FileConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
 void FileConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
 #endif
   const fio::Flags flags = fio::Flags::kProtocolFile | fs::internal::RightsToFlags(rights()) |
-                           (append() ? fio::Flags::kFileAppend : fio::Flags());
+                           (GetAppend() ? fio::Flags::kFileAppend : fio::Flags());
   Connection::NodeClone(flags, request->request.TakeChannel());
 }
 
@@ -124,7 +124,7 @@ zx::result<> FileConnection::WithRepresentation(
     builder.attributes(fidl::ObjectView<fio::wire::NodeAttributes2>::FromExternal(&(*attributes)));
   }
 #endif
-  builder.is_append(append());
+  builder.is_append(GetAppend());
   if (zx::result observer = vnode()->GetObserver(); observer.is_ok()) {
     builder.observer(std::move(*observer));
   } else if (observer.error_value() != ZX_ERR_NOT_SUPPORTED) {
@@ -211,16 +211,36 @@ void FileConnection::GetFlags(GetFlagsCompleter::Sync& completer) {
   if (rights() & fio::Rights::kExecute) {
     flags |= fio::OpenFlags::kRightExecutable;
   }
-  if (append()) {
+  if (GetAppend()) {
     flags |= fio::OpenFlags::kAppend;
   }
   completer.Reply(ZX_OK, flags);
 }
 
 void FileConnection::SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) {
-  append() = static_cast<bool>(request->flags & fio::OpenFlags::kAppend);
-  completer.Reply(ZX_OK);
+  const bool append = static_cast<bool>(request->flags & fio::OpenFlags::kAppend);
+  completer.Reply(SetAppend(append).status_value());
 }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+void FileConnection::GetFlags2(GetFlags2Completer::Sync& completer) {
+  fio::Flags flags = fio::Flags::kProtocolFile | RightsToFlags(rights());
+  if (GetAppend()) {
+    flags |= fio::Flags::kFileAppend;
+  }
+  completer.ReplySuccess(flags);
+}
+
+void FileConnection::SetFlags2(SetFlags2RequestView request, SetFlags2Completer::Sync& completer) {
+  // Only the APPEND flag is allowed.
+  if (request->flags & ~fio::Flags::kFileAppend) {
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  const bool append = static_cast<bool>(request->flags & fio::Flags::kFileAppend);
+  completer.Reply(SetAppend(append));
+}
+#endif
 
 void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) {
   zx::result result = Connection::NodeQueryFilesystem();
@@ -231,7 +251,7 @@ void FileConnection::QueryFilesystem(QueryFilesystemCompleter::Sync& completer) 
 }
 
 zx_status_t FileConnection::ResizeInternal(uint64_t length) {
-  FS_PRETTY_TRACE_DEBUG("[FileTruncate] rights: ", rights(), ", append: ", append());
+  FS_PRETTY_TRACE_DEBUG("[FileTruncate] rights: ", rights(), ", append: ", GetAppend());
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     return ZX_ERR_BAD_HANDLE;
   }

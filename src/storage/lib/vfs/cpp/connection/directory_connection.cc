@@ -183,6 +183,12 @@ void DirectoryConnection::SetFlags(SetFlagsRequestView request,
   completer.Reply(ZX_ERR_NOT_SUPPORTED);
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+void DirectoryConnection::GetFlags2(GetFlags2Completer::Sync& completer) {
+  completer.ReplySuccess(fio::Flags::kProtocolDirectory | RightsToFlags(rights()));
+}
+#endif
+
 void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/346585458): This operation should require the TRAVERSE right.
   zx_status_t status = [&]() -> zx_status_t {

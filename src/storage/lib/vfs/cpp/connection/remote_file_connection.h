@@ -26,6 +26,12 @@ class RemoteFileConnection final : public FileConnection {
   ~RemoteFileConnection() final = default;
 
  private:
+  bool GetAppend() const final { return append_; }
+  zx::result<> SetAppend(bool append) final {
+    append_ = append;
+    return zx::ok();
+  }
+
   //
   // |fuchsia.io/File| operations.
   //
@@ -47,6 +53,7 @@ class RemoteFileConnection final : public FileConnection {
 
   // Current seek offset.
   size_t offset_ = 0;
+  bool append_;
 };
 
 }  // namespace fs::internal

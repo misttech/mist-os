@@ -63,9 +63,6 @@ type HarnessConfig = struct {
 
     /// Supports services.
     supports_services bool;
-
-    /// Supports get_flags2 and set_flags2.
-    supports_get_set_flags2 bool;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.
