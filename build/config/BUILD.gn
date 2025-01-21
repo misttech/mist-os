@@ -1566,6 +1566,10 @@ config("Wno-nontrivial-memaccess") {
   }
 }
 
+config("Wsystem-headers") {
+  cflags = [ "-Wsystem-headers" ]
+}
+
 # Adding this config directly to a linking target ensures that any deps on
 # ifs_shared_library() `.as-needed` targets don't bring link stubs into the
 # link.  This should be used for a relocatable link, along with a metadata
