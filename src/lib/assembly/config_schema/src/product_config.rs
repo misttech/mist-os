@@ -148,9 +148,6 @@ pub struct BuildInfoConfig {
     pub jiri_snapshot: FileRelativePathBuf,
     /// Path to the latest commit date.
     pub latest_commit_date: FileRelativePathBuf,
-    /// Path to the minimum UTC stamp.
-    /// TODO(https://fxbug.dev/356621614): Deprecated. This should be removed once all products stop using.
-    pub minimum_utc_stamp: Option<FileRelativePathBuf>,
 }
 
 /// Configuration options for the component policy.
