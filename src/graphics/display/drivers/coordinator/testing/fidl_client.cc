@@ -11,6 +11,7 @@
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/assert.h>
+#include <zircon/status.h>
 
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
@@ -22,15 +23,10 @@
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 #include "src/lib/testing/predicates/status.h"
-#include "zircon/status.h"
-
-namespace fhd = fuchsia_hardware_display;
-namespace fhdt = fuchsia_hardware_display_types;
-namespace sysmem2 = fuchsia_sysmem2;
 
 namespace display_coordinator {
 
-TestFidlClient::Display::Display(const fhd::wire::Info& info) {
+TestFidlClient::Display::Display(const fuchsia_hardware_display::wire::Info& info) {
   id_ = display::ToDisplayId(info.id);
 
   for (size_t i = 0; i < info.pixel_format.count(); i++) {
@@ -44,28 +40,28 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
   monitor_serial_ = fbl::String(info.monitor_serial.data());
   image_metadata_ = {
       .dimensions = {.width = modes_[0].active_area.width, .height = modes_[0].active_area.height},
-      .tiling_type = fhdt::wire::kImageTilingTypeLinear,
+      .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeLinear,
   };
 }
 
 display::DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
 
-zx::result<> TestFidlClient::OpenCoordinator(const fidl::WireSyncClient<fhd::Provider>& provider,
-                                             ClientPriority client_priority,
-                                             async_dispatcher_t* coordinator_listener_dispatcher) {
+zx::result<> TestFidlClient::OpenCoordinator(
+    const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
+    ClientPriority client_priority, async_dispatcher_t* coordinator_listener_dispatcher) {
   ZX_ASSERT(coordinator_listener_dispatcher != nullptr);
 
-  auto [dc_client, dc_server] = fidl::Endpoints<fhd::Coordinator>::Create();
+  auto [dc_client, dc_server] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
   auto [coordinator_listener_client, coordinator_listener_server] =
-      fidl::Endpoints<fhd::CoordinatorListener>::Create();
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
   FDF_LOG(INFO, "Opening coordinator");
   if (client_priority == ClientPriority::kVirtcon) {
     fidl::Arena arena;
-    auto request =
-        fidl::WireRequest<fhd::Provider::OpenCoordinatorWithListenerForVirtcon>::Builder(arena)
-            .coordinator(std::move(dc_server))
-            .coordinator_listener(std::move(coordinator_listener_client))
-            .Build();
+    auto request = fidl::WireRequest<fuchsia_hardware_display::Provider::
+                                         OpenCoordinatorWithListenerForVirtcon>::Builder(arena)
+                       .coordinator(std::move(dc_server))
+                       .coordinator_listener(std::move(coordinator_listener_client))
+                       .Build();
     auto response = provider->OpenCoordinatorWithListenerForVirtcon(std::move(request));
     if (!response.ok()) {
       FDF_LOG(ERROR, "Could not open Virtcon coordinator, error=%s",
@@ -75,11 +71,11 @@ zx::result<> TestFidlClient::OpenCoordinator(const fidl::WireSyncClient<fhd::Pro
   } else {
     ZX_DEBUG_ASSERT(client_priority == ClientPriority::kPrimary);
     fidl::Arena arena;
-    auto request =
-        fidl::WireRequest<fhd::Provider::OpenCoordinatorWithListenerForPrimary>::Builder(arena)
-            .coordinator(std::move(dc_server))
-            .coordinator_listener(std::move(coordinator_listener_client))
-            .Build();
+    auto request = fidl::WireRequest<fuchsia_hardware_display::Provider::
+                                         OpenCoordinatorWithListenerForPrimary>::Builder(arena)
+                       .coordinator(std::move(dc_server))
+                       .coordinator_listener(std::move(coordinator_listener_client))
+                       .Build();
     auto response = provider->OpenCoordinatorWithListenerForPrimary(std::move(request));
     if (!response.ok()) {
       FDF_LOG(ERROR, "Could not open coordinator, error=%s", response.FormatDescription().c_str());
@@ -170,19 +166,19 @@ TestFidlClient::~TestFidlClient() = default;
 zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_layers) {
   fbl::AutoLock l(mtx());
 
-  std::vector<fhd::wire::LayerId> fidl_layers;
+  std::vector<fuchsia_hardware_display::wire::LayerId> fidl_layers;
   for (const auto& info : present_layers) {
     fidl_layers.push_back(ToFidlLayerId(info.layer_id));
   }
-  if (auto reply =
-          dc_->SetDisplayLayers(ToFidlDisplayId(display_id()),
-                                fidl::VectorView<fhd::wire::LayerId>::FromExternal(fidl_layers));
+  if (auto reply = dc_->SetDisplayLayers(
+          ToFidlDisplayId(display_id()),
+          fidl::VectorView<fuchsia_hardware_display::wire::LayerId>::FromExternal(fidl_layers));
       !reply.ok()) {
     return reply.status();
   }
 
   for (const auto& info : present_layers) {
-    const fhd::wire::LayerId fidl_layer_id = ToFidlLayerId(info.layer_id);
+    const fuchsia_hardware_display::wire::LayerId fidl_layer_id = ToFidlLayerId(info.layer_id);
     const display::EventId wait_event_id =
         info.image_ready_wait_event_id.value_or(display::kInvalidEventId);
     if (auto reply = dc_->SetLayerImage2(fidl_layer_id, ToFidlImageId(info.image_id),
@@ -193,13 +189,13 @@ zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_
   }
 
   if (auto reply = dc_->CheckConfig(false);
-      !reply.ok() || reply.value().res != fhdt::wire::ConfigResult::kOk) {
+      !reply.ok() || reply.value().res != fuchsia_hardware_display_types::wire::ConfigResult::kOk) {
     return reply.ok() ? ZX_ERR_INVALID_ARGS : reply.status();
   }
   return dc_->ApplyConfig().status();
 }
 
-fhdt::wire::ConfigStamp TestFidlClient::GetRecentAppliedConfigStamp() {
+fuchsia_hardware_display_types::wire::ConfigStamp TestFidlClient::GetRecentAppliedConfigStamp() {
   fbl::AutoLock lock(mtx());
   EXPECT_TRUE(dc_);
   auto result = dc_->GetLatestAppliedConfigStamp();
@@ -208,7 +204,7 @@ fhdt::wire::ConfigStamp TestFidlClient::GetRecentAppliedConfigStamp() {
 }
 
 zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
-    const fhdt::wire::ImageMetadata& image_metadata) {
+    const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) {
   fbl::AutoLock lock(mtx());
   return ImportImageWithSysmemLocked(image_metadata);
 }
@@ -228,27 +224,28 @@ std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPrese
 }
 
 zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmemLocked(
-    const fhdt::wire::ImageMetadata& image_metadata) {
+    const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) {
   // Create all the tokens.
-  fidl::WireSyncClient<sysmem2::BufferCollectionToken> local_token;
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken> local_token;
   {
-    auto [client, server] = fidl::Endpoints<sysmem2::BufferCollectionToken>::Create();
+    auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
     fidl::Arena arena;
     auto allocate_shared_request =
-        sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena);
+        fuchsia_sysmem2::wire::AllocatorAllocateSharedCollectionRequest::Builder(arena);
     allocate_shared_request.token_request(std::move(server));
     auto result = sysmem_->AllocateSharedCollection(allocate_shared_request.Build());
     if (!result.ok()) {
       FDF_LOG(ERROR, "Failed to allocate shared collection: %s", result.status_string());
       return zx::error(result.status());
     }
-    local_token = fidl::WireSyncClient<sysmem2::BufferCollectionToken>(std::move(client));
+    local_token = fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken>(std::move(client));
     EXPECT_NE(ZX_HANDLE_INVALID, local_token.client_end().channel().get());
   }
-  auto [client, server] = fidl::Endpoints<sysmem2::BufferCollectionToken>::Create();
+  auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   {
     fidl::Arena arena;
-    auto duplicate_request = sysmem2::wire::BufferCollectionTokenDuplicateRequest::Builder(arena);
+    auto duplicate_request =
+        fuchsia_sysmem2::wire::BufferCollectionTokenDuplicateRequest::Builder(arena);
     duplicate_request.rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
     duplicate_request.token_request(std::move(server));
     if (auto result = local_token->Duplicate(duplicate_request.Build()); !result.ok()) {
@@ -280,7 +277,7 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     return zx::error(result.value().error_value());
   }
 
-  const fhdt::wire::ImageBufferUsage image_buffer_usage = {
+  const fuchsia_hardware_display_types::wire::ImageBufferUsage image_buffer_usage = {
       .tiling_type = image_metadata.tiling_type,
   };
 
@@ -303,38 +300,41 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   // Use the local collection so we can read out the error if allocation
   // fails, and to ensure everything's allocated before trying to import it
   // into another process.
-  fidl::WireSyncClient<sysmem2::BufferCollection> sysmem_collection;
+  fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection> sysmem_collection;
   {
-    auto [client, server] = fidl::Endpoints<sysmem2::BufferCollection>::Create();
+    auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
     fidl::Arena arena;
-    auto bind_shared_request = sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena);
+    auto bind_shared_request =
+        fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest::Builder(arena);
     bind_shared_request.token(local_token.TakeClientEnd());
     bind_shared_request.buffer_collection_request(std::move(server));
     if (auto result = sysmem_->BindSharedCollection(bind_shared_request.Build()); !result.ok()) {
       FDF_LOG(ERROR, "Failed to bind shared collection: %s", result.FormatDescription().c_str());
       return zx::error(result.status());
     }
-    sysmem_collection = fidl::WireSyncClient<sysmem2::BufferCollection>(std::move(client));
+    sysmem_collection = fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>(std::move(client));
   }
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   fidl::Arena arena;
-  auto set_name_request = sysmem2::wire::NodeSetNameRequest::Builder(arena);
+  auto set_name_request = fuchsia_sysmem2::wire::NodeSetNameRequest::Builder(arena);
   set_name_request.priority(10000u);
   set_name_request.name("display-client-unittest");
   (void)sysmem_collection->SetName(set_name_request.Build());
   arena.Reset();
-  auto constraints = sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
   constraints.min_buffer_count(1);
-  constraints.usage(
-      sysmem2::wire::BufferUsage::Builder(arena).none(sysmem2::wire::kNoneUsage).Build());
+  constraints.usage(fuchsia_sysmem2::wire::BufferUsage::Builder(arena)
+                        .none(fuchsia_sysmem2::wire::kNoneUsage)
+                        .Build());
   // We specify min_size_bytes 1 so that something is specifying a minimum size.  More typically the
   // display client would specify ImageFormatConstraints that implies a non-zero min_size_bytes.
-  constraints.buffer_memory_constraints(sysmem2::wire::BufferMemoryConstraints::Builder(arena)
-                                            .min_size_bytes(1)
-                                            .ram_domain_supported(true)
-                                            .Build());
+  constraints.buffer_memory_constraints(
+      fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena)
+          .min_size_bytes(1)
+          .ram_domain_supported(true)
+          .Build());
   auto set_constraints_request =
-      sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
+      fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
   set_constraints_request.constraints(constraints.Build());
   zx_status_t status = sysmem_collection->SetConstraints(set_constraints_request.Build()).status();
   if (status != ZX_OK) {
@@ -360,10 +360,10 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   }
 
   const display::ImageId image_id = next_image_id_++;
-  const fhd::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
+  const fuchsia_hardware_display::wire::ImageId fidl_image_id = ToFidlImageId(image_id);
   const auto import_result =
       dc_->ImportImage(image_metadata,
-                       fhd::wire::BufferId{
+                       fuchsia_hardware_display::wire::BufferId{
                            .buffer_collection_id = fidl_display_collection_id,
                            .buffer_index = 0,
                        },
