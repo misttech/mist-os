@@ -158,7 +158,7 @@ pub fn exposed_c_entry_points() -> &'static [*const extern "C" fn()] {
         TEE_AEEncryptFinal as *const extern "C" fn(),
         TEE_AEDecryptFinal as *const extern "C" fn(),
 
-        // Asymmmetric Functions
+        // Asymmetric Functions
         TEE_AsymmetricEncrypt as *const extern "C" fn(),
         TEE_AsymmetricDecrypt as *const extern "C" fn(),
         TEE_AsymmetricSignDigest as *const extern "C" fn(),
@@ -870,8 +870,8 @@ extern "C" fn TEE_AllocateTransientObject(
 ) -> TEE_Result {
     assert!(!object.is_null());
     to_tee_result(|| -> TeeResult {
-        let object_type = Type::from_u32(objectType).unwrap();
-        let obj = context::with_current(|context| {
+        let object_type = Type::from_u32(objectType).ok_or(Error::NotSupported)?;
+        let obj = context::with_current_mut(|context| {
             context.storage.allocate_transient_object(object_type, maxObjectSize)
         })?;
         // SAFETY: `object` nullity checked above.
@@ -885,13 +885,13 @@ extern "C" fn TEE_AllocateTransientObject(
 #[no_mangle]
 extern "C" fn TEE_FreeTransientObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
-    context::with_current(|context| context.storage.free_transient_object(object));
+    context::with_current_mut(|context| context.storage.free_transient_object(object));
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetTransientObject(object: TEE_ObjectHandle) {
     let object = *ObjectHandle::from_binding(&object);
-    context::with_current(|context| context.storage.reset_transient_object(object));
+    context::with_current_mut(|context| context.storage.reset_transient_object(object));
 }
 
 #[no_mangle]
@@ -949,7 +949,7 @@ extern "C" fn TEE_CopyObjectAttributes1(
     to_tee_result(|| -> TeeResult {
         let src = *ObjectHandle::from_binding(&srcObject);
         let dest = *ObjectHandle::from_binding(&destObject);
-        storage::copy_object_attributes(src, dest)
+        context::with_current_mut(|context| context.storage.copy_object_attributes(src, dest))
     }())
 }
 
@@ -968,7 +968,7 @@ extern "C" fn TEE_GenerateKey(
     to_tee_result(|| -> TeeResult {
         let object = *ObjectHandle::from_binding(&object);
         let params = slice_from_raw_parts(params, paramCount as usize);
-        storage::generate_key(object, keySize, params)
+        context::with_current_mut(|context| context.storage.generate_key(object, keySize, params))
     }())
 }
 
