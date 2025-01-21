@@ -60,8 +60,7 @@ fuchsia_virtualaudio::Configuration VirtualAudioCodec::GetDefaultConfig(
 }
 
 VirtualAudioCodec::VirtualAudioCodec(fuchsia_virtualaudio::Configuration config,
-                                     std::weak_ptr<VirtualAudioDeviceImpl> owner,
-                                     zx_device_t* parent)
+                                     std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent)
     : VirtualAudioCodecDeviceType(parent), parent_(std::move(owner)), config_(std::move(config)) {
   ddk_proto_id_ = ZX_PROTOCOL_CODEC;
   sprintf(instance_name_, "virtual-audio-codec-%d", instance_count_++);

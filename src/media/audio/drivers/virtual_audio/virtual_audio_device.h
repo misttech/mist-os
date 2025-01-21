@@ -1,8 +1,8 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DEVICE_IMPL_H_
-#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DEVICE_IMPL_H_
+#ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DEVICE_H_
+#define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.virtualaudio/cpp/fidl.h>
@@ -33,10 +33,10 @@ class VirtualAudioDriver;
 //
 // The device lives until the controlling FIDL channel is closed or the device host process decides
 // to remove the `VirtualAudioDriver`.
-class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Device>,
-                               public std::enable_shared_from_this<VirtualAudioDeviceImpl> {
+class VirtualAudioDevice : public fidl::WireServer<fuchsia_virtualaudio::Device>,
+                           public std::enable_shared_from_this<VirtualAudioDevice> {
  public:
-  static fit::result<fuchsia_virtualaudio::Error, std::shared_ptr<VirtualAudioDeviceImpl>> Create(
+  static fit::result<fuchsia_virtualaudio::Error, std::shared_ptr<VirtualAudioDevice>> Create(
       const fuchsia_virtualaudio::Configuration& cfg,
       fidl::ServerEnd<fuchsia_virtualaudio::Device> server, zx_device_t* dev_node,
       async_dispatcher_t* fidl_dispatcher);
@@ -89,8 +89,8 @@ class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Dev
                        AdjustClockRateCompleter::Sync& completer) override;
 
   // Public for std::make_shared. Use Create, not this ctor.
-  VirtualAudioDeviceImpl(std::optional<bool> is_input, async_dispatcher_t* fidl_dispatcher);
-  ~VirtualAudioDeviceImpl() override;
+  VirtualAudioDevice(std::optional<bool> is_input, async_dispatcher_t* fidl_dispatcher);
+  ~VirtualAudioDevice() override;
 
  private:
   const std::optional<bool> is_input_;
@@ -111,4 +111,4 @@ class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Dev
 
 }  // namespace virtual_audio
 
-#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DEVICE_IMPL_H_
+#endif  // SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DEVICE_H_

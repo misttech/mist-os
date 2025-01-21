@@ -14,7 +14,7 @@
 
 namespace virtual_audio {
 
-class VirtualAudioDeviceImpl;
+class VirtualAudioDevice;
 
 class VirtualAudio;
 using VirtualAudioDeviceType = ddk::Device<VirtualAudio, ddk::Unbindable,
@@ -41,7 +41,7 @@ class VirtualAudio : public VirtualAudioDeviceType {
 
   async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 
-  std::unordered_set<std::shared_ptr<VirtualAudioDeviceImpl>> devices_;
+  std::unordered_set<std::shared_ptr<VirtualAudioDevice>> devices_;
 };
 
 }  // namespace virtual_audio

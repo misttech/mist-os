@@ -4,7 +4,7 @@
 #ifndef SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DRIVER_H_
 #define SRC_MEDIA_AUDIO_DRIVERS_VIRTUAL_AUDIO_VIRTUAL_AUDIO_DRIVER_H_
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_device.h"
 
 namespace virtual_audio {
 
@@ -41,10 +41,9 @@ class VirtualAudioDriver {
   // correct thread, and hence it is safe to access the annotated data and execute the annotated
   // code.
   struct __TA_CAPABILITY("role") Token {};
-  class __TA_SCOPED_CAPABILITY ScopedToken {
-   public:
-    explicit ScopedToken(const Token& token) __TA_ACQUIRE(token) {}
-    ~ScopedToken() __TA_RELEASE() {}
+  class __TA_SCOPED_CAPABILITY ScopedToken{
+    public : explicit ScopedToken(const Token& token) __TA_ACQUIRE(token){} ~ScopedToken()
+        __TA_RELEASE(){}
   };
 
   virtual ~VirtualAudioDriver() = default;

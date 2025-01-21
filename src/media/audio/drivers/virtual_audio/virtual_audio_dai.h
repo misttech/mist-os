@@ -13,7 +13,7 @@
 
 #include <ddktl/device.h>
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_device.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_driver.h"
 
 namespace virtual_audio {
@@ -31,7 +31,7 @@ class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
   static fuchsia_virtualaudio::Configuration GetDefaultConfig(bool is_input);
 
   VirtualAudioDai(fuchsia_virtualaudio::Configuration config,
-                  std::weak_ptr<VirtualAudioDeviceImpl> owner, zx_device_t* parent);
+                  std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent);
   void ResetDaiState() { connected_ = false; }
 
   async_dispatcher_t* dispatcher() override {
@@ -100,7 +100,7 @@ class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
 
   // This should never be invalid: this VirtualAudioStream should always be destroyed before
   // its parent. This field is a weak_ptr to avoid a circular reference count.
-  const std::weak_ptr<VirtualAudioDeviceImpl> parent_;
+  const std::weak_ptr<VirtualAudioDevice> parent_;
   static int instance_count_;
   char instance_name_[64];
   bool connected_ = false;

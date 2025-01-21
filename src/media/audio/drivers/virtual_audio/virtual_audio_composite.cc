@@ -111,7 +111,7 @@ fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
 }
 
 VirtualAudioComposite::VirtualAudioComposite(fuchsia_virtualaudio::Configuration config,
-                                             std::weak_ptr<VirtualAudioDeviceImpl> owner,
+                                             std::weak_ptr<VirtualAudioDevice> owner,
                                              zx_device_t* parent)
     : VirtualAudioCompositeDeviceType(parent),
       parent_(std::move(owner)),

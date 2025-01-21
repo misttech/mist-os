@@ -16,7 +16,7 @@
 #include <audio-proto/audio-proto.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_device.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_driver.h"
 
 namespace virtual_audio {
@@ -24,7 +24,7 @@ namespace virtual_audio {
 class VirtualAudioStream : public audio::SimpleAudioStream {
  public:
   static fbl::RefPtr<VirtualAudioStream> Create(const fuchsia_virtualaudio::Configuration& cfg,
-                                                std::weak_ptr<VirtualAudioDeviceImpl> owner,
+                                                std::weak_ptr<VirtualAudioDevice> owner,
                                                 zx_device_t* dev_node);
   static fuchsia_virtualaudio::Configuration GetDefaultConfig(bool is_input);
 
@@ -54,7 +54,7 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   friend class fbl::RefPtr<VirtualAudioStream>;
 
   VirtualAudioStream(const fuchsia_virtualaudio::Configuration& cfg,
-                     std::weak_ptr<VirtualAudioDeviceImpl> parent, zx_device_t* dev_node)
+                     std::weak_ptr<VirtualAudioDevice> parent, zx_device_t* dev_node)
       // StreamConfig is either input or output;
       // if direction is unspecified the is_input field access will assert.
       : audio::SimpleAudioStream(dev_node,
@@ -108,7 +108,7 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
 
   // This should never be invalid: this VirtualAudioStream should always be destroyed before
   // its parent. This field is a weak_ptr to avoid a circular reference count.
-  const std::weak_ptr<VirtualAudioDeviceImpl> parent_;
+  const std::weak_ptr<VirtualAudioDevice> parent_;
 
   // Accessed in GetBuffer, defended by token.
   fzl::VmoMapper ring_buffer_mapper_ __TA_GUARDED(domain_token());
@@ -164,7 +164,7 @@ class VirtualAudioStreamWrapper : public VirtualAudioDriver {
   using ErrorT = fuchsia_virtualaudio::Error;
 
   VirtualAudioStreamWrapper(const fuchsia_virtualaudio::Configuration& cfg,
-                            std::weak_ptr<VirtualAudioDeviceImpl> owner, zx_device_t* dev_node) {
+                            std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* dev_node) {
     stream_ = VirtualAudioStream::Create(cfg, std::move(owner), dev_node);
   }
   async_dispatcher_t* dispatcher() override { return stream_->dispatcher(); }

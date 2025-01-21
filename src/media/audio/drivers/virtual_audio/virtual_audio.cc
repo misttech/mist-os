@@ -17,7 +17,7 @@
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_codec.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_composite.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_dai.h"
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_device.h"
 #include "src/media/audio/drivers/virtual_audio/virtual_audio_stream.h"
 
 namespace virtual_audio {
@@ -106,8 +106,8 @@ void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView re
 void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& completer) {
   auto config = fidl::ToNatural(request->config);
   ZX_ASSERT(config.device_specific().has_value());
-  auto result = VirtualAudioDeviceImpl::Create(std::move(config), std::move(request->server),
-                                               parent_, dispatcher_);
+  auto result = VirtualAudioDevice::Create(std::move(config), std::move(request->server), parent_,
+                                           dispatcher_);
   if (!result.is_ok()) {
     zxlogf(ERROR, "Device creation failed with status %d",
            fidl::ToUnderlying(result.error_value()));

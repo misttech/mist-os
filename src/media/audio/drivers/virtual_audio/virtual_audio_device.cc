@@ -1,7 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include "src/media/audio/drivers/virtual_audio/virtual_audio_device_impl.h"
+#include "src/media/audio/drivers/virtual_audio/virtual_audio_device.h"
 
 #include <lib/ddk/debug.h>
 #include <lib/zx/clock.h>
@@ -17,10 +17,10 @@
 namespace virtual_audio {
 
 // static
-fit::result<fuchsia_virtualaudio::Error, std::shared_ptr<VirtualAudioDeviceImpl>>
-VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
-                               fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
-                               zx_device_t* dev_node, async_dispatcher_t* fidl_dispatcher) {
+fit::result<fuchsia_virtualaudio::Error, std::shared_ptr<VirtualAudioDevice>>
+VirtualAudioDevice::Create(const fuchsia_virtualaudio::Configuration& cfg,
+                           fidl::ServerEnd<fuchsia_virtualaudio::Device> server,
+                           zx_device_t* dev_node, async_dispatcher_t* fidl_dispatcher) {
   std::optional<bool> is_input;
   switch (cfg.device_specific()->Which()) {
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
@@ -39,7 +39,7 @@ VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
       zxlogf(ERROR, "Device type creation not supported");
       return fit::error(fuchsia_virtualaudio::Error::kInternal);
   }
-  auto device = std::make_shared<VirtualAudioDeviceImpl>(std::move(is_input), fidl_dispatcher);
+  auto device = std::make_shared<VirtualAudioDevice>(std::move(is_input), fidl_dispatcher);
 
   // The `device` shared_ptr is held until the server is unbound (i.e. until the channel is closed).
   device->binding_ = fidl::BindServer(
@@ -84,17 +84,17 @@ VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
   return fit::ok(device);
 }
 
-VirtualAudioDeviceImpl::VirtualAudioDeviceImpl(std::optional<bool> is_input,
-                                               async_dispatcher_t* fidl_dispatcher)
+VirtualAudioDevice::VirtualAudioDevice(std::optional<bool> is_input,
+                                       async_dispatcher_t* fidl_dispatcher)
     : is_input_(std::move(is_input)), fidl_dispatcher_(fidl_dispatcher) {}
 
-VirtualAudioDeviceImpl::~VirtualAudioDeviceImpl() {
+VirtualAudioDevice::~VirtualAudioDevice() {
   // The driver should have been unbound by our on_unbound handler.
   ZX_ASSERT(driver_ == nullptr);
 }
 
 // Post the given task with automatic cancellation if the device is cancelled before the task fires.
-void VirtualAudioDeviceImpl::PostToDispatcher(fit::closure task_to_post) {
+void VirtualAudioDevice::PostToDispatcher(fit::closure task_to_post) {
   async::PostTask(fidl_dispatcher_,
                   [weak = weak_from_this(), task_to_post = std::move(task_to_post)]() {
                     if (weak.lock()) {
@@ -103,7 +103,7 @@ void VirtualAudioDeviceImpl::PostToDispatcher(fit::closure task_to_post) {
                   });
 }
 
-void VirtualAudioDeviceImpl::ShutdownAsync(fit::closure cb) {
+void VirtualAudioDevice::ShutdownAsync(fit::closure cb) {
   if (is_bound_) {
     on_destroy_callbacks_.emplace_back(std::move(cb));
     binding_->Unbind();
@@ -115,13 +115,13 @@ void VirtualAudioDeviceImpl::ShutdownAsync(fit::closure cb) {
 // This is called when the driver is destroyed by an external entity (perhaps the device host
 // process is removing our driver driver). When this happens, drop the driver so we stop making
 // requests to the driver.
-void VirtualAudioDeviceImpl::DriverIsShuttingDown() { binding_->Unbind(); }
+void VirtualAudioDevice::DriverIsShuttingDown() { binding_->Unbind(); }
 
 //
 // virtualaudio::Device implementation
 //
 
-void VirtualAudioDeviceImpl::GetFormat(GetFormatCompleter::Sync& completer) {
+void VirtualAudioDevice::GetFormat(GetFormatCompleter::Sync& completer) {
   if (!driver_) {
     zxlogf(WARNING, "%s: %p has no driver for this request", __func__, this);
     return;
@@ -141,8 +141,8 @@ void VirtualAudioDeviceImpl::GetFormat(GetFormatCompleter::Sync& completer) {
 }
 
 // Deliver SetFormat notification on binding's thread, if binding is valid.
-void VirtualAudioDeviceImpl::NotifySetFormat(uint32_t frames_per_second, uint32_t sample_format,
-                                             uint32_t num_channels, zx_duration_t external_delay) {
+void VirtualAudioDevice::NotifySetFormat(uint32_t frames_per_second, uint32_t sample_format,
+                                         uint32_t num_channels, zx_duration_t external_delay) {
   PostToDispatcher(
       [weak = weak_from_this(), frames_per_second, sample_format, num_channels, external_delay]() {
         auto self = weak.lock();
@@ -158,7 +158,7 @@ void VirtualAudioDeviceImpl::NotifySetFormat(uint32_t frames_per_second, uint32_
       });
 }
 
-void VirtualAudioDeviceImpl::GetGain(GetGainCompleter::Sync& completer) {
+void VirtualAudioDevice::GetGain(GetGainCompleter::Sync& completer) {
   if (!driver_) {
     zxlogf(WARNING, "%s: %p has no driver for this request", __func__, this);
     return;
@@ -176,8 +176,7 @@ void VirtualAudioDeviceImpl::GetGain(GetGainCompleter::Sync& completer) {
   });
 }
 
-void VirtualAudioDeviceImpl::NotifySetGain(bool current_mute, bool current_agc,
-                                           float current_gain_db) {
+void VirtualAudioDevice::NotifySetGain(bool current_mute, bool current_agc, float current_gain_db) {
   PostToDispatcher([weak = weak_from_this(), current_mute, current_agc, current_gain_db]() {
     auto self = weak.lock();
     if (!self) {
@@ -191,7 +190,7 @@ void VirtualAudioDeviceImpl::NotifySetGain(bool current_mute, bool current_agc,
   });
 }
 
-void VirtualAudioDeviceImpl::GetBuffer(GetBufferCompleter::Sync& completer) {
+void VirtualAudioDevice::GetBuffer(GetBufferCompleter::Sync& completer) {
   if (!driver_) {
     zxlogf(WARNING, "%s: %p has no driver for this request", __func__, this);
     return;
@@ -209,9 +208,9 @@ void VirtualAudioDeviceImpl::GetBuffer(GetBufferCompleter::Sync& completer) {
   });
 }
 
-void VirtualAudioDeviceImpl::NotifyBufferCreated(zx::vmo ring_buffer_vmo,
-                                                 uint32_t num_ring_buffer_frames,
-                                                 uint32_t notifications_per_ring) {
+void VirtualAudioDevice::NotifyBufferCreated(zx::vmo ring_buffer_vmo,
+                                             uint32_t num_ring_buffer_frames,
+                                             uint32_t notifications_per_ring) {
   PostToDispatcher([weak = weak_from_this(), ring_buffer_vmo = std::move(ring_buffer_vmo),
                     num_ring_buffer_frames, notifications_per_ring]() mutable {
     auto self = weak.lock();
@@ -227,7 +226,7 @@ void VirtualAudioDeviceImpl::NotifyBufferCreated(zx::vmo ring_buffer_vmo,
   });
 }
 
-void VirtualAudioDeviceImpl::SetNotificationFrequency(
+void VirtualAudioDevice::SetNotificationFrequency(
     SetNotificationFrequencyRequestView request,
     SetNotificationFrequencyCompleter::Sync& completer) {
   if (!driver_) {
@@ -248,7 +247,7 @@ void VirtualAudioDeviceImpl::SetNotificationFrequency(
   });
 }
 
-void VirtualAudioDeviceImpl::NotifyStart(zx_time_t start_time) {
+void VirtualAudioDevice::NotifyStart(zx_time_t start_time) {
   PostToDispatcher([weak = weak_from_this(), start_time]() {
     auto self = weak.lock();
     if (!self) {
@@ -261,7 +260,7 @@ void VirtualAudioDeviceImpl::NotifyStart(zx_time_t start_time) {
   });
 }
 
-void VirtualAudioDeviceImpl::NotifyStop(zx_time_t stop_time, uint32_t ring_buffer_position) {
+void VirtualAudioDevice::NotifyStop(zx_time_t stop_time, uint32_t ring_buffer_position) {
   PostToDispatcher([weak = weak_from_this(), stop_time, ring_buffer_position]() {
     auto self = weak.lock();
     if (!self) {
@@ -275,7 +274,7 @@ void VirtualAudioDeviceImpl::NotifyStop(zx_time_t stop_time, uint32_t ring_buffe
   });
 }
 
-void VirtualAudioDeviceImpl::GetPosition(GetPositionCompleter::Sync& completer) {
+void VirtualAudioDevice::GetPosition(GetPositionCompleter::Sync& completer) {
   if (!driver_) {
     zxlogf(WARNING, "%s: %p has no driver for this request", __func__, this);
     return;
@@ -293,8 +292,7 @@ void VirtualAudioDeviceImpl::GetPosition(GetPositionCompleter::Sync& completer) 
   });
 }
 
-void VirtualAudioDeviceImpl::NotifyPosition(zx_time_t monotonic_time,
-                                            uint32_t ring_buffer_position) {
+void VirtualAudioDevice::NotifyPosition(zx_time_t monotonic_time, uint32_t ring_buffer_position) {
   PostToDispatcher([weak = weak_from_this(), monotonic_time, ring_buffer_position]() {
     auto self = weak.lock();
     if (!self) {
@@ -308,8 +306,8 @@ void VirtualAudioDeviceImpl::NotifyPosition(zx_time_t monotonic_time,
   });
 }
 
-void VirtualAudioDeviceImpl::ChangePlugState(ChangePlugStateRequestView request,
-                                             ChangePlugStateCompleter::Sync& completer) {
+void VirtualAudioDevice::ChangePlugState(ChangePlugStateRequestView request,
+                                         ChangePlugStateCompleter::Sync& completer) {
   if (!driver_) {
     zxlogf(WARNING, "%s: %p has no driver; cannot change dynamic plug state", __func__, this);
     return;
@@ -327,8 +325,8 @@ void VirtualAudioDeviceImpl::ChangePlugState(ChangePlugStateRequestView request,
   });
 }
 
-void VirtualAudioDeviceImpl::AdjustClockRate(AdjustClockRateRequestView request,
-                                             AdjustClockRateCompleter::Sync& completer) {
+void VirtualAudioDevice::AdjustClockRate(AdjustClockRateRequestView request,
+                                         AdjustClockRateCompleter::Sync& completer) {
   if (!driver_) {
     zxlogf(WARNING, "%s: %p has no driver; cannot change clock rate", __func__, this);
     return;

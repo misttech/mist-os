@@ -15,7 +15,7 @@ namespace virtual_audio {
 
 // static
 fbl::RefPtr<VirtualAudioStream> VirtualAudioStream::Create(
-    const fuchsia_virtualaudio::Configuration& cfg, std::weak_ptr<VirtualAudioDeviceImpl> owner,
+    const fuchsia_virtualaudio::Configuration& cfg, std::weak_ptr<VirtualAudioDevice> owner,
     zx_device_t* devnode) {
   return audio::SimpleAudioStream::Create<VirtualAudioStream>(cfg, owner, devnode);
 }
