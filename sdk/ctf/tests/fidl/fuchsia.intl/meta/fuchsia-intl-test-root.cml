@@ -33,10 +33,14 @@
         },
         {
             protocol: [
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.stash.Store",
             ],
+            from: "parent",
+            to: "#test_realm_factory",
+        },
+        {
+            dictionary: "diagnostics",
             from: "parent",
             to: "#test_realm_factory",
         },

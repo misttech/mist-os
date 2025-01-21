@@ -43,17 +43,6 @@
             to: "#system-activity-governor",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: [
-                "#fake-suspend",
-                "#system-activity-governor",
-            ],
-        },
-        {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
             to: "#system-activity-governor",

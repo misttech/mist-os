@@ -24,10 +24,12 @@
             to: "#test_driver",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.process.Launcher",
-            ],
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#test_driver",
+        },
+        {
+            protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
             to: "#test_driver",
         },

@@ -21,17 +21,6 @@
             from: "parent",
             to: "#archivist",
         },
-
-        // Disable the required offer for Archivist
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "void",
-            to: "#archivist",
-            availability: "optional",
-        },
         {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",

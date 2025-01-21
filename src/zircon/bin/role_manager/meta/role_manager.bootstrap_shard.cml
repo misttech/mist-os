@@ -23,14 +23,6 @@
             to: [ "#role_manager" ],
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#role_manager",
-        },
-        {
             dictionary: "diagnostics",
             from: "self",
             to: "#role_manager",

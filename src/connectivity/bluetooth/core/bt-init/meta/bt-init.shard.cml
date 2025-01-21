@@ -88,6 +88,11 @@
             to: "#bt-host-collection",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "#bt-host-collection",
+        },
+        {
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.stash.SecureStore",

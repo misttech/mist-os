@@ -301,9 +301,7 @@
         {
             protocol: [
                 "fuchsia.diagnostics.LogSettings",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.Log",
-                "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
             to: [

@@ -19,13 +19,5 @@
             from: "self",
             to: "#ptysvc",
         },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#ptysvc",
-        },
     ],
 }

@@ -42,16 +42,6 @@
             to: "#full_resolver",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "#archivist",
-            to: "#full_resolver",
-        },
-        {
-            protocol: "fuchsia.inspect.InspectSink",
-            from: "#archivist",
-            to: "#full_resolver",
-        },
-        {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: "#full-drivers",
@@ -97,6 +87,9 @@
             to: "#full-drivers",
             source_availability: "unknown",
         },
+
+        // TODO(https://fxbug.dev/345827642): remove once OOT drivers are using these protocols from
+        // the diagnostics dictionary themselves.
         {
             protocol: [
                 "fuchsia.inspect.InspectSink",

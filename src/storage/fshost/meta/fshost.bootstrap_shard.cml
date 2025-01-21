@@ -60,14 +60,6 @@
             to: "#fshost",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#fshost",
-        },
-        {
             config: [
                 "fuchsia.fshost.Blobfs",
                 "fuchsia.fshost.BlobfsInitialInodes",

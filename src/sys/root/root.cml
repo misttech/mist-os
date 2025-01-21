@@ -119,30 +119,6 @@
             to: "#elf_runner",
         },
 
-        // The LogSink capability comes from an ELF component, but running ELF components
-        // requires an ELF runner. Therefore the ELF runner can't get the LogSink capability.
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "void",
-            to: "#elf_runner",
-            availability: "optional",
-        },
-
-        // We route these from void to bootstrap to satisfy the requirement
-        // that the protocols routed everywhere. Bootstrap is exposing them itself.
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "void",
-            to: [
-                "#bootstrap",
-                "#config",
-            ],
-            availability: "optional",
-        },
-
         // Capabilities routed from "parent" at the root are either provided by
         // bootsvc through component_manager's namespace or by component_manager
         // itself as a builtin service

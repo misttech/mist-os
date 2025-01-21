@@ -52,7 +52,7 @@
             to: [ "#test-topology-test-daemon" ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#test-power-broker" ],
         },

@@ -88,14 +88,6 @@
             from: "#shutdown_shim",
             to: "#virtual_console",
         },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#virtual_console",
-        },
     ],
     expose: [],
 }

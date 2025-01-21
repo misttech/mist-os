@@ -24,14 +24,6 @@
             source_availability: "unknown",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#bootstrap",
-            to: "#startup",
-        },
-        {
             config: [
                 "fuchsia.bluetooth.LegacyPairing",
                 "fuchsia.fonts.FontManifest",
@@ -175,7 +167,6 @@
                 "fuchsia.fshost.Admin",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",

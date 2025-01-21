@@ -31,14 +31,6 @@
             to: "#system-activity-governor",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#system-activity-governor",
-        },
-        {
             dictionary: "diagnostics",
             from: "self",
             to: [ "#system-activity-governor" ],

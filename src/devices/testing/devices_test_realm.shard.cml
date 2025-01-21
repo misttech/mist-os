@@ -15,11 +15,15 @@
     ],
     offer: [
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: [ "#devices-tests" ],
+        },
+        {
             // These hermetic capabilities are offered to be used by tests.
             protocol: [
                 // Tests can write to debug logs
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.vulkan.loader.Loader",
             ],

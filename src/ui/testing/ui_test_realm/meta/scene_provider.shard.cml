@@ -15,7 +15,7 @@
             to: "#scene-provider",
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#scene-provider" ],
         },

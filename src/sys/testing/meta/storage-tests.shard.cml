@@ -31,9 +31,6 @@
             protocol: [
                 // Tests can write to debug logs
                 "fuchsia.boot.WriteOnlyLog",
-
-                // Tests can use inspect
-                "fuchsia.inspect.InspectSink",
                 "fuchsia.process.Launcher",
 
                 // Tests can produce trace.

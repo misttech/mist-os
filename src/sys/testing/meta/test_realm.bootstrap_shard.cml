@@ -12,14 +12,6 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#testing",
-        },
-        {
             dictionary: "diagnostics",
             from: "self",
             to: "#testing",
@@ -43,7 +35,7 @@
         },
         {
             protocol: "fuchsia.diagnostics.ArchiveAccessor",
-            from: "#archivist",
+            from: "#archivist/diagnostics-accessors",
             to: "#testing",
         },
         {

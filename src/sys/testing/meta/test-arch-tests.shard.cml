@@ -83,7 +83,7 @@
             to: [ "#test-arch-tests" ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#test-arch-tests" ],
         },

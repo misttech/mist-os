@@ -28,14 +28,6 @@
             to: "#debug-dash-launcher",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#debug-dash-launcher",
-        },
-        {
             protocol: [ "fuchsia.process.Resolver" ],
             from: "#process_resolver",
             to: "#debug-dash-launcher",

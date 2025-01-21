@@ -35,14 +35,6 @@
             to: "#device_name_provider",
             subdir: "network",
         },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#device_name_provider",
-        },
     ],
     expose: [
         {

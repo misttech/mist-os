@@ -54,13 +54,5 @@
             to: [ "#cpu_manager" ],
             dependency: "weak",
         },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: [ "#cpu_manager" ],
-        },
     ],
 }

@@ -46,7 +46,7 @@
             to: "#fxfs_data",
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#fxfs_data",

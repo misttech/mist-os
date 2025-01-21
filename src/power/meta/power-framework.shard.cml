@@ -77,17 +77,6 @@
             to: "#power_manager",
             availability: "optional",
         },
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: [
-                "#power-broker",
-                "#power_manager",
-            ],
-        },
     ],
     expose: [
         {

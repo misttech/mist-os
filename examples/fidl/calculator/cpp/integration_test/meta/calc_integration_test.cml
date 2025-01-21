@@ -32,7 +32,7 @@
     // Capabilities required by components under test.
     offer: [
         {
-            protocol: [ "fuchsia.inspect.InspectSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: "#calc_server",
         },

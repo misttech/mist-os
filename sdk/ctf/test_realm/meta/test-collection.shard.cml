@@ -85,7 +85,7 @@
             to: [ "#ctf-tests" ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#ctf-tests" ],
         },

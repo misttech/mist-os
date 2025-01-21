@@ -23,7 +23,7 @@
             to: [ "#test_driver" ],
         },
         {
-            protocol: [ "fuchsia.inspect.InspectSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#fake_cobalt",

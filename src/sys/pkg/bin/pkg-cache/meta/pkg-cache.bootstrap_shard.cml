@@ -79,14 +79,6 @@
             availability: "optional",
         },
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "#archivist",
-            to: "#pkg-cache",
-        },
-        {
             directory: "boot",
             from: "parent",
             as: "bootfs-blobs",

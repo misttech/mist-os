@@ -77,7 +77,7 @@
             to: "#ota",
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#ota" ],
         },

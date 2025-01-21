@@ -71,7 +71,7 @@
             to: "#realm_builder",
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#sysinfo" ],
         },

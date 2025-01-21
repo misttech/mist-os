@@ -11,10 +11,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#realm_builder_server" ],
         },

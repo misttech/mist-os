@@ -39,7 +39,7 @@
             ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#fuzz_starnix_test_runner",

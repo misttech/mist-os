@@ -30,7 +30,7 @@
             to: "#reverser",
         },
         {
-            protocol: [ "fuchsia.inspect.InspectSink" ],
+            dictionary: "diagnostics",
             from: "parent",
             to: [
                 "#fizzbuzz",

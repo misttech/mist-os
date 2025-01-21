@@ -350,7 +350,7 @@
             rights: [ "r*" ],
         },
         {
-            protocol: "fuchsia.inspect.InspectSink",
+            dictionary: "diagnostics",
             from: "parent",
             to: [ "#system-tests" ],
         },
