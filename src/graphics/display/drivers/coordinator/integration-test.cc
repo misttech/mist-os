@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -32,6 +33,9 @@
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
+#include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
@@ -40,19 +44,15 @@ namespace display_coordinator {
 
 class TestFidlClient {
  public:
-  class Display {
+  // Cached information about a display reported by the coordinator.
+  struct Display {
    public:
-    explicit Display(const fuchsia_hardware_display::wire::Info& info);
+    static Display From(const fuchsia_hardware_display::wire::Info& fidl_display_info);
 
-    display::DisplayId id_;
-    fbl::Vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
-    fbl::Vector<fuchsia_hardware_display_types::wire::Mode> modes_;
+    display::DisplayId id;
 
-    fbl::String manufacturer_name_;
-    fbl::String monitor_name_;
-    fbl::String monitor_serial_;
-
-    fuchsia_hardware_display_types::wire::ImageMetadata image_metadata_;
+    // Represents an image that covers the entire display.
+    display::ImageMetadata fullscreen_image_metadata;
   };
 
   struct EventInfo {
@@ -105,7 +105,8 @@ class TestFidlClient {
 
   display::DisplayId display_id() const;
 
-  fbl::Vector<Display> displays_;
+  std::vector<Display> connected_displays_;
+
   fidl::WireSyncClient<fuchsia_hardware_display::Coordinator> dc_ TA_GUARDED(mtx());
   bool has_ownership_ = false;
 
@@ -142,25 +143,31 @@ class TestFidlClient {
   zx::result<EventInfo> CreateEventLocked() TA_REQ(mtx());
 };
 
-TestFidlClient::Display::Display(const fuchsia_hardware_display::wire::Info& info) {
-  id_ = display::ToDisplayId(info.id);
+// static
+TestFidlClient::Display TestFidlClient::Display::From(
+    const fuchsia_hardware_display::wire::Info& fidl_display_info) {
+  const display::DisplayId display_id = display::ToDisplayId(fidl_display_info.id);
+  ZX_ASSERT(display_id != display::kInvalidDisplayId);
 
-  for (size_t i = 0; i < info.pixel_format.count(); i++) {
-    pixel_formats_.push_back(info.pixel_format[i]);
-  }
-  for (size_t i = 0; i < info.modes.count(); i++) {
-    modes_.push_back(info.modes[i]);
-  }
-  manufacturer_name_ = fbl::String(info.manufacturer_name.data());
-  monitor_name_ = fbl::String(info.monitor_name.data());
-  monitor_serial_ = fbl::String(info.monitor_serial.data());
-  image_metadata_ = {
-      .dimensions = {.width = modes_[0].active_area.width, .height = modes_[0].active_area.height},
-      .tiling_type = fuchsia_hardware_display_types::wire::kImageTilingTypeLinear,
+  ZX_ASSERT(!fidl_display_info.modes.empty());
+  display::Mode display_mode = display::Mode::From(fidl_display_info.modes[0]);
+
+  const display::ImageMetadata fullscreen_image_metadata = display::ImageMetadata({
+      .width = display_mode.active_area().width(),
+      .height = display_mode.active_area().height(),
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+
+  return Display{
+      .id = display_id,
+      .fullscreen_image_metadata = fullscreen_image_metadata,
   };
 }
 
-display::DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
+display::DisplayId TestFidlClient::display_id() const {
+  ZX_ASSERT(!connected_displays_.empty());
+  return connected_displays_[0].id;
+}
 
 zx::result<> TestFidlClient::OpenCoordinator(
     const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
@@ -207,7 +214,8 @@ zx::result<> TestFidlClient::OpenCoordinator(
 }
 
 zx::result<display::ImageId> TestFidlClient::CreateImage() {
-  return ImportImageWithSysmem(displays_[0].image_metadata_);
+  ZX_ASSERT(!connected_displays_.empty());
+  return ImportImageWithSysmem(connected_displays_[0].fullscreen_image_metadata.ToFidl());
 }
 
 zx::result<display::LayerId> TestFidlClient::CreateLayer() {
@@ -230,9 +238,12 @@ zx::result<display::LayerId> TestFidlClient::CreateLayerLocked() {
     FDF_LOG(ERROR, "Failed to create layer: %s", zx_status_get_string(reply.value().error_value()));
     return zx::error(reply.value().error_value());
   }
-  EXPECT_EQ(
-      dc_->SetLayerPrimaryConfig(reply.value()->layer_id, displays_[0].image_metadata_).status(),
-      ZX_OK);
+
+  ZX_ASSERT(!connected_displays_.empty());
+  EXPECT_EQ(dc_->SetLayerPrimaryConfig(reply.value()->layer_id,
+                                       connected_displays_[0].fullscreen_image_metadata.ToFidl())
+                .status(),
+            ZX_OK);
   return zx::ok(display::ToLayerId(reply.value()->layer_id));
 }
 
@@ -269,7 +280,7 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {
 }
 
 bool TestFidlClient::HasOwnershipAndValidDisplay() const {
-  return has_ownership_ && !displays_.is_empty();
+  return has_ownership_ && !connected_displays_.empty();
 }
 
 zx::result<> TestFidlClient::EnableVsyncEventDelivery() {
@@ -329,7 +340,9 @@ std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPrese
   zx::result<display::LayerId> layer_result = CreateLayer();
   EXPECT_OK(layer_result);
 
-  zx::result<display::ImageId> image_result = ImportImageWithSysmem(displays_[0].image_metadata_);
+  ZX_ASSERT(!connected_displays_.empty());
+  zx::result<display::ImageId> image_result =
+      ImportImageWithSysmem(connected_displays_[0].fullscreen_image_metadata.ToFidl());
   EXPECT_OK(image_result);
 
   return {
@@ -503,8 +516,10 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmemLocked(
 void TestFidlClient::OnDisplaysChanged(
     std::vector<fuchsia_hardware_display::wire::Info> added_displays,
     std::vector<display::DisplayId> removed_display_ids) {
+  ZX_ASSERT(removed_display_ids.empty());
+
   for (const fuchsia_hardware_display::wire::Info& added_display : added_displays) {
-    displays_.push_back(Display(added_display));
+    connected_displays_.push_back(Display::From(added_display));
   }
 }
 
@@ -1130,7 +1145,7 @@ TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
   constexpr display::BufferCollectionId buffer_collection_id(0xffeeeedd);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
       client->dc_->ImportImage(
-          client->displays_[0].image_metadata_,
+          client->connected_displays_[0].fullscreen_image_metadata.ToFidl(),
           fuchsia_hardware_display::wire::BufferId{
               .buffer_collection_id = ToFidlBufferCollectionId(buffer_collection_id),
               .buffer_index = 0,
@@ -1149,7 +1164,7 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
   constexpr display::ImageId image_id(1);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
       client->dc_->ImportImage(
-          client->displays_[0].image_metadata_,
+          client->connected_displays_[0].fullscreen_image_metadata.ToFidl(),
           fuchsia_hardware_display::wire::BufferId{
               .buffer_collection_id = ToFidlBufferCollectionId(kNonExistentCollectionId),
               .buffer_index = 0,
