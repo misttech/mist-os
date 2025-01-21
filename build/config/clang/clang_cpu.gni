@@ -10,6 +10,10 @@ clang_cpu_translations = [
     clang = "aarch64"
   },
   {
+    gn = "riscv64"
+    clang = "riscv64"
+  },
+  {
     gn = "x64"
     clang = "x86_64"
   },
