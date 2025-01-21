@@ -136,11 +136,6 @@ class TestFidlClient {
       fit::bind_member<&TestFidlClient::OnDisplaysChanged>(this),
       fit::bind_member<&TestFidlClient::OnVsync>(this),
       fit::bind_member<&TestFidlClient::OnClientOwnershipChange>(this)};
-
-  zx::result<display::ImageId> ImportImageWithSysmemLocked(
-      const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) TA_REQ(mtx());
-  zx::result<display::LayerId> CreateLayerLocked() TA_REQ(mtx());
-  zx::result<EventInfo> CreateEventLocked() TA_REQ(mtx());
 };
 
 // static
@@ -219,16 +214,8 @@ zx::result<display::ImageId> TestFidlClient::CreateImage() {
 }
 
 zx::result<display::LayerId> TestFidlClient::CreateLayer() {
-  fbl::AutoLock lock(mtx());
-  return CreateLayerLocked();
-}
+  fbl::AutoLock<fbl::Mutex> lock(mtx());
 
-zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEvent() {
-  fbl::AutoLock lock(mtx());
-  return CreateEventLocked();
-}
-
-zx::result<display::LayerId> TestFidlClient::CreateLayerLocked() {
   ZX_DEBUG_ASSERT(dc_);
   auto reply = dc_->CreateLayer();
   if (!reply.ok()) {
@@ -247,7 +234,9 @@ zx::result<display::LayerId> TestFidlClient::CreateLayerLocked() {
   return zx::ok(display::ToLayerId(reply.value()->layer_id));
 }
 
-zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {
+zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEvent() {
+  fbl::AutoLock<fbl::Mutex> lock(mtx());
+
   zx::event event;
   if (auto status = zx::event::create(0u, &event); status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to create zx::event: %d", status);
@@ -330,12 +319,6 @@ fuchsia_hardware_display_types::wire::ConfigStamp TestFidlClient::GetRecentAppli
   return result.value().stamp;
 }
 
-zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
-    const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) {
-  fbl::AutoLock lock(mtx());
-  return ImportImageWithSysmemLocked(image_metadata);
-}
-
 std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPresentLayerInfo() {
   zx::result<display::LayerId> layer_result = CreateLayer();
   EXPECT_OK(layer_result);
@@ -352,8 +335,10 @@ std::vector<TestFidlClient::PresentLayerInfo> TestFidlClient::CreateDefaultPrese
   };
 }
 
-zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmemLocked(
+zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
     const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) {
+  fbl::AutoLock<fbl::Mutex> lock(mtx());
+
   // Create all the tokens.
   fidl::WireSyncClient<fuchsia_sysmem2::BufferCollectionToken> local_token;
   {
