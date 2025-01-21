@@ -1,0 +1,26 @@
+Name: ring
+License File: LICENSE
+Description:
+
+## What is this crate used for?
+
+ring is a core set of cryptographic operations exposed via an easy-to-use API.
+
+* Are there any use restrictions? i.e. only for development hosts
+
+ring is limited in access by a visibility list.
+
+* What differs from upstream? Include a changelog if feasible.
+
+This is a fork of ring to cherry-pick
+https://github.com/briansmith/ring/pull/2152, which hasn't been included in a
+release yet. It also removes the `third_party/NIST` directory, which is only
+needed for tests.
+
+* Are there any restrictions to how it should be rolled?
+
+Consult with //third_party/rust_crates/OWNERS.
+
+* Is there anything else which makes this dependency "special"?
+
+No.

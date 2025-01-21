@@ -1,0 +1,24 @@
+Name: fiat
+License File: LICENSE
+Description:
+
+## What is this crate used for?
+
+Fiat are generated using [Fiat
+Cryptography](https://github.com/mit-plv/fiat-crypto) templates.
+
+* Are there any use restrictions? i.e. only for development hosts
+
+ring is limited in access by a visibility list.
+
+* What differs from upstream? Include a changelog if feasible.
+
+This contains no changes to the `third_party/fiat` directory in ring-0.17.8.
+
+* Are there any restrictions to how it should be rolled?
+
+Consult with //third_party/rust_crates/OWNERS.
+
+* Is there anything else which makes this dependency "special"?
+
+No.

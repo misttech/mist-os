@@ -1,0 +1,167 @@
+# Copyright 2020 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# C and Assembly parts of ring 0.16.20
+#
+# More advanced usages of might require more sophisticated
+# build rules
+
+import("//build/licenses/license.gni")
+
+ring_crate = "../../forks/ring-0.17.8"
+
+license("ring_license") {
+  public_package_name = "ring"
+  license_files = [ "${ring_crate}/LICENSE" ]
+}
+
+license("fiat_license") {
+  public_package_name = "fiat"
+  license_files = [ "${ring_crate}/third_party/fiat/LICENSE" ]
+}
+
+applicable_licenses = [
+  ":ring_license",
+  ":fiat_license",
+]
+
+config("ring-config") {
+  if (current_cpu == "riscv64") {
+    # The current version of ring being used does not support RISC-V.
+    # TODO(https://fxbug.dev/42079121): Remove once ring has proper RISC-V support
+    cflags = [
+      # There are no assembly files. This may not be necessary but is accurate.
+      "-DOPENSSL_NO_ASM",
+
+      # Define an architecture that is supported to avoid "Unknown target CPU"
+      # and other compile errors.
+      "-D__AARCH64EL__",
+
+      # The above causes this inaccurate symbol to be defined. This might not
+      # have any effect.
+      "-UOPENSSL_AARCH64",
+    ]
+  }
+}
+
+static_library("ring-core") {
+  complete_static_lib = true
+  configs += [ ":ring-config" ]
+
+  include_dirs = [
+    "$ring_crate/include",
+    ".",
+  ]
+
+  sources = []
+
+  sources += [
+    "$ring_crate/crypto/curve25519/curve25519.c",
+    "$ring_crate/crypto/fipsmodule/aes/aes_nohw.c",
+    "$ring_crate/crypto/fipsmodule/bn/montgomery.c",
+    "$ring_crate/crypto/fipsmodule/bn/montgomery_inv.c",
+    "$ring_crate/crypto/fipsmodule/ec/ecp_nistz.c",
+    "$ring_crate/crypto/fipsmodule/ec/gfp_p256.c",
+    "$ring_crate/crypto/fipsmodule/ec/gfp_p384.c",
+    "$ring_crate/crypto/fipsmodule/ec/p256.c",
+    "$ring_crate/crypto/limbs/limbs.c",
+    "$ring_crate/crypto/mem.c",
+    "$ring_crate/crypto/poly1305/poly1305.c",
+  ]
+
+  if (current_cpu == "arm64" || current_cpu == "x64") {
+    sources += [ "$ring_crate/crypto/crypto.c" ]
+  }
+
+  if (current_cpu == "x64") {
+    sources += [ "$ring_crate/crypto/cpu_intel.c" ]
+  }
+
+  if (current_cpu == "x64") {
+    # from "crypto/chacha/asm/chacha-x86_64.pl"
+    if (is_mac) {
+      sources += [ "$ring_crate/pregenerated/chacha-x86_64-macosx.S" ]
+    } else {
+      sources += [ "$ring_crate/pregenerated/chacha-x86_64-elf.S" ]
+    }
+
+    sources += [ "$ring_crate/crypto/curve25519/curve25519_64_adx.c" ]
+
+    foreach(asm_src,
+            [
+              "aesni-x86_64",
+              "vpaes-x86_64",
+              "x86_64-mont",
+              "x86_64-mont5",
+              "p256-x86_64-asm",
+              "aesni-gcm-x86_64",
+              "ghash-x86_64",
+            ]) {
+      if (is_mac) {
+        sources += [ "$ring_crate/pregenerated/$asm_src-macosx.S" ]
+      } else {
+        sources += [ "$ring_crate/pregenerated/$asm_src-elf.S" ]
+      }
+    }
+
+    sources += [ "$ring_crate/crypto/poly1305/poly1305_vec.c" ]
+
+    foreach(asm_src,
+            [
+              "sha256-x86_64",
+              "sha512-x86_64",
+              "chacha20_poly1305_x86_64",
+            ]) {
+      if (is_mac) {
+        sources += [ "$ring_crate/pregenerated/$asm_src-macosx.S" ]
+      } else {
+        sources += [ "$ring_crate/pregenerated/$asm_src-elf.S" ]
+      }
+    }
+
+    sources += [
+      "$ring_crate/third_party/fiat/asm/fiat_curve25519_adx_mul.S",
+      "$ring_crate/third_party/fiat/asm/fiat_curve25519_adx_square.S",
+    ]
+  }
+
+  if (current_cpu == "arm64" || current_cpu == "x64") {
+    sources += [ "$ring_crate/crypto/fipsmodule/ec/p256-nistz.c" ]
+  }
+
+  if (current_cpu == "arm64") {
+    foreach(asm_src,
+            [
+              "aesv8-armx",
+              "ghashv8-armx",
+            ]) {
+      if (is_mac) {
+        sources += [ "$ring_crate/pregenerated/$asm_src-ios64.S" ]
+      } else {
+        sources += [ "$ring_crate/pregenerated/$asm_src-linux64.S" ]
+      }
+    }
+  }
+
+  if (current_cpu == "arm64") {
+    foreach(asm_src,
+            [
+              "chacha-armv8",
+              "chacha20_poly1305_armv8",
+              "vpaes-armv8",
+              "armv8-mont",
+              "p256-armv8-asm",
+              "ghash-neon-armv8",
+              "aesv8-gcm-armv8",
+              "sha256-armv8",
+              "sha512-armv8",
+            ]) {
+      if (is_mac) {
+        sources += [ "$ring_crate/pregenerated/$asm_src-macosx.S" ]
+      } else {
+        sources += [ "$ring_crate/pregenerated/$asm_src-linux64.S" ]
+      }
+    }
+  }
+}

@@ -184,9 +184,9 @@ ref-cast = "1.0.23"
 regex = "1.7.3"
 regex-syntax = "0.8.3"
 rend = { version = "0.5.2", features = ["zerocopy-0_8"] }
-ring = "0.16.20"
+ring = "0.17.8"
 rustc-hash = "1.0.1"
-rustls = { version = "=0.21.7", features = ["dangerous_configuration"] }
+rustls = { version = "0.21.12", features = ["dangerous_configuration"] }
 rustls-pemfile = "1.0.4"
 rustls-webpki = "0.101.6"
 rustyline = "2.1.0"
@@ -402,6 +402,7 @@ notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
 #pulldown-cmark = { path = "forks/pulldown-cmark" }
+ring = { path = "forks/ring-0.17.8" }
 rustyline = { path = "forks/rustyline" }
 security-framework = { path = "forks/security-framework" }
 tracing-core = { path = "forks/tracing-core" }
@@ -831,47 +832,25 @@ rustflags = []
 # See https://fxbug.dev/104855 if you want to change this: Please talk to Security team.
 # Thank you!
 visibility = [
-  ":ring",
-  ":rustls-v0_21_7",
-  ":rustls-webpki-v0_101_6",
-  ":sct-v0_7_0",
-  ":trust-dns-proto-v0_21_2",
   ":tuf-v0_3_0-beta12",
-  ":webpki-v0_21_0",
-
-  ":ring.clippy",
-  ":rustls-v0_21_7.clippy",
-  ":rustls-webpki-v0_101_6.clippy",
-  ":sct-v0_6_0.clippy",
-  ":trust-dns-proto-v0_21_2.clippy",
   ":tuf-v0_3_0-beta12.clippy",
-  ":webpki-v0_21_0.clippy",
-
-  ":ring.rustdoc",
-  ":rustls-v0_21_7.rustdoc",
-  ":rustls-webpki-v0_101_6.rustdoc",
-  ":sct-v0_7_0.rustdoc",
-  ":trust-dns-proto-v0_21_2.rustdoc",
   ":tuf-v0_3_0-beta12.rustdoc",
-  ":webpki-v0_21_0.rustdoc",
-
-  ":ring.aux.deps",
-  ":rustls-v0_21_7.aux.deps",
-  ":rustls-webpki-v0_101_6.aux.deps",
-  ":sct-v0_7_0.aux.deps",
-  ":trust-dns-proto-v0_21_2.aux.deps",
   ":tuf-v0_3_0-beta12.aux.deps",
-  ":webpki-v0_21_0.aux.deps",
-
-  ":ring.aux.transdeps",
-  ":rustls-v0_21_7.aux.transdeps",
-  ":rustls-webpki-v0_101_6.aux.transdeps",
-  ":sct-v0_7_0.aux.transdeps",
-  ":trust-dns-proto-v0_21_2.aux.transdeps",
   ":tuf-v0_3_0-beta12.aux.transdeps",
-  ":webpki-v0_21_0.aux.transdeps",
 ]
-deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
+deps = [ "//third_party/rust_crates/compat/ring-0.16.20:ring-core" ]
+
+[gn.package.ring."0.17.8"]
+# See https://fxbug.dev/104855 if you want to change this: Please talk to Security team.
+# Thank you!
+visibility = [
+  ":ring",
+  ":rustls-v0_21_12",
+  ":rustls-webpki-v0_101_7",
+  ":sct-v0_7_1",
+]
+deps = [ "//third_party/rust_crates/compat/ring-0.17.8:ring-core" ]
+env_vars = [ "RING_CORE_PREFIX=ring_core_0_17_8_" ]
 
 # Please keep the rust_icu_* crates together in this list.
 # Refer to //build/icu/README.md for the details of the approach.
@@ -906,7 +885,7 @@ target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "ic
 configs = [ "//src/lib/icu:version" ]
 target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 
-[gn.package.rustls."0.21.7"]
+[gn.package.rustls."0.21.12"]
 rustflags = []
 
 [gn.package.rutabaga_gfx."0.1.3"]

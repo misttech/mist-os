@@ -201,7 +201,7 @@ async fn unlock_device_with_creds<F: FastbootInterface>(
     messenger.send(Event::Unlock(UnlockEvent::GeneratingToken)).await?;
 
     let rng = rand::SystemRandom::new();
-    let mut signature = vec![0; unlock_creds.unlock_key.public_modulus_len()];
+    let mut signature = vec![0; unlock_creds.unlock_key.public().modulus_len()];
     unlock_creds
         .unlock_key
         .sign(&RSA_PKCS1_SHA512, &rng, &challenge.challenge_data, &mut signature)
