@@ -1212,6 +1212,10 @@ void Client::SetOwnership(bool is_owner) {
 fidl::Status Client::NotifyDisplayChanges(
     std::span<const fuchsia_hardware_display::wire::Info> added_display_infos,
     std::span<const fuchsia_hardware_display_types::wire::DisplayId> removed_display_ids) {
+  if (!coordinator_listener_.is_valid()) {
+    return fidl::Status::Ok();
+  }
+
   // TODO(https://fxbug.dev/42052765): OnDisplayChanged() takes VectorViews
   // of non-const display Info and display::DisplayId types though it doesn't modify
   // the vectors. We have to perform a const_cast to drop their constness.
@@ -1222,52 +1226,35 @@ fidl::Status Client::NotifyDisplayChanges(
       const_cast<fuchsia_hardware_display_types::wire::DisplayId*>(removed_display_ids.data()),
       removed_display_ids.size());
 
-  if (coordinator_listener_.is_valid()) {
-    fidl::OneWayStatus call_result = coordinator_listener_->OnDisplaysChanged(
-        fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
-            non_const_added_display_infos.data(), non_const_added_display_infos.size()),
-        fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId>::FromExternal(
-            non_const_removed_display_ids.data(), non_const_removed_display_ids.size()));
-    return call_result;
-  }
-
-  // Fallback to `Coordinator` protocol.
-  fidl::OneWayStatus send_event_result = fidl::WireSendEvent(*binding_)->OnDisplaysChanged(
+  fidl::OneWayStatus call_result = coordinator_listener_->OnDisplaysChanged(
       fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
           non_const_added_display_infos.data(), non_const_added_display_infos.size()),
       fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId>::FromExternal(
           non_const_removed_display_ids.data(), non_const_removed_display_ids.size()));
-  return send_event_result;
+  return call_result;
 }
 
 fidl::Status Client::NotifyOwnershipChange(bool client_has_ownership) {
-  if (coordinator_listener_.is_valid()) {
-    fidl::OneWayStatus call_result =
-        coordinator_listener_->OnClientOwnershipChange(client_has_ownership);
-    return call_result;
+  if (!coordinator_listener_.is_valid()) {
+    return fidl::Status::Ok();
   }
 
-  // Fallback to `Coordinator` protocol.
-  fidl::OneWayStatus send_event_result =
-      fidl::WireSendEvent(*binding_)->OnClientOwnershipChange(client_has_ownership);
-  return send_event_result;
+  fidl::OneWayStatus call_result =
+      coordinator_listener_->OnClientOwnershipChange(client_has_ownership);
+  return call_result;
 }
 
 fidl::Status Client::NotifyVsync(display::DisplayId display_id, zx::time timestamp,
                                  display::ConfigStamp config_stamp,
                                  display::VsyncAckCookie vsync_ack_cookie) {
-  if (coordinator_listener_.is_valid()) {
-    fidl::OneWayStatus send_call_result = coordinator_listener_->OnVsync(
-        ToFidlDisplayId(display_id), timestamp.get(), ToFidlConfigStamp(config_stamp),
-        ToFidlVsyncAckCookie(vsync_ack_cookie));
-    return send_call_result;
+  if (!coordinator_listener_.is_valid()) {
+    return fidl::Status::Ok();
   }
 
-  // Fallback to `Coordinator` protocol.
-  fidl::OneWayStatus send_event_result = fidl::WireSendEvent(*binding_)->OnVsync(
+  fidl::OneWayStatus send_call_result = coordinator_listener_->OnVsync(
       ToFidlDisplayId(display_id), timestamp.get(), ToFidlConfigStamp(config_stamp),
-      ToFidlVsyncAckCookieValue(vsync_ack_cookie));
-  return send_event_result;
+      ToFidlVsyncAckCookie(vsync_ack_cookie));
+  return send_call_result;
 }
 
 void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,

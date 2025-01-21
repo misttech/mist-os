@@ -9,14 +9,17 @@ using fuchsia.sysmem2;
 using zx;
 
 /// Provides updates from a `Coordinator` to one of its clients.
+///
+/// This protocol solely consists of one-way methods.
 open protocol CoordinatorListener {
-    /// Called when displays are added or removed.
-    /// Called on client creation if there are any displays already connected.
+    /// Called when the set of connected displays changes.
     ///
-    /// A display change always invalidates the current configuration. When a
-    /// `CoordinatorListener` receives this method call, the corresponding
-    /// `Coordinator` client must either apply a new configuration or
-    /// revalidate and reapply their current configuration.
+    /// Also used to communicate the set of connected displays to a newly
+    /// connected client.
+    ///
+    /// After this method is called, any current configuration is invalidated.
+    /// The client must validate and apply a new configuration, using the
+    /// methods [`Coordinator.CheckConfig`] and [`Coordinator.ApplyConfig`].
     ///
     /// `added` and `removed` must not be both empty.
     strict OnDisplaysChanged(struct {
@@ -24,29 +27,49 @@ open protocol CoordinatorListener {
         removed vector<fuchsia.hardware.display.types.DisplayId>:MAX;
     });
 
-    /// Called on every display Vertical Synchronization (Vsync) signal.
+    /// Called on every display Vertical Synchronization (Vsync).
+    ///
+    /// Clients must acknowledge VSync events via the method
+    /// [`Coordinator.AcknowledgeVsync`].  The coordinator may throttle a client
+    /// that accumulates a certain number of unacknowledged VSync cookies.
+    /// Throttled clients do not receive VSync events.
+    ///
+    /// After a the client catches up on acknowledging cookies, the coordinator
+    /// will unthrottle it (resume sending VSync events). Throttled clients may
+    /// miss some VSync events, as the coordinator is allowed to drop VSync
+    /// event information for throttled clients.
+    ///
+    /// When dropping VSync event information for throttled clients, the
+    /// coordinator should prioritize retaining the information for newer
+    /// events. In other words, the oldest unreported events should be dropped
+    /// first.
     strict OnVsync(struct {
-        /// The display on which the Vsync occurred.
+        /// The display associated with the VSync event.
         display_id fuchsia.hardware.display.types.DisplayId;
 
-        /// The time the Vsync occurred.
+        /// The time when the VSync occurred.
+        ///
+        /// The accurrancy of this timestamp depends on the display hardware.
         timestamp zx.Time;
 
-        /// The stamp of the latest configuration that has been applied to the
-        /// display.
+        /// Identifies the lastest configuration fully applied to the display.
+        ///
+        /// Guaranteed to be a valid value.
+        ///
+        /// If a configuration contains images that are still waiting to be
+        /// ready, that configuration will be only partially applied (without
+        /// the pending image). That configuration's stamp will not be reported
+        /// here.
         applied_config_stamp fuchsia.hardware.display.types.ConfigStamp;
 
-        /// If valid, the `Coordinator` client must acknowledge the Vsync
-        /// signal immediately upon receipt by calling `AcknowledgeVsync()`.
-        /// Failure to acknowledge `OnVsync` calls will result in the
-        /// suspension of Vsync event notification.
+        /// Used to acknowledge the receipt of VSync events.
         ///
-        /// If a `Coordinator` client fails to respond to vsync messages,
-        /// the client will throttle Vsync events. Information about the
-        /// throttled events is stored in a bounded queue, which drops the
-        /// oldest events when it reaches its capacity. When the client
-        /// acknowledges VSync receipt, the coordinator delivers all VSync
-        /// events for all the entries in the queue.
+        /// A value of zero means no acknowledgement is required by the
+        /// client.
+        ///
+        /// Each non-zero cookie must be acknowledged immediately, via a call to
+        /// [`Coordinator.AcknowledgeVsync`]. Cookies must be acknowledged even
+        /// if the client does not change the display's configuration.
         cookie VsyncAckCookie;
     });
 
@@ -85,17 +108,6 @@ open protocol CoordinatorListener {
 /// - ZX_ERR_NO_MEMORY: memory could not be allocated to satisfy the requested operation.
 /// - ZX_ERR_INTERNAL: catch-all used for any error that is not listed above.
 closed protocol Coordinator {
-    /// Event fired when displays are added or removed. This event will be fired
-    /// when the callback is registered if there are any connected displays.
-    ///
-    /// A display change always invalidates the current configuration. When a
-    /// client receives this event, they must either apply a new configuration
-    /// or revalidate and reapply their current configuration.
-    strict -> OnDisplaysChanged(struct {
-        added vector<Info>:MAX;
-        removed vector<fuchsia.hardware.display.types.DisplayId>:MAX;
-    });
-
     /// Imports a Buffer-Collection backed image.
     ///
     /// `image_metadata` must be compatible with the arguments passed to
@@ -425,65 +437,11 @@ closed protocol Coordinator {
         cookie uint64;
     });
 
-    /// Event sent for every VSync (Vertical Sync).
-    ///
-    /// Clients must acknowledge VSync events by calling `AcknowledgeVsync()`.
-    /// The coordinator may throttle a client that accumulates a certain number
-    /// of unacknowledged VSync cookies. Throttled clients do not receive VSync
-    /// events.
-    ///
-    /// After a the client catches up on acknowledging cookies, the coordinator
-    /// will unthrottle it (resume sending VSync events). Throttled clients may
-    /// miss some VSync events, as the coordinator is allowed to drop VSync
-    /// event information for throttled clients.
-    ///
-    /// When dropping VSync event information for throttled clients, the
-    /// coordinator should prioritize retaining the information for newer
-    /// events. In other words, the oldest unreported events should be dropped
-    /// first.
-    strict -> OnVsync(struct {
-        /// The display associated with the VSync event.
-        display_id fuchsia.hardware.display.types.DisplayId;
-
-        /// The time when the VSync occurred.
-        ///
-        /// The accurrancy of this timestamp depends on the display hardware.
-        timestamp zx.Time;
-
-        /// Identifies the lastest configuration fully applied to the display.
-        ///
-        /// Guaranteed to be a valid value.
-        ///
-        /// If a configuration contains images that are still waiting to be
-        /// ready, that configuration will be only partially applied (without
-        /// the pending image). That configuration's stamp will not be reported
-        /// here.
-        applied_config_stamp fuchsia.hardware.display.types.ConfigStamp;
-
-        /// Used to acknowledge the receipt of VSync events.
-        ///
-        /// A value of zero means no acknowledgement is required by the
-        /// client.
-        ///
-        /// Each non-zero cookie must be acknowledged immediately, via an
-        /// `AcknowledgeVsync` call. Cookies must be acknowledged even if the
-        /// client does not change the display's configuration.
-        cookie uint64;
-    });
-
     /// Sets the visibility behavior of the virtcon.
     ///
     /// This must only be called from the Virtcon client.
     strict SetVirtconMode(struct {
         mode VirtconMode;
-    });
-
-    /// Event fired when the client gains or loses ownership of the displays.
-    ///
-    /// New clients should assume they do not have ownership of the display
-    /// until this event informs them otherwise.
-    strict -> OnClientOwnershipChange(struct {
-        has_ownership bool;
     });
 
     /// Import a sysmem buffer collection token. `buffer_collection_id` must not
