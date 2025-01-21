@@ -585,22 +585,24 @@ VmCowPages::~VmCowPages() {
 template <typename T>
 zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRangeLocked(T func, uint64_t offset,
                                                                 uint64_t size) const {
-  return ForEveryOwnedHierarchyPageInRange(this, func, offset, size);
+  return ForEveryOwnedHierarchyPageInRange<const VmPageOrMarker*>(this, func, offset, size);
 }
 
 template <typename T>
 zx_status_t VmCowPages::ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset,
                                                                        uint64_t size) {
-  return ForEveryOwnedHierarchyPageInRange(this, func, offset, size);
+  return ForEveryOwnedHierarchyPageInRange<VmPageOrMarkerRef>(this, func, offset, size);
 }
 
-template <typename S, typename T>
+template <typename T>
+zx_status_t VmCowPages::RemoveOwnedHierarchyPagesInRangeLocked(T func, uint64_t offset,
+                                                               uint64_t size) {
+  return ForEveryOwnedHierarchyPageInRange<VmPageOrMarker*>(this, func, offset, size);
+}
+
+template <typename P, typename S, typename T>
 zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint64_t offset,
                                                           uint64_t size) {
-  constexpr bool MUTABLE = !ktl::is_const_v<S>;
-  static_assert((MUTABLE && ktl::is_same_v<S, VmCowPages>) ||
-                (!MUTABLE && ktl::is_same_v<S, const VmCowPages>));
-
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
 
@@ -677,9 +679,12 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
       // from any empty offset within the range.
       //
       // Otherwise process pages within the range directly owned by `cur`.
-      if constexpr (MUTABLE) {
+      if constexpr (ktl::is_same_v<P, VmPageOrMarker*>) {
         status = cur->page_list_.RemovePagesAndIterateGaps(page_callback, gap_callback,
                                                            start_in_cur, end_in_cur);
+      } else if constexpr (ktl::is_same_v<P, VmPageOrMarkerRef>) {
+        status = cur->page_list_.ForEveryPageAndGapInRangeMutable(page_callback, gap_callback,
+                                                                  start_in_cur, end_in_cur);
       } else {
         status = cur->page_list_.ForEveryPageAndGapInRange(page_callback, gap_callback,
                                                            start_in_cur, end_in_cur);
@@ -693,8 +698,11 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
       // Processing gaps is expensive due to additional per-page overhead involved in tracking the
       // gaps and intervals, so save time by avoiding that and only processing pages directly owned
       // by `cur`.
-      if constexpr (MUTABLE) {
+      if constexpr (ktl::is_same_v<P, VmPageOrMarker*>) {
         status = cur->page_list_.RemovePages(page_callback, start_in_cur, end_in_cur);
+      } else if constexpr (ktl::is_same_v<P, VmPageOrMarkerRef>) {
+        status =
+            cur->page_list_.ForEveryPageInRangeMutable(page_callback, start_in_cur, end_in_cur);
       } else {
         status = cur->page_list_.ForEveryPageInRange(page_callback, start_in_cur, end_in_cur);
       }
@@ -1888,7 +1896,7 @@ void VmCowPages::ReleaseOwnedPagesLocked(uint64_t start) {
 
   // Decrement the share count on all pages, both directly owned by us and shared via our parents,
   // that this node can see, and free any pages with a zero ref count.
-  zx_status_t status = ForEveryOwnedMutableHierarchyPageInRangeLocked(
+  zx_status_t status = RemoveOwnedHierarchyPagesInRangeLocked(
       [&](VmPageOrMarker* p, const VmCowPages* owner, uint64_t this_offset, uint64_t owner_offset) {
         // Explicitly handle this case separately since although we would naturally find these to
         // have a share_count of 0 and free them, we would always like to free any markers, however
@@ -3973,7 +3981,7 @@ zx_status_t VmCowPages::DecompressInRangeLocked(VmCowRange range, Guard<Critical
   do {
     __UNINITIALIZED AnonymousPageRequest page_request;
     status = ForEveryOwnedMutableHierarchyPageInRangeLocked(
-        [&cur_offset, &page_request](VmPageOrMarker* p, VmCowPages* owner, uint64_t this_offset,
+        [&cur_offset, &page_request](VmPageOrMarkerRef p, VmCowPages* owner, uint64_t this_offset,
                                      uint64_t owner_offset) {
           if (!p->IsReference()) {
             return ZX_ERR_NEXT;

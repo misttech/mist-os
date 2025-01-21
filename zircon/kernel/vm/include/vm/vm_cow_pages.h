@@ -846,15 +846,22 @@ class VmCowPages final : public VmHierarchyBase,
     return page_source_ && page_source_->properties().is_providing_specific_physical_pages;
   }
 
-  // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is constant.
+  // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is constant and may not be
+  // modified in any way.
   template <typename T>
   zx_status_t ForEveryOwnedHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size) const
+      TA_REQ(lock());
+
+  // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is a VmPageOrMarkerRef, which
+  // supports limited mutation.
+  template <typename T>
+  zx_status_t ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size)
       TA_REQ(lock());
 
   // See |ForEveryOwnedHierarchyPageInRange|. Each entry given to `T` is mutable and `T` may modify
   // it or replace it with an empty entry.
   template <typename T>
-  zx_status_t ForEveryOwnedMutableHierarchyPageInRangeLocked(T func, uint64_t offset, uint64_t size)
+  zx_status_t RemoveOwnedHierarchyPagesInRangeLocked(T func, uint64_t offset, uint64_t size)
       TA_REQ(lock());
 
   // Iterates a range within a visible node, invoking a callback for every `VmPageListEntry` the
@@ -888,7 +895,7 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // Returns `ZX_OK` if no `func` invocations returned any errors, otherwise returns the error code
   // from the failing `func` invocation.
-  template <typename S, typename T>
+  template <typename P, typename S, typename T>
   static zx_status_t ForEveryOwnedHierarchyPageInRange(S* self, T func, uint64_t offset,
                                                        uint64_t size) TA_REQ(self->lock());
 
