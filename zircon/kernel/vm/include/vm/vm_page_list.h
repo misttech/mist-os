@@ -904,6 +904,12 @@ class VmPageList final {
     return ForEveryPageAndGapInRange<const VmPageOrMarker*>(this, per_page_func, per_gap_func,
                                                             start_offset, end_offset);
   }
+  template <typename PAGE_FUNC, typename GAP_FUNC>
+  zx_status_t ForEveryPageAndGapInRangeMutable(PAGE_FUNC per_page_func, GAP_FUNC per_gap_func,
+                                               uint64_t start_offset, uint64_t end_offset) {
+    return ForEveryPageAndGapInRange<VmPageOrMarkerRef>(this, per_page_func, per_gap_func,
+                                                        start_offset, end_offset);
+  }
 
   // walk the page tree, calling |per_page_func| on every page/marker/interval that fulfills
   // (returns true) the |compare_func|. Also call |contiguous_run_func| on every contiguous range of
@@ -1423,7 +1429,7 @@ class VmPageList final {
     uint64_t expected_next_off = start_offset;
     // Set to true when we encounter an interval start but haven't yet encountered the end.
     bool in_interval = false;
-    auto per_page_wrapper_fn = [&](auto* p, uint64_t off) {
+    auto per_page_wrapper_fn = [&](auto p, uint64_t off) {
       // Update our interval tracking first. Should the callbacks later request an early exit then
       // this work is wasted, but doing it first, and unconditionally, lets the compiler perform
       // better common expression elimination with the per_gap_func check next.
