@@ -31,14 +31,15 @@ class VirtualAudioDai final : public VirtualAudioDaiDeviceType,
   static fuchsia_virtualaudio::Configuration GetDefaultConfig(bool is_input);
 
   VirtualAudioDai(fuchsia_virtualaudio::Configuration config,
-                  std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent);
+                  std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent,
+                  fit::closure on_shutdown);
   void ResetDaiState() { connected_ = false; }
 
   async_dispatcher_t* dispatcher() override {
     return fdf::Dispatcher::GetCurrent()->async_dispatcher();
   }
-  void ShutdownAndRemove() override { DdkAsyncRemove(); }
-  void DdkRelease() {}
+  void ShutdownAsync() override;
+  void DdkRelease();
 
   // VirtualAudioDriver overrides.
   // TODO(https://fxbug.dev/42075676): Add support for GetPositionForVA,

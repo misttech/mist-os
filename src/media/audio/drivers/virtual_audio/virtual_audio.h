@@ -8,7 +8,7 @@
 #include <lib/ddk/device.h>
 
 #include <memory>
-#include <unordered_set>
+#include <unordered_map>
 
 #include <ddktl/device.h>
 
@@ -30,6 +30,8 @@ class VirtualAudio : public VirtualAudioDeviceType {
   void DdkUnbind(ddk::UnbindTxn txn);
 
  private:
+  using DeviceId = uint64_t;
+
   zx::result<> Init();
 
   // Implements virtualaudio.Control.
@@ -39,9 +41,22 @@ class VirtualAudio : public VirtualAudioDeviceType {
   void GetNumDevices(GetNumDevicesCompleter::Sync& completer) override;
   void RemoveAll(RemoveAllCompleter::Sync& completer) override;
 
+  void OnDeviceShutdown(DeviceId device_id);
+
+  void ShutdownAllDevices();
+
   async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
 
-  std::unordered_set<std::shared_ptr<VirtualAudioDevice>> devices_;
+  // `DeviceId` is needed in order to locate a device when the device has shutdown and is to be
+  // removed.
+  std::unordered_map<DeviceId, std::shared_ptr<VirtualAudioDevice>> devices_;
+  DeviceId next_device_id_ = 0;
+
+  // Invoked once all the devices have shutdown.
+  std::optional<ddk::UnbindTxn> unbind_txn_;
+
+  // Invoked once all the devices have shutdown.
+  std::vector<RemoveAllCompleter::Async> remove_all_completers_;
 };
 
 }  // namespace virtual_audio

@@ -25,7 +25,7 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
  public:
   static fbl::RefPtr<VirtualAudioStream> Create(const fuchsia_virtualaudio::Configuration& cfg,
                                                 std::weak_ptr<VirtualAudioDevice> owner,
-                                                zx_device_t* dev_node);
+                                                zx_device_t* dev_node, fit::closure on_shutdown);
   static fuchsia_virtualaudio::Configuration GetDefaultConfig(bool is_input);
 
   using ErrorT = fuchsia_virtualaudio::Error;
@@ -54,13 +54,15 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
   friend class fbl::RefPtr<VirtualAudioStream>;
 
   VirtualAudioStream(const fuchsia_virtualaudio::Configuration& cfg,
-                     std::weak_ptr<VirtualAudioDevice> parent, zx_device_t* dev_node)
+                     std::weak_ptr<VirtualAudioDevice> parent, zx_device_t* dev_node,
+                     fit::closure on_shutdown)
       // StreamConfig is either input or output;
       // if direction is unspecified the is_input field access will assert.
       : audio::SimpleAudioStream(dev_node,
                                  cfg.device_specific()->stream_config()->is_input().value()),
         config_(cfg),
-        parent_(std::move(parent)) {}
+        parent_(std::move(parent)),
+        on_shutdown_(std::move(on_shutdown)) {}
 
   //
   // Implementation of audio::SimpleAudioStream.
@@ -152,6 +154,8 @@ class VirtualAudioStream : public audio::SimpleAudioStream {
 
   zx::clock reference_clock_ __TA_GUARDED(domain_token()) = {};
   int32_t clock_rate_adjustment_ __TA_GUARDED(domain_token()) = 0;
+
+  fit::closure on_shutdown_;
 };
 
 // This class composes a VirtualAudioStream. This allows using the functionality of a
@@ -164,8 +168,12 @@ class VirtualAudioStreamWrapper : public VirtualAudioDriver {
   using ErrorT = fuchsia_virtualaudio::Error;
 
   VirtualAudioStreamWrapper(const fuchsia_virtualaudio::Configuration& cfg,
-                            std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* dev_node) {
-    stream_ = VirtualAudioStream::Create(cfg, std::move(owner), dev_node);
+                            std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* dev_node,
+                            fit::closure on_shutdown)
+      : VirtualAudioDriver(std::move(on_shutdown)) {
+    stream_ = VirtualAudioStream::Create(
+        cfg, std::move(owner), dev_node,
+        fit::bind_member<&VirtualAudioStreamWrapper::OnStreamShutdown>(this));
   }
   async_dispatcher_t* dispatcher() override { return stream_->dispatcher(); }
   fit::result<ErrorT, CurrentFormat> GetFormatForVA() override {
@@ -198,10 +206,12 @@ class VirtualAudioStreamWrapper : public VirtualAudioDriver {
     return stream_->AdjustClockRateFromVA(ppm_from_monotonic);
   }
 
-  void ShutdownAndRemove() override {
+  void ShutdownAsync() override {
     stream_->Shutdown();
     stream_->DdkAsyncRemove();
   }
+
+  void OnStreamShutdown() { OnShutdown(); }
 
  private:
   fbl::RefPtr<VirtualAudioStream> stream_;

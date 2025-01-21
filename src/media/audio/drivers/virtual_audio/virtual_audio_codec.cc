@@ -60,8 +60,12 @@ fuchsia_virtualaudio::Configuration VirtualAudioCodec::GetDefaultConfig(
 }
 
 VirtualAudioCodec::VirtualAudioCodec(fuchsia_virtualaudio::Configuration config,
-                                     std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent)
-    : VirtualAudioCodecDeviceType(parent), parent_(std::move(owner)), config_(std::move(config)) {
+                                     std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent,
+                                     fit::closure on_shutdown)
+    : VirtualAudioCodecDeviceType(parent),
+      VirtualAudioDriver(std::move(on_shutdown)),
+      parent_(std::move(owner)),
+      config_(std::move(config)) {
   ddk_proto_id_ = ZX_PROTOCOL_CODEC;
   sprintf(instance_name_, "virtual-audio-codec-%d", instance_count_++);
   zx_status_t status = DdkAdd(ddk::DeviceAddArgs(instance_name_));
@@ -263,5 +267,9 @@ void VirtualAudioCodec::PlugStateChanged(const fuchsia_hardware_audio::PlugState
   }
   should_return_plug_state_ = true;
 }
+
+void VirtualAudioCodec::ShutdownAsync() { DdkAsyncRemove(); }
+
+void VirtualAudioCodec::DdkRelease() { OnShutdown(); }
 
 }  // namespace virtual_audio

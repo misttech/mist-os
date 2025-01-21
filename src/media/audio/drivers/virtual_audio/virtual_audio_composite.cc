@@ -112,8 +112,9 @@ fuchsia_virtualaudio::Configuration VirtualAudioComposite::GetDefaultConfig() {
 
 VirtualAudioComposite::VirtualAudioComposite(fuchsia_virtualaudio::Configuration config,
                                              std::weak_ptr<VirtualAudioDevice> owner,
-                                             zx_device_t* parent)
+                                             zx_device_t* parent, fit::closure on_shutdown)
     : VirtualAudioCompositeDeviceType(parent),
+      VirtualAudioDriver(std::move(on_shutdown)),
       parent_(std::move(owner)),
       config_(std::move(config)) {
   ddk_proto_id_ = ZX_PROTOCOL_AUDIO_COMPOSITE;
@@ -777,5 +778,9 @@ void VirtualAudioComposite::handle_unknown_method(
   zxlogf(ERROR, "VirtualAudioComposite::handle_unknown_method (SignalProcessing) ordinal %zu",
          metadata.method_ordinal);
 }
+
+void VirtualAudioComposite::ShutdownAsync() { DdkAsyncRemove(); }
+
+void VirtualAudioComposite::DdkRelease() { OnShutdown(); }
 
 }  // namespace virtual_audio

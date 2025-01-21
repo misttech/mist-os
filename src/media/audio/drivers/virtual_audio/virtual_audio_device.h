@@ -36,26 +36,20 @@ class VirtualAudioDriver;
 class VirtualAudioDevice : public fidl::WireServer<fuchsia_virtualaudio::Device>,
                            public std::enable_shared_from_this<VirtualAudioDevice> {
  public:
+  // `on_shutdown` called when FIDL server and driver have completely shutdown.
   static fit::result<fuchsia_virtualaudio::Error, std::shared_ptr<VirtualAudioDevice>> Create(
       const fuchsia_virtualaudio::Configuration& cfg,
       fidl::ServerEnd<fuchsia_virtualaudio::Device> server, zx_device_t* dev_node,
-      async_dispatcher_t* fidl_dispatcher);
+      async_dispatcher_t* fidl_dispatcher, fit::closure on_shutdown);
 
   std::optional<bool> is_input() const { return is_input_; }
-  bool is_bound() const { return is_bound_; }
 
   // Executes the given task on the FIDL channel's main dispatcher thread.
   // Used to deliver callbacks or events from the driver execution domain.
   void PostToDispatcher(fit::closure task_to_post);
 
-  // Shuts down this server.
-  // Shutdown happens asynchronously, after which `cb` is called from the PostToDispatcher thread.
-  // Must be called from the PostToDispatcher thread.
-  void ShutdownAsync(fit::closure cb);
-
-  // `VirtualAudioDriver` uses this to tell us that the driver has been shut down by an external
-  // entity (such as the device host process). Must be called from a PostToDispatcher closure.
-  void DriverIsShuttingDown();
+  // Shuts down the FIDL server and the driver.
+  void ShutdownAsync();
 
   //
   // Implementation of virtualaudio.Device.
@@ -89,24 +83,29 @@ class VirtualAudioDevice : public fidl::WireServer<fuchsia_virtualaudio::Device>
                        AdjustClockRateCompleter::Sync& completer) override;
 
   // Public for std::make_shared. Use Create, not this ctor.
-  VirtualAudioDevice(std::optional<bool> is_input, async_dispatcher_t* fidl_dispatcher);
+  VirtualAudioDevice(std::optional<bool> is_input, async_dispatcher_t* fidl_dispatcher,
+                     fit::closure on_shutdown);
   ~VirtualAudioDevice() override;
 
  private:
+  // Called when `binding_` is unbound. Called on `fidl_dispatcher_`.
+  static void OnFidlServerUnbound(VirtualAudioDevice* device, fidl::UnbindInfo unbind_info,
+                                  fidl::ServerEnd<fuchsia_virtualaudio::Device> server_end);
+
+  // Called by `driver_` when it has completely shutdown. May be called from any dispatcher.
+  void OnDriverShutdown();
+
   const std::optional<bool> is_input_;
   async_dispatcher_t* const fidl_dispatcher_;
 
-  // This is std::optional only to break a circular dependency. In practice this is set during
-  // Create() then never changed, so during normal operation is should never be std::nullopt.
+  // Will be set to `std::nullopt` when the FIDL server is unbound.
   std::optional<fidl::ServerBindingRef<fuchsia_virtualaudio::Device>> binding_;
-  bool is_bound_ = true;  // starts bound after Create
 
-  // This may be nullptr if the underlying driver is removed before the
-  // fuchsia.virtualaudio.Device FIDL channel is closed.
+  // Will be set to `std::nullptr` when the driver is completely shutdown.
   std::unique_ptr<VirtualAudioDriver> driver_;
 
-  // Callbacks to run on destroy.
-  std::vector<fit::closure> on_destroy_callbacks_;
+  // Called when `binding_` is unbound and `driver_` is shutdown.
+  fit::closure on_shutdown_;
 };
 
 }  // namespace virtual_audio

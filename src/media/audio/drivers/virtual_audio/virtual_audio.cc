@@ -49,26 +49,13 @@ zx::result<> VirtualAudio::Init() {
 
 void VirtualAudio::DdkUnbind(ddk::UnbindTxn txn) {
   if (devices_.empty()) {
-    zxlogf(INFO, "%s with no devices; unbinding self", __func__);
+    zxlogf(INFO, "Unbinding immediately: No devices to shutdown");
     txn.Reply();
     return;
   }
 
-  // Close any remaining device bindings, freeing those drivers.
-  auto remaining = std::make_shared<size_t>(devices_.size());
-
-  for (auto& d : devices_) {
-    zxlogf(INFO, "%s with %lu devices; shutting one down", __func__, *remaining);
-    d->ShutdownAsync([remaining, txn = std::move(txn)]() mutable {
-      ZX_ASSERT(*remaining > 0);
-      // After all devices are gone we can remove the control device itself.
-      if (--(*remaining) == 0) {
-        zxlogf(INFO, "DdkUnbind(lambda): after shutting down devices; unbinding self");
-        txn.Reply();
-      }
-    });
-  }
-  devices_.clear();
+  unbind_txn_.emplace(std::move(txn));
+  ShutdownAllDevices();
 }
 
 void VirtualAudio::DdkRelease() {
@@ -106,15 +93,17 @@ void VirtualAudio::GetDefaultConfiguration(GetDefaultConfigurationRequestView re
 void VirtualAudio::AddDevice(AddDeviceRequestView request, AddDeviceCompleter::Sync& completer) {
   auto config = fidl::ToNatural(request->config);
   ZX_ASSERT(config.device_specific().has_value());
-  auto result = VirtualAudioDevice::Create(std::move(config), std::move(request->server), parent_,
-                                           dispatcher_);
+  auto device_id = next_device_id_++;
+  auto result =
+      VirtualAudioDevice::Create(std::move(config), std::move(request->server), parent_,
+                                 dispatcher_, [this, device_id]() { OnDeviceShutdown(device_id); });
   if (!result.is_ok()) {
     zxlogf(ERROR, "Device creation failed with status %d",
            fidl::ToUnderlying(result.error_value()));
     completer.ReplyError(result.error_value());
     return;
   }
-  devices_.insert(result.value());
+  devices_[device_id] = result.value();
   completer.ReplySuccess();
 }
 
@@ -122,13 +111,9 @@ void VirtualAudio::GetNumDevices(GetNumDevicesCompleter::Sync& completer) {
   uint32_t num_inputs = 0;
   uint32_t num_outputs = 0;
   uint32_t num_unspecified_direction = 0;
-  for (auto& d : devices_) {
-    if (!d->is_bound()) {
-      devices_.erase(d);
-      continue;
-    }
-    if (d->is_input().has_value()) {
-      if (d->is_input().value()) {
+  for (auto& [_, device] : devices_) {
+    if (device->is_input().has_value()) {
+      if (device->is_input().value()) {
         num_inputs++;
       } else {
         num_outputs++;
@@ -146,26 +131,31 @@ void VirtualAudio::RemoveAll(RemoveAllCompleter::Sync& completer) {
     return;
   }
 
-  // This callback waits until all devices have shut down. We wrap the async completer in a
-  // shared_ptr so the callback can be copied into each ShutdownAsync call.
-  struct ShutdownState {
-    explicit ShutdownState(RemoveAllCompleter::Sync& sync) : completer(sync.ToAsync()) {}
-    RemoveAllCompleter::Async completer;
-    size_t remaining;
-  };
-  auto state = std::make_shared<ShutdownState>(completer);
-  state->remaining = devices_.size();
+  remove_all_completers_.emplace_back(completer.ToAsync());
+  ShutdownAllDevices();
+}
 
-  for (auto& d : devices_) {
-    d->ShutdownAsync([state]() {
-      ZX_ASSERT(state->remaining > 0);
-      // After all devices are gone, notify the completer.
-      if ((--state->remaining) == 0) {
-        state->completer.Reply();
-      }
-    });
+void VirtualAudio::OnDeviceShutdown(DeviceId device_id) {
+  zxlogf(INFO, "Device %lu has shutdown", device_id);
+  devices_.erase(device_id);
+  if (devices_.empty()) {
+    zxlogf(INFO, "All devices have shutdown");
+    for (auto& completer : remove_all_completers_) {
+      completer.Reply();
+    }
+    if (unbind_txn_.has_value()) {
+      zxlogf(INFO, "Completing unbind");
+      unbind_txn_->Reply();
+      unbind_txn_.reset();
+    }
   }
-  devices_.clear();
+}
+
+void VirtualAudio::ShutdownAllDevices() {
+  for (auto& [id, device] : devices_) {
+    zxlogf(INFO, "Shutting down device %lu", id);
+    device->ShutdownAsync();
+  }
 }
 
 }  // namespace virtual_audio

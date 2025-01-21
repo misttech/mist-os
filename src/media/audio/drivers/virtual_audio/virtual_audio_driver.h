@@ -46,6 +46,10 @@ class VirtualAudioDriver {
         __TA_RELEASE(){}
   };
 
+  explicit VirtualAudioDriver(fit::closure on_shutdown) : on_shutdown_(std::move(on_shutdown)) {
+    ZX_ASSERT(on_shutdown_ != nullptr);
+  }
+
   virtual ~VirtualAudioDriver() = default;
 
   // Execute the given task on a dispatcher.
@@ -61,7 +65,7 @@ class VirtualAudioDriver {
   const Token& domain_token() const __TA_RETURN_CAPABILITY(domain_token_) { return domain_token_; }
 
   // Shutdown the stream and request that it be unbound from the device tree.
-  virtual void ShutdownAndRemove() = 0;
+  virtual void ShutdownAsync() = 0;
 
   //
   // The following methods implement getters and setters for fuchsia.virtualaudio.Device.
@@ -92,8 +96,13 @@ class VirtualAudioDriver {
     return fit::error(ErrorT::kNotSupported);
   }
 
+ protected:
+  // Call when the driver has completely shutdown.
+  void OnShutdown() { on_shutdown_(); }
+
  private:
   Token domain_token_;
+  fit::closure on_shutdown_;
 };
 
 }  // namespace virtual_audio

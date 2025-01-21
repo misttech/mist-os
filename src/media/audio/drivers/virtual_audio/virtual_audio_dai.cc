@@ -79,8 +79,12 @@ fuchsia_virtualaudio::Configuration VirtualAudioDai::GetDefaultConfig(bool is_in
 }
 
 VirtualAudioDai::VirtualAudioDai(fuchsia_virtualaudio::Configuration config,
-                                 std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent)
-    : VirtualAudioDaiDeviceType(parent), parent_(std::move(owner)), config_(std::move(config)) {
+                                 std::weak_ptr<VirtualAudioDevice> owner, zx_device_t* parent,
+                                 fit::closure on_shutdown)
+    : VirtualAudioDaiDeviceType(parent),
+      VirtualAudioDriver(std::move(on_shutdown)),
+      parent_(std::move(owner)),
+      config_(std::move(config)) {
   ddk_proto_id_ = ZX_PROTOCOL_DAI;
   sprintf(instance_name_, "virtual-audio-dai-%d", instance_count_++);
   zx_status_t status = DdkAdd(ddk::DeviceAddArgs(instance_name_));
@@ -395,5 +399,9 @@ void VirtualAudioDai::handle_unknown_method(
   zxlogf(ERROR, "VirtualAudioDai::handle_unknown_method (RingBuffer) ordinal %zu",
          metadata.method_ordinal);
 }
+
+void VirtualAudioDai::ShutdownAsync() { DdkAsyncRemove(); }
+
+void VirtualAudioDai::DdkRelease() { OnShutdown(); }
 
 }  // namespace virtual_audio
