@@ -164,15 +164,15 @@ class FenceCollection : private FenceCallback {
   // Explicit destruction step. Use this to control when fences are destroyed.
   void Clear() __TA_EXCLUDES(mtx_);
 
-  // Import `event` so that it can subsequently be referenced by passing `id` to `GetFence()`.
+  // Imports `event` so that it can subsequently be referenced by passing `id` to `GetFence()`.
   // `id` must not already be registered by a previous call to `ImportEvent()`, unless it was
   // subsequently unregistered by calling `ReleaseEvent()`.
   zx_status_t ImportEvent(zx::event event, display::EventId id) __TA_EXCLUDES(mtx_);
 
-  // Unregister a fence that was previously registered by `ImportEvent()`.
+  // Unregisters a fence that was previously registered by `ImportEvent()`.
   void ReleaseEvent(display::EventId id) __TA_EXCLUDES(mtx_);
 
-  // Get reference to existing fence by its ID, or nullptr if no fence is found.
+  // Gets reference to existing fence by its ID, or nullptr if no fence is found.
   fbl::RefPtr<FenceReference> GetFence(display::EventId id) __TA_EXCLUDES(mtx_);
 
  private:

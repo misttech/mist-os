@@ -80,8 +80,7 @@ void Fence::OnRefDisarmed(FenceReference* ref) {
 void Fence::OnReady(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_status_t status,
                     const zx_packet_signal_t* signal) {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent() == fence_creation_dispatcher_);
-  ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Fence::OnReady failed with status %d %s", status,
-                      zx_status_get_string(status));
+  ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Fence::OnReady failed: %s", zx_status_get_string(status));
   ZX_DEBUG_ASSERT(signal->observed & ZX_EVENT_SIGNALED);
   TRACE_DURATION("gfx", "Display::Fence::OnReady");
   TRACE_FLOW_END("gfx", "event_signal", koid_);
