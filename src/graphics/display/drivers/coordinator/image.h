@@ -67,6 +67,7 @@ class Image : public fbl::RefCounted<Image>,
   using DoublyLinkedList = fbl::DoublyLinkedList<DoublyLinkedListPointer, fbl::DefaultObjectTag,
                                                  fbl::SizeOrder::N, DefaultDoublyLinkedListTraits>;
 
+  // `controller` must be non-null, and must outlive the Image.
   Image(Controller* controller, const display::ImageMetadata& metadata,
         display::DriverImageId driver_id, inspect::Node* parent_node, ClientId client_id);
   ~Image();
@@ -114,7 +115,7 @@ class Image : public fbl::RefCounted<Image>,
   }
   display::ConfigStamp latest_client_config_stamp() const { return latest_client_config_stamp_; }
 
-  // Aliases controller_->mtx() for the purpose of thread-safety analysis.
+  // Aliases controller_.mtx() for the purpose of thread-safety analysis.
   fbl::Mutex* mtx() const;
 
   // Checks if the Image is in a DoublyLinkedList container.
@@ -152,7 +153,7 @@ class Image : public fbl::RefCounted<Image>,
   const display::DriverImageId driver_id_;
   const display::ImageMetadata metadata_;
 
-  Controller* const controller_;
+  Controller& controller_;
   const ClientId client_id_;
 
   // Stamp of the latest Controller display configuration that uses this image.

@@ -331,7 +331,7 @@ TEST_F(IntegrationTest, AcknowledgeVsync) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return IsClientActive(ClientPriority::kPrimary); }));
   EXPECT_EQ(0u, primary_client->vsync_count());
 
-  // send vsyncs upto watermark level
+  // send vsyncs up to watermark level
   for (uint32_t i = 0; i < ClientProxy::kVsyncMessagesWatermark; i++) {
     SendVsyncFromCoordinatorClientProxy();
   }

@@ -39,7 +39,6 @@
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
-#include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-id.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -255,7 +254,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   void SetLayerImageImpl(display::LayerId layer_id, display::ImageId image_id,
                          display::EventId wait_event_id);
 
-  Controller* const controller_;
+  Controller& controller_;
   ClientProxy* const proxy_;
   const ClientPriority priority_;
   const ClientId id_;
@@ -325,6 +324,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 class ClientProxy {
  public:
   // `client_id` is assigned by the Controller to distinguish clients.
+  // `controller` must outlive ClientProxy.
   ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
               fit::function<void()> on_client_disconnected);
 
@@ -343,7 +343,7 @@ class ClientProxy {
   // have it be freed.
   void CloseOnControllerLoop();
 
-  // Requires holding controller_->mtx() lock
+  // Requires holding controller_.mtx() lock
   zx_status_t OnDisplayVsync(display::DisplayId display_id, zx_time_t timestamp,
                              display::ConfigStamp controller_stamp);
   void OnDisplaysChanged(std::span<const display::DisplayId> added_display_ids,
@@ -410,7 +410,7 @@ class ClientProxy {
   friend IntegrationTest;
 
   fbl::Mutex mtx_;
-  Controller* const controller_;
+  Controller& controller_;
 
   Client handler_;
   bool vsync_delivery_enabled_ __TA_GUARDED(&mtx_) = false;

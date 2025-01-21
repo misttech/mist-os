@@ -62,7 +62,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>, display::DriverLayerId> 
   //   the new fence and start async waiting for the fence.
   // - The layer's latest pending (waiting) image will be associated with the
   //   client configuration |stamp|, as it reflects the latest configuration
-  //   state; this will owerwrite all the previous stamp states for this image.
+  //   state; this will overwrite all the previous stamp states for this image.
   //   The stamp will be used later when display core integrates stamps of all
   //   layers to determine the current frame state.
   //

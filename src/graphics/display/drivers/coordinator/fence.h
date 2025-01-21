@@ -132,12 +132,8 @@ class FenceReference : public fbl::RefCounted<FenceReference>,
   zx_status_t StartReadyWait();
   void ResetReadyWait();
 
-  void OnReady();
-
  private:
   fbl::RefPtr<Fence> fence_;
-
-  fbl::RefPtr<FenceReference> release_fence_;
 
   fdf::UnownedDispatcher const fence_creation_dispatcher_;
 };
@@ -170,6 +166,8 @@ class FenceCollection : private FenceCallback {
 
   zx_status_t ImportEvent(zx::event event, display::EventId id) __TA_EXCLUDES(mtx_);
   void ReleaseEvent(display::EventId id) __TA_EXCLUDES(mtx_);
+
+  // Get reference to existing fence by its ID, or nullptr if no fence is found.
   fbl::RefPtr<FenceReference> GetFence(display::EventId id) __TA_EXCLUDES(mtx_);
 
  private:
