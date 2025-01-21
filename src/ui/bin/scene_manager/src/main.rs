@@ -246,6 +246,15 @@ async fn inner_main() -> Result<(), Error> {
     // Create a node under root to hang all input pipeline inspect data off of.
     let inspect_node = inspector.root().create_child("input_pipeline");
 
+    // Create Activity Manager.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    let activity_manager = ActivityManager::new(
+        zx::MonotonicDuration::from_millis(idle_threshold_ms as i64),
+        &inspect_node,
+        suspend_enabled,
+    )
+    .await;
+
     // Start input pipeline.
     let has_light_sensor_configuration = light_sensor_configuration.is_some();
     if let Ok(input_pipeline) = input_pipeline::handle_input(
@@ -271,14 +280,6 @@ async fn inner_main() -> Result<(), Error> {
         }
         fasync::Task::local(input_pipeline.handle_input_events()).detach();
     };
-
-    // Create Activity Manager.
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
-    let activity_manager = ActivityManager::new(
-        zx::MonotonicDuration::from_millis(idle_threshold_ms as i64),
-        suspend_enabled,
-    )
-    .await;
 
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;

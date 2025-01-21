@@ -384,6 +384,20 @@ pub fn create_mouse_input_report_relative(
     }
 }
 
+/// Returns an |input_device::InputDeviceDescriptor::Mouse|.
+pub fn get_mouse_device_descriptor() -> input_device::InputDeviceDescriptor {
+    const COUNTS_PER_MM: u32 = 12;
+    input_device::InputDeviceDescriptor::Mouse(mouse_binding::MouseDeviceDescriptor {
+        device_id: 1,
+        absolute_x_range: Some(fidl_input_report::Range { min: -50, max: 50 }),
+        absolute_y_range: Some(fidl_input_report::Range { min: -50, max: 50 }),
+        wheel_v_range: None,
+        wheel_h_range: None,
+        buttons: None,
+        counts_per_mm: COUNTS_PER_MM,
+    })
+}
+
 /// Creates a [`mouse_binding::MouseEvent`] with the provided parameters.
 ///
 /// # Parameters
@@ -570,6 +584,28 @@ pub fn create_touch_input_report(
 
 pub fn create_touch_contact(id: u32, position: Position) -> touch_binding::TouchContact {
     touch_binding::TouchContact { id, position, pressure: None, contact_size: None }
+}
+
+/// Returns an |input_device::InputDeviceDescriptor::TouchScreen|.
+pub fn get_touch_screen_device_descriptor() -> input_device::InputDeviceDescriptor {
+    input_device::InputDeviceDescriptor::TouchScreen(touch_binding::TouchScreenDeviceDescriptor {
+        device_id: 1,
+        contacts: vec![touch_binding::ContactDeviceDescriptor {
+            x_range: fidl_input_report::Range { min: 0, max: 100 },
+            y_range: fidl_input_report::Range { min: 0, max: 100 },
+            x_unit: fidl_input_report::Unit {
+                type_: fidl_input_report::UnitType::Meters,
+                exponent: -6,
+            },
+            y_unit: fidl_input_report::Unit {
+                type_: fidl_input_report::UnitType::Meters,
+                exponent: -6,
+            },
+            pressure_range: None,
+            width_range: None,
+            height_range: None,
+        }],
+    })
 }
 
 /// Creates a [`touch_binding::TouchScreenEvent`] with the provided parameters.

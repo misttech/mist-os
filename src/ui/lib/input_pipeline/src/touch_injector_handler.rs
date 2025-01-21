@@ -491,6 +491,7 @@ mod tests {
     use crate::testing_utilities::{
         create_fake_input_event, create_touch_contact, create_touch_pointer_sample_event,
         create_touch_screen_event, create_touch_screen_event_with_handled, create_touchpad_event,
+        get_touch_screen_device_descriptor,
     };
     use assert_matches::assert_matches;
     use maplit::hashmap;
@@ -506,30 +507,6 @@ mod tests {
     const TOUCH_ID: u32 = 1;
     const DISPLAY_WIDTH: f32 = 100.0;
     const DISPLAY_HEIGHT: f32 = 100.0;
-
-    /// Returns an |input_device::InputDeviceDescriptor::TouchScreen|.
-    fn get_touch_screen_device_descriptor() -> input_device::InputDeviceDescriptor {
-        input_device::InputDeviceDescriptor::TouchScreen(
-            touch_binding::TouchScreenDeviceDescriptor {
-                device_id: 1,
-                contacts: vec![touch_binding::ContactDeviceDescriptor {
-                    x_range: fidl_input_report::Range { min: 0, max: 100 },
-                    y_range: fidl_input_report::Range { min: 0, max: 100 },
-                    x_unit: fidl_input_report::Unit {
-                        type_: fidl_input_report::UnitType::Meters,
-                        exponent: -6,
-                    },
-                    y_unit: fidl_input_report::Unit {
-                        type_: fidl_input_report::UnitType::Meters,
-                        exponent: -6,
-                    },
-                    pressure_range: None,
-                    width_range: None,
-                    height_range: None,
-                }],
-            },
-        )
-    }
 
     /// Returns an |input_device::InputDeviceDescriptor::Touchpad|.
     fn get_touchpad_device_descriptor() -> input_device::InputDeviceDescriptor {
