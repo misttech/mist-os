@@ -181,7 +181,7 @@ class IntegrationTest : public TestBase {
 
     // Send one last vsync, to make sure any blank configs take effect.
     SendVsyncFromDisplayEngine();
-    EXPECT_EQ(0u, CoordinatorController()->TEST_imported_images_count());
+    EXPECT_EQ(0u, CoordinatorController()->ImportedImagesCountForTesting());
     TestBase::TearDown();
   }
 

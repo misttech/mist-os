@@ -118,11 +118,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   // Just for display core unittests.
   zx::result<display::DriverImageId> ImportVmoImageForTesting(zx::vmo vmo, size_t offset);
 
-  size_t TEST_imported_images_count() const {
-    fbl::AutoLock lock(&image_mutex_);
-    return imported_images_.size();
-  }
-
   uint8_t GetClampRgbValue() const {
     fbl::AutoLock lock(&capture_mutex_);
     return clamp_rgb_value_;

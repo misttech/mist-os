@@ -147,8 +147,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   uint8_t GetMinimumRgb() const { return client_minimum_rgb_; }
 
-  // Test helpers
-  size_t TEST_imported_images_count() const { return images_.size(); }
+  size_t ImportedImagesCountForTesting() const { return images_.size(); }
 
   // Used for testing
   sync_completion_t* fidl_unbound() { return &fidl_unbound_; }
@@ -387,8 +386,7 @@ class ClientProxy {
 
   void CloseForTesting();
 
-  // Test helpers
-  size_t TEST_imported_images_count() const { return handler_.TEST_imported_images_count(); }
+  size_t ImportedImagesCountForTesting() const { return handler_.ImportedImagesCountForTesting(); }
 
   // Define these constants here so we can access it for test
 

@@ -983,10 +983,10 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
 
 Controller::~Controller() { FDF_LOG(INFO, "Controller::~Controller"); }
 
-size_t Controller::TEST_imported_images_count() const {
+size_t Controller::ImportedImagesCountForTesting() const {
   fbl::AutoLock lock(mtx());
-  size_t virtcon_images = virtcon_client_ ? virtcon_client_->TEST_imported_images_count() : 0;
-  size_t primary_images = primary_client_ ? primary_client_->TEST_imported_images_count() : 0;
+  size_t virtcon_images = virtcon_client_ ? virtcon_client_->ImportedImagesCountForTesting() : 0;
+  size_t primary_images = primary_client_ ? primary_client_->ImportedImagesCountForTesting() : 0;
   size_t display_images = 0;
   for (const auto& display : displays_) {
     display_images += display.images.size_slow();

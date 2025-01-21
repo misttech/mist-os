@@ -158,8 +158,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   fbl::Mutex* mtx() const { return &mtx_; }
   const inspect::Inspector& inspector() const { return inspector_; }
 
-  // Test helpers
-  size_t TEST_imported_images_count() const;
+  size_t ImportedImagesCountForTesting() const;
   display::ConfigStamp TEST_controller_stamp() const;
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
