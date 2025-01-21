@@ -143,6 +143,8 @@ pub enum IfEnum {
     IpForward(IfIpForward),
     List(IfList),
     Mld(IfMld),
+    Add(IfAdd),
+    Remove(IfRemove),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -409,6 +411,36 @@ pub struct IfIpForwardSet {
 pub struct IfList {
     #[argh(positional)]
     pub name_pattern: Option<String>,
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "add")]
+/// add interfaces
+pub struct IfAdd {
+    #[argh(subcommand)]
+    pub cmd: IfAddEnum,
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand)]
+pub enum IfAddEnum {
+    Blackhole(IfBlackholeAdd),
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "blackhole")]
+/// add a blackhole interface
+pub struct IfBlackholeAdd {
+    #[argh(positional)]
+    pub name: String,
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "remove")]
+/// remove interfaces
+pub struct IfRemove {
+    #[argh(positional, arg_name = "nicid or name:ifname")]
+    pub interface: InterfaceIdentifier,
 }
 
 // TODO(https://fxbug.dev/371584272): Replace this with if config.

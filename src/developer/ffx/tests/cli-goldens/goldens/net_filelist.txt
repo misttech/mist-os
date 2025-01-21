@@ -197,6 +197,8 @@ ffx/net/filter/remove/namespace.golden
 ffx/net/filter/remove/routine.golden
 ffx/net/filter/remove/rule.golden
 ffx/net/if.golden
+ffx/net/if/add.golden
+ffx/net/if/add/blackhole.golden
 ffx/net/if/addr.golden
 ffx/net/if/addr/add.golden
 ffx/net/if/addr/del.golden
@@ -218,6 +220,7 @@ ffx/net/if/list.golden
 ffx/net/if/mld.golden
 ffx/net/if/mld/get.golden
 ffx/net/if/mld/set.golden
+ffx/net/if/remove.golden
 ffx/net/log.golden
 ffx/net/log/set-packets.golden
 ffx/net/migration.golden

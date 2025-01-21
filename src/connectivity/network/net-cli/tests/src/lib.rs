@@ -13,8 +13,12 @@
 
 mod filter;
 
+use std::collections::HashMap;
+
 use anyhow::Result;
 use argh::FromArgs as _;
+use futures::StreamExt as _;
+use net_cli::{underlying_user_facing_error, UserFacingError};
 use net_declare::{fidl_ip_v6, fidl_mac};
 use net_types::ip::{IpVersion, Ipv4, Ipv6};
 use netemul::TestRealm;
@@ -41,6 +45,14 @@ impl<'a, P: fidl::endpoints::DiscoverableProtocolMarker> net_cli::ServiceConnect
         &self,
     ) -> Result<<P as fidl::endpoints::ProtocolMarker>::Proxy, anyhow::Error> {
         Ok(connect_to_hermetic_network_realm_protocol::<P>(self.realm).await)
+    }
+}
+
+impl<'a> NetworkTestRealmConnector<'a> {
+    async fn connect_to_protocol<P: fidl::endpoints::DiscoverableProtocolMarker>(
+        &self,
+    ) -> <P as fidl::endpoints::ProtocolMarker>::Proxy {
+        connect_to_hermetic_network_realm_protocol::<P>(self.realm).await
     }
 }
 
@@ -458,4 +470,143 @@ async fn rule_list() {
 
     let rules = list_rules().await;
     assert_eq!(&rules[..], &[v4_rule, v4_default_rule, v6_rule, v6_default_rule][..]);
+}
+
+#[fuchsia::test]
+async fn add_remove_blackhole() {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm = sandbox
+        .create_realm(
+            "net-cli-test-realm",
+            &[KnownServiceProvider::NetworkTestRealm { require_outer_netstack: false }],
+        )
+        .expect("creating realm should succeed");
+
+    let network_test_realm = realm
+        .connect_to_protocol::<fntr::ControllerMarker>()
+        .expect("failed to connect to network test realm controller");
+
+    network_test_realm
+        .start_hermetic_network_realm(fntr::Netstack::V3)
+        .await
+        .expect("start_hermetic_network_realm failed")
+        .expect("start_hermetic_network_realm error");
+
+    let connector = NetworkTestRealmConnector { realm: &realm };
+
+    let interfaces_state = connector.connect_to_protocol::<fnet_interfaces::StateMarker>().await;
+    let mut event_stream = std::pin::pin!(fnet_interfaces_ext::event_stream_from_state::<
+        fnet_interfaces_ext::AllInterest,
+    >(
+        &interfaces_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("should succeed"));
+    let mut state = fnet_interfaces_ext::existing(
+        event_stream.by_ref(),
+        HashMap::<u64, fnet_interfaces_ext::PropertiesAndState<(), _>>::new(),
+    )
+    .await
+    .expect("should succeed");
+
+    {
+        let buffers = ffx_writer::TestBuffers::default();
+        net_cli::do_root(
+            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            net_cli::Command::from_args(&["net"], &["if", "add", "blackhole", INTERFACE1_NAME])
+                .expect("should parse args successfully"),
+            &connector,
+        )
+        .await
+        .expect("should succeed");
+        let (stdout, stderr) = buffers.into_strings();
+        assert_eq!(stdout, String::new());
+        assert_eq!(stderr, String::new());
+    }
+
+    fnet_interfaces_ext::wait_interface(event_stream.by_ref(), &mut state, |state| {
+        state.values().find_map(|state| (INTERFACE1_NAME == &state.properties.name).then_some(()))
+    })
+    .await
+    .expect("should successfully wait for blackhole interface to be installed");
+
+    {
+        let buffers = ffx_writer::TestBuffers::default();
+        net_cli::do_root(
+            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            net_cli::Command::from_args(
+                &["net"],
+                &["if", "get", &format!("name:{INTERFACE1_NAME}")],
+            )
+            .expect("should parse args successfully"),
+            &connector,
+        )
+        .await
+        .expect("should succeed");
+
+        let interface: serde_json::Value =
+            serde_json::from_slice(&buffers.into_stdout()[..]).expect("should be valid JSON array");
+        assert_eq!(
+            interface,
+            serde_json::json!({
+                "addresses": {
+                    "ipv4": [],
+                    "ipv6": [],
+                },
+                "device_class": "Blackhole",
+                "has_default_ipv4_route": false,
+                "has_default_ipv6_route": false,
+                "mac": null,
+                "name": INTERFACE1_NAME,
+                "nicid": 2,
+                "online": false,
+            })
+        );
+    }
+
+    {
+        let buffers = ffx_writer::TestBuffers::default();
+        net_cli::do_root(
+            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            net_cli::Command::from_args(
+                &["net"],
+                &["if", "remove", &format!("name:{INTERFACE1_NAME}")],
+            )
+            .expect("should parse args successfully"),
+            &connector,
+        )
+        .await
+        .expect("should succeed");
+        let (stdout, stderr) = buffers.into_strings();
+        assert_eq!(stdout, String::new());
+        assert_eq!(stderr, String::new());
+    }
+
+    fnet_interfaces_ext::wait_interface(event_stream.by_ref(), &mut state, |state| {
+        state
+            .values()
+            .find_map(|state| (INTERFACE1_NAME == &state.properties.name).then_some(()))
+            .is_none()
+            .then_some(())
+    })
+    .await
+    .expect("should successfully wait for blackhole interface to be uninstalled");
+
+    {
+        let buffers = ffx_writer::TestBuffers::default();
+        let result = net_cli::do_root(
+            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            net_cli::Command::from_args(
+                &["net"],
+                &["if", "get", &format!("name:{INTERFACE1_NAME}")],
+            )
+            .expect("should parse args successfully"),
+            &connector,
+        )
+        .await;
+        let error = result.unwrap_err();
+        let UserFacingError { msg } =
+            underlying_user_facing_error(&error).expect("should be user-facing error");
+        assert_eq!(msg, format!("No interface with name {INTERFACE1_NAME}"));
+    }
 }
