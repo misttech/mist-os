@@ -20,7 +20,6 @@ asinh
 asinhf
 asinhl
 asinl
-asprintf
 atan
 atan2
 atan2f
