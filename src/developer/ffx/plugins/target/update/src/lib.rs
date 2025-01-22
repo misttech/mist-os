@@ -7,8 +7,8 @@ use ffx_config::EnvironmentContext;
 use ffx_target::TargetProxy;
 use ffx_update_args::ForceInstall;
 use fho::{
-    bug, daemon_protocol, deferred, moniker, return_user_error, Connector, Deferred, FfxContext,
-    FfxMain, FfxTool, Result, SimpleWriter,
+    bug, daemon_protocol, deferred, moniker, return_user_error, Deferred, FfxContext, FfxMain,
+    FfxTool, Result, SimpleWriter,
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_update::{
@@ -23,6 +23,7 @@ use futures::future::FutureExt as _;
 use futures::{pin_mut, select, TryStreamExt};
 use std::path::PathBuf;
 use std::time::Duration;
+use target_connector::Connector;
 use {
     ffx_update_args as args, fidl_fuchsia_developer_ffx as ffx,
     fidl_fuchsia_update_installer_ext as installer,

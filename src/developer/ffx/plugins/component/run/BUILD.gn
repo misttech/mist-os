@@ -13,6 +13,7 @@ if (is_host) {
       "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
       "//src/developer/ffx/core:lib",
       "//src/developer/ffx/lib/fho:lib",
+      "//src/developer/ffx/lib/target/connector:lib",
       "//src/developer/ffx/plugins/component/common:ffx_component",
       "//src/developer/ffx/plugins/log:ffx_log",
       "//src/developer/ffx/plugins/log:ffx_log_args",

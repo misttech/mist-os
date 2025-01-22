@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use error::LogError;
 use ffx_log_args::LogCommand;
-use fho::{Connector, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
@@ -16,6 +16,7 @@ use log_command::log_formatter::{
 };
 use log_command::{LogProcessingResult, LogSubCommand, WatchCommand};
 use std::io::Write;
+use target_connector::Connector;
 use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
 
 mod condition_variable;

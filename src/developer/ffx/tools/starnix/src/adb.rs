@@ -9,7 +9,7 @@ use emulator_instance::EMU_INSTANCE_ROOT_DIR;
 use ffx_config::EnvironmentContext;
 use ffx_emulator_config::ShowDetail;
 use ffx_emulator_engines::EngineBuilder;
-use fho::{return_bug, Connector, FfxContext, Result};
+use fho::{return_bug, FfxContext, Result};
 use fidl_fuchsia_developer_ffx::TargetInfo;
 use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
@@ -23,6 +23,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use target_connector::Connector;
 use tokio::net::{TcpListener, TcpStream};
 use tracing::info;
 use {

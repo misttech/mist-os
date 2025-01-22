@@ -23,6 +23,7 @@ use moniker::Moniker;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use target_connector::Connector;
 use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 const NODENAME: &str = "Rust";
@@ -147,8 +148,8 @@ impl TestEnvironment {
         self.event_rcv.take()
     }
 
-    pub async fn rcs_connector(&self) -> fho::Connector<RemoteControlProxy> {
-        fho::Connector::try_from_env(&self.fho_env).await.expect("Could not make test connector")
+    pub async fn rcs_connector(&self) -> Connector<RemoteControlProxy> {
+        Connector::try_from_env(&self.fho_env).await.expect("Could not make test connector")
     }
 
     /// Simulates a target reboot.

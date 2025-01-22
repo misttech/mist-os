@@ -10,6 +10,9 @@ use analytics::{set_new_opt_in_status, show_status_message};
 use anyhow::{anyhow, Context, Result};
 use api::value::TryConvert;
 use core::fmt;
+use ffx_command_error::bug;
+use futures::future::LocalBoxFuture;
+use std::fmt::Debug;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -46,6 +49,31 @@ lazy_static::lazy_static! {
 #[doc(hidden)]
 pub mod macro_deps {
     pub use {anyhow, serde_json};
+}
+
+pub trait TryFromEnvContext: Sized + Debug {
+    fn try_from_env_context<'a>(
+        env: &'a EnvironmentContext,
+    ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>>;
+}
+
+// This is an implementation for the "target_spec", which is just an `Option<String>` (it should
+// really just be a newtype, but that requires a lot of existing code to change).
+impl TryFromEnvContext for Option<String> {
+    fn try_from_env_context<'a>(
+        env: &'a EnvironmentContext,
+    ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>> {
+        Box::pin(async {
+            // TODO(XXX): Create a TargetSpecifier type vs. Option<String>.
+            // ffx_target::get_target_specifier(env).await.bug().map_err(Into::into) })
+            let target_spec = env.get_optional(keys::TARGET_DEFAULT_KEY).map_err(|e| bug!(e))?;
+            match target_spec {
+                Some(ref target) => tracing::info!("Target specifier: ['{target:?}']"),
+                None => tracing::debug!("No target specified"),
+            }
+            Ok(target_spec)
+        })
+    }
 }
 
 /// The levels of configuration possible

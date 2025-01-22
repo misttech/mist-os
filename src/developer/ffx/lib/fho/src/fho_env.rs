@@ -107,7 +107,7 @@ impl FhoEnvironment {
         &self.context
     }
 
-    pub(crate) async fn behavior(&self) -> Option<FhoConnectionBehavior> {
+    pub async fn behavior(&self) -> Option<FhoConnectionBehavior> {
         if let Some(ref b) = *self.behavior.read().await {
             Some(b.clone())
         } else {

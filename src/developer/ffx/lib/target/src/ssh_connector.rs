@@ -6,11 +6,13 @@ use crate::target_connector::{
     FDomainConnection, OvernetConnection, TargetConnection, TargetConnectionError, TargetConnector,
     BUFFER_SIZE,
 };
+use crate::Resolution;
 use anyhow::Result;
 use ffx_command_error::FfxContext as _;
-use ffx_config::EnvironmentContext;
+use ffx_config::{EnvironmentContext, TryFromEnvContext};
 use ffx_ssh::ssh::{build_ssh_command_with_env, SshError};
 use fuchsia_async::Task;
+use futures::future::LocalBoxFuture;
 use nix::sys::signal::kill;
 use nix::sys::signal::Signal::SIGKILL;
 use nix::sys::wait::waitpid;
@@ -163,6 +165,24 @@ impl SshConnector {
             input: Box::new(stdin),
             errors: errors_receiver,
             main_task,
+        })
+    }
+}
+
+impl TryFromEnvContext for SshConnector {
+    fn try_from_env_context<'a>(
+        env: &'a EnvironmentContext,
+    ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>> {
+        Box::pin(async {
+            let resolution = Resolution::try_from_env_context(env).await?;
+            let res = resolution.addr().map_err(|_| {
+                ffx_command_error::user_error!(
+                    "query did not resolve an IP address. Resolved the following: {:?}",
+                    resolution,
+                )
+            })?;
+            tracing::debug!("connecting to address {res}");
+            SshConnector::new(res, env).await.bug().map_err(Into::into)
         })
     }
 }

@@ -22,6 +22,7 @@ ffx_plugin("ffx_update") {
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target:lib",
+    "//src/developer/ffx/lib/target/connector:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/developer/ffx/plugins/repository/server/start:ffx_repository_server_start",
     "//src/developer/ffx/plugins/repository/server/start:ffx_repository_server_start_args",

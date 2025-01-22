@@ -5,7 +5,7 @@
 use ffx_config::EnvironmentContext;
 use ffx_target::TargetProxy;
 use fho::{
-    bug, return_bug, return_user_error, user_error, Connector, Deferred, FfxMain, Result,
+    bug, return_bug, return_user_error, user_error, Deferred, FfxMain, Result,
     VerifiedMachineWriter,
 };
 use fidl::endpoints::DiscoverableProtocolMarker;
@@ -24,6 +24,7 @@ use std::net::Ipv6Addr;
 use std::path::PathBuf;
 use std::process;
 use std::time::Duration;
+use target_connector::Connector;
 use timeout::timeout;
 use zx_status::Status;
 

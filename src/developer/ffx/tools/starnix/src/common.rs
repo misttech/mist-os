@@ -4,11 +4,11 @@
 
 use anyhow::{bail, Context, Result};
 use component_debug::cli;
-use fho::Connector;
 use fidl_fuchsia_developer_remotecontrol as rc;
 use fidl_fuchsia_starnix_container::{ControllerMarker, ControllerProxy};
 use lazy_static::lazy_static;
 use regex::Regex;
+use target_connector::Connector;
 
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 

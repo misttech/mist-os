@@ -6,9 +6,9 @@
 
 use anyhow::{anyhow, Context};
 use camino::Utf8Path;
+use ffx_command_error::{return_user_error, Result};
 use ffx_repository_serve_args::ServeCommand;
 use ffx_target::{knock_target, TargetProxy};
-use fho::{return_user_error, Connector, Result};
 use fidl_fuchsia_developer_ffx::{
     RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetInfo,
 };
@@ -25,6 +25,7 @@ use pkg::repo::register_target_with_fidl_proxies;
 use std::io::Write;
 use std::sync::Arc;
 use std::time::Duration;
+use target_connector::Connector;
 use timeout::timeout;
 
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";

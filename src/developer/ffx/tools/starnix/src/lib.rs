@@ -5,9 +5,10 @@
 use argh::{ArgsInfo, FromArgs};
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
-use fho::{Connector, Error, FfxMain, FfxTool, Result, SimpleWriter};
+use fho::{Error, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::TargetInfo;
 use fidl_fuchsia_developer_remotecontrol as rc;
+use target_connector::Connector;
 
 pub mod common;
 use common::connect_to_rcs;

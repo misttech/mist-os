@@ -34,6 +34,7 @@ if (is_host) {
     "symbol-index",
     "symbolize",
     "target",
+    "target/connector",
     "tasks",
     "testing",
     "timeout",

@@ -8,11 +8,12 @@ use discovery::query::TargetInfoQuery;
 use discovery::{
     DiscoverySources, FastbootConnectionState, TargetEvent, TargetHandle, TargetState,
 };
-use ffx_config::EnvironmentContext;
+use ffx_command_error::{user_error, NonFatalError};
+use ffx_config::{EnvironmentContext, TryFromEnvContext};
 use fidl_fuchsia_developer_ffx::{self as ffx};
 use fidl_fuchsia_developer_remotecontrol::{IdentifyHostResponse, RemoteControlProxy};
 use fuchsia_async::TimeoutExt;
-use futures::future::join_all;
+use futures::future::{join_all, LocalBoxFuture};
 use futures::{pin_mut, select, FutureExt, StreamExt};
 use itertools::Itertools;
 use netext::IsLocalAddr;
@@ -27,6 +28,7 @@ use target_errors::FfxTargetError;
 
 use crate::connection::Connection;
 use crate::ssh_connector::SshConnector;
+use crate::UNSPECIFIED_TARGET_NAME;
 
 const CONFIG_TARGET_SSH_TIMEOUT: &str = "target.host_pipe_ssh_timeout";
 const CONFIG_LOCAL_DISCOVERY_TIMEOUT: &str = "discovery.timeout";
@@ -737,6 +739,29 @@ impl Resolution {
             );
         }
         Ok(self.identify_host_response.as_ref().unwrap())
+    }
+}
+
+impl TryFromEnvContext for Resolution {
+    fn try_from_env_context<'a>(
+        env: &'a EnvironmentContext,
+    ) -> LocalBoxFuture<'a, ffx_command_error::Result<Self>> {
+        Box::pin(async {
+            let unspecified_target = UNSPECIFIED_TARGET_NAME.to_owned();
+            let target_spec = Option::<String>::try_from_env_context(env).await?;
+            let target_spec_unwrapped = if env.is_strict() {
+                target_spec.as_ref().ok_or(user_error!(
+                    "You must specify a target via `-t <target_name>` before any command arguments"
+                ))?
+            } else {
+                target_spec.as_ref().unwrap_or(&unspecified_target)
+            };
+            tracing::trace!("resolving target spec address from {}", target_spec_unwrapped);
+            let resolution = resolve_target_address(&target_spec, env)
+                .await
+                .map_err(|e| ffx_command_error::Error::User(NonFatalError(e.into()).into()))?;
+            Ok(resolution)
+        })
     }
 }
 

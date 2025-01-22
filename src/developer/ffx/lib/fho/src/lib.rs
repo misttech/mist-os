@@ -15,7 +15,7 @@ pub use subtool::{FfxMain, FfxTool};
 
 // Re-export TryFromEnv related symbols
 pub use from_env::{
-    daemon_protocol, moniker, moniker_f, AvailabilityFlag, CheckEnv, Connector,
+    daemon_protocol, init_daemon_behavior, moniker, moniker_f, AvailabilityFlag, CheckEnv,
     DeviceLookupDefaultImpl,
 };
 

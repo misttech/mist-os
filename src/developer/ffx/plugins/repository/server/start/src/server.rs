@@ -7,11 +7,12 @@ use ffx_config::EnvironmentContext;
 use ffx_repository_serve::{get_repo_base_name, serve_impl};
 use ffx_repository_serve_args::ServeCommand;
 use ffx_repository_server_start_args::StartCommand;
-use fho::{bug, user_error, Connector, Deferred, FfxMain, Result};
+use fho::{bug, user_error, Deferred, FfxMain, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use pkg::{PkgServerInstanceInfo, PkgServerInstances, ServerMode};
 use std::time::Duration;
+use target_connector::Connector;
 
 // map from the start command to the serve command.
 pub(crate) fn to_serve_command(cmd: &StartCommand) -> ServeCommand {

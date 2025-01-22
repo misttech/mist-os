@@ -10,8 +10,8 @@ use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
 use ffx_target::TargetProxy;
 use fho::{
-    bug, daemon_protocol, deferred, return_bug, return_user_error, Connector, Deferred, FfxMain,
-    FfxTool, Result, SimpleWriter,
+    bug, daemon_protocol, deferred, return_bug, return_user_error, Deferred, FfxMain, FfxTool,
+    Result, SimpleWriter,
 };
 use fidl_fuchsia_developer_ffx::{self as ffx, RepositoryRegistryProxy, ServerStatus};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -31,6 +31,7 @@ use signal_hook::iterator::Signals;
 use std::fs;
 use std::io::Write;
 use std::sync::Arc;
+use target_connector::Connector;
 use target_errors::FfxTargetError;
 use tuf::metadata::RawSignedMetadata;
 

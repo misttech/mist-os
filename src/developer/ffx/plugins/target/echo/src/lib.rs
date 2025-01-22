@@ -6,9 +6,10 @@ use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use ffx_target_echo_args::EchoCommand;
-use fho::{Connector, FfxMain, FfxTool, VerifiedMachineWriter};
+use fho::{FfxMain, FfxTool, VerifiedMachineWriter};
 use schemars::JsonSchema;
 use serde::Serialize;
+use target_connector::Connector;
 
 #[derive(Debug, Serialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]

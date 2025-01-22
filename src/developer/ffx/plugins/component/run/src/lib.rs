@@ -25,7 +25,7 @@ async fn cmd_impl(
     rcs_proxy: rc::RemoteControlProxy,
     args: RunComponentCommand,
     mut writer: MachineWriter<LogEntry>,
-    connector: fho::Connector<rc::RemoteControlProxy>,
+    connector: target_connector::Connector<rc::RemoteControlProxy>,
 ) -> Result<(), anyhow::Error> {
     let rcs_proxy_clone = rcs_proxy.clone();
     let lifecycle_controller_factory = move || {
@@ -89,7 +89,7 @@ pub struct RunTool {
     #[command]
     cmd: RunComponentCommand,
     rcs: rc::RemoteControlProxy,
-    connector: fho::Connector<rc::RemoteControlProxy>,
+    connector: target_connector::Connector<rc::RemoteControlProxy>,
 }
 
 fho::embedded_plugin!(RunTool);

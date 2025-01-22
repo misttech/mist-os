@@ -12,6 +12,7 @@ rustc_library("lib") {
 
   deps = [
     "macro:config-macros",
+    "//src/developer/ffx/command/error:lib",
     "//src/developer/ffx/config/domain:lib",
     "//src/developer/ffx/lib/buildid:lib",
     "//src/developer/ffx/lib/errors:lib",

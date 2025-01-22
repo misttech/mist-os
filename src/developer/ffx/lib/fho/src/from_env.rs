@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::connector::{DirectConnector, NetworkConnector};
+use crate::connector::DirectConnector;
 use crate::fho_env::{DeviceLookup, FhoConnectionBehavior};
 use crate::{FhoEnvironment, TryFromEnv, TryFromEnvWith};
 use async_trait::async_trait;
@@ -12,10 +12,9 @@ use fdomain_client::fidl::{
     Proxy as FProxy,
 };
 use ffx_build_version::VersionInfo;
-use ffx_command_error::{return_bug, return_user_error, FfxContext, Result};
+use ffx_command_error::{return_user_error, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
-use ffx_target::ssh_connector::SshConnector;
 use ffx_target::TargetInfoQuery;
 use fidl::encoding::DefaultFuchsiaResourceDialect;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
@@ -100,40 +99,7 @@ impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
     }
 }
 
-/// A connector lets a tool make multiple attempts to connect to an object. It
-/// retains the environment in the tool body to allow this.
-#[derive(Clone)]
-pub struct Connector<T: TryFromEnv> {
-    env: FhoEnvironment,
-    _connects_to: std::marker::PhantomData<T>,
-}
-
-async fn knock_rcs(
-    target: &Option<String>,
-    tc_proxy: &ffx_fidl::TargetCollectionProxy,
-    open_target_timeout: Duration,
-    knock_target_timeout: Duration,
-) -> Result<()> {
-    loop {
-        match ffx_target::knock_target_by_name(
-            target,
-            tc_proxy,
-            open_target_timeout,
-            knock_target_timeout,
-        )
-        .await
-        {
-            Ok(()) => break,
-            Err(ffx_target::KnockError::CriticalError(e)) => return Err(e.into()),
-            Err(ffx_target::KnockError::NonCriticalError(_)) => {
-                // Should we log the error? It'll spam like hell.
-            }
-        };
-    }
-    Ok(())
-}
-
-async fn init_daemon_behavior(context: &EnvironmentContext) -> Result<FhoConnectionBehavior> {
+pub async fn init_daemon_behavior(context: &EnvironmentContext) -> Result<FhoConnectionBehavior> {
     let build_info = context.build_info();
     let overnet_injector = Injection::initialize_overnet(
         context.clone(),
@@ -143,204 +109,6 @@ async fn init_daemon_behavior(context: &EnvironmentContext) -> Result<FhoConnect
     .await?;
 
     Ok(FhoConnectionBehavior::DaemonConnector(Arc::new(overnet_injector)))
-}
-
-async fn daemon_try_connect<T: TryFromEnv>(
-    env: &FhoEnvironment,
-    log_target_wait: &mut impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
-    open_target_timeout: Duration,
-    knock_target_timeout: Duration,
-) -> Result<T> {
-    loop {
-        return match T::try_from_env(env).await {
-            Err(ffx_command_error::Error::User(e)) => {
-                match e.downcast::<target_errors::FfxTargetError>() {
-                    Ok(target_errors::FfxTargetError::DaemonError {
-                        err: ffx_fidl::DaemonError::Timeout,
-                        target,
-                        ..
-                    }) => {
-                        let Ok(daemon_proxy) = ffx_fidl::DaemonProxy::try_from_env(env).await
-                        else {
-                            // Let the initial try_from_env detect this error.
-                            continue;
-                        };
-                        let (tc_proxy, server_end) =
-                            fidl::endpoints::create_proxy::<ffx_fidl::TargetCollectionMarker>();
-                        let Ok(Ok(())) = daemon_proxy
-                            .connect_to_protocol(
-                                ffx_fidl::TargetCollectionMarker::PROTOCOL_NAME,
-                                server_end.into_channel(),
-                            )
-                            .await
-                        else {
-                            // Let the rcs_proxy_connector detect this error too.
-                            continue;
-                        };
-                        log_target_wait(&target, &None)?;
-                        // The daemon version of this check uses a "knock" against RCS, which is
-                        // essentially: keep a channel open to RCS for about a second, and if no
-                        // error events come in on the channel during that time, we consider it
-                        // "safe." This isn't something strictly necessary (and is not being used
-                        // in the daemonless version). This was implemented when reliability with
-                        // overnet was pretty spotty (when it was primarily a mesh network), and
-                        // was a means to determine if a connection was "real" or if it was
-                        // something stale.
-                        //
-                        // For non-daemon connections this isn't necessary, and we
-                        // can operate under the assumption that if we have connected to an
-                        // instance of an RCS proxy, we are therefore able to use it.t
-                        knock_rcs(&target, &tc_proxy, open_target_timeout, knock_target_timeout)
-                            .await?;
-                        continue;
-                    }
-                    Ok(other) => return Err(Into::<FfxError>::into(other).into()),
-                    Err(e) => return Err(e.into()),
-                }
-            }
-            other => other,
-        };
-    }
-}
-
-async fn direct_connector_try_connect<T: TryFromEnv>(
-    env: &FhoEnvironment,
-    dc: &Arc<dyn DirectConnector>,
-    log_target_wait: &mut impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
-) -> Result<T> {
-    loop {
-        match dc.connect().await {
-            Ok(()) => {}
-            Err(err) => {
-                let e = err.downcast_non_fatal()?;
-                tracing::debug!("error when attempting to connect with connector: {e}");
-                log_target_wait(&dc.target_spec(), &Some(crate::Error::User(e)))?;
-                // This is just a small wait to prevent busy-looping. The delay is arbitrary.
-                fuchsia_async::Timer::new(Duration::from_millis(50)).await;
-                continue;
-            }
-        }
-        return match T::try_from_env(env).await {
-            Err(conn_error) => {
-                let e = conn_error.downcast_non_fatal()?;
-                tracing::debug!("error when trying to connect using TryFromEnv: {e}");
-                log_target_wait(&dc.target_spec(), &Some(crate::Error::User(e)))?;
-                if let Err(e) = dc.rcs_proxy().await {
-                    tracing::debug!("unable to get RCS proxy after TryFromEnv failure: {e}");
-                } else {
-                    // This state is really only possible if:
-                    //
-                    // a.) There is a bug. This just shouldn't happen with regular usage of FHO.
-                    // b.) A user has created a `impl TryFromEnv` structure that returns a
-                    //     non-fatal error implying a "retry" must happen.
-                    //
-                    // Hence log a warning, as both cases are odd behavior.
-                    tracing::warn!(
-                        "despite TryFromEnv failure, able to get RCS proxy from device connection"
-                    );
-                }
-                continue;
-            }
-            Ok(res) => Ok(res),
-        };
-    }
-}
-
-impl<T: TryFromEnv> Connector<T> {
-    const OPEN_TARGET_TIMEOUT: Duration = Duration::from_millis(500);
-    const KNOCK_TARGET_TIMEOUT: Duration = ffx_target::DEFAULT_RCS_KNOCK_TIMEOUT;
-
-    /// Try to get a `T` from the environment. Will wait for the target to
-    /// appear if it is non-responsive. If that occurs, `log_target_wait` will
-    /// be called prior to waiting.
-    pub async fn try_connect(
-        &self,
-        mut log_target_wait: impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
-    ) -> Result<T> {
-        if let Some(behavior) = self.env.behavior().await {
-            match behavior {
-                FhoConnectionBehavior::DaemonConnector(_) => {
-                    daemon_try_connect(
-                        &self.env,
-                        &mut log_target_wait,
-                        Self::OPEN_TARGET_TIMEOUT,
-                        Self::KNOCK_TARGET_TIMEOUT,
-                    )
-                    .await
-                }
-                FhoConnectionBehavior::DirectConnector(ref dc) => {
-                    direct_connector_try_connect::<T>(&self.env, dc, &mut log_target_wait).await
-                }
-            }
-        } else {
-            return_bug!("Behavior must be initialized at this point")
-        }
-    }
-}
-
-#[async_trait(?Send)]
-impl<T: TryFromEnv> TryFromEnv for Connector<T> {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        if env.behavior().await.is_none() {
-            let b = init_daemon_behavior(env.environment_context()).await?;
-            env.set_behavior(b.clone()).await;
-        }
-        if env.lookup().await.is_none() {
-            env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await
-        }
-        Ok(Connector { env: env.clone(), _connects_to: Default::default() })
-    }
-}
-
-pub struct DirectTargetConnector<T: TryFromEnv> {
-    pub inner: Connector<T>,
-    connector: Arc<NetworkConnector<SshConnector>>,
-}
-
-#[async_trait(?Send)]
-impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        // Configure the environment to use a direct connector
-        let connector: Arc<NetworkConnector<SshConnector>> = Arc::new(
-            NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(
-                &env.environment_context(),
-            )
-            .await?,
-        );
-
-        let direct_env = env.clone();
-        direct_env.set_behavior(FhoConnectionBehavior::DirectConnector(connector.clone())).await;
-        if direct_env.lookup().await.is_none() {
-            direct_env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await
-        }
-        Ok(DirectTargetConnector {
-            connector,
-            inner: Connector { env: direct_env, _connects_to: Default::default() },
-        })
-    }
-}
-
-/// This is prototype code for the daemonless direct-non-strict connection.
-impl<T: TryFromEnv> DirectTargetConnector<T> {
-    /// Try to get a `T` from the environment. Will wait for the target to
-    /// appear if it is non-responsive. If that occurs, `log_target_wait` will
-    /// be called prior to waiting.
-    #[allow(dead_code)]
-    pub async fn try_connect(
-        &self,
-        log_target_wait: impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
-    ) -> Result<T> {
-        self.inner.try_connect(log_target_wait).await
-    }
-
-    #[allow(dead_code)]
-    pub async fn get_address(&self) -> Option<std::net::SocketAddr> {
-        self.connector.device_address().await
-    }
-    #[allow(dead_code)]
-    pub async fn get_ssh_host_address(&self) -> Option<String> {
-        self.connector.host_ssh_address().await
-    }
 }
 
 #[async_trait(?Send)]
@@ -695,110 +463,9 @@ impl TryFromEnv for Option<Arc<dyn DirectConnector>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::connector::MockDirectConnector;
-    use crate::fho_env::{FhoConnectionBehavior, MockDeviceLookup};
-    use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
+    use crate::fho_env::MockDeviceLookup;
 
     use super::*;
-
-    #[fuchsia::test]
-    async fn test_connector_try_connect_fail_reconnect_and_rcs_eventual_success() {
-        let config_env = ffx_config::test_init().await.unwrap();
-
-        let mut mock_connector = MockDirectConnector::new();
-        mock_connector.expect_device_address().returning(|| Box::pin(async { None }));
-        mock_connector.expect_target_spec().returning(|| None);
-        let mut seq = mockall::Sequence::new();
-        mock_connector.expect_connect().times(3).in_sequence(&mut seq).returning(|| {
-            Box::pin(async {
-                Err(crate::Error::User(
-                    crate::NonFatalError(anyhow::anyhow!("we just need to try again")).into(),
-                ))
-            })
-        });
-        mock_connector
-            .expect_connect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|| Box::pin(async { Ok(()) }));
-        mock_connector.expect_rcs_proxy().times(2).in_sequence(&mut seq).returning(|| {
-            Box::pin(async {
-                Err(crate::Error::User(
-                    crate::NonFatalError(
-                        anyhow::anyhow!("we must retry connecting to RCS!").into(),
-                    )
-                    .into(),
-                ))
-            })
-        });
-        mock_connector
-            .expect_connect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|| Box::pin(async { Ok(()) }));
-        mock_connector.expect_rcs_proxy().times(1).in_sequence(&mut seq).returning(|| {
-            Box::pin(async {
-                // This will return an unusable proxy, but we're not going to use it so it's not
-                // important.
-                let (proxy, _) = fidl::endpoints::create_proxy::<RemoteControlMarker>();
-                Ok(proxy)
-            })
-        });
-        let tool_env = crate::testing::ToolEnv::new().make_environment_with_behavior(
-            config_env.context.clone(),
-            FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
-        );
-
-        let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
-        let res = connector.try_connect(|_, _| Ok(())).await;
-        assert!(res.is_ok(), "Expected success: {:?}", res);
-    }
-
-    #[fuchsia::test]
-    async fn test_connector_try_connect_fail_after_successful_connection() {
-        let config_env = ffx_config::test_init().await.unwrap();
-        let mut mock_connector = MockDirectConnector::new();
-        mock_connector.expect_device_address().returning(|| Box::pin(async { None }));
-        mock_connector.expect_target_spec().returning(|| None);
-        let mut seq = mockall::Sequence::new();
-        mock_connector
-            .expect_connect()
-            .times(1)
-            .in_sequence(&mut seq)
-            .returning(|| Box::pin(async { Ok(()) }));
-        mock_connector.expect_rcs_proxy().times(1).in_sequence(&mut seq).returning(|| {
-            Box::pin(async {
-                Err(crate::Error::Unexpected(anyhow::anyhow!("something critical failed!").into()))
-            })
-        });
-        let tool_env = crate::testing::ToolEnv::new().make_environment_with_behavior(
-            config_env.context.clone(),
-            FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
-        );
-
-        let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
-        let res = connector.try_connect(|_, _| Ok(())).await;
-        assert!(res.is_err(), "Expected failure: {:?}", res);
-    }
-
-    #[fuchsia::test]
-    async fn test_connector_try_connect_fail_after_critical_connection_error() {
-        let config_env = ffx_config::test_init().await.unwrap();
-        let mut mock_connector = MockDirectConnector::new();
-        mock_connector.expect_connect().times(1).returning(|| {
-            Box::pin(async {
-                Err(crate::Error::Unexpected(anyhow::anyhow!("we're doomed!").into()))
-            })
-        });
-        let tool_env = crate::testing::ToolEnv::new().make_environment_with_behavior(
-            config_env.context.clone(),
-            FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
-        );
-
-        let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
-        let res = connector.try_connect(|_, _| Ok(())).await;
-        assert!(res.is_err(), "Expected failure: {:?}", res);
-    }
 
     #[fuchsia::test]
     async fn test_target_info_try_from_env_none_is_okay() {

@@ -12,6 +12,7 @@ ffx_plugin("ffx_target_echo") {
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target/connector:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
