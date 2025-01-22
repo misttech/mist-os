@@ -26,6 +26,17 @@
             to: "#chromium-tests",
         },
 
+        // TODO(https://fxbug.dev/345827642): Remove once out-of-tree users are using these
+        // protocols from the dictionary.
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent/diagnostics",
+            to: "#chromium-tests",
+        },
+
         // These system capabilities are offered for use by the chromium tests.
         // TODO(https://fxbug.dev/42173552): Drive down this list via fakes and similar.
         {
