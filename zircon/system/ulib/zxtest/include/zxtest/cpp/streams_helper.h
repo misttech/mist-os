@@ -5,12 +5,12 @@
 #ifndef ZXTEST_CPP_STREAMS_HELPER_H_
 #define ZXTEST_CPP_STREAMS_HELPER_H_
 
-#include <iostream>
 #include <optional>
 #include <sstream>
 
 #include <zxtest/base/assertion.h>
 #include <zxtest/base/types.h>
+#include <zxtest/cpp/internal.h>
 
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_status_value, status_value, zx_status_t (C::*)() const);
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_status, status, zx_status_t (C::*)() const);
@@ -39,7 +39,9 @@ struct Tag {};
 class StreamableBase {
  public:
   StreamableBase(const zxtest::SourceLocation location)
-      : stream_(std::stringstream("")), location_(location) {}
+      : stream_(std::stringstream("")), location_(location) {
+    LIB_ZXTEST_CHECK_RUNNING();
+  }
 
   // Lower precedence operator that returns void, such that the following
   // expressions are valid in functions that return void:
