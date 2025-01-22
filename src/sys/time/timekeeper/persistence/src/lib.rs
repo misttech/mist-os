@@ -5,6 +5,7 @@
 //! Testing-only code for persistent Timekeeper behavior changes around
 //! real-time clock (RTC) handling.
 
+use fuchsia_runtime::UtcTimeline;
 use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -16,76 +17,124 @@ const PERSISTENT_STATE_PATH: &'static str = "/data/persistent_state.json";
 /// How many reboots should the setting persist for?
 const REBOOT_COUNT: u8 = 1;
 
-/// The persistent state of the RTC testing API.
+/// The persistent Timekeeper state.
+///
+/// See the method documentation for the specific components of the
+/// state that is being persisted.
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct State {
     // This many reboots remain until we're allowed to write to RTC again. This
     // counter is decreased by Timekeeper on each restart, until zero is reached.
     num_reboots_until_rtc_write_allowed: u8,
+
+    // If set to nonzero, this is the reference instant on the boot timeline
+    // used for estimating UTC.
+    #[serde(default)]
+    reference_boot_instant_ns: i64,
+
+    // If set to nonzero, this is the UTC instant corresponding to
+    // `reference_boot_instant_ns` above.
+    #[serde(default)]
+    reference_utc_instant_ns: i64,
 }
 
 impl State {
     pub fn new(update_rtc: bool) -> Self {
-        Self {
-            num_reboots_until_rtc_write_allowed: match update_rtc {
-                true => 0,
-                // Limit the validity of the setting, expressed in number of
-                // reboots.
-                false => REBOOT_COUNT,
-            },
-        }
+        let mut value = Self { ..Default::default() };
+        value.set_may_update_rtc(update_rtc);
+        value
     }
 
     /// Returns whether updating the RTC clock is allowed.
     pub fn may_update_rtc(&self) -> bool {
         self.num_reboots_until_rtc_write_allowed == 0
     }
-}
 
-/// Read the persistent state. Any errors are logged only, and defaults are returned.
-pub fn read_and_update_state() -> State {
-    read_and_update_state_internal(PERSISTENT_STATE_PATH)
-}
+    pub fn set_may_update_rtc(&mut self, update_rtc: bool) {
+        self.num_reboots_until_rtc_write_allowed = match update_rtc {
+            true => 0,
+            // Limit the validity of the setting, expressed in number of
+            // reboots.
+            false => REBOOT_COUNT,
+        };
+    }
 
-pub fn read_and_update_state_internal<P: AsRef<Path>>(path: P) -> State {
-    let path = path.as_ref();
-    let state: State = fs::read_to_string(path)
-        .as_ref()
-        .map(|s| {
-            serde_json::from_str(s)
-                .map_err(|e| error!("while deserializing: {:?}: {:?}", path, e))
-                .unwrap_or_else(|_| Default::default())
-        })
-        .map_err(|e| debug!("while reading: {:?}", e))
-        .unwrap_or_else(|_| Default::default());
-    debug!("read persistent state: {:?}", &state);
+    /// Gets a known-good reference point on the boot-to-utc affine transform.
+    pub fn get_rtc_reference(&self) -> (zx::BootInstant, zx::Instant<UtcTimeline>) {
+        let reference_boot = zx::BootInstant::from_nanos(self.reference_boot_instant_ns);
+        let reference_utc = zx::Instant::from_nanos(self.reference_utc_instant_ns);
+        (reference_boot, reference_utc)
+    }
+
+    /// Sets a known-good reference point on the boot-to-utc affine transform.
+    ///
+    /// This setting can be used to recover a known-good UTC estimate.
+    ///
+    /// # Args
+    ///
+    /// - `boot_reference`: a reference instant on the boot timeline.
+    /// - `utc_reference`: a reference instant on the UTC timeline that corresponds
+    ///   to `boot_timeline`.
+    pub fn set_rtc_reference(
+        &mut self,
+        boot_reference: zx::BootInstant,
+        utc_reference: zx::Instant<UtcTimeline>,
+    ) {
+        self.reference_boot_instant_ns = boot_reference.into_nanos();
+        self.reference_utc_instant_ns = utc_reference.into_nanos();
+    }
 
     // Change the reboot limit.
-    let mut next = state.clone();
-    next.num_reboots_until_rtc_write_allowed =
-        state.num_reboots_until_rtc_write_allowed.saturating_sub(1);
-    write_state_internal(path, &next);
+    fn spend_one_reboot_count(&mut self) {
+        self.num_reboots_until_rtc_write_allowed =
+            self.num_reboots_until_rtc_write_allowed.saturating_sub(1);
+    }
 
-    // Return the previous state.
-    state
-}
+    /// Reads the persistent state, updating the testing-only components.
+    ///
+    /// Any errors are logged only, and defaults are returned.
+    pub fn read_and_update() -> Self {
+        Self::read_and_update_internal(PERSISTENT_STATE_PATH)
+    }
 
-/// Write the persistent state to mutable persistent storage.
-pub fn write_state(state: &State) {
-    write_state_internal(PERSISTENT_STATE_PATH, state)
-}
+    pub fn read_and_update_internal<P: AsRef<Path>>(path: P) -> Self {
+        let path = path.as_ref();
+        let state: State = fs::read_to_string(path)
+            .as_ref()
+            .map(|s| {
+                serde_json::from_str(s)
+                    .map_err(|e| error!("while deserializing: {:?}: {:?}", path, e))
+                    .unwrap_or_else(|_| Default::default())
+            })
+            .map_err(|e| debug!("while reading: {:?}", e))
+            .unwrap_or_else(|_| Default::default());
+        debug!("read persistent state: {:?}", &state);
 
-fn write_state_internal<P: AsRef<Path>>(path: P, state: &State) {
-    let path = path.as_ref();
-    debug!("writing persistent state: {:?} to {:?}", state, path);
-    serde_json::to_string(state)
-        .map(|s| {
-            fs::write(path, s)
-                .map_err(|e| error!("while writing persistent state: {:?}: {:?}", path, e))
-                .map_err(|e| error!("while serializing state from: {:?}: {:?}", path, e))
-                .unwrap_or(())
-        })
-        .unwrap_or(())
+        let mut next = state.clone();
+        next.spend_one_reboot_count();
+        Self::write_internal(path, &next);
+
+        // Return the previous state.
+        state
+    }
+
+    /// Write the persistent state to mutable persistent storage.
+    pub fn write(state: &Self) {
+        Self::write_internal(PERSISTENT_STATE_PATH, state)
+    }
+
+    fn write_internal<P: AsRef<Path>>(path: P, state: &Self) {
+        let path = path.as_ref();
+        debug!("writing persistent state: {:?} to {:?}", state, path);
+        serde_json::to_string(state)
+            .map(|s| {
+                fs::write(path, s)
+                    .map_err(|e| error!("while writing persistent state: {:?}: {:?}", path, e))
+                    .map_err(|e| error!("while serializing state from: {:?}: {:?}", path, e))
+                    .unwrap_or(())
+            })
+            .unwrap_or(())
+    }
 }
 
 #[cfg(test)]
@@ -97,11 +146,11 @@ mod tests {
         let d = tempfile::TempDir::new().expect("tempdir created");
         let p = d.path().join("file.json");
         let s = State::new(false);
-        write_state_internal(&p, &s);
+        State::write_internal(&p, &s);
 
         // First time around, we may not update the RTC.
-        assert!(!read_and_update_state_internal(&p).may_update_rtc());
+        assert!(!State::read_and_update_internal(&p).may_update_rtc());
         // Second time around, we may.
-        assert!(read_and_update_state_internal(&p).may_update_rtc());
+        assert!(State::read_and_update_internal(&p).may_update_rtc());
     }
 }

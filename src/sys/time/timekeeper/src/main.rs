@@ -35,7 +35,7 @@ use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
 use log::{debug, error, info, warn};
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
@@ -261,15 +261,14 @@ async fn main() -> Result<()> {
         }
     };
 
-    let allow_update_rtc =
-        Rc::new(Cell::new(persistence::read_and_update_state().may_update_rtc()));
+    let persistent_state = Rc::new(RefCell::new(persistence::State::read_and_update()));
 
     let (cmd_send, cmd_rcv) = mpsc::channel(1);
 
     let cmd_send_clone = cmd_send.clone();
     let serve_test_protocols = config.serve_test_protocols();
     let serve_fuchsia_time_alarms = config.serve_fuchsia_time_alarms();
-    let aur = allow_update_rtc.clone();
+    let ps = persistent_state.clone();
     fasync::Task::local(async move {
         maintain_utc(
             primary_track,
@@ -279,7 +278,7 @@ async fn main() -> Result<()> {
             config,
             cmd_send_clone,
             cmd_rcv,
-            aur,
+            ps,
         )
         .await;
     })
@@ -332,7 +331,7 @@ async fn main() -> Result<()> {
     let result = fs
         .for_each_concurrent(MAX_CONCURRENT_HANDLERS, |request: Rpcs| {
             let time_test_mutex = time_test_mutex.clone();
-            let allow_update_rtc = allow_update_rtc.clone();
+            let allow_update_rtc = persistent_state.clone();
             let timer_loop = timer_loop.clone();
             fuchsia_trace::instant!(c"timekeeper", c"request", fuchsia_trace::Scope::Process);
             async move {
@@ -485,7 +484,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
     config: Arc<Config>,
     cmd_send: mpsc::Sender<Command>,
     cmd_recv: mpsc::Receiver<Command>,
-    allow_update_rtc: Rc<Cell<bool>>,
+    persistent_state: Rc<RefCell<persistence::State>>,
 ) where
     R: Rtc,
     D: Diagnostics,
@@ -572,7 +571,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         Track::Primary,
         Arc::clone(&config),
         cmd_recv,
-        allow_update_rtc,
+        persistent_state,
     );
     let (_, r2) = mpsc::channel(1);
     let fut2_cfg_clone = config.clone();
@@ -586,7 +585,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
                 Track::Monitor,
                 fut2_cfg_clone,
                 r2,
-                Rc::new(Cell::new(true)),
+                Rc::new(RefCell::new(persistence::State::new(true))),
             )
         })
         .into();
@@ -634,6 +633,10 @@ mod tests {
 
     lazy_static! {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
+    }
+
+    fn new_state_for_test(value: bool) -> Rc<RefCell<persistence::State>> {
+        Rc::new(RefCell::new(persistence::State::new(value)))
     }
 
     /// Creates and starts a new clock with default options, returning a tuple of the clock and its
@@ -705,7 +708,7 @@ mod tests {
         let boot_ref = zx::BootInstant::get();
 
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -794,7 +797,7 @@ mod tests {
 
         let boot_ref = zx::BootInstant::get();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -883,7 +886,7 @@ mod tests {
 
         let boot_ref = executor.boot_now();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -938,7 +941,7 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -983,7 +986,7 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -1039,7 +1042,7 @@ mod tests {
         }])
         .into();
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(
@@ -1094,7 +1097,7 @@ mod tests {
         .into();
 
         let (s, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         // Maintain UTC until no more work remains
         let mut fut = pin!(maintain_utc(

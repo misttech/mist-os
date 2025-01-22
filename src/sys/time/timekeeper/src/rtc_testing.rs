@@ -9,17 +9,17 @@ use anyhow::Result;
 use futures::StreamExt;
 use log::{debug, error};
 use persistence::State;
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::rc::Rc;
 use {fidl_fuchsia_time_test as fftt, persistence};
 
 /// Serves `fuchsia.time.test/Rtc`.
 ///
 /// Args:
-/// - `persistent_enabled_bit`: the state bit to manage.
+/// - `persistent_state`: the persistent state that's being managed.
 /// - `stream`: the request stream from the test fixture.
 pub async fn serve(
-    persist_enabled: Rc<Cell<bool>>,
+    persistent_state: Rc<RefCell<State>>,
     mut stream: fftt::RtcRequestStream,
 ) -> Result<()> {
     debug!("rtc_testing::serve: entering serving loop");
@@ -27,15 +27,15 @@ pub async fn serve(
         match request {
             Ok(fftt::RtcRequest::PersistentEnable { responder, .. }) => {
                 debug!("received: fuchsia.time.test/Rtc.PersistentEnable");
-                persist_enabled.set(true);
+                persistent_state.borrow_mut().set_may_update_rtc(true);
                 responder.send(Ok(()))?;
-                persistence::write_state(&State::new(true));
+                State::write(&persistent_state.borrow());
             }
             Ok(fftt::RtcRequest::PersistentDisable { responder, .. }) => {
                 debug!("received: fuchsia.time.test/Rtc.PersistentDisable");
-                persist_enabled.set(false);
+                persistent_state.borrow_mut().set_may_update_rtc(false);
                 responder.send(Ok(()))?;
-                persistence::write_state(&State::new(false));
+                State::write(&persistent_state.borrow());
             }
             Err(e) => {
                 error!("FIDL error: {:?}", e);

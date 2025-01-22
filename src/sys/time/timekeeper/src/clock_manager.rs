@@ -15,7 +15,7 @@ use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcDuration, UtcInstant};
 use futures::channel::mpsc;
 use futures::{select, FutureExt, SinkExt, StreamExt};
 use log::{debug, error, info, warn};
-use std::cell::Cell;
+use std::cell::RefCell;
 use std::cmp;
 use std::fmt::{self, Debug};
 use std::rc::Rc;
@@ -316,7 +316,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         track: Track,
         config: Arc<Config>,
         async_commands: mpsc::Receiver<Command>,
-        allow_update_rtc: Rc<Cell<bool>>,
+        allow_update_rtc: Rc<RefCell<persistence::State>>,
     ) {
         ClockManager::new(clock, time_source_manager, rtc, diagnostics, track, config, None)
             .maintain_clock(async_commands, allow_update_rtc)
@@ -362,7 +362,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
     async fn maintain_clock(
         mut self,
         async_commands: mpsc::Receiver<Command>,
-        allow_update_rtc: Rc<Cell<bool>>,
+        allow_update_rtc: Rc<RefCell<persistence::State>>,
     ) {
         // TIMING NOTES: all delays in the management loops are tied to a monotonic
         // timeline, which means they can pause.
@@ -385,7 +385,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         let mut receiver = async_commands.fuse(); // Required by select! below.
 
         let serve_test_protocols = self.config.serve_test_protocols();
-        let update_allowed = allow_update_rtc.get();
+        let update_allowed = allow_update_rtc.borrow().may_update_rtc();
         let allow_timekeeper_to_update_rtc = !serve_test_protocols || update_allowed;
         if !allow_timekeeper_to_update_rtc {
             warn!(concat!(
@@ -679,6 +679,10 @@ mod tests {
         static ref TEST_TRACK: Track = Track::from(TEST_ROLE);
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
         static ref START_CLOCK_SOURCE: StartClockSource = StartClockSource::External(TEST_ROLE);
+    }
+
+    fn new_state_for_test(value: bool) -> Rc<RefCell<persistence::State>> {
+        Rc::new(RefCell::new(persistence::State::new(value)))
     }
 
     /// Creates and starts a new clock with default options.
@@ -999,8 +1003,8 @@ mod tests {
         // Maintain the clock until no more work remains.
         let reference_before = zx::BootInstant::get();
         let (_, r) = mpsc::channel(1);
-        let allow_rtc = Rc::new(Cell::new(true));
-        let mut fut = pin!(clock_manager.maintain_clock(r, allow_rtc));
+        let rtc_state = new_state_for_test(true);
+        let mut fut = pin!(clock_manager.maintain_clock(r, rtc_state));
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let reference_after = zx::BootInstant::get();
@@ -1053,7 +1057,7 @@ mod tests {
 
         let (_, r) = mpsc::channel(1);
         let start_time = executor.now();
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
         let mut fut = pin!(clock_manager.maintain_clock(r, b));
 
         let _ = executor.run_until_stalled(&mut fut);
@@ -1081,7 +1085,7 @@ mod tests {
         // At the start, the clock is set to no error.
         let details = clock_clone.get_details().unwrap();
         assert_eq!(0, details.error_bounds);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
 
         let _t = fasync::Task::local(async move {
             // Set zero bound.
@@ -1133,7 +1137,7 @@ mod tests {
             let rtc = FakeRtc::valid(BACKSTOP_TIME);
             let diagnostics = Arc::new(FakeDiagnostics::new());
             let config = crate::tests::make_test_config_with_test_protocols();
-            let b = Rc::new(Cell::new(true));
+            let b = new_state_for_test(true);
 
             let reference = zx::BootInstant::get();
             let clock_manager = create_clock_manager(
@@ -1187,7 +1191,7 @@ mod tests {
         // Maintain the clock until no more work remains
         let reference_before = zx::BootInstant::get();
         let (_, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
         let mut fut = pin!(clock_manager.maintain_clock(r, b));
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
@@ -1258,7 +1262,7 @@ mod tests {
         // Maintain the clock until no more work remains
         let reference_before = zx::BootInstant::get();
         let (_, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
         let mut fut = pin!(clock_manager.maintain_clock(r, b));
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
@@ -1354,7 +1358,7 @@ mod tests {
         // a clock skew but blocking on the timer to end it.
         let reference_before = executor.boot_now();
         let (_, r) = mpsc::channel(1);
-        let b = Rc::new(Cell::new(true));
+        let b = new_state_for_test(true);
         let mut fut = pin!(clock_manager.maintain_clock(r, b));
         nudge_executor(&executor, fasync::MonotonicDuration::from_seconds(1));
         let _ = executor.run_until_stalled(&mut fut);
