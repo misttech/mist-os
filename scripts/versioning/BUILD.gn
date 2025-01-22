@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/fuchsia/platform_version.gni")
+import("//build/config/fuchsia/versioning.gni")
 import("//build/python/python_host_test.gni")
 
 assert(is_host)
@@ -31,6 +32,14 @@ python_host_test("update_platform_version_tests") {
 }
 
 if (bump_api_level) {
+  import("//build/testing/config.gni")
+  if (!update_goldens) {
+    print()
+    print(
+        "WARNING: It is strongly recommended that `update_goldens` be true to ensure all goldens will be updated.")
+    print("Bumping the API level anyways, but this may not go well...")
+  }
+
   # Adds a new in-development API level that is one greater than the highest
   # existing numbered API level.
   #

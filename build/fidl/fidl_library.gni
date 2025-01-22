@@ -616,7 +616,7 @@ template("fidl_library") {
           current = json_summary_file
           golden = "${goldens_dir}/${level}/${library_name}.api_summary.json"
 
-          if (update_goldens || bump_api_level) {
+          if (update_goldens) {
             # Using this policy for every level allows generating all goldens
             # from scratch. See https://fxbug.dev/324481114#comment5.
             policy = "update_golden"

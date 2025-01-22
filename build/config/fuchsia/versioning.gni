@@ -1,0 +1,12 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This file contains variables relevant to `//scripts/versioning/BUILD.gn`.
+# It is minimal because it is imported by `//build/testing/config.gni`.
+
+declare_args() {
+  # If true, generate golden files for API level N+1, where N is
+  # max(platform_version.frozen_api_levels).
+  bump_api_level = false
+}
