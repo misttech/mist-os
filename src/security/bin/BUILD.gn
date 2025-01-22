@@ -5,7 +5,6 @@
 group("tests") {
   testonly = true
   deps = [
-    "cr50_agent:tests",
     "kms:tests",
     "tee_manager:tests",
   ]

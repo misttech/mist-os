@@ -149,11 +149,6 @@
             from: "#critical-services",
         },
         {
-            protocol: "fuchsia.tpm.cr50.Cr50",
-            from: "#cr50_agent",
-            source_availability: "unknown",
-        },
-        {
             dictionary: "diagnostics-accessors",
             from: "#archivist",
         },

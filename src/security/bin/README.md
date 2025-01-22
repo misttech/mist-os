@@ -12,10 +12,6 @@ of Fuchsia.
   `/core/account/credential_manager` and serves the `fuchsia.identity.credential` FIDL
   interfaces. The services provided by this component are consumed by the
   `password_authenticator` for storing and retrieving user credentials.
-* [cr50\_agent](//src/security/bin/cr50_agent): Launched at `/bootstrap/cr50_agent` and
-  serves the `fuchsia.tpm.cr50` and `fuchsia.tpm` FIDL interfaces. This agent acts as
-  a resource manager between the underlying driver implementation and the rest of the
-  system.
 * [root\_ssl\_certificates](//src/security/bin/root_ssl_certificates): Fuchsia's
   TLS root CA certificates (a.k.a. truststore). It serves as a resource package
   for components that use TLS.

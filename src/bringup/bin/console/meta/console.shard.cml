@@ -315,12 +315,6 @@
             to: "#console-launcher",
         },
         {
-            protocol: [ "fuchsia.tpm.cr50.Cr50" ],
-            from: "#cr50_agent",
-            to: "#console-launcher",
-            source_availability: "unknown",
-        },
-        {
             protocol: [
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",

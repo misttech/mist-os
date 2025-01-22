@@ -193,7 +193,6 @@
         {
             protocol: [
                 "fuchsia.fxfs.CryptManagement",
-                "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.virtualconsole.SessionManager",
             ],
             from: "#bootstrap",

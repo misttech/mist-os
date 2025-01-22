@@ -129,7 +129,6 @@
         {
             protocol: [
                 "fuchsia.hardware.pty.Device",
-                "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.virtualconsole.SessionManager",
             ],
             from: "parent",
