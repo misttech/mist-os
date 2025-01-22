@@ -5,7 +5,10 @@
 use crate::color_transform_manager::ColorTransformManager;
 use ::input_pipeline::input_device::InputDeviceType;
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
-use ::input_pipeline::interaction_state_handler::InteractionStateHandler;
+use ::input_pipeline::interaction_state_handler::{
+    handle_interaction_aggregator_request_stream, handle_interaction_notifier_request_stream,
+    init_interaction_hanging_get,
+};
 use ::input_pipeline::light_sensor::Configuration as LightSensorConfiguration;
 use anyhow::{Context, Error};
 use fidl_fuchsia_accessibility::{ColorTransformHandlerMarker, ColorTransformMarker};
@@ -246,14 +249,9 @@ async fn inner_main() -> Result<(), Error> {
     // Create a node under root to hang all input pipeline inspect data off of.
     let inspect_node = inspector.root().create_child("input_pipeline");
 
-    // Create InteractionStateHandler.
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
-    let interaction_state_handler = InteractionStateHandler::new(
-        zx::MonotonicDuration::from_millis(idle_threshold_ms as i64),
-        &inspect_node,
-        suspend_enabled,
-    )
-    .await;
+    // Create state publisher for InteractionStateHandler.
+    let mut interaction_hanging_get = init_interaction_hanging_get();
+    let interaction_state_publisher = interaction_hanging_get.new_publisher();
 
     // Start input pipeline.
     let has_light_sensor_configuration = light_sensor_configuration.is_some();
@@ -270,6 +268,9 @@ async fn inner_main() -> Result<(), Error> {
         focus_chain_publisher,
         supported_input_devices,
         light_sensor_configuration,
+        idle_threshold_ms as i64,
+        interaction_state_publisher,
+        suspend_enabled,
     )
     .await
     {
@@ -407,10 +408,8 @@ async fn inner_main() -> Result<(), Error> {
             ExposedServices::UserInteractionObservation(stream) => {
                 #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 {
-                    let interaction_state_handler = interaction_state_handler.clone();
                     fasync::Task::local(async move {
-                    match interaction_state_handler
-                        .handle_interaction_aggregator_request_stream(stream)
+                    match handle_interaction_aggregator_request_stream(stream)
                         .await
                     {
                         Ok(()) => (),
@@ -431,9 +430,9 @@ async fn inner_main() -> Result<(), Error> {
             ExposedServices::UserInteraction(stream) => {
                 #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 {
-                    let interaction_state_handler = interaction_state_handler.clone();
+                    let subscriber = interaction_hanging_get.new_subscriber();
                     fasync::Task::local(async move {
-                        match interaction_state_handler.handle_interaction_notifier_request_stream(stream).await
+                        match handle_interaction_notifier_request_stream(stream, subscriber).await
                         {
                             Ok(()) => (),
                             Err(e) => {

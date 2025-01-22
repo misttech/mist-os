@@ -2,6 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use ::input_pipeline::interaction_state_handler::{
+    InteractionStateHandler, InteractionStatePublisher,
+};
 use ::input_pipeline::light_sensor::{
     Calibration as LightSensorCalibration, Configuration as LightSensorConfiguration,
     FactoryFileLoader,
@@ -75,10 +79,21 @@ pub async fn handle_input(
     focus_chain_publisher: FocusChainProviderPublisher,
     supported_input_devices: Vec<String>,
     light_sensor_configuration: Option<LightSensorConfiguration>,
+    idle_threshold_ms: i64,
+    interaction_state_publisher: InteractionStatePublisher,
+    suspend_enabled: bool,
 ) -> Result<InputPipeline, Error> {
     let input_handlers_node = node.create_child("input_handlers");
     let metrics_logger = metrics::MetricsLogger::new();
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    let interaction_state_handler = InteractionStateHandler::new(
+        zx::MonotonicDuration::from_millis(idle_threshold_ms as i64),
+        &input_handlers_node,
+        interaction_state_publisher,
+        suspend_enabled,
+    )
+    .await;
     let factory_reset_handler =
         FactoryResetHandler::new(&input_handlers_node, metrics_logger.clone());
     let media_buttons_handler =
@@ -145,6 +160,7 @@ pub async fn handle_input(
             icu_data_loader,
             &node,
             display_ownership_event,
+            interaction_state_handler,
             factory_reset_handler.clone(),
             media_buttons_handler.clone(),
             light_sensor_handler.clone(),
@@ -377,6 +393,7 @@ async fn build_input_pipeline_assembly(
     icu_data_loader: icu_data::Loader,
     node: &inspect::Node,
     display_ownership_event: zx::Event,
+    interaction_state_handler: Rc<InteractionStateHandler>,
     factory_reset_handler: Rc<FactoryResetHandler>,
     media_buttons_handler: Rc<MediaButtonsHandler>,
     light_sensor_handler: Option<Rc<CalibratedLightSensorHandler>>,
@@ -395,6 +412,8 @@ async fn build_input_pipeline_assembly(
             &supported_input_devices,
             /* displays_recent_events = */ true,
         );
+        assembly = assembly.add_handler(interaction_state_handler);
+
         if supported_input_devices.contains(&input_device::InputDeviceType::Keyboard) {
             info!("Registering keyboard-related input handlers.");
             assembly = register_keyboard_related_input_handlers(
