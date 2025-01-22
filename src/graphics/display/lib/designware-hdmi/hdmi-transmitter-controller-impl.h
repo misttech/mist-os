@@ -46,7 +46,7 @@ class HdmiTransmitterControllerImpl : public HdmiTransmitterController {
   void PrintReg(const char* name, uint32_t address);
 
   void ScdcWrite(uint8_t addr, uint8_t val);
-  void ScdcRead(uint8_t addr, uint8_t* val);
+  uint8_t ScdcRead(uint8_t addr);
 
   void ConfigCsc(const ColorParam& color_param);
 

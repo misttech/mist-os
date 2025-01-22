@@ -10,24 +10,54 @@
 
 #include "src/graphics/display/lib/api-types/cpp/display-timing.h"
 #include "src/graphics/display/lib/designware-hdmi/color-param.h"
+#include "src/graphics/display/lib/designware-hdmi/ddc-controller-regs.h"
 #include "src/graphics/display/lib/designware-hdmi/regs.h"
 
 namespace designware_hdmi {
 
+namespace {
+
+// HDMI Specification 2.0b, Section 10.4.3 "Data Transfer Protocols", page 125.
+constexpr uint8_t kScdcI2cTargetAddress = 0x54;
+
+// The I2C address for writing the DDC segment.
+//
+// VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
+// Dec 31 2020, Section 2.2.3 "DDC Addresses", page 17.
+constexpr uint8_t kDdcSegmentI2cTargetAddress = 0x30;
+
+// The I2C address for writing the DDC data offset/reading DDC data.
+//
+// VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
+// Dec 31 2020, Section 2.2.3 "DDC Addresses", page 17.
+constexpr uint8_t kDdcDataI2cTargetAddress = 0x50;
+
+}  // namespace
+
 void HdmiTransmitterControllerImpl::ScdcWrite(uint8_t addr, uint8_t val) {
-  WriteReg(HDMITX_DWC_I2CM_SLAVE, 0x54);
-  WriteReg(HDMITX_DWC_I2CM_ADDRESS, addr);
-  WriteReg(HDMITX_DWC_I2CM_DATAO, val);
-  WriteReg(HDMITX_DWC_I2CM_OPERATION, 0x10);
+  registers::DdcControllerDataTargetAddress::Get()
+      .FromValue(0)
+      .set_data_target_address(kScdcI2cTargetAddress)
+      .WriteTo(&controller_mmio_);
+  registers::DdcControllerWordOffset::Get().FromValue(0).set_word_offset(addr).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerWriteByte::Get().FromValue(0).set_byte(val).WriteTo(&controller_mmio_);
+  registers::DdcControllerCommand::Get().FromValue(0).set_write(true).WriteTo(&controller_mmio_);
   usleep(2000);
 }
 
-void HdmiTransmitterControllerImpl::ScdcRead(uint8_t addr, uint8_t* val) {
-  WriteReg(HDMITX_DWC_I2CM_SLAVE, 0x54);
-  WriteReg(HDMITX_DWC_I2CM_ADDRESS, addr);
-  WriteReg(HDMITX_DWC_I2CM_OPERATION, 1);
+uint8_t HdmiTransmitterControllerImpl::ScdcRead(uint8_t addr) {
+  registers::DdcControllerDataTargetAddress::Get()
+      .FromValue(0)
+      .set_data_target_address(kScdcI2cTargetAddress)
+      .WriteTo(&controller_mmio_);
+  registers::DdcControllerWordOffset::Get().FromValue(0).set_word_offset(addr).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerCommand::Get().FromValue(0).set_ddc_read_byte(true).WriteTo(
+      &controller_mmio_);
   usleep(2000);
-  *val = (uint8_t)ReadReg(HDMITX_DWC_I2CM_DATAI);
+
+  return registers::DdcControllerReadByte::Get().ReadFrom(&controller_mmio_).byte();
 }
 
 zx_status_t HdmiTransmitterControllerImpl::InitHw() {
@@ -39,26 +69,49 @@ zx_status_t HdmiTransmitterControllerImpl::InitHw() {
   // FIXME: Pinmux i2c pins (skip for now since uboot it doing it)
 
   // Configure i2c interface
-  // a. disable all interrupts (read_req, done, nack, arbitration)
-  WriteReg(HDMITX_DWC_I2CM_INT, 0);
-  WriteReg(HDMITX_DWC_I2CM_CTLINT, 0);
+  // a. Do not mask any interrupt (read_req, done, nack, arbitration)
+  registers::DdcControllerDoneInterruptMask::Get()
+      .FromValue(0)
+      .set_read_request_masked(false)
+      .set_command_done_masked(false)
+      .WriteTo(&controller_mmio_);
+  registers::DdcControllerErrorInterruptMask::Get()
+      .FromValue(0)
+      .set_nack_masked(false)
+      .set_arbitration_masked(false)
+      .WriteTo(&controller_mmio_);
 
   // b. set interface to standard mode
-  WriteReg(HDMITX_DWC_I2CM_DIV, 0);
+  registers::DdcControllerClockControl::Get()
+      .FromValue(0)
+      .set_i2c_controller_transfer_mode(
+          registers::DdcControllerClockControl::I2cControllerTransferMode::kStandardMode)
+      .WriteTo(&controller_mmio_);
 
   // c. Setup i2c timings (based on u-boot source)
-  WriteReg(HDMITX_DWC_I2CM_SS_SCL_HCNT_1, 0);
-  WriteReg(HDMITX_DWC_I2CM_SS_SCL_HCNT_0, 0xcf);
-  WriteReg(HDMITX_DWC_I2CM_SS_SCL_LCNT_1, 0);
-  WriteReg(HDMITX_DWC_I2CM_SS_SCL_LCNT_0, 0xff);
-  WriteReg(HDMITX_DWC_I2CM_FS_SCL_HCNT_1, 0);
-  WriteReg(HDMITX_DWC_I2CM_FS_SCL_HCNT_0, 0x0f);
-  WriteReg(HDMITX_DWC_I2CM_FS_SCL_LCNT_1, 0);
-  WriteReg(HDMITX_DWC_I2CM_FS_SCL_LCNT_0, 0x20);
-  WriteReg(HDMITX_DWC_I2CM_SDA_HOLD, 0x08);
+  registers::DdcControllerSlowSpeedSclHighLevelControl1::Get().FromValue(0x00).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerSlowSpeedSclHighLevelControl0::Get().FromValue(0xcf).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerSlowSpeedSclLowLevelControl1::Get().FromValue(0x00).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerSlowSpeedSclLowLevelControl0::Get().FromValue(0xff).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerFastSpeedSclHighLevelControl1::Get().FromValue(0x00).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerFastSpeedSclHighLevelControl0::Get().FromValue(0x0f).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerFastSpeedSclLowLevelControl1::Get().FromValue(0x00).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerFastSpeedSclLowLevelControl0::Get().FromValue(0x20).WriteTo(
+      &controller_mmio_);
+  registers::DdcControllerDataPinHoldTime::Get().FromValue(0).set_data_pin_hold_time(8).WriteTo(
+      &controller_mmio_);
 
   // d. disable any SCDC operations for now
-  WriteReg(HDMITX_DWC_I2CM_SCDC_UPDATE, 0);
+  registers::DdcControllerScdcControl::Get()
+      .FromValue(registers::DdcControllerScdcControl::kDisableAllScdcOperations)
+      .WriteTo(&controller_mmio_);
 
   return ZX_OK;
 }
@@ -268,7 +321,15 @@ void HdmiTransmitterControllerImpl::ConfigHdmitx(const ColorParam& color_param,
   WriteReg(HDMITX_DWC_IH_FC_STAT2, 0xff);
   WriteReg(HDMITX_DWC_IH_AS_STAT0, 0xff);
   WriteReg(HDMITX_DWC_IH_PHY_STAT0, 0xff);
-  WriteReg(HDMITX_DWC_IH_I2CM_STAT0, 0xff);
+  // TODO(https://fxbug.dev/390552175): The Amlogic-provided reference code
+  // sets the register to 0xff. We should figure out whether it's necessary to
+  // set the undefined bits.
+  registers::DdcControllerInterruptStatus::Get()
+      .FromValue(0xff)
+      .set_read_request_pending(true)
+      .set_command_done_pending(true)
+      .set_error_pending(true)
+      .WriteTo(&controller_mmio_);
   WriteReg(HDMITX_DWC_IH_CEC_STAT0, 0xff);
   WriteReg(HDMITX_DWC_IH_VP_STAT0, 0xff);
   WriteReg(HDMITX_DWC_IH_I2CMPHY_STAT0, 0xff);
@@ -286,7 +347,11 @@ void HdmiTransmitterControllerImpl::SetupInterrupts() {
 
   WriteReg(HDMITX_DWC_IH_MUTE_PHY_STAT0, 0x3f);
 
-  WriteReg(HDMITX_DWC_IH_MUTE_I2CM_STAT0, 1 << 1);
+  // The DDC I2C "command done" interrupt is muted. The driver won't receive
+  // interrupts on E-DDC read / write completion, instead it periodically polls
+  // the interrupt status register.
+  registers::DdcControllerInterruptMute::Get().FromValue(0).set_command_done_muted(true).WriteTo(
+      &controller_mmio_);
 
   // turn all cec-related interrupts on
   WriteReg(HDMITX_DWC_IH_MUTE_CEC_STAT0, 0x0);
@@ -311,8 +376,7 @@ void HdmiTransmitterControllerImpl::Reset() {
 }
 
 void HdmiTransmitterControllerImpl::SetupScdc(bool is4k) {
-  uint8_t scdc_data = 0;
-  ScdcRead(0x1, &scdc_data);
+  uint8_t scdc_data = ScdcRead(0x1);
   FDF_LOG(INFO, "version is %s\n", (scdc_data == 1) ? "2.0" : "<= 1.4");
   // scdc write is done twice in uboot
   // TODO: find scdc register def
@@ -577,26 +641,48 @@ zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_
 
     // The HDMITX_DWC_I2CM registers are a limited interface to the i2c bus for the E-DDC
     // protocol, which is good enough for the bus this device provides.
-    if (op.address == 0x30 && !op.is_read && op.data_size == 1) {
-      segment_num = *((const uint8_t*)op.data_buffer);
-    } else if (op.address == 0x50 && !op.is_read && op.data_size == 1) {
-      offset = *((const uint8_t*)op.data_buffer);
-    } else if (op.address == 0x50 && op.is_read) {
+    if (op.address == kDdcSegmentI2cTargetAddress && !op.is_read && op.data_size == 1) {
+      segment_num = op.data_buffer[0];
+    } else if (op.address == kDdcDataI2cTargetAddress && !op.is_read && op.data_size == 1) {
+      offset = op.data_buffer[0];
+    } else if (op.address == kDdcDataI2cTargetAddress && op.is_read) {
       if (op.data_size % 8 != 0) {
         return ZX_ERR_NOT_SUPPORTED;
       }
 
-      WriteReg(HDMITX_DWC_I2CM_SLAVE, 0x50);
-      WriteReg(HDMITX_DWC_I2CM_SEGADDR, 0x30);
-      WriteReg(HDMITX_DWC_I2CM_SEGPTR, segment_num);
+      registers::DdcControllerDataTargetAddress::Get()
+          .FromValue(0)
+          .set_data_target_address(kDdcDataI2cTargetAddress)
+          .WriteTo(&controller_mmio_);
+      registers::DdcControllerSegmentTargetAddress::Get()
+          .FromValue(0)
+          .set_segment_target_address(kDdcSegmentI2cTargetAddress)
+          .WriteTo(&controller_mmio_);
+      registers::DdcControllerSegmentPointer::Get()
+          .FromValue(0)
+          .set_segment_pointer(segment_num)
+          .WriteTo(&controller_mmio_);
 
       for (uint32_t i = 0; i < op.data_size; i += 8) {
-        WriteReg(HDMITX_DWC_I2CM_ADDRESS, offset);
-        WriteReg(HDMITX_DWC_I2CM_OPERATION, 1 << 2);
+        registers::DdcControllerWordOffset::Get().FromValue(0).set_word_offset(offset).WriteTo(
+            &controller_mmio_);
+
+        // TODO(https://fxbug.dev/390552175): The code below uses DDC instead of
+        // E-DDC to read the EDID bytes. The segment pointer is not sent to the
+        // display device, so the actual bytes read by the DDC controller are
+        // dependent by the display device implementation. We should use E-DDC
+        // instead.
+        registers::DdcControllerCommand::Get().FromValue(0).set_ddc_read_8bytes(true).WriteTo(
+            &controller_mmio_);
         offset = static_cast<uint8_t>(offset + 8);
 
         uint32_t timeout = 0;
-        while ((!(ReadReg(HDMITX_DWC_IH_I2CM_STAT0) & (1 << 1))) && (timeout < 5)) {
+
+        auto interrupt_status = registers::DdcControllerInterruptStatus::Get().FromValue(0);
+        while (timeout < 5) {
+          interrupt_status.ReadFrom(&controller_mmio_);
+          if (interrupt_status.command_done_pending())
+            break;
           usleep(1000);
           timeout++;
         }
@@ -605,11 +691,11 @@ zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_
           return ZX_ERR_TIMED_OUT;
         }
         usleep(1000);
-        WriteReg(HDMITX_DWC_IH_I2CM_STAT0, 1 << 1);  // clear INT
+        interrupt_status.set_command_done_pending(true).WriteTo(&controller_mmio_);
 
         for (int j = 0; j < 8; j++) {
-          uint32_t address = static_cast<uint32_t>(HDMITX_DWC_I2CM_READ_BUFF0 + j);
-          ((uint8_t*)op.data_buffer)[i + j] = static_cast<uint8_t>(ReadReg(address));
+          op.data_buffer[i + j] =
+              registers::DdcControllerReadBuffer::Get(j).ReadFrom(&controller_mmio_).byte();
         }
       }
     } else {

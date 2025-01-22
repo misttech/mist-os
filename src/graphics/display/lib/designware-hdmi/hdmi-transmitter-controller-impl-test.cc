@@ -263,7 +263,7 @@ TEST_F(HdmiTransmitterControllerImplTest, EdidTransferTest) {
 
       {.address = kIhI2cmStat0Offset, .value = 0b0000'0000},
       {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
-      {.address = kIhI2cmStat0Offset, .value = 0b010, .write = true},
+      {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
 
       {.address = kI2cmReadBuff0Offset + 0, .value = 8},
       {.address = kI2cmReadBuff0Offset + 1, .value = 7},
@@ -278,7 +278,7 @@ TEST_F(HdmiTransmitterControllerImplTest, EdidTransferTest) {
       {.address = kI2cmOperationOffset, .value = 0b00'0100, .write = true},
 
       {.address = kIhI2cmStat0Offset, .value = 0b1111'1111},
-      {.address = kIhI2cmStat0Offset, .value = 0b010, .write = true},
+      {.address = kIhI2cmStat0Offset, .value = 0b1111'1111, .write = true},
 
       {.address = kI2cmReadBuff0Offset + 0, .value = 1},
       {.address = kI2cmReadBuff0Offset + 1, .value = 2},
