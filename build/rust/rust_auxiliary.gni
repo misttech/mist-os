@@ -391,7 +391,6 @@ template("rust_auxiliary") {
         "--crate-type=$rust_crate_type",
         "--crate-name=$_crate_name",
         "{{rustflags}}",
-        "--error-format=json",
       ]
       args += invoker.rustflags
       if (rust_crate_type == "proc-macro") {
