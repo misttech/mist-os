@@ -351,6 +351,7 @@ fidl_library://fidl/fuchsia.scheduler
 fidl_library://fidl/fuchsia.session
 fidl_library://fidl/fuchsia.settings
 fidl_library://fidl/fuchsia.settings.policy
+fidl_library://fidl/fuchsia.storage.ftl
 fidl_library://fidl/fuchsia.sysinfo
 fidl_library://fidl/fuchsia.sysmem
 fidl_library://fidl/fuchsia.sysmem2
