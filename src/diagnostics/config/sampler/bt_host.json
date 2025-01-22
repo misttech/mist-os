@@ -1,0 +1,86 @@
+{
+    "metrics": [
+        {
+            "event_codes": [
+                0,
+                0,
+                1
+            ],
+            "metric_id": 11,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/low_energy_connection_manager:incoming_connection_success_count"
+        },
+        {
+            "event_codes": [
+                0,
+                1,
+                1
+            ],
+            "metric_id": 11,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/low_energy_connection_manager:incoming_connection_failure_count"
+        },
+        {
+            "event_codes": [
+                0,
+                0,
+                2
+            ],
+            "metric_id": 11,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/low_energy_connection_manager:outgoing_connection_success_count"
+        },
+        {
+            "event_codes": [
+                0,
+                1,
+                2
+            ],
+            "metric_id": 11,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/low_energy_connection_manager:outgoing_connection_failure_count"
+        },
+        {
+            "event_codes": [
+                1,
+                0,
+                1
+            ],
+            "metric_id": 11,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/bredr_connection_manager/incoming:successful_connections"
+        },
+        {
+            "event_codes": [
+                1,
+                1,
+                1
+            ],
+            "metric_id": 11,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/bredr_connection_manager/incoming:failed_connections"
+        },
+        {
+            "event_codes": [
+                1,
+                0,
+                2
+            ],
+            "metric_id": 11,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/bredr_connection_manager/outgoing:successful_connections"
+        },
+        {
+            "event_codes": [
+                1,
+                1,
+                2
+            ],
+            "metric_id": 11,
+            "metric_type": "Occurrence",
+            "selector": "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/bredr_connection_manager/outgoing:failed_connections"
+        }
+    ],
+    "poll_rate_sec": 300,
+    "project_id": 2322225253
+}

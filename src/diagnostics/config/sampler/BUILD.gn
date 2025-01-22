@@ -10,6 +10,7 @@ import("//build/config.gni")
 # in this variable will be ignored.
 sampler_files = [
   "archivist.json",
+  "bt_host.json",
   "driver_manager_all.json",
   "fshost.json",
   "netstack.json",
@@ -20,7 +21,6 @@ sampler_files = [
 
   # TODO(https://fxbug.dev/): remove driver_manager_all.json and bring back these
   #"audio-drivers.json",
-  #"bthost.json",
   #"connectivity-wlan.json",
   #"display.json",
   #"ftl.json",
