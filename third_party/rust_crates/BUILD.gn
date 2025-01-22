@@ -601,7 +601,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("paste") {
-  public_deps = [ ":paste-v1_0_9($host_toolchain)" ]
+  public_deps = [ ":paste-v1_0_15($host_toolchain)" ]
 }
 
 group("pathdiff") {
@@ -8220,7 +8220,7 @@ rust_library("macro_rules_attribute-v0_1_3") {
 
   deps = []
   deps += [ ":macro_rules_attribute-proc_macro-v0_1_3($host_toolchain)" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
 
   rustenv = []
 
@@ -10204,18 +10204,18 @@ rust_library("password-hash-v0_4_2") {
   applicable_licenses = [ ":password-hash-v0_4_2.license" ]
 }
 
-license("paste-v1_0_9.license") {
+license("paste-v1_0_15.license") {
   public_package_name = "paste"
   license_files = [
-    "//third_party/rust_crates/vendor/paste-1.0.9/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/paste-1.0.9/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/paste-1.0.15/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/paste-1.0.15/LICENSE-MIT",
   ]
 }
 
-rust_proc_macro("paste-v1_0_9") {
+rust_proc_macro("paste-v1_0_15") {
   crate_name = "paste"
-  crate_root = "//third_party/rust_crates/vendor/paste-1.0.9/src/lib.rs"
-  output_name = "paste-9ceccfa079366a8a"
+  crate_root = "//third_party/rust_crates/vendor/paste-1.0.15/src/lib.rs"
+  output_name = "paste-d06f06c5c22d78df"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10225,13 +10225,13 @@ rust_proc_macro("paste-v1_0_9") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=9ceccfa079366a8a",
-    "-Cextra-filename=-9ceccfa079366a8a",
+    "-Cmetadata=d06f06c5c22d78df",
+    "-Cextra-filename=-d06f06c5c22d78df",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":paste-v1_0_9.license" ]
+  applicable_licenses = [ ":paste-v1_0_15.license" ]
 }
 
 license("pathdiff-v0_2_1.license") {
@@ -12934,7 +12934,7 @@ icu_rust_library("rust_icu_sys-v5_0_0") {
 
   deps = []
   deps += [ ":libc-v0_2_169" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
 
   rustenv = []
 
@@ -12968,7 +12968,7 @@ icu_rust_library("rust_icu_ucal-v5_0_0") {
 
   deps = []
   deps += [ ":log-v0_4_22" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
   deps += [ ":rust_icu_uenum-v5_0_0" ]
@@ -13007,7 +13007,7 @@ icu_rust_library("rust_icu_uchar-v5_0_0") {
 
   deps = []
   deps += [ ":log-v0_4_22" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
 
@@ -13043,7 +13043,7 @@ icu_rust_library("rust_icu_udat-v5_0_0") {
 
   deps = []
   deps += [ ":log-v0_4_22" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
   deps += [ ":rust_icu_ucal-v5_0_0" ]
@@ -13083,7 +13083,7 @@ icu_rust_library("rust_icu_udata-v5_0_0") {
 
   deps = []
   deps += [ ":log-v0_4_22" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
 
@@ -13118,7 +13118,7 @@ icu_rust_library("rust_icu_uenum-v5_0_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
 
@@ -13155,7 +13155,7 @@ icu_rust_library("rust_icu_uloc-v5_0_0") {
   deps = []
   deps += [ ":anyhow-v1_0_95" ]
   deps += [ ":log-v0_4_22" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
   deps += [ ":rust_icu_uenum-v5_0_0" ]
@@ -13194,7 +13194,7 @@ icu_rust_library("rust_icu_unorm2-v5_0_0") {
 
   deps = []
   deps += [ ":log-v0_4_22" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
   deps += [ ":rust_icu_ucal-v5_0_0" ]
@@ -13235,7 +13235,7 @@ icu_rust_library("rust_icu_ustring-v5_0_0") {
 
   deps = []
   deps += [ ":log-v0_4_22" ]
-  deps += [ ":paste-v1_0_9($host_toolchain)" ]
+  deps += [ ":paste-v1_0_15($host_toolchain)" ]
   deps += [ ":rust_icu_common-v5_0_0" ]
   deps += [ ":rust_icu_sys-v5_0_0" ]
 

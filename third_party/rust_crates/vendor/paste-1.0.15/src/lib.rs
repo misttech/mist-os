@@ -137,6 +137,7 @@
 //! method_new!(Paste);  // expands to #[doc = "Create a new `Paste` object"]
 //! ```
 
+#![doc(html_root_url = "https://docs.rs/paste/1.0.15")]
 #![allow(
     clippy::derive_partial_eq_without_eq,
     clippy::doc_markdown,
@@ -410,6 +411,26 @@ fn parse_bracket_as_segments(input: TokenStream, scope: Span) -> Result<Vec<Segm
 
 fn pasted_to_tokens(mut pasted: String, span: Span) -> Result<TokenStream> {
     let mut tokens = TokenStream::new();
+
+    #[cfg(not(no_literal_fromstr))]
+    {
+        use proc_macro::{LexError, Literal};
+        use std::str::FromStr;
+
+        if pasted.starts_with(|ch: char| ch.is_ascii_digit()) {
+            let literal = match panic::catch_unwind(|| Literal::from_str(&pasted)) {
+                Ok(Ok(literal)) => TokenTree::Literal(literal),
+                Ok(Err(LexError { .. })) | Err(_) => {
+                    return Err(Error::new(
+                        span,
+                        &format!("`{:?}` is not a valid literal", pasted),
+                    ));
+                }
+            };
+            tokens.extend(iter::once(literal));
+            return Ok(tokens);
+        }
+    }
 
     if pasted.starts_with('\'') {
         let mut apostrophe = TokenTree::Punct(Punct::new('\'', Spacing::Joint));
