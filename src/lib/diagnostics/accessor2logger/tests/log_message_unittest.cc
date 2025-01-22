@@ -76,7 +76,7 @@ TEST(LogMessage, MonikerStringification) {
           "line": 24,
           "dropped": 0
         },
-        "moniker": "test/path/<test_moniker>",
+        "moniker": "test/path/test_moniker",
         "payload": {
           "root": {
             "keys": {
@@ -107,7 +107,7 @@ TEST(LogMessage, MonikerStringification) {
                         static_cast<int>((message.time.get() / 1000000ULL) % 1000ULL), message.pid,
                         message.tid, fxl::JoinStrings(message.tags, ", ").c_str(),
                         SeverityToString(message.severity).c_str(), message.msg.c_str());
-  ASSERT_TRUE(encoded_message.find("[<test_moniker>] INFO: "
+  ASSERT_TRUE(encoded_message.find("[test_moniker] INFO: "
                                    "[src/diagnostics/lib/cpp-log-decoder/test.cc(24)] test "
                                    "message user property=5.2") != std::string::npos);
 }
@@ -133,7 +133,7 @@ TEST(LogMessage, LegacyHostEncoding) {
           "line": 24,
           "dropped": 0
         },
-        "moniker": "<test_moniker>",
+        "moniker": "test_moniker",
         "payload": {
           "root": {
             "keys": {
@@ -164,7 +164,7 @@ TEST(LogMessage, LegacyHostEncoding) {
                         static_cast<int>((message.time.get() / 1000000ULL) % 1000ULL), message.pid,
                         message.tid, fxl::JoinStrings(message.tags, ", ").c_str(),
                         SeverityToString(message.severity).c_str(), message.msg.c_str());
-  ASSERT_TRUE(encoded_message.find("[some tag, some other tag] INFO: "
+  ASSERT_TRUE(encoded_message.find("[test_moniker, some tag, some other tag] INFO: "
                                    "[src/diagnostics/lib/cpp-log-decoder/test.cc(24)] test "
                                    "message user property=5.2") != std::string::npos);
 }
@@ -707,6 +707,72 @@ TEST(LogMessage, Tags) {
       "severity": "INFO",
       "tags": ["hello", "world"]
     },
+    "payload": {
+      "root": {
+        "message": {
+          "value": ""
+        }
+      }
+    }
+  }
+]
+)JSON",
+      .expected_tags = std::vector<std::string>{"hello", "world"},
+  });
+  cases.emplace_back(ValidationTestCase{
+      .input = R"JSON(
+[
+  {
+    "metadata": {
+      "timestamp": 1000,
+      "severity": "INFO",
+      "tags": ["hello", "world"]
+    },
+    "moniker": "world/hello",
+    "payload": {
+      "root": {
+        "message": {
+          "value": ""
+        }
+      }
+    }
+  }
+]
+)JSON",
+      .expected_tags = std::vector<std::string>{"hello", "world"},
+  });
+  cases.emplace_back(ValidationTestCase{
+      .input = R"JSON(
+[
+  {
+    "metadata": {
+      "timestamp": 1000,
+      "severity": "INFO",
+      "tags": ["foo"]
+    },
+    "moniker": "world/hello",
+    "payload": {
+      "root": {
+        "message": {
+          "value": ""
+        }
+      }
+    }
+  }
+]
+)JSON",
+      .expected_tags = std::vector<std::string>{"hello", "foo"},
+  });
+  cases.emplace_back(ValidationTestCase{
+      .input = R"JSON(
+[
+  {
+    "metadata": {
+      "timestamp": 1000,
+      "severity": "INFO",
+      "tags": ["world"]
+    },
+    "moniker": "hello",
     "payload": {
       "root": {
         "message": {

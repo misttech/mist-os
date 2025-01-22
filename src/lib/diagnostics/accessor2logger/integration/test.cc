@@ -22,9 +22,9 @@ void WriteLogs() {
   // WARNING: Test is sensitive to line numbers and file name.
   // These log lines are added to the top of the file to prevent changes to the test below from
   // changing the expected outputs.
-  FX_LOGS(INFO) << "Hello info";        // Line 24
-  FX_LOGS(WARNING) << "Hello warning";  // Line 25
-  FX_LOGS(ERROR) << "Hello error";      // Line 26
+  FX_LOGS(INFO) << "Hello info";        // Line 25
+  FX_LOGS(WARNING) << "Hello warning";  // Line 26
+  FX_LOGS(ERROR) << "Hello error";      // Line 27
 }
 
 std::vector<fuchsia::logger::LogMessage> GetLogs() {
