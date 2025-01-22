@@ -15,9 +15,13 @@
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_status_value, status_value, zx_status_t (C::*)() const);
 DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(has_status, status, zx_status_t (C::*)() const);
 
-#define LIB_ZXTEST_RETURN_TAG_true return Tag()&
+#define LIB_ZXTEST_RETURN_TAG_true return zxtest::internal::Tag{}&
+
 #define LIB_ZXTEST_RETURN_TAG_false
+
 #define LIB_ZXTEST_RETURN_TAG(val) LIB_ZXTEST_RETURN_TAG_##val
+
+namespace zxtest::internal {
 
 template <typename T>
 zx_status_t GetStatus(const T& status) {
@@ -120,5 +124,7 @@ class StreamableSkip : public StreamableBase {
     zxtest::Runner::GetInstance()->SkipCurrent(message);
   }
 };
+
+}  // namespace zxtest::internal
 
 #endif  // ZXTEST_CPP_STREAMS_HELPER_H_
