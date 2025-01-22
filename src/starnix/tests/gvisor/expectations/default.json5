@@ -296,6 +296,10 @@
                 "Cases/ElfInterpreterBadPathTest.Test/2",
                 "Cases/ElfInterpreterBadPathTest.Test/3",
 
+                // fault_test
+                // TODO(https://fxbug.dev/391438267)
+                "TaggedAddressesTest.MemoryFault",
+
                 // fcntl_test
                 "FcntlTest.SetSig",
                 "FcntlTest.SetSigDefaultsToZero",
