@@ -179,11 +179,9 @@ impl CgroupOps for CgroupRoot {
         fs: &FileSystemHandle,
         name: &FsStr,
     ) -> Result<CgroupHandle, Errno> {
+        let new_child = Cgroup::new(current_task, fs, name, &self.weak_self, None);
         let mut children = self.children.lock();
-        children.insert_child(
-            name.into(),
-            Cgroup::new(current_task, fs, name, &self.weak_self, None, FreezerState::Thawed),
-        )
+        children.insert_child(name.into(), new_child)
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
@@ -455,17 +453,14 @@ impl Cgroup {
         name: &FsStr,
         root: &Weak<CgroupRoot>,
         parent: Option<Weak<Cgroup>>,
-        inherited_freezer_state: FreezerState,
     ) -> CgroupHandle {
         Arc::new_cyclic(|weak| {
             let weak_ops = weak.clone() as Weak<dyn CgroupOps>;
-            let mut state: CgroupState = Default::default();
-            state.inherited_freezer_state = inherited_freezer_state;
             Self {
                 root: root.clone(),
                 name: name.to_owned(),
                 parent,
-                state: Mutex::new(state),
+                state: Default::default(),
                 directory_node: fs.create_node(
                     current_task,
                     CgroupDirectory::new(weak_ops.clone()),
@@ -589,22 +584,15 @@ impl CgroupOps for Cgroup {
         fs: &FileSystemHandle,
         name: &FsStr,
     ) -> Result<CgroupHandle, Errno> {
+        let new_child =
+            Cgroup::new(current_task, fs, name, &self.root, Some(self.weak_self.clone()));
         let mut state = self.state.lock();
         if state.deleted {
             return error!(ENOENT);
         }
-        let freezer_state = state.get_effective_freezer_state();
-        state.children.insert_child(
-            name.into(),
-            Cgroup::new(
-                current_task,
-                fs,
-                name,
-                &self.root,
-                Some(self.weak_self.clone()),
-                freezer_state,
-            ),
-        )
+        // New child should inherit the effective freezer state of the current cgroup.
+        new_child.state.lock().inherited_freezer_state = state.get_effective_freezer_state();
+        state.children.insert_child(name.into(), new_child)
     }
 
     fn remove_child(&self, name: &FsStr) -> Result<CgroupHandle, Errno> {
