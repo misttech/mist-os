@@ -72,7 +72,7 @@ pub enum ValueError {
         expect_ty: in_use_handle::EndpointType,
         expect_proto: String,
     },
-    #[error("Handle is a {0}, (need {})", (.0).opposite())]
+    #[error("Handle is a {}, (need {})", .0, .0.opposite())]
     EndpointTypeMismatch(in_use_handle::EndpointType),
     #[error("Handle is a {0} for {1}, (need {2})")]
     EndpointProtocolMismatch(in_use_handle::EndpointType, String, String),

@@ -57,7 +57,7 @@ pub enum Error {
     #[error("Invalid magic bytes, expected [c8, bf, 0b, 48, ad, ab, c5, 11], found {0:02x?}")]
     InvalidMagic([u8; 8]),
 
-    #[error("Bad length of index entries, expected multiple of {}, found {0}", INDEX_ENTRY_LEN)]
+    #[error("Bad length of index entries, expected multiple of {INDEX_ENTRY_LEN}, found {0}")]
     InvalidIndexEntriesLen(u64),
 
     #[error(
@@ -84,8 +84,7 @@ pub enum Error {
     InvalidDirectoryNamesChunkLen(u64),
 
     #[error(
-        "Bad length of directory chunk, expected multiple of {}, found {0}",
-        DIRECTORY_ENTRY_LEN
+        "Bad length of directory chunk, expected multiple of {DIRECTORY_ENTRY_LEN}, found {0}"
     )]
     InvalidDirectoryChunkLen(u64),
 

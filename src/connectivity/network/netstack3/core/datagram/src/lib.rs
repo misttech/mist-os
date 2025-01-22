@@ -11,7 +11,6 @@
 #![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
 
 extern crate fakealloc as alloc;
-extern crate fakestd as std;
 
 #[path = "."]
 mod internal {

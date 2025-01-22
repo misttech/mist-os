@@ -26,9 +26,6 @@ rustc_library_with_features("netstack3-udp") {
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:thiserror",
-
-    # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
-    "//src/connectivity/network/netstack3/core/fakestd",
   ]
 
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use arbitrary::Arbitrary;
-use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
+use fidl_fuchsia_wlan_ieee80211::{self as fidl_ieee80211, MAX_SSID_BYTE_LEN};
 use std::borrow::Cow;
 use std::ops::{Deref, Index};
 use std::slice::SliceIndex;
@@ -14,7 +14,7 @@ use thiserror::Error;
 #[cfg_attr(test, derive(PartialEq, Eq))]
 #[non_exhaustive]
 pub enum SsidError {
-    #[error("Invalid SSID length: {0} bytes (maximum is {})", fidl_ieee80211::MAX_SSID_BYTE_LEN)]
+    #[error("Invalid SSID length: {0} bytes (maximum is {MAX_SSID_BYTE_LEN})")]
     Size(usize),
 }
 

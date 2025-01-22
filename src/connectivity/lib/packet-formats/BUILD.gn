@@ -57,10 +57,7 @@ rustc_library("packet-formats") {
   version = "0.1.0"
   edition = "2021"
 
-  deps = _common_deps + [
-           # TODO(https://github.com/rust-lang/rust/issues/62502): Remove this crate.
-           "//src/connectivity/network/netstack3/core/fakestd",
-         ]
+  deps = _common_deps
 
   sources = _common_sources
 

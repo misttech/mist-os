@@ -343,7 +343,8 @@ pub(crate) enum Error {
     #[error("endpoint `{0}` assigned to a netstack multiple times")]
     EndpointAssignedMultipleTimes(String),
     #[error(
-        "endpoint name '{0}' exceeds maximum interface name length of {}",
+        "endpoint name '{}' exceeds maximum interface name length of {}",
+        .0,
         fnet_interfaces::INTERFACE_NAME_LENGTH
     )]
     EndpointNameExceedsMaximumLength(String),

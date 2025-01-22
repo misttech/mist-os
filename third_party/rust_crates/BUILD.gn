@@ -1001,7 +1001,7 @@ group("textwrap") {
 }
 
 group("thiserror") {
-  public_deps = [ ":thiserror-v1_0_57" ]
+  public_deps = [ ":thiserror-v2_0_11" ]
 }
 
 import("//third_party/rust_crates/private_visibility.gni")
@@ -16029,6 +16029,39 @@ rust_library("thiserror-v1_0_57") {
   applicable_licenses = [ ":thiserror-v1_0_57.license" ]
 }
 
+license("thiserror-v2_0_11.license") {
+  public_package_name = "thiserror"
+  license_files = [
+    "//third_party/rust_crates/vendor/thiserror-2.0.11/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/thiserror-2.0.11/LICENSE-MIT",
+  ]
+}
+
+rust_library("thiserror-v2_0_11") {
+  crate_name = "thiserror"
+  crate_root = "//third_party/rust_crates/vendor/thiserror-2.0.11/src/lib.rs"
+  output_name = "thiserror-8a3ff9093ac91484"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":thiserror-impl-v2_0_11($host_toolchain)" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=8a3ff9093ac91484",
+    "-Cextra-filename=-8a3ff9093ac91484",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":thiserror-v2_0_11.license" ]
+}
+
 license("thiserror-impl-v1_0_57.license") {
   public_package_name = "thiserror_impl"
   license_files = [
@@ -16061,6 +16094,40 @@ rust_proc_macro("thiserror-impl-v1_0_57") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":thiserror-impl-v1_0_57.license" ]
+}
+
+license("thiserror-impl-v2_0_11.license") {
+  public_package_name = "thiserror_impl"
+  license_files = [
+    "//third_party/rust_crates/vendor/thiserror-impl-2.0.11/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/thiserror-impl-2.0.11/LICENSE-MIT",
+  ]
+}
+
+rust_proc_macro("thiserror-impl-v2_0_11") {
+  crate_name = "thiserror_impl"
+  crate_root =
+      "//third_party/rust_crates/vendor/thiserror-impl-2.0.11/src/lib.rs"
+  output_name = "thiserror_impl-f3a0b485e9f76b86"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":proc-macro2-v1_0_86" ]
+  deps += [ ":quote-v1_0_38" ]
+  deps += [ ":syn-v2_0_87" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=f3a0b485e9f76b86",
+    "-Cextra-filename=-f3a0b485e9f76b86",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":thiserror-impl-v2_0_11.license" ]
 }
 
 license("thread_local-v1_1_7.license") {

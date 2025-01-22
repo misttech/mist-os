@@ -63,7 +63,7 @@ impl ContextAuthenticator {
 
 #[derive(thiserror::Error, Debug)]
 pub(crate) enum ContextAuthenticatorError {
-    #[error("expected context length {} found {0}", TAG_LEN + fuchsia_hash::HASH_SIZE)]
+    #[error("expected context length {} found {}", TAG_LEN + fuchsia_hash::HASH_SIZE, .0)]
     InvalidLength(usize),
 
     #[error("authentication failed")]

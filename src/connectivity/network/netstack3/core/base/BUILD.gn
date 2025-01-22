@@ -68,9 +68,6 @@ rustc_library_with_features("netstack3-base") {
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:zerocopy",
-
-    # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
-    "//src/connectivity/network/netstack3/core/fakestd",
   ]
 
   _testutils_deps = [
@@ -80,6 +77,9 @@ rustc_library_with_features("netstack3-base") {
     "//third_party/rust_crates:criterion",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand_xorshift",
+
+    # Needed for a re-export of println.
+    "//src/connectivity/network/netstack3/core/fakestd",
   ]
 
   configs += [ "//src/connectivity/network/netstack3:netstack3_configs" ]
@@ -104,6 +104,7 @@ rustc_library_with_features("netstack3-base") {
     },
     {
       target_name = "netstack3-base-benchmarks"
+      testonly = true
       features = [ "testutils" ]
       deps += _testutils_deps
       deps +=

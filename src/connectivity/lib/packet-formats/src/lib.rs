@@ -23,10 +23,6 @@
 
 extern crate alloc;
 
-// TODO(https://github.com/rust-lang/rust/issues/62502): Remove this crate.
-#[cfg(not(test))]
-extern crate fakestd as std;
-
 /// Emit a debug message and return an error.
 ///
 /// Invoke the `debug!` macro on all but the first argument. A call to
