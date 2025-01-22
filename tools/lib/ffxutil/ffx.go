@@ -50,15 +50,60 @@ const (
 	Trace LogLevel = "Trace"
 )
 
-func getCommand(
-	runner *subprocess.Runner,
-	stdout, stderr io.Writer,
-	args ...string,
-) *exec.Cmd {
-	return runner.Command(args, subprocess.RunOptions{
-		Stdout: stdout,
-		Stderr: stderr,
-	})
+type ffxCmdBuilder interface {
+	// Build an ffx command with appropriate additional arguments
+	command(ffxPath string, args []string) []string
+	// Store the configuration for future ffx invocations
+	setConfig(user, global map[string]any) error
+	// Return additional environment variables required by this runner
+	env() []string
+}
+
+// stdCmdFfxBuilder is a builder for ffx commands using the 'standard" approach:
+// with isolate dirs, invoking `ffx config set` to specify configurations,
+// etc. Eventually we will also have a "strict" builder which will abide by
+// ffx-strict semantics (see b/391391857).
+type stdFfxCmdBuilder struct {
+	isolateDir string
+	configDir  string
+}
+
+func newStdFfxCmdBuilder(
+	isolateDir string,
+	configDir string,
+) *stdFfxCmdBuilder {
+	return &stdFfxCmdBuilder{
+		isolateDir,
+		configDir,
+	}
+}
+
+func (r *stdFfxCmdBuilder) command(ffxPath string, args []string) []string {
+	return append([]string{ffxPath, "--isolate-dir", r.isolateDir}, args...)
+}
+
+func (r *stdFfxCmdBuilder) setConfig(user, global map[string]any) error {
+	ffxEnvFilepath := filepath.Join(r.configDir, ffxEnvFilename)
+	globalConfigFilepath := filepath.Join(r.configDir, "global_config.json")
+	userConfigFilepath := filepath.Join(r.configDir, "user_config.json")
+	ffxEnvSettings := map[string]any{
+		"user":   userConfigFilepath,
+		"global": globalConfigFilepath,
+	}
+	if err := writeConfigFile(globalConfigFilepath, global); err != nil {
+		return fmt.Errorf("failed to write ffx global config at %s: %w", globalConfigFilepath, err)
+	}
+	if err := writeConfigFile(userConfigFilepath, user); err != nil {
+		return fmt.Errorf("failed to write ffx user config at %s: %w", userConfigFilepath, err)
+	}
+	if err := writeConfigFile(ffxEnvFilepath, ffxEnvSettings); err != nil {
+		return fmt.Errorf("failed to write ffx env file at %s: %w", ffxEnvFilepath, err)
+	}
+	return nil
+}
+
+func (r *stdFfxCmdBuilder) env() []string {
+	return []string{fmt.Sprintf("%s=%s", FFXIsolateDirEnvKey, r.isolateDir)}
 }
 
 // FFXInstance takes in a path to the ffx tool and runs ffx commands with the provided config.
@@ -67,11 +112,11 @@ type FFXInstance struct {
 	ffxPath string
 
 	runner     *subprocess.Runner
+	cmdBuilder ffxCmdBuilder
 	stdout     io.Writer
 	stderr     io.Writer
 	target     string
 	env        []string
-	isolateDir string
 }
 
 // ConfigSettings contains settings to apply to the ffx configs at the specified config level.
@@ -126,11 +171,11 @@ func FFXWithTarget(ffx *FFXInstance, target string) *FFXInstance {
 		ctx:        ffx.ctx,
 		ffxPath:    ffx.ffxPath,
 		runner:     ffx.runner,
+		cmdBuilder: ffx.cmdBuilder,
 		stdout:     ffx.stdout,
 		stderr:     ffx.stderr,
 		target:     target,
 		env:        ffx.env,
-		isolateDir: ffx.isolateDir,
 	}
 }
 
@@ -138,7 +183,7 @@ func FFXWithTarget(ffx *FFXInstance, target string) *FFXInstance {
 func NewFFXInstance(
 	ctx context.Context,
 	ffxPath string,
-	dir string,
+	processDir string,
 	env []string,
 	target, sshKey string,
 	outputDir string,
@@ -155,29 +200,40 @@ func NewFFXInstance(
 		return nil, err
 	}
 
-	env = append(os.Environ(), env...)
-	env = append(env, fmt.Sprintf("%s=%s", FFXIsolateDirEnvKey, absOutputDir))
 	absFFXPath, err := filepath.Abs(ffxPath)
 	if err != nil {
 		return nil, err
 	}
+	cmdBuilder := newStdFfxCmdBuilder(
+		absOutputDir,
+		absOutputDir,
+	)
+	env = append(os.Environ(), env...)
+	env = append(env, cmdBuilder.env()...)
 	ffx := &FFXInstance{
 		ctx:        ctx,
 		ffxPath:    absFFXPath,
-		runner:     &subprocess.Runner{Dir: dir, Env: env},
+		runner:     &subprocess.Runner{Dir: processDir, Env: env},
+		cmdBuilder: cmdBuilder,
 		stdout:     os.Stdout,
 		stderr:     os.Stderr,
 		target:     target,
 		env:        env,
-		isolateDir: absOutputDir,
 	}
-	ffxEnvFilepath := filepath.Join(ffx.isolateDir, ffxEnvFilename)
-	globalConfigFilepath := filepath.Join(ffx.isolateDir, "global_config.json")
-	userConfigFilepath := filepath.Join(ffx.isolateDir, "user_config.json")
-	ffxEnvSettings := map[string]any{
-		"user":   userConfigFilepath,
-		"global": globalConfigFilepath,
+	if sshKey != "" {
+		sshKey, err = filepath.Abs(sshKey)
+		if err != nil {
+			return nil, err
+		}
 	}
+	userConfig, globalConfig := buildConfigs(absOutputDir, absFFXPath, sshKey, extraConfigSettings)
+	if err := cmdBuilder.setConfig(userConfig, globalConfig); err != nil {
+		return nil, err
+	}
+	return ffx, nil
+}
+
+func buildConfigs(absOutputDir string, absFFXPath string, absSshKeyPath string, extraConfigSettings []ConfigSettings) (user, global map[string]any) {
 	// Set these fields in the global config for tests that don't use this library
 	// and don't set their own isolated env config.
 	globalConfigSettings := map[string]any{
@@ -185,17 +241,13 @@ func NewFFXInstance(
 		// metrics, device discovery, device auto-connection, etc.
 		"ffx.isolated": true,
 	}
-	configSettings := map[string]any{
+	userConfigSettings := map[string]any{
 		"log.dir":                      filepath.Join(absOutputDir, "ffx_logs"),
 		"ffx.subtool-search-paths":     filepath.Dir(absFFXPath),
 		"test.experimental_json_input": true,
 	}
-	if sshKey != "" {
-		sshKey, err = filepath.Abs(sshKey)
-		if err != nil {
-			return nil, err
-		}
-		configSettings["ssh.priv"] = []string{sshKey}
+	if absSshKeyPath != "" {
+		userConfigSettings["ssh.priv"] = []string{absSshKeyPath}
 	}
 	for _, settings := range extraConfigSettings {
 		if settings.Level == "global" {
@@ -204,23 +256,14 @@ func NewFFXInstance(
 			}
 		} else {
 			for key, val := range settings.Settings {
-				configSettings[key] = val
+				userConfigSettings[key] = val
 			}
 		}
 	}
 	if deviceAddr := os.Getenv(botanistconstants.DeviceAddrEnvKey); deviceAddr != "" {
 		globalConfigSettings["discovery.mdns.enabled"] = false
 	}
-	if err := writeConfigFile(globalConfigFilepath, globalConfigSettings); err != nil {
-		return nil, fmt.Errorf("failed to write ffx global config at %s: %w", globalConfigFilepath, err)
-	}
-	if err := writeConfigFile(userConfigFilepath, configSettings); err != nil {
-		return nil, fmt.Errorf("failed to write ffx user config at %s: %w", userConfigFilepath, err)
-	}
-	if err := writeConfigFile(ffxEnvFilepath, ffxEnvSettings); err != nil {
-		return nil, fmt.Errorf("failed to write ffx env file at %s: %w", ffxEnvFilepath, err)
-	}
-	return ffx, nil
+	return userConfigSettings, globalConfigSettings
 }
 
 func writeConfigFile(configPath string, configSettings map[string]any) error {
@@ -283,8 +326,11 @@ func (f *FFXInstance) ConfigSet(ctx context.Context, key, value string) error {
 
 // Command returns an *exec.Cmd to run ffx with the provided args.
 func (f *FFXInstance) Command(args ...string) *exec.Cmd {
-	args = append([]string{f.ffxPath, "--isolate-dir", f.isolateDir}, args...)
-	return getCommand(f.runner, f.stdout, f.stderr, args...)
+	ffx_cmd := f.cmdBuilder.command(f.ffxPath, args)
+	return f.runner.Command(ffx_cmd, subprocess.RunOptions{
+		Stdout: f.stdout,
+		Stderr: f.stderr,
+	})
 }
 
 // CommandWithTarget returns a Command to run with the associated target.
