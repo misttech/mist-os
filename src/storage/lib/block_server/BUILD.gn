@@ -21,6 +21,7 @@ block_server_deps = [
   "//sdk/rust/zx",
   "//src/lib/fidl/rust/fidl",
   "//src/lib/fuchsia-async",
+  "//src/lib/trace/rust:trace",
   "//src/storage/lib/block_protocol",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:futures",

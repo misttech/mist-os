@@ -1326,7 +1326,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
       if (split_last && result.is_ok())
         requests_.pop_back();
       for (const block_server::Request& request : requests_) {
-        session_.SendReply(request.request_id, result);
+        session_.SendReply(request.request_id, request.trace_flow_id, result);
       }
       requests_.clear();
       total_bytes_ = 0;
@@ -1370,7 +1370,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
 
         status = Flush();
 
-        session.SendReply(request.request_id, zx::make_result(status));
+        session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
 
         TRACE_DURATION_END("sdmmc", "flush", "opcode",
                            TA_INT32(static_cast<int32_t>(request.operation.tag)), "txn_status",
@@ -1386,7 +1386,7 @@ void SdmmcBlockDevice::OnRequests(const block_server::Session& session,
                 .offset_dev = request.operation.trim.device_block_offset,
             },
             USER_DATA_PARTITION);
-        session.SendReply(request.request_id, zx::make_result(status));
+        session.SendReply(request.request_id, request.trace_flow_id, zx::make_result(status));
 
         TRACE_DURATION_END(
             "sdmmc", "trim", "opcode", TA_INT32(static_cast<int32_t>(request.operation.tag)),

@@ -73,7 +73,7 @@ class TestInterface : public Interface {
         default:
           ZX_PANIC("Unexpected operation");
       }
-      session.SendReply(request.request_id, zx::ok());
+      session.SendReply(request.request_id, request.trace_flow_id, zx::ok());
     }
   }
 

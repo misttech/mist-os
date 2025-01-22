@@ -100,6 +100,7 @@ struct Operation {
 struct Request {
   RequestId request_id;
   Operation operation;
+  uint64_t trace_flow_id;
   zx::unowned<zx::vmo> vmo;
 };
 
@@ -109,7 +110,7 @@ struct Callbacks {
   void (*on_new_session)(void *context, const Session *session);
   void (*on_requests)(void *context, const Session *session, Request *requests,
                       uintptr_t request_count);
-  void (*log)(void *, const char *, uintptr_t);
+  void (*log)(void *context, const char *message, uintptr_t message_len);
 };
 
 using ShutdownCallback = void (*)(void *);
@@ -164,7 +165,8 @@ void block_server_session_release(const Session *session);
 /// # Safety
 ///
 /// `session` must be valid.
-void block_server_send_reply(const Session *session, RequestId request_id, zx_status_t status);
+void block_server_send_reply(const Session *session, RequestId request_id, uint64_t trace_flow_id,
+                             zx_status_t status);
 
 }  // extern "C"
 

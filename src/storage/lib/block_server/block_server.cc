@@ -62,8 +62,9 @@ Session::~Session() {
 
 void Session::Run() { block_server_session_run(session_); }
 
-void Session::SendReply(RequestId request_id, zx::result<> result) const {
-  block_server_send_reply(session_, request_id, result.status_value());
+void Session::SendReply(RequestId request_id, TraceFlowId trace_flow_id,
+                        zx::result<> result) const {
+  block_server_send_reply(session_, request_id, trace_flow_id, result.status_value());
 }
 
 BlockServer::BlockServer(BlockServer&& other)

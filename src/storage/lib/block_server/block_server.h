@@ -16,6 +16,7 @@
 namespace block_server {
 
 using RequestId = internal::RequestId;
+using TraceFlowId = uint64_t;
 using Operation = internal::Operation;
 using Request = internal::Request;
 
@@ -42,7 +43,7 @@ class Session {
   // Runs the session (blocking).
   void Run();
 
-  void SendReply(RequestId, zx::result<>) const;
+  void SendReply(RequestId, TraceFlowId, zx::result<>) const;
 
  private:
   friend class BlockServer;

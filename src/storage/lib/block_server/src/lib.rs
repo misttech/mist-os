@@ -8,7 +8,9 @@ use futures::{Future, FutureExt as _, TryStreamExt as _};
 use std::borrow::Cow;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::num::NonZero;
 use std::ops::Range;
+use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use zx::HandleBased;
 use {
@@ -407,6 +409,44 @@ impl<SM: SessionManager> SessionHelper<SM> {
         }
     }
 
+    fn finish_fifo_request(
+        &self,
+        request: RequestTracking,
+        status: zx::Status,
+    ) -> Option<BlockFifoResponse> {
+        match request.group_or_request {
+            GroupOrRequest::Group(group_id) => {
+                let response = self.message_groups.complete(group_id, status);
+                fuchsia_trace::duration!(
+                    c"storage",
+                    c"block_server::finish_transaction_in_group",
+                    "group" => u32::from(group_id),
+                    "group_completed" => response.is_some(),
+                    "status" => status.into_raw());
+                if let Some(trace_flow_id) = request.trace_flow_id {
+                    fuchsia_trace::flow_step!(
+                        c"storage",
+                        c"block_server::finish_transaction",
+                        trace_flow_id.get().into()
+                    );
+                }
+                response
+            }
+            GroupOrRequest::Request(reqid) => {
+                fuchsia_trace::duration!(
+                    c"storage", c"block_server::finish_transaction", "status" => status.into_raw());
+                if let Some(trace_flow_id) = request.trace_flow_id {
+                    fuchsia_trace::flow_step!(
+                        c"storage",
+                        c"block_server::finish_transaction",
+                        trace_flow_id.get().into()
+                    );
+                }
+                Some(BlockFifoResponse { status: status.into_raw(), reqid, ..Default::default() })
+            }
+        }
+    }
+
     fn decode_fifo_request(&self, request: &BlockFifoRequest) -> Option<DecodedRequest> {
         let flags = BlockIoFlag::from_bits_truncate(request.command.flags);
         let is_group = flags.contains(BlockIoFlag::GROUP_ITEM);
@@ -495,7 +535,49 @@ impl<SM: SessionManager> SessionHelper<SM> {
             },
             BlockOpcode::CloseVmo => Operation::CloseVmo,
         });
-        Some(DecodedRequest { group_or_request, operation, vmo })
+        if let Ok(operation) = operation.as_ref() {
+            use fuchsia_trace::ArgValue;
+            static CACHE: AtomicU64 = AtomicU64::new(0);
+            if let Some(context) =
+                fuchsia_trace::TraceCategoryContext::acquire_cached(c"storage", &CACHE)
+            {
+                let trace_args_with_group = [
+                    ArgValue::of("group", u32::from(group_or_request.group_id())),
+                    ArgValue::of("opcode", operation.trace_label()),
+                ];
+                let trace_args = [ArgValue::of("opcode", operation.trace_label())];
+                let _scope = if group_or_request.is_group() {
+                    fuchsia_trace::duration(
+                        c"storage",
+                        c"block_server::start_transaction",
+                        &trace_args_with_group,
+                    )
+                } else {
+                    fuchsia_trace::duration(
+                        c"storage",
+                        c"block_server::start_transaction",
+                        &trace_args,
+                    )
+                };
+                let trace_flow_id = NonZero::new(request.trace_flow_id);
+                if let Some(trace_flow_id) = trace_flow_id.clone() {
+                    fuchsia_trace::flow_step(
+                        &context,
+                        c"block_server::start_trnsaction",
+                        trace_flow_id.get().into(),
+                        &[],
+                    );
+                }
+            }
+        }
+        Some(DecodedRequest {
+            request_tracking: RequestTracking {
+                group_or_request,
+                trace_flow_id: NonZero::new(request.trace_flow_id),
+            },
+            operation,
+            vmo,
+        })
     }
 
     fn take_vmos(&self) -> BTreeMap<u16, Arc<zx::Vmo>> {
@@ -505,7 +587,7 @@ impl<SM: SessionManager> SessionHelper<SM> {
 
 #[derive(Debug)]
 struct DecodedRequest {
-    group_or_request: GroupOrRequest,
+    request_tracking: RequestTracking,
     operation: Result<Operation, zx::Status>,
     vmo: Option<Arc<zx::Vmo>>,
 }
@@ -541,10 +623,45 @@ pub enum Operation {
     CloseVmo,
 }
 
+impl Operation {
+    fn trace_label(&self) -> &'static str {
+        match self {
+            Operation::Read { .. } => "read",
+            Operation::Write { .. } => "write",
+            Operation::Flush { .. } => "flush",
+            Operation::Trim { .. } => "trim",
+            Operation::CloseVmo { .. } => "close_vmo",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct RequestTracking {
+    group_or_request: GroupOrRequest,
+    trace_flow_id: Option<NonZero<u64>>,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum GroupOrRequest {
     Group(u16),
     Request(u32),
+}
+
+impl GroupOrRequest {
+    fn is_group(&self) -> bool {
+        if let Self::Group(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn group_id(&self) -> u16 {
+        match self {
+            Self::Group(id) => *id,
+            Self::Request(_) => 0,
+        }
+    }
 }
 
 /// cbindgen:ignore
