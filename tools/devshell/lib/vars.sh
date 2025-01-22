@@ -987,9 +987,13 @@ function fx-run-ninja {
       # Automatic auth with gcert (from re-client bootstrap) needs $USER.
       "USER=${USER}"
       "FX_BUILD_LOAS_TYPE=$loas_type_for_bazel"
-      # A few tools need credentials for authentication, like remotetool.
+      # A few tools need application credentials for authentication,
+      # like 'remotetool'.
       # Explicitly set this variable without forwarding $HOME.
       # User-overridable.
+      # Note: When using gcert to authenticate for bazel,
+      # unset this variable to prevent bazel from looking for a file
+      # that it doesn't need.  This is handled in bazel wrappers.
       "GOOGLE_APPLICATION_CREDENTIALS=${GOOGLE_APPLICATION_CREDENTIALS:-$HOME/.config/gcloud/application_default_credentials.json}"
       # For bazel subinvocations to be able to authenticate with gcert,
       # need to forward the authentication socket (used by gnubby).

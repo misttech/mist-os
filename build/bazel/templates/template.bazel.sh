@@ -129,7 +129,11 @@ build_metadata_opts=()
 # This requires less interaction from the user than 'gcloud auth ...'.
 use_gcert_auth=()
 if [[ "$FX_BUILD_LOAS_TYPE" == "unrestricted" ]]
-then use_gcert_auth=(--config=gcertauth)
+then
+  use_gcert_auth=(--config=gcertauth)
+  # Don't set this, otherwise bazel will look for it
+  # (and fail if it doesn't exist).
+  unset GOOGLE_APPLICATION_CREDENTIALS
 fi
 
 # Setting $USER so `bazel` won't fail in environments with fake UIDs. Even if

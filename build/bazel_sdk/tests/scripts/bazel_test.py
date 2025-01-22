@@ -971,6 +971,9 @@ def main() -> int:
         and os.environ.get("FX_BUILD_LOAS_TYPE", "") == "unrestricted"
     ):
         bazel_config_args += ["--config=gcertauth"]
+        # Tell bazel to not look for the app. credential file,
+        # because it may not exist.
+        os.environ.pop("GOOGLE_APPLICATION_CREDENTIALS", None)
 
     bazel_config_args += build_metadata_flags(siblings_link_template)
 
