@@ -99,7 +99,7 @@ where
         )
         .await
         .expect("failed to create lease helper CPU element during startup")
-        .lease()
+        .create_lease_and_wait_until_satisfied()
         .await
         .expect("failed to lease CPU element during startup");
         log::info!("Leased CPU power element at 'Active'.");

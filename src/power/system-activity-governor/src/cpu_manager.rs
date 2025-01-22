@@ -53,6 +53,28 @@ pub trait SuspendResumeListener {
     async fn notify_on_resume(&self);
 }
 
+/// Vends "suspend blockers", object references that, when held, indicate that the system should
+/// not suspend. Practically speaking, these blockers are used to guarantee that the system does
+/// not suspend in the gap between when a wake lease is acquired and when the lease becomes
+/// satisfied.
+pub struct SuspendBlockManager {
+    marker: Rc<()>,
+}
+
+impl SuspendBlockManager {
+    pub fn new() -> Self {
+        SuspendBlockManager { marker: Rc::new(()) }
+    }
+
+    pub fn get_suspend_blocker(&self) -> std::rc::Weak<()> {
+        Rc::downgrade(&self.marker)
+    }
+
+    pub fn suspend_blocked(&self) -> bool {
+        Rc::weak_count(&self.marker) > 0
+    }
+}
+
 /// Controls access to CPU power element and suspend management.
 struct CpuManagerInner {
     /// The context used to manage the CPU power element.
@@ -65,7 +87,9 @@ struct CpuManagerInner {
     /// The flag used to track whether suspension is allowed based on CPU's power level.
     /// If true, CPU has transitioned from a higher power state to CpuLevel::Inactive
     /// and is still at the CpuLevel::Inactive power level.
-    suspend_allowed: bool,
+    cpu_element_is_inactive: bool,
+    /// Allows the upper layer of SAG to block system suspension.
+    suspend_block_manager: Rc<SuspendBlockManager>,
 }
 
 /// Manager of the CPU power element and suspend logic.
@@ -89,7 +113,8 @@ impl CpuManager {
                 cpu,
                 suspender,
                 suspend_state_index: 0,
-                suspend_allowed: false,
+                cpu_element_is_inactive: false,
+                suspend_block_manager: Rc::new(SuspendBlockManager::new()),
             }),
             suspend_resume_listener: OnceCell::new(),
             _inspect_node: RefCell::new(IRingBuffer::new(inspect, 128)),
@@ -127,10 +152,10 @@ impl CpuManager {
         // check whether the system can be suspended.
         if required_level == CpuLevel::Inactive.into_primitive() {
             log::debug!("beginning suspend process for cpu");
-            inner.suspend_allowed = true;
+            inner.cpu_element_is_inactive = true;
             return Ok(true);
         } else {
-            inner.suspend_allowed = false;
+            inner.cpu_element_is_inactive = false;
             return Ok(false);
         }
     }
@@ -149,6 +174,10 @@ impl CpuManager {
         self.inner.lock().await.cpu.clone()
     }
 
+    pub async fn suspend_block_manager(&self) -> Rc<SuspendBlockManager> {
+        self.inner.lock().await.suspend_block_manager.clone()
+    }
+
     /// Attempts to suspend the system.
     ///
     /// Returns an enum representing the result of the suspend attempt.
@@ -158,8 +187,11 @@ impl CpuManager {
         {
             log::debug!("trigger_suspend: acquiring inner lock");
             let inner = self.inner.lock().await;
-            if !inner.suspend_allowed {
-                log::info!("Suspend not allowed");
+            if !inner.cpu_element_is_inactive {
+                log::info!("Suspend not allowed because CPU element is not inactive");
+                return SuspendResult::NotAllowed;
+            } else if inner.suspend_block_manager.suspend_blocked() {
+                log::info!("Suspend not allowed due to outstanding wake leases");
                 return SuspendResult::NotAllowed;
             }
 

@@ -966,6 +966,86 @@ async fn test_activity_governor_blocks_for_on_suspend_started() -> Result<()> {
 }
 
 #[fuchsia::test]
+async fn test_acquire_wake_lease_doesnt_deadlock_in_on_suspend_started() -> Result<()> {
+    let (realm, _) = create_realm().await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+
+    let (listener_client_end, mut listener_stream) = fidl::endpoints::create_request_stream();
+    activity_governor
+        .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
+            listener: Some(listener_client_end),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    // Define the listener such that:
+    //  - OnResume and OnSuspendFail both notify on_resume_tx. (At time of writing, the
+    //    OnSuspendFail path is exercised, but we plan to remove that method soon.)
+    //  - OnSuspendStarted calls AcquireWakeLease and passes the lease to on_suspend_started_rx.
+    let (on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
+    let (on_suspend_started_tx, mut on_suspend_started_rx) = mpsc::channel(1);
+    fasync::Task::local(async move {
+        // At time of writing, OnSuspendFail is executed rather than OnResume, but this is written
+        // in preparation for removal of OnSuspendFail.
+        let mut on_resume_tx = on_resume_tx;
+        let mut on_suspend_fail_tx = on_resume_tx.clone();
+
+        let mut on_suspend_started_tx = on_suspend_started_tx;
+
+        while let Some(Ok(req)) = listener_stream.next().await {
+            match req {
+                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
+                    log::info!("Running OnResume");
+                    on_resume_tx.try_send(()).unwrap();
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
+                    log::info!("Running OnSuspendStarted");
+                    let lease = activity_governor
+                        .acquire_wake_lease("on_suspend_started_wake_lease")
+                        .await
+                        .unwrap()
+                        .unwrap();
+                    on_suspend_started_tx.try_send(lease).unwrap();
+                    responder.send().unwrap()
+                }
+                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
+                    log::info!("Running OnSuspendFail");
+                    on_suspend_fail_tx.try_send(()).unwrap();
+                    responder.send().unwrap();
+                }
+                fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
+                    panic!("Unexpected method: {}", ordinal);
+                }
+            }
+        }
+    })
+    .detach();
+
+    // Call SetBootComplete to allow SAG to start suspending.
+    {
+        let boot_control = realm.connect_to_protocol::<fsystem::BootControlMarker>().await?;
+        let () =
+            boot_control.set_boot_complete().await.expect("SetBootComplete should have succeeded");
+    }
+
+    // Wait to receive the wake lease from OnSuspendStarted.
+    let _wake_lease = on_suspend_started_rx.next().await.unwrap();
+
+    // Verify that SAG did not call Suspender.Suspend due to the existence of the wake lease.
+    assert!(suspend_device.await_suspend().now_or_never().is_none());
+
+    // Now wait for the resume callback resulting from OnSuspendStarted's wake lease.
+    on_resume_rx.next().await.unwrap();
+
+    Ok(())
+}
+
+#[fuchsia::test]
 async fn test_activity_governor_handles_listener_raising_power_levels() -> Result<()> {
     let (realm, activity_governor_moniker) = create_realm().await?;
     let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
@@ -1633,6 +1713,7 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
                     client_token_koid: wake_lease.get_koid().unwrap().raw_koid(),
                     name: wake_lease_name,
                     type: AnyStringProperty,
+                    status: "Satisfied",
                 }
             },
         }
@@ -1651,6 +1732,10 @@ async fn test_activity_governor_take_wake_lease_raises_execution_state_to_wake_h
             },
         }
     );
+
+    // Confirm that the device is called after the wake lease is dropped. In particular, this
+    // guarantees that SAG's internal suspend-blocking logic does not prevent suspension.
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
 
     Ok(())
 }
@@ -1707,6 +1792,7 @@ async fn test_activity_governor_acquire_wake_lease_raises_execution_state_to_sus
                     client_token_koid: wake_lease.get_koid().unwrap().raw_koid(),
                     name: wake_lease_name,
                     type: AnyStringProperty,
+                    status: "Satisfied",
                 }
             },
         }
@@ -1829,6 +1915,7 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         wake_lease_child.add_property_assertion("client_token_koid", Box::new(*client_token_koid));
         wake_lease_child.add_property_assertion("name", Box::new(wake_lease_name));
         wake_lease_child.add_property_assertion("type", Box::new(AnyStringProperty));
+        wake_lease_child.add_property_assertion("status", Box::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);
@@ -1896,6 +1983,7 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
         wake_lease_child.add_property_assertion("client_token_koid", Box::new(*client_token_koid));
         wake_lease_child.add_property_assertion("name", Box::new(wake_lease_name));
         wake_lease_child.add_property_assertion("type", Box::new(AnyStringProperty));
+        wake_lease_child.add_property_assertion("status", Box::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);

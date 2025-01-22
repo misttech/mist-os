@@ -98,7 +98,7 @@ mod tests {
 
         // The lease() call should only return once the lease is satisfied, so the provider element
         // is ON.
-        let lease = helper.lease().await?;
+        let lease = helper.create_lease_and_wait_until_satisfied().await?;
         assert_eq!(ON, provider_level_receiver.next().await.unwrap());
         assert!(provider_level_receiver.try_next().is_err());
 
@@ -108,7 +108,7 @@ mod tests {
         assert!(provider_level_receiver.try_next().is_err());
 
         // The helper can be reused to create additional leases.
-        let lease = helper.lease().await?;
+        let lease = helper.create_lease_and_wait_until_satisfied().await?;
         assert_eq!(ON, provider_level_receiver.next().await.unwrap());
         assert!(provider_level_receiver.try_next().is_err());
         drop(lease);
@@ -149,7 +149,7 @@ mod tests {
 
         // The lease() call should only return once the lease is satisfied, so both provider
         // elements are ON.
-        let lease = helper.lease().await?;
+        let lease = helper.create_lease_and_wait_until_satisfied().await?;
         assert_eq!(ON, provider_1_receiver.next().await.unwrap());
         assert_eq!(ON, provider_2_receiver.next().await.unwrap());
         assert!(provider_1_receiver.try_next().is_err());
@@ -209,7 +209,7 @@ mod tests {
         };
 
         let helper = client_lib::LeaseHelper::new(&topology, "Lease", vec![dependency]).await?;
-        let lease_future = helper.lease().fuse();
+        let lease_future = helper.create_lease_and_wait_until_satisfied().fuse();
         let timer = fasync::Timer::new(fasync::MonotonicInstant::after(
             fasync::MonotonicDuration::from_seconds(1),
         ))

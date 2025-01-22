@@ -172,9 +172,8 @@ open protocol ActivityGovernorListener {
     /// required to keep the system awake, if needed.
     ///
     /// SAG does not block on the response to this method, so the listener may
-    /// safely call ActivityGovernor.AcquireWakeLease or
-    /// ActivityGovernor.TakeApplicationActivityLease. In particular, it is not
-    /// affected by https://fxbug.dev/389163722.
+    /// safely take actions that block on raising Execution State's power level.
+    /// In particular, it is not affected by https://fxbug.dev/391429689.
     strict OnResume() -> ();
 
     /// Called before the activity governor initiates a system suspension.
@@ -182,11 +181,12 @@ open protocol ActivityGovernorListener {
     /// The server is expected to respond once it has performed the operations
     /// it needs to prepare itself for suspend, if any.
     ///
-    /// It is not safe for this method to call ActivityGovernor.AcquireWakeLease
-    /// or ActivityGovernor.TakeApplicationActivityLease, or to perform any
+    /// It is not safe for this method to call
+    /// ActivityGovernor.TakeApplicationActivityLease or to perform any
     /// other action that blocks on raising Execution State above its Inactive
-    /// level. Doing so will currently result in a deadlock. This constraint
-    /// will be removed; see https://fxbug.dev/389163722.
+    /// level. (However, AcquireWakeLease does _not_ block in this way and is
+    /// safe to call.) Doing so will currently result in a deadlock. This
+    /// constraint will eventually be removed; see https://fxbug.dev/391429689.
     flexible OnSuspendStarted() -> ();
 
     /// Called when the activity governor detects a suspend failure.
@@ -196,9 +196,8 @@ open protocol ActivityGovernorListener {
     /// respond.
     ///
     /// SAG does not block on the response to this method, so the listener may
-    /// safely call ActivityGovernor.AcquireWakeLease or
-    /// ActivityGovernor.TakeApplicationActivityLease. In particular, it is not
-    /// affected by https://fxbug.dev/389163722.
+    /// safely take actions that block on raising Execution State's power level.
+    /// In particular, it is not affected by https://fxbug.dev/391429689.
     flexible OnSuspendFail() -> ();
 };
 
@@ -263,6 +262,9 @@ open protocol ActivityGovernor {
     /// Creates a lease that blocks the system from dropping below the Application
     /// Activity 'Active' state. In particular, this blocks suspension of the
     /// hardware platform.
+    ///
+    /// This method is _not_ safe to call during
+    /// ActivityGovernorListener.OnSuspendStarted.
     ///
     /// If an error occurs while creating a token for the activity lease, then the
     /// channel to `ActivityGovernor` will be closed by the server and no
