@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use crate::connector::{DirectConnector, NetworkConnector};
+use crate::fho_env::{DeviceLookup, FhoConnectionBehavior};
+use crate::{FhoEnvironment, TryFromEnv, TryFromEnvWith};
 use async_trait::async_trait;
 use errors::FfxError;
 use fdomain_client::fidl::{
@@ -10,9 +12,8 @@ use fdomain_client::fidl::{
     Proxy as FProxy,
 };
 use ffx_build_version::VersionInfo;
-use ffx_command::{return_bug, return_user_error, FfxCommandLine, FfxContext, Result};
+use ffx_command_error::{return_bug, return_user_error, FfxContext, Result};
 use ffx_config::EnvironmentContext;
-use ffx_core::Injector;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::TargetInfoQuery;
@@ -21,11 +22,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use futures::future::LocalBoxFuture;
 use rcs::OpenDirType;
-use std::future::Future;
 use std::marker::PhantomData;
-use std::path::PathBuf;
-use std::pin::Pin;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -38,42 +35,13 @@ pub(crate) use helpers::*;
 const DEFAULT_PROXY_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[async_trait(?Send)]
-pub trait TryFromEnv: Sized {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self>;
-}
-
-#[async_trait(?Send)]
 pub trait CheckEnv {
     async fn check_env(self, env: &FhoEnvironment) -> Result<()>;
 }
 
-#[async_trait(?Send)]
-pub trait TryFromEnvWith: 'static {
-    type Output: 'static;
-    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output>;
-}
-
-#[derive(Clone)]
-pub enum FhoConnectionBehavior {
-    DaemonConnector(Arc<dyn Injector>),
-    DirectConnector(Rc<dyn DirectConnector>),
-}
-
-// This trait can a.) probably use more members, and b.) be something that is made public inside of
-// the `target` library.
-#[cfg_attr(test, mockall::automock)]
-pub trait DeviceLookup {
-    fn target_spec(&self, env: EnvironmentContext) -> LocalBoxFuture<'_, Result<Option<String>>>;
-
-    fn resolve_target_query_to_info(
-        &self,
-        query: TargetInfoQuery,
-        env: EnvironmentContext,
-    ) -> LocalBoxFuture<'_, Result<Vec<ffx_fidl::TargetInfo>>>;
-}
-
 /// The default implementation of device lookup and resolution. Primarily used for simpler testing.
 #[doc(hidden)]
+#[derive(Clone)]
 pub struct DeviceLookupDefaultImpl;
 
 impl DeviceLookup for DeviceLookupDefaultImpl {
@@ -96,174 +64,6 @@ impl DeviceLookup for DeviceLookupDefaultImpl {
     }
 }
 
-#[derive(Clone)]
-pub struct FhoEnvironment {
-    pub ffx: FfxCommandLine,
-    pub context: EnvironmentContext,
-    pub behavior: FhoConnectionBehavior,
-    pub lookup: Arc<dyn DeviceLookup>,
-}
-
-impl FhoEnvironment {
-    /// This attempts to wrap errors around a potential failure in the underlying connection being
-    /// used to facilitate FIDL protocols. This should NOT be used by developers, this is intended
-    /// to be used outside of the scope of an ffx subtool (outside of the `main` function).
-    pub async fn maybe_wrap_connection_errors<T>(&self, res: Result<T>) -> Result<T> {
-        match (res, &self.behavior) {
-            (Err(e), FhoConnectionBehavior::DirectConnector(dc)) => {
-                return Err(dc.wrap_connection_errors(e).await);
-            }
-            (r, _) => r,
-        }
-    }
-
-    /// While the surface of this function is a little awkward, this is necessary to provide a
-    /// readable error. Authors shouldn't use this directly, they should instead use
-    /// `TryFromEnv`.
-    pub fn injector<T: TryFromEnv>(&self) -> Result<Arc<dyn Injector>> {
-        let strict = self.ffx.global.strict;
-        match &self.behavior {
-            FhoConnectionBehavior::DaemonConnector(dc) => Ok(dc.clone()),
-            _ => {
-                if strict {
-                    Err(
-                        ffx_command::user_error!(
-                            "ffx-strict doesn't support use of the daemon, which is used to allocate '{}'. This command must either be re-written or you should not use it.",
-                            std::any::type_name::<T>()
-                        )
-                    )
-                } else {
-                    Err(ffx_command::user_error!(
-                        "Attempting to use the daemon to allocate '{}', which is not yet supported",
-                        std::any::type_name::<T>()
-                    ))
-                }
-            }
-        }
-    }
-}
-
-pub async fn connection_behavior(
-    ffx: &FfxCommandLine,
-    injector: &Option<Arc<dyn Injector>>,
-    env: &EnvironmentContext,
-) -> Result<FhoConnectionBehavior> {
-    if ffx.global.strict {
-        let connector =
-            NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(env).await?;
-        Ok(crate::from_env::FhoConnectionBehavior::DirectConnector(Rc::new(connector)))
-    } else {
-        if let Some(daemon_injector) = injector {
-            Ok(crate::from_env::FhoConnectionBehavior::DaemonConnector(daemon_injector.clone()))
-        } else {
-            return_bug!("Cannot initialize connection, the daemon injector is not pare of the execution environment.")
-        }
-    }
-}
-
-impl FhoEnvironment {
-    /// Update the log file name which can be influenced by the
-    /// FfxMain implementation being run.
-    pub fn update_log_file(&self, basename: Option<String>) -> Result<()> {
-        if let Some(basename) = basename {
-            // If the base name is the default, no action is needed.
-            if basename == ffx_config::logging::LOG_BASENAME {
-                return Ok(());
-            }
-            // If the log was specified on the command line, no action is needed
-            if self.ffx.global.log_destination.is_some() {
-                return Ok(());
-            }
-
-            // Some simple validation of the basename.
-            if basename.is_empty() {
-                return_bug!("basename cannot be empty")
-            }
-
-            // Build the path to the new log file.
-            let dir: PathBuf =
-                self.context.get(ffx_config::logging::LOG_DIR).unwrap_or_else(|_| ".".into());
-            let mut log_file = dir.join(basename);
-            log_file.set_extension("log");
-
-            tracing::info!("Switching log file to {log_file:?}");
-            eprintln!("Switching log file to {log_file:?}");
-
-            ffx_config::logging::change_log_file(&log_file)?;
-        }
-
-        Ok(())
-    }
-
-    pub async fn new(context: &EnvironmentContext, ffx: &FfxCommandLine) -> Result<Self> {
-        let build_info = context.build_info();
-        let injector = Injection::initialize_overnet(
-            context.clone(),
-            None,
-            DaemonVersionCheck::SameVersionInfo(build_info),
-        )
-        .await?;
-        let injector: Option<Arc<dyn ffx_core::Injector>> = Some(Arc::new(injector));
-        #[allow(deprecated)] // injector field.
-        let env = FhoEnvironment {
-            behavior: crate::from_env::connection_behavior(&ffx, &injector, &context).await?,
-            ffx: ffx.clone(),
-            context: context.clone(),
-            lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
-        };
-        Ok(env)
-    }
-
-    pub fn new_for_test(
-        context: &EnvironmentContext,
-        ffx: &FfxCommandLine,
-        behavior: FhoConnectionBehavior,
-        lookup: Arc<dyn DeviceLookup>,
-    ) -> Self {
-        #[allow(deprecated)] // injector field.
-        FhoEnvironment { behavior, ffx: ffx.clone(), context: context.clone(), lookup }
-    }
-}
-
-/// This is so that you can use a () somewhere that generically expects something
-/// to be TryFromEnv, but there's no meaningful type to put there.
-#[async_trait(?Send)]
-impl TryFromEnv for () {
-    async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
-        Ok(())
-    }
-}
-
-#[async_trait(?Send)]
-impl<T> TryFromEnv for Arc<T>
-where
-    T: TryFromEnv,
-{
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        T::try_from_env(env).await.map(Arc::new)
-    }
-}
-
-#[async_trait(?Send)]
-impl<T> TryFromEnv for Rc<T>
-where
-    T: TryFromEnv,
-{
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        T::try_from_env(env).await.map(Rc::new)
-    }
-}
-
-#[async_trait(?Send)]
-impl<T> TryFromEnv for Box<T>
-where
-    T: TryFromEnv,
-{
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        T::try_from_env(env).await.map(Box::new)
-    }
-}
-
 #[async_trait(?Send)]
 impl<T> TryFromEnv for Result<T>
 where
@@ -277,7 +77,7 @@ where
 #[async_trait(?Send)]
 impl TryFromEnv for VersionInfo {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        Ok(env.context.build_info())
+        Ok(env.environment_context().build_info())
     }
 }
 
@@ -289,7 +89,7 @@ pub struct AvailabilityFlag<T>(pub T);
 impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
     async fn check_env(self, env: &FhoEnvironment) -> Result<()> {
         let flag = self.0.as_ref();
-        if env.context.get(flag).unwrap_or(false) {
+        if env.environment_context().get(flag).unwrap_or(false) {
             Ok(())
         } else {
             return_user_error!(
@@ -331,6 +131,18 @@ async fn knock_rcs(
         };
     }
     Ok(())
+}
+
+async fn init_daemon_behavior(context: &EnvironmentContext) -> Result<FhoConnectionBehavior> {
+    let build_info = context.build_info();
+    let overnet_injector = Injection::initialize_overnet(
+        context.clone(),
+        None,
+        DaemonVersionCheck::SameVersionInfo(build_info),
+    )
+    .await?;
+
+    Ok(FhoConnectionBehavior::DaemonConnector(Arc::new(overnet_injector)))
 }
 
 async fn daemon_try_connect<T: TryFromEnv>(
@@ -393,7 +205,7 @@ async fn daemon_try_connect<T: TryFromEnv>(
 
 async fn direct_connector_try_connect<T: TryFromEnv>(
     env: &FhoEnvironment,
-    dc: &Rc<dyn DirectConnector>,
+    dc: &Arc<dyn DirectConnector>,
     log_target_wait: &mut impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
 ) -> Result<T> {
     loop {
@@ -445,19 +257,23 @@ impl<T: TryFromEnv> Connector<T> {
         &self,
         mut log_target_wait: impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
     ) -> Result<T> {
-        match &self.env.behavior {
-            FhoConnectionBehavior::DaemonConnector(_) => {
-                daemon_try_connect(
-                    &self.env,
-                    &mut log_target_wait,
-                    Self::OPEN_TARGET_TIMEOUT,
-                    Self::KNOCK_TARGET_TIMEOUT,
-                )
-                .await
+        if let Some(behavior) = self.env.behavior().await {
+            match behavior {
+                FhoConnectionBehavior::DaemonConnector(_) => {
+                    daemon_try_connect(
+                        &self.env,
+                        &mut log_target_wait,
+                        Self::OPEN_TARGET_TIMEOUT,
+                        Self::KNOCK_TARGET_TIMEOUT,
+                    )
+                    .await
+                }
+                FhoConnectionBehavior::DirectConnector(ref dc) => {
+                    direct_connector_try_connect::<T>(&self.env, dc, &mut log_target_wait).await
+                }
             }
-            FhoConnectionBehavior::DirectConnector(dc) => {
-                direct_connector_try_connect::<T>(&self.env, dc, &mut log_target_wait).await
-            }
+        } else {
+            return_bug!("Behavior must be initialized at this point")
         }
     }
 }
@@ -465,25 +281,38 @@ impl<T: TryFromEnv> Connector<T> {
 #[async_trait(?Send)]
 impl<T: TryFromEnv> TryFromEnv for Connector<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        if env.behavior().await.is_none() {
+            let b = init_daemon_behavior(env.environment_context()).await?;
+            env.set_behavior(b.clone()).await;
+        }
+        if env.lookup().await.is_none() {
+            env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await
+        }
         Ok(Connector { env: env.clone(), _connects_to: Default::default() })
     }
 }
 
 pub struct DirectTargetConnector<T: TryFromEnv> {
     pub inner: Connector<T>,
-    connector: Rc<NetworkConnector<SshConnector>>,
+    connector: Arc<NetworkConnector<SshConnector>>,
 }
 
 #[async_trait(?Send)]
 impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         // Configure the environment to use a direct connector
-        let connector: Rc<NetworkConnector<SshConnector>> = Rc::new(
-            NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(&env.context).await?,
+        let connector: Arc<NetworkConnector<SshConnector>> = Arc::new(
+            NetworkConnector::<ffx_target::ssh_connector::SshConnector>::new(
+                &env.environment_context(),
+            )
+            .await?,
         );
 
-        let mut direct_env = env.clone();
-        direct_env.behavior = FhoConnectionBehavior::DirectConnector(connector.clone());
+        let direct_env = env.clone();
+        direct_env.set_behavior(FhoConnectionBehavior::DirectConnector(connector.clone())).await;
+        if direct_env.lookup().await.is_none() {
+            direct_env.set_lookup(Box::new(DeviceLookupDefaultImpl)).await
+        }
         Ok(DirectTargetConnector {
             connector,
             inner: Connector { env: direct_env, _connects_to: Default::default() },
@@ -540,12 +369,20 @@ impl TryFromEnv for Vec<ffx_fidl::TargetInfo> {
     /// end up attempting to connect to all discoverable targets which may be problematic in test or
     /// lab environments.
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        let target = env.lookup.target_spec(env.context.clone()).await?;
-        let targets = env
-            .lookup
+        let looker = env.lookup().await;
+
+        let lookup: &Box<dyn DeviceLookup> = if let Some(ref lookup) = *looker {
+            lookup
+        } else {
+            let l = Box::new(DeviceLookupDefaultImpl);
+            env.set_lookup(l.clone()).await;
+            return Self::try_from_env(env).await;
+        };
+        let target = lookup.target_spec(env.environment_context().clone()).await?;
+        let targets = lookup
             .resolve_target_query_to_info(
                 TargetInfoQuery::from(target.clone()),
-                env.context.clone(),
+                env.environment_context().clone(),
             )
             .await?;
         if targets.is_empty() {
@@ -560,91 +397,11 @@ impl TryFromEnv for Vec<ffx_fidl::TargetInfo> {
     }
 }
 
-/// Allows you to defer the initialization of an object in your tool struct
-/// until you need it (if at all) or apply additional combinators on it (like
-/// custom timeout logic or anything like that).
-///
-/// If you need to defer something that requires a decorator, use the
-/// [`deferred`] decorator around it.
-///
-/// Example:
-/// ```rust
-/// #[derive(FfxTool)]
-/// struct Tool {
-///     daemon: fho::Deferred<fho::DaemonProxy>,
-/// }
-/// impl fho::FfxMain for Tool {
-///     type Writer = fho::SimpleWriter;
-///     async fn main(self, _writer: fho::SimpleWriter) -> fho::Result<()> {
-///         let daemon = self.daemon.await?;
-///         writeln!(writer, "Loaded the daemon proxy!");
-///     }
-/// }
-/// ```
-pub struct Deferred<T: 'static>(Pin<Box<dyn Future<Output = Result<T>>>>);
-#[async_trait(?Send)]
-impl<T> TryFromEnv for Deferred<T>
-where
-    T: TryFromEnv,
-{
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        let env = env.clone();
-        Ok(Self(Box::pin(async move { T::try_from_env(&env).await })))
-    }
-}
-
-impl<T: 'static> Deferred<T> {
-    /// Use the value provided to create a test-able Deferred value.
-    pub fn from_output(output: Result<T>) -> Self {
-        Self(Box::pin(async move { output }))
-    }
-}
-
-/// The implementation of the decorator returned by [`deferred`]
-pub struct WithDeferred<T>(T);
-#[async_trait(?Send)]
-impl<T> TryFromEnvWith for WithDeferred<T>
-where
-    T: TryFromEnvWith + 'static,
-{
-    type Output = Deferred<T::Output>;
-    async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
-        let env = env.clone();
-        Ok(Deferred(Box::pin(async move { self.0.try_from_env_with(&env).await })))
-    }
-}
-
-/// A decorator for proxy types in [`crate::FfxTool`] implementations so you can
-/// specify the moniker for the component exposing the proxy you're loading.
-///
-/// Example:
-///
-/// ```rust
-/// #[derive(FfxTool)]
-/// struct Tool {
-///     #[with(fho::deferred(fho::moniker("/core/foo/thing")))]
-///     foo_proxy: fho::Deferred<FooProxy>,
-/// }
-/// ```
-pub fn deferred<T: TryFromEnvWith>(inner: T) -> WithDeferred<T> {
-    WithDeferred(inner)
-}
-
-impl<T> Future for Deferred<T> {
-    type Output = Result<T>;
-    fn poll(
-        mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        self.0.as_mut().poll(cx)
-    }
-}
-
 /// Gets the actively configured SDK from the environment
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_config::Sdk {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.context.get_sdk().user_message("Could not load currently active SDK")
+        env.environment_context().get_sdk().user_message("Could not load currently active SDK")
     }
 }
 
@@ -652,7 +409,7 @@ impl TryFromEnv for ffx_config::Sdk {
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_config::SdkRoot {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.context.get_sdk_root().user_message("Could not load currently active SDK")
+        env.environment_context().get_sdk_root().user_message("Could not load currently active SDK")
     }
 }
 
@@ -776,10 +533,18 @@ pub fn daemon_protocol<P>() -> WithDaemonProtocol<P> {
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_fidl::DaemonProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        if env.behavior().await.is_none() {
+            let b = init_daemon_behavior(env.environment_context()).await?;
+            env.set_behavior(b.clone()).await;
+        }
         // Might need to revisit whether it's necessary to cast every daemon_factory() invocation
         // into a user error. This line originally casted every error into "Failed to create daemon
         // proxy", which obfuscates the original error.
-        env.injector::<Self>()?.daemon_factory().await.map_err(|e| crate::user_error!("{}", e))
+        env.injector::<Self>()
+            .await?
+            .daemon_factory()
+            .await
+            .map_err(|e| crate::user_error!("{}", e))
     }
 }
 
@@ -790,8 +555,13 @@ impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
     /// and starting a new instance of the daemon if none is currently present, you should use the
     /// impl for `ffx_fidl::DaemonProxy`, which returns a `Result<ffx_fidl::DaemonProxy>`.
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        if env.behavior().await.is_none() {
+            let b = init_daemon_behavior(env.environment_context()).await?;
+            env.set_behavior(b.clone()).await;
+        }
         let res = env
-            .injector::<Self>()?
+            .injector::<Self>()
+            .await?
             .try_daemon()
             .await
             .user_message("Failed internally while checking for daemon.")?;
@@ -802,7 +572,11 @@ impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_fidl::TargetProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        match env.injector::<Self>()?.target_factory().await.map_err(|e| {
+        if env.behavior().await.is_none() {
+            let b = init_daemon_behavior(env.environment_context()).await?;
+            env.set_behavior(b.clone()).await;
+        }
+        match env.injector::<Self>().await?.target_factory().await.map_err(|e| {
             // This error case happens when there are multiple targets in target list.
             // So let's print out the ffx error message directly (which comes from OpenTargetError::QueryAmbiguous)
             // rather than just returning "Failed to create target proxy" which is not helpful.
@@ -822,7 +596,14 @@ impl TryFromEnv for ffx_fidl::TargetProxy {
 #[async_trait(?Send)]
 impl TryFromEnv for fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        match &env.behavior {
+        let behavior = if let Some(behavior) = env.behavior().await {
+            behavior
+        } else {
+            let b = init_daemon_behavior(env.environment_context()).await?;
+            env.set_behavior(b.clone()).await;
+            b
+        };
+        match behavior {
             FhoConnectionBehavior::DirectConnector(dc) => {
                 dc.rcs_proxy_fdomain().await.map_err(Into::into)
             }
@@ -844,9 +625,15 @@ impl TryFromEnv for fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy 
 #[async_trait(?Send)]
 impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        match &env.behavior {
-            FhoConnectionBehavior::DirectConnector(dc) => dc.rcs_proxy().await.map_err(Into::into),
-            FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory().await {
+        let behavior = if let Some(behavior) = env.behavior().await {
+            behavior
+        } else {
+            let b = init_daemon_behavior(env.environment_context()).await?;
+            env.set_behavior(b.clone()).await;
+            b
+        };
+        match behavior {
+            FhoConnectionBehavior::DaemonConnector(daemon) => match daemon.remote_factory().await {
                 Ok(p) => Ok(p),
                 Err(e) => {
                     if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
@@ -857,6 +644,9 @@ impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
                     }
                 }
             },
+            FhoConnectionBehavior::DirectConnector(direct) => {
+                direct.rcs_proxy().await.map_err(Into::into)
+            }
         }
     }
 }
@@ -871,7 +661,7 @@ impl TryFromEnv for ffx_writer::SimpleWriter {
 #[async_trait(?Send)]
 impl<T: serde::Serialize> TryFromEnv for ffx_writer::MachineWriter<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        Ok(ffx_writer::MachineWriter::new(env.ffx.global.machine))
+        Ok(ffx_writer::MachineWriter::new(env.ffx_command().global.machine))
     }
 }
 
@@ -880,71 +670,41 @@ impl<T: serde::Serialize + schemars::JsonSchema> TryFromEnv
     for ffx_writer::VerifiedMachineWriter<T>
 {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        Ok(ffx_writer::VerifiedMachineWriter::new(env.ffx.global.machine))
+        Ok(ffx_writer::VerifiedMachineWriter::new(env.ffx_command().global.machine))
     }
 }
 
 #[async_trait(?Send)]
 impl TryFromEnv for EnvironmentContext {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        Ok(env.context.clone())
+        Ok(env.environment_context().clone())
     }
 }
 
 // Returns a DirectConnector only if we have a direct connection. Returns None for
 // a daemon connection.
 #[async_trait(?Send)]
-impl TryFromEnv for Option<Rc<dyn DirectConnector>> {
+impl TryFromEnv for Option<Arc<dyn DirectConnector>> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        Ok(if let FhoConnectionBehavior::DirectConnector(dc) = &env.behavior {
-            Some(dc.clone())
-        } else {
-            None
-        })
-    }
-}
-
-#[async_trait(?Send)]
-impl<T> TryFromEnv for PhantomData<T> {
-    async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
-        Ok(PhantomData)
+        match env.behavior().await {
+            Some(FhoConnectionBehavior::DirectConnector(ref direct)) => Ok(Some(direct.clone())),
+            _ => Ok(None),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::connector::MockDirectConnector;
-    use ffx_command::Error;
+    use crate::fho_env::{FhoConnectionBehavior, MockDeviceLookup};
     use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 
     use super::*;
 
-    #[derive(Debug)]
-    struct AlwaysError;
-    #[async_trait(?Send)]
-    impl TryFromEnv for AlwaysError {
-        async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
-            Err(Error::User(anyhow::anyhow!("boom")))
-        }
-    }
-
-    #[fuchsia::test]
-    async fn test_deferred_err() {
-        let config_env = ffx_config::test_init().await.unwrap();
-        let tool_env = crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-
-        Deferred::<AlwaysError>::try_from_env(&tool_env)
-            .await
-            .expect("Deferred result should be Ok")
-            .await
-            .expect_err("Inner AlwaysError should error after second await");
-    }
-
     #[fuchsia::test]
     async fn test_connector_try_connect_fail_reconnect_and_rcs_eventual_success() {
         let config_env = ffx_config::test_init().await.unwrap();
-        let mut tool_env =
-            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
+
         let mut mock_connector = MockDirectConnector::new();
         mock_connector.expect_device_address().returning(|| Box::pin(async { None }));
         mock_connector.expect_target_spec().returning(|| None);
@@ -984,7 +744,11 @@ mod tests {
                 Ok(proxy)
             })
         });
-        tool_env.behavior = FhoConnectionBehavior::DirectConnector(Rc::new(mock_connector));
+        let tool_env = crate::testing::ToolEnv::new().make_environment_with_behavior(
+            config_env.context.clone(),
+            FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
+        );
+
         let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
         assert!(res.is_ok(), "Expected success: {:?}", res);
@@ -993,8 +757,6 @@ mod tests {
     #[fuchsia::test]
     async fn test_connector_try_connect_fail_after_successful_connection() {
         let config_env = ffx_config::test_init().await.unwrap();
-        let mut tool_env =
-            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
         let mut mock_connector = MockDirectConnector::new();
         mock_connector.expect_device_address().returning(|| Box::pin(async { None }));
         mock_connector.expect_target_spec().returning(|| None);
@@ -1009,7 +771,11 @@ mod tests {
                 Err(crate::Error::Unexpected(anyhow::anyhow!("something critical failed!").into()))
             })
         });
-        tool_env.behavior = FhoConnectionBehavior::DirectConnector(Rc::new(mock_connector));
+        let tool_env = crate::testing::ToolEnv::new().make_environment_with_behavior(
+            config_env.context.clone(),
+            FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
+        );
+
         let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
         assert!(res.is_err(), "Expected failure: {:?}", res);
@@ -1018,15 +784,17 @@ mod tests {
     #[fuchsia::test]
     async fn test_connector_try_connect_fail_after_critical_connection_error() {
         let config_env = ffx_config::test_init().await.unwrap();
-        let mut tool_env =
-            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
         let mut mock_connector = MockDirectConnector::new();
         mock_connector.expect_connect().times(1).returning(|| {
             Box::pin(async {
                 Err(crate::Error::Unexpected(anyhow::anyhow!("we're doomed!").into()))
             })
         });
-        tool_env.behavior = FhoConnectionBehavior::DirectConnector(Rc::new(mock_connector));
+        let tool_env = crate::testing::ToolEnv::new().make_environment_with_behavior(
+            config_env.context.clone(),
+            FhoConnectionBehavior::DirectConnector(Arc::new(mock_connector)),
+        );
+
         let connector = Connector::<RemoteControlProxy>::try_from_env(&tool_env).await.unwrap();
         let res = connector.try_connect(|_, _| Ok(())).await;
         assert!(res.is_err(), "Expected failure: {:?}", res);
@@ -1040,9 +808,8 @@ mod tests {
         mock.expect_resolve_target_query_to_info()
             .times(1)
             .returning(|_q, _e| Box::pin(async { Ok(vec![ffx_fidl::TargetInfo::default()]) }));
-        let mut tool_env =
-            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        tool_env.lookup = Arc::new(mock);
+        let tool_env = crate::testing::ToolEnv::new()
+            .make_environment_with_lookup(config_env.context.clone(), mock);
         let info = ffx_fidl::TargetInfo::try_from_env(&tool_env).await.unwrap();
         assert_eq!(info, ffx_fidl::TargetInfo::default());
     }
@@ -1055,9 +822,9 @@ mod tests {
         mock.expect_resolve_target_query_to_info()
             .times(1)
             .returning(|_q, _e| Box::pin(async { Ok(vec![]) }));
-        let mut tool_env =
-            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        tool_env.lookup = Arc::new(mock);
+        let tool_env = crate::testing::ToolEnv::new()
+            .make_environment_with_lookup(config_env.context.clone(), mock);
+
         let result = ffx_fidl::TargetInfo::try_from_env(&tool_env).await;
         assert!(result.is_err());
     }
@@ -1072,9 +839,8 @@ mod tests {
         mock.expect_resolve_target_query_to_info()
             .times(1)
             .returning(|_q, _e| Box::pin(async { Ok(vec![]) }));
-        let mut tool_env =
-            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        tool_env.lookup = Arc::new(mock);
+        let tool_env = crate::testing::ToolEnv::new()
+            .make_environment_with_lookup(config_env.context.clone(), mock);
         let result = ffx_fidl::TargetInfo::try_from_env(&tool_env).await;
         assert!(result.is_err());
     }
@@ -1091,9 +857,8 @@ mod tests {
                 Ok(vec![ffx_fidl::TargetInfo::default(), ffx_fidl::TargetInfo::default()])
             })
         });
-        let mut tool_env =
-            crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
-        tool_env.lookup = Arc::new(mock);
+        let tool_env = crate::testing::ToolEnv::new()
+            .make_environment_with_lookup(config_env.context.clone(), mock);
         let result = ffx_fidl::TargetInfo::try_from_env(&tool_env).await;
         assert!(result.is_err());
     }

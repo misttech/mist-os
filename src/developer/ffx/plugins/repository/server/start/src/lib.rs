@@ -653,7 +653,7 @@ mod tests {
                 auto_publish: None,
             },
             repos,
-            context: env.context.clone(),
+            context: test_env.context.clone(),
             target_proxy_connector: Connector::try_from_env(&env)
                 .await
                 .expect("Could not make target proxy test connector"),

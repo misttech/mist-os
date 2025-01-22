@@ -21,7 +21,7 @@ macro_rules! embedded_plugin {
             use $crate::FfxMain as _;
 
             $crate::macro_deps::check_strict_constraints(
-                &env.ffx.global,
+                &env.ffx_command().global,
                 <$tool as $crate::FfxTool>::requires_target(),
             )?;
 
@@ -29,7 +29,7 @@ macro_rules! embedded_plugin {
             // try to print it and then exit.
             let mut writer: <$tool as $crate::FfxMain>::Writer =
                 $crate::TryFromEnv::try_from_env(&env).await?;
-            if env.ffx.global.schema {
+            if env.ffx_command().global.schema {
                 use $crate::macro_deps::ffx_writer::ToolIO;
                 if <<$tool as $crate::FfxMain>::Writer as $crate::ToolIO>::has_schema() {
                     writer.try_print_schema()?;
@@ -105,9 +105,12 @@ mod tests {
 
         let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
         let behavior = FhoConnectionBehavior::DaemonConnector(injector.clone());
-        let lookup = Arc::new(crate::from_env::DeviceLookupDefaultImpl);
-        let env =
-            FhoEnvironment::new_for_test(&_config_env.context, &ffx_cmd_line, behavior, lookup);
+        let env = FhoEnvironment::new_for_test(
+            &_config_env.context,
+            &ffx_cmd_line,
+            behavior,
+            crate::from_env::DeviceLookupDefaultImpl,
+        );
 
         ffx_plugin_impl(&env, fake_tool).await.expect("Plugin to run successfully");
 

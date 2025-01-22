@@ -217,13 +217,15 @@ pub struct ShowToolWrapper {
 }
 
 impl ShowToolWrapper {
-    fn set_target_spec(&mut self, target_spec: Option<String>) {
-        self.env.ffx.global.target = target_spec;
-    }
-
-    async fn allocate(&mut self) -> fho::Result<()> {
-        let context = self.env.ffx.global.load_context(self.env.context.exe_kind())?;
-        let fho_env = FhoEnvironment::new(&context, &self.env.ffx).await?;
+    async fn allocate(&mut self, target_spec: Option<String>) -> fho::Result<()> {
+        let context = self
+            .env
+            .ffx_command()
+            .global
+            .load_context(self.env.environment_context().exe_kind())?;
+        let mut new_ffx = self.env.ffx_command().clone();
+        new_ffx.global.target = target_spec;
+        let fho_env = FhoEnvironment::new(&context, &new_ffx).await?;
         self.inner.replace(ShowTool::from_env(fho_env, TargetShow::default()).await?);
         Ok(())
     }
@@ -1404,8 +1406,7 @@ async fn doctor_summary<W: Write>(
             let node = ledger
                 .add_node("Running `ffx target show` against device", LedgerMode::Automatic)?;
             ledger.set_outcome(node, LedgerOutcome::Info)?;
-            show_tool.set_target_spec(target.nodename.clone());
-            match show_tool.allocate().await {
+            match show_tool.allocate(target.nodename.clone()).await {
                 Ok(_) => {
                     let node = ledger.add(LedgerNode::new(
                         "Allocating proxies for `target show`".to_string(),

@@ -20,7 +20,6 @@ use show::{
     AddressData, BoardData, BuildData, DeviceData, ProductData, TargetShowInfo, UpdateData,
 };
 use std::net::IpAddr;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Duration;
 use timeout::timeout;
@@ -33,7 +32,7 @@ pub struct ShowTool {
     #[command]
     cmd: args::TargetShow,
     rcs_proxy: RemoteControlProxy,
-    connector: Option<Rc<dyn DirectConnector>>, // Returns Some(dc) only if we have a direct connection
+    connector: Option<Arc<dyn DirectConnector>>, // Returns Some(dc) only if we have a direct connection
     target_proxy: Deferred<TargetProxy>,
     #[with(moniker("/core/system-update"))]
     channel_control_proxy: ChannelControlProxy,
@@ -132,7 +131,7 @@ async fn gather_target_info_from_daemon(
 /// Determine target information.
 async fn gather_target_show(
     rcs_proxy: RemoteControlProxy,
-    connector: Option<Rc<dyn DirectConnector>>,
+    connector: Option<Arc<dyn DirectConnector>>,
     target_proxy: Deferred<TargetProxy>,
     last_reboot_info_proxy: LastRebootInfoProviderProxy,
 ) -> Result<TargetData> {
@@ -592,7 +591,7 @@ mod tests {
         };
     }
 
-    fn setup_fake_direct_connector() -> Rc<dyn DirectConnector> {
+    fn setup_fake_direct_connector() -> Arc<dyn DirectConnector> {
         let mut dc = fho::MockDirectConnector::new();
         dc.expect_connection().return_once(|| {
             let device_address = std::net::SocketAddr::new("127.0.0.1".parse().unwrap(), 22);
@@ -600,7 +599,7 @@ mod tests {
             let conn = ffx_target::Connection::fake(fidl_pipe);
             Box::pin(async { Ok(Arc::new(Mutex::new(Some(conn)))) })
         });
-        Rc::new(dc)
+        Arc::new(dc)
     }
 
     #[fuchsia::test]

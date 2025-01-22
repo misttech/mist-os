@@ -133,7 +133,7 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
             metrics.print_notice(&mut std::io::stderr()).await?;
         }
         let writer = TryFromEnv::try_from_env(&self.env).await?;
-        let res: Result<ExitStatus> = if self.env.ffx.global.schema {
+        let res: Result<ExitStatus> = if self.env.ffx_command().global.schema {
             if self.main.has_schema() {
                 self.main
                     .try_print_schema(writer)

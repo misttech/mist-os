@@ -214,7 +214,7 @@ ffx config remove repository.server.enabled && ffx doctor --restart-daemon
             REPO_BACKGROUND_FEATURE_FLAG,
         );
     }
-    // Check that there is a target device identifed, it is OK if it is not online.
+    // Check that there is a target device identified, it is OK if it is not online.
     if !cmd.no_device {
         let res = rcs_proxy_connector
             .try_connect(|target, err| {
@@ -1498,7 +1498,7 @@ mod test {
                     auto_publish: None,
                 },
                 repos,
-                context: env.context.clone(),
+                context: env.environment_context().clone(),
                 target_proxy_connector: Connector::try_from_env(&env)
                     .await
                     .expect("Could not make target proxy test connector"),
@@ -1662,7 +1662,7 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                 },
-                env.context.clone(),
+                env.environment_context().clone(),
                 writer,
                 ServerMode::Foreground,
             )
@@ -1827,7 +1827,7 @@ mod test {
                     refresh_metadata: false,
                     auto_publish: None,
                 },
-                env.context.clone(),
+                env.environment_context().clone(),
                 writer,
                 ServerMode::Foreground,
             )

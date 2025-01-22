@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::FhoEnvironment;
-use crate::from_env::TryFromEnv;
+use crate::{FhoEnvironment, TryFromEnv};
 use fdomain_client::fidl::{
     DiscoverableProtocolMarker as FDiscoverableProtocolMarker, Proxy as FProxy,
 };

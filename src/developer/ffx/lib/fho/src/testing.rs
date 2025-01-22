@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fho_env::DeviceLookup;
 use crate::subtool::{FfxTool, ToolCommand};
-use crate::FhoEnvironment;
+use crate::{FhoConnectionBehavior, FhoEnvironment};
 use argh::FromArgs;
 use async_trait::async_trait;
 use fdomain_fuchsia_developer_remotecontrol::RemoteControlProxy as FRemoteControlProxy;
@@ -73,15 +74,40 @@ impl ToolEnv {
         self.injector
     }
 
+    pub fn make_environment_with_lookup<T: DeviceLookup + 'static>(
+        self,
+        context: EnvironmentContext,
+        lookup: T,
+    ) -> FhoEnvironment {
+        let injector = Arc::new(self.injector);
+        FhoEnvironment::new_for_test(
+            &context,
+            &self.ffx_cmd_line,
+            FhoConnectionBehavior::DaemonConnector(injector),
+            lookup,
+        )
+    }
     pub fn make_environment(self, context: EnvironmentContext) -> FhoEnvironment {
         let injector = Arc::new(self.injector);
-        #[allow(deprecated)] // injector field.
-        FhoEnvironment {
-            ffx: self.ffx_cmd_line,
-            context,
-            behavior: crate::FhoConnectionBehavior::DaemonConnector(injector),
-            lookup: Arc::new(crate::from_env::DeviceLookupDefaultImpl),
-        }
+        FhoEnvironment::new_for_test(
+            &context,
+            &self.ffx_cmd_line,
+            FhoConnectionBehavior::DaemonConnector(injector),
+            crate::from_env::DeviceLookupDefaultImpl,
+        )
+    }
+
+    pub fn make_environment_with_behavior(
+        self,
+        context: EnvironmentContext,
+        behavior: crate::fho_env::FhoConnectionBehavior,
+    ) -> FhoEnvironment {
+        FhoEnvironment::new_for_test(
+            &context,
+            &self.ffx_cmd_line,
+            behavior,
+            crate::from_env::DeviceLookupDefaultImpl,
+        )
     }
 
     pub async fn build_tool<T: FfxTool>(self, context: EnvironmentContext) -> Result<T> {
