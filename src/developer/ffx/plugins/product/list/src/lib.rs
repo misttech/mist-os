@@ -141,8 +141,7 @@ where
     let prefix = format!("development/{}", &prefix);
 
     let mut result = Vec::new();
-    let base_urls: Vec<String> =
-        context.get(CONFIG_BASE_URLS).context("get config CONFIG_BASE_URLS")?;
+    let base_urls: Vec<String> = context.get(CONFIG_BASE_URLS).unwrap_or(vec![]);
     for base_url in base_urls {
         let (bucket, _) = split_gs_url(&base_url).context("Splitting gs URL.")?;
         if let Some(version) = get_latest_version(bucket, &prefix, auth, ui, &client).await? {
@@ -199,8 +198,11 @@ where
     let index: String = context.get(PRODUCT_BUNDLE_INDEX_KEY)?;
     if Path::new(&index).is_file() {
         let pm = std::fs::read_to_string(index)?;
-        let prods = serde_json::from_str::<ProductManifest>(&pm)
+        let mut prods = serde_json::from_str::<ProductManifest>(&pm)
             .map_err(|e| bug!("Parsing json {:?}: {e}", pm))?;
+        if let Some(product_version) = &version {
+            prods.retain(|p| p.product_version == *product_version);
+        }
         products.extend(prods);
 
         // If version is not explicitly passed in, directly return
@@ -293,6 +295,13 @@ mod test {
             .await
             .unwrap();
 
+        env.context
+            .query(CONFIG_BASE_URLS)
+            .level(Some(ConfigLevel::User))
+            .set(serde_json::json!([]))
+            .await
+            .unwrap();
+
         env
     }
 
@@ -331,6 +340,36 @@ mod test {
             }],
             pbs
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_pb_list_impl_filter_based_on_version() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join(PB_MANIFEST_NAME);
+        let env = setup_test_env(&path).await;
+        let mut f = File::create(&path).expect("file create");
+        f.write_all(
+            r#"[{
+            "name": "fake_name",
+            "product_version": "fake_version",
+            "transfer_manifest_url": "fake_url"
+            }]"#
+            .as_bytes(),
+        )
+        .expect("write_all");
+
+        let ui = structured_ui::MockUi::new();
+        let pbs = pb_list_impl(
+            &AuthFlowChoice::Default,
+            None,
+            Some("24.20240910.2.1".into()),
+            None,
+            &ui,
+            &env.context,
+        )
+        .await
+        .expect("testing list");
+        assert!(pbs.is_empty());
     }
 
     #[fuchsia::test]
@@ -378,7 +417,7 @@ mod test {
     async fn test_pb_list_impl_machine_code_ignore_unknown_fields() {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join(PB_MANIFEST_NAME);
-        let env = setup_test_env(&path).await;
+        let env: TestEnv = setup_test_env(&path).await;
         let mut f = File::create(&path).expect("file create");
         f.write_all(
             r#"[{
