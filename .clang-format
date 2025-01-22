@@ -1,18 +1,26 @@
 # http://clang.llvm.org/docs/ClangFormatStyleOptions.html
 BasedOnStyle: Google
+
 # This defaults to 'Auto'. Explicitly set it for a while, so that
 # 'vector<vector<int> >' in existing files gets formatted to
 # 'vector<vector<int>>'. ('Auto' means that clang-format will only use
 # 'int>>' if the file already contains at least one such instance.)
 Standard: Cpp11
-SortIncludes: true
+
+DerivePointerAlignment: true
+PointerAlignment: Left
+
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 BreakStringLiterals: false
-DerivePointerAlignment: true
-PointerAlignment: Left
 ColumnLimit: 100
+
+WrapNamespaceBodyWithEmptyLines: Always
+FixNamespaceComments: true
+
 ForEachMacros: ['list_for_every_entry','list_for_every_entry_safe']
+
+SortIncludes: true
 IncludeBlocks: Regroup
 IncludeCategories:
   # This specific header must come last in kernel source files.  Its
