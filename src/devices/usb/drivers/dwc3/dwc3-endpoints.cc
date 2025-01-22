@@ -134,6 +134,16 @@ void Dwc3::EpEndTransfers(Endpoint& ep, zx_status_t reason) {
     opt_info->actual = 0;
     pending_completions_.push(std::move(*opt_info));
   }
+
+  // If the reason is ZX_ERR_IO_NOT_PRESENT then the request is either in response to a
+  // port-detach, or a configuration change. In either case the irq thread remains live and we need
+  // to eat all pending completions before continuing.
+  if (reason == ZX_ERR_IO_NOT_PRESENT) {
+    while (!pending_completions_.empty()) {
+      std::optional<RequestInfo> info{pending_completions_.pop()};
+      info->uep->server->RequestComplete(info->status, info->actual, std::move(info->req));
+    }
+  }
 }
 
 void Dwc3::EpReadTrb(Endpoint& ep, Fifo& fifo, const dwc3_trb_t* src, dwc3_trb_t* dst) {

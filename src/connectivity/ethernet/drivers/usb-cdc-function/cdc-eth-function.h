@@ -116,6 +116,7 @@ class UsbCdc : public UsbCdcType,
   std::mutex ethernet_mutex_ __TA_ACQUIRED_AFTER(tx_mutex_);
   ddk::EthernetIfcProtocolClient ethernet_ifc_ __TA_GUARDED(ethernet_mutex_);
   bool online_ __TA_GUARDED(ethernet_mutex_) = false;
+  bool configured_ = false;
   usb_speed_t speed_ = 0;
   // TX lock -- Must be acquired before ethernet_mutex
   // when both locks are held.

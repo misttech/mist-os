@@ -4,6 +4,7 @@
 
 #include "src/connectivity/ethernet/drivers/usb-cdc-function/cdc-eth-function.h"
 
+#include <endian.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.function/cpp/fidl.h>
 #include <lib/ddk/binding_driver.h>
@@ -380,6 +381,15 @@ zx_status_t UsbCdc::UsbFunctionInterfaceControl(const usb_setup_t* setup,
                                                 const uint8_t* write_buffer, size_t write_size,
                                                 uint8_t* out_read_buffer, size_t read_size,
                                                 size_t* out_read_actual) {
+  uint16_t w_value{le16toh(setup->w_value)};
+  uint16_t w_index{le16toh(setup->w_index)};
+  uint16_t w_length{le16toh(setup->w_length)};
+
+  zxlogf(DEBUG,
+         "bmRequestType=%02x bRequest=%02x wValue=%04x (%d) wIndex=%04x (%d) wLength=%04x (%d)",
+         setup->bm_request_type, setup->b_request, w_value, w_value, w_index, w_index, w_length,
+         w_length);
+
   TRACE_DURATION("cdc_eth", __func__, "write_size", write_size, "read_size", read_size);
   if (out_read_actual != NULL) {
     *out_read_actual = 0;
@@ -387,11 +397,19 @@ zx_status_t UsbCdc::UsbFunctionInterfaceControl(const usb_setup_t* setup,
 
   zxlogf(DEBUG, "%s", __func__);
 
-  // USB_CDC_SET_ETHERNET_PACKET_FILTER is the only control request required by the spec
+  // The following control requests are currently unsupported, though non-criticial. To avoid
+  // hanging up bus-enumeration, reply with success.
+
   if (setup->bm_request_type == (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) &&
       setup->b_request == USB_CDC_SET_ETHERNET_PACKET_FILTER) {
     zxlogf(DEBUG, "%s: USB_CDC_SET_ETHERNET_PACKET_FILTER", __func__);
     // TODO(voydanoff) implement the requested packet filtering
+    return ZX_OK;
+  }
+
+  if (setup->bm_request_type == (USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_ENDPOINT) &&
+      setup->b_request == USB_REQ_CLEAR_FEATURE && setup->w_value == USB_ENDPOINT_HALT) {
+    zxlogf(DEBUG, "%s: USB_REQ_CLEAR_FEATURE", __func__);
     return ZX_OK;
   }
 
@@ -401,6 +419,10 @@ zx_status_t UsbCdc::UsbFunctionInterfaceControl(const usb_setup_t* setup,
 zx_status_t UsbCdc::UsbFunctionInterfaceSetConfigured(bool configured, usb_speed_t speed) {
   TRACE_DURATION("cdc_eth", __func__, "configured", configured, "speed", speed);
   zxlogf(INFO, "%s %d %d", __func__, configured, speed);
+
+  if (configured_) {
+    return ZX_OK;
+  }
 
   zxlogf(DEBUG, "%s: before crit_enter", __func__);
   {
@@ -419,12 +441,14 @@ zx_status_t UsbCdc::UsbFunctionInterfaceSetConfigured(bool configured, usb_speed
       return status;
     }
     speed_ = speed;
+    configured_ = configured;
     cdc_send_notifications();
   } else {
     function_.DisableEp(bulk_out_addr_);
     function_.DisableEp(bulk_in_addr_);
     function_.DisableEp(intr_addr_);
     speed_ = USB_SPEED_UNDEFINED;
+    configured_ = configured;
   }
 
   zxlogf(DEBUG, "%s: return ZX_OK", __func__);
