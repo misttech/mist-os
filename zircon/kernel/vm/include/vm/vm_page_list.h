@@ -25,14 +25,15 @@ class VMPLCursor;
 
 // RAII helper for representing content in a page list node. This supports being in one of five
 // states
-//  * Empty       - Contains nothing
+//  * Empty       - Contains nothing.
 //  * Page p      - Contains a vm_page 'p'. This 'p' is considered owned by this wrapper and
 //                  `ReleasePage` must be called to give up ownership.
 //  * Reference r - Contains a reference 'r' to some content. This 'r' is considered owned by this
 //                  wrapper and `ReleaseReference` must be called to give up ownership.
 //  * Marker      - Indicates that whilst not a page, it is also not empty. Markers can be used to
 //                  separate the distinction between "there's no page because we've deduped to the
-//                  zero page" and "there's no page because our parent contains the content".
+//                  zero page" (a `Marker` is inserted) and "there's no page because our parent
+//                  contains the content" (which is represented as `Empty`).
 //  * Interval    - Indicates that this page is part of a sparse page interval. An interval will
 //                  have a Start sentinel, and an End sentinel, and all offsets that lie between the
 //                  two will be empty. If the interval spans a single page, it will be represented
