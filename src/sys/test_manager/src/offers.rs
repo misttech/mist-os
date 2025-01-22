@@ -60,6 +60,23 @@ pub(crate) fn map_offers(offers: Vec<fdecl::Offer>) -> Result<Vec<ftest::Capabil
             }) => {
                 capabilities.push(Capability::resolver(target_name).into());
             }
+            fdecl::Offer::Config(fdecl::OfferConfiguration {
+                target_name: Some(target_name),
+                ..
+            }) => {
+                capabilities.push(
+                    Capability::configuration(target_name).availability_same_as_target().into(),
+                );
+            }
+            fdecl::Offer::Dictionary(fdecl::OfferDictionary {
+                target_name: Some(target_name),
+                ..
+            }) if target_name != "diagnostics" => {
+                // NB: "diagnostics" is always routed, so don't propagate it here to avoid duplicate
+                // routes.
+                capabilities
+                    .push(Capability::dictionary(target_name).availability_same_as_target().into());
+            }
             _ => {
                 // Ignore anything else that is routed to the test collection
             }
