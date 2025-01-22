@@ -420,8 +420,16 @@ pub fn complete_duration(
 ///
 /// ```rust
 ///   {
-///       let args = [ArgValue::of("x", 5), ArgValue::of("y", 10)];
-///       let _scope = duration(c"foo", c"bar", &args);
+///       let mut args;
+///       let _scope =  {
+///           static CACHE: trace_site_t = trace_site_t::new(0);
+///           if let Some(_context) = TraceCategoryContext::acquire_cached(c"foo", &CACHE) {
+///               args = [ArgValue::of("x", 5), ArgValue::of("y", 10)];
+///               Some($crate::duration(c"foo", c"bar", &args))
+///           } else {
+///               None
+///           }
+///       };
 ///       ...
 ///       ...
 ///       // event will be recorded on drop.
@@ -433,7 +441,14 @@ macro_rules! duration {
         let mut args;
         let _scope =  {
             static CACHE: $crate::trace_site_t = $crate::trace_site_t::new(0);
-            if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
+            // NB: It is intentional that _context is not used here.  This cached context is used to
+            // elide the expensive context lookup if tracing is disabled.  When the duration ends,
+            // it will do a second lookup, but this cost is dwarfed by the cost of writing the trace
+            // event, so this second lookup is irrelevant.  Retaining the context for the lifetime
+            // of the DurationScope to avoid this second lookup would prevent the trace buffers from
+            // flushing until the DurationScope is dropped.
+            if let Some(_context) =
+                    $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 args = [$($crate::ArgValue::of($key, $val)),*];
                 Some($crate::duration($category, $name, &args))
             } else {
@@ -451,6 +466,9 @@ macro_rules! duration {
 ///
 /// 0 to 15 arguments can be associated with the event, each of which is used
 /// to annotate the duration with additional information.
+///
+/// NOTE: For performance reasons, it is advisable to create a cached context scope, which will
+/// avoid expensive lookups when tracing is disabled.  See the example in the `duration!` macro.
 pub fn duration<'a>(
     category: &'static CStr,
     name: &'static CStr,
