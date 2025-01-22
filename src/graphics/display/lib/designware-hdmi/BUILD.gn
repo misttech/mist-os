@@ -9,7 +9,6 @@ source_set("hdmi-transmitter-controller") {
   sources = [
     "color-param.h",
     "hdmi-transmitter-controller.h",
-    "regs.h",
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
@@ -20,18 +19,24 @@ source_set("hdmi-transmitter-controller") {
 
 source_set("hdmi-transmitter-controller-impl") {
   sources = [
+    "ddc-controller-regs.h",
     "hdmi-transmitter-controller-impl.cc",
     "hdmi-transmitter-controller-impl.h",
+    "regs.h",
   ]
   public_deps = [
     ":hdmi-transmitter-controller",
     "//sdk/lib/driver/logging/cpp",
+    "//zircon/system/ulib/hwreg",
   ]
 }
 
 test("designware-hdmi-tests-bin") {
   output_name = "designware-hdmi-tests"
-  sources = [ "hdmi-transmitter-controller-impl-test.cc" ]
+  sources = [
+    "ddc-controller-regs-test.cc",
+    "hdmi-transmitter-controller-impl-test.cc",
+  ]
   deps = [
     ":hdmi-transmitter-controller-impl",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
