@@ -1,6 +1,6 @@
 {
   "name": "start",
-  "description": "Starts the repository server. Note that all repositories listed from `ffx repository list` will be started as subpaths.",
+  "description": "Starts the package repository server.",
   "examples": [],
   "flags": [
     {
@@ -36,7 +36,7 @@
       "optionality": "optional",
       "long": "--daemon",
       "short": null,
-      "description": "run server in as part of the ffx daemon. This is the default mode. This switch is mutually exclusive with --background and --foreground.",
+      "description": "run server in as part of the ffx daemon. This switch is mutually exclusive with --background and --foreground. The daemon mode is deprecated. If it is used, please file a bug at go/ffx-bug describing why daemon mode was needed.",
       "hidden": false
     },
     {
@@ -44,7 +44,7 @@
       "optionality": "optional",
       "long": "--foreground",
       "short": null,
-      "description": "run server as a foreground process. This is mutually exclusive with --daemon and --background.",
+      "description": "run server as a foreground process.  This is the default mode. This is mutually exclusive with --daemon and --background.",
       "hidden": false
     },
     {

@@ -67,11 +67,9 @@ impl FfxMain for ServerStartTool {
             self.cmd.foreground || self.cmd.disconnected,
         ) {
             // Daemon server mode
-            (false, true, false) | (false, false, false) => {
-                start_daemon_server(self.cmd, self.repos.await?).await
-            }
+            (false, true, false) => start_daemon_server(self.cmd, self.repos.await?).await,
             // Foreground server mode
-            (false, false, true) => {
+            (false, false, true) | (false, false, false) => {
                 let mode = if self.cmd.disconnected {
                     ServerMode::Background
                 } else {

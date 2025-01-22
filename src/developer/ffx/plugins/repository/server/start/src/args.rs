@@ -11,12 +11,7 @@ use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
-#[argh(
-    subcommand,
-    name = "start",
-    description = "Starts the repository server. Note that all \
-    repositories listed from `ffx repository list` will be started as subpaths."
-)]
+#[argh(subcommand, name = "start", description = "Starts the package repository server.")]
 pub struct StartCommand {
     /// address on which to start the repository.
     /// Note that this can be either IPV4 or IPV6.
@@ -31,13 +26,14 @@ pub struct StartCommand {
     #[argh(switch)]
     pub background: bool,
 
-    /// run server in as part of the ffx daemon. This is the
-    /// default mode. This switch is mutually exclusive with
-    /// --background and --foreground.
+    /// run server in as part of the ffx daemon. This switch is mutually exclusive with
+    /// --background and --foreground. The daemon mode is deprecated. If it is used, please file a
+    /// bug at go/ffx-bug describing why daemon mode was needed.
     #[argh(switch)]
     pub daemon: bool,
 
-    /// run server as a foreground process. This is mutually
+    /// run server as a foreground process.  This is the
+    /// default mode. This is mutually
     /// exclusive with --daemon and --background.
     #[argh(switch)]
     pub foreground: bool,
