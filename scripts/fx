@@ -219,6 +219,8 @@ if [[ "${script_dir}" != "${fuchsia_dir}"* ]]; then
   echo >&2 "  ${fuchsia_dir}/scripts/fx"
   echo >&2 "Or, if you use fx-env.sh, source fx-env from the current fuchsia dir:"
   echo >&2 "  source ${fuchsia_dir}/scripts/fx-env.sh"
+  echo >&2 "To change your current environment, update your 'PATH':"
+  echo >&2 "  source ${fuchsia_dir}/scripts/fx-env.sh && fx-update-path"
   exit 1
 fi
 
