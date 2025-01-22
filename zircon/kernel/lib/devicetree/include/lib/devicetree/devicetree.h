@@ -303,12 +303,12 @@ class StringList {
 // Forward declaration of PropertyDecoder, see below.
 class PropertyDecoder;
 
-// Represents a |reg| property, which usually encodes mmio mapped registers for a device.
+// Represents a `reg` property, which usually encodes mmio mapped registers for a device.
 //
 // This property usually encodes series or memory-mapped registers as pairs of [address, size] where
 // each entry in the pair is defined by a sequence of cells. For the address the number of cells is
 // determined by |num_address_cells| and for the size the number of cells is determined by
-// |num_size_cells|.
+// `num_size_cells`.
 //
 // See
 // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#reg
@@ -397,6 +397,49 @@ class RangesProperty : public PropEncodedArray<RangesPropertyElement> {
   using PropEncodedArray<RangesPropertyElement>::PropEncodedArray;
 };
 
+// Represents a `status` property, which indicates if the containing device node
+// is in  a usable state.
+//
+// See
+// https://devicetree-specification.readthedocs.io/en/latest/chapter2-devicetree-basics.html#status
+// for more details.
+class StatusProperty {
+ public:
+  static std::optional<StatusProperty> Create(std::optional<std::string_view> prop_value);
+
+  constexpr bool is_okay() const { return status_ == Status::kOkay; }
+  constexpr bool is_disabled() const { return status_ == Status::kDisabled; }
+
+  constexpr bool is_fail() const {
+    return status_ == Status::kFail || status_ == Status::kFailWithCode;
+  }
+
+  constexpr std::optional<std::string_view> fail_code() const {
+    if (status_ != Status::kFailWithCode) {
+      return std::nullopt;
+    }
+    return code_;
+  }
+
+ private:
+  enum class Status : uint8_t {
+    kOkay,
+    kDisabled,
+    kFail,
+    kFailWithCode,
+    kUnknown,
+  };
+
+  explicit constexpr StatusProperty(Status status, std::string_view code = std::string_view())
+      : status_(status), code_(code) {}
+
+  Status status_ = Status::kUnknown;
+
+  // Only available when `status_` is `kFailWithCode`.
+  // Stores the `sss` portion of `fail-sss` status.
+  std::string_view code_;
+};
+
 // See
 // https://devicetree-specification.readthedocs.io/en/v0.3/devicetree-basics.html#property-values
 // for the types and representations of possible property values.
@@ -435,6 +478,8 @@ class PropertyValue {
     }
     return true;
   }
+
+  std::optional<StatusProperty> AsStatus() const { return StatusProperty::Create(AsString()); }
 
   // Given a device node's property decoder |decoder|, the property value is assumed
   // to be a property encoded array, to be interpreted as 'reg'.
@@ -645,9 +690,11 @@ class PropertyDecoder {
       : parent_(parent),
         properties_(std::move(properties)),
         aliases_(aliases ? &*aliases : nullptr),
-        cell_counts_(properties_.begin()) {}
+        cached_properties_(properties_.begin()) {}
   explicit constexpr PropertyDecoder(PropertyDecoder* parent, Properties properties)
-      : parent_(parent), properties_(std::move(properties)), cell_counts_(properties_.begin()) {}
+      : parent_(parent),
+        properties_(std::move(properties)),
+        cached_properties_(properties_.begin()) {}
   explicit constexpr PropertyDecoder(Properties properties)
       : PropertyDecoder(nullptr, std::move(properties)) {}
 
@@ -676,7 +723,7 @@ class PropertyDecoder {
   }
 
   // Performs property lookup and decoding, using the provided |PropertyValue::*| method pointer.
-  template <auto PropertyValue::*ValueDecoder, typename... Args>
+  template <auto PropertyValue::* ValueDecoder, typename... Args>
   constexpr auto FindAndDecodeProperty(std::string_view name, Args&&... args) const {
     using ReturnValue = std::invoke_result_t<decltype(ValueDecoder), PropertyValue, Args...>;
     auto prop = FindProperty(name);
@@ -700,13 +747,20 @@ class PropertyDecoder {
 
   // Cached special '#' properties.
   constexpr std::optional<uint32_t> num_address_cells() const {
-    return cell_counts_.LookUp(cell_counts_.address, properties_.end());
+    return cached_properties_.LookUp(cached_properties_.address, properties_.end());
   }
   constexpr std::optional<uint32_t> num_size_cells() const {
-    return cell_counts_.LookUp(cell_counts_.size, properties_.end());
+    return cached_properties_.LookUp(cached_properties_.size, properties_.end());
   }
   constexpr std::optional<uint32_t> num_interrupt_cells() const {
-    return cell_counts_.LookUp(cell_counts_.interrupt, properties_.end());
+    return cached_properties_.LookUp(cached_properties_.interrupt, properties_.end());
+  }
+  constexpr std::optional<StatusProperty> status() const {
+    return cached_properties_.LookUp(cached_properties_.status, properties_.end());
+  }
+  constexpr bool is_status_ok() const {
+    auto s = status();
+    return !s || s->is_okay();
   }
 
   // Translate |address| from this node's view to the root's view of the address.
@@ -718,14 +772,19 @@ class PropertyDecoder {
   std::optional<uint64_t> TranslateAddress(uint64_t address) const;
 
  private:
-  struct CellCounts {
-    explicit constexpr CellCounts() = default;
-    explicit constexpr CellCounts(Properties::iterator start) : next(start) {}
+  struct CachedProperties {
+    explicit constexpr CachedProperties() = default;
+    explicit constexpr CachedProperties(Properties::iterator start) : next(start) {}
 
     void TryToPopulate() {
       const auto& [name, value] = *(next++);
 
       // Not a special property.
+      if (name == "status") {
+        status = value.AsStatus();
+        return;
+      }
+
       if (name[0] != '#') {
         return;
       }
@@ -746,12 +805,12 @@ class PropertyDecoder {
       }
     }
 
-    constexpr std::optional<uint32_t>& LookUp(std::optional<uint32_t>& cell_count,
-                                              Properties::iterator end) {
-      while (!cell_count && next != end) {
+    template <typename T>
+    constexpr std::optional<T>& LookUp(std::optional<T>& value, Properties::iterator end) {
+      while (!value && next != end) {
         TryToPopulate();
       }
-      return cell_count;
+      return value;
     }
 
     // Points to the next property to keep searching for unseen cacheable
@@ -762,6 +821,7 @@ class PropertyDecoder {
     std::optional<uint32_t> address;
     std::optional<uint32_t> size;
     std::optional<uint32_t> interrupt;
+    std::optional<StatusProperty> status;
   };
 
   template <size_t... Is, typename... PropertyNames>
@@ -794,8 +854,8 @@ class PropertyDecoder {
     for (auto it = properties_.begin(); it != properties_.end(); ++it) {
       // If we reach the last processed cell count iterator, bump it to
       // avoid doing duplicate iteration later.
-      if (cell_counts_.next == it) {
-        cell_counts_.TryToPopulate();
+      if (cached_properties_.next == it) {
+        cached_properties_.TryToPopulate();
       }
       if (!visitor(*it)) {
         break;
@@ -806,7 +866,7 @@ class PropertyDecoder {
   PropertyDecoder* parent_ = nullptr;
   Properties properties_;
   const Properties* aliases_ = nullptr;
-  mutable CellCounts cell_counts_;
+  mutable CachedProperties cached_properties_;
 };
 
 // Represents a devicetree. This class does not dynamically allocate

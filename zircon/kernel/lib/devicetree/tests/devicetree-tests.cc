@@ -684,13 +684,15 @@ TEST(PropertyDecoderTest, ResolvePathNoAlias) {
   EXPECT_TRUE(empty_suffix.empty());
 }
 
-TEST(PropertyDecoderTest, CellCountsAreCached) {
+TEST(PropertyDecoderTest, CellCountsAndStatusAreCached) {
   // This test relies on manipulating the underlying data, to verify
   // at which point are the properties actually cached.
   PropertyBuilder builder;
   builder.Add("#address-cells", 1);
   builder.Add("#size-cells", 2);
   builder.Add("#interrupt-cells", 3);
+  builder.Add("status", "okay");
+
   auto properties = builder.Build();
 
   devicetree::PropertyDecoder decoder(properties);
@@ -706,16 +708,26 @@ TEST(PropertyDecoderTest, CellCountsAreCached) {
     auto interrupt_cells = decoder.num_interrupt_cells();
     ASSERT_TRUE(interrupt_cells);
     EXPECT_EQ(*interrupt_cells, 3);
+
+    auto status = decoder.status();
+    ASSERT_TRUE(status);
+    EXPECT_TRUE(status->is_okay());
   }
-  // Update the underlying propeties, if the property is not cached, it should
+  // Update the underlying properties, if the property is not cached, it should
   // return the updated value.
   PropertyBuilder mod_builder;
   mod_builder.Add("#address-cells", 3);
   mod_builder.Add("#size-cells", 4);
   mod_builder.Add("#interrupt-cells", 5);
+  mod_builder.Add("status", "barz");
+
   std::ignore = mod_builder.Build();
+
   // copy contents to the previous property block.
-  builder.property_block = mod_builder.property_block;
+  memcpy(builder.property_block.data(), mod_builder.property_block.data(),
+         mod_builder.property_block.size());
+  memcpy(builder.string_block.data(), mod_builder.string_block.data(),
+         mod_builder.string_block.size());
 
   // Safe check that the underlying properties have been updated.
   {
@@ -739,6 +751,10 @@ TEST(PropertyDecoderTest, CellCountsAreCached) {
     auto interrupt_cells = decoder.num_interrupt_cells();
     ASSERT_TRUE(interrupt_cells);
     EXPECT_EQ(*interrupt_cells, 3);
+
+    auto status = decoder.status();
+    ASSERT_TRUE(status);
+    EXPECT_TRUE(status->is_okay());
   }
 }
 
@@ -750,6 +766,7 @@ TEST(PropertyDecoderTest, CellCountsNullOptWhenNotPresent) {
     EXPECT_FALSE(decoder.num_address_cells());
     EXPECT_FALSE(decoder.num_size_cells());
     EXPECT_FALSE(decoder.num_interrupt_cells());
+    EXPECT_FALSE(decoder.status());
   }
 
   builder.Add("#address-cells", 3);
@@ -759,6 +776,7 @@ TEST(PropertyDecoderTest, CellCountsNullOptWhenNotPresent) {
     EXPECT_TRUE(decoder.num_address_cells());
     EXPECT_FALSE(decoder.num_size_cells());
     EXPECT_FALSE(decoder.num_interrupt_cells());
+    EXPECT_FALSE(decoder.status());
   }
 
   builder.Add("#size-cells", 4);
@@ -768,6 +786,7 @@ TEST(PropertyDecoderTest, CellCountsNullOptWhenNotPresent) {
     EXPECT_TRUE(decoder.num_address_cells());
     EXPECT_TRUE(decoder.num_size_cells());
     EXPECT_FALSE(decoder.num_interrupt_cells());
+    EXPECT_FALSE(decoder.status());
   }
 
   builder.Add("#interrupt-cells", 5);
@@ -777,6 +796,17 @@ TEST(PropertyDecoderTest, CellCountsNullOptWhenNotPresent) {
     EXPECT_TRUE(decoder.num_address_cells());
     EXPECT_TRUE(decoder.num_size_cells());
     EXPECT_TRUE(decoder.num_interrupt_cells());
+    EXPECT_FALSE(decoder.status());
+  }
+
+  builder.Add("status", "disabled");
+  {
+    auto props = builder.Build();
+    devicetree::PropertyDecoder decoder(props);
+    EXPECT_TRUE(decoder.num_address_cells());
+    EXPECT_TRUE(decoder.num_size_cells());
+    EXPECT_TRUE(decoder.num_interrupt_cells());
+    EXPECT_TRUE(decoder.status());
   }
 }
 
@@ -1205,6 +1235,61 @@ TEST(PropertyEncodedArrayTest, DecodeFieldsWithZeroSize) {
   EXPECT_EQ(*encoded_triplet_1[0], uint64_t(456) << 32 | 124);
   EXPECT_FALSE(encoded_triplet_1[1].has_value());
   EXPECT_EQ(*encoded_triplet_1[2], 3);
+}
+
+TEST(StatusPropertyTest, CreateNullopt) {
+  auto prop = devicetree::StatusProperty::Create(std::nullopt);
+  ASSERT_FALSE(prop);
+}
+
+TEST(StatusPropertyTest, CreateFromOkay) {
+  auto prop = devicetree::StatusProperty::Create("okay");
+  EXPECT_TRUE(prop);
+  EXPECT_TRUE(prop->is_okay());
+  EXPECT_FALSE(prop->is_fail());
+  EXPECT_FALSE(prop->is_disabled());
+  EXPECT_FALSE(prop->fail_code());
+}
+
+TEST(StatusPropertyTest, CreateFromOk) {
+  auto prop = devicetree::StatusProperty::Create("ok");
+  EXPECT_TRUE(prop);
+  EXPECT_TRUE(prop->is_okay());
+  EXPECT_FALSE(prop->is_fail());
+  EXPECT_FALSE(prop->is_disabled());
+  EXPECT_FALSE(prop->fail_code());
+}
+
+TEST(StatusPropertyTest, CreateFromDisabled) {
+  auto prop = devicetree::StatusProperty::Create("disabled");
+  ASSERT_TRUE(prop);
+  EXPECT_TRUE(prop->is_disabled());
+  EXPECT_FALSE(prop->is_fail());
+  EXPECT_FALSE(prop->is_okay());
+  EXPECT_FALSE(prop->fail_code());
+}
+
+TEST(StatusPropertyTest, CreateFromFail) {
+  auto prop = devicetree::StatusProperty::Create("fail");
+  ASSERT_TRUE(prop);
+  EXPECT_TRUE(prop->is_fail());
+  EXPECT_FALSE(prop->is_disabled());
+  EXPECT_FALSE(prop->is_okay());
+  EXPECT_FALSE(prop->fail_code());
+}
+
+TEST(StatusPropertyTest, CreateFromFailWithCode) {
+  auto prop = devicetree::StatusProperty::Create("fail-abc");
+  ASSERT_TRUE(prop);
+  EXPECT_TRUE(prop->is_fail());
+  EXPECT_FALSE(prop->is_disabled());
+  EXPECT_FALSE(prop->is_okay());
+  EXPECT_EQ(prop->fail_code(), "abc");
+}
+
+TEST(StatusPropertyTest, CreateFromBadStr) {
+  auto prop = devicetree::StatusProperty::Create("what-is-this");
+  ASSERT_FALSE(prop);
 }
 
 }  // namespace
