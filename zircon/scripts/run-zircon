@@ -315,7 +315,7 @@ if [[ -n $DISKFILE ]]; then
     DISKARG="virtio-blk-pci,drive=${NAME}"
   elif [[ "${DISKTYPE}" == "ahci" ]]; then
     if [[ $AHCI_NUM -eq 0 ]]; then
-        DISKARG="ich9-ahci,id=ahci0"
+        ARGS+=("-device" "ich9-ahci,id=ahci0")
     fi
     DISKARG="ide-hd,drive=${NAME},bus=ahci0.${AHCI_NUM}"
     AHCI_NUM=$((AHCI_NUM + 1))
@@ -323,13 +323,13 @@ if [[ -n $DISKFILE ]]; then
     DISKARG="nvme,drive=${NAME},serial=zircon"
   elif [[ "${DISKTYPE}" == "virtio-scsi" ]]; then
     if [[ $VIRTIO_SCSI_NUM -eq 0 ]]; then
-        DISKARG="virtio-scsi-pci,id=scsi0"
+        ARGS+=("-device" "virtio-scsi-pci,id=scsi0")
     fi
     DISKARG="scsi-hd,drive=${NAME},scsi-id=${VIRTIO_SCSI_NUM},lun=1"
     VIRTIO_SCSI_NUM=$((VIRTIO_SCSI_NUM + 1))
   elif [[ "${DISKTYPE}" == "usb" ]]; then
     if [[ $USB_NUM -eq 0 ]]; then
-        DISKARG="nec-usb-xhci,id=xhci0"
+        ARGS+=("-device" "nec-usb-xhci,id=xhci0")
     fi
     DISKARG="usb-storage,bus=xhci0.0,removable=on,drive=${NAME}"
     USB_NUM=$((USB_NUM + 1))
