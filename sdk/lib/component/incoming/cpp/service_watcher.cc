@@ -27,8 +27,7 @@ zx_status_t ServiceWatcher::Begin(fidl::ClientEnd<fuchsia_io::Directory> dir,
   if (zx_status_t status = response.s; status != ZX_OK) {
     return status;
   }
-
-  buf_.resize(fuchsia_io::wire::kMaxBuf);
+  buf_ = std::make_shared<uint8_t[fuchsia_io::wire::kMaxBuf]>();
   client_end_ = client.TakeChannel();
   wait_.set_object(client_end_.get());
   wait_.set_trigger(ZX_CHANNEL_READABLE);
@@ -53,25 +52,40 @@ void ServiceWatcher::OnWatchedEvent(async_dispatcher_t* dispatcher, async::WaitB
   if (status != ZX_OK || !(signal->observed & ZX_CHANNEL_READABLE)) {
     return;
   }
-  assert(buf_.size() < std::numeric_limits<uint32_t>::max());
-  uint32_t size = static_cast<uint32_t>(buf_.size());
-  status = client_end_.read(0, buf_.data(), nullptr, size, 0, &size, nullptr);
+
+  uint32_t size;
+  status = client_end_.read(0, buf_.get(), nullptr, fuchsia_io::wire::kMaxBuf, 0, &size, nullptr);
   if (status != ZX_OK) {
     return;
   }
 
-  for (auto i = buf_.begin(), end = buf_.begin() + size; std::distance(i, end) > 2;) {
+  std::weak_ptr<uint8_t[fuchsia_io::wire::kMaxBuf]> weak_buf = buf_;
+  uint8_t* msg = buf_.get();
+  while (size >= 2) {
     // Process message structure, as described by fuchsia_io::wire::WatchedEvent.
-    auto event = static_cast<fuchsia_io::wire::WatchEvent>(*i++);
-    uint64_t len = *i++;
+    auto event = static_cast<fuchsia_io::wire::WatchEvent>(*msg++);
+    uint64_t len = *msg++;
     // Restrict the length to the remaining size of the buffer.
-    len = std::min<uint64_t>(len, std::max(0l, std::distance(i, end)));
-    // If the entry is valid, invoke the callback.
-    if (len != 1 || *i != '.') {
-      std::string instance(reinterpret_cast<char*>(i.base()), len);
-      callback_(event, std::move(instance));
+    if (size < (len + 2u)) {
+      break;
     }
-    i += len;
+
+    // If the entry is valid, invoke the callback.
+    if (event == fuchsia_io::wire::WatchEvent::kIdle) {  // we don't need to look for a filename
+      callback_(event, "");
+    } else {
+      std::string filename(reinterpret_cast<char*>(msg), len);
+      // "." is not a device, so ignore it.
+      if (filename != ".") {
+        callback_(event, filename);
+      }
+    }
+    // The callback may have destroyed the ServiceWatcher, so make sure we still exist.
+    if (weak_buf.expired()) {
+      return;
+    }
+    msg += len;
+    size -= len + 2;
   }
 
   wait_.Begin(dispatcher);
