@@ -34,6 +34,7 @@ rustc_library("sampler-config") {
   test_deps = [
     "//src/lib/fuchsia",
     "//src/lib/fuchsia",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:tempfile",
   ]
 
