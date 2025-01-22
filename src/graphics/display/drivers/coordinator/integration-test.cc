@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <vector>
 
 #include <fbl/alloc_checker.h>
@@ -25,6 +26,7 @@
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/drivers/coordinator/testing/base.h"
 #include "src/graphics/display/drivers/coordinator/testing/mock-coordinator-listener.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
@@ -37,6 +39,7 @@
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
+#include "src/graphics/display/lib/driver-utils/post-task.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -93,10 +96,12 @@ class TestFidlClient {
 
   zx_status_t PresentLayers() { return PresentLayers(CreateDefaultPresentLayerInfo()); }
 
-  zx_status_t PresentLayers(std::vector<PresentLayerInfo> layers);
+  // The std::vector can be converted to std::span once we adopt C++23, which has
+  // more ergonoic span handling.
+  zx_status_t PresentLayers(const std::vector<PresentLayerInfo>& layers);
 
-  void OnDisplaysChanged(std::vector<fuchsia_hardware_display::wire::Info> added_displays,
-                         std::vector<display::DisplayId> removed_display_ids);
+  void OnDisplaysChanged(std::span<const fuchsia_hardware_display::wire::Info> added_displays,
+                         std::span<const display::DisplayId> removed_display_ids);
 
   void OnClientOwnershipChange(bool has_ownership);
 
@@ -132,10 +137,14 @@ class TestFidlClient {
   display::ConfigStamp recent_presented_config_stamp_;
   const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem_;
 
+  // Must outlive `coordinator_listener_binding_`.
   MockCoordinatorListener coordinator_listener_{
       fit::bind_member<&TestFidlClient::OnDisplaysChanged>(this),
       fit::bind_member<&TestFidlClient::OnVsync>(this),
       fit::bind_member<&TestFidlClient::OnClientOwnershipChange>(this)};
+  async_dispatcher_t* coordinator_listener_dispatcher_ = nullptr;
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener>>
+      coordinator_listener_binding_;
 };
 
 // static
@@ -159,6 +168,24 @@ TestFidlClient::Display TestFidlClient::Display::From(
   };
 }
 
+TestFidlClient::~TestFidlClient() {
+  if (coordinator_listener_binding_.has_value()) {
+    ZX_ASSERT(coordinator_listener_dispatcher_ != nullptr);
+    // We can call Unbind() on any thread, but it's async and previously-started dispatches can
+    // still be in-flight after this call.
+    coordinator_listener_binding_->Unbind();
+    // The Unbind() above will prevent starting any new dispatches, but previously-started
+    // dispatches can still be in-flight. For this reason we must fence the Bind's dispatcher thread
+    // before we delete stuff used during dispatch such as on_vsync_callback_.
+    libsync::Completion done;
+    zx::result<> post_task_result = display::PostTask<display_coordinator::kDisplayTaskTargetSize>(
+        *coordinator_listener_dispatcher_, [&done] { done.Signal(); });
+    ZX_ASSERT(post_task_result.is_ok());
+    done.Wait();
+    // Now it's safe to delete on_vsync_callback_ (for example).
+  }
+}
+
 display::DisplayId TestFidlClient::display_id() const {
   ZX_ASSERT(!connected_displays_.empty());
   return connected_displays_[0].id;
@@ -168,8 +195,11 @@ zx::result<> TestFidlClient::OpenCoordinator(
     const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
     ClientPriority client_priority, async_dispatcher_t* coordinator_listener_dispatcher) {
   ZX_ASSERT(coordinator_listener_dispatcher != nullptr);
+  ZX_ASSERT_MSG(!coordinator_listener_binding_.has_value(), "OpenCoordinator() already called");
+  ZX_ASSERT_MSG(coordinator_listener_dispatcher_ == nullptr, "OpenCoordinator() already called");
 
-  auto [dc_client, dc_server] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  auto [coordinator_client, coordinator_server] =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
   auto [coordinator_listener_client, coordinator_listener_server] =
       fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
   FDF_LOG(INFO, "Opening coordinator");
@@ -177,7 +207,7 @@ zx::result<> TestFidlClient::OpenCoordinator(
     fidl::Arena arena;
     auto request = fidl::WireRequest<fuchsia_hardware_display::Provider::
                                          OpenCoordinatorWithListenerForVirtcon>::Builder(arena)
-                       .coordinator(std::move(dc_server))
+                       .coordinator(std::move(coordinator_server))
                        .coordinator_listener(std::move(coordinator_listener_client))
                        .Build();
     auto response = provider->OpenCoordinatorWithListenerForVirtcon(std::move(request));
@@ -191,7 +221,7 @@ zx::result<> TestFidlClient::OpenCoordinator(
     fidl::Arena arena;
     auto request = fidl::WireRequest<fuchsia_hardware_display::Provider::
                                          OpenCoordinatorWithListenerForPrimary>::Builder(arena)
-                       .coordinator(std::move(dc_server))
+                       .coordinator(std::move(coordinator_server))
                        .coordinator_listener(std::move(coordinator_listener_client))
                        .Build();
     auto response = provider->OpenCoordinatorWithListenerForPrimary(std::move(request));
@@ -202,9 +232,11 @@ zx::result<> TestFidlClient::OpenCoordinator(
   }
 
   fbl::AutoLock lock(mtx());
-  dc_.Bind(std::move(dc_client));
-  coordinator_listener_.Bind(std::move(coordinator_listener_server),
-                             coordinator_listener_dispatcher);
+  dc_.Bind(std::move(coordinator_client));
+  coordinator_listener_dispatcher_ = coordinator_listener_dispatcher;
+  coordinator_listener_binding_.emplace(fidl::BindServer(coordinator_listener_dispatcher,
+                                                         std::move(coordinator_listener_server),
+                                                         &coordinator_listener_));
   return zx::ok();
 }
 
@@ -277,9 +309,7 @@ zx::result<> TestFidlClient::EnableVsyncEventDelivery() {
   return zx::make_result(dc_->SetVsyncEventDelivery(true).status());
 }
 
-TestFidlClient::~TestFidlClient() = default;
-
-zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_layers) {
+zx_status_t TestFidlClient::PresentLayers(const std::vector<PresentLayerInfo>& present_layers) {
   fbl::AutoLock l(mtx());
 
   std::vector<fuchsia_hardware_display::wire::LayerId> fidl_layers;
@@ -499,8 +529,8 @@ zx::result<display::ImageId> TestFidlClient::ImportImageWithSysmem(
 }
 
 void TestFidlClient::OnDisplaysChanged(
-    std::vector<fuchsia_hardware_display::wire::Info> added_displays,
-    std::vector<display::DisplayId> removed_display_ids) {
+    std::span<const fuchsia_hardware_display::wire::Info> added_displays,
+    std::span<const display::DisplayId> removed_display_ids) {
   ZX_ASSERT(removed_display_ids.empty());
 
   for (const fuchsia_hardware_display::wire::Info& added_display : added_displays) {

@@ -6,9 +6,8 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
-#include <lib/async/cpp/task.h>
-#include <lib/sync/cpp/completion.h>
-#include <zircon/assert.h>
+#include <lib/fit/function.h>
+#include <lib/zx/time.h>
 
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
@@ -23,32 +22,7 @@ MockCoordinatorListener::MockCoordinatorListener(
       on_vsync_callback_(std::move(on_vsync_callback)),
       on_client_ownership_change_callback_(std::move(on_client_ownership_change_callback)) {}
 
-MockCoordinatorListener::~MockCoordinatorListener() {
-  if (binding_.has_value()) {
-    ZX_ASSERT(binding_dispatcher_);
-    // We can call Unbind() on any thread, but it's async and previously-started dispatches can
-    // still be in-flight after this call.
-    binding_->Unbind();
-    // The Unbind() above will prevent starting any new dispatches, but previously-started
-    // dispatches can still be in-flight. For this reason we must fence the Bind's dispatcher thread
-    // before we delete stuff used during dispatch such as on_vsync_callback_.
-    libsync::Completion done;
-    zx_status_t post_status = async::PostTask(binding_dispatcher_, [&done] { done.Signal(); });
-    ZX_ASSERT(post_status == ZX_OK);
-    done.Wait();
-    // Now it's safe to delete on_vsync_callback_ (for example).
-  }
-}
-
-void MockCoordinatorListener::Bind(
-    fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> server_end,
-    async_dispatcher_t* dispatcher) {
-  ZX_ASSERT(server_end.is_valid());
-  ZX_ASSERT(dispatcher != nullptr);
-  ZX_ASSERT(!binding_.has_value());
-  binding_dispatcher_ = dispatcher;
-  binding_ = fidl::BindServer(dispatcher, std::move(server_end), this);
-}
+MockCoordinatorListener::~MockCoordinatorListener() = default;
 
 void MockCoordinatorListener::OnDisplaysChanged(OnDisplaysChangedRequestView request,
                                                 OnDisplaysChangedCompleter::Sync& completer) {
