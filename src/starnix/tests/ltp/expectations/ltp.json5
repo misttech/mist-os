@@ -260,7 +260,7 @@
                 // TODO(https://fxbug.dev/328694820) Re-enable once flake is resolved.
                 "ptrace01",
 
-                // TODO(https://fxbug.dev/329897718) Re-enable once falke is resolved.
+                // TODO(https://fxbug.dev/329897718) Re-enable once flake is resolved.
                 "sched_setscheduler04",
 
                 // TODO(https://fxbug.dev/353535860) deflake and enable
@@ -276,6 +276,9 @@
                 // TODO(https://fxbug.dev/373897750): These tests require cgroups to be unlinkable.
                 "cgroup_core03",
                 "clone303",
+
+                // TODO(http://fxbuf.dev/390870202): Re-enable once flake is resolved.
+                "clock_nanosleep02",
             ],
         },
     ],
