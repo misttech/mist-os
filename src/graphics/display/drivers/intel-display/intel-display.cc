@@ -16,6 +16,7 @@
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zbi-format/graphics.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/items/graphics.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
@@ -128,16 +129,16 @@ struct FramebufferInfo {
 };
 
 // The bootloader (UEFI and Depthcharge) informs zircon of the framebuffer information using a
-// ZBI_TYPE_FRAMEBUFFER entry. We assume this information to be valid and unmodified by an
-// unauthorized call to zx_framebuffer_set_range(), however this is potentially an issue.
-// See https://fxbug.dev/42157524.
-zx::result<FramebufferInfo> GetFramebufferInfo(const zx::unowned_resource& framebuffer_resource) {
-  FramebufferInfo info;
-  zx_status_t status = zx_framebuffer_get_info(framebuffer_resource->get(), &info.format,
-                                               &info.width, &info.height, &info.stride);
-  if (status != ZX_OK) {
-    return zx::error(status);
+// ZBI_TYPE_FRAMEBUFFER entry.
+zx::result<FramebufferInfo> GetFramebufferInfo(std::optional<zbi_swfb_t> fb_info) {
+  if (!fb_info.has_value()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
+  FramebufferInfo info;
+  info.width = fb_info->width;
+  info.height = fb_info->height;
+  info.stride = fb_info->stride;
+  info.format = fb_info->format;
   info.bytes_per_pixel = zbitl::BytesPerPixel(info.format);
   info.size = info.stride * info.height * info.bytes_per_pixel;
   return zx::ok(info);
@@ -2149,7 +2150,7 @@ void Controller::PrepareStopOnPowerStateTransition(
     fuchsia_system_state::SystemPowerState power_state, fdf::PrepareStopCompleter completer) {
   // TODO(https://fxbug.dev/42119483): Implement the suspend hook based on suspendtxn
   if (power_state == fuchsia_system_state::SystemPowerState::kMexec) {
-    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(resources_.framebuffer);
+    zx::result<FramebufferInfo> fb_status = GetFramebufferInfo(framebuffer_info_);
     if (fb_status.is_error()) {
       completer(zx::ok());
       return;
@@ -2303,7 +2304,7 @@ zx_status_t Controller::Init() {
     // Prevent clients from allocating memory in this region by telling |gtt_| to exclude it from
     // the region allocator.
     uint32_t offset = 0u;
-    auto fb = GetFramebufferInfo(resources_.framebuffer);
+    auto fb = GetFramebufferInfo(framebuffer_info_);
     if (fb.is_error()) {
       FDF_LOG(INFO, "Failed to obtain framebuffer size (%s)", fb.status_string());
       // It is possible for zx_framebuffer_get_info to fail in a headless system as the bootloader
@@ -2367,8 +2368,10 @@ zx::result<ddk::AnyProtocol> Controller::GetProtocol(uint32_t proto_id) {
 
 Controller::Controller(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
                        fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                       ControllerResources resources, inspect::Inspector inspector)
+                       ControllerResources resources, std::optional<zbi_swfb_t> framebuffer_info,
+                       inspect::Inspector inspector)
     : resources_(std::move(resources)),
+      framebuffer_info_(framebuffer_info),
       sysmem_(std::move(sysmem)),
       pci_(std::move(pci)),
       inspector_(std::move(inspector)) {}
@@ -2389,11 +2392,11 @@ Controller::~Controller() {
 zx::result<std::unique_ptr<Controller>> Controller::Create(
     fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
     fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
-    inspect::Inspector inspector) {
+    std::optional<zbi_swfb_t> framebuffer_info, inspect::Inspector inspector) {
   fbl::AllocChecker alloc_checker;
-  auto controller =
-      fbl::make_unique_checked<Controller>(&alloc_checker, std::move(sysmem), std::move(pci),
-                                           std::move(resources), std::move(inspector));
+  auto controller = fbl::make_unique_checked<Controller>(&alloc_checker, std::move(sysmem),
+                                                         std::move(pci), std::move(resources),
+                                                         framebuffer_info, std::move(inspector));
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);

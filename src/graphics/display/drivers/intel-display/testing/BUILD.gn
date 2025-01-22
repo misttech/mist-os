@@ -35,7 +35,11 @@ source_set("fake-framebuffer") {
     "fake-framebuffer.h",
   ]
 
-  public_deps = [ "//zircon/system/public" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/lib/zbi-format",
+    "//zircon/system/public",
+  ]
 }
 
 test("fake-framebuffer-tests-bin") {
@@ -43,6 +47,7 @@ test("fake-framebuffer-tests-bin") {
   sources = [ "fake-framebuffer-test.cc" ]
   deps = [
     ":fake-framebuffer",
+    "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/zbi-format",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",

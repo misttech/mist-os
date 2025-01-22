@@ -25,7 +25,7 @@ fuchsia_cc_driver("driver") {
   sources = [ "framebuffer-intel-display.cc" ]
   deps = [
     ":framebuffer-intel-display-bind",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/zbi-format",

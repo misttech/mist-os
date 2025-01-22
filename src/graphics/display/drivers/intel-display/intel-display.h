@@ -18,6 +18,7 @@
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/zbi-format/graphics.h>
 #include <lib/zx/channel.h>
 
 #include <memory>
@@ -56,10 +57,6 @@ typedef struct buffer_allocation {
 } buffer_allocation_t;
 
 struct ControllerResources {
-  // Must be of type `ZX_RSRC_KIND_SYSTEM` with base
-  // `ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE`.
-  zx::unowned_resource framebuffer;
-
   // Must be of type `ZX_RSRC_KIND_MMIO` with access to all valid ranges.
   zx::unowned_resource mmio;
 
@@ -81,12 +78,13 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   static zx::result<std::unique_ptr<Controller>> Create(
       fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
       fidl::ClientEnd<fuchsia_hardware_pci::Device> pci, ControllerResources resources,
-      inspect::Inspector inspector);
+      std::optional<zbi_swfb_t> framebuffer_info, inspect::Inspector inspector);
 
   // Prefer to use the `Create()` factory function in production code.
   explicit Controller(fidl::ClientEnd<fuchsia_sysmem2::Allocator> sysmem,
                       fidl::ClientEnd<fuchsia_hardware_pci::Device> pci,
-                      ControllerResources resources, inspect::Inspector inspector);
+                      ControllerResources resources, std::optional<zbi_swfb_t> framebuffer_info,
+                      inspect::Inspector inspector);
 
   // Creates a Controller with no valid FIDL clients and no resources for
   // testing purpose only.
@@ -235,6 +233,7 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   void DisableSystemAgentGeyserville();
 
   ControllerResources resources_;
+  std::optional<zbi_swfb_t> framebuffer_info_;
 
   std::unique_ptr<DisplayDevice> QueryDisplay(DdiId ddi_id, display::DisplayId display_id)
       __TA_REQUIRES(display_lock_);

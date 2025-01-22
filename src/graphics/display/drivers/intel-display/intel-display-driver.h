@@ -51,7 +51,7 @@ class IntelDisplayDriver : public fdf::DriverBase {
                                          fdf::PrepareStopCompleter completer);
 
   std::unique_ptr<Controller> controller_;
-  zx::resource framebuffer_resource_;
+  std::optional<zbi_swfb_t> framebuffer_info_;
   zx::resource mmio_resource_;
   zx::resource ioport_resource_;
 
