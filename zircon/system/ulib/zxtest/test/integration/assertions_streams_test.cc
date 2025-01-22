@@ -1234,14 +1234,43 @@ TEST(ZxTestAssertionStreamTest, AssertSkipIsFirstStatement) {
   // multiple statements.
   if (false)
     ZXTEST_SKIP();
-  FAIL();
+  else
+    FAIL();
   TEST_CHECKPOINT();
 }
 
 TEST(ZxTestAssertionStreamTest, ScopedTrace) {
   TEST_EXPECTATION(CHECKPOINT_NOT_REACHED, HAS_ERRORS, "Failure should have happened.");
   SCOPED_TRACE("This is a trace.");
-  FAIL();
+  ADD_FAILURE("This is a failure!");
+  ZXTEST_SKIP();
   TEST_CHECKPOINT();
 }
+
+TEST(ZxTestAssertionStreamTest, ExpectContainedInUnbracedBranches) {
+  TEST_EXPECTATION(CHECKPOINT_REACHED, HAS_ERRORS, "Failure should have happened.");
+
+  // Intentionally omitting {} around if block, to check if expansion is generating incorrect
+  // code, (e.g. the introducing an unpaired if, which will then be paired with the following else).
+  // See https://fxbug.dev/388300636 for more details.
+  if (false)
+    ASSERT_TRUE(false, "Expected Assert");
+  else
+    EXPECT_FALSE(true, "UnexpectedAssert");
+  TEST_CHECKPOINT();
+}
+
+TEST(ZxTestAssertionStreamTest, AssertContainedInUnbracedBranches) {
+  TEST_EXPECTATION(CHECKPOINT_NOT_REACHED, HAS_ERRORS, "Failure should have happened.");
+
+  // Intentionally omitting {} around if block, to check if expansion is generating incorrect
+  // code, (e.g. the introducing an unpaired if, which will then be paired with the following else).
+  // See https://fxbug.dev/388300636 for more details.
+  if (false)
+    EXPECT_TRUE(false, "Expected Assert");
+  else
+    ASSERT_FALSE(true, "UnexpectedAssert");
+  TEST_CHECKPOINT();
+}
+
 }  // namespace

@@ -164,26 +164,25 @@ __END_CDECLS
   } while (0)
 
 // Helper function to print variables.
-#define LIB_ZXTEST_SPRINT_PRINTER(var, buffer, size) \
-  _Generic((var),                                                     \
-             char: _zxtest_print_int,                                   \
-             signed char: _zxtest_print_int,                            \
-             short: _zxtest_print_int,                                  \
-             int: _zxtest_print_int,                                    \
-             long: _zxtest_print_long_long,                             \
-             long long: _zxtest_print_long_long,                        \
-             unsigned char: _zxtest_print_unsigned_int,                 \
-             unsigned short: _zxtest_print_unsigned_int,                \
-             unsigned int: _zxtest_print_unsigned_int,                  \
-             unsigned long: _zxtest_print_unsigned_long_long,           \
-             unsigned long long: _zxtest_print_unsigned_long_long,      \
-             float: _zxtest_print_double,                               \
-             double: _zxtest_print_double,                              \
-             long double: _zxtest_print_long_double,                    \
-             bool: _zxtest_print_bool,                                  \
-             const char*: _zxtest_print_str,                            \
-             default: _zxtest_print_ptr) \
-  (var, buffer, size)
+#define LIB_ZXTEST_SPRINT_PRINTER(var, buffer, size)        \
+  _Generic((var),                                           \
+      char: _zxtest_print_int,                              \
+      signed char: _zxtest_print_int,                       \
+      short: _zxtest_print_int,                             \
+      int: _zxtest_print_int,                               \
+      long: _zxtest_print_long_long,                        \
+      long long: _zxtest_print_long_long,                   \
+      unsigned char: _zxtest_print_unsigned_int,            \
+      unsigned short: _zxtest_print_unsigned_int,           \
+      unsigned int: _zxtest_print_unsigned_int,             \
+      unsigned long: _zxtest_print_unsigned_long_long,      \
+      unsigned long long: _zxtest_print_unsigned_long_long, \
+      float: _zxtest_print_double,                          \
+      double: _zxtest_print_double,                         \
+      long double: _zxtest_print_long_double,               \
+      bool: _zxtest_print_bool,                             \
+      const char*: _zxtest_print_str,                       \
+      default: _zxtest_print_ptr)(var, buffer, size)
 
 #define LIB_ZXTEST_NULLPTR NULL
 
@@ -265,10 +264,11 @@ static void zxtest_clean_buffer(char** buffer) { free(*buffer); }
     LIB_ZXTEST_CHECK_RUNNING();                                                                    \
     const void* _actual = (const void*)(actual);                                                   \
     const void* _expected = (const void*)(expected);                                               \
-    if (!(op(_actual, _expected, size))) {                                                         \
+    const size_t byte_count = (size);                                                              \
+    if (!(op(_actual, _expected, byte_count))) {                                                   \
       LIB_ZXTEST_GEN_ASSERT_DESC(msg_buffer, desc, ##__VA_ARGS__);                                 \
-      LIB_ZXTEST_LOAD_PRINT_HEX(_actual, size, act, line);                                         \
-      LIB_ZXTEST_LOAD_PRINT_HEX(_expected, size, exptd, line);                                     \
+      LIB_ZXTEST_LOAD_PRINT_HEX(_actual, byte_count, act, line);                                   \
+      LIB_ZXTEST_LOAD_PRINT_HEX(_expected, byte_count, exptd, line);                               \
       LIB_ZXTEST_ASSERT(msg_buffer, #expected, LIB_ZXTEST_GET_PRINT_VAR(_expected, exptd, line),   \
                         #actual, LIB_ZXTEST_GET_PRINT_VAR(_actual, act, line), file, line, fatal); \
       LIB_ZXTEST_RETURN_IF_FATAL(fatal);                                                           \
