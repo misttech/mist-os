@@ -200,6 +200,13 @@ inline bool IsZirconPartitionSpec(const PartitionSpec& spec) {
          spec.partition == Partition::kZirconR;
 }
 
+inline bool IsEfiSystemPartition(const GptPartitionMetadata& part) {
+  // Check for EFI system partition 'fuchsia-esp'.
+  // And for legacy "efi-system" partition name.
+  return FilterByTypeAndName(part, GUID_EFI_VALUE, GUID_EFI_NAME) ||
+         FilterByName(part, "efi-system");
+}
+
 }  // namespace paver
 
 #endif  // SRC_STORAGE_LIB_PAVER_GPT_H_

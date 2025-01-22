@@ -255,6 +255,15 @@ class GptDevicePartitionerTests : public PaverTest {
     ASSERT_NO_FATAL_FAILURE(CreateDiskWithContents(disk, std::move(*contents)));
   }
 
+  // Creates a GPT-formatted device with EFI partition
+  void CreateDiskWithUefiGpt(std::unique_ptr<BlockDevice>* disk, size_t size = 0) {
+    return CreateDiskWithGpt(
+        disk, size,
+        {
+            PartitionDescription{GUID_EFI_NAME, Uuid(kEfiType), 0x8023, 0x8000},
+        });
+  }
+
   void ReadBlocks(const BlockDevice* blk_dev, size_t offset_in_blocks, size_t size_in_blocks,
                   uint8_t* out) const {
     zx::result block_client = paver::BlockPartitionClient::Create(
@@ -495,8 +504,8 @@ TEST_F(EfiDevicePartitionerTests, InitializeTwoCandidatesWithoutFvmFails) {
 TEST_F(EfiDevicePartitionerTests, InitializeWithMultipleCandidateGPTsFailsWithoutExplicitDevice) {
   // Set up a two valid GPTs.
   std::unique_ptr<BlockDevice> gpt, gpt2;
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&gpt));
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&gpt2));
+  ASSERT_NO_FATAL_FAILURE(CreateDiskWithUefiGpt(&gpt, 64 * kGibibyte));
+  ASSERT_NO_FATAL_FAILURE(CreateDiskWithUefiGpt(&gpt2, 64 * kGibibyte));
 
   ASSERT_OK(CreatePartitioner(gpt.get()));
   ASSERT_OK(CreatePartitioner(gpt2.get()));
@@ -520,7 +529,7 @@ TEST_F(EfiDevicePartitionerTests, FindOldBootloaderPartitionName) {
 
 TEST_F(EfiDevicePartitionerTests, SupportsPartition) {
   std::unique_ptr<BlockDevice> gpt;
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&gpt));
+  ASSERT_NO_FATAL_FAILURE(CreateDiskWithUefiGpt(&gpt, 64 * kGibibyte));
 
   zx::result status = CreatePartitioner(gpt.get());
   ASSERT_OK(status);
@@ -549,7 +558,7 @@ TEST_F(EfiDevicePartitionerTests, SupportsPartition) {
 
 TEST_F(EfiDevicePartitionerTests, ValidatePayload) {
   std::unique_ptr<BlockDevice> gpt;
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&gpt));
+  ASSERT_NO_FATAL_FAILURE(CreateDiskWithUefiGpt(&gpt, 64 * kGibibyte));
 
   zx::result status = CreatePartitioner(gpt.get());
   ASSERT_OK(status);
@@ -573,7 +582,7 @@ TEST_F(EfiDevicePartitionerTests, OnStopRebootBootloader) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(
       &gpt, 64 * kGibibyte,
       {
-          // The only partition we actually need present is the A/B/R metadata partition.
+          PartitionDescription{GUID_EFI_NAME, Uuid(kEfiType), 0x8023, 0x8000},
           PartitionDescription{GUID_ABR_META_NAME, Uuid(kAbrMetaType), 0x10023, 0x8},
       }));
 
@@ -612,7 +621,7 @@ TEST_F(EfiDevicePartitionerTests, OnStopRebootRecovery) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(
       &gpt, 64 * kGibibyte,
       {
-          // The only partition we actually need present is the A/B/R metadata partition.
+          PartitionDescription{GUID_EFI_NAME, Uuid(kEfiType), 0x8023, 0x8000},
           PartitionDescription{GUID_ABR_META_NAME, Uuid(kAbrMetaType), 0x10023, 0x8},
       }));
 
@@ -757,16 +766,16 @@ TEST_F(EfiDevicePartitionerWithStorageHostTests, ResetPartitionTables) {
   ASSERT_NO_FATAL_FAILURE(ResetPartitionTablesTest());
 }
 
-TEST_F(EfiDevicePartitionerWithStorageHostTests, InitializeWithoutGptSucceeds) {
+TEST_F(EfiDevicePartitionerWithStorageHostTests, InitializeWithoutGptFails) {
   std::unique_ptr<BlockDevice> gpt;
   ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kGibibyte, &gpt));
 
-  ASSERT_OK(EfiDevicePartitionerTests::CreatePartitioner());
+  ASSERT_NOT_OK(EfiDevicePartitionerTests::CreatePartitioner());
 }
 
 TEST_F(EfiDevicePartitionerWithStorageHostTests, InitializeWithoutFvmSucceeds) {
   std::unique_ptr<BlockDevice> gpt;
-  ASSERT_NO_FATAL_FAILURE(CreateDiskWithGpt(&gpt, 64 * kGibibyte));
+  ASSERT_NO_FATAL_FAILURE(CreateDiskWithUefiGpt(&gpt, 64 * kGibibyte));
 
   ASSERT_OK(EfiDevicePartitionerTests::CreatePartitioner());
 }
@@ -777,6 +786,7 @@ TEST_F(EfiDevicePartitionerWithStorageHostTests, InitializePartitionsWithoutExpl
       CreateDiskWithGpt(&gpt, 64 * kGibibyte,
                         {
                             PartitionDescription{"efi", Uuid(kEfiType), 0x22, 0x8000},
+                            PartitionDescription{GUID_EFI_NAME, Uuid(kEfiType), 0x8023, 0x8000},
                         }));
 
   ASSERT_NOT_OK(EfiDevicePartitionerTests::CreatePartitioner(gpt.get()));

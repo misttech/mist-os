@@ -58,13 +58,13 @@ zx::result<std::unique_ptr<DevicePartitioner>> EfiDevicePartitioner::Initialize(
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     Arch arch, fidl::ClientEnd<fuchsia_device::Controller> block_device,
     std::shared_ptr<Context> context) {
-  if (arch != Arch::kX64) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-
   auto status = GptDevicePartitioner::InitializeGpt(devices, svc_root, std::move(block_device));
   if (status.is_error()) {
     return status.take_error();
+  }
+
+  if (zx::result find = status->gpt->FindPartition(IsEfiSystemPartition); find.is_error()) {
+    return find.take_error();
   }
 
   auto partitioner =

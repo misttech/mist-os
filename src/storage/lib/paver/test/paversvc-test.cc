@@ -2111,14 +2111,17 @@ class PaverServiceBlockTest : public PaverServiceTest {
   }
 
   static constexpr uint8_t kEmptyType[GPT_GUID_LEN] = GUID_EMPTY_VALUE;
+  static constexpr size_t kEfiBlockStart = 0x20400;
+  static constexpr size_t kEfiBlockSize = 0x10000;
 };
 
 TEST_F(PaverServiceBlockTest, InitializePartitionTables) {
   std::unique_ptr<BlockDevice> gpt_dev;
   // 64GiB disk.
   constexpr uint64_t block_count = (64LU << 30) / kBlockSize;
-  ASSERT_NO_FATAL_FAILURE(
-      BlockDevice::CreateWithGpt(devmgr_.devfs_root(), block_count, kBlockSize, {}, &gpt_dev));
+  ASSERT_NO_FATAL_FAILURE(BlockDevice::CreateWithGpt(
+      devmgr_.devfs_root(), block_count, kBlockSize,
+      {{GUID_EFI_NAME, uuid::Uuid(GUID_EFI_VALUE), kEfiBlockStart, kEfiBlockSize}}, &gpt_dev));
 
   auto [data_sink, server] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
   fidl::OneWayStatus find_result = client_->FindPartitionTableManager(std::move(server));
@@ -2133,8 +2136,9 @@ TEST_F(PaverServiceBlockTest, InitializePartitionTablesMultipleDevicesOneGpt) {
   std::unique_ptr<BlockDevice> gpt_dev1, gpt_dev2;
   // 64GiB disk.
   constexpr uint64_t block_count = (64LU << 30) / kBlockSize;
-  ASSERT_NO_FATAL_FAILURE(
-      BlockDevice::CreateWithGpt(devmgr_.devfs_root(), block_count, kBlockSize, {}, &gpt_dev1));
+  ASSERT_NO_FATAL_FAILURE(BlockDevice::CreateWithGpt(
+      devmgr_.devfs_root(), block_count, kBlockSize,
+      {{GUID_EFI_NAME, uuid::Uuid(GUID_EFI_VALUE), kEfiBlockStart, kEfiBlockSize}}, &gpt_dev1));
   ASSERT_NO_FATAL_FAILURE(
       BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, &gpt_dev2));
 
@@ -2207,7 +2211,7 @@ TEST_F(PaverServiceLuisTest, SysconfigNotSupportedAndFailWithPeerClosed) {
 }
 
 TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
-  // TODO(b/217597389): Consdier also adding an e2e test for this interface.
+  // TODO(b/217597389): Consider also adding an e2e test for this interface.
   auto [local, remote] = fidl::Endpoints<fuchsia_paver::DynamicDataSink>::Create();
   ASSERT_OK(client_->FindPartitionTableManager(std::move(remote)));
   fidl::WireSyncClient data_sink{std::move(local)};

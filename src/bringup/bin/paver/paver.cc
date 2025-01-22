@@ -93,8 +93,8 @@ int main(int argc, char** argv) {
       std::make_unique<paver::MoonflowerPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
-  paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::X64PartitionerFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::AndroidPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::DefaultPartitionerFactory>());
 #elif defined(astro)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
